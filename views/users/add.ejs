@@ -1,0 +1,208 @@
+<div
+  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom"
+>
+  <h1 class="h3">Εισαγωγή Νέου Χρήστη</h1>
+  <div class="btn-toolbar mb-2 mb-md 0">
+    <div class="btn-group me-2">
+      <a class="btn btn-sm btn-outline-secondary" href="/admin"
+        ><i class="bi bi-table"></i> Επιστροφή</a
+      >
+      <!-- <button class="btn btn-sm btn-outline-secondary">?</button> -->
+    </div>
+  </div>
+</div>
+
+<div class="col py-3">
+  <div class="row">
+    <div class="col">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item">
+            <a href="/">Dashboard</a>
+          </li>
+          <li class="breadcrumb-item active">Νέος Χρήστης</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card z-depth-5">
+    <div class="card-body">
+      <form action="/admin/add" method="POST">
+        <div class="row form-group g-3 align-items-center mb-2">
+          <div class="col-1-5 right-align">
+            <label for="firstName" class="col-form-label field-required"
+              >Όνομα</label
+            >
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="firstName"
+              id="firstName"
+              class="form-control"
+              value=""
+              required
+            />
+          </div>
+
+          <div class="col-1-5 right-align">
+            <label for="lastName" class="col-form-label field-required"
+              >Επώνυμο</label
+            >
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="lastName"
+              id="lastName"
+              class="form-control"
+              value=""
+              required
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-2">
+          <div class="col-1-5 right-align">
+            <label for="email" class="col-form-label field-required">Email</label>
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="email"
+              id="email"
+              class="form-control"
+              value=""
+              required
+            />
+          </div>
+
+          <div class="col-1-5 right-align">
+            <label for="password" class="col-form-label field-required"
+              >Password</label
+            >
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="password"
+              id="password"
+              class="form-control"
+              value=""
+              required
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-2">
+          <div class="col-1-5 right-align">
+            <label for="tel" class="col-form-label">Τηλέφωνο</label>
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="tel"
+              id="tel"
+              class="form-control"
+              value=""
+            />
+          </div>
+
+          <div class="col-1-5 right-align">
+            <label for="team" class="col-form-label field-required"
+              >Ομάδα Εργασίας</label
+            >
+          </div>
+          <div class="col-4">
+            <input
+              type="text"
+              name="team"
+              id="team"
+              class="form-control"
+              value=""
+              style="outline: 4 !important"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-2">
+          <div class="col-1-5 right-align">
+            <label for="group" class="col-form-label field-required">Role</label>
+          </div>
+          <div class="col-4" style="padding-top: 8px">
+            <div class="form-check form-check-inline">
+              <input type="radio" name="radioRoles" id="roleAdmin" value="A" />
+              <label class="form-check-label" for="roleAdmin">Admin</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" name="radioRoles" id="roleCustomer" value="C" />
+              <label class="form-check-label" for="roleCustomer">Customer</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input type="radio" name="radioRoles" id="roleVisitor" value="V" />
+              <label class="form-check-label" for="roleVisitor">Visitor</label>
+            </div>
+          </div>
+
+          <div class="col-1-5 right-align">
+            <label for="group1" class="col-form-label field-required"
+              >Status</label
+            >
+          </div>
+          <div class="col-4" style="padding-top: 8px">
+            <div class="form-check form-check-inline">
+              <input type="radio" name="radioStatus" id="radioActive" value="A" />
+              <label class="form-check-label" for="radioActive">Ενεργός</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input
+                type="radio"
+                name="radioStatus"
+                id="radioInactive"
+                value="I"
+              />
+              <label class="form-check-label" for="radioInactive"
+                >Ανενεργός</label
+              >
+            </div>
+          </div>
+        </div>
+        <div class="row form-group g-3 align-items-center mb-2">
+          <div class="col-1-5 right-align padding-right-10">
+            <label for="details" class="col-form-label">Σημειώσεις</label>
+          </div>
+          <div class="col-9-5">
+            <textarea
+              class="form-control"
+              name="details"
+              id="details"
+              cols="30"
+              rows="5"
+            ></textarea>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div
+            class="d-inline-block d-flex"
+            style="justify-content: space-around"
+          >
+            <button type="submit" class="btn btn-outline-secondary mt-2 w-15">
+              <i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
+            </button>
+            <a
+              class="btn btn-sm btn-outline-secondary mt-2 w-15"
+              style="vertical-align: middle"
+              href="/admin"
+            >
+              <i class="bi bi-table"></i> Επιστροφή</a
+            >
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

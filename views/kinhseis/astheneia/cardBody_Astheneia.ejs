@@ -1,0 +1,459 @@
+<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem;">
+    <div class="col-3-8"></div>
+
+    <div class="col-1-6 text-center">
+        <div class="col-0-5"></div>
+
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required" style="margin-left: -2.3rem">
+            Συνεχιζόμενη Ασθένεια
+        </label>
+    </div>
+
+    <div class="col-5">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required">
+             
+        </label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem;">
+    <div class="col-1-2"></div>
+    
+    <div class="col-3 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 text-center field-required" style="margin-left: -7vw;">
+            Ημερομηνία
+        </label>
+    </div>
+    
+    <div class="col-1-2 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required" style="margin-left: -4.5vw">
+            για τον ίδιο λόγο στο
+        </label>
+    </div>
+
+    <div class="col-0-6"></div>
+    <div class="col-1-5">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-11">
+            Ημέρες Ασθενείας
+        </label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; ">
+    <div class="col-0-7 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required">
+            α/α
+        </label>
+    </div>
+
+    <div class="col-1-2"></div>
+
+    <div class="col-1 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-12">
+            Από
+        </label>
+    </div>
+
+    <div class="col-0-4"></div>
+
+    <div class="col-1">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-12">
+            Έως
+        </label>
+    </div>
+
+    <div class="col-1-9 left-align">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-2-5">
+            Επόμ. Εργασ. Έτος
+        </label>
+    </div>
+
+    <div class="col-0-5 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-15">
+            <=3
+        </label>
+    </div>
+
+    <div class="col-0-7 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-14-5">
+            >3
+        </label>
+    </div>
+
+    <div class="col-0-5 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-15-5">
+            Σύνολο
+        </label>
+    </div>
+
+    <div class="col-1-5 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-11">
+            Άδεια κύησης/λοχείας
+        </label>
+    </div>
+
+    <div class="col-1-1 text-center">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-6">
+            Επιδότηση ΕΦΚΑ
+        </label>
+    </div>
+
+    <div class="col-1-4">
+        <label class="col-form-label-1 label-font-size-0-7-bold700 field-required ml-n-3">
+            Αποδοχές Ασθενείας
+        </label>
+    </div>
+
+</div>
+
+<hr class="hr-style-1" style="margin-top: -.05rem; margin-left: -1rem !important; margin-right: -1rem !important; margin-bottom: 1.5rem;" />
+
+
+<% let tabIndexCounter = 300; %>
+<% for (let i = 1; i <= parseInt(arithmos_grammon_astheneion); i++) { %>
+    
+    <div class="row form-group align-items-center" style="margin-left: -1rem; margin-right: -1rem; margin-bottom: .5rem; font-size: 0.8rem;">
+        <div class="col-0-5 text-center">
+            <label for="aa_<%= ("0" + i).slice(-2) %>">
+                <%= ("0" + i).slice(-2) %>
+            </label>
+        </div>
+
+        <div class="col-0-2"></div>
+
+        <div class="col-1-5">
+            <input type="date" class="date-control left-align clearAble" 
+                name="apo_hmeromhnia_astheneias_<%= ("0" + i).slice(-2) %>" 
+                id="apo_hmeromhnia_astheneias_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" />
+        </div>
+
+        <div class="col-1-5">
+            <input type="date" class="date-control left-align clearAble" 
+                name="eos_hmeromhnia_astheneias_<%= ("0" + i).slice(-2) %>" 
+                id="eos_hmeromhnia_astheneias_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" />
+        </div>
+    
+        <div class="col-0-2"></div>
+
+        <div class="col-1 text-center checkbox-flex-center">
+            <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="idios_logos_<%= ("0" + i).slice(-2) %>" name="idios_logos_<%= ("0" + i).slice(-2) %>"  value="" style="margin-top: -1.2rem;" tabIndex="<%= tabIndexCounter++ %>" />
+            <label for="idios_logos_<%= ("0" + i).slice(-2) %>" id="label-idios_logos_<%= ("0" + i).slice(-2) %>" style="margin-left: 0.75rem; font-size: 0.875vw; margin-top: -1.2rem;">
+                ΟΧΙ
+            </label>
+        </div>
+
+
+        <div class="col-0-72 text-center">
+            <input type="number" class="form-control1 input-contents right-align no-spin" 
+                name="days_less_3_<%= ("0" + i).slice(-2) %>" 
+                id="days_less_3_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" />
+        </div>
+    
+        <div class="col-0-72 text-center" style="margin-left: -1rem;">
+            <input type="number" class="form-control1 input-contents right-align no-spin" 
+                name="days_greater_3_<%= ("0" + i).slice(-2) %>" 
+                id="days_greater_3_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" />
+        </div>
+    
+        <div class="col-0-72 text-center" style="margin-left: -1rem;">
+            <input type="number" class="form-control1 input-contents right-align no-spin" 
+                name="synolo_astheneias_<%= ("0" + i).slice(-2) %>" 
+                id="synolo_astheneias_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" style="background-color: #f5faae61;" />
+        </div>
+
+        <div class="col-0-6"></div>
+
+        <div class="col-1-5 text-center checkbox-flex-center">
+            <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="adeia_kyhshs_loxeias_<%= ("0" + i).slice(-2) %>" name="adeia_kyhshs_loxeias_<%= ("0" + i).slice(-2) %>"  value="" style="margin-top: -1.2rem;" tabIndex="<%= tabIndexCounter++ %>" />
+            <label for="adeia_kyhshs_loxeias_<%= ("0" + i).slice(-2) %>" id="label-adeia_kyhshs_loxeias_<%= ("0" + i).slice(-2) %>" style="margin-left: 0.75rem; font-size: 0.875vw; margin-top: -1.2rem;">
+                ΟΧΙ
+            </label>
+        </div>
+
+            
+        <div class="col-1-2">
+            <input type="number" class="form-control1 input-contents right-align no-spin" 
+                name="epidothsh_efka_<%= ("0" + i).slice(-2) %>" 
+                id="epidothsh_efka_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" />
+        </div>
+    
+        <div class="col-0-3"></div>
+
+        <div class="col-1-5 text-center">
+            <input type="number" class="form-control1 input-contents right-align no-spin" 
+                name="apodoxes_astheneias_<%= ("0" + i).slice(-2) %>" 
+                id="apodoxes_astheneias_<%= ("0" + i).slice(-2) %>" 
+                value="" tabIndex="<%= tabIndexCounter++ %>" style="margin-left: -1.5rem;"/>
+        </div>
+
+        <div>
+            <input type="hidden"
+                name="eidos_astheneias_<%= ("0" + i).slice(-2) %>" 
+                id="eidos_astheneias_<%= ("0" + i).slice(-2) %>" 
+                value="" />
+        </div>
+
+    </div>
+<% } %>
+
+<div class="row form-group align-items-center" style="margin-left: -1rem; margin-right: -1rem; margin-bottom: .5rem; font-size: 0.8rem;">
+    <div class="col-4-9"></div>
+
+    <div class="col-0-72 ml-0-0-0">
+        <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
+            name="synolo_less_3" 
+            id="synolo_less_3" 
+            style="font-size: 1vw !important;" 
+            value="" tabIndex="-1" readonly />
+    </div>
+
+    <div class="col-0-72 text-center" style="margin-left: -1rem;">
+        <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
+            name="synolo_greater_3" 
+            id="synolo_greater_3" 
+            style="font-size: 1vw !important;" 
+            value="" tabIndex="-1" readonly />
+    </div>
+
+    <div class="col-0-72 text-center" style="margin-left: -1rem;">
+        <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
+            name="geniko_synolo_hmeron_astheneias" 
+            id="geniko_synolo_hmeron_astheneias"
+            style="font-size: 1vw !important;" 
+            value="" tabIndex="-1" readonly />
+    </div>
+
+    <div class="col-2-27"></div>
+
+    <div class="col-1-2 text-center ml-n-1-0">
+        <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
+            name="geniko_synolo_epidothshs_efka" 
+            id="geniko_synolo_epidothshs_efka"
+            style="font-size: 1vw !important;" 
+            value="" tabIndex="-1" readonly />
+    </div>
+
+    <div class="col-0-25"></div>
+
+    <div class="col-1-5 text-center ml-n-1-0-1">
+        <input type="number" class="form-control2 input-contents-totals right-align no-spin" 
+            name="geniko_synolo_astheneias" 
+            id="geniko_synolo_astheneias"
+            style="font-size: 1vw !important;" 
+            value="" tabIndex="-1" readonly />
+    </div>
+</div>
+
+<hr class="hr-style-1" style="margin-top: 0.5rem; margin-left: -1rem !important; margin-right: -1rem !important;" />
+
+<div class="row form-group" style="margin-top: -.5rem; margin-bottom: -.3rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+
+    <div class="col-0-1"></div>
+
+    <div class="col-4 left-align">
+        <label class="col-form-label label-font-size-0-80" id="ergasiako_etos">
+        </label>
+        <input type="hidden" name="ergasiako_etos" id="ergasiakoEtos" />
+    </div>
+
+    <div class="col-4 center-align">
+        <label class="col-form-label label-font-size-0-80" id="epomeno_ergasiako_etos">
+        </label>
+        <input type="hidden" name="epomeno_ergasiako_etos" id="epomenoErgasiakoEtos" />
+    </div>
+
+    <div class="col-3-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="diasthma_apasxolhshs">
+        </label>
+        <input type="hidden" name="diasthma_apasxolhshs" id="diasthmaApasxolhshs" />
+    </div>
+</div>
+
+<hr class="hr-style-1" style="margin-top: 0.5rem; margin-left: -1rem !important; margin-right: -1rem !important;" />
+
+<div class="row form-group" style="margin-top: -.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-1-9 left-align">
+        <label class="col-form-label label-font-size-0-80 field-required custom-underline">
+            ΑΝΑΛΥΣΗ ΗΜΕΡΩΝ ΑΣΘΕΝΕΙΑΣ
+        </label>
+    </div>
+
+    <div class="col-5-5"></div>
+
+    <div class="col-3-5 left-align">
+        <label class="col-form-label label-font-size-0-80 ml-0-6 field-required" id="dikaioymenh_astheneia_trexontos_ergasiakoy_etoys">
+        </label>
+    </div>
+
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80 ml-1-8 field-required" id="dikaioymenh_astheneia_trexontos_ergasiakoy_etoys_timh">
+        </label>
+        <input type="hidden" name="dikaioymenh_astheneia_trexontos_ergasiakoy_etoys" id="dikaioymenhAstheneiaTrexontosErgasiakoyEtoys" />
+    </div>
+</div>
+
+<div class="row form-group" style="margin-top: -0.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-3-25 left-align">
+        <label class="col-form-label label-font-size-0-80" id="diasthma_hmeron_astheneias">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="diasthma_hmeron_astheneias_timh">
+        </label>
+        <input type="hidden" name="diasthma_hmeron_astheneias" id="diasthmaHmeronAstheneias" />
+    </div>
+
+    <div class="col-3-75"></div>
+
+    <div class="col-3-5 left-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="lhfteisa_adeia_asteneias_prohgoymenon_mhnon">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="lhfteisa_adeia_asteneias_prohgoymenon_mhnon_timh">
+        </label>
+        <input type="hidden" name="lhfteisa_adeia_asteneias_prohgoymenon_mhnon" id="lhfteisaAdeiaAsteneiasProhgoymenonMhnon" />
+
+    </div>
+</div>
+
+<div class="row form-group" style="margin-top: -0.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-0-75 left-align">
+        <label class="col-form-label label-font-size-0-80 bold-700" id="meion">
+        </label>
+    </div>
+    
+    <div class="col-2-5 left-align">
+        <label class="col-form-label label-font-size-0-80" id="mh_ergasimes_basei_orarioy">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="mh_ergasimes_basei_orarioy_timh">
+        </label>
+        <input type="hidden" name="mh_ergasimes_basei_orarioy" id="mhErgasimesBaseiOrarioy" />
+    </div>
+
+    <div class="col-3-75 left-align">
+        <label class="col-form-label label-font-size-smaller" id="mh_ergasimes_hmeromhnies">
+        </label>
+        <input type="hidden" name="mh_ergasimes_hmeromhnies" id="mhErgasimesHmeromhnies" />
+    </div>
+
+    <div class="col-3-5 left-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="ypoloipo_adeias_astheneias_trexontos_etoys">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80 field-required right-align" id="ypoloipo_adeias_astheneias_trexontos_etoys_timh">
+        </label>
+        <input type="hidden" name="ypoloipo_adeias_astheneias_trexontos_etoys" id="ypoloipoAstheneiasTrexontosEtoys" />
+    </div>
+</div>
+
+<div class="row form-group" style="margin-top: -0.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-0-75"></div>
+
+    <div class="col-2-5 left-align">
+        <label class="col-form-label label-font-size-0-80" id="repo">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="repo_timh">
+        </label>
+        <input type="hidden" name="repo" id="repoTimh" />
+    </div>
+
+    <div class="col-3-75 left-align">
+        <label class="col-form-label label-font-size-smaller" id="repo_hmeromhnies">
+        </label>
+    </div>
+    <input type="hidden" name="repo_hmeromhnies" id="repoHmeromhnies" />
+</div>
+
+<div class="row form-group" style="margin-top: -0.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-0-75"></div>
+
+    <div class="col-2-5 left-align">
+        <label class="col-form-label label-font-size-0-80" id="argies">
+        </label>
+    </div>
+
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="argies_timh">
+        </label>
+        <input type="hidden" name="argies" id="argiesTimh" />
+    </div>
+
+    <div class="col-3-75 left-align">
+        <label class="col-form-label label-font-size-smaller" id="argies_hmeromhnies">
+        </label>
+        <input type="hidden" name="argies_hmeromhnies" id="argiesHmeromhnies" />
+    </div>
+
+    <!-- <div class="col-3-5 left-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="dikaioymenh_astheneia_epomenoy_ergasiakoy_etoys">
+        </label>
+    </div>
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="dikaioymenh_astheneia_epomenoy_ergasiakoy_etoys_timh">
+        </label>
+    </div> -->
+</div>
+
+<div class="row form-group" style="margin-top: -0.5rem; margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-0-75 left-align">
+        <label class="col-form-label label-font-size-0-80 bold-700" id="syn">
+        </label>
+    </div>
+
+    <div class="col-2-5 left-align">
+        <label class="col-form-label label-font-size-0-80" id="argies_mh_ergasimon_repo">
+        </label>
+    </div>
+    
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80" id="argies_mh_ergasimon_repo_timh">
+        </label>
+        <input type="hidden" name="argies_mh_ergasimon_repo" id="argiesMhErgasimonRepoTimh" />
+    </div>
+
+    <div class="col-7-5 left-align">
+        <label class="col-form-label label-font-size-smaller" id="argies_mh_ergasimon_repo_hmeromhnies">
+        </label>
+    </div>
+    <input type="hidden" name="argies_mh_ergasimon_repo_hmeromhnies" id="argiesMhErgasimonRepoHmeromhnies" />
+</div>
+
+<!-- <div class="row form-group" style="margin-left: -2rem; margin-right: -1rem; font-size: 0.8rem;">
+    <div class="col-0-1"></div>
+
+    <div class="col-0-25"></div>
+
+    <div class="col-3-25 left-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="lhftheisa_adeia_astheneias">
+        </label>
+    </div>
+
+    <div class="col-0-5 right-align">
+        <label class="col-form-label label-font-size-0-80 field-required" id="lhftheisa_adeia_astheneias_timh">
+        </label>
+    </div>
+</div> -->

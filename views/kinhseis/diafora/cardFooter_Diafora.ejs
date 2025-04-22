@@ -1,0 +1,48 @@
+<div class="card-footer mt-auto">
+  <div
+    class="d-inline-block d-flex"
+    style="
+      margin-top: -0.5rem !important;
+      margin-bottom: -1rem !important;
+      margin-left: 10px !important;
+      margin-right: 10px !important;
+      justify-content: space-around;
+    ">
+	
+	<button type="button" id="saveButton_diafora"
+		class="btn btn-brown rounded-4 mt-2 w-15 buttons-content submitButton"
+		data-admin="<%= userPrivileges.admin %>"
+		data-create="<%= userPrivileges.create %>">
+		<i class="bi bi-floppy"></i> Αποθήκευση
+ 	</button>
+ 
+   <a type="button" id="updateButton_diafora"
+		class="btn btn-brown rounded-4 mt-2 w-15 buttons-content"
+		href="#"
+		data-admin="<%= userPrivileges.admin %>"
+		data-update="<%= userPrivileges.update %>">
+		<i class="bi bi-pencil"></i> Μεταβολή
+	</a>
+
+   <a type="button" id="undoButton_diafora"
+		class="btn btn-brown rounded-4 mt-2 w-15 buttons-content"
+		href="#"
+		data-admin="<%= userPrivileges.admin %>"
+		data-update="<%= userPrivileges.update %>">
+		<i class="bi bi-arrow-counterclockwise"></i> Αναίρεση
+	</a>
+
+   <a type="button" id="deleteButton_diafora"
+		class="btn btn-brown rounded-4 mt-2 w-15 buttons-content"
+		href="#"
+		data-admin="<%= userPrivileges.admin %>"
+		data-delete="<%= userPrivileges.delete %>">
+		<i class="bi bi-trash"></i> Διαγραφή
+	</a>
+
+    <a
+      class="btn btn-brown buttons-content rounded-4 mt-2 w-15" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή
+    </a>
+    <button type="button" class="btn btn-toTop scroll-to-top"><i class="bi bi-chevron-double-up"></i></button>
+  </div>
+</div>

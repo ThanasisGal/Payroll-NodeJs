@@ -1,0 +1,47 @@
+<div
+  class="modal fade"
+  id="deleteModal"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false"
+  tabindex="-1"
+  aria-labelledby="staticBackdropLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-danger">
+        <div class="modal-title fw-bold" style="font-size: 18px"><i class="bi bi-trash3"></i>
+          Διαγραφή Χρήστη
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <p>
+          Ο χρήστης
+          <b class="fw-bold"><%= users.lastName %> <%= users.firstName %></b> θα
+          διαγραφεί οριστικά.<br /><br />
+          Είστε σίγουρος(η);
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          data-bs-dismiss="modal"
+        >
+          Κλείσιμο
+        </button>
+
+        <form
+          action="/edit/<%= users._id %>?_method=DELETE"
+          method="POST"
+          class="position-relative"
+        >
+          <button type="submit" class="btn btn-outline-danger">
+            Διαγραφή Χρήστη
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,238 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    <!-- <hr style="margin-top: -2rem" /> -->
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5">
+
+              <div class="card-header" style="height: 11.9vh !important;">
+                <label class="text-center headers-content" style="height: 7.1vh !important;">
+                  Συντήρηση Ποσοστών Κρατήσεων
+                </label>
+                <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                  <div class="col-1-5 right-align">
+                    <label for="krathsh" class="col-form-label label-font-size field-required" style="color: #000000;">
+                      Κράτηση
+                    </label>
+                  </div>
+
+                  <div class="col-10">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      data-toggle="krathsh"
+                      name="krathsh"
+                      id="krathsh"
+                      data-selected="<%= posostaKrathseon.kodikos %>" disabled >
+                    </select>
+                  </div>
+
+                </div>
+              </div>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 30  vh; background-color: #ffffff;" >
+                <input type="hidden" name="krathshId" id="krathshId" value="<%= posostaKrathseon.krathshId %>" />
+                <input type="hidden" name="kodikos" id="kodikos" value="<%= posostaKrathseon.kodikos %>" />
+                <input type="hidden" name="posostaKrathseonId" id="posostaKrathseonId" class="form-control" value="<%= posostaKrathseon._id %>" />
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1-5 left-align">
+                    <label for="aa_eggrafhs" class="col-form-label label-font-size">
+                      α/α Εγγραφής 
+                    </label>
+                  </div>
+                  <div class="col-1">
+                    <input type="text" name="aa_eggrafhs" id="aa_eggrafhs" class="form-control input-contents text-center" value="<%= posostaKrathseon.aa_eggrafhs %> " disabled />
+                  </div>
+
+                  <div class="col-1-5"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="isxyei_apo" class="col-form-label label-font-size">
+                      Ισχύει ΑΠΟ
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="isxyei_apo" id="isxyei_apo" class="date-control" value="<%= convertDate(posostaKrathseon.isxyei_apo.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' })) %>" />
+                  </div>
+                  <!-- Η συνάρτηση convertDate έχει οριστεί στον server-side και συγκεκριμμένα στη static editPosostaKrathseonForm -->
+                  <div class="col-1-5"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="isxyei_eos" class="col-form-label label-font-size">
+                      Ισχύει ΕΩΣ 
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="isxyei_eos" id="isxyei_eos" class="date-control" value="<%= convertDate(posostaKrathseon.isxyei_eos.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' })) %>" />
+                  </div>
+                </div>
+              
+                </br>
+              
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="pososto_ergazomenoy" class="col-form-label label-font-size">
+                      Ποσοστό Εργαζ/νου 
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="pososto_ergazomenoy" id="pososto_ergazomenoy"  oninput="updateTotalPososton(document.getElementById('pososto_ergazomenoy').value, document.getElementById('pososto_ergodoth').value, 4)" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.pososto_ergazomenoy).toFixed(4) %>" />
+                  </div>
+
+                  <div class="col-3"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="poso_ergazomenoy" class="col-form-label label-font-size">
+                      Ποσό Εργαζομένου
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="poso_ergazomenoy" id="poso_ergazomenoy" oninput="updateTotalPoson(document.getElementById('poso_ergazomenoy').value, document.getElementById('poso_ergodoth').value, 2)" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.poso_ergazomenoy).toFixed(2) %>" />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="pososto_ergodoth" class="col-form-label label-font-size">
+                      Ποσοστό Εργοδότη 
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="pososto_ergodoth" id="pososto_ergodoth"  oninput="updateTotalPososton(document.getElementById('pososto_ergazomenoy').value, document.getElementById('pososto_ergodoth').value, 4)" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.pososto_ergodoth).toFixed(4) %>" />
+                  </div>
+
+                  <div class="col-3"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="poso_ergodoth" class="col-form-label label-font-size">
+                      Ποσό Εργοδότη
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="poso_ergodoth" id="poso_ergodoth" oninput="updateTotalPoson(document.getElementById('poso_ergazomenoy').value, document.getElementById('poso_ergodoth').value, 2)" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.poso_ergodoth).toFixed(2) %>" />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="synolo_pososton" class="col-form-label label-font-size field-required">
+                      Σύνολο Ποσοστών
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="synolo_pososton" id="synolo_pososton" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.synolo_pososton).toFixed(4) %>" readonly />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="synolo_poson" class="col-form-label label-font-size field-required">
+                      Σύνολο Ποσών
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="synolo_poson" id="synolo_poson" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.synolo_poson).toFixed(2) %>" readonly />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label id="label-PosoPlasmatikhsAxias" for="poso_plasmatikhs_axias" class="col-form-label label-font-size field-required" style="color: #000000;">Πλασματική Αξία</label>
+                  </div>
+                  <div class="col-2 right-align">
+                    <input type="text" id="poso_plasmatikhs_axias" name="poso_plasmatikhs_axias" class="form-control input-contents right-align"
+                    value="<%= parseFloat(posostaKrathseon.poso_plasmatikhs_axias).toFixed(2) %>" />
+                  </div>
+                </div>
+
+                </br>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="anotato_orio_palion" class="col-form-label label-font-size">
+                      Ανώτατο Όριο Παλιών
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="anotato_orio_palion" id="anotato_orio_palion" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.anotato_orio_palion).toFixed(2) %>" />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="anotato_orio_neon" class="col-form-label label-font-size">
+                      Ανώτατο Όριο Νέων
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="anotato_orio_neon" id="anotato_orio_neon" class="form-control input-contents right-align" value="<%= parseFloat(posostaKrathseon.anotato_orio_neon).toFixed(2) %>" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="card-footer mt-auto"
+              >
+                <div
+                  class="d-inline-block d-flex"
+                  style="
+                    margin-top: -0.5rem !important;
+                    margin-bottom: -1rem !important;
+                    margin-left: 10px !important;
+                    margin-right: 10px !important;
+                    justify-content: space-around;
+                  "
+                >
+                  <button
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton"
+                  >
+                    <i class="bi bi-floppy"></i> Αποθήκευση
+                  </button>
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                    href="/krathseis/krathseis"
+                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <% if (process.env.NODE_ENV === 'production') { %>
+      <script src="/min.js/krathseis/krathseis_pososta_edit_ejs.min.js"></script>
+    <% } else { %>
+      <script src="/js/common/getCompanyDescription.js"></script>
+      <script src="/js/krathseis/putFieldValuesPososton.js"></script>
+      <script src="/js/krathseis/loadKrathseis_edit.js"></script>
+      <script src="/js/krathseis/calcTotalPosostonKrathseon.js"></script>
+      <script src="/js/common/navTabs.js"></script>
+      <script src="/js/common/tooltipsForButtons.js"></script>
+      <script src="/js/common/moveByEnter.js"></script>
+    <% } %>
+
+  </div>
+</div>

@@ -1,0 +1,143 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    </br>
+    </br>
+    </br>
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div>
+          <form class="formRadius" id="transferForm">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 90%; margin-left: 5%;">
+
+              <div class="card-header mb-2">
+                <label class="text-center headers-content">
+                  Αντιγραφή Προγραμμάτων Εργασίας
+                </label>
+              </div>
+
+              <hr class="hr-style-1" />
+
+              <div class="card-body overflow-auto flex-grow-1" style="height: 25vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                <input type="hidden" name="idHidden" id="idHidden" value="" />
+                <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
+                <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
+                <input type="hidden" name="kodikosHidden" id="kodikosHidden" value="" />
+                <input type="hidden" name="kodikos2Hidden" id="kodikos2Hidden" value="" />
+                <input type="hidden" name="hmeromhnia_proslhpshs_hidden" id="hmeromhnia_proslhpshs_hidden" value="" />
+                <input type="hidden" name="hmeromhnia_allaghs_orarioy_apo_hidden" id="hmeromhnia_allaghs_orarioy_apo_hidden" value="" />
+                <input type="hidden" name="hmeromhnia_allaghs_orarioy_eos_hidden" id="hmeromhnia_allaghs_orarioy_eos_hidden" value="" />
+                <input type="hidden" name="eidikh_kathgoria_ergazomenoy" id="eidikh_kathgoria_ergazomenoy" value="" />
+                <input type="hidden" name="hmeromhnia_proslhpshs_hidden2" id="hmeromhnia_proslhpshs_hidden2" value="" />
+                <input type="hidden" name="eidikh_kathgoria_ergazomenoy2" id="eidikh_kathgoria_ergazomenoy2" value="" />
+                <input type="hidden" name="hmeromhnia_allaghs_orarioy_apo_hidden2" id="hmeromhnia_allaghs_orarioy_apo_hidden2" value="" />
+                <input type="hidden" name="hmeromhnia_allaghs_orarioy_eos_hidden2" id="hmeromhnia_allaghs_orarioy_eos_hidden2" value="" />
+                </br>
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
+                  <div class="col-1-2 right-align">
+                    <label for="ergazomenos" class="col-form-label label-font-size-smaller field-required">
+                      Από Εργαζόμενο
+                    </label>
+                  </div>
+
+                  <div class="col-5 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="ergazomenos" id="ergazomenos" required>
+                    </select>
+                  </div>
+                  
+                  <div class="col-1 right-align">
+                    <label for="hmeromhnia_allaghs_orarioy_apo" class="col-form-label" style="font-size: 0.70vw;">
+                      Από Ημερομηνία
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_apo" id="hmeromhnia_allaghs_orarioy_apo" class="date-control" required />
+                  </div>
+                  
+                  <div class="col-0-3"></div>
+                  
+                  <div class="col-1 right-align">
+                    <label for="hmeromhnia_allaghs_orarioy_eos" class="col-form-label" style="font-size: 0.70vw;">
+                      Εως Ημερομηνία
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_eos" id="hmeromhnia_allaghs_orarioy_eos" class="date-control" required />
+                  </div>
+                </div>
+
+                </br>
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.8rem;">
+                  <div class="col-1-2 right-align">
+                    <label for="ergazomenos2" class="col-form-label label-font-size-smaller field-required">
+                      Σε Εργαζόμενο
+                    </label>
+                  </div>
+  
+                  <div class="col-5 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2 " data-live-search="true" name="ergazomenos2" id="ergazomenos2" required>
+                    </select>
+                  </div>
+                  
+                  <div class="col-1 right-align">
+                    <label for="hmeromhnia_allaghs_orarioy_apo2" class="col-form-label" style="font-size: 0.70vw;">
+                      Από Ημερομηνία
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_apo2" id="hmeromhnia_allaghs_orarioy_apo2" class="date-control" required />
+                  </div>
+                  
+                  <div class="col-0-3"></div>
+                  
+                  <div class="col-1 right-align">
+                    <label for="hmeromhnia_allaghs_orarioy_eos2" class="col-form-label" style="font-size: 0.70vw;">
+                      Εως Ημερομηνία
+                    </label>
+                  </div>
+                  <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_eos2" id="hmeromhnia_allaghs_orarioy_eos2" class="date-control" required />
+                  </div>
+                </div>
+  
+                </div>
+
+              <div class="card-footer mt-auto">
+                <div class="d-inline-block d-flex" style="margin-top: -0.5rem !important; margin-bottom: -1rem !important; margin-left: 10px !important; margin-right: 10px !important; justify-content: space-around;">
+
+                  <button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" name="copyScheduleButton" id="copyScheduleButton"><i class="bi bi-copy"></i> Αντιγραφή
+                  </button>
+                  
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                  <button type="button" class="btn btn-toTop scroll-to-top"><i class="bi bi-chevron-double-up"></i></button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <% if (process.env.NODE_ENV === 'production') { %>
+      <script src="/min.js/ergazomenoi/ergazomenoi/antigrafhProgrammatonErgasias.min.js"></script>
+    <% } else { %>
+      <script src="/js/common/getCompanyDescription.js"></script>
+      <script src="/js/common/toggleLabel.js"></script>
+      <script src="/js/dates/convertDateToISO.js"></script>
+      <script src="/js/common/tooltipsForButtons.js"></script>
+      <script src="/js/common/moveByEnter.js"></script>
+      <script src="/js/common/scrollToTop.js"></script>
+      <script src="/js/ergazomenoi/programmata/loadDropdowns.js"></script>
+      <script src="/js/ergazomenoi/programmata/copyScheduleButton.js"></script>
+      <script src="/js/common/setupTabKeyNavigation.js"></script>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,261 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active">Σταθερά Στοιχεία</li>
+        <li>Αποδοχές</li>
+        <li>Κρατήσεις</li>
+        <li>Αλλοδαποί</li>
+        <li>Επαγγ.Κατάρτιση</li>
+        <li>Διάφορα</li>
+        <li>Ωράριο Εργασίας</li>
+        <li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
+      </ul>
+    </div>
+    <hr style="margin-top: -2rem; margin-bottom: 1rem;" />
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section1') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100"  id="cardBody" style="height: 64vh; background-color: #ffffff;" >
+                
+                <input type="hidden" name="ergazomenoiId" id="ergazomenoiId" class="form-control input-contents" value="<%= ergazomenoiData._id %>" />
+                <input type="hidden" name="istorikoId" id="istorikoId" class="form-control input-contents" value="<%= istorikoData._id %>" />
+                <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= ergazomenoiData.team %>" />
+                <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= ergazomenoiData.company_kod %>" />
+                <input type="hidden" name="eidikhKathgoriaErgazomenoy" id="eidikhKathgoriaErgazomenoy" value="0" />
+                <input type="hidden" name="kodikosHidden" id="kodikosHidden" value="<%= ergazomenoiData.kodikos %>" />
+                <input type="hidden" name="eponymoHidden" id="eponymoHidden" value="<%= ergazomenoiData.eponymo %>" />
+                <input type="hidden" name="onomaHidden" id="onomaHidden" value="<%= ergazomenoiData.onoma %>" />
+                <input type="hidden" name="afmHidden" id="afmHidden" value="<%= ergazomenoiData.afm %>" />
+                <input type="hidden" name="amkaHidden" id="amkaHidden" value="<%= ergazomenoiData.amka %>" />
+                <input type="hidden" name="eidikothtaErganh" id="eidikothtaErganh" value="<%= ergazomenoiData.eidikothta_erganh %>" />
+                <input type="hidden" name="kpk_efka" id="kpk_efka_hidden" value="<%= ergazomenoiData.kpk_efka %>" />
+                <input type="hidden" name="kpk_efka_basei_symbashs_hidden" id="kpk_efka_basei_symbashs_hidden" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
+          
+         
+                <div class="accordion" id="accordion">
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/prosopikaStoixeia') %>
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/efka') %>
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/dypa') %>
+
+                  <%- include('./partials/edit/cardBodies/section1/accordion/kentraKostoys') %>
+
+                </div>
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_2_section visible" data-section="Αποδοχές">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+
+                <input type="hidden" name="selectedSymbash" id="selectedSymbash" />
+                <input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
+                <input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
+
+                <%- include('./partials/edit/cardBodies/section2/apodoxes') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_3_section visible" data-section="Κρατήσεις">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section3') %>
+              
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+
+                <%- include('./partials/edit/cardBodies/section3/krathseis') %>
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_4_section visible" data-section="Αλλοδαποί">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section4') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+                
+                <%- include('./partials/edit/cardBodies/section4/allodapoi') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section5') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+
+                <%- include('./partials/edit/cardBodies/section5/epaggelmatikhKatartish') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_6_section visible" data-section="Διάφορα">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section6') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+
+                <%- include('./partials/edit/cardBodies/section6/diafora') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section8') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+                <input type="hidden" id="dateDifference" name="dateDifference" value="">
+                
+                <%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
+        <div>
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+
+              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section7') %>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+
+                <%- include('./partials/edit/cardBodies/section7/istoriko') %>
+
+              </div>
+
+              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            </div>
+          </form>
+        </div>
+      </section>
+
+  </div>
+  
+  <% if (process.env.NODE_ENV === 'production') { %>
+    <script src="/min.js/ergazomenoi/ergazomenoi/ergazomenoi_edit_ejs.min.js"></script>
+  <% } else { %>
+    <script src="/js/ergazomenoi/genika/toggleDisabledSelectViaCheckbox.js"></script>
+    <script src="/js/common/toggleLabelErgazomenon.js"></script>
+    <script src="/js/common/checkHlikia.js"></script>  <!-- Εμφάνιση της Ηλικίας ή της έκφρασης "ΑΝΗΛΙΚΟΣ" -->
+    <script src="/js/common/totalPercentChecker.js"></script>  <!-- Έλεγχος των % των Κ.Κ. να μην υπερβαίνουν το 100% -->
+    <script src="/js/common/scrollToTop.js"></script>
+    <script src="/js/ergazomenoi/genika/editStoixeiaSymbaseon.js"></script>  <!-- Φόρτωση των στοιχείων των συμβάσεων και υπολογισμός των αναλογούντων μικτών αποδοχών -->
+    <script src="/js/ergazomenoi/genika/fillLabelFromInput.js"></script>  <!-- Εμφάνιση των στοιχείων των εργαζομένων στο Header της φόρμας -->
+    <script src="/js/ergazomenoi/genika/loadDropdowns_edit.js"></script>  <!-- Φόρτωση των Dropdowns της φόρμας -->
+    <script src="/js/ergazomenoi/genika/date-sync-edit.js"></script>
+    <script src="/js/ergazomenoi/genika/afmChecker.js"></script>  <!-- Έλεγχος ορθότητας ΑΦΜ -->
+    <script src="/js/ergazomenoi/genika/amkaChecker.js"></script>  <!-- Έλεγχος ορθότητας ΑΜΚΑ -->
+    <script src="/js/ergazomenoi/genika/ibanChecker.js"></script>  <!-- Έλεγχος ορθότητας ΙΒΑΝ -->
+    <script src="/js/ergazomenoi/genika/fillHiddenBankCode.js"></script>  <!-- Αποθήκευση του κωδικού Τράπεζας -->
+    <script src="/js/ergazomenoi/genika/calcProyphresia.js"></script>  <!-- Υπολογισμός Προϋπηρεσίας και Μισθολογικού Κλιμακίου -->
+    <script src="/js/ergazomenoi/genika/infinityScrollingSelectJQuery.js"></script>
+    <script src="/js/ergazomenoi/genika/clearEfkaSelects.js"></script>  <!-- Καθαρισμός των selects ΕΦΚΑ και επαναφορά του ΚΠΚ αν είχε οριστεί προηγουμένως Ειδική Περίπτωση Ασφάλισης -->
+    <script src="/js/ergazomenoi/genika/editKrathseis.js"></script>  <!-- Φόρτωση των selects των Κρατήσεων -->
+    <script src="/js/ergazomenoi/genika/clearSelects.js"></script>  <!-- Καθαρισμός των selects των Συμβάσεων και των Κρατήσεων -->
+    <script src="/js/ergazomenoi/genika/reCalcApodoxes_Edit.js"></script>  <!-- Επανυπολογισμός των Αποδοχών -->
+    <script src="/js/ergazomenoi/genika/getDaysFromDate.js"></script><!-- Εμφάνιση των ημερών απασχόλησης (Δε, Τρ...) και έλεγχος των ημερών αργίας -->
+    <script src="/js/ergazomenoi/genika/selectRepo.js"></script>
+    <script src="/js/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs.js"></script>  <!-- Έλεγχος για το αν η ημ/νια αλλαγής σύμβασης είναι μικρότερη απ' την ημ/νία πρόσληψης -->
+    <script src="/js/ergazomenoi/genika/putInputValuesToHiddenValues.js"></script>
+    <script src="/js/ergazomenoi/genika/calcOresApasxolhshs.js"></script>
+    <script src="/js/ergazomenoi/genika/putFieldValues.js"></script>
+    <script src="/js/ergazomenoi/genika/manipulateIstorikoModel.js"></script>
+    <script src="/js/ergazomenoi/genika/toggleDisabledInputViaCheckbox.js"></script>
+  <% } %>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const endDateInput = document.getElementById('hmeromhnia_allaghs_orarioy_eos');
+    const patronymo = document.getElementById('eponymo_patera');
+    endDateInput.focus();
+    patronymo.focus();
+});
+</script>

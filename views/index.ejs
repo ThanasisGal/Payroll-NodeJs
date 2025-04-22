@@ -1,0 +1,206 @@
+<div
+  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+
+  <form
+    class="nav col-12 col-md-auto flex-end mb-2 ms-auto mb-md-0"
+    role="search"
+    method="POST"
+    action="/admin/search"
+  >
+    <div class="input-group">
+      <span style="padding-top: 10px;"><i class="bi bi-search"></i>&nbsp;</span>
+      <input
+        type="search"
+        name="searchTerm"
+        class="form-control rounded-end-2 ms-auto"
+        placeholder="Αναζήτηση..."
+        aria-label="Search"
+      />
+    </div>
+  </form>
+</div>
+
+<% messages.forEach(element => { %>
+  <div class="auto-close alert alert-info alert-dismissible fade show" role="alert">
+    <b class="fw-bold"><i class="bi bi-check2-circle"></i></h2>&nbsp; <%= element %></b>
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Κλείσιμο"
+    ></button>
+  </div>
+<% }) %>
+
+<div class="card z-depth-5">
+  <div class="card-body">
+    <label class="card-header bg-header text-center w-100" style="font-size: 24px; font-weight: 600;"
+    >Διαχείριση Χρηστών</label
+    >
+
+    <div class="table-responsive">
+      <table class="table table-striped table-sm table-hover" id="myTable">
+        <thead style="font-size: 18px">
+          <tr>
+            <th scope="col">Κωδ.</th>
+            <th scope="col">Επώνυμο</th>
+            <th scope="col">Όνομα</th>
+            <th scope="col">@Email</th>
+            <th scope="col">Τηλέφωνο</th>
+            <th scope="col">Ομάδα Εργασίας</th>
+            <th scope="col">Ενεργός</th>
+            <th scope="col" class="text-end">Ενέργειες</th>
+          </tr>
+        </thead>
+        
+        <tbody>
+          <% users.forEach(element => { %>
+          <tr class="align-middle">
+            <td><%= element.kod %></td>
+            <td><%= element.lastName %></td>
+            <td><%= element.firstName %></td>
+            <td><%= element.email %></td>
+            <td><%= element.tel %></td>
+            <td><%= element.team %></td>
+            <td>
+              <% if (element.situation == 'A') { %>
+              <input class="form-check-input custom-checkbox checkbox-class" type="checkbox" value="" id="flexCheckCheckedDisabled" checked disabled />
+              <% } else { %>
+              <input class="form-check-input custom-checkbox checkbox-class" type="checkbox" value="" id="flexCheckCheckedDisabled" disabled
+              />
+              <% } %>
+            </td>
+            <td class="text-end">
+              <div class="d-flex flex-row justify-content-end gap-2">
+                <a
+                  href="/admin/view/<%= element._id %>"
+                  role="button"
+                  class="btn btn-secondary btn-small"
+                  title="Προβολή"
+                >
+                  <i class="bi bi-eye"></i>
+                </a>
+
+                <a
+                  href="/admin/edit/<%= element._id %>"
+                  type="button"
+                  class="btn btn-secondary btn-small"
+                  title="Διόρθωση"
+                >
+                  <i class="bi bi-pencil"></i>
+                </a>
+
+                <a
+                  href="/admin/delete/<%= element._id %>"
+                  type="button"
+                  class="btn btn-secondary btn-small"
+                  title="Διαγραφή"
+                >
+                  <i class="bi bi-person-x"></i>
+                </a>
+                <!-- </form> -->
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    </div>
+      <div class="card-footer">
+        <div
+          class="d-inline-block d-flex"
+          style="justify-content: space-between">
+          <a href="/admin/add" class="btn btn-outline-secondary mb-1 mt-2 w-15"
+          ><i class="bi bi-person-plus"></i> Νέος Χρήστης</a
+          >
+          <a
+            class="btn btn-outline-secondary mb-1 mt-2 w-15"
+            href="/"
+          >
+            <i class="bi bi-table"></i> Επιστροφή</a
+          >
+          <% if (users.length > 0) { %>
+          <nav aria-label="Dashboard Pagination">
+            <ul class="pagination pagination-sm justify-content-end mt-1">
+              <% if (current == 1) { %>
+          
+              <li class="page-item disabled">
+                <a href="#" class="page-link"><i class="bi bi-chevron-bar-left"></i></a>
+              </li>
+          
+              <li class="page-item disabled">
+                <a href="#" class="page-link"><i class="bi bi-chevron-left"></i></a>
+              </li>
+          
+              <% } else { %>
+          
+              <li class="page-item">
+                <a href="/admin/?page=1" class="page-link"
+                  ><i class="bi bi-chevron-bar-left"></i
+                ></a>
+              </li>
+          
+              <li class="page-item">
+                <a href="/admin/?page=<%= Number(current) - 1 %>" class="page-link"
+                  ><i class="bi bi-chevron-left"></i
+                ></a>
+              </li>
+          
+              <% } %> <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> <% if (i
+              !== 1) { %>
+          
+              <li class="page-item disabled"><a href="#" class="page-link">...</a></li>
+          
+              <% } %> <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %> <% if
+              (i == current) { %>
+          
+              <li class="page-item">
+                <a href="#" class="page-link pageItem"><%= i %></a>
+              </li>
+          
+              <% } else { %>
+          
+              <li class="page-item">
+                <a href="/admin/?page=<%= i %>" class="page-link"><%= i %></a>
+              </li>
+          
+              <% } %> <% if (i == Number(current) + 2 && i < pages) { %>
+          
+              <li class="page-item disabled"><a href="#" class="page-link">...</a></li>
+              <li class="page-item">
+                <a href="/admin/?page=<%= pages %>" class="page-link"><%= pages %></a>
+              </li>
+          
+              <% } %> <% } %> <% if (current == pages) { %>
+          
+              <li class="page-item disabled">
+                <a href="#" class="page-link"><i class="bi bi-chevron-right"></i></a>
+              </li>
+          
+              <li class="page-item disabled">
+                <a href="#" class="page-link"><i class="bi bi-chevron-bar-right"></i></a>
+              </li>
+          
+              <% } else { %>
+          
+              <li class="page-item">
+                <a href="/admin/?page=<%= Number(current) + 1 %>" class="page-link"
+                  ><i class="bi bi-chevron-right"></i
+                ></a>
+              </li>
+          
+              <li class="page-item">
+                <a href="/admin/?page=<%= pages %>" class="page-link"
+                  ><i class="bi bi-chevron-bar-right"></i
+                ></a>
+              </li>
+          
+          <% } %>
+            </ul>
+          </nav>
+    </div>
+  </div>
+</div>
+
+<% } %> <%- include('./partials/modalDelete.ejs') %>

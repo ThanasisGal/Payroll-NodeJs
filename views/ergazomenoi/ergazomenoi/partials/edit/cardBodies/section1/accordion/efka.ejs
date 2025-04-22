@@ -1,0 +1,140 @@
+<div class="accordion-item">
+  <h2 class="accordion-header">
+    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="false" aria-controls="panelsStayOpen-collapseFour" style="background-color: #3d4e001e !important; font-size: 1vw; font-weight: 700; color: #525114">
+      Ε.Φ.Κ.Α.
+    </button>
+  </h2>
+  <div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
+    <div class="accordion-body">
+      <input type="hidden" name="kad_efka_hidden" id="kad_efka_hidden" value="<%= ergazomenoiData.kad_efka %>" />
+      <input type="hidden" name="eidikothta_efka_hidden" id="eidikothta_efka_hidden" value="<%= ergazomenoiData.eidikothta_efka %>" />
+      <input type="hidden" name="kpk_efka_basei_symbashs" id="kpk_efka_basei_symbashs" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
+      <input type="hidden" name="tmp_kpk_efka_basei_symbashs" id="tmp_kpk_efka_basei_symbashs" />
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="kad_efka" class="col-form-label label-font-size field-required">
+            Κ.Α.Δ. ΕΦΚΑ
+          </label>
+        </div>
+        <div class="col-9-5">
+          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kad_efka" id="kad_efka" data-selected="<%= ergazomenoiData.kad_efka %>">
+          </select>
+        </div>
+        <button
+        type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-001" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων ΚΑΔ, Ειδικότητα, ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
+        <i class="bi bi-trash" style="color: red"></i> 
+        </button>
+      </div>
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="eidikothta_efka" class="col-form-label label-font-size field-required">
+            Ειδικότητα ΕΦΚΑ
+          </label>
+        </div>
+        <div class="col-9-5">
+          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_efka" id="eidikothta_efka" data-selected="<%= ergazomenoiData.eidikothta_efka %>" disabled>
+          </select>
+        </div>
+        <button
+          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-002" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Ειδικότητα, ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
+          <i class="bi bi-trash" style="color: red"></i> 
+        </button>
+      </div>
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="kpk_efka" class="col-form-label label-font-size field-required">
+            Κ.Π.Κ. ΕΦΚΑ
+          </label>
+        </div>
+        <div class="col-9-5">
+          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kpk_efka" id="kpk_efka" data-selected="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" disabled>
+          </select>
+        </div>
+        <button
+          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-003" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
+        <i class="bi bi-trash" style="color: red"></i> 
+        </button>
+      </div>
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="epa_efka" class="col-form-label label-font-size field-required">
+            Ειδική Περίπτωση ΕΦΚΑ
+          </label>
+        </div>
+        <div class="col-9-5">
+          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="epa_efka" id="epa_efka" data-selected="<%= ergazomenoiData.epa_efka %>" >
+          </select>
+        </div>
+        <button
+          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-004" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
+          <i class="bi bi-trash" style="color: red"></i> 
+        </button>
+      </div>
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="meiosh_eisforon_ergazomenon" class="col-form-label label-font-size">
+            Μείωση Εργατικής Εισφοράς
+          </label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="meiosh_eisforon_ergazomenon" name="meiosh_eisforon_ergazomenon" <%= ergazomenoiData.meiosh_eisforon_ergazomenon ? 'checked' : '' %> value="" />
+          <label for="meiosh_eisforon_ergazomenon" id="label-meiosh_eisforon_ergazomenon" style="margin-left: 0.75rem; font-size: 0.875vw;">
+            ΟΧΙ
+          </label>
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-2 left-align">
+          <label for="epidothsh_eisforon_ergodoth" class="col-form-label label-font-size">
+            Επιδ/ση Εργοδ/κής Εισφοράς
+          </label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="epidothsh_eisforon_ergodoth" name="epidothsh_eisforon_ergodoth" <%= ergazomenoiData.epidothsh_eisforon_ergodoth ? 'checked' : '' %> value="" />
+          <label for="epidothsh_eisforon_ergodoth" id="label-epidothsh_eisforon_ergodoth" style="margin-left: 0.75rem; font-size: 0.875vw;">
+            ΟΧΙ
+          </label>
+        </div>
+      </div>
+
+      <hr class="hr-style" />
+
+      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+        <div class="col-2 left-align">
+          <label for="palios_neos" class="col-form-label label-font-size field-required">
+            Παλιός/Νέος Ασφαλισμένος
+          </label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="palios_neos" name="palios_neos" <%= ergazomenoiData.palios_neos ? 'checked' : '' %> value="" />
+          <label for="palios_neos" id="label-palios_neos" style="margin-left: 0.75rem; font-size: 0.875vw;">
+            ΠΑΛΙΟΣ
+          </label>
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-2 left-align">
+          <label for="amoibetai_me_sse" class="col-form-label label-font-size">
+            Αμοίβεται με οικεία ΣΣΕ και ασφαλίζεται με Τεκμαρτά
+          </label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="amoibetai_me_sse" name="amoibetai_me_sse" <%= ergazomenoiData.amoibetai_me_sse ? 'checked' : '' %> value="" />
+          <label for="amoibetai_me_sse" id="label-amoibetai_me_sse" style="margin-left: 0.75rem; font-size: 0.875vw;">
+            ΟΧΙ
+          </label>
+        </div>
+      </div>
+
+      <hr class="hr-style" />
+
+    </div>
+  </div>
+</div>

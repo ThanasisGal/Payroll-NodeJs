@@ -1,0 +1,60 @@
+<style>
+  body {
+    background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
+    background-repeat: no-repeat;
+    background-attachment:inherit;
+    background-size:auto;
+    background-position: 60% 50%;
+  }
+</style>
+
+<div
+class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom"
+>
+
+<% if (!userId) { %> 
+  <a
+    href="/login"
+    type="button"
+    class="btn btn-outline-success btn-small buttons-content ms-auto w-11_5"
+    style="margin-top: -7px; font-size: 1.1rem; font-weight: 700;"
+    title="Σύνδεση και είσοδος στην εφαρμογή"
+  >
+    <i class="buttons-content bi bi-box-arrow-in-right"></i> Σύνδεση
+  </a>
+<% } else { %>
+  <a
+    href="/companies/genikastoixeia/"
+    type="button"
+    class="btn btn-outline-success btn-small buttons-content ms-auto w-11_5"
+    style="margin-top: -7px; font-size: 1.1rem; font-weight: 700;"
+    title="Επιστροφή στην εφαρμογή (Εταιρείες)"
+  >
+    <i class="buttons-content bi bi-box-arrow-in-right"></i> Είσοδος
+  </a>
+<% } %>
+</div>
+
+<% messages.forEach(element => { %>
+  <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
+    <b class="fw-bold" style="font-size: 18px;">
+      <% if (images[0] == 'sign-stop') { %>
+      <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
+      <% } else if (images[0] == 'check-circle') { %>
+        <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
+      <% } else if (images[0] == 'exclamation-triangle') { %>
+        <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
+      <% } else if (images[0] == 'question-circle') { %>
+        <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
+      <% } %>
+     </h2>&nbsp; <%= element %></b>
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Κλείσιμο"
+    ></button>
+  </div>
+<% }) %>
+
+<!-- <script src="/js/changeUrl.js"></script> -->

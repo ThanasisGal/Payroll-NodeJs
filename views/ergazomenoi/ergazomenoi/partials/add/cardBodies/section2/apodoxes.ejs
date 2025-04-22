@@ -1,0 +1,166 @@
+<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-2 left-align">
+    <label for="symbash" class="col-form-label label-font-size field-required">
+      Σύμβαση
+    </label>
+  </div>
+  <div class="col-9-5">
+    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="symbash" id="symbash">
+    </select>
+  </div>
+  <button
+  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-001" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Σύμβαση, Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+  <i class="bi bi-trash" style="color: red"></i> 
+  </button>
+</div>
+
+<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-2 left-align">
+    <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
+      Κατηγορία Σύμβασης
+    </label>
+  </div>
+  <div class="col-9-5">
+    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kathgoria_symbashs" id="kathgoria_symbashs" disabled>
+    </select>
+  </div>
+  <button
+  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-002" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+  <i class="bi bi-trash" style="color: red"></i> 
+  </button>
+</div>
+
+<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-2 left-align">
+    <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
+      Ειδικότητα Σύμβασης
+    </label>
+  </div>
+  <div class="col-9-5">
+    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_symbashs" id="eidikothta_symbashs" disabled>
+    </select>
+  </div>
+  <button
+  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-003" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+  <i class="bi bi-trash" style="color: red"></i> 
+  </button>
+</div>
+
+<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem">
+  <div class="col-1 text-center">
+    <label class="col-form-label field-required">
+      α/α
+    </label>
+  </div>
+  <div class="col-7 text-center">
+    <label class="col-form-label field-required">
+      Στοιχείο Σύμβασης
+    </label>
+  </div>
+  <div class="col-1-5 text-center">
+    <label class="col-form-label field-required">
+      Ποσό Βάσει Σύμβασης
+    </label>
+  </div>
+  <div class="col-0-3"></div>
+  <div class="col-2 text-center">
+    <label class="col-form-label field-required">
+      Αποδοχές Βάσει Ωρών Εργασίας
+    </label>
+  </div>
+</div>
+
+<div id="stoixeiaSymbaseonContainer">
+  <!-- Εδώ θα προστεθούν δυναμικά τα select στοιχεία -->
+</div>
+
+<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-8 text-right">
+    <label class="col-form-label field-required text-right">
+      Σ Υ Ν Ο Λ Α 
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble" name="synolo_symbashs" id="synolo_symbashs" style="background-color: #eeff0223;" readonly />
+  </div>
+  <div class="col-0-5"></div>
+  <div class="col-1-5">
+    <input type="text" class="form-control input-contents right-align clearAble" name="synolo_symbashs_basei_oron_ergasias" id="synolo_symbashs_basei_oron_ergasias" style="background-color: #2b97001e" readonly />
+  </div>
+</div>
+
+<hr style=" margin-bottom: 1rem;" />
+
+<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Νόμιμος Μισθός
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble"  style="background-color: #eeff0223;" name="nomimosMisthos" id="nomimosMisthos" readonly />
+  </div>
+
+  <div class="col-0-5"></div>
+
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Νόμιμο Ημερομίσθιο
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble"  style="background-color: #eeff0223;" name="nomimoHmeromisthio" id="nomimoHmeromisthio" readonly />
+  </div>
+
+  <div class="col-0-5"></div>
+
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Νόμιμο Ωρομίσθιο
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #eeff0223;" name="nomimoOromisthio" id="nomimoOromisthio" readonly />
+  </div>
+</div>
+
+<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Πραγματικός Μισθός
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikosMisthos" id="pragmatikosMisthos" readonly />
+  </div>
+
+  <div class="col-0-5"></div>
+
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Πραγματικό Ημερ/σθιο
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" readonly />
+  </div>
+
+  <div class="col-0-5"></div>
+
+  <div class="col-2 text-left">
+    <label class="col-form-label field-required text-left">
+      Πραγματικό Ωρομίσθιο
+    </label>
+  </div>
+  <div class="col-1-5">
+    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikoOromisthio" id="pragmatikoOromisthio" readonly />
+  </div>
+</div>
+
+<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+  <div class="col-9"></div>
+
+  <button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content" name="reCalcButton" id="reCalcButton">
+    <i class="bi bi-floppy"></i> Επανυπολογισμός Αποδοχών
+  </button>
+</div>

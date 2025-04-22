@@ -1,0 +1,255 @@
+<div
+  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+  </br>
+</div>
+
+  <% messages.forEach(element => { %>
+    <% if (typeof types !== 'undefined' && types.length > 0) { %>
+      <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
+        <b class="fw-bold" style="font-size: 18px;">
+        <% if (images[0] == 'sign-stop') { %>
+          <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
+        <% } else if (images[0] == 'check-circle') { %>
+          <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
+        <% } else if (images[0] == 'exclamation-triangle') { %>
+          <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
+        <% } else if (images[0] == 'question-circle') { %>
+          <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
+        <% } %>
+        </h2>&nbsp; <%= element %></b>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="alert"
+          aria-label="Κλείσιμο"
+        ></button>
+      </div>
+    <% } %>
+  <% }) %>
+</br></br>
+<div class="container w-50">
+  <form action="/register/userRegistration" method="POST">
+    <div class="card z-depth-5">
+      <label class="card-header bg-header text-center"
+        ><h4>Εγγραφή Χρήστη</h4></label
+      >
+
+      <div class="card-body">
+        <div class="col-9">
+          <input
+            type="hidden"
+            name="tmpEmail"
+            id="tmpEmail"
+            class="form-control"
+            value=""
+          />
+        </div>
+
+        
+        <div class="row form-group g-3 align-items-center mt-2 mb-1">
+          <div class="col-3 right-align">
+            <label for="firstName" class="col-form-label field-required"
+              >Όνομα</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="text"
+              name="firstName"
+              id="firstName"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label for="lastName" class="col-form-label field-required"
+              >Επώνυμο</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="text"
+              name="lastName"
+              id="lastName"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label for="Email" class="col-form-label field-required"
+              >@Email</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="text"
+              name="email"
+              id="email"
+              class="form-control"
+              value=""
+              readonly
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label for="tel" class="col-form-label">Τηλέφωνο</label>
+          </div>
+          <div class="col-9">
+            <input
+              type="text"
+              name="tel"
+              id="tel"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label for="team" class="col-form-label field-required"
+              >Ομάδα Εργασίας</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="text"
+              name="team"
+              id="team"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label for="Password" class="col-form-label field-required"
+              >Password</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="password"
+              name="password"
+              id="password"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div class="row form-group g-3 align-items-center mb-1">
+          <div class="col-3 right-align">
+            <label
+              for="password_confirmation"
+              class="col-form-label field-required"
+              >Επιβεβαίωση Password</label
+            >
+          </div>
+          <div class="col-9">
+            <input
+              type="password"
+              name="password_confirmation"
+              id="password_confirmation"
+              class="form-control"
+              value=""
+            />
+          </div>
+        </div>
+
+        <div>
+          <input
+            type="hidden"
+            name="privileges"
+            id="privileges"
+            class="form-control"
+            value="V"
+          />
+        </div>
+
+        <div>
+          <input
+            type="hidden"
+            name="situation"
+            id="situation"
+            class="form-control"
+            value="A"
+          />
+        </div>
+
+        <div>
+          <input
+            type="hidden"
+            name="details"
+            id="details"
+            class="form-control"
+            value=""
+          />
+        </div>
+
+        <div>
+          <input
+            type="hidden"
+            name="isVerified"
+            id="isVerified"
+            class="form-control"
+            value="false"
+          />
+        </div>
+
+        <div>
+          <input
+            type="hidden"
+            name="isAdmin"
+            id="isAdmin"
+            class="form-control"
+            value="false"
+          />
+        </div>
+      </div>
+      <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important;">
+        <div
+          class="d-inline-block d-flex"
+          style="
+          margin-top: -0.5rem !important;
+          margin-bottom: -1rem !important;
+          margin-left: 10px !important;
+          margin-right: 10px !important;
+          justify-content: space-around;"
+        >
+          <button type="submit" class="btn btn-brown rounded-4 w-40 mb-1 mt-2"><i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
+          </button>
+          <a class="btn btn-brown rounded-4 w-40 mb-1 mt-2" href="/login"
+            ><i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+          >
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    let url = new URL(document.location.href);
+    let params = new URLSearchParams(url.search);
+    let hex = params.get("mail");
+    let mail = '';
+
+    if (hex) {
+      for (let i = 0; i < hex.length; i += 2) {
+        mail += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+      }
+      document.getElementById("email").value = mail;
+      document.getElementById("firstName").focus();
+    }
+  });
+</script>

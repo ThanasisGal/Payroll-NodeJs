@@ -1,0 +1,156 @@
+<div class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-3 border-bottom mt-3 mb-3" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;"></div>
+
+<section>
+  <form>
+    <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+      <div class="card-header p-0" style="height: 3.5rem !important;">
+        <label class="text-center w-100 headers-content mt-2">
+          Ενημέρωση Ψηφιακού Ωραρίου ΕΡΓΑΝΗ
+        </label>
+      </div>
+
+      <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
+      <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
+      <input type="hidden" name="username" id="username" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].username %>" readonly />
+      <input type="hidden" name="password" id="password" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].password %>" readonly />
+
+      <div class="row form-group g-3 align-items-center mb-3" style="margin-top: 0.005rem !important;">
+        <div class="col-1-5 left-align">
+          <label for="apo_hmeromhnia" class="col-form-label" style="font-size: .9rem !important; padding-left: 3rem;">
+            Από Ημερομηνία
+          </label>
+        </div>
+        <div class="col-1-5">
+          <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" required />
+        </div>
+
+        <!-- <div class="col-3-5"></div> -->
+
+        <div class="col-1-5 left-align">
+          <label for="eos_hmeromhnia" class="col-form-label" style="font-size: .9rem !important; padding-left: 2rem;">
+            Έως Ημερομηνία
+          </label>
+        </div>
+        <div class="col-1-5">
+          <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
+        </div>
+
+        <div class="col-1 left-align">
+          <label for="diadikasia" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 2rem;">
+            Διαδικασία
+          </label>
+        </div>
+
+        <div class="col-3"> 
+          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="diadikasia" id="diadikasia">
+            <option value="195" disabled>Άδειες</option>
+            <option value="196" disabled>Άδειες ΟΡΘΗ ΕΠΑΝΑΛΗΨΗ</option>
+            <option value="183">Μεταβ/νο-Τροπ/μενο ανά Ημέρα</option>
+            <option value="207" disabled>Απολογιστικό ανά Ημέρα</option>
+            <option value="192" disabled>Μεταβ/νο-Τροπ/μενο / Ημέρα Οδηγοί</option>
+            <option value="182" selected>Σταθερό Εβδομαδιαίο</option>
+          </select>
+        </div>
+
+        <div class="col-0-7 left-align">
+          <label for="fileType" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 2rem;">
+            Τύπος 
+          </label>
+        </div>
+        <div class="col-0-8"> 
+          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="fileType" id="fileType">
+            <option value="xml" selected>xml</option>
+            <option value="xlsx">xlsx</option>
+            <option value="json">json</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row form-group align-items-center" style="margin-top: -1rem; margin-bottom: .5rem;">
+        <div class="col-1-5 left-align">
+          <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 3rem;">
+            Υποκατάστημα
+          </label>
+        </div>
+        <div class="col-10"> 
+          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="ypokatasthmata" id="ypokatasthmata">
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
+          <thead style="font-size: 0.9vw;">
+            <tr>
+              <th scope="col" class="color-brown backgroundColor-brown col-0-5" style="text-align: center !important;"><input type="checkbox" id="select-all" class="form-check-input custom-checkbox checkbox-class"></th>
+              <th scope="col" class="color-brown backgroundColor-brown col-0-5">Κωδ.<i class="sort-icon bi"></i></th>
+              <th scope="col" class="color-brown backgroundColor-brown col-3-5">Επώνυμο<i class="sort-icon bi"></i></th>
+              <th scope="col" class="color-brown backgroundColor-brown col-2">Όνομα<i class="sort-icon bi"></i></th>
+              <th scope="col" class="color-brown backgroundColor-brown col-2">Πατρώνυμο<i class="sort-icon bi"></i></th>
+              <th scope="col" class="color-brown backgroundColor-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
+            </tr>
+          </thead>
+        </table>
+      </div>
+
+      <div class="card-body p-0 overflow-auto flex-grow-1" style="height: 52vh; background-color: #ffffff;">
+        <div class="table-responsive">
+          <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
+            <body>
+              <% if (ergazomenoi.length !== 0) { %>
+                <% ergazomenoi.forEach(element => { %>
+                  <tr class="input-content-regular" data-id="<%= element._id %>" data-kod="<%= element.kodikos %>">
+                    <td class="col-0-5" style="text-align: center !important;"><input type="checkbox" id="select-one" class="form-check-input custom-checkbox checkbox-class row-checkbox"></td>
+                    <td class="col-0-5"><%= element.kodikos %></td>
+                    <td class="col-3-5"><%= element.eponymo %></td>
+                    <td class="col-2"><%= element.onoma %></td>
+                    <td class="col-2"><%= element.patronymo %></td>
+                    <td class="col-1"><%= element.afm %></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="7" class="records-not-found">Δεν βρέθηκαν εγγραφές.</td>
+                </tr>
+              <% } %>
+            </body>
+          </table>
+        </div>
+      </div>
+
+      <div class="card-footer mt-auto">
+        <div class="d-flex" style="margin: -0.5rem 0.625rem 2rem;">
+      
+          <!-- Κουμπιά ενεργειών -->
+          <div class="d-flex" style="width: 100%; justify-content: space-around;">
+            <a 
+              id="get-oraria-btn"
+              href="#" 
+              role="button" style="font-size: 0.8vw;"
+              data-bs-toggle="tooltip" title="Ενημέρωση ψηφιακού ωραρίου ΑΠΟ - ΕΩΣ ημερομηνία και για τους επιλεγέντες εργαζόμενους" data-bs-placement="bottom" class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <% if (!userPrivileges.admin && !userPrivileges.update) { %>disabled-link<% } %>" <% if (!userPrivileges.admin && !userPrivileges.update) { %>onclick="event.preventDefault();" <% } %>>
+              <i class="bi bi-cloud-arrow-up"></i> Αποστολή Ωραρίων
+            </a>
+      
+            <a 
+              href="/mainapp"
+              role="button"
+              class="btn btn-brown rounded-4 mb-3 mt-2 col-2-5" style="font-size: 0.8vw;">
+              <i class="bi bi-chevron-double-left"></i> Επιστροφή
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</section>
+
+<% if (process.env.NODE_ENV === 'production') { %>
+  <script src="/min.js/ergazomenoi/programmata/exagoghOrarionSeErganh.min.js"></script>
+<% } else { %>
+  <script src="/js/common/moveByEnter.js"></script>
+  <script src="/js/common/scrollToTop.js"></script>
+  <script src="/js/common/sortTable.js"></script>
+  <script src="/js/common/setupTabKeyNavigation.js"></script>
+  <script src="/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script>
+  <script src="/js/ergazomenoi/programmata/controlCheckbox.js"></script>
+<% } %>

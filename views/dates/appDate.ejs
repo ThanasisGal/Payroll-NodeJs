@@ -1,0 +1,61 @@
+<div
+  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+  </br>
+</div>
+
+<div class="container w-35">
+  <form action="/dates/changeAppDate" method="POST">
+    
+    <div class="card z-depth-5 mt-10">
+      <div class="card-header">
+        <label class="w-100 text-center"><h4>Αλλαγή Ημερομηνίας Εφαρμογής</h4></label>
+      </div>
+      <div class="card-body">
+        <div class="row form-group g-3 align-items-center mt-2 mb-5">
+          <div class="col-6 right-align">
+            <label
+              for="appHmeromhnia"
+              class="col-form-label label-font-size"
+              >Ημερομηνία Εφαρμογής</label
+            >
+          </div>
+
+          <div class="col-4">
+            <input
+            type="date"
+            name="appHmeromhnia"
+            id="appHmeromhnia"
+            class="date-control"
+            value=""
+            />
+        </div>
+        </div>
+      </div>
+
+      <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important;">
+        <div
+          class="d-inline-block d-flex"
+          style="
+          margin-top: -0.5rem !important;
+          margin-bottom: -1rem !important;
+          margin-left: 10px !important;
+          margin-right: 10px !important;
+          justify-content: space-around;"
+        >
+          <button type="submit" class="btn btn-brown rounded-4 w-35 mb-1 mt-2"><i class="bi bi-box-arrow-in-right"></i> Ενημέρωση
+          </button>
+          <a class="btn btn-brown rounded-4 w-35 mb-1 mt-2" href="/mainapp"
+            ><i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+          >
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="/js/common/getCompanyDescription.js"></script>
+<script src="/js/common/getXrhsh.js"></script>
+<script src="/js/common/getPeriod.js"></script>
+<script src="/js/common/getAppDate.js"></script>
+<script src="/js/common/getUser.js"></script>
+<!-- <script src="/js/common/changeUrl.js"></script> -->

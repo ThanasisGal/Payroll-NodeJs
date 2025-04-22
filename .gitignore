@@ -1,0 +1,10 @@
+# Κλειδιά και διαπιστευτήρια
+*.pem
+.env
+
+# Παραγόμενα αρχεία και φακέλοι
+public/json/*.json
+public/pdf/*.pdf
+public/xlsx/*.xlsx
+public/xml/*.xml
+node_modules/

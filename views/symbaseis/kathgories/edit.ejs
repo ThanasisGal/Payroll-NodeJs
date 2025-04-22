@@ -1,0 +1,110 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    <!-- <hr style="margin-top: -2rem" /> -->
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius">
+
+            </br></br>
+
+            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+
+              <div class="card-header">
+                <label class="text-center headers-content">
+                  Συντήρηση Κατηγορίας Σύμβασης
+                </label>
+              </div>
+
+              <div class="card-body overflow-auto flex-grow-1" style="height: 27vh; background-color: #ffffff;" >
+                <input type="hidden" name="kathgoriesId" id="kathgoriesId" class="form-control" value="<%= kathgories._id %>" />
+                <input type="hidden" name="aa" id="aa" class="form-control" value="<%= kathgories.aa %>" />
+                <input type="hidden" name="afora_thn_symbash" id="afora_thn_symbash" class="form-control" value="<%= kathgories.afora_thn_symbash %>" />
+
+                </br>
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 right-align">
+                    <label
+                      class="col-form-label label-font-size">
+                      Σύμβαση
+                    </label>
+                  </div>
+                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
+                    <label><%= symbaseis.kodikos.padEnd(10, '\u00A0') + symbaseis.perigrafh %></label>
+                  </div>
+                </div>
+                
+                </br>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kodikos"
+                      class="col-form-label label-font-size field-required">
+                      Κωδικός
+                    </label>
+                  </div>
+                  <div class="col-1">
+                    <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= kathgories.kodikos.toString().padStart(4, '0') %>" readonly />
+                  </div>
+                </div>
+                
+                </br>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 right-align">
+                    <label for="perigrafh" class="col-form-label label-font-size field-required">
+                        Περιγραφή
+                    </label>
+                  </div>
+                  <div class="col-10-5">
+                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="<%= kathgories.perigrafh %>" />
+                  </div>
+                </div>
+                
+                </br>
+
+              </div>
+              
+              <div class="card-footer mt-auto" >
+                <div
+                  class="d-inline-block d-flex"
+                  style="
+                    margin-top: -0.5rem !important;
+                    margin-bottom: -1rem !important;
+                    margin-left: 10px !important;
+                    margin-right: 10px !important;
+                    justify-content: space-around;
+                  "
+                >
+                  <button
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton" 
+                  >
+                    <i class="bi bi-floppy"></i> Αποθήκευση
+                  </button>
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                    href="/symbaseis/kathgories"
+                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <script src="/js/common/getCompanyDescription.js"></script>
+    <script src="/js/common/moveByEnter.js"></script>
+    <script src="/js/symbaseis/kathgories/putFieldValues.js"></script>
+    <!-- <script src="/js/common/changeUrl.js"></script> -->
+  </div>
+</div>

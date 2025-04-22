@@ -1,0 +1,668 @@
+<div class="row form-group g-3 align-items-center mb-3" style="margin-top: -2.25rem;">
+  <div class="col-1-1 right-align"  style="margin-left: -0.3rem;">
+    <label for="synoloApodoxon" class="col-form-label label-font-size-smaller">
+      Σύνολο Αποδοχών
+    </label>
+  </div>
+  <div class="col-1-2">
+    <input type="number" class="form-control1 input-contents right-align no-spin notCleared" name="synoloApodoxon" id="synoloApodoxon" tabIndex="-1" style="background-color: #faf7ae5a;" value="0" readonly />
+  </div>
+
+  <div class="col-1-2 right-align">
+    <label for="symfonhtheisMisthos" class="col-form-label label-font-size-smaller">
+      Συμφ/θείς Μισθός
+    </label>
+  </div>
+  <div class="col-1-2">
+    <input type="number" class="form-control1 input-contents right-align no-spin notCleared" name="symfonhtheisMisthos" id="symfonhtheisMisthos" tabIndex="-1" style="background-color: #faf7ae5a;" value="0" readonly />
+  </div>
+
+  <div class="col-1-0-6 right-align">
+    <label for="nomimoHmeromisthio" class="col-form-label label-font-size-smaller">
+      Νόμ. Ημερ/σθιο
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin notCleared" name="nomimoHmeromisthio" id="nomimoHmeromisthio" style="background-color: #faf7ae5a;" tabIndex="-1" value="0" />
+  </div>
+
+  <div class="col-1 right-align">
+    <label for="pragmatikoHmeromisthio" class="col-form-label label-font-size-smaller">
+      Πραγμ.Ημ/σθιο 
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin notCleared" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+  </div>
+
+  <div class="col-1 right-align">
+    <label for="nomimoOromisthio" class="col-form-label label-font-size-smaller">
+      Νόμ. Ωρομίσθιο
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" style="background-color: #faf7ae5a;" class="form-control1 input-contents right-align no-spin notCleared" name="nomimoOromisthio" id="nomimoOromisthio" tabIndex="-1" value="0" />
+  </div>
+
+  <div class="col-1 right-align">
+    <label for="pragmatikoOromisthio" class="col-form-label label-font-size-smaller">
+      Πραγμ.Ωρομίσθιο 
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin notCleared" name="pragmatikoOromisthio" id="pragmatikoOromisthio" style="background-color: #86cf5b30; margin-left: 0.3rem;" tabIndex="-1" value="0" />
+  </div>
+</div>
+
+<hr class="hr-style-4" />
+
+<div class="row form-group g-3 align-items-center mb-3 mt-n-1-7">
+  <div class="col-1-1 right-align" style="margin-left: -1rem;">
+    <label for="hmeresErgasias" class="col-form-label label-font-size-smaller">
+      Ημέρες Εργασίας
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin input-field alreadyExists" name="hmeresErgasias" id="hmeresErgasias" value="0" min="0" max="31" />
+  </div>
+
+  <div class="col-1-1 right-align">
+    <label for="oresErgasias" class="col-form-label label-font-size-smaller">
+      Ώρες Εργασίας
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresErgasias" id="oresErgasias" value="0" />
+  </div>
+
+  <div class="col-1-0-6 right-align">
+    <label for="hmeresApoysias" class="col-form-label label-font-size-smaller">
+      Ημέρες Απουσίας
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="hmeresApoysias" id="hmeresApoysias" value="0" />
+  </div>
+
+  <div class="col-1-0-6 right-align">
+    <label for="oresApoysias" class="col-form-label label-font-size-smaller">
+      Ώρες Απουσίας
+    </label>
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresApoysias" id="oresApoysias" value="0" />
+  </div>
+
+  <div class="col-2-84 right-align">
+    <label class="col-form-label label-font-size-smaller">
+      Ημέρες & Ώρες Εργασίας <strong>ΜΕΙΟΝ</strong> Απουσίες
+    </label>
+  </div>
+  <div class="col-0-8" style="margin-left: 1rem;">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="hmeresErgasiasMeionApoysies" id="hmeresErgasiasMeionApoysies" style="background-color: #5d943d61;" value="0" tabIndex="-1" readonly />
+  </div>
+  <div class="col-0-8">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="oresErgasiasMeionApoysies" id="oresErgasiasMeionApoysies" style="background-color: #5d943d61;" value="0" tabIndex="-1" readonly />
+  </div>
+</div>
+
+<hr class="hr-style-3" />
+
+<div class="row form-group g-3 mt-n-1-7">
+  <div class="col-3 left-align">
+    <label for="hmeresAsfalishs" class="col-form-label label-font-size-smaller">
+      Ημέρες Ασφάλισης
+    </label>
+  </div>
+
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="hmeresAsfalishs" id="hmeresAsfalishs" tabIndex="1" value="0" />
+  </div>
+
+  <div class="col-1"></div>
+  <div class="col-2 left-align">
+    <label class="col-form-label fs-72" style="font-weight: 700; color: darkgreen">
+      Απαλλαγή από Ασφ/κές Εισφορές
+    </label>
+  </div>
+
+  <div class="col-0-1-5-1"></div>
+
+  <div class="col-3 left-align" style="color: #4c4c4c !important">
+    <label class="col-form-label label-font-size" style="color: #676767 !important">
+      <strong>ΤΑΚΤΙΚΑ ΚΑΤΑΒΑΛΛΟΜΕΝΕΣ ΑΠΟΔΟΧΕΣ</strong>
+    </label>
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-left mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresArgion" class="col-form-label label-font-size-smaller left-align">
+      Ώρες - Αξία Εργασίας Αργιών (Μόνο για προσαύξηση)
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresArgion" id="oresArgion" tabIndex="2" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaArgion" id="axiaArgion" tabIndex="-1" value="0" readonly />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaArgion" id="asfalistikhAxiaArgion" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="taktikesApodoxesMhYpologizomenesSeDora" class="col-form-label label-font-size-smaller">
+      Μη υπολογιζόμενες σε δώρα
+    </label>
+  </div>
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="taktikesApodoxesMhYpologizomenesSeDoraText" id="taktikesApodoxesMhYpologizomenesSeDoraText" tabIndex="19" value="" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="taktikesApodoxesMhYpologizomenesSeDora" id="taktikesApodoxesMhYpologizomenesSeDora" tabIndex="20" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-55">
+  <div class="col-3 left-align">
+    <label for="oresNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Εργασίας Νύχτας (Μόνο για προσαύξηση)
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresNyxtas" id="oresNyxtas" tabIndex="3" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaNyxtas" id="axiaNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaNyxtas" id="asfalistikhAxiaNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="taktikesApodoxesYpologizomenesSeDora" class="col-form-label label-font-size-smaller">
+      Υπολογιζόμενες σε δώρα
+    </label>
+  </div>
+
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="taktikesApodoxesYpologizomenesSeDoraText" id="taktikesApodoxesYpologizomenesSeDoraText" tabIndex="21" value="" />
+  </div>
+  
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="taktikesApodoxesYpologizomenesSeDora" id="taktikesApodoxesYpologizomenesSeDora" tabIndex="22" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresYperergasias" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Υπερεργασίας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresYperergasias" id="oresYperergasias" tabIndex="4" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaYperergasias" id="axiaYperergasias" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaYperergasias" id="asfalistikhAxiaYperergasias" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-3-9 left-align">
+    <label  for="sympsifisteesApodoxes" class="col-form-label label-font-size">
+      Αποδοχές Δυνάμενες να Συμψηφιστούν με Μελλοντικές Αποδοχές
+    </label>
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="sympsifisteesApodoxes" id="sympsifisteesApodoxes" tabIndex="23" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3"">
+  <div class="col-3 left-align">
+    <label for="oresYperergasiasNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Υπερεργασίας Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresYperergasiasNyxtas" id="oresYperergasiasNyxtas" tabIndex="5" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaYperergasiasNyxtas" id="axiaYperergasiasNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaYperergasiasNyxtas" id="asfalistikhAxiaYperergasiasNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-3-9 left-align" style="color: #4c4c4c !important">
+    <label class="col-form-label label-font-size" style="color: #676767 !important">
+      <strong>ΕΚΤΑΚΤΑ ΚΑΤΑΒΑΛΛΟΜΕΝΕΣ ΑΠΟΔΟΧΕΣ</strong>
+    </label>
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresYperergasiasArgion" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Υπερεργασίας Αργιών
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresYperergasiasArgion" id="oresYperergasiasArgion" tabIndex="6" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaYperergasiasArgion" id="axiaYperergasiasArgion" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaYperergasiasArgion" id="asfalistikhAxiaYperergasiasArgion" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="epimerizomenesSeMhnesErgasias" class="col-form-label label-font-size-smaller">
+      Επιμεριζόμενες σε μήνες εργασίας
+    </label>
+  </div>
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="epimerizomenesSeMhnesErgasiasText" id="epimerizomenesSeMhnesErgasiasText" tabIndex="24" value="" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="epimerizomenesSeMhnesErgasias" id="epimerizomenesSeMhnesErgasias" tabIndex="25" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresYperergasiasArgionNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Υπερεργασίας Αργιών Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresYperergasiasArgionNyxtas" id="oresYperergasiasArgionNyxtas" tabIndex="7" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaYperergasiasArgionNyxtas" id="axiaYperergasiasArgionNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaYperergasiasArgionNyxtas" id="asfalistikhAxiaYperergasiasArgionNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="primBonus" class="col-form-label label-font-size-smaller">
+      Πριμ / Bonus
+    </label>
+  </div>
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="primBonusText" id="primBonusText" tabIndex="26" value="" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="primBonus" id="primBonus" tabIndex="27" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresNomimhsYperorias" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Νόμιμης Υπερωρίας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresNomimhsYperorias" id="oresNomimhsYperorias" tabIndex="8" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaNomimhsYperorias" id="axiaNomimhsYperorias" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaNomimhsYperorias" id="asfalistikhAxiaNomimhsYperorias" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="apallassomenesKrathseon" class="col-form-label label-font-size-smaller">
+      Απαλλασσόμενες του Φόρου
+    </label>
+  </div>
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="apallassomenesForoyText" id="apallassomenesForoyText" tabIndex="28" value="" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="apallassomenesForoy" id="apallassomenesForoy" tabIndex="29" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresNomimhsYperoriasNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Νόμιμης Υπερωρίας Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresNomimhsYperoriasNyxtas" id="oresNomimhsYperoriasNyxtas" tabIndex="9" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaNomimhsYperoriasNyxtas" id="axiaNomimhsYperoriasNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaNomimhsYperoriasNyxtas" id="asfalistikhAxiaNomimhsYperoriasNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-2 left-align">
+    <label for="apallassomenesKrathseon" class="col-form-label label-font-size-smaller">
+      Απαλλασσόμενες των Κρατήσεων
+    </label>
+  </div>
+  <div class="col-1-9">
+    <input type="text" class="form-control1 input-contents left-align alreadyExists" name="apallassomenesKrathseonText" id="apallassomenesKrathseonText" tabIndex="30" value="" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="apallassomenesKrathseon" id="apallassomenesKrathseon" tabIndex="31" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresNomimhsYperoriasArgion" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Νόμιμης Υπερωρίας Αργιών
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresNomimhsYperoriasArgion" id="oresNomimhsYperoriasArgion" tabIndex="10" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaNomimhsYperoriasArgion" id="axiaNomimhsYperoriasArgion" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaNomimhsYperoriasArgion" id="asfalistikhAxiaNomimhsYperoriasArgion" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-3 left-align">
+    <label for="meioshErgatikhsEisforas" class="col-form-label label-font-size-smaller">
+      Μείωση Εργατικής Εισφοράς
+    </label>
+  </div>
+  <div class="col-0-9"></div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="meioshErgatikhsEisforas" id="meioshErgatikhsEisforas" tabIndex="32" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresNomimhsYperoriasArgionNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Νόμιμης Υπερωρίας Αργιών Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresNomimhsYperoriasArgionNyxtas" id="oresNomimhsYperoriasArgionNyxtas" tabIndex="11" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaNomimhsYperoriasArgionNyxtas" id="axiaNomimhsYperoriasArgionNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaNomimhsYperoriasArgionNyxtas" id="asfalistikhAxiaNomimhsYperoriasArgionNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-3 left-align">
+    <label for="epidothshErgodotikhsEisforas" class="col-form-label label-font-size-smaller">
+      Επιδοτηση Εργοδοτικής Εισφοράς
+    </label>
+  </div>
+
+  <div class="col-0-9"></div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="epidothshErgodotikhsEisforas" id="epidothshErgodotikhsEisforas" tabIndex="33" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresParanomhsYperorias" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Παράνομης Υπερωρίας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresParanomhsYperorias" id="oresParanomhsYperorias" tabIndex="12" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaParanomhsYperorias" id="axiaParanomhsYperorias" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaParanomhsYperorias" id="asfalistikhAxiaParanomhsYperorias" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <div class="col-1-0-3 left-align">
+    <label for="apoHmeromhnia" class="col-form-label" style="font-size: 0.69vw !important;">
+      Από Ημερομηνία
+    </label>
+  </div>
+
+  <div class="col-1-4">
+    <input type="date" class="date-control right-align alreadyExists" name="apoHmeromhnia" id="apoHmeromhnia" style="font-size: 0.8vw !important; text-align: left !important;" tabIndex="34" value="" />
+  </div>
+
+  <div class="col-1-0-3 left-align">
+    <label for="eosHmeromhnia" class="col-form-label label-font-size-smaller">
+      Έως Ημερομηνία
+    </label>
+  </div>
+
+  <div class="col-1-4">
+    <input type="date" class="date-control right-align ml-0-2 alreadyExists" name="eosHmeromhnia" id="eosHmeromhnia" style="font-size: 0.8vw !important; text-align: left !important;" tabIndex="35" value="" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresParanomhsYperoriasNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Παράνομης Υπερωρίας Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresParanomhsYperoriasNyxtas" id="oresParanomhsYperoriasNyxtas" tabIndex="13" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaParanomhsYperoriasNyxtas" id="axiaParanomhsYperoriasNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaParanomhsYperoriasNyxtas" id="asfalistikhAxiaParanomhsYperoriasNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1-1-71"></div>
+
+  <input type="hidden" class="form-control1 input-contents right-align no-spin" name="neoPragmatikoHmeromisthio" id="neoPragmatikoHmeromisthio" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+
+  <div class="col-3 left-align">
+    <label for="synoloMiktonApodoxon" class="col-form-label label-font-size field-required">
+      Σύνολο Μικτών Αποδοχών
+    </label>
+  </div>
+
+  <div class="col-0-9"></div>
+
+  <div class="col-1">
+    <input type="text" class="form-control1 input-contents right-align no-spin" name="synoloMiktonApodoxon" id="synoloMiktonApodoxon" style="background-color: #86cf5b30;" tabIndex="-1" value="0" readonly />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresParanomhsYperoriasArgion" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Παράνομης Υπερωρίας Αργιών
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresParanomhsYperoriasArgion" id="oresParanomhsYperoriasArgion" tabIndex="14" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaParanomhsYperoriasArgion" id="axiaParanomhsYperoriasArgion" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaParanomhsYperoriasArgion" id="asfalistikhAxiaParanomhsYperoriasArgion" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+  <div class="col-1 left-align" style="margin-bottom: -.8rem;"></div>
+
+  <div class="col-0-1-5-1"></div>
+    
+  <input type="hidden" class="form-control1 input-contents right-align no-spin" name="pragmatikoHmeromisthioAstheneias" id="pragmatikoHmeromisthioAstheneias" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+  
+  <div class="col-3 left-align">
+    <label for="synoloKrathseon_I" class="col-form-label label-font-size field-required">
+      Σύνολο Κρατήσεων
+    </label>
+  </div>
+
+  <div class="col-0-9"></div>
+
+  <div class="col-1">
+    <input type="text" class="form-control1 input-contents right-align no-spin ml-n-0" name="synoloKrathseon_I" id="synoloKrathseon_I" style="background-color: #eae86341;" tabIndex="-1" value="" readonly />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresParanomhsYperoriasArgionNyxtas" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Παράνομης Υπερωρίας Αργιών Νύχτας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresParanomhsYperoriasArgionNyxtas" id="oresParanomhsYperoriasArgionNyxtas" tabIndex="15" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaParanomhsYperoriasArgionNyxtas" id="axiaParanomhsYperoriasArgionNyxtas" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="asfalistikhAxiaParanomhsYperoriasArgionNyxtas" id="asfalistikhAxiaParanomhsYperoriasArgionNyxtas" tabIndex="-1" value="0" style="background-color: #86cf5b30;" readonly />
+  </div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="synoloAsfalistikhsAxias" id="synoloAsfalistikhsAxias" tabIndex="-1" value="0" style="font-size: 1vw !important; font-weight: 700 !important; background-color: #eae86341;" readonly />
+  </div>  
+
+  <div class="col-0-1-5-1"></div>
+
+  <input type="hidden" class="form-control1 input-contents right-align no-spin" name="synoloTaktikaKataballomenonApodoxon" id="synoloTaktikaKataballomenonApodoxon" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+
+  <div class="col-3 left-align">
+    <label for="synoloForoy" class="col-form-label label-font-size field-required">
+      Σύνολο Φόρου
+    </label>
+  </div>
+
+  <div class="col-0-9"></div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists ml-n-0" name="synoloForoy" id="synoloForoy" tabIndex="-1" style="background-color: #eae86341;" value="0" />
+  </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-2 left-align">
+    <label for="oresErgasias6Hmeras" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Εργασίας 6ης Ημέρας
+    </label>
+  </div>
+  <div class="col-1"></div>
+
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresErgasias6Hmeras" id="oresErgasias6Hmeras" tabIndex="16" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaErgasias6Hmeras" id="axiaErgasias6Hmeras" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1-26"></div>
+  
+  <div class="col-0-9">
+    <input type="hidden" class="form-control1 input-contents right-align no-spin" name="synoloEktaktaKataballomenonApodoxon" id="synoloEktaktaKataballomenonApodoxon" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+  </div>
+
+  <div class="col-3 left-align">
+    <label for="prokatabolh" class="col-form-label label-font-size field-required">
+      Προκαταβολή
+    </label>
+  </div>
+
+  <div class="col-0-9"></div>
+
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="prokatabolh" id="prokatabolh" tabIndex="-1" style="background-color: #eae86341;" value="0" />
+  </div>
+
+</div>
+
+<div class="row form-group g-3 align-items-center mt-n-1-3">
+  <div class="col-3 left-align">
+    <label for="oresProsthethsErgasias" class="col-form-label label-font-size-smaller">
+      Ώρες - Αξία Πρόσθετης Εργασίας
+    </label>
+  </div>
+  <div class="col-0-9">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="oresProsthethsErgasias" id="oresProsthethsErgasias" tabIndex="17" value="0" />
+  </div>
+  <div class="col-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin" name="axiaProsthethsErgasias" id="axiaProsthethsErgasias" tabIndex="-1" value="0" readonly />
+  </div>
+
+  <div class="col-1-26 left-align" style="color: green;"">
+    <!-- <label for="synoloProsayxhseon" class="col-form-label" style="font-size: 0.65vw !important;">
+      Προσαυξήσεων
+    </label> -->
+  </div>
+  <div class="col-0-9">
+    <input type="hidden" class="form-control1 input-contents right-align no-spin" name="synoloProsayxhseon" id="synoloProsayxhseon" style="background-color: #86cf5b30;" tabIndex="-1" value="0" />
+  </div>
+
+  <div class="col-1 left-align">
+    <label for="plhroteo" class="col-form-label label-font-size-larger field-required">
+      ΠΛΗΡΩΤΕΟ
+    </label>
+  </div>
+  <div class="col-2-5 left-align">
+    <label for="plhroteo" class="col-form-label label-font-size-smallest">
+      (Επιλέξτε Νέο Πληρωτέο με διπλό κλικ στο ποσό)
+    </label>
+  </div>
+
+  <div class="col-0-3"></div>
+
+  <div class="col-1-1">
+    <input type="number" class="form-control1 input-contents right-align no-spin alreadyExists" name="plhroteo" id="plhroteo" tabIndex="-1" style="background-color: #012b0fb2; color: #ffffff; font-size: 1.1rem !important; font-weight: 800;" value="0" readonly />
+  </div>
+</div>

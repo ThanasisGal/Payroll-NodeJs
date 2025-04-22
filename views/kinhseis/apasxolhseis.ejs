@@ -1,0 +1,210 @@
+<div class="tadded-container" id="apasxolhseisForm">
+    <div class="container-fluid">
+        <div class="menu_Links">
+            <ul>
+                <li class="apodoxes active">Αποδοχές</li>
+                <li class="krathseis">Κρατήσεις</li>
+                <li class="foroi">Φόροι</li>
+                <li class="astheneia">Ασθένειες</li>
+                <li class="adeies">Άδειες</li>
+                <li class="diafora">Διάφορα</li>
+            </ul>
+        </div>
+        
+        <hr style="margin-top: -2rem; margin-bottom: 0.4rem;" />
+
+        <div class="sections">
+            <section class="sel_1_section visible" data-section="Αποδοχές">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis ht-62" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+
+                            <%- include('./apasxolhseis/cardHeader_Apasxolhseis') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+                                <input type="hidden" name="idHidden" id="idHidden" value="" />
+                                <input type="hidden" name="idKinhseonHidden" id="idKinhseonHidden" value="" />
+                                <input type="hidden" name="team" id="team" value="<%= sessionTeam %>" />
+                                <input type="hidden" name="company_kod" id="company_kod" value="<%= companyId %>" />
+                                <input type="hidden" name="mhnas" id="mhnas" value="<%= sessionMhnas %>" />
+                                <input type="hidden" name="etos" id="etos" value="<%= sessionEtos %>" />
+                                <input type="hidden" name="typ_apod" id="typ_apod" value="<%= sessionTyposApodoxon %>" />
+
+                                <input type="hidden" name="kodikosHidden" id="kodikosHidden" value="" />
+                                <input type="hidden" name="eidikhKathgoriaErgazomenoy_Hidden" id="eidikhKathgoriaErgazomenoy_Hidden" value="" />
+                                <input type="hidden" name="aa_misthodosias_Hidden" id="aa_misthodosias_Hidden" value="" />
+                                <input type="hidden" name="exoflhsh_Hidden" id="exoflhsh_Hidden" value="" />
+                                <input type="hidden" name="poso_plhromhs_Hidden" id="poso_plhromhs_Hidden" value="" />
+                                
+                                <input type="hidden" name="sxeshErgasias_Hidden" id="sxeshErgasias_Hidden" value="" />
+                                <input type="hidden" name="kathestosApasxolhshs_Hidden" id="kathestosApasxolhshs_Hidden" value="" />
+                                <input type="hidden" name="oikogeneiakhKatastash_Hidden" id="oikogeneiakhKatastash_Hidden" value="" />
+                                <input type="hidden" name="typosErgazomenon_Hidden" id="typosErgazomenon_Hidden" value="" />
+                                <input type="hidden" name="periodos_Hidden" id="periodos_Hidden" value="<%= sessionMhnas %>" />
+                                <input type="hidden" name="typosApodoxon_Hidden" id="typosApodoxon_Hidden" value="" />
+                                <input type="hidden" name="apasxolhshBaseiSymbashs_Hidden" id="apasxolhshBaseiSymbashs_Hidden" value="" />
+                                <input type="hidden" name="noRecords_Hidden" id="noRecords_Hidden" value="" />
+                                <input type="hidden" name="orioYperorion_Hidden" id="orioYperorion_Hidden" value="0" />
+                                <input type="hidden" class="notCleared" name="ypokatasthma_Hidden" id="ypokatasthma_Hidden" value="" />
+                                <input type="hidden" class="notCleared" name="ergazomenos_Hidden" id="ergazomenos_Hidden" value="" />
+                                <input type="hidden" name="allaghPlhroteoy_Hidden" id="allaghPlhroteoy_Hidden" value="0" />
+                                
+                                <input type="hidden" name="synoloMiktonApodoxon_Hidden" id="synoloMiktonApodoxon_Hidden" value="0" />
+                                <input type="hidden" name="dotoPlhroteo_Hidden" id="dotoPlhroteo_Hidden" value="false" />
+                                
+                                <%- include('./apasxolhseis/cardBody_Apasxolhseis') %>
+
+                            </div>
+
+                            <%- include('./apasxolhseis/cardFooter_Apodoxes') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="sel_2_section visible" data-section="Κρατήσεις">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+              
+                            <%- include('./krathseis/cardHeader_Krathseis') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                                <%- include('./krathseis/cardBody_Krathseis') %>
+
+                            </div>
+
+                            <%- include('./krathseis/cardFooter_Krathseis') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="sel_3_section visible" data-section="Φόροι">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+              
+                            <%- include('./foroi/cardHeader_Foroi') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                                <%- include('./foroi/cardBody_Foroi') %>
+
+                            </div>
+
+                            <%- include('./foroi/cardFooter_Foroi') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="sel_4_section visible" data-section="Ασθένειες">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+              
+                            <%- include('./astheneia/cardHeader_Astheneia') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="height: 61.6vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                                <input type="hidden" name="arithmos_grammon_astheneion" id="arithmos_grammon_astheneion" value="<%= arithmos_grammon_astheneion %>" />
+                                <input type="hidden" name="hmeromhnia_arxhs_ergasiakoy_etoys" id="hmeromhnia_arxhs_ergasiakoy_etoys" value="" />
+                                <input type="hidden" name="hmeromhnia_teloys_ergasiakoy_etoys" id="hmeromhnia_teloys_ergasiakoy_etoys" value="" />
+                                <input type="hidden" name="hmeromhnia_arxhs_epomenoy_ergasiakoy_etoys" id="hmeromhnia_arxhs_epomenoy_ergasiakoy_etoys" value="" />
+                                <input type="hidden" name="hmeromhnia_teloys_epomenoy_ergasiakoy_etoys" id="hmeromhnia_teloys_epomenoy_ergasiakoy_etoys" value="" />
+
+                                <%- include('./astheneia/cardBody_Astheneia') %>
+
+                            </div>
+
+                            <%- include('./astheneia/cardFooter_Astheneia') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="sel_5_section visible" data-section="Άδειες">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+              
+                            <%- include('./adeies/cardHeader_Adeies') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="height: 61.6vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                                <input type="hidden" name="arithmos_grammon_adeion" id="arithmos_grammon_adeion" value="<%= arithmos_grammon_adeion %>" />
+
+                                <%- include('./adeies/cardBody_Adeies') %>
+
+                            </div>
+
+                            <%- include('./adeies/cardFooter_Adeies') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="sel_6_section visible" data-section="Διάφορα">
+                <div>
+                    <form class="formRadius">
+
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+              
+                            <%- include('./diafora/cardHeader_Diafora') %>
+
+                            <div class="card-body overflow-auto flex-grow-1" style="height: 61.6vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                                <%- include('./diafora/cardBody_Diafora') %>
+
+                            </div>
+
+                            <%- include('./diafora/cardFooter_Diafora') %>
+
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+        </div>
+        
+        <% if (process.env.NODE_ENV === 'production') { %>
+            <script src="/min.js/kinhseis/apasxolhseis_ejs.min.js"></script>
+        <% } else { %>
+            <script src="/js/common/moveByEnter.js"></script>
+            <script src="/js/common/formatDates.js"></script>
+            <script src="/js/common/formatTimes.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/buttonPermissions.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/allaghReadonlyFields.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/loadDropdowns.js"></script>
+            <script src="/js/common/removeGreekAccentsAndToUpper.js"></script>
+            <script src="/js/common/modal.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/apasxolhseis.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/updateLabelFromHidden.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/clearFormFields.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/clearValueFields.js"></script>
+            <script src="/js/common/showModal.js"></script>
+            <script src="/js/common/scrollToTop.js"></script>
+            <script src="/js/common/getFocusNumberFields.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/loadKrathseis.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/astheneies.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/ypologismoiForoy.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/adeies.js"></script>
+            <script src="/js/kinhseis/apasxolhseis/putFieldValues.js"></script>
+        <% } %>
+
+    </div>
+</div>

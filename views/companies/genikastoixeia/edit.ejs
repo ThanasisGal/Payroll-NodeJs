@@ -1,0 +1,2020 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active">Σταθερά Στοιχεία</li>
+        <li>Δραστηριότητες</li>
+        <li>Τεχνικός Ασφαλείας</li>
+        <li>Ιατρός Εργασίας</li>
+        <li>Λογιστής</li>
+        <li>Διάφορα</li>
+        <li>Έμμεσος Εργοδότης</li>
+        <li>Διάδοχος Εργοδότης</li>
+      </ul>
+    </div>
+    <hr style="margin-top: -2rem" />
+    
+    <div class="sections">    
+      <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
+      <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+      <input type="hidden" name="companyNomos" id="companyNomos" class="form-control" value="<%= company.nomos %>" />
+      <input type="hidden" name="companyDhmos" id="companyDhmos" class="form-control" value="<%= company.dhmos %>" />
+      <input type="hidden" name="companyPolh" id="companyPolh" class="form-control" value="<%= company.polh %>" />
+      <input type="hidden" name="companyLogisths" id="companyLogisths" class="form-control" value="<%= company.logisths ? company.logisths : '' %>" />
+      <input type="hidden" name="companyTexnikos" id="companyTexnikos" class="form-control" value="<%= company.texnikos_asfaleias ? company.texnikos_asfaleias : '' %>" />
+      <input type="hidden" name="companyIatros" id="companyIatros" class="form-control" value="<%= company.iatros_ergasias ? company.iatros_ergasias : '' %>" />
+      <input type="hidden" name="currentImage" id="currentImage" class="form-control" value="<%= company.sfragida ? company.sfragida : '' %>" />
+      <input type="hidden" name="imagePath" id="imagePath" class="form-control" value="<%= company.imagePath ? company.imagePath : '' %>" />
+      <input type="hidden" name="companyEmmesosErgodoths" id="companyEmmesosErgodoths" class="form-control" value="<%= company.emmesos_ergodoths ? company.emmesos_ergodoths : '' %>" />
+      <input type="hidden" name="companyDiadoxosErgodoths" id="companyDiadoxosErgodoths" class="form-control" value="<%= company.diadoxos_ergodoths ? company.diadoxos_ergodoths : '' %>" />
+
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content">Συντήρηση Στοιχείων Εταιρείας ( Κωδ. <%= company.kod %> )</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymia"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymia"
+                      id="eponymia"
+                      class="form-control input-content"
+                      value="<%= company.eponymia %>"
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="firstName"
+                      class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="firstName"
+                      id="firstName"
+                      class="form-control input-content"
+                      value="<%= company.firstname %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="fatherName"
+                      class="col-form-label label-font-size"
+                      >Πατρώνυμο</label
+                    >
+                  </div>
+
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="fatherName"
+                      id="fatherName"
+                      class="form-control input-content"
+                      value="<%= company.fathername %>"
+                    />
+                  </div>
+
+                  <div class="col-2"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="titlos" class="col-form-label label-font-size"
+                      >Τίτλος</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <input
+                      type="text"
+                      name="titlos"
+                      id="titlos"
+                      class="form-control input-content"
+                      value="<%= company.titlos %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="activity" class="col-form-label label-font-size"
+                      >Δραστηριότητα</label
+                    >
+                  </div>
+                  <div class="col-10-5">
+                    <input
+                      type="text"
+                      name="activity"
+                      id="activity"
+                      class="form-control input-content"
+                      value="<%= company.activity %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm"
+                      id="afm"
+                      class="form-control input-content"
+                      value="<%= company.afm %>"
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="adt" class="col-form-label label-font-size"
+                      >Α.Δ.Τ.</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="adt"
+                      id="adt"
+                      class="form-control input-content"
+                      value="<%= company.adt %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="odos" class="col-form-label label-font-size"
+                      >Οδός</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="odos"
+                      id="odos"
+                      class="form-control input-content"
+                      value="<%= company.odos %>"
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="arithmos" class="col-form-label label-font-size"
+                      >Αριθμός</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="arithmos"
+                      id="arithmos"
+                      class="form-control input-content"
+                      value="<%= company.arithmos %>"
+                    />
+                  </div>
+
+                  <div class="col-1 right-align">
+                    <label for="tk" class="col-form-label label-font-size"
+                      >Τ.Κ.</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="tk"
+                      id="tk"
+                      class="form-control input-content"
+                      value="<%= company.tk %>"
+                      maxlength="5"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="perifereies"
+                      class="col-form-label label-font-size"
+                      >Περιφέρεια</label
+                    >
+                  </div>
+
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="perifereies"
+                      id="perifereies">
+                      <% perifereies.forEach(function(perifereia) { %>
+                          <option value="<%= perifereia.kodikos %>" <% if(perifereia.kodikos == company.perifereia) { %>selected<% } %>><%= perifereia.perigrafh %></option>
+                      <% }); %>
+                    </select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="nomos" class="col-form-label label-font-size"
+                      >Περιφ. Ενότητα</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="nomos"
+                      id="nomos"
+                      style="font-size: 1vw">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="dhmos" class="col-form-label label-font-size"
+                      >Δημοτ. Ενότητα</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="dhmos"
+                      id="dhmos"
+                      style="font-size: 1vw"
+                    ></select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="polh" class="col-form-label label-font-size"
+                      >Δημοτ.Διαμέρισμα</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="polh"
+                      id="polh"
+                      style="font-size: 1vw"
+                    ></select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="thlefono" class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="thlefono"
+                      id="thlefono"
+                      class="form-control input-content"
+                      value="<%= company.thlefono %>"
+                      maxlength="10"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="fax" class="col-form-label label-font-size"
+                      >Fax</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="fax"
+                      id="fax"
+                      class="form-control input-content"
+                      value="<%= company.fax %>"
+                      maxlength="10"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="anenergh" class="col-form-label label-font-size"
+                      >Ανενεργή</label
+                    >
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="anenergh" name="anenergh" <%= company.anenergh ? 'checked' : '' %> value="" /> 
+                    <label for="anenergh" id="label-anenergh" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+                  </div>
+
+                  <div class="col-4"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="email" class="col-form-label label-font-size"
+                      >e-Mail</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      class="form-control input-content"
+                      value="<%= company.email %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="nomikhmorfh"
+                      class="col-form-label label-font-size"
+                      >Νομική Μορφή</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="nomikhmorfh"
+                      id="nomikhmorfh"
+                      data-selected="<%= company.nomikh_morfh %>">
+                  </select>
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="pararthmaefka"
+                      class="col-form-label label-font-size"
+                      >Παράρτημα ΕΦΚΑ</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="pararthmaefka"
+                      id="pararthmaefka"
+                      data-selected="<%= company.pararthma_efka %>">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="doy" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
+                  </div>
+                  <div class="col-5">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="doy"
+                      id="doy"
+                      data-selected="<%= company.doy_company %>">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="tameio1" class="col-form-label label-font-size"
+                      >Ταμείο #1 (τ.ΙΚΑ)</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="tameio1"
+                      id="tameio1">
+                    </select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="ame1" class="col-form-label label-font-size"
+                      >Α.Μ.Ε. #1</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ame1"
+                      id="ame1"
+                      class="form-control input-content"
+                      value="<%= company.ame1 %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="tameio2" class="col-form-label label-font-size"
+                      >Ταμείο #2</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="tameio2"
+                      id="tameio2">
+                    </select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="ame2" class="col-form-label label-font-size"
+                      >Α.Μ.Ε. #2</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ame2"
+                      id="ame2"
+                      class="form-control input-content"
+                      value="<%= company.ame2 %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-1-5 right-align">
+                    <label for="tameio3" class="col-form-label label-font-size"
+                      >Ταμείο #3</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="tameio3"
+                      id="tameio3">
+                    </select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="ame3" class="col-form-label label-font-size"
+                      >Α.Μ.Ε. #3</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ame3"
+                      id="ame3"
+                      class="form-control input-content"
+                      value="<%= company.ame3 %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-2">
+                  <div class="col-1-5 right-align">
+                    <label for="tameio4" class="col-form-label label-font-size"
+                      >Ταμείο #4</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="tameio4"
+                      id="tameio4">
+                    </select>
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="ame4" class="col-form-label label-font-size"
+                      >Α.Μ.Ε. #4</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ame4"
+                      id="ame4"
+                      class="form-control input-content"
+                      value="<%= company.ame4 %>"
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button" class="btn btn-brown rounded-4 buttons-content mt-2 w-20 submitButton" id="">
+                      <i class="buttons-content bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 buttons-content mt-2 w-20"
+                      href="/companies/genikastoixeia/">
+                      <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_2_section visible" data-section="Δραστηριότητες">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Δραστηριότητες</label
+              >
+              <div class="card-body">
+                <% for (let index = 1; index <= 6; index++) { %>
+                  <div class="row form-group g-3 align-items-center mb-3">
+                    <div class="col-1-5 right-align">
+                      <label
+                        <% if (index === 1) { %>
+                          for=<%= `koddrast${index}` %>
+                          class="col-form-label label-font-size"
+                          >Κύρια Δραστηριότητα</label>
+                        <% } else if (index === 6) { %>
+                          for=<%= `koddrast${index}` %>
+                          class="col-form-label label-font-size"
+                          >ΚΑΔ Παραρτήματος</label>
+                        <% } else { %>
+                          for=<%= `koddrast${index}` %>
+                          class="col-form-label label-font-size"
+                          >Δευτ/σα Δραστ/τα #<%= index %></label>
+                        <% } %>
+                    </div>
+                
+                    <div class="col-1">
+                      <input
+                        type="text"
+                        name=<%= `koddrast${index}` %>
+                        id=<%= `koddrast${index}` %>
+                        class="form-control input-content"
+                        value=""
+                        placeholder="Αναζήτηση"
+                      />
+                    </div>
+                
+                    <div class="col-8-5">
+                      <select
+                        class="form-select selectpicker-dropdown-small"
+                        name=<%= `kad${index}` %>
+                        id=<%= `select_kad${index}` %>
+                      ></select>
+                    </div>
+                    <i
+                      id=<%= `tooltipIcon_${index}` %>
+                      class="bi bi-info-circle-fill col-0-5"
+                      style="
+                        cursor: pointer;
+                        font-size: 20px;
+                        color: rgb(128, 187, 253);">
+                    </i>
+                  </div>
+                <% } %>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                      style="font-size: 0.8vw"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      style="font-size: 0.8vw"
+                      style="vertical-align: middle"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_3_section visible" data-section="Τεχνικός Ασφαλείας">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Τεχνικός Ασφαλείας</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kod_ta"
+                      class="col-form-label label-font-size"
+                      >Κωδικός</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="kod_ta"
+                      id="kod_ta"
+                      class="form-control input-content"
+                      value="<%= company.texnikos_asfaleias %>"
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm_ta"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm_ta"
+                      id="afm_ta"
+                      class="form-control input-content"
+                      value=""
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymo_ta"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymo_ta"
+                      id="eponymo_ta"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="onoma_ta" class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="onoma_ta"
+                      id="onoma_ta"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="dieythynsh_ta"
+                      class="col-form-label label-font-size"
+                      >Διεύθυνση</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="dieythynsh_ta"
+                      id="dieythynsh_ta"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="thlefono_ta"
+                      class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="thlefono_ta"
+                      id="thlefono_ta"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="ores_ta"
+                      class="col-form-label label-font-size field-required"
+                    >
+                      Ώρες Απασχ/σης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="number"
+                      name="ores_ta"
+                      id="ores_ta"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="ap_katatheshs_ta"
+                      class="col-form-label label-font-size"
+                      >Αρ.Πρωτ. Κατάθεσης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ap_katatheshs_ta"
+                      id="ap_katatheshs_ta"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="hmnia_katatheshs_ta"
+                      class="col-form-label label-font-size"
+                      >Ημ/νία Κατάθεσης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="hmnia_katatheshs_ta"
+                      id="hmnia_katatheshs_ta"
+                      class="date-control"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="isxyei_eos_ta"
+                      class="col-form-label label-font-size"
+                      >Ισχύει Έως</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="isxyei_eos_ta"
+                      id="isxyei_eos_ta"
+                      class="date-control"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                      style="font-size: 0.8vw"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      style="font-size: 0.8vw"
+                      style="vertical-align: middle"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_4_section visible" data-section="Ιατρός Εργασίας">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Ιατρός Εργασίας</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kod_ia"
+                      class="col-form-label label-font-size"
+                      >Κωδικός</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="kod_ia"
+                      id="kod_ia"
+                      class="form-control input-content"
+                      value="<%= company.iatros_ergasias %>"
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm_ia"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm_ia"
+                      id="afm_ia"
+                      class="form-control input-content"
+                      value=""
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymo_ia"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymo_ia"
+                      id="eponymo_ia"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="onoma_ia" class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="onoma_ia"
+                      id="onoma_ia"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="dieythynsh_ia"
+                      class="col-form-label label-font-size"
+                      >Διεύθυνση</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="dieythynsh_ia"
+                      id="dieythynsh_ia"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="thlefono_ia"
+                      class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="thlefono_ia"
+                      id="thlefono_ia"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="ores_ia"
+                      class="col-form-label label-font-size field-required"
+                    >
+                      Ώρες Απασχ/σης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="number"
+                      name="ores_ia"
+                      id="ores_ia"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="ap_katatheshs_ia"
+                      class="col-form-label label-font-size"
+                      >Αρ.Πρωτ. Κατάθεσης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="ap_katatheshs_ia"
+                      id="ap_katatheshs_ia"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="hmnia_katatheshs_ia"
+                      class="col-form-label label-font-size"
+                      >Ημ/νία Κατάθεσης</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="hmnia_katatheshs_ia"
+                      id="hmnia_katatheshs_ia"
+                      class="date-control"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="isxyei_eos_ia"
+                      class="col-form-label label-font-size"
+                      >Ισχύει Έως</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="isxyei_eos_ia"
+                      id="isxyei_eos_ia"
+                      class="date-control"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                      style="font-size: 0.8vw"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      style="font-size: 0.8vw"
+                      style="vertical-align: middle"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_5_section visible" data-section="Λογιστής">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Λογιστής</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kod_lo"
+                      class="col-form-label label-font-size"
+                      >Κωδικός</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="kod_lo"
+                      id="kod_lo"
+                      class="form-control input-content"
+                      value="<%= company.logisths %>"
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm_lo"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm_lo"
+                      id="afm_lo"
+                      class="form-control input-content"
+                      value=""
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymo_lo"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymo_lo"
+                      id="eponymo_lo"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="onoma_lo" class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="onoma_lo"
+                      id="onoma_lo"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="dieythynsh_lo"
+                      class="col-form-label label-font-size"
+                      >Διεύθυνση</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="dieythynsh_lo"
+                      id="dieythynsh_lo"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="thlefono_lo"
+                      class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="thlefono_lo"
+                      id="thlefono_lo"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="doy_lo"
+                      class="col-form-label label-font-size"
+                      >Δ.Ο.Υ.</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="doy_lo"
+                      id="doy_lo"
+                    ></select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="arithmos_adeias_lo"
+                      class="col-form-label label-font-size field-required">Αριθμός Άδειας</label>
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="arithmos_adeias_lo"
+                      id="arithmos_adeias_lo"
+                      class="form-control input-content"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kathgoria_adeias_lo"
+                      class="col-form-label label-font-size"
+                      >Κατηγορία Άδειας</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="kathgoria_adeias_lo"
+                      id="kathgoria_adeias_lo"
+                      class="form-control input-content"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                      style="font-size: 0.8vw"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      style="font-size: 0.8vw"
+                      style="vertical-align: middle"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_6_section visible" data-section="Διάφορα">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label class="card-header bg-header text-center headers-content">
+                Συντήρηση Στοιχείων Εταιρείας - Διάφορα
+              </label>
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-4 right-align">
+                    <label for="oikodomika" class="col-form-label label-font-size"
+                      >Η εταιρεία εκτελεί οικοδομικά έργα</label
+                    >
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="oikodomika" name="oikodomika" <%= company.oikodomika ? 'checked' : '' %> value="" /> 
+                    <label for="oikodomika" id="label-oikodomika" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-4 right-align">
+                    <label for="doropasxa_apd" class="col-form-label label-font-size"
+                      >Το Δώρο Πάσχα θα εμφανίζεται στην τρέχουσα ΑΠΔ</label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="doropasxa_apd" name="doropasxa_apd" <%= company.doropasxa_apd ? 'checked' : '' %> value="" /> 
+                    <label for="doropasxa_apd" id="label-doropasxa_apd" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-4 right-align">
+                    <label for="doroxrist_apd" class="col-form-label label-font-size"
+                      >Το Δώρο Χριστουγέννων θα εμφανίζεται στην τρέχουσα ΑΠΔ</label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="doroxrist_apd" name="doroxrist_apd" <%= company.doroxrist_apd ? 'checked' : '' %> value="" /> 
+                    <label for="doroxrist_apd" id="label-doroxrist_apd" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-4 right-align">
+                    <label for="ypologismos_epi_pragmatikoy_oromisthioy" class="col-form-label label-font-size"
+                      >Υπολογισμός προσαυξήσεων ΜΟΝΟ επί πραγματικού ωρομισθίου</label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="ypologismos_epi_pragmatikoy_oromisthioy" name="ypologismos_epi_pragmatikoy_oromisthioy" <%= company.ypologismos_epi_pragmatikoy_oromisthioy ? 'checked' : '' %> value="" /> 
+                    <label for="ypologismos_epi_pragmatikoy_oromisthioy" id="label-ypologismos_epi_pragmatikoy_oromisthioy" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-0-5">
+                  <div class="col-4 right-align">
+                    <label for="keimeno_exoflhshs" class="col-form-label label-font-size"
+                      >Κείμενο Εξοφλητικής Απόδειξης</label
+                    >
+                  </div>
+                  <div class="col-8">
+                    <textarea
+                      class="form-control textarea-content"
+                      name="keimeno_exoflhshs"
+                      id="keimeno_exoflhshs"
+                      cols="30"
+                      rows="4"
+                      style="height: 12vh;">
+                      <%= company.keimeno_exoflhshs?.trim() || '' %>
+                    </textarea>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-4 right-align">
+                    <label for="selectedUsers" class="col-form-label label-font-size">Επιλογή Χρηστών που έχουν πρόσβαση στην εταιρεία</label>
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      style="height:8rem;"
+                      data-live-search="true"
+                      name="selectedUsers"
+                      id="selectedUsers"
+                      multiple
+                    >
+                    </select>
+                  </div>
+                  
+                  <div class="col-2">
+                    <label class="col-form-label" style="font-size: smaller">Επιλογή πολλών χρηστών με Ctrl + click</label>
+                  </div>
+
+                  <div class="col-2">
+                    <button type="button" id="select-all" class="btn btn-brown rounded-4 mt-2 w-100"
+                    ><i class="bi bi-check2-all"></i> Επιλογή Όλων</button>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-2">
+                  <div class="col-4 right-align">
+                    <label class="col-form-label label-font-size">Επιλογή σφραγίδας-υπογραφής εταιρείας-εκπροσώπου
+                    </label>
+                  </div>
+
+                  <div class="col-6 left-align">
+                    <button type="button" id="customButton" class="btn btn-brown rounded-4 buttons-content w-40"><i class="bi bi-cloud-arrow-up"></i> Επιλέξτε Αρχείο</button>
+                    <!-- Πραγματικό input πεδίο, κρυμμένο -->
+                    <input type="file" id="sfragida" name="sfragida" accept="image/*" style="display:none">
+                    <% if (company.sfragida) { %>
+                      <img id="preview-image" src="<%= company.sfragida %>">
+                      <% } else { %>
+                        <img id="preview-image" style="width: 12.5rem; height: 6.25rem; display: none;">
+                    <% } %>
+                  </div>
+                  <div class="col-2">
+                    <button type="button" id="clear-image" class="btn btn-brown rounded-4 w-100"><i class="bi bi-eraser"></i> Καθαρισμός</button>
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important;
+                margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
+                      href="/companies/genikastoixeia"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_7_section visible" data-section="Έμμεσος Εργοδότης">
+        <div class="container">
+          <form class="formRadius"enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Έμμεσος Εργοδότης</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kod_em_erg"
+                      class="col-form-label label-font-size"
+                      >Κωδικός</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="kod_em_erg"
+                      id="kod_em_erg"
+                      class="form-control input-contents"
+                      value="<%= company.emmesos_ergodoths %>"
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm_em_erg"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm_em_erg"
+                      id="afm_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymo_em_erg"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymo_em_erg"
+                      id="eponymo_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="onoma_em_erg" class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="onoma_em_erg"
+                      id="onoma_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="titlos_em_erg"
+                      class="col-form-label label-font-size"
+                      >Διακριτικός Τίτλος</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="titlos_em_erg"
+                      id="titlos_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="nomikh_morfh_em_erg"
+                      class="col-form-label label-font-size"
+                      >Νομική Μορφή</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="nomikh_morfh_em_erg"
+                      id="nomikh_morfh_em_erg"
+                    ></select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="drasthriothta_em_erg"
+                      class="col-form-label label-font-size"
+                      >Αντικ. Δραστ/τητας</label
+                    >
+                  </div>
+                  <div class="col-10-5">
+                    <input
+                      type="text"
+                      name="drasthriothta_em_erg"
+                      id="drasthriothta_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="dieythynsh_em_erg"
+                      class="col-form-label label-font-size"
+                      >Διεύθυνση</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="dieythynsh_em_erg"
+                      id="dieythynsh_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="thlefono_em_erg"
+                      class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="thlefono_em_erg"
+                      id="thlefono_em_erg"
+                      class="form-control input-contents"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="email_em_erg"
+                      class="col-form-label label-font-size"
+                      >eMail</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="mail"
+                      class="form-control input-contents"
+                      name="email_em_erg"
+                      id="email_em_erg"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="daneismos_epa_apo_em_erg"
+                      class="col-form-label label-font-size">Δανεισμός μέσω ΕΠΑ Από</label>
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="daneismos_epa_apo_em_erg"
+                      id="daneismos_epa_apo_em_erg"
+                      class="date-control"
+                      value=""
+                    />
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="daneismos_epa_eos_em_erg"
+                      class="col-form-label label-font-size"
+                      >Έως</label
+                    >
+                  </div>
+
+                  <div class="col-2">
+                    <input
+                      type="date"
+                      name="daneismos_epa_eos_em_erg"
+                      id="daneismos_epa_eos_em_erg"
+                      class="date-control"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important; margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="sel_8_section visible" data-section="Διάδοχος Εργοδότης">
+        <div class="container">
+          <form class="formRadius" enctype="multipart/form-data">
+            <div class="card z-depth-5">
+              <label
+                class="card-header bg-header text-center headers-content"
+                >Συντήρηση Στοιχείων Εταιρείας - Διάδοχος Εργοδότης</label
+              >
+              <div class="card-body">
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="kod_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Κωδικός</label
+                    >
+                  </div>
+                  <div class="col-1">
+                    <input
+                      type="text"
+                      name="kod_diad_erg"
+                      id="kod_diad_erg"
+                      class="form-control input-contents"
+                      value="<%= company.diadoxos_ergodoths %>"
+                      disabled
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="afm_diad_erg"
+                      class="col-form-label label-font-size field-required"
+                      >Α.Φ.Μ</label
+                    >
+                  </div>
+                  <div class="col-2">
+                    <input
+                      type="text"
+                      name="afm_diad_erg"
+                      id="afm_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                      maxlength="9"
+                      pattern="[0-9]{1,}"
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="eponymo_diad_erg"
+                      class="col-form-label label-font-size field-required"
+                      >Επώνυμο/μία</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="eponymo_diad_erg"
+                      id="eponymo_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="onoma_diad_erg" class="col-form-label label-font-size"
+                      >Όνομα</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="onoma_diad_erg"
+                      id="onoma_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="titlos_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Διακριτικός Τίτλος</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="titlos_diad_erg"
+                      id="titlos_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="nomikh_morfh_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Νομική Μορφή</label
+                    >
+                  </div>
+                  <div class="col-4">
+                    <select
+                      class="form-select selectpicker-dropdown-normal"
+                      data-live-search="true"
+                      name="nomikh_morfh_diad_erg"
+                      id="nomikh_morfh_diad_erg"
+                    ></select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="drasthriothta_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Αντικ. Δραστ/τητας</label
+                    >
+                  </div>
+                  <div class="col-10-5">
+                    <input
+                      type="text"
+                      name="drasthriothta_diad_erg"
+                      id="drasthriothta_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="dieythynsh_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Διεύθυνση</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="text"
+                      name="dieythynsh_diad_erg"
+                      id="dieythynsh_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                      required
+                    />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="thlefono_diad_erg"
+                      class="col-form-label label-font-size"
+                      >Τηλέφωνο</label
+                    >
+                  </div>
+                  <div class="col-3">
+                    <input
+                      type="text"
+                      name="thlefono_diad_erg"
+                      id="thlefono_diad_erg"
+                      class="form-control input-contents"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3">
+                  <div class="col-1-5 right-align">
+                    <label
+                      for="email_diad_erg"
+                      class="col-form-label label-font-size"
+                      >eMail</label
+                    >
+                  </div>
+                  <div class="col-5">
+                    <input
+                      type="mail"
+                      class="form-control input-contents"
+                      name="email_diad_erg"
+                      id="email_diad_erg"
+                      value=""
+                    />
+                  </div>
+                </div>
+
+                <div class="card-footer" style="margin-left: -1rem !important; margin-right: -1rem !important; margin-bottom: -1rem !important;">
+                  <div
+                    class="d-inline-block d-flex"
+                    style="
+                      margin-top: -0.5rem !important;
+                      margin-bottom: -1rem !important;
+                      margin-left: 10px !important;
+                      margin-right: 10px !important;
+                      justify-content: space-around;
+                    "
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-brown rounded-4 mt-2 w-20 submitButton"
+                    >
+                      <i class="bi bi-floppy"></i> Αποθήκευση
+                    </button>
+                    <a
+                      class="btn btn-brown rounded-4 mt-2 w-20"
+                      href="/companies/genikastoixeia/"
+                    >
+                      <i class="bi bi-chevron-double-left"></i> Επιστροφή</a
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <% if (process.env.NODE_ENV === 'production') { %>
+    <script src="/min.js/companies/genikastoixeia/companies_edit_ejs.min.js"></script>
+  <% } else { %>
+    <script src="/js/common/getCompanyDescription.js"></script>
+    <script src="/js/common/tooltips.js"></script>
+    <script src="/js/common/checkAfm.js"></script>  
+    <script src="/js/common/navTabs.js"></script>
+    <script src="/js/companies/genikastoixeia/loadDropdowns_edit.js"></script>
+    <script src="/js/companies/genikastoixeia/loadKadDropdowns.js"></script>
+    <script src="/js/companies/genikastoixeia/loadLoipaPedia.js"></script>
+    <script src="/js/companies/genikastoixeia/loadMultipleUsers.js"></script>
+    <script src="/js/common/toggleLabel.js"></script>
+    <script src="/js/common/moveByEnter.js"></script>
+    <script src="/js/common/select-UnselectAndChangeButtonTextContent.js"></script>
+    <script src="/js/common/readAndPreviewImage.js"></script>
+    <script src="/js/common/changeInputTypeFile.js"></script>
+    <script src="/js/common/clearImage.js"></script>
+    <script src="/js/dates/convertDateToISO.js"></script>
+    <script src="/js/companies/genikastoixeia/putFieldValues_Company.js"></script>
+  <% } %>
+</div>

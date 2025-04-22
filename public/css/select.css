@@ -1,0 +1,115 @@
+/* Import Google Font - Poppins */
+/* @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap'); */
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+::selection{
+  color: #fff;
+  background: #4285f4;
+}
+.wrapper{
+  width: 41.66666666%;
+}
+.select-btn, li{
+  display: flex;
+  align-items: left;
+  cursor: pointer;
+  word-wrap: break-word;
+}
+.select-btn{
+  line-height: 1.5;
+  padding: 1px 10px;
+  font-size: 0.875vw;
+  font-weight: 500;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #c0c0c0;
+  justify-content: space-between;
+  text-align: left;
+}
+.select-btn i{
+  font-size: 14px;
+  transition: transform 0.3s linear;
+}
+.wrapper.active .select-btn i{
+  transform: rotate(-180deg);
+}
+.content{
+  display: none;
+  padding: 5px;
+  width: 100%;
+  margin-top: 0px;
+  background: #fff;
+  border-radius: 4px;
+  font-size: 0.87vw;
+  text-align:left;
+  word-wrap: break-word;
+  border: 1px solid #c0c0c0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  /* box-shadow: 0 10px 25px rgba(0,0,0,0.1); */
+}
+.wrapper.active .content{
+  display: block;
+}
+.content .search{
+  position: relative;
+}
+.search i{
+  top: 50%;
+  left: 15px;
+  color: #999;
+  font-size: 0.875vw;
+  pointer-events: none;
+  transform: translateY(-50%);
+  position: absolute;
+}
+.search input{
+  height: 30px;
+  width: 99%;
+  outline: none;
+  font-size: 1vw;
+  border-radius: 5px;
+  padding: 0 20px 0 43px;
+  border: 1px solid #B3B3B3;
+}
+.search input:focus{
+  padding-left: 42px;
+  border: 2px solid #4285f4;
+}
+.search input::placeholder{
+  color: #bfbfbf;
+}
+.content .options{
+  margin-top: 1px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 1px;
+  line-height: 22px;
+}
+.options::-webkit-scrollbar{
+  width: 7px;
+}
+.options::-webkit-scrollbar-track{
+  background: #f1f1f1;
+  border-radius: 25px;
+}
+.options::-webkit-scrollbar-thumb{
+  background: #ccc;
+  border-radius: 25px;
+}
+.options::-webkit-scrollbar-thumb:hover{
+  background: #b3b3b3;
+}
+.options li{
+  /* height: 22px; */
+  padding: 0 1px;
+  font-size: 0.75vw;
+  word-wrap: break-word;
+}
+.options li:hover, li.selected{
+  border-radius: 5px;
+  background: #f2f2f2;
+}
+

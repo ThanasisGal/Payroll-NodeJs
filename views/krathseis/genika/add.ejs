@@ -1,0 +1,1226 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    <!-- <hr style="margin-top: -2rem" /> -->
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5">
+
+              <div class="card-header" style="height: 14.8vh !important;">
+                <label class="text-center headers-content">
+                  Εισαγωγή Νέας Κράτησης
+                </label>
+                <div class="row form-group g-3 align-items-center mt-2" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                  <div class="col-1-5 right-align">
+                    <label for="kodikos" class="col-form-label label-font-size field-required" style="color: #000000;">
+                      Κωδικός
+                    </label>
+                  </div>
+                  <div class="col-1">
+                    <input type="text" name="kodikos_h" id="kodikos_h" class="form-control input-contents" value="" required />
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="perigrafh" class="col-form-label label-font-size field-required" style="color: #000000;">
+                      Περιγραφή
+                    </label>
+                  </div>
+                  <div class="col-8">
+                    <input type="text" name="perigrafh_h" id="perigrafh_h" class="form-control input-contents" value="" required />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                  <div class="col-1-5 right-align">
+                    <label for="kodikos_tameioy_h" class="col-form-label label-font-size" style="color: #000000;">
+                      Αφορά Ταμείο
+                    </label>
+                  </div>
+                  <div class="col-2-5">
+                    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kodikos_tameioy_h" id="kodikos_tameioy_h" required>
+                    </select>
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="kyrio_epikoyriko_h" class="col-form-label label-font-size" style="color: #000000;">
+                      Τύπος Ταμείου
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="kyrio_epikoyriko_h" name="kyrio_epikoyriko_h" value="" />
+                    <label for="kyrio_epikoyriko_h" id="label-kyrio_epikoyriko_h" style="margin-left: 0.75rem; font-size: 0.875vw; font-weight: 600; color: #000000;">
+                      ΚΥΡΙΟ
+                    </label>
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="apla_barea_h" class="col-form-label label-font-size" style="color: #000000;">
+                      Τύπος Ενσήμων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apla_barea_h" name="apla_barea_h" value="" />
+                    <label for="apla_barea_h" id="label-apla_barea_h" style="margin-left: 0.75rem; font-size: 0.875vw; font-weight: 600; color: #000000;">
+                      ΑΠΛΑ
+                    </label>
+                  </div>
+
+                  <div class="col-1-5 right-align">
+                    <label for="ypologizetai_sto_foro_h" class="col-form-label label-font-size" style="color: #000000;">
+                      Υπολ/ζεται στο Φόρο
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="ypologizetai_sto_foro_h" name="ypologizetai_sto_foro_h" value="" />
+                    <label for="ypologizetai_sto_foro_h" id="label-ypologizetai_sto_foro_h" style="margin-left: 0.75rem; font-size: 0.875vw; font-weight: 600; color: #000000;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+                <!-- <hr class="division" style="margin-top: -0.5vw;"></hr> -->
+              </div>
+              
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 61vh; background-color: #ffffff;" >
+
+                <input type="hidden" name="kodikos" id="kodikos" />
+                <input type="hidden" name="perigrafh" id="perigrafh" />
+                <input type="hidden" name="kodikos_tameioy" id="kodikos_tameioy" />
+                <input type="hidden" name="kyrio_epikoyriko" id="kyrio_epikoyriko" />
+                <input type="hidden" name="apla_barea" id="apla_barea" />
+                <input type="hidden" name="ypologizetai_sto_foro" id="ypologizetai_sto_foro" />
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align mt-1" style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΙΣΧΥΕΙ ΓΙΑ ΤΟΥΣ ΤΥΠΟΥΣ ΑΠΟΔΟΧΩΝ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_001" class="col-form-label label-font-size">
+                      <strong>001</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_001" name="typos_apodoxon_001" value="" />
+                    <label for="typos_apodoxon_001" id="label-typos_apodoxon_001" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_003" class="col-form-label label-font-size">
+                      <strong>003</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_003" name="typos_apodoxon_003" value="" />
+                    <label for="typos_apodoxon_003" id="label-typos_apodoxon_003" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_004" class="col-form-label label-font-size">
+                      <strong>004</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_004" name="typos_apodoxon_004" value="" />
+                    <label for="typos_apodoxon_004" id="label-typos_apodoxon_004" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_005" class="col-form-label label-font-size">
+                      <strong>005</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_005" name="typos_apodoxon_005" value="" />
+                    <label for="typos_apodoxon_005" id="label-typos_apodoxon_005" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_006" class="col-form-label label-font-size">
+                      <strong>006</strong> Επίδομα Ισολογισμού
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_006" name="typos_apodoxon_006" value="" />
+                    <label for="typos_apodoxon_006" id="label-typos_apodoxon_006" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_007" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αποδοχές Άδειας Εποχικώς Απασχολούμενων" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>007</strong> Αποδοχές Άδειας Εποχικώς Απ...
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_007" name="typos_apodoxon_007" value="" />
+                    <label for="typos_apodoxon_007" id="label-typos_apodoxon_007" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_008" class="col-form-label label-font-size">
+                      <strong>008</strong> Αποδοχές Ασθενείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_008" name="typos_apodoxon_008" value="" />
+                    <label for="typos_apodoxon_008" id="label-typos_apodoxon_008" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_009" class="col-form-label label-font-size">
+                      <strong>009</strong> Αναδρομικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_009" name="typos_apodoxon_009" value="" />
+                    <label for="typos_apodoxon_009" id="label-typos_apodoxon_009" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_010" class="col-form-label label-font-size">
+                      <strong>010</strong> Bonus
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_010" name="typos_apodoxon_010" value="" />
+                    <label for="typos_apodoxon_010" id="label-typos_apodoxon_010" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_011" class="col-form-label label-font-size">
+                      <strong>011</strong> Υπερωρίες
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_011" name="typos_apodoxon_011" value="" />
+                    <label for="typos_apodoxon_011" id="label-typos_apodoxon_011" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_012" class="col-form-label label-font-size">
+                      <strong>012</strong> Αμοιβή με το κομμάτι (Φασόν)
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_012" name="typos_apodoxon_012" value="" />
+                    <label for="typos_apodoxon_012" id="label-typos_apodoxon_012" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_013" class="col-form-label label-font-size">
+                      <strong>013</strong> Τεκμαρτές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_013" name="typos_apodoxon_013" value="" />
+                    <label for="typos_apodoxon_013" id="label-typos_apodoxon_013" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_014" class="col-form-label label-font-size">
+                      <strong>014</strong> Λοιπές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_014" name="typos_apodoxon_014" value="" />
+                    <label for="typos_apodoxon_014" id="label-typos_apodoxon_014" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_015" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Τεκμαρτές Αποδοχές για Κλάδο ΕΤΕΑΜ" data-tooltip-max-width="15vw" data-bs-placement="bottom">
+                      <strong>015</strong> Τεκμαρτές Αποδοχές για κλάδο...
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_015" name="typos_apodoxon_015" value="" />
+                    <label for="typos_apodoxon_015" id="label-typos_apodoxon_015" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_016" class="col-form-label label-font-size">
+                      <strong>016</strong> Αμοιβές κατ' Αποκοπή / ΕΦΑΠΑΞ
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_016" name="typos_apodoxon_016" value="" />
+                    <label for="typos_apodoxon_016" id="label-typos_apodoxon_016" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_017" class="col-form-label label-font-size">
+                      <strong>017</strong> Εισφορές χωρίς Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_017" name="typos_apodoxon_017" value="" />
+                    <label for="typos_apodoxon_017" id="label-typos_apodoxon_017" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΔΙΑΘΕΣΙΜΟΤΗΤΑ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_021" class="col-form-label label-font-size">
+                      <strong>021</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_021" name="typos_apodoxon_021" value="" />
+                    <label for="typos_apodoxon_021" id="label-typos_apodoxon_021" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_022" class="col-form-label label-font-size">
+                      <strong>022</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_022" name="typos_apodoxon_022" value="" />
+                    <label for="typos_apodoxon_022" id="label-typos_apodoxon_022" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_023" class="col-form-label label-font-size">
+                      <strong>023</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_023" name="typos_apodoxon_023" value="" />
+                    <label for="typos_apodoxon_023" id="label-typos_apodoxon_023" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_024" class="col-form-label label-font-size">
+                      <strong>024</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_024" name="typos_apodoxon_024" value="" />
+                    <label for="typos_apodoxon_024" id="label-typos_apodoxon_024" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_025" class="col-form-label label-font-size">
+                      <strong>025</strong> Επίδομα Ισολογισμού
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_025" name="typos_apodoxon_025" value="" />
+                    <label for="typos_apodoxon_025" id="label-typos_apodoxon_025" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_026" class="col-form-label label-font-size">
+                      <strong>026</strong> Αποδοχές Ασθενείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_026" name="typos_apodoxon_026" value="" />
+                    <label for="typos_apodoxon_026" id="label-typos_apodoxon_026" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_027" class="col-form-label label-font-size">
+                      <strong>027</strong> Αναδρομικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_027" name="typos_apodoxon_027" value="" />
+                    <label for="typos_apodoxon_027" id="label-typos_apodoxon_027" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_028" class="col-form-label label-font-size">
+                      <strong>028</strong> Bonus
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_028" name="typos_apodoxon_028" value="" />
+                    <label for="typos_apodoxon_028" id="label-typos_apodoxon_028" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_029" class="col-form-label label-font-size">
+                      <strong>029</strong> Υπερωρίες
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_029" name="typos_apodoxon_029" value="" />
+                    <label for="typos_apodoxon_029" id="label-typos_apodoxon_029" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_030" class="col-form-label label-font-size">
+                      <strong>030</strong> Λοιπές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_030" name="typos_apodoxon_030" value="" />
+                    <label for="typos_apodoxon_030" id="label-typos_apodoxon_030" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_031" class="col-form-label label-font-size">
+                      <strong>031</strong> Εισφορές χωρίς Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_031" name="typos_apodoxon_031" value="" />
+                    <label for="typos_apodoxon_031" id="label-typos_apodoxon_031" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΑΜΟΙΒΟΜΕΝΟΙ ΜΕ ΑΠΥ / ΤΠΥ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_032" class="col-form-label label-font-size">
+                      <strong>032</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_032" name="typos_apodoxon_032" value="" />
+                    <label for="typos_apodoxon_032" id="label-typos_apodoxon_032" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_033" class="col-form-label label-font-size">
+                      <strong>033</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_033" name="typos_apodoxon_033" value="" />
+                    <label for="typos_apodoxon_033" id="label-typos_apodoxon_033" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_034" class="col-form-label label-font-size">
+                      <strong>034</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_034" name="typos_apodoxon_034" value="" />
+                    <label for="typos_apodoxon_034" id="label-typos_apodoxon_034" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_035" class="col-form-label label-font-size">
+                      <strong>035</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_035" name="typos_apodoxon_035" value="" />
+                    <label for="typos_apodoxon_035" id="label-typos_apodoxon_035" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΑΝΑΣΤΟΛΕΣ ΣΥΜΒΑΣΕΩΝ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_018" class="col-form-label label-font-size">
+                      <strong>018</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_018" name="typos_apodoxon_018" value="" />
+                    <label for="typos_apodoxon_018" id="label-typos_apodoxon_018" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_019" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά την χρήση 2020 κατά την οποία, ο εργοδότης κατέβαλλε στον εργαζόμενο το Δώρο Πάσχα και γινόταν επιστροφή απ' το Υπ.Οικ." data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>019</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_019" name="typos_apodoxon_019" value="" />
+                    <label for="typos_apodoxon_019" id="label-typos_apodoxon_019" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_116" class="col-form-label label-font-size">
+                      <strong>116</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_116" name="typos_apodoxon_116" value="" />
+                    <label for="typos_apodoxon_116" id="label-typos_apodoxon_116" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_123" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά τις χρήσεις 2021 και μετά" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>123</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_123" name="typos_apodoxon_123" value="" />
+                    <label for="typos_apodoxon_123" id="label-typos_apodoxon_123" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΣΥΝΕΡΓΑΣΙΑ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_068" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά την απεικόνιση της παρασχεθείσας απασχόλησης" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>068</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_068" name="typos_apodoxon_068" value="" />
+                    <label for="typos_apodoxon_068" id="label-typos_apodoxon_068" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_069" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά το τμήμα των αποδοχών, που δεν υποχρεούται να καταβάλλει ο εργοδότης στον εργαζόμενο, πλην όμως έχει υποχρέωση να το δηλώσει μέσω Α.Π.Δ." data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>069</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_069" name="typos_apodoxon_069" value="" />
+                    <label for="typos_apodoxon_069" id="label-typos_apodoxon_069" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_070" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά την απεικόνιση του τμήματος του Επιδόματος Αδείας, το οποίο οφείλει να καταβάλλει ο εργοδότης στον εργαζόμενο" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>070</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_070" name="typos_apodoxon_070" value="" />
+                    <label for="typos_apodoxon_070" id="label-typos_apodoxon_070" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_071" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά το τμήμα των αποδοχών του Επιδόματος Αδείας, που δεν υποχρεούται να καταβάλλει ο εργοδότης στον εργαζόμενο - καθόσον επιδοτείται -, πλην όμως έχει υποχρέωση να το δηλώσει μέσω της Α.Π.Δ." data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>071</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_071" name="typos_apodoxon_071" value="" />
+                    <label for="typos_apodoxon_071" id="label-typos_apodoxon_071" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_114" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά την απεικόνιση του τμήματος του Δώρου Χριστουγέννων, το οποίο οφείλει να καταβάλλει ο εργοδότης στον εργαζόμενο" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>114</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_114" name="typos_apodoxon_114" value="" />
+                    <label for="typos_apodoxon_114" id="label-typos_apodoxon_114" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_115" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αφορά το τμήμα των αποδοχών του Επιδόματος Αδείας, που δεν υποχρεούται να καταβάλλει ο εργοδότης στον εργαζόμενο - καθόσον επιδοτείται -, πλην όμως έχει υποχρέωση να το δηλώσει μέσω της Α.Π.Δ." data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>115</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_115" name="typos_apodoxon_115" value="" />
+                    <label for="typos_apodoxon_115" id="label-typos_apodoxon_115" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΑΣΦΑΛΙΣΤΙΚΟΣ ΠΟΡΟΣ ΜΙΣΘΩΤΩΝ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_601" class="col-form-label label-font-size">
+                      <strong>601</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_601" name="typos_apodoxon_601" value="" />
+                    <label for="typos_apodoxon_601" id="label-typos_apodoxon_601" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_603" class="col-form-label label-font-size">
+                      <strong>603</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_603" name="typos_apodoxon_603" value="" />
+                    <label for="typos_apodoxon_603" id="label-typos_apodoxon_603" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_604" class="col-form-label label-font-size">
+                      <strong>604</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_604" name="typos_apodoxon_604" value="" />
+                    <label for="typos_apodoxon_604" id="label-typos_apodoxon_604" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_605" class="col-form-label label-font-size">
+                      <strong>605</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_605" name="typos_apodoxon_605" value="" />
+                    <label for="typos_apodoxon_605" id="label-typos_apodoxon_605" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_608" class="col-form-label label-font-size">
+                      <strong>608</strong> Αποδοχές Ασθενείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_608" name="typos_apodoxon_608" value="" />
+                    <label for="typos_apodoxon_608" id="label-typos_apodoxon_608" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_609" class="col-form-label label-font-size">
+                      <strong>609</strong> Αναδρομικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_609" name="typos_apodoxon_609" value="" />
+                    <label for="typos_apodoxon_609" id="label-typos_apodoxon_609" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_610" class="col-form-label label-font-size">
+                      <strong>610</strong> Bonus
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_610" name="typos_apodoxon_610" value="" />
+                    <label for="typos_apodoxon_610" id="label-typos_apodoxon_610" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_611" class="col-form-label label-font-size">
+                      <strong>611</strong> Υπερωρίες
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_611" name="typos_apodoxon_611" value="" />
+                    <label for="typos_apodoxon_611" id="label-typos_apodoxon_611" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      100.000 ΝΕΕΣ ΘΕΣΕΙΣ ΕΡΓΑΣΙΑΣ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_901" class="col-form-label label-font-size">
+                      <strong>901</strong> Τακτικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_901" name="typos_apodoxon_901" value="" />
+                    <label for="typos_apodoxon_901" id="label-typos_apodoxon_901" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_902" class="col-form-label label-font-size">
+                      <strong>902</strong> Δώρο Χριστουγέννων
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_902" name="typos_apodoxon_902" value="" />
+                    <label for="typos_apodoxon_902" id="label-typos_apodoxon_902" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_903" class="col-form-label label-font-size">
+                      <strong>903</strong> Δώρο Πάσχα
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_903" name="typos_apodoxon_903" value="" />
+                    <label for="typos_apodoxon_903" id="label-typos_apodoxon_903" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_904" class="col-form-label label-font-size">
+                      <strong>904</strong> Επίδομα Αδείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_904" name="typos_apodoxon_904" value="" />
+                    <label for="typos_apodoxon_904" id="label-typos_apodoxon_904" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_905" class="col-form-label label-font-size">
+                      <strong>905</strong> Επίδομα Ισολογισμού
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_905" name="typos_apodoxon_905" value="" />
+                    <label for="typos_apodoxon_905" id="label-typos_apodoxon_905" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_906" class="col-form-label label-font-size" data-bs-toggle="tooltip" title="Αποδοχές Άδειας Εποχικώς Απασχολούμενων" data-tooltip-max-width="15vw" data-bs-placement="bottom" >
+                      <strong>906</strong> Αποδοχές Άδειας Εποχικώς Απ...
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_906" name="typos_apodoxon_906" value="" />
+                    <label for="typos_apodoxon_906" id="label-typos_apodoxon_906" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_907" class="col-form-label label-font-size">
+                      <strong>907</strong> Αποδοχές Ασθενείας
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_907" name="typos_apodoxon_907" value="" />
+                    <label for="typos_apodoxon_907" id="label-typos_apodoxon_907" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_908" class="col-form-label label-font-size">
+                      <strong>908</strong> Αναδρομικές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_908" name="typos_apodoxon_908" value="" />
+                    <label for="typos_apodoxon_908" id="label-typos_apodoxon_908" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_909" class="col-form-label label-font-size">
+                      <strong>909</strong> Bonus
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_909" name="typos_apodoxon_909" value="" />
+                    <label for="typos_apodoxon_909" id="label-typos_apodoxon_909" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_910" class="col-form-label label-font-size">
+                      <strong>910</strong> Υπερωρίες
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_910" name="typos_apodoxon_910" value="" />
+                    <label for="typos_apodoxon_910" id="label-typos_apodoxon_910" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_911" class="col-form-label label-font-size">
+                      <strong>911</strong> Αμοιβή με το κομμάτι (Φασόν)
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_911" name="typos_apodoxon_911" value="" />
+                    <label for="typos_apodoxon_911" id="label-typos_apodoxon_911" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_912" class="col-form-label label-font-size">
+                      <strong>912</strong> Τεκμαρτές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_912" name="typos_apodoxon_912" value="" />
+                    <label for="typos_apodoxon_912" id="label-typos_apodoxon_912" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_913" class="col-form-label label-font-size">
+                      <strong>913</strong> Λοιπές Αποδοχές
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_913" name="typos_apodoxon_913" value="" />
+                    <label for="typos_apodoxon_913" id="label-typos_apodoxon_913" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="typos_apodoxon_914" class="col-form-label label-font-size">
+                      <strong>914</strong> Αμοιβές κατ' Αποκοπή / ΕΦΑΠΑΞ
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_apodoxon_914" name="typos_apodoxon_914" value="" />
+                    <label for="typos_apodoxon_914" id="label-typos_apodoxon_914" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-12 center-align"  style="background-color: #3d4e001e !important;
+                  font-size: 1.1vw;"">
+                    <label class="col-form-label field-required">
+                      ΠΑΡΑΜΕΤΡΟΙ ΕΛΕΓΧΟΥ Α.Π.Δ.
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="ypologismos_epi_plasmatikhs" class="col-form-label label-font-size">
+                      Υπολ/ζεται επί πλασματικών Αποδοχών
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="ypologismos_epi_plasmatikhs" name="ypologismos_epi_plasmatikhs" value="" />
+                    <label for="ypologismos_epi_plasmatikhs" id="label-ypologismos_epi_plasmatikhs" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_hmnia_apo" class="col-form-label label-font-size">
+                      Ενημερώνει το πεδίο "Από Ημερομηνία"
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_hmnia_apo" name="apaiteitai_hmnia_apo" value="" />
+                    <label for="apaiteitai_hmnia_apo" id="label-apaiteitai_hmnia_apo" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_panta_proslhpsh" class="col-form-label label-font-size">
+                      Πάντα / Κατά την πρόσληψη
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_panta_proslhpsh" name="apaiteitai_panta_proslhpsh" data-toggle="apaiteitai_panta_proslhpsh" value="" disabled/>
+                    <label for="apaiteitai_panta_proslhpsh" id="label-apaiteitai_panta_proslhpsh" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_hmnia_eos" class="col-form-label label-font-size">
+                      Ενημερώνει το πεδίο "Έως Ημερομηνία"
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_hmnia_eos" name="apaiteitai_hmnia_eos" value="" />
+                    <label for="apaiteitai_hmnia_eos" id="label-apaiteitai_hmnia_eos" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_panta_apoxorhsh" class="col-form-label label-font-size">
+                      Πάντα / Κατά την Αποχώρηση
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_panta_apoxorhsh" name="apaiteitai_panta_apoxorhsh" data-toggle="apaiteitai_panta_apoxorhsh" value="" disabled/>
+                    <label for="apaiteitai_panta_apoxorhsh" id="label-apaiteitai_panta_apoxorhsh" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_kata_thn_adeia_apo" class="col-form-label label-font-size">
+                      Ενημερώνει το πεδίο "Από Ημερομηνία (Άδεια)"
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_kata_thn_adeia_apo" name="apaiteitai_kata_thn_adeia_apo" value="" />
+                    <label for="apaiteitai_kata_thn_adeia_apo" id="label-apaiteitai_kata_thn_adeia_apo" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_kata_thn_adeia_eos" class="col-form-label label-font-size">
+                      Ενημερώνει το πεδίο "Έως Ημερομηνία (Άδεια)"
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_kata_thn_adeia_eos" name="apaiteitai_kata_thn_adeia_eos" value="" />
+                    <label for="apaiteitai_kata_thn_adeia_eos" id="label-apaiteitai_kata_thn_adeia_eos" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_hmeres_asfalishs" class="col-form-label label-font-size">
+                      Ενημερώνει Ημέρες Ασφάλισης
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_hmeres_asfalishs" name="apaiteitai_hmeres_asfalishs" value=""/>
+                    <label for="apaiteitai_hmeres_asfalishs" id="label-apaiteitai_hmeres_asfalishs" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                  <div class="col-0-5"></div>
+
+                  <div class="col-2-5 left-align">
+                    <label for="apaiteitai_apodoxes_asfalishs" class="col-form-label label-font-size">
+                      Ενημερώνει Αποδοχές Ασφάλισης
+                    </label>
+                  </div>
+                  <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apaiteitai_apodoxes_asfalishs" name="apaiteitai_apodoxes_asfalishs" value="" />
+                    <label for="apaiteitai_apodoxes_asfalishs" id="label-apaiteitai_apodoxes_asfalishs" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      ΟΧΙ
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="card-footer mt-auto"
+              >
+                <div
+                  class="d-inline-block d-flex"
+                  style="
+                    margin-top: -0.5rem !important;
+                    margin-bottom: -1rem !important;
+                    margin-left: 10px !important;
+                    margin-right: 10px !important;
+                    justify-content: space-around;
+                  "
+                >
+                  <button
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton"
+                  >
+                    <i class="bi bi-floppy"></i> Αποθήκευση
+                  </button>
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                    href="/krathseis/krathseis"
+                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <% if (process.env.NODE_ENV === 'production') { %>
+      <script src="/min.js/krathseis/krathseis_genika_add_ejs.min.js"></script>
+    <% } else { %>
+      <script src="/js/common/getCompanyDescription.js"></script>
+      <script src="/js/krathseis/getFieldValues.js"></script>
+      <!-- <script src="/js/common/navTabs.js"></script> -->
+      <script src="/js/krathseis/loadDropdowns_add.js"></script>
+      <script src="/js/krathseis/checkKrathshIfExists.js"></script>
+      <script src="/js/common/toggleLabelKrathseon.js"></script>
+      <script src="/js/dates/convertDateToISO.js"></script>
+      <script src="/js/common/tooltipsForButtons.js"></script>
+      <script src="/js/common/moveByEnter.js"></script>
+    <% } %>
+
+  </div>
+</div>

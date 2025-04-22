@@ -1,0 +1,391 @@
+import { Router } from "express";
+const router = Router();
+
+import userController from "../controllers/userController.js";
+import companiesController from "../controllers/companies/companiesController.js";
+import mainAppController from "../controllers/mainAppController.js";
+import checkUserAuth from "../middlewares/auth-middleware.js";
+import getSessionVars from "../middlewares/session-variables.js";
+import checkAuth from "../middlewares/checkValidUser.js";
+import ypokatasthmataController from "../controllers/companies/ypokatasthmataController.js";
+import nomimoiekprosopoiController from "../controllers/companies/nomimoiekprosopoiController.js";
+import passwordsController from "../controllers/companies/passwordsController.js";
+import antistoixiseisController from "../controllers/companies/antistoixiseisController.js";
+import krathseisController from "../controllers/krathseisController.js";
+import genikaAPIsController from "../controllers/genikaAPIsController.js";
+import ergazomenoiController from "../controllers/ergazomenoi/ergazomenoiController.js";
+import symbaseisController from "../controllers/symbaseisController.js";
+import programmataController from "../controllers/ergazomenoi/programmataController.js";
+import erganhController from "../controllers/ergazomenoi/erganhController.js";
+import kinhseisController from "../controllers/Kinhseis/kinhseisController.js";
+import forosController from "../controllers/Kinhseis/forosContoller.js";
+import ektyposhSymbaseonController from "../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js";
+import ektyposhApasxolhseonController from "../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js";
+
+import { createDropdownApi } from '../utils/dropdownHelper.js';
+
+import TmhmataModel from '../models/stathera_arxeia.js';
+
+// Route Level Middlware - To Protected Route
+router.use("/changepassword", checkUserAuth);
+router.use(getSessionVars);
+
+// PUBLIC Routes
+
+//User Routes
+
+router.get("/", userController.homepage);
+router.post("/search", (req, res) => res.redirect("/"));
+
+router.get("/login", userController.loginForm);
+router.get("/verifyEmail", userController.verifyEmailForm);
+router.get("/verify-Email", userController.emailVerification);
+router.post("/login/verify-email", userController.sendUserVerifyEmail);
+router.get("/register", userController.registerForm);
+router.post("/register/userRegistration", userController.userRegistration);
+router.post("/login/userLogin", userController.userLogin);
+router.get("/login/change_password", userController.changePasswordForm);
+router.post("/login/send-reset-password-email", userController.sendUserResetPasswordEmail);
+router.get("/reset_password", userController.resetPasswordForm);
+router.post("/reset_password/:id/:token", userController.userPasswordReset);
+router.get("/login/logout", userController.logoutForm);
+router.post("/logout/userLogout", userController.logout);
+router.get("/logout/end_Session", userController.logout);
+
+//=============================================================================
+
+//Admin Routes
+router.get("/admin", userController.adminHomepage);
+router.get("/admin/add", userController.addUser);
+router.post("/admin/add", userController.postUser);
+router.get("/admin/view/:id", userController.viewUser);
+router.get("/admin/edit/:id", userController.editUser);
+router.put("/admin/edit/:id", userController.editPostUser);
+router.delete("/admin/edit/:id", userController.deletePostUser);
+router.get("/admin/delete/:id", userController.checkAndDeletePostUser);
+router.post("/admin/search", userController.searchPostUser);
+router.get("/admin/search", userController.searchGetUser);
+
+// MainApp Router
+router.get("/mainapp", checkAuth, mainAppController.getMainAppForm);
+
+// Date Routes
+router.get("/dates/getYearsForm", mainAppController.getYearsForm);
+router.post("/dates/changeYear", mainAppController.changeYear);
+router.get("/dates/getPeriodsForm", mainAppController.getPeriodsForm);
+router.post("/dates/changePeriod", mainAppController.changePeriod);
+router.get("/dates/getAppDateForm", mainAppController.getAppDateForm);
+router.post("/dates/changeAppDate", mainAppController.changeAppDate);
+
+// Companies Router
+router.get("/companies/genikastoixeia", checkAuth, companiesController.mainCompaniesForm);
+router.get("/companies/genikastoixeia/add", checkAuth, companiesController.addCompanyForm);
+router.post("/companies/genikastoixeia/add", companiesController.postCompanyForm);
+router.post("/companies/genikastoixeia/search", companiesController.searchPostCompanies);
+router.get("/companies/genikastoixeia/search", checkAuth, companiesController.searchGetCompanies);
+router.get("/companies/genikastoixeia/select/:id", checkAuth, companiesController.choiseCompanies);
+router.get("/companies/genikastoixeia/edit/:id", checkAuth, companiesController.editCompanyForm);
+router.delete("/companies/genikastoixeia/delete/:id", checkAuth, companiesController.deleteCompany);
+
+// Ypokatasthmata Router
+router.get("/companies/ypokatasthmata", checkAuth, ypokatasthmataController.mainYpokatasthmataForm);
+router.get("/companies/ypokatasthmata/add", checkAuth, ypokatasthmataController.addYpokatasthmataForm);
+router.post("/companies/ypokatasthmata/add", ypokatasthmataController.postYpokatasthmataForm);
+router.post("/companies/ypokatasthmata/search", ypokatasthmataController.searchPostYpokatasthmata);
+router.get("/companies/ypokatasthmata/search", checkAuth, ypokatasthmataController.searchGetYpokatasthmata);
+router.get("/companies/ypokatasthmata/edit/:id", checkAuth, ypokatasthmataController.editYpokatasthmataForm);
+router.delete("/companies/ypokatasthmata/delete/:id", checkAuth, ypokatasthmataController.deleteYpokatasthmata);
+
+// Nomimoi Ekprosopoi Router
+router.get("/companies/nomimoi_ekprosopoi", checkAuth, nomimoiekprosopoiController.mainNomimoiEkprosopoiForm);
+router.get("/companies/nomimoi_ekprosopoi/add", checkAuth, nomimoiekprosopoiController.addNomimoiEkprosopoiForm);
+router.post("/companies/nomimoi_ekprosopoi/add", nomimoiekprosopoiController.postNomimoiEkprosopoiForm);
+router.get("/companies/nomimoi_ekprosopoi/search", checkAuth, nomimoiekprosopoiController.searchGetNomimoiEkprosopoi);
+router.post("/companies/nomimoi_ekprosopoi/search", nomimoiekprosopoiController.searchPostNomimoiEkprosopoi);
+router.get("/companies/nomimoi_ekprosopoi/edit/:id", checkAuth, nomimoiekprosopoiController.editNomimoiEkprosopoiForm);
+router.delete("/companies/nomimoi_ekprosopoi/delete/:id", checkAuth, nomimoiekprosopoiController.deleteNomimoiEkprosopoi);
+
+// Passwords Router
+router.get("/companies/passwords", checkAuth, passwordsController.mainPasswordsForm);
+router.get("/companies/passwords/add", checkAuth, passwordsController.addPasswordsForm);
+router.post("/companies/passwords/add", passwordsController.postPasswordsForm);
+router.get("/companies/passwords/search", checkAuth, passwordsController.searchGetPasswords);
+router.post("/companies/passwords/search", passwordsController.searchPostPasswords);
+router.get("/companies/passwords/edit/:id", checkAuth, passwordsController.editPasswordsForm);
+router.delete("/companies/passwords/delete/:id", checkAuth, passwordsController.deletePasswords);
+
+// Antistoixiseis Router
+router.get("/companies/antistoixiseis", checkAuth, antistoixiseisController.mainAntistoixiseisForm);
+router.get("/companies/antistoixiseis/search", checkAuth, antistoixiseisController.searchGetAntistoixiseis);
+router.post("/companies/antistoixiseis/search", antistoixiseisController.searchPostAntistoixiseis);
+router.get("/companies/antistoixiseis/add/:id", checkAuth, antistoixiseisController.addAntistoixiseisForm);
+router.get("/companies/antistoixiseis/addFromNested/:id", checkAuth, antistoixiseisController.addAntistoixiseisNestedForm);
+router.post("/companies/antistoixiseis/add", antistoixiseisController.postAntistoixiseisForm);
+router.get("/companies/antistoixiseis/edit/:id", checkAuth, antistoixiseisController.editAntistoixiseisForm);
+router.delete("/companies/antistoixiseis/deleteFromNested/:id", antistoixiseisController.deleteAntistoixiseis);
+router.delete("/companies/antistoixiseis/delete/:id", antistoixiseisController.deleteAllAntistoixiseis);
+
+// Krathseis Router
+router.get("/krathseis/krathseis", checkAuth, krathseisController.mainKrathseisForm);
+router.get("/krathseis/search", checkAuth, krathseisController.searchGetKrathseis);
+router.post("/krathseis/search", krathseisController.searchPostKrathseis);
+router.get("/krathseis/genika/add", checkAuth, krathseisController.addKrathseisForm);
+router.post("/krathseis/genika/add", krathseisController.postKrathseisForm);
+router.get("/krathseis/genika/edit/:id", checkAuth, krathseisController.editKrathseisForm);
+router.delete("/krathseis/genika/delete/:id", checkAuth, krathseisController.deleteKrathseis);
+router.get("/krathseis/pososta/add", checkAuth, krathseisController.addPosostaKrathseonForm);
+router.post("/krathseis/pososta/add", krathseisController.postPosostaKrathseonForm);
+router.get("/krathseis/posostaKrathseon/edit/:id", checkAuth, krathseisController.editPosostaKrathseonForm);
+router.delete("/krathseis/posostaKrathseon/delete/:id", krathseisController.deletePosostaKrathseon);
+router.get("/krathseis/updates", checkAuth, krathseisController.posostaKrathseonKrathshId);
+
+// Ergazomenoi Router
+router.get("/ergazomenoi/ergazomenoi", checkAuth, ergazomenoiController.mainErgazomenoiForm);
+router.get("/ergazomenoi/ergazomenoi/add", checkAuth, ergazomenoiController.addErgazomenoiForm);
+router.post("/ergazomenoi/ergazomenoi/add", checkAuth, ergazomenoiController.postErgazomenoiForm);
+router.get("/ergazomenoi/ergazomenoi/edit/:id", checkAuth, ergazomenoiController.editErgazomenoiForm);
+router.get("/ergazomenoi/ergazomenoi/istoriko/:kod", checkAuth, ergazomenoiController.getIstorikoData);
+router.post("/ergazomenoi/ergazomenoi/istoriko/:kod", checkAuth, ergazomenoiController.updateIstorikoData);
+router.delete("/ergazomenoi/ergazomenoi/delete/:id", checkAuth, ergazomenoiController.deleteErgazomenoi);
+router.get("/ergazomenoi/ergazomenoi/search", checkAuth, ergazomenoiController.searchGetErgazomenoi);
+router.post("/ergazomenoi/ergazomenoi/search", ergazomenoiController.searchPostErgazomenoi);
+
+// Ergazomenoi - Programmata Router
+router.get("/ergazomenoi/programmata/programmaErgasias", checkAuth, programmataController.mainProgrammaErgasiasForm);
+router.delete("/ergazomenoi/programmata/delete/:selectedTeam/:selectedCompany/:selectedKodikos/:startDate/:endDate", checkAuth, programmataController.deleteOrariaErgazomenoyApoEos);
+router.get("/ergazomenoi/programmata/antigrafhProgrammaton", checkAuth, programmataController.mainAntigrafhProgrammatonForm);
+router.post("/ergazomenoi/programmata/copy", checkAuth, programmataController.antigrafhProgrammaton);
+
+// Ergazomenoi - Programmata - Erganh Router
+router.get("/ergazomenoi/programmata/eisagoghOrarionApoErganh", checkAuth, erganhController.mainEisagoghOrarionApoErganhForm);
+router.post("/ergazomenoi/programmata/importSchedule", checkAuth, erganhController.eisagoghOrarionApoErganh);
+router.get("/ergazomenoi/programmata/eisagoghOrarionApoKartes", checkAuth, erganhController.mainEisagoghOrarionApoKartesForm);
+router.post("/ergazomenoi/programmata/importCards", checkAuth, erganhController.eisagoghOrarionApoKartes);
+router.post("/ergazomenoi/programmata/delete-pdf", checkAuth, erganhController.deletePdfFile);
+router.get("/ergazomenoi/programmata/exagoghOrarionSeErganh", checkAuth, erganhController.mainExagoghOrarionSeErganhForm);
+router.get("/ergazomenoi/programmata/apologistikosPinakasOrarion", checkAuth, erganhController.mainApologistikosPinakasForm);
+
+// Symbaseis Router
+router.get("/symbaseis/symbaseis", checkAuth, symbaseisController.mainSymbaseisForm);
+router.get("/symbaseis/symbaseis/add", checkAuth, symbaseisController.addSymbaseisForm);
+router.post("/symbaseis/symbaseis/add", symbaseisController.postSymbaseisForm);
+router.get("/symbaseis/symbaseis/search", checkAuth, symbaseisController.searchGetSymbaseis);
+router.post("/symbaseis/symbaseis/search", symbaseisController.searchPostSymbaseis);
+router.get("/symbaseis/symbaseis/edit/:id", checkAuth, symbaseisController.editSymbaseisForm);
+router.delete("/symbaseis/symbaseis/delete/:id", checkAuth, symbaseisController.deleteSymbaseis);
+
+// KathgoriesSymbaseon Router
+router.get("/symbaseis/kathgories", checkAuth, symbaseisController.mainKathgoriesSymbaseonForm);
+router.get("/symbaseis/kathgories/add/:kodikosSymbashs", checkAuth, symbaseisController.addKathgoriesSymbaseonForm);
+router.post("/symbaseis/kathgories/add", symbaseisController.postKathgoriesSymbaseonForm);
+router.get("/symbaseis/kathgories/search", checkAuth, symbaseisController.searchGetKathgoriesSymbaseon);
+router.post("/symbaseis/kathgories/search", checkAuth, symbaseisController.searchPostKathgoriesSymbaseon);
+router.get("/symbaseis/kathgories/edit/:id", checkAuth, symbaseisController.editKathgoriesSymbaseonForm);
+router.delete("/symbaseis/kathgories/delete/:id", checkAuth, symbaseisController.deleteKathgoriesSymbaseon);
+
+// EidikothtesSymbaseon Router
+router.get("/symbaseis/eidikothtes", checkAuth, symbaseisController.mainEidikothtesSymbaseonForm);
+router.get("/symbaseis/eidikothtes/search", checkAuth, symbaseisController.searchGetEidikothtesSymbaseon);
+router.post("/symbaseis/eidikothtes/search", checkAuth, symbaseisController.searchPostEidikothtesSymbaseon);
+router.get("/symbaseis/eidikothtes/add/:kodikosSymbashs_Kathgorias", checkAuth, symbaseisController.addEidikothtesSymbaseonForm);
+router.post("/symbaseis/eidikothtes/add", symbaseisController.postEidikothtesSymbaseonForm);
+router.get("/symbaseis/eidikothtes/edit/:id", checkAuth, symbaseisController.editEidikothtesSymbaseonForm);
+router.delete("/symbaseis/eidikothtes/delete/:id", checkAuth, symbaseisController.deleteEidikothtesSymbaseon);
+
+// StoixeiaSymbaseon Router
+router.get("/symbaseis/stoixeiaSymbaseon", checkAuth, symbaseisController.mainStoixeiaSymbaseonForm);
+router.post("/symbaseis/stoixeiaSymbaseon/search", checkAuth, symbaseisController.searchPostStoixeiaSymbaseon);
+router.get("/symbaseis/stoixeiaSymbaseon/search", checkAuth, symbaseisController.searchGetStoixeiaSymbaseon);
+router.get("/symbaseis/stoixeiaSymbaseon/add/:kodikosSymbashs_Kathgorias_Eidikothtas", checkAuth, symbaseisController.addStoixeiaSymbaseonForm);
+router.post("/symbaseis/stoixeiaSymbaseon/add", symbaseisController.postStoixeiaSymbaseonForm);
+router.get("/symbaseis/stoixeiaSymbaseon/edit/:id", checkAuth, symbaseisController.editStoixeiaSymbaseonForm);
+router.delete("/symbaseis/stoixeiaSymbaseon/delete/:id", checkAuth, symbaseisController.deleteStoixeiaSymbaseon);
+
+// YpologismoiKlimakion Router
+router.get("/symbaseis/ypologismoiKlimakion", checkAuth, symbaseisController.mainYpologismoiForm);
+router.get("/symbaseis/klimakia", checkAuth, symbaseisController.mainYpologismoiForm);
+
+// Kinhseis Router
+router.get("/kinhseis/apasxolhseis", checkAuth, kinhseisController.mainApasxolhseisForm);
+router.post("/kinhseis/apasxolhseis/add", checkAuth, kinhseisController.postApasxolhseisForm);
+router.delete("/kinhseis/apasxolhseis/delete/:id", checkAuth, kinhseisController.deleteApasxolhseis);
+
+// EktyposeisApasxolhseon Router
+router.get("/ektyposeis/apasxolhseis/ektyposhApasxolhseon", checkAuth, ektyposhApasxolhseonController.mainApodeixeisErgazomenonForm);
+
+// EktyposeisSymbaseon Router
+router.get("/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon", checkAuth, ektyposhSymbaseonController.mainSymbaseisErgazomenonForm);
+
+
+
+// PROTECTED Routes
+router.post("/login/change_password/changepassword", userController.changeUserPassword);
+
+// EndPoints API's
+router.post("/api/afmEtaireias", companiesController.checkAfmEtaireias);
+router.get("/api/allUser", mainAppController.getAllUsers);
+router.get("/api/allUsersByTeam/:companyTeam", companiesController.getAllUsersByTeam);
+router.get("/api/appDateInUse", mainAppController.getAppDateInUse);
+
+router.get("/api/companies/:companyId", companiesController.getCompanies);
+router.get("/api/companies/antistoixiseis/getAntistoixiseis/:krathshId", antistoixiseisController.getAntistoixiseis);
+router.post("/api/companies/antistoixiseis/update/:antistoixishId", antistoixiseisController.postAntistoixiseisUpdate);
+router.post("/api/companies/update/:companyId", companiesController.postCompanyUpdate);
+router.get("/api/companyDescription", mainAppController.getCompanyDescription);
+router.get("/api/companyUsers/:companyId", companiesController.populateCompanyUsers);
+
+router.get("/api/dhmoi", genikaAPIsController.getDhmoi);
+router.post("/api/diadoxosErgodoths", genikaAPIsController.checkDiadoxosErgodoths);
+router.get("/api/diadoxosErgodoths/:kodikosDiadoxoyErgodoth", genikaAPIsController.getDiadoxosErgodoths);
+router.get("/api/doy", genikaAPIsController.getCompanyDoy);
+router.get("/api/dypa", genikaAPIsController.getDypa);
+
+router.post("/api/emmesosErgodoths", genikaAPIsController.checkEmmesosErgodoths);
+router.get("/api/emmesosErgodoths/:kodikosEmmesoyErgodoth", genikaAPIsController.getEmmesosErgodoths);
+
+router.get("/api/getKadForEditForm", companiesController.getKadForEditForm);
+router.get("/api/getKads/:companyId", companiesController.getCompanyKads);
+
+router.get("/api/handleNomikesMorfes", genikaAPIsController.handleNomikesMorfes);
+router.get("/api/handlePararthmataEfka", genikaAPIsController.handlePararthmataEfka);
+
+router.post("/api/iatrosErgasias", genikaAPIsController.checkIatrosErgasias);
+router.get("/api/iatrosErgasias/:kodikosIatroy", genikaAPIsController.getIatrosErgasias);
+router.get("/api/idiothtes", genikaAPIsController.getIdiothtes);
+
+router.post("/api/krathseis/checkKrathshIfExists", krathseisController.checkKrathshIfExists);
+router.get("/api/krathseis/getKrathseis", krathseisController.getKrathseis);
+router.get("/api/krathseis/getPosostaKrathseon/:krathshId", krathseisController.getPosostaKrathseon);
+router.post("/api/krathseis/PosostaKrathseon/update/:posostaKrathseonId", krathseisController.postPosostaKrathseonUpdate);
+router.post("/api/krathseis/update/:krathseisId", krathseisController.postKrathseisUpdate);
+
+router.get("/api/loadDhmoi/:nomosKodikos", genikaAPIsController.getDhmoiEditForm);
+router.get("/api/loadNomoi/:perifereiaKodikos", genikaAPIsController.getNomoiEditForm);
+router.get("/api/loadPoleis/:dhmosKodikos", genikaAPIsController.getPoleisEditForm);
+router.get("/api/login/getRoles", userController.getUserRoles);
+router.post("/api/logisths", genikaAPIsController.checkLogisths);
+router.get("/api/logisths/:kodikosLogisth", genikaAPIsController.getLogisths);
+
+router.get("/api/nomikesMorfes", genikaAPIsController.getNomikesMorfes);
+router.post("/api/nomimoiEkprosopoi/update/:nomimosEkprosoposId", nomimoiekprosopoiController.postNomimoiEkprosopoiUpdate);
+router.get("/api/nomoi", genikaAPIsController.getNomoi);
+
+router.get("/api/pararthmataEfka", genikaAPIsController.getPararthmataEfka);
+router.post("/api/passwords/update/:passwordsId", passwordsController.postPasswordsUpdate);
+router.get("/api/perifereies", genikaAPIsController.getPerifereies);
+router.get("/api/periodoi", mainAppController.getPeriods);
+router.get("/api/periodInUse", mainAppController.getPeriodInUse);
+router.get("/api/poleis", genikaAPIsController.getPoleis);
+router.get("/api/populatedoy", genikaAPIsController.getDoy);
+router.get("/api/populatekad", genikaAPIsController.getKad);
+router.get("/api/populatetameia", genikaAPIsController.getTameia);
+
+router.get("/api/sepe", genikaAPIsController.getSepe);
+
+router.get("/api/tameia", genikaAPIsController.getAllTameia);
+router.post("/api/texnikosAsfaleias", genikaAPIsController.checkTexnikosAsfaleias);
+router.get("/api/texnikosAsfaleias/:kodikosTexnikoy", genikaAPIsController.getTexnikosAsfaleias);
+router.get("/api/typoiTaytothton", genikaAPIsController.getTypoiTaytothton);
+router.get("/api/yphkoothtes", genikaAPIsController.getYphkoothtes);
+router.get("/api/eidikesKathgories", genikaAPIsController.getEidikesKathgories);
+router.get("/api/oresEidikonKathgorion/:kodikos", genikaAPIsController.getOresFromEidikesKathgories);
+router.get("/api/oikogeneiakhKatastash", genikaAPIsController.getOikogeneiakhKatastash);
+router.get("/api/trapezes", genikaAPIsController.getBanks);
+router.post("/api/afmErgazomenoy", ergazomenoiController.checkAfmErgazomenoy);
+router.get("/api/kathestosApasxolhshs", genikaAPIsController.getKathestotaApasxolhshs);
+router.get("/api/sxeseisErgasias", genikaAPIsController.getSxeseisErgasias);
+router.get("/api/syggenikesSxeseis", genikaAPIsController.getSyggenikesSxeseis);
+router.get("/api/theshEythynhs", genikaAPIsController.getTheseisEythynhs);
+router.get("/api/eidikhPeriptosh", genikaAPIsController.getEidikesPeriptoseis);
+router.get("/api/apasxolhseisBaseiSymbashs", genikaAPIsController.getApasxolhseisBaseiSymbashs);
+router.get("/api/asfalistikesKlaseis", genikaAPIsController.getAsfalistikesKlaseis);
+router.get("/api/tmhmata", genikaAPIsController.getTmhmata);
+router.get("/api/ekpaideytikaEpipeda", genikaAPIsController.getEkpaideytikaEpipeda);
+router.get("/api/eidikothtes", genikaAPIsController.getEidikothtes);
+router.get("/api/typoiErgazomenon", genikaAPIsController.getTypoiErgazomenon);
+router.get("/api/ypokatasthmata", ypokatasthmataController.getYpokatasthmata);
+router.get("/api/eidikothtesErganh", genikaAPIsController.getEidikothtesErganh);
+router.get("/api/getSelectedEidikothta", genikaAPIsController.getSelectedEidikothta);
+router.get("/api/kadEfka", genikaAPIsController.getKadEfka);
+router.get("/api/kpkEfkaOtanYparxeiEpa", genikaAPIsController.getKpk);
+router.get("/api/antistoixishKadEidikothtesEfka", genikaAPIsController.getEidikothtesEfka);
+router.get("/api/antistoixishKadKpkEfka", genikaAPIsController.getKpkEfka);
+router.get("/api/epaEfka", genikaAPIsController.getEidikesPeriptoseisEfka);
+router.get("/api/antistoixishEpaKpkEfka", genikaAPIsController.getKpkBaseiEpaEfka);
+router.get("/api/getKpkEfkaReset", genikaAPIsController.getKpkEfka);
+router.get("/api/programmataDypa", genikaAPIsController.getProgrammataDypa);
+router.get("/api/populateKentraKostoys", genikaAPIsController.getKentraKostoys);
+
+router.get("/api/symbaseis", genikaAPIsController.getSymbaseis);
+router.post("/api/symbaseis/update/:symbaseisId", symbaseisController.postSymbaseisUpdate);
+
+router.get("/api/kathgoriesSymbaseon/:symbash", genikaAPIsController.getKathgoriesSymbaseon);
+router.get("/api/symbaseis/kathgories/:symbashId", symbaseisController.loadKathgoriesSymbaseonForm);
+router.post("/api/kathgoriesSymbaseon/update/:kathgoriesId", symbaseisController.postKathgoriesSymbaseonUpdate);
+
+router.get("/api/eidikothtesSymbaseon/:symbash_kathgoria", genikaAPIsController.getEidikothtesSymbaseon);
+router.get("/api/symbaseis/eidikothtes/:symbash_kathgoria", symbaseisController.loadEidikothtesSymbaseonForm);
+router.post("/api/eidikothtesSymbaseon/update/:eidikothtesId", symbaseisController.postEidikothtesSymbaseonUpdate);
+
+router.get("/api/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", genikaAPIsController.getStoixeiaSymbaseon);
+router.get("/api/symbaseis/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", symbaseisController.loadStoixeiaSymbaseonForm);
+router.post("/api/stoixeiaSymbaseon/update/:stoixeiaSymbaseonId", symbaseisController.postStoixeiaSymbaseonUpdate);
+
+router.post("/api/apodoxesErgazomenon", symbaseisController.calcApodoxesErgazomenon);
+router.post("/api/enhmeroshKlimakion", symbaseisController.postKlimakiaSymbaseon);
+router.get("/api/krathseisErgazomenon", symbaseisController.getKrathseisErgazomenon);
+router.get("/api/genikesParametroi", genikaAPIsController.getGenikesParametroi);
+router.post("/api/getOraria", ergazomenoiController.getOrariaAnaErgazomeno);
+router.post("/api/ergazomenoi/update/:ergazomenoiId", ergazomenoiController.postErgazomenoiUpdate);
+
+router.get("/api/getAllErgazomenoi/:selectedTeam/:selectedCompany", programmataController.getAllErgazomenoi);
+router.get("/api/getErgazomeno/:selectedTeam/:selectedCompany/:selectedKodikos", programmataController.getErgazomeno);
+router.post("/api/ergazomenoi/programmata/update/:selectedTeam/:selectedCompany/:selectedKodikos", programmataController.postOrariaUpdate);
+router.get("/api/erganh/periods", checkAuth, erganhController.getPeriods);
+router.post("/api/ergazomenoi/programmata/getOraria", programmataController.getOraria);
+
+router.get("/api/adeiesDiamonhs/:typosAdeias", genikaAPIsController.getAdeiesDiamonhs);
+router.get("/api/thematikaPedia", genikaAPIsController.getThematikaPedia);
+router.get("/api/thematikesEnothtes", genikaAPIsController.getThematikesEnothtes);
+router.get("/api/foreisEkpaideyshs", genikaAPIsController.getForeisEkpaideyshs);
+router.get("/api/languages", genikaAPIsController.getLanguages);
+router.post("/api/checkArgies", genikaAPIsController.checkArgies);
+router.post("/api/dateDifference", genikaAPIsController.dateDifference);
+
+router.get("/api/kathgoriesErgasias", genikaAPIsController.getKathgoriesErgasias);
+
+router.get("/api/user", mainAppController.getUser);
+
+router.get("/api/xrhseis", mainAppController.getXrhseis);
+
+router.get("/api/yearInUse", mainAppController.getYearInUse);
+router.post("/api/ypokatasthmata/update/:ypokatasthmaId", ypokatasthmataController.postYpokatasthmaUpdate);
+
+router.get("/api/kinhseis/getErgazomenoi/:selectedTeam/:selectedCompany", kinhseisController.getErgazomenoi);
+router.get("/api/kinhseis/getLoipaStoixeiaErgazomenoy/:selectedTeam/:selectedCompany/:selectedKodikos", kinhseisController.loipaStoixeiaErgazomenoy);
+router.get("/api/kinhseis/typoiApodoxon", kinhseisController.getTypoiApodoxon);
+router.get("/api/kinhseis/calcTotals", kinhseisController.getTotals_Apasxolhseon);
+router.get("/api/kinhseis/calcApoysies", kinhseisController.getTotals_Apoysion);
+router.get("/api/kinhseis/getApasxolhseis", kinhseisController.getApasxolhseis);
+router.get("/api/kinhseis/getEthsioSynoloYperorion", kinhseisController.getEthsioSynoloYperorion);
+router.get("/api/kinhseis/getKrathseis", kinhseisController.getKrathseisWithPososta);
+router.get("/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon", kinhseisController.getAntistoixiseisByKrathshAndTypoApodoxon);
+router.get("/api/kinhseis/getKlimakiaForoy", forosController.getKlimakiaForoy);
+router.get("/api/kinhseis/getEkptoshForoy", forosController.getEkptoshForoy);
+router.get("/api/kinhseis/getEisodhmaProForoyMeioshs", forosController.getEisodhmaProForoyMeioshs);
+router.post("/api/kinhseis/argies_astheneion", kinhseisController.getSynoloArgion);
+router.post("/api/kinhseis/hmeres_mh_ergasias", kinhseisController.getSynoloHmeronMhErgasias);
+router.post("/api/kinhseis/prohgoymenes_astheneies", kinhseisController.getSynoloProhgoymenonAstheneion);
+router.post("/api/kinhseis/hmeromhnies_astheneias", kinhseisController.get_Hmeromhnies_Astheneion);
+router.post("/api/kinhseis/asfalistikes_klaseis", kinhseisController.get_Asfalistikes_Klaseis_Gia_Epidothsh_Efka);
+router.get("/api/kinhseis/kathgories_adeion", kinhseisController.get_Kathgories_Adeion);
+router.post("/api/kinhseis/prohgoymenes_adeies", kinhseisController.getSynoloProhgoymenonAdeion);
+router.post("/api/kinhseis/apodoxes_prohgoymenon_periodon", kinhseisController.getSynoloApodoxonProhgoymenonPeriodon);
+
+router.post("/api/ektyposeis/symbaseis/ergazomenoi", ektyposhSymbaseonController.createPdf);
+router.get('/api/ektyposeis/apasxolhseis/tmhmata', createDropdownApi(TmhmataModel));
+
+router.post("/api/update_session_typosApodoxon", kinhseisController.update_session_typosApodoxon);
+router.post("/api/update_session_periodos", kinhseisController.update_session_periodos);
+
+export default router;

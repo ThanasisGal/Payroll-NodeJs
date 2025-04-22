@@ -1,0 +1,26 @@
+<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem; margin-bottom: -0.5rem;">
+  <% for (let i = 1; i <= 7; i++) { %>
+    <input type="hidden" name="krathshHidden_<%= ('0' + i).slice(-2) %>" id="krathshHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['krathsh_' + ('0' + i).slice(-2)] %>" />
+    <input type="hidden" name="amaKrathshsHidden_<%= ('0' + i).slice(-2) %>" id="amaKrathshsHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['ama_krathshs_' + ('0' + i).slice(-2)] %>" />
+  <% } %>
+  
+  <div class="col-1 text-center">
+    <label class="col-form-label field-required">
+      α/α
+    </label>
+  </div>
+  <div class="col-8 text-center">
+    <label class="col-form-label field-required">
+      Κράτηση
+    </label>
+  </div>
+  <div class="col-2 text-center">
+    <label class="col-form-label field-required">
+      Α.Μ.Α
+    </label>
+  </div>
+</div>
+
+<div id="krathseisContainer">
+  <!-- Εδώ θα προστεθούν δυναμικά τα select κρατήσεις -->
+</div>

@@ -1,0 +1,176 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    <!-- <hr style="margin-top: -2rem" /> -->
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius">
+
+            <div class="card d-flex flex-column z-depth-5">
+
+              <div class="card-header" style="height: 15.6vh !important;">
+                <label class="text-center headers-content" style="height: 7.1vh !important;">
+                  Συντήρηση Αντιστοιχίσεων Κ.Π.Κ.
+                </label>
+                <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                  <div class="col-1 left-align">
+                    <label for="company" class="col-form-label label-font-size" style="color: #000000;">
+                      Εταιρεία
+                    </label>
+                  </div>
+
+                  <div class="col-11">
+                    <input type="text" id="company" name="company" class="form-control input-contents left-align" value="<%= company.kod %> &nbsp; &nbsp; &nbsp; <%= company.eponymia %> &nbsp; <%= company.fathername.substr(0, 3) %> &nbsp; <%= company.firstname %>" disabled />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+                  <div class="col-1 left-align">
+                    <label for="krathsh" class="col-form-label label-font-size" style="color: #000000;">
+                      Κράτηση
+                    </label>
+                  </div>
+
+                  <div class="col-8-5">
+                    <input type="text" id="krathsh" name="krathsh" class="form-control input-contents left-align" value="<%= krathsh.kodikos %> &nbsp; &nbsp; &nbsp; <%= krathsh.perigrafh %>" disabled />
+                  </div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="aa_eggrafhs" class="col-form-label label-font-size" style="color: #000000;"> α/α Εγγραφής 
+                    </label>
+                  </div>
+                  <div class="col-1">
+                    <input type="text" name="aa_eggrafhs" id="aa_eggrafhs" class="form-control input-contents text-center" value="<%= antistoixish.aa_eggrafhs.toString().padStart(4, '0') %> " disabled />
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 30  vh; background-color: #ffffff;" >
+                <input type="hidden" name="antistoixishId" id="antistoixishId" value="<%= antistoixish._id %>" />
+                <input type="hidden" name="team" id="team" value="<%= company.team %>" />
+                <input type="hidden" name="companyId" id="companyId" value="<%= company._id %>" />
+                <input type="hidden" name="companyKod" id="companyKod" value="<%= company.kod %>" />
+                <input type="hidden" name="krathshId" id="krathshId" value="<%= krathsh._id %>" />
+                <input type="hidden" name="krathshKod" id="krathshKod" value="<%= krathsh.kodikos %>" />
+                
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="kpk" class="col-form-label label-font-size field-required">
+                      Κωδικός Πακέτου Κάλυψης
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="kpk" id="kpk" class="form-control input-contents right-align" value="<%= antistoixish.kpk %>" maxlength="4" pattern="[0-9]{1,}" />
+                  </div>
+                </div>
+
+                </br>
+                
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="apo_typos_apodoxon" class="col-form-label label-font-size field-required">
+                      Από Τύπο Αποδοχών 
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="apo_typos_apodoxon" id="apo_typos_apodoxon" class="form-control input-contents right-align" value="<%= antistoixish.apo_typos_apodoxon %>" maxlength="3" />
+                  </div>
+
+                  <div class="col-3"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="se_typos_apodoxon" class="col-form-label label-font-size field-required">
+                      Σε Τύπο Αποδοχών
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="se_typos_apodoxon" id="se_typos_apodoxon" class="form-control input-contents right-align" value="<%= antistoixish.se_typos_apodoxon %>" maxlength="3" />
+                  </div>
+                </div>
+
+                </br>
+                
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="kad" class="col-form-label label-font-size field-required">
+                      Κ.Α.Δ.
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="kad" id="kad" class="form-control input-contents right-align" value="<%= antistoixish.kad %>" maxlength="4" />
+                  </div>
+
+                  <div class="col-3"></div>
+                  
+                  <div class="col-1-5 left-align">
+                    <label for="eidikothta" class="col-form-label label-font-size field-required">
+                      Ειδικότητα
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="eidikothta" id="eidikothta" class="form-control input-contents right-align" value="<%= antistoixish.eidikothta %>" maxlength="6" />
+                  </div>
+                </div>
+
+                </br>
+                  
+                <div class="row form-group g-3 align-items-center">
+                  <div class="col-2-5 left-align">
+                    <label for="epa" class="col-form-label label-font-size field-required">
+                      Ειδική Περίπτωση Ασφάλισης 
+                    </label>
+                  </div>
+                  <div class="col-2">
+                    <input type="text" name="epa" id="epa" class="form-control input-contents right-align" value="<%= antistoixish.epa %>" maxlength="2" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="card-footer mt-auto"
+              >
+                <div
+                  class="d-inline-block d-flex"
+                  style="
+                    margin-top: -0.5rem !important;
+                    margin-bottom: -1rem !important;
+                    margin-left: 10px !important;
+                    margin-right: 10px !important;
+                    justify-content: space-around;
+                  "
+                >
+                  <button
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton"
+                  >
+                    <i class="bi bi-floppy"></i> Αποθήκευση
+                  </button>
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                    href="/companies/antistoixiseis"
+                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <script src="/js/common/getCompanyDescription.js"></script>
+    <!-- <script src="/js/companies/antistoixiseis/getFieldValues.js"></script> -->
+    <script src="/js/common/navTabs.js"></script>
+    <script src="/js/common/tooltipsForButtons.js"></script>
+    <script src="/js/common/moveByEnter.js"></script>
+    <script src="/js/companies/antistoixiseis/fillValuesWithZeroes.js"></script>
+    <script src="/js/companies/antistoixiseis/putFieldValues.js"></script>
+    <!-- <script src="/js/common/changeUrl.js"></script> -->
+  </div>
+</div>

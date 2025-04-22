@@ -1,0 +1,158 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+    </br>
+    </br>
+    </br>
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div>
+          <form class="formRadius" id="transferForm">
+
+            <div class="card d-flex flex-column z-depth-5" style="width: 90%; margin-left: 5%;">
+
+              <div class="card-header mb-2">
+                <label class="text-center headers-content">
+                  Εισαγωγή / Δημιουργία Ωραρίων Από τις Κάρτες Εργασίας
+                </label>
+              </div>
+
+              <hr class="hr-style-1" />
+
+              <div class="card-body overflow-auto flex-grow-1" style="height: 28vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+
+                <input type="hidden" name="idHidden" id="idHidden" class="form-control input-contents" value="" />
+                <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
+                <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
+                <input type="hidden" name="kodikosHidden" id="kodikosHidden" class="form-control input-contents" value="" />
+                <input type="hidden" name="afmHidden" id="afmHidden" class="form-control input-contents" value="" />
+                <input type="hidden" name="hmeromhnia_proslhpshs_hidden" id="hmeromhnia_proslhpshs_hidden" class="form-control input-contents" value="" />
+                <input type="hidden" name="eidikh_kathgoria_ergazomenoy" id="eidikh_kathgoria_ergazomenoy" class="form-control input-contents" value="" />
+                <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
+
+                </br>
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
+                  <div class="col-3-5"></div>
+                  <div class="col-2 left-align">
+                    <label for="interval" class="col-form-label label-font-size-smaller field-required">
+                      Στρογγυλοποίηση στα 
+                    </label>
+                  </div>
+                  <div class="col-3 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="interval" id="interval">
+                      <option value="1" selected>Χωρίς στρογγυλοποίηση</option>
+                      <option value="5">5 Λεπτά</option>
+                      <option value="10">10 Λεπτά</option>
+                      <option value="15">15 Λεπτά</option>
+                      <option value="20">20 Λεπτά</option>
+                      <option value="25">25 Λεπτά</option>
+                      <option value="30">30 Λεπτά</option>
+                      <!-- <option value="35">35 Λεπτά</option>
+                      <option value="40">40 Λεπτά</option>
+                      <option value="45">45 Λεπτά</option>
+                      <option value="50">50 Λεπτά</option>
+                      <option value="55">55 Λεπτά</option> -->
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
+                  <div class="col-2 left-align">
+                    <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required">
+                      Υποκατάστημα
+                    </label>
+                  </div>
+                  <div class="col-10 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="ypokatasthmata" id="ypokatasthmata">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
+                  <div class="col-2 left-align">
+                    <label for="ergazomenos" class="col-form-label label-font-size-smaller field-required">
+                      Για τον Εργαζόμενο
+                    </label>
+                  </div>
+                  <div class="col-10 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="ergazomenos" id="ergazomenos">
+                    </select>
+                  </div>
+                  <div class="col-5 mt-2" style="display: none;"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2 " data-live-search="true" name="ergazomenos2" id="ergazomenos2">
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
+                  <div class="col-2 left-align">
+                    <label for="periods" class="col-form-label" style="font-size: 0.70vw;">
+                      Για τον μήνα
+                    </label>
+                  </div>
+
+                  <div class="col-2 mt-2"> 
+                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="periods" id="periods">
+                    </select>
+                  </div>
+
+                  <div class="col-2">
+                    <input type="hidden" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" required />
+                  </div>
+
+                  <label for="username" class="col-form-label" style="font-size: 0.75vw; display: none;">
+                    Χρήστης
+                  </label>
+                  <input type="hidden" name="username" id="username" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].username %>" readonly />
+                  <label for="password" class="col-form-label" style="font-size: 0.70vw; display: none;">
+                    Κωδικός Χρήστη
+                  </label>
+                  <input type="hidden" name="password" id="password" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].password %>" readonly />
+
+                  <div class="col-4"></div>
+
+                  <div class="col-2">
+                    <input type="hidden" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-footer mt-auto">
+                <div class="d-inline-block d-flex" style="margin-top: -0.5rem !important; margin-bottom: -1rem !important; margin-left: 10px !important; margin-right: 10px !important; justify-content: space-around;">
+
+                  <button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" name="importCardsButton" id="importCardsButton"><i class="bi bi-copy"></i> Εισαγωγή - Επισκόπηση
+                  </button>
+                  
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                  <button type="button" class="btn btn-toTop scroll-to-top"><i class="bi bi-chevron-double-up"></i></button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <% if (process.env.NODE_ENV === 'production') { %>
+      <script src="/min.js/ergazomenoi/programmata/eisagoghOrarionApoKartes.min.js"></script>
+    <% } else { %>
+      <script src="/js/common/moveByEnter.js"></script>
+      <script src="/js/common/getCompanyDescription.js"></script>
+      <script src="/js/common/toggleLabel.js"></script>
+      <script src="/js/dates/convertDateToISO.js"></script>
+      <script src="/js/common/tooltipsForButtons.js"></script>
+      <script src="/js/common/scrollToTop.js"></script>
+      <script src="/js/ergazomenoi/programmata/loadDropdowns.js"></script>
+      <script src="/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script>
+      <script src="/js/ergazomenoi/programmata/loadDropdownsPeriods.js"></script>
+      <script src="/js/ergazomenoi/programmata/importCardsButton.js"></script>
+      <script src="/js/common/setupTabKeyNavigation.js"></script>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,139 @@
+<div
+  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mt-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;"></br>
+</div>
+<!-- </br> -->
+<div class="container">
+  <form class="formRadius">
+
+    <div class="card d-flex flex-column z-depth-5">
+      <div class="card-header p-0" style="height: 3.5rem !important;">
+        <label class="text-center w-100 headers-content mt-2">
+          Υπολογισμός Κλιμακίων Συμβάσεων
+        </label>
+      </div>
+      
+      <div class="card-body overflow-auto flex-grow w-95" style="height: 64vh; background-color: #ffffff; margin-left: 5%" >
+
+        <input type="hidden" id="kodikosSymbashs" name="kodikosSymbashs" />
+        <input type="hidden" id="kodikosKathgorias" name="kodikosKathgorias" />
+        <input type="hidden" id="kodikosEidikothtas" name="kodikosEidikothtas" />
+
+        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+          <div class="col-2 left-align">
+            <label class="col-form-label field-required" style="font-size: 12px;">
+              Περίοδος Ισχύος της Σύμβασης
+            </label>
+          </div>
+
+          <div class="col-2 left-align">
+            <label for="isxyei_apo" class="col-form-label label-font-size">
+              Από Ημ/νία Έναρξης
+            </label>
+          </div>
+          <div class="col-2-5">
+            <input type="date" name="isxyei_apo" id="isxyei_apo" class="date-control" value="" />
+          </div>
+          <div class="col-2 left-align">
+            <label for="isxyei_eos" class="col-form-label label-font-size">
+              Έως Ημ/νία Λήξης
+            </label>
+          </div>
+          <div class="col-2-5">
+            <input type="date" name="isxyei_eos" id="isxyei_eos" class="date-control" value="" />
+          </div>
+        </div>
+
+        </br>
+
+        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+          <div class="col-2 left-align">
+            <label for="symbash" class="col-form-label label-font-size field-required" >
+              Σύμβαση
+            </label>
+          </div>
+      
+          <div class="col-9">
+            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="symbash" id="symbash">
+            </select>
+          </div>
+          <button
+            type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-001" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Σύμβαση, Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+            <i class="bi bi-trash" style="color: red"></i> 
+          </button>
+        </div>
+
+        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+          <div class="col-2 left-align">
+            <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
+              Κατηγορία Σύμβασης
+            </label>
+          </div>
+          <div class="col-9">
+            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kathgoria_symbashs" id="kathgoria_symbashs" disabled>
+            </select>
+          </div>
+          <button
+            type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-002" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+            <i class="bi bi-trash" style="color: red"></i> 
+          </button>
+        </div>
+
+        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+          <div class="col-2 left-align">
+            <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
+              Ειδικότητα Σύμβασης
+            </label>
+          </div>
+          <div class="col-9">
+            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_symbashs" id="eidikothta_symbashs" disabled>
+            </select>
+          </div>
+          <button
+          type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-003" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
+          <i class="bi bi-trash" style="color: red"></i> 
+          </button>
+        </div>
+
+        </br>
+
+        <div id="stoixeiaSymbaseonContainer">
+          <!-- Εδώ θα προστεθούν δυναμικά τα label στοιχεία -->
+        </div>
+
+      </div>
+
+      <div class="card-footer">
+        <div
+          class="d-inline-block d-flex"
+          style="
+            margin-top: -0.5rem !important;
+            margin-bottom: -1rem !important;
+            margin-left: 10px !important;
+            margin-right: 10px !important;
+            justify-content: space-around;">
+          
+          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" id="calculateButton"><i class="bi bi-calculator"></i> 
+            Υπολογισμός
+          </a>
+          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" id="updateButton"><i class="bi bi-floppy"></i> 
+            Ενημέρωση
+          </a>
+          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp"><i class="bi bi-chevron-double-left"></i> 
+            Επιστροφή
+          </a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+
+
+
+
+<script src="/js/symbaseis/ypologismoiKlimakion/addStoixeiaSymbaseon.js"></script>
+<script src="/js/symbaseis/ypologismoiKlimakion/loadDropdowns_ypologismoi.js"></script>
+<script src="/js/symbaseis/ypologismoiKlimakion/clearSelects.js"></script>
+<script src="/js/symbaseis/ypologismoiKlimakion/ypologismos.js"></script>
+<script src="/js/symbaseis/ypologismoiKlimakion/enhmerosh.js"></script>
+<!-- <script src="/js/common/changeUrl.js"></script> -->

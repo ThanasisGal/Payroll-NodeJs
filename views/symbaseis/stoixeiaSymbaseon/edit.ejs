@@ -1,0 +1,218 @@
+<div class="tadded-container">
+  <div class="container-fluid">
+    <div class="menu_Links">
+      <ul>
+        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
+      </ul>
+    </div>
+
+    <div class="sections">
+      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        <div class="container">
+          <form class="formRadius">
+
+            </br></br></br></br>
+
+            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+
+              <div class="card-header">
+                <label class="text-center headers-content">
+                  Συντήρηση Στοιχείων Σύμβασης
+                </label>
+              </div>
+
+              <div class="card-body overflow-auto flex-grow-1" style="height: 42.5vh; background-color: #ffffff;" >
+                <input type="hidden" name="afora_thn_symbash_kathgoria_eidikothta" id="afora_thn_symbash_kathgoria_eidikothta" value="<%= stoixeiaSymbaseon.afora_thn_symbash_kathgoria_eidikothta %>" />
+                <input type="hidden" name="stoixeiaSymbaseonId" id="stoixeiaSymbaseonId" value="<%= stoixeiaSymbaseonId %>" />
+          
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label
+                      class="col-form-label label-font-size">
+                      Σύμβαση
+                    </label>
+                  </div>
+                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
+                    <label><%= symbaseis.kodikos.padEnd(10, '\u00A0') + symbaseis.perigrafh %></label>
+                  </div>
+                </div>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label
+                      class="col-form-label label-font-size">
+                      Κατηγορία
+                    </label>
+                  </div>
+                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
+                    <label><%= kathgories.kodikos.padEnd(10, '\u00A0') + kathgories.perigrafh %></label>
+                  </div>
+                </div>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label
+                      class="col-form-label label-font-size">
+                      Ειδικότητα
+                    </label>
+                  </div>
+                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
+                    <label><%= eidikothtes.kodikos.padEnd(10, '\u00A0') + eidikothtes.perigrafh %></label>
+                  </div>
+                </div>
+
+                <hr style="margin-bottom: 1rem;" />
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label
+                      for="kodikos"
+                      class="col-form-label label-font-size">
+                      Κωδικός
+                    </label>
+                  </div>
+                  <div class="col-1">
+                    <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= stoixeiaSymbaseon.kodikos.toString().padStart(4, '0') %>" readonly />
+                  </div>
+                </div>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label
+                      for="perigrafh"
+                      class="col-form-label label-font-size field-required">
+                        Περιγραφή
+                    </label>
+                  </div>
+                  <div class="col-10-5">
+                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="<%= stoixeiaSymbaseon.perigrafh %>" />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center" style="background-color: #ffffff;">
+                  <div class="col-1-5 left-align">
+                    <label for="poso_pososto" class="col-form-label label-font-size left-align field-required">
+                      Ποσό ή Ποσοστό
+                    </label>
+                  </div>
+                  <div class="col-1-5 left-align checkbox-flex-center">
+                    <input type="checkbox" id="poso_pososto" name="poso_pososto" class="form-check-input custom-checkbox checkbox-class" <%= stoixeiaSymbaseon.poso_pososto ? 'checked' : '' %> value="" />
+                    <label for="poso_pososto" id="label-poso_pososto" style="margin-left: 0.75rem; font-size: 0.875vw;"><%= stoixeiaSymbaseon.poso_pososto ? 'ΠΟΣΟ' : 'ΠΟΣΟΣΤΟ' %>
+                    </label>
+                  </div>
+
+                  <div class="col-3"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="poso" class="col-form-label label-font-size">
+                      Ποσό
+                    </label>
+                  </div>
+
+                  <div class="col-1">
+                    <input type="number" name="poso" id="poso" class="form-control input-contents text-right" value="<%= stoixeiaSymbaseon.poso %>" disabled />
+                  </div>
+                
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="pososto" class="col-form-label label-font-size">
+                      Ποσοστό
+                    </label>
+                  </div>
+
+                  <div class="col-1">
+                    <input type="number" name="pososto" id="pososto" class="form-control input-contents text-right" value="<%= stoixeiaSymbaseon.pososto %>" min="0" max="100" step="0.05" />
+                  </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-4" style="background-color: #ffffff;">
+                  <div class="col-1-5 left-align">
+                    <label for="arithmos_klimakion" class="col-form-label label-font-size left-align field-required">
+                      Αριθμός Κλιμακίων
+                    </label>
+                  </div>
+
+                  <div class="col-1">
+                    <input type="number" name="arithmos_klimakion" id="arithmos_klimakion" class="form-control input-contents text-right" min="1" max="50" value="<%= stoixeiaSymbaseon.arithmos_klimakion %>" />
+                  </div>
+                
+                  <div class="col-3-5"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="ypologismos_apo_klimakio" class="col-form-label label-font-size-smaller">
+                      Ξεκινά απ'το Κλιμάκιο
+                    </label>
+                  </div>
+
+                  <div class="col-1">
+                    <input type="number" name="ypologismos_apo_klimakio" id="ypologismos_apo_klimakio" class="form-control input-contents text-right" min="1" max="35" value="<%= stoixeiaSymbaseon.ypologismos_apo_klimakio %>" />
+                  </div>
+
+                  <div class="col-1"></div>
+
+                  <div class="col-1-5 left-align">
+                    <label for="bhma_ypologismoy" class="col-form-label label-font-size">
+                      Βήμα Υπολογισμού
+                    </label>
+                  </div>
+
+                  <div class="col-1">
+                    <input type="number" name="bhma_ypologismoy" id="bhma_ypologismoy" class="form-control input-contents text-right" min="1" max="35" value="<%= stoixeiaSymbaseon.bhma_ypologismoy %>" />
+                  </div>
+                </div>
+                
+                <div class="row form-group g-3 align-items-center mb-1">
+                  <div class="col-1-5 left-align">
+                    <label 
+                      for="typos_ypologismoy"
+                      class="col-form-label label-font-size field-required">
+                        Τύπος Υπολογισμού
+                    </label>
+                  </div>
+                  <div class="col-10-5">
+                    <input type="text" name="typos_ypologismoy" id="typos_ypologismoy" class="form-control input-contents" value="<%= stoixeiaSymbaseon.typos_ypologismoy %>" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="card-footer mt-auto"
+              >
+                <div
+                  class="d-inline-block d-flex"
+                  style="
+                    margin-top: -0.5rem !important;
+                    margin-bottom: -1rem !important;
+                    margin-left: 10px !important;
+                    margin-right: 10px !important;
+                    justify-content: space-around;
+                  "
+                >
+                  <button
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton" data-url="/api/stoixeiaSymbaseon/update" data-message="Επιτυχής ενημέρωση του αρχείου: των Στοιχείων Συμβάσεων" data-field-key="stoixeiaSymbaseonId"
+                  >
+                    <i class="bi bi-floppy"></i> Αποθήκευση
+                  </button>
+                  <a
+                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                    href="/symbaseis/stoixeiaSymbaseon"
+                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                  </a>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <script src="/js/common/getCompanyDescription.js"></script>
+    <script src="/js/common/moveByEnter.js"></script>
+    <script src="/js/common/toggleLabelSymbaseis.js"></script>
+    <!-- <script src="/js/common/getFieldValues.js"></script> -->
+    <script src="/js/common/putFieldValues.js"></script>
+    <!-- <script src="/js/common/changeUrl.js"></script> -->
+  </div>
+</div>
