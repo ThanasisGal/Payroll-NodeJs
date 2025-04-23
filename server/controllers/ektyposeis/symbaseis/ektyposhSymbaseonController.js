@@ -650,9 +650,6 @@ class ektyposhSymbaseonController {
                 }
             
                 // Ετοιμάζουμε εντολή μετατροπής LibreOffice
-                // const libreOfficePath = isWindows
-                //     ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
-                //     : `flatpak run org.libreoffice.LibreOffice`;
                 const libreOfficePath = isWindows
                 ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
                 : `/usr/bin/libreoffice`; // default path από apt
@@ -761,9 +758,14 @@ class ektyposhSymbaseonController {
             await compressAndSavePdf(finalPdfPath, company);
 
             // Ετοιμάζουμε ένα link για το τελικό merged PDF
-            const pdfLink = isProduction 
-                ? `https://${host}/pdf/${path.basename(mergedPdfPath)}`
-                : `http://${host}:${port}/pdf/${path.basename(mergedPdfPath)}`;
+            const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+            const pdfFilename = path.basename(mergedPdfPath);
+            const pdfLink = `${baseUrl}/pdf/${pdfFilename}`;
+            
+
+            // const pdfLink = isProduction 
+            //     ? `https://${host}/pdf/${path.basename(mergedPdfPath)}`
+            //     : `http://${host}:${port}/pdf/${path.basename(mergedPdfPath)}`;
 
             const htmlLink = `Το PDF αρχείο των συμβάσεων έχει δημιουργηθεί. </br> Κάντε κλικ <a href="${pdfLink}" target="_blank" style="font-weight: 700 !important;">εδώ</a> για να το εκτυπώσετε. </br> <strong>ΠΡΟΣΟΧΗ!!!</strong> </br> Τα αρχεία που δημιουργήθηκαν θα διαγραφούν σε 3 λεπτά.`;
         
