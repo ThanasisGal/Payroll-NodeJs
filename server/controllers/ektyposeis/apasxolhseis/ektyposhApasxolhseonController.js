@@ -680,10 +680,13 @@ class ektyposhApasxolhseonController {
                 }
             
                 // Ετοιμάζουμε εντολή μετατροπής LibreOffice
+                // const libreOfficePath = isWindows
+                //     ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
+                //     : `flatpak run org.libreoffice.LibreOffice`;
                 const libreOfficePath = isWindows
-                    ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
-                    : `flatpak run org.libreoffice.LibreOffice`;
-
+                ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
+                : `/usr/bin/libreoffice`; // default path από apt
+            
                 const libreOfficeCommand = `${libreOfficePath} --headless --convert-to pdf "${tempDocxPath}" --outdir "${outputFolder}"`;
 
                 // Εφαρμόζουμε την εντολή
