@@ -1186,7 +1186,7 @@ a {
   list-style: none;
 } */
 .menu_Links ul {
-  display: flex;
+  display: flex; 
   justify-content: flex-start;
   list-style: none;
   padding: 0;
