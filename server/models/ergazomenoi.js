@@ -7,6 +7,7 @@ import { Schema as _Schema, model } from "mongoose";
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
         energos: { type: Boolean, default: false },
+        archived: { type: Boolean, default: false },
         fylo: { type: Boolean, default: false },
         eponymo: { type: String, trim: true },
         onoma: { type: String, trim: true },
@@ -232,6 +233,18 @@ import { Schema as _Schema, model } from "mongoose";
         updatedAt: { type: Date, default: Date.now() },
         ypologismos_foroy: { type: Boolean, default: false },
     });
+
+    ErgazomenoiSchema.index(
+        { team: 1, company_kod: 1, ypokatasthma: 1, kodikos: 1 },
+        { partialFilterExpression: { archived: false, energos: true } }
+      );
+      
+      // 2. Ανενεργοί / αρχειοθετημένοι (για ιστορικό, admin προβολή)
+      ErgazomenoiSchema.index(
+        { team: 1, company_kod: 1, kodikos: 1 },
+        { partialFilterExpression: { archived: true } }
+      );
+              
     const ErgazomenoiModel = model("Ergazomenoi", ErgazomenoiSchema);
 
     const OrariaSchema = new Schema({

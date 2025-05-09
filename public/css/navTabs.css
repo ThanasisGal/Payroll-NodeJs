@@ -27,10 +27,11 @@ a {
 
 .menu_Links ul li {
   display: inline-block;
-  padding: 4px 15px;
+  width: 12.5vw;
+  padding: 4px 5px;
   border-radius: 4px;
   font-weight: bold;
-  font-size: 0.875vw
+  font-size: 0.75vw;
   color: #000;
   cursor: pointer;
   transition: 0.5s;

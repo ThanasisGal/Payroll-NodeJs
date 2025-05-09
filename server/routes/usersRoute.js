@@ -22,9 +22,10 @@ import forosController from "../controllers/Kinhseis/forosContoller.js";
 import ektyposhSymbaseonController from "../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js";
 import ektyposhApasxolhseonController from "../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js";
 
-import { createDropdownApi } from '../utils/dropdownHelper.js';
+// import { createDropdownApi } from '../utils/dropdownHelper.js';
 
 import TmhmataModel from '../models/stathera_arxeia.js';
+import PeriodsModel from '../models/stathera_arxeia.js';
 
 // Route Level Middlware - To Protected Route
 router.use("/changepassword", checkUserAuth);
@@ -383,7 +384,9 @@ router.post("/api/kinhseis/prohgoymenes_adeies", kinhseisController.getSynoloPro
 router.post("/api/kinhseis/apodoxes_prohgoymenon_periodon", kinhseisController.getSynoloApodoxonProhgoymenonPeriodon);
 
 router.post("/api/ektyposeis/symbaseis/ergazomenoi", ektyposhSymbaseonController.createPdf);
-router.get('/api/ektyposeis/apasxolhseis/tmhmata', createDropdownApi(TmhmataModel));
+
+// router.get('/api/ektyposeis/apasxolhseis/tmhmata', createDropdownApi(TmhmataModel));
+// router.get('/api/ektyposeis/apasxolhseis/periodoi', createDropdownApi(PeriodsModel));
 
 router.post("/api/update_session_typosApodoxon", kinhseisController.update_session_typosApodoxon);
 router.post("/api/update_session_periodos", kinhseisController.update_session_periodos);

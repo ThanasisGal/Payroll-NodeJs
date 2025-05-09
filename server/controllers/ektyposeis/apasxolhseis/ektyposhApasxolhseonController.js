@@ -23,6 +23,8 @@ const { PoleisModel,
         SxeseisErgasiasModel,
         DoyModel,
         EidikothtesEfarmoghsModel,
+        TmhmataModel,
+        PeriodsModel
       } = Models_A; 
 
 const { UserPrivilegesModel } = Models_B;
@@ -366,7 +368,7 @@ class ektyposhApasxolhseonController {
     static getTmhmata = async (req, res) => {
         try {
             const { search = '', page = 1 } = req.query;
-            const limit = 30;
+            const limit = 50;
             const skip = (parseInt(page) - 1) * limit;
             const regex = new RegExp(search, 'i');
         
@@ -374,12 +376,12 @@ class ektyposhApasxolhseonController {
                 $or: [{ perigrafh: regex }, { kodikos: regex }],
             };
         
-            const tmhmata = await EidikothtesErganhModel.find(query)
+            const tmhmata = await TmhmataModel.find(query)
                 .sort({ kodikos: 1 })
                 .skip(skip)
                 .limit(limit);
         
-            const count = await EidikothtesErganhModel.countDocuments(query);
+            const count = await TmhmataModel.countDocuments(query);
             const hasMore = skip + tmhmata.length < count;
         
             const items = tmhmata.map(t => ({
@@ -392,7 +394,44 @@ class ektyposhApasxolhseonController {
         } catch (error) {
             res.status(500).send(error);
         }
-      };
+    };
+      
+    static getPeriodoi = async (req, res) => {
+        try {
+            const sessionEtos = req.session.yearInUse;
+
+            const { search = '', page = 1 } = req.query;
+            const limit = 50;
+            const skip = (parseInt(page) - 1) * limit;
+            const regex = new RegExp(search, 'i');
+        
+            const query = {
+                $or: [
+                    { perigrafh: regex },
+                    { kodikos: regex }
+                  ],
+                  xrhsh: sessionEtos
+                };
+        
+            const periodoi = await PeriodsModel.find(query)
+                .sort({ kodikos: 1 })
+                .skip(skip)
+                .limit(limit);
+        
+            const count = await PeriodsModel.countDocuments(query);
+            const hasMore = skip + tmhmata.length < count;
+        
+            const items = periodoi.map(t => ({
+                value: t._id,
+                label: `${t.kodikos} - ${t.perigrafh}`,
+            }));
+            console.log({ limit, skip, count, returned: periodoi.length });
+            
+            res.json({ items, hasMore });
+        } catch (error) {
+            res.status(500).send(error);
+        }
+    };
       
     static createPdf = async (req, res) => { 
         const { team, company, kodikoi, username, password, ypokatasthma } = req.body;

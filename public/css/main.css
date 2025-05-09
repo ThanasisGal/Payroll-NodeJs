@@ -1174,7 +1174,7 @@ a {
 
 .tadded-container .menu_Links {
   position: relative;
-  /* text-align: center; */
+  text-align: center;
   padding: 0.0625rem;
   margin: 1.125rem 0;
   margin-top: 0px;
@@ -1196,15 +1196,15 @@ a {
 .menu_Links ul li {
   display: inline-block;
   padding: 0.25rem 0.625rem;
-  border-radius: 0.875rem;
-  font-weight: 500;
-  font-size: 0.875vw;
+  border-radius: 0.5rem;
+  font-weight: 700;
+  font-size: 0.85vw;
   color: #000;
   cursor: pointer;
   transition: 0.2s;
   color: #114900;
   margin-bottom: 1rem;
-  margin-left: 30px;
+  margin-left: 2rem;
 }
 
 @media (max-width: 567px) {
@@ -3108,4 +3108,324 @@ a[href] {
   pointer-events: none;  /* Αποτρέπει το hover και τα κλικ */
   opacity: 0.5;  /* Το κάνει να φαίνεται γκριζαρισμένο */
   cursor: default;
+}
+
+/* =====================================
+   Βασικό styling TomSelect σαν Bootstrap
+===================================== */
+
+/* Wrapper του select */
+.ts-wrapper.tom-dropdown {
+  position: relative;
+  height: 32px;
+  background-color: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Προσθήκη εικονιδίου dropdown */
+/* .ts-wrapper.tom-dropdown::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23495057' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 16 16'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform: translateY(-50%);
+  pointer-events: none;
+} */
+
+/* ▼ εικονίδιο dropdown */
+.ts-wrapper.dropdown-wrapper::after {   /* ← άλλαξε μόνο τον selector */
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23495057' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 16 16'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform: translateY(-50%);
+  z-index: 2;          /* (προαιρετικό) για να κάθεται πάνω απ’ τα tags */
+}
+
+/* =====================================
+   Container input + tags
+===================================== */
+.ts-control {
+  position: relative;
+  padding: 2px 36px 2px 8px !important; /* πάνω δεξιά κάτω αριστερά */
+  min-height: 32px;
+  border: none !important;
+  background-color: transparent !important;
+  padding: 0.375rem 0.75rem !important;
+  font-size: 0.875rem;
+  min-height: 32px;
+  width: 100%;
+  display: flex !important;
+  flex-wrap: nowrap;           /* ❗ Μη γίνει wrap τα tags */
+  align-items: center;
+  gap: 0.25rem;
+  overflow: visible !important;
+  padding-right: 36px !important; /* ❗ Χώρος για το εικονίδιο */
+  z-index: 1;
+  max-width: 100%;       /* ποτέ πέρα από τον wrapper */
+  overflow-x: hidden;    /* ✱ no horizontal scroll inside */
+}
+
+/* Κάθε tag */
+.ts-wrapper.multi .item {
+  height: 22px; /* ⬅️ Μικρότερο ύψος */
+  line-height: 22px; /* ⬅️ Να κεντράρεται σωστά το κείμενο */
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  background-color: #e9ecef;
+  color: #212529;
+  border-radius: 0.25rem;
+  margin-right: 0.25rem;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  flex: none;
+}
+
+/* Κουμπί διαγραφής σε κάθε tag */
+.ts-wrapper.multi .remove {
+  color: #dc3545;
+  font-size: 1rem;
+  margin-left: 0.25rem;
+  margin-top: 3px; /* ⬅️ Το κατεβάζουμε 3px */
+}
+
+/* Εσωτερικό input */
+.ts-control input {
+  display: inline-block !important;
+  /* width: auto !important; */
+  min-width: 100px;
+  padding: 0px 0px;
+  font-size: 0.9rem;
+  background: white !important;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  color: #495057;
+}
+
+/* =====================================
+   Εμφάνιση Dropdown Επιλογών
+===================================== */
+.ts-dropdown { 
+  border-radius: 0.375rem;
+  box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+  z-index: 1050;
+  font-size: 0.875rem;
+  overflow: visible;
+}
+
+.ts-dropdown-content{
+  max-height: 250px;   /* ⬅︎ ό,τι ύψος θες */
+  overflow-y: auto;    /* οριζόντιο όχι */
+}
+
+/* Hover σε επιλογή */
+.ts-dropdown .option:hover {
+  background-color: #d1e7dd !important;
+  color: #084298;
+}
+
+/* Ήδη επιλεγμένες επιλογές */
+.ts-dropdown .ts-option--selected {
+  background-color: #bee1fcbd !important;
+  color: #0f5132 !important;
+}
+
+/* Γραμμή που χωρίζει τα επιλεγμένα από τα μη επιλεγμένα */
+.ts-dropdown .ts-option--selected + .option:not(.ts-option--selected) {
+  border-top: 1px solid #ced4da;
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+/* =====================================
+   +N Overflow Indicator
+===================================== */
+.ts-overflow-indicator {
+  background-color: #70b35670 !important;
+  border-radius: 50%;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #000000;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  user-select: none;
+
+  position: absolute;
+  top: 50%;
+  right: -2.2rem;
+  transform: translateY(-50%);
+}
+
+/* Hover στο +N */
+.ts-overflow-indicator:hover {
+  background-color: #377001b0 !important;
+  color: #ffffff !important;
+}
+
+/* =====================================
+   Popup που ανοίγει από το +N
+===================================== */
+.ts-overflow-popup {
+  position: absolute;
+  top: calc(100% + 2px);         /* ❗ 2px κάτω από το select */
+  right: 0;
+  /* transform: translateX(4px); ✅ Μετατόπιση δεξιά 3px */
+  /* z-index: 1060;                ❗ Πάνω από το dropdown */
+  background: #ebebeb !important;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  box-shadow: 0 .25rem .5rem rgba(0, 0, 0, 0.459);
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  width: 100%; /* ➔ Να πιάνει όλο το πλάτος του ts-control */
+  min-width: unset; /* ➔ Καταργούμε το 300px που είχε πριν*/
+  overflow: visible;
+  animation: fadein 0.2s ease;
+  height: auto;
+}
+
+/* Ρύθμιση γραμμών μέσα στο popup */
+.ts-popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  cursor: default;               /* ❗ Default στο κείμενο */
+}
+
+/* Ρύθμιση κουμπιού Χ */
+.ts-popup-row button {
+  all: unset;
+  color: #dc3545;
+  font-size: 1rem;
+  cursor: pointer;               /* ❗ Pointer μόνο στο κουμπί */
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Hover στο κουμπί Χ */
+.ts-popup-row button:hover {
+  background-color: #f8d7da;
+  color: #a71d2a;
+}
+
+/* =====================================
+   Προαιρετικό fade-in popup
+===================================== */
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* .ts-control .items-placeholder {
+  display: none !important;
+} */
+
+.ts-control .item {
+  display: inline-block;
+  padding: 3px 6px;
+  margin: 2px 2px 2px 0;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-size: 0.885em;
+  position: relative;
+}
+
+.ts-control .item .remove {
+  margin-left: 6px;
+  color: #900 !important;
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.ts-fill-reset-btn {
+  position: absolute;
+  right: -4rem; 
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  background-color: #d4e7d4; /* ανοιχτό πράσινο */
+  color: #2b6d2b;            /* σκούρο πράσινο */
+  border: none ; /* 1px solid #2b6d2b; */
+  border-radius: 4px;
+  height: 28px;
+  width: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ts-dropdown .option:hover, .ts-overflow-popup .ts-popup-row:hover {
+  background-color: #d1e7dd !important;
+  color: #084298 !important;
+}
+
+.ts-overflow-popup::-webkit-scrollbar {
+  width: 6px;
+}
+.ts-overflow-popup::-webkit-scrollbar-thumb {
+  background-color: #c2c2c2;
+  border-radius: 3px;
+}
+
+.ts-wrapper.single{
+  position:relative;
+  overflow:visible;
+}
+.ts-wrapper.single .ts-control{
+  display:flex;
+  align-items:center;
+}
+.ts-wrapper.single .item{
+  flex:1 1 auto;
+  min-width:0;           /* επιτρέπει shrink */
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  padding-right:0.75rem; /* κενό δίπλα στο εικονίδιο */
+}
+.ts-single-reset-btn{
+  position:absolute;
+  top:50%;
+  left:calc(100% + 4px);
+  transform:translateY(-50%);
+  background-color: #d4e7d4; /* ανοιχτό πράσινο */
+  color: #2b6d2b;            /* σκούρο πράσινο */
+  /* border: 1px solid #2b6d2b; */
+  border-radius: 4px;
+  height: 28px;
+  width: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
 }

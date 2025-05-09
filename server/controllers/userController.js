@@ -377,7 +377,7 @@ class userController {
         from: process.env.EMAIL_FROM,
         to: email,
         subject: "Web Payroll Solutions => Επαλήθευση email",
-        html: `Γεια σας, <br /><br />Επειδή ζητήσατε να εγγραφείτε σαν χρήστης της εφαρμογής <strong>"Web Payroll System"</strong> <br /> θα πρέπει πριν συνεχίσετε να επαληθεύσετε το email σας. <br /><br /><br /> <a href="${link}"><strong>Κάντε κλικ εδώ</strong></a> για να επαληθεύσετε το email σας`,
+        html: `Γεια σας, <br /><br />Επειδή ζητήσατε να εγγραφείτε σαν χρήστης της εφαρμογής <strong>"Web Payroll Solutions"</strong> <br /> θα πρέπει πριν συνεχίσετε να επαληθεύσετε το email σας. <br /><br /><br /> <a href="${link}"><strong>Κάντε κλικ εδώ</strong></a> για να επαληθεύσετε το email σας`,
       });
 
       await req.flash(

@@ -19,14 +19,46 @@
           <input type="hidden" name="password" id="password" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].password %>" readonly />
       <% } %>
 
-      <div class="row form-group align-items-center" style="margin-top: 1.5rem;">
+      <div class="row form-group align-items-center" style="margin-top: .495rem;">
         <div class="col-1-3 left-align">
           <label for="typoiApodoxon" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 1.75rem;">
             Tύποι Αποδοxών
           </label>
         </div>
         <div class="col-4"> 
-          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="typoiApodoxon" id="typoiApodoxon">
+            <select
+              id="select-typoiApodoxon"
+              class="tom-dropdown"
+              name="select-typoiApodoxon"
+              multiple
+              data-api="/api/dropdown/typoiApodoxon"
+              data-xrhsh-related="false"
+              data-team-related="false"
+              data-company-related="false"
+              data-mhnas-related="false"
+              placeholder="Αναζήτηση Τύπων Αποδοχών">
+            </select>
+        </div>
+
+        <div class="col-0-5"></div>
+
+        <div class="col-1-3 left-align">
+          <label for="select-periodoi" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 3rem;">
+            Μήνες
+          </label>
+        </div>
+        <div class="col-4"> 
+          <select
+            id="select-periodoi"
+            class="tom-dropdown"
+            name="select-periodoi"
+            multiple
+            data-api="/api/dropdown/periodoi"
+            data-xrhsh-related="true"
+            data-team-related="false"
+            data-company-related="false"
+            data-mhnas-related="false"
+            placeholder="Αναζήτηση Περιόδου">
           </select>
         </div>
       </div>
@@ -37,29 +69,41 @@
             Υποκαταστήματα
           </label>
         </div>
-        <div class="col-5"> 
-          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="ypokatasthmata" id="ypokatasthmata">
+        <div class="col-4"> 
+          <select
+            id="select-ypokatasthmata"
+            class="tom-dropdown"
+            name="select-ypokatasthmata"
+            multiple
+            data-api="/api/dropdown/ypokatasthmata"
+            data-xrhsh-related="false"
+            data-team-related="true"
+            data-company-related="true"
+            data-mhnas-related="false"
+            placeholder="Αναζήτηση Υποκαταστήματος">
           </select>
         </div>
 
-        <div class="col-1 left-align">
-          <label for="tmhmata" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 2.25rem;">
+        <div class="col-0-5"></div>
+
+        <div class="col-1-3 left-align">
+          <label for="select-tmhmata" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 2.25rem;">
             Τμήματα
           </label>
         </div>
-        <div class="col-2"> 
-          <select id="tmhmata" name="tmhmata" multiple data-api="/api/ektyposeis/apasxolhseis/tmhmata"></select>
-          <div id="info" style="margin-top: 10px; display: none;"></div>
-        </div>
-
-        <div class="col-1 left-align">
-          <label for="periodoi" class="col-form-label label-font-size-smaller field-required" style="font-size: .9rem; padding-left: 3rem;">
-            Μήνες
-          </label>
-        </div>
-        <div class="col-1-5"> 
-          <select class="form-select selectpicker-dropdown-small" data-live-search="true" name="periodoi" id="periodoi">
-          </select>
+        <div class="col-4"> 
+            <select
+                id="select-tmhmata"
+                class="tom-dropdown"
+                name="select-tmhmata"
+                single
+                data-api="/api/dropdown/tmhmata"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Τμήματος">
+            </select>
         </div>
       </div>
 
@@ -132,11 +176,13 @@
 <% if (process.env.NODE_ENV === 'production') { %>
   <script src="/min.js/ektyposeis/atomikesEkkathariseis.min.js"></script>
 <% } else { %>
-  <script src="/js/common/moveByEnter.js"></script>
-  <script src="/js/common/scrollToTop.js"></script>
-  <script src="/js/common/sortTable.js"></script>
-  <script src="/js/common/setupTabKeyNavigation.js"></script>
-  <!-- <script src="/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script> -->
-  <script src="/js/ektyposeis/symbaseis/controlCheckbox.js"></script>
-  <script type="module" src="/js/common/multipleChoicesDropdowns.js"></script>
+  <script src="/static/js/common/moveByEnter.js"></script>
+  <script src="/static/js/common/scrollToTop.js"></script>
+  <script src="/static/js/common/sortTable.js"></script>
+  <script src="/static/js/common/setupTabKeyNavigation.js"></script>
+  <!-- <script type="module" src="/static/js/app.js"></script>
+  <script type="module" src="/static/js/dropdownManager.js"></script> -->
+  
+  <!-- <script src="/static/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script> -->
+  <!-- <script src="/static/js/ektyposeis/symbaseis/controlCheckbox.js"></script>
 <% } %>
