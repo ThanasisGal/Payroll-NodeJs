@@ -1,6 +1,5 @@
 *.pem
 .env
-public/js
 public/json/*.json
 public/pdf/*.pdf
 public/xlsx/*.xlsx
