@@ -144,6 +144,7 @@ class userController {
 
   static editUser = async (req, res) => {
     try {
+      console.log(req.params.id);
       const users = await UserModel.findOne({ _id: req.params.id });
 
       const locals = {

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
-import formatNumber from "../../../public/js/common/formatNumber.js";
+import formatNumber from "../../../public/js/utils/formatNumber.js";
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, PasswordsModel } = Models_C;
