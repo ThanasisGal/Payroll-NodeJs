@@ -111,5 +111,8 @@
   </form>
 </div>
 
-<script src="/static/js/util/getUserRole.js"></script>
-<!-- <script src="/static/js/changeUrl.js"></script> -->
+<% if (process.env.NODE_ENV === 'production') { %>
+  <script src="/min.js/views/login/login_ejs.min.js"></script>
+<% } else { %>
+  <script src="/static/js/common/getUserRole.js"></script>
+<% } %>

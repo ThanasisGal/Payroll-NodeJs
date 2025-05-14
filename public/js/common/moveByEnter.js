@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.querySelectorAll("input, select").forEach((element) => {
       element.addEventListener("keypress", function (e) {
         if (e.key === "Enter" && !this.classList.contains("use-default-enter")) {
-          e.preventDefault(); // Αποτροπή της προεπιλεγμένης λειτουργίας
+          e.preventDefault();       // Αποτροπή της προεπιλεγμένης λειτουργίας
 
           let allElements = Array.from(form.querySelectorAll("input, select"))
             .filter(el => !el.disabled && el.style.display !== "none");

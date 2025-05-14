@@ -2764,6 +2764,7 @@ mark, .mark {
 #nav-tree li a {
   display: block;
   position: relative;
+  /* padding: 5px 15px; */
   padding-bottom: 10px;
   text-decoration: none;
   color: #333;
@@ -2775,13 +2776,73 @@ mark, .mark {
   box-sizing: border-box;
 }
 
-#nav-tree li a[data-multiline="true"] {
-  padding-bottom: 35px; /* Ρύθμιση padding για multiline κείμενο */
+#nav-tree li a[data-multiline-3="true"] {
+  padding: 5px 15px 40px 15px !important;
 }
 
-/* #nav-tree li a[data-multiline="false"] {
-  padding-bottom: 10px; Ρύθμιση padding για multiline κείμενο
-} */
+#nav-tree li a[data-multiline-2="true"] {
+  padding: 5px 15px 40px 15px !important;
+}
+
+#nav-tree li a[data-multiline-2_1="true"] {
+  padding: 5px 15px 43px 15px !important;
+}
+
+@media screen and (max-width: 1375px) {
+  #nav-tree li a[data-multiline-3="true"] {
+    padding: 5px 15px 65px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-2="true"] {
+    padding: 5px 15px 58px 15px !important;
+  }
+
+    #nav-tree li a[data-multiline-2_1="true"] {
+    padding: 5px 15px 45px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-1="true"] {
+    padding: 5px 15px 40px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-1_1="true"] {
+    padding: 5px 15px 40px 15px !important;
+  }
+}
+
+@media screen and (max-width: 1456px) {
+  #nav-tree li a[data-multiline-3="true"] {
+    padding: 5px 15px 60px 15px !important;
+  }
+}
+
+@media screen and (max-width: 1603px) {
+  #nav-tree li a[data-multiline-3="true"] {
+    padding: 5px 15px 45px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-2="true"] {
+    padding: 5px 15px 45px 15px !important;
+  }
+
+    #nav-tree li a[data-multiline-2_1="true"] {
+    padding: 5px 15px 45px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-1="true"] {
+    padding: 5px 15px 45px 15px !important;
+  }
+
+  #nav-tree li a[data-multiline-1_1="true"] {
+    padding: 5px 15px 40px 15px !important;
+  }
+}
+
+@media screen and (max-width: 1686px) {
+  #nav-tree li a[data-multiline-1_1="true"] {
+    padding: 5px 15px 40px 15px !important;
+  }
+}
 
 #nav-tree li:hover {
   background-color: transparent;
@@ -2817,6 +2878,13 @@ a[href] {
 }
 
 /* Τα υπομενού είναι κρυμμένα από προεπιλογή */
+.menu {
+  display: block;
+  max-width: 16vw; /* Responsive πλάτος υπομενού */
+  font-size: 0.9rem;
+  transition: max-height 0.3s ease;
+}
+
 .submenu {
   display: none;
   padding-left: 5px; /* Εσοχή για τα υπομενού */
@@ -2837,7 +2905,7 @@ a[href] {
   }
 
   .submenu {
-    max-width: 75vw; /* Τα υπομενού προσαρμόζονται για μικρότερες οθόνες */
+    max-width: 70vw; /* Τα υπομενού προσαρμόζονται για μικρότερες οθόνες */
   }
 }
 
@@ -2882,7 +2950,7 @@ a[href] {
 
 /* Περιστροφή του caret όταν το μενού είναι ανοικτό */
 .rotate-chevron {
-  transform: translateY(-50%) rotate(180deg); /* Περιστροφή του εικονιδίου */
+  transform: translateY(-50%) rotate(180deg);
 }
 
 /* Menu links styling */
@@ -2896,17 +2964,19 @@ a[href] {
 .submenu-li {
   color: #363636dc;
   font-weight: 700 !important;
-  font-size: .85rem;
-}
-
-.childmenu-li {
-  color: #6cad4e; /* Προαιρετική αλλαγή του χρώματος του link στο hover */
-  font-weight: 400 !important;
   font-size: .8rem;
 }
 
+.childmenu-li {
+  color: #0b8600; 
+  font-weight: 400;
+  font-size: .85rem;
+}
+
 .childmenu-li:hover a {
-  font-weight: 800 !important;
+  color: #a81502 !important; 
+  font-size: .8rem !important;
+  font-weight: 500 !important;
 }
 
 .table-active {
