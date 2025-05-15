@@ -1,110 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE-edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><%= locals.title %></title>
-    <meta name="description" content="<%= locals.description %>" />
+    <html lang="en">
+        <head>
+            <meta charset="UTF-8" />
+            <meta http-equiv="X-UA-Compatible" content="IE-edge" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title><%= locals.title %></title>
+            <meta name="description" content="<%= locals.description %>" />
 
-    <script>
-      (function() {
-          let ua = navigator.userAgent;
-          let htmlTag = document.documentElement;
+            <script>
+                (function() {
+                    let ua = navigator.userAgent;
+                    let htmlTag = document.documentElement;
 
-          if (ua.indexOf("Firefox") > -1) {
-              htmlTag.classList.add("firefox");
-          } else if (ua.indexOf("Edg") > -1) {
-              htmlTag.classList.add("edge");
-          } else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) {
-              htmlTag.classList.add("chrome");
-          } else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) {
-              htmlTag.classList.add("safari");
-          }
-      })();
-    </script>
+                    if (ua.indexOf("Firefox") > -1) {
+                        htmlTag.classList.add("firefox");
+                    } else if (ua.indexOf("Edg") > -1) {
+                        htmlTag.classList.add("edge");
+                    } else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) {
+                        htmlTag.classList.add("chrome");
+                    } else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) {
+                        htmlTag.classList.add("safari");
+                    }
+                })();
+            </script>
 
-    <link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
-    <script src="/static/js/common/tooltipsForButtons.js"></script>
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
-    <!-- <script src="https://cdn.webpayrollsolutions.com/assets/js/dropdown-item.min.js"></script> -->
-    <!-- <script src="/static/js/dropdown-item.js"></script>
-    <script src="/static/js/dropdownManager.js"></script> -->
-    <script type="module" src="/static/js/app.js"></script>
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
-    <link rel="icon" href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico" type="image/x-icon" />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <!-- <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/main.css" /> -->
-    <link rel="stylesheet" href="/static/css/main.css" />
-    <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
+            <link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
+            <script src="/static/js/common/tooltipsForButtons.js"></script>
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
+            <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
+            <!-- <script src="https://cdn.webpayrollsolutions.com/assets/js/dropdown-item.min.js"></script> -->
+            <!-- <script src="/static/js/dropdown-item.js"></script>
+            <script src="/static/js/dropdownManager.js"></script> -->
+            <script type="module" src="/static/js/app.js"></script>
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
+            <link rel="icon" href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico" type="image/x-icon" />
+            <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+            <!-- <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/main.css" /> -->
+            <link rel="stylesheet" href="/static/css/main.css" />
+            <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
 
-  </head>
+        </head>
 
-  <body>
-    <div class="loader-container">
-      <div class="loader"></div>
-      <div class="loader-text">Παρακαλώ περιμένετε...</div>
-    </div>
-    
-    <%- include('../partials/header.ejs') %>
+        <body>
+            <div class="loader-container">
+            <div class="loader"></div>
+            <div class="loader-text">Παρακαλώ περιμένετε...</div>
+            </div>
+            
+            <%- include('../partials/header.ejs') %>
 
-    <div class="container-fluid" style="overflow-y: auto">
-      <div class="row">
-        <%- include('../partials/sidebar.ejs') %>
+            <div class="container-fluid" style="overflow-y: auto">
+            <div class="row">
+                <%- include('../partials/sidebar.ejs') %>
 
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4"><%- body %></main>
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4"><%- body %></main>
 
-      </div>
+            </div>
 
-      <%- include('../partials/footer.ejs') %>
-    </div>
+            <%- include('../partials/footer.ejs') %>
+            </div>
 
-    <% if (process.env.NODE_ENV === 'production') { %>
-      <!-- <script src="/min.js/layouts/main_ejs.min.js"></script> -->
-      <script src="/static/js/utils/tree.js"></script>
-      <script src="/static/js/utils/scripts.js"></script>
-      <script type="module" src="/static/js/utils/formatNumber.js"></script>
-      <script src="/static/js/common/getUserRole.js"></script>
-      <script src="/static/js/common/getCompanyDescription.js"></script>
-      <script src="/static/js/common/getXrhsh.js"></script>
-      <script src="/static/js/common/getPeriod.js"></script>
-      <script src="/static/js/common/getUser.js"></script>
-      <script src="/static/js/common/navTabs.js"></script>
-      <script src="/static/js/common/tooltipsForButtons.js"></script>
-      <script src="/static/js/common/moveByEnter.js"></script>
-      <script src="/static/js/common/changeFontSizeSelectDropdownMenu.js"></script>
-      <script src="/static/js/common/countdown.js"></script>
-      <script src="/static/js/dates/convertDateToISO.js"></script>
-      <script src="/static/js/common/changeUrl.js"></script>
-    <% } else { %>
-      <script src="/static/js/utils/tree.js"></script>
-      <script src="/static/js/utils/scripts.js"></script>
-      <script type="module" src="/static/js/utils/formatNumber.js"></script>
-      <script src="/static/js/common/getUserRole.js"></script>
-      <script src="/static/js/common/getCompanyDescription.js"></script>
-      <script src="/static/js/common/getXrhsh.js"></script>
-      <script src="/static/js/common/getPeriod.js"></script>
-      <script src="/static/js/common/getUser.js"></script>
-      <script src="/static/js/common/navTabs.js"></script>
-      <script src="/static/js/common/tooltipsForButtons.js"></script>
-      <script src="/static/js/common/moveByEnter.js"></script>
-      <script src="/static/js/common/changeFontSizeSelectDropdownMenu.js"></script>
-      <script src="/static/js/common/countdown.js"></script>
-      <script src="/static/js/dates/convertDateToISO.js"></script>
-    <% } %>
+            <% if (process.env.NODE_ENV === 'production') { %>
+                <script src="/static/min.js/layouts/main_ejs.min.js"></script>
+            <% } else { %>
+                <script src="/static/js/utils/tree.js"></script>
+                <script src="/static/js/utils/scripts.js"></script>
+                <script type="module" src="/static/js/utils/formatNumber.js"></script>
+                <script src="/static/js/common/getUserRole.js"></script>
+                <script src="/static/js/common/getCompanyDescription.js"></script>
+                <script src="/static/js/common/getXrhsh.js"></script>
+                <script src="/static/js/common/getPeriod.js"></script>
+                <script src="/static/js/common/getUser.js"></script>
+                <script src="/static/js/common/navTabs.js"></script>
+                <script src="/static/js/common/tooltipsForButtons.js"></script>
+                <script src="/static/js/common/moveByEnter.js"></script>
+                <script src="/static/js/common/changeFontSizeSelectDropdownMenu.js"></script>
+                <script src="/static/js/common/countdown.js"></script>
+                <script src="/static/js/dates/convertDateToISO.js"></script>
+            <% } %>
 
-    <script>
-      window.addEventListener("load", function () {
-        document.querySelector(".loader-container").style.display = "none";
-      });
-    </script>
+            <script>
+                window.addEventListener("load", function () {
+                    document.querySelector(".loader-container").style.display = "none";
+                });
+            </script>
 
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
-    <script src="/static/js/common/tooltipsForButtons.js"></script>
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
-    <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
-  </body>
-</html>
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
+            <script src="/static/js/common/tooltipsForButtons.js"></script>
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
+            <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
+        </body>
+    </html>

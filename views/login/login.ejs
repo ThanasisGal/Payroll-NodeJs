@@ -1,118 +1,108 @@
 <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 </div>
 
 <div class="ht-12">
-<% messages.forEach(element => { %>
-  <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
-    <b class="fw-bold" style="font-size: 18px;">
-      <% if (images[0] == 'sign-stop') { %>
-      <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
-      <% } else if (images[0] == 'check-circle') { %>
-        <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
-      <% } else if (images[0] == 'exclamation-triangle') { %>
-        <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
-      <% } else if (images[0] == 'question-circle') { %>
-        <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
-      <% } %>
-     </h2>&nbsp; <%= element %></b>
-    <button
-      type="button"
-      class="btn-close"
-      data-bs-dismiss="alert"
-      aria-label="Κλείσιμο"
-    ></button>
-  </div>
-<% }) %>
+    <% messages.forEach(element => { %>
+        <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
+            <b class="fw-bold" style="font-size: 18px;">
+            <% if (images[0] == 'sign-stop') { %>
+                <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
+            <% } else if (images[0] == 'check-circle') { %>
+                <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
+            <% } else if (images[0] == 'exclamation-triangle') { %>
+                <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
+            <% } else if (images[0] == 'question-circle') { %>
+                <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
+            <% } %>
+            </h2>&nbsp; <%= element %></b>
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="alert"
+                aria-label="Κλείσιμο"
+            ></button>
+        </div>
+    <% }) %>
 </div>
 
 <div class="container w-40">
-  <form action="/login/userLogin" method="POST">
+    <form action="/login/userLogin" method="POST">
 
-    <div class="card z-depth-5">
-      <div class="card-header">
-        <label class="headers-content w-100 text-center">Σύνδεση & Είσοδος στην Εφαρμογή</label>
-      </div>
-      <div class="card-body">
-        <div class="row form-group g-3 align-items-center mt-2 mb-5">
-          <div class="col-2 left-align">
-            <label for="email" class="col-form-label field-required"
-              >e-mail</label
-            >
-          </div>
-          <div class="col-10">
-            <input
-              type="text"
-              name="email"
-              id="email"
-              class="form-control"
-              required
-            />
-          </div>
+        <div class="card z-depth-5">
+            <div class="card-header">
+                <label class="headers-content w-100 text-center">Σύνδεση & Είσοδος στην Εφαρμογή</label>
+            </div>
+            <div class="card-body">
+                <div class="row form-group g-3 align-items-center mt-2 mb-5">
+                    <div class="col-2 left-align">
+                        <label for="email" class="col-form-label field-required">e-mail</label>
+                    </div>
+                    <div class="col-10">
+                        <input
+                            type="text"
+                            name="email"
+                            id="email"
+                            class="form-control"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-2">
+                    <div class="col-2 left-align">
+                        <label for="password" class="col-form-label field-required">Password</label>
+                    </div>
+                    <div class="col-10">
+                        <input
+                            type="password"
+                            name="password"
+                            id="password"
+                            class="form-control"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div class="text-center mt-5" tabindex="-1">
+                    <a class="small text-muted" href="/verifyEmail"><i class="bi bi-pencil-square"></i> Εγγραφείτε</a>
+
+                    &nbsp; &nbsp;
+                    <a class="small text-muted" href="/reset_password"><i class="bi bi-patch-question"></i> Ξεχάσατε το password; </a>
+
+                    &nbsp; &nbsp;
+                    <a class="small text-muted" href="/login/change_password"><i class="bi bi-key"></i> Αλλαγή Password</a>
+                </div>
+            </div>
+
+            <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important;">
+                <div
+                    class="d-inline-block d-flex"
+                    style="
+                        margin-top: -0.5rem !important;
+                        margin-bottom: -1rem !important;
+                        margin-left: 10px !important;
+                        margin-right: 10px !important;
+                        justify-content: space-around;"
+                >
+                    <button type="submit" class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2"><i class="buttons-content bi bi-box-arrow-in-right"></i> Είσοδος
+                    </button>
+                    
+                    <% if (typeof userName !== 'undefined' && userName.length > 0) { %>
+                        <a class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2" href="/"
+                        ><i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή</a>
+                    <% } else { %>
+                        <a class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2" href="/"
+                        ><i class="buttons-content bi bi-x-octagon"></i> Ακύρωση</a>
+                    <% } %>
+                </div>
+            </div>
         </div>
-
-        <div class="row form-group g-3 align-items-center mb-2">
-          <div class="col-2 left-align">
-            <label for="password" class="col-form-label field-required"
-              >Password</label
-            >
-          </div>
-          <div class="col-10">
-            <input
-              type="password"
-              name="password"
-              id="password"
-              class="form-control"
-              required
-            />
-          </div>
-        </div>
-
-        <div class="text-center mt-5" tabindex="-1">
-          <a class="small text-muted" href="/verifyEmail"
-          ><i class="bi bi-pencil-square"></i> Εγγραφείτε</a
-          >
-
-          &nbsp; &nbsp;
-          <a class="small text-muted" href="/reset_password"
-            ><i class="bi bi-patch-question"></i> Ξεχάσατε το password; </a
-          >
-
-          &nbsp; &nbsp;
-          <a class="small text-muted" href="/login/change_password"
-            ><i class="bi bi-key"></i> Αλλαγή Password</a
-          >
-        </div>
-      </div>
-
-      <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important;">
-        <div
-          class="d-inline-block d-flex"
-          style="
-          margin-top: -0.5rem !important;
-          margin-bottom: -1rem !important;
-          margin-left: 10px !important;
-          margin-right: 10px !important;
-          justify-content: space-around;"
-        >
-          <button type="submit" class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2"><i class="buttons-content bi bi-box-arrow-in-right"></i> Είσοδος
-          </button>
-          
-          <% if (typeof userName !== 'undefined' && userName.length > 0) { %>
-            <a class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2" href="/"
-            ><i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή</a>
-          <% } else { %>
-            <a class="btn btn-brown rounded-4 buttons-content w-35 mb-1 mt-2" href="/"
-            ><i class="buttons-content bi bi-x-octagon"></i> Ακύρωση</a>
-          <% } %>
-        </div>
-      </div>
-    </div>
-  </form>
+    </form>
 </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/min.js/views/login/login_ejs.min.js"></script>
+    <script src="/static/min.js/views/login/login_ejs.min.js"></script>
 <% } else { %>
-  <script src="/static/js/common/getUserRole.js"></script>
+    <script src="/static/js/common/getUserRole.js"></script>
 <% } %>
