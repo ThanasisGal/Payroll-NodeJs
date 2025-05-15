@@ -13,9 +13,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const response = await fetch(`/api/user`);
         const newUser = await response.json();
         
-
-        document.getElementById("selectedUser").innerHTML =
-          "Χρήστης : " + newUser.firstName + fiveSpaces + "Group : " + newUser.team;
+        if (newUser) {
+          document.getElementById("selectedUser").innerHTML =
+            "Χρήστης : " + newUser.firstName + fiveSpaces + "Group : " + newUser.team;
+        } else {
+            "Χρήστης : " + fiveSpaces + "Group : ";
+        }
       } catch (error) {
         console.error("Πρόβλημα κατά την εμφάνιση του ονόματος και της ομάδας εργασίας του χρήστη:", error);
       }

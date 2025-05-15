@@ -71,7 +71,7 @@ class mainAppController {
 
   static getUser = async (req, res) => {
     const sessionUserId = req.session.userId;
-
+    console.log(req.session);
     try {
       const user = await UserModel.findOne({ _id: sessionUserId }).select('firstName team');
       res.json(user);

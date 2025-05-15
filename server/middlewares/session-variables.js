@@ -1,7 +1,7 @@
 var getSessionVars = async (req, res, next) =>{
-  console.log("getSessionVars running", req.session);
   try {
-    if (req.session && req.session.userId) {
+    if (req.session) {
+    // if (req.session && req.session.userId) {
       res.locals.userId = req.session.userId;
       res.locals.userName = req.session.userName;
       res.locals.userTeam = req.session.userTeam;

@@ -285,8 +285,12 @@
   </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/min.js/views/partials/sidebar.min.js"></script>
+  <!-- <script src="/min.js/views/partials/sidebar.min.js"></script> -->
+  <script src="/static/js/common/sidebar.js"></script>
+  <script src="/static/js/common/tooltipsForButtons.js"></script>
+  <script src="/static/js/common/changeUrl.js"></script>
 <% } else { %>
   <script src="/static/js/common/sidebar.js"></script>
   <script src="/static/js/common/tooltipsForButtons.js"></script>
+  <script src="/static/js/common/changeUrl.js"></script>
 <% } %>
