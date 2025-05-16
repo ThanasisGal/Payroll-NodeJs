@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Models_A from "../../models/stathera_arxeia.js";
 import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
-import formatNumber from "../../../public/js/utils/formatNumber.js";
 
 const { KrathseisModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
