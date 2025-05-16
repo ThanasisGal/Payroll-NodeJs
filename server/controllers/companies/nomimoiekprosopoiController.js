@@ -3,13 +3,17 @@ import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
 import Models from "../../models/stathera_arxeia.js";
 // import formatNumber from "../../public/js/utils/formatNumber.js"
-import formatNumber from "../../utils/formatNumber.js"
+// import formatNumber from "../../utils/formatNumber.js"
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
 const { PerifereiesModel } = Models;
 
 let nextPageSearchTerm = "";
+
+function formatNumber(number, totalLength) {
+  return number.toString().padStart(totalLength, '0');
+}
 
 class nomimoiekprosopoiController {
 
