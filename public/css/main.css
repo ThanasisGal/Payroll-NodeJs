@@ -108,7 +108,12 @@
 
 .form-container {
   height: 92vh;
-  overflow-y: auto;
+  overflow-y: hidden;
+}
+
+.container {
+  height: 83.4vh;
+  overflow-y: hidden;
 }
 
 .container-fluid {
@@ -3308,7 +3313,7 @@ a[href] {
 }
 
 .ts-dropdown-content{
-  max-height: 250px;   /* ⬅︎ ό,τι ύψος θες */
+  max-height: 250px;
   overflow-y: auto;    /* οριζόντιο όχι */
 }
 

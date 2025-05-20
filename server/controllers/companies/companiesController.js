@@ -766,7 +766,7 @@ class companiesController {
         
         const formData = req.body;
 
-        const imagePath = isWindows
+        let imagePath = isWindows
             ? 'C:/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png'
             : '/home/ubuntu/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png';
 

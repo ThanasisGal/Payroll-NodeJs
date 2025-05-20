@@ -2,8 +2,6 @@ import mongoose from "mongoose";
 import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
 import Models from "../../models/stathera_arxeia.js";
-// import formatNumber from "../../public/js/utils/formatNumber.js"
-// import formatNumber from "../../utils/formatNumber.js"
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
@@ -30,9 +28,7 @@ class nomimoiekprosopoiController {
 
     try {
       // Άντληση στοιχείων εταιρείας
-      const company = await CompaniesModel.findOne({
-        _id: sessionCompanyInUse,
-      });
+      const company = await CompaniesModel.findOne({_id: sessionCompanyInUse}).lean();
 
       const companyIdAsString = company._id.toString(); // Μετατρέπω το company.id από object σε string
 
@@ -121,11 +117,9 @@ class nomimoiekprosopoiController {
     };
 
     try {
-      const company = await CompaniesModel.findOne({
-        _id: sessionCompanyInUse,
-      });
+      const company = await CompaniesModel.findOne({ _id: sessionCompanyInUse }).lean();
 
-      const data = await PerifereiesModel.find().sort("kodikos");
+      const data = await PerifereiesModel.find().sort("kodikos").lean();
       res.render("companies/nomimoi_ekprosopoi/add", {
         locals,
         company,
@@ -161,8 +155,7 @@ class nomimoiekprosopoiController {
     const newNomimosEkprosopos = NomimoiEkprosopoiModel({
       team: formData.companyTeam,
       companykod_object: formData.companyId,
-      companykod: formData.companyKodikos,
-      kodikos: formatNumber(aa_kod, 4),
+      companykod: formatNumber(parseInt(formData.companyKodikos), 4),
       nomiko_prosopo: formData.nomiko_prosopo,
       nomikh_morfh: (formData.nomikh_morfh = formData.nomikh_morfh === null || formData.nomikh_morfh === "" ? "" : formData.nomikh_morfh),
       eponymia: formData.eponymia,
@@ -458,12 +451,12 @@ class nomimoiekprosopoiController {
     };
 
     try {
-      const perifereies = await PerifereiesModel.find().sort("perigrafh");
+      const perifereies = await PerifereiesModel.find().sort("perigrafh").lean();
       const nomimoiekprosopoiId = req.params.id;
       
-      const nomimosEkprosopos = await NomimoiEkprosopoiModel.findById(nomimoiekprosopoiId);
+      const nomimosEkprosopos = await NomimoiEkprosopoiModel.findById(nomimoiekprosopoiId).lean();
       
-      const company = await CompaniesModel.findOne({ team: nomimosEkprosopos.team, kod: nomimosEkprosopos.companykod });
+      const company = await CompaniesModel.findOne({ _id: nomimosEkprosopos.companykod_object }).lean();
 
       res.render("companies/nomimoi_ekprosopoi/edit", {
         locals,
@@ -483,6 +476,7 @@ class nomimoiekprosopoiController {
     const formData = req.body;
 
     const filteredDataNomimoiEkprosopoi = {
+      companykod: formatNumber(parseInt(formData.companyKodikos), 4),
       nomiko_prosopo: formData.nomiko_prosopo,
       nomikh_morfh: formData.nomikh_morfh,
       eponymia: formData.eponymia,

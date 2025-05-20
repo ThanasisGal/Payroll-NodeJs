@@ -5,14 +5,13 @@
         <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
       </ul>
     </div>
-    <!-- <hr style="margin-top: -2rem" /> -->
 
     <div class="sections">
       <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
         <div class="container">
           <form class="formRadius">
 
-            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+            <div class="card z-depth-5" style="height: 79vh;">
 
               <div class="card-header">
                 <label class="text-center headers-content">
@@ -20,7 +19,7 @@
                 </label>
               </div>
 
-              <div class="card-body overflow-auto flex-grow-1" style="height: 67.5vh; background-color: #ffffff;" >
+              <div class="card-body" style="background-color: #ffffff;" >
                 <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
                 <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
                 <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
@@ -59,7 +58,7 @@
                       id="kodikos"
                       class="form-control input-contents"
                       value="<%= nomimosEkprosopos.kodikos %>"
-                      disabled
+                      readonly
                     />
                   </div>
                 </div>

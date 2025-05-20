@@ -1,10 +1,13 @@
 import mongoose from "mongoose";
 import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
-import formatNumber from "../../../public/js/utils/formatNumber.js";
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, PasswordsModel } = Models_C;
+
+function formatNumber(number, totalLength) {
+  return number.toString().padStart(totalLength, '0');
+}
 
 let nextPageSearchTerm = "";
 
@@ -120,7 +123,7 @@ class passwordsController {
     const newPassword = PasswordsModel({
       team: formData.companyTeam,
       companykod_object: formData.companyId,
-      companykod: formData.companyKodikos,
+      companykod: formatNumber(formData.companyKodikos, 4),
       kodikos: formatNumber(formData.Kodikos, 4),
       perigrafh: formData.perigrafh,
       username: formData.username,
@@ -322,7 +325,7 @@ class passwordsController {
       const passwordsId = req.params.id;
       
       const passwords = await PasswordsModel.findById(passwordsId);
-      const company = await CompaniesModel.findOne({ team: passwords.team, kod: passwords.companykod });
+      const company = await CompaniesModel.findOne({ _id: passwords.companykod_object });
 
       res.render("companies/passwords/edit", {
         locals,

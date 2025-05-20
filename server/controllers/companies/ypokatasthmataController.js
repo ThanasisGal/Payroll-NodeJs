@@ -2,11 +2,14 @@ import mongoose from "mongoose";
 import Models_B from "../../models/privileges.js";
 import Models_C from "../../models/companies.js";
 import Models from "../../models/stathera_arxeia.js";
-import formatNumber from "../../../public/js/utils/formatNumber.js";
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, YpokatasthmataModel } = Models_C;
 const { PerifereiesModel } = Models;
+
+function formatNumber(number, totalLength) {
+  return number.toString().padStart(totalLength, '0');
+}
 
 let nextPageSearchTerm = "";
 
@@ -478,7 +481,7 @@ class ypokatasthmataController {
 
       const ypokatasthmaId = req.params.id;
       const ypokatasthma = await YpokatasthmataModel.findById(ypokatasthmaId);
-      const company = await CompaniesModel.findOne({ team: ypokatasthma.team, kod: ypokatasthma.companykod });
+      const company = await CompaniesModel.findOne({ _id: ypokatasthma.companykod_object }).lean();
 
       res.render("companies/ypokatasthmata/edit", {
         locals,
