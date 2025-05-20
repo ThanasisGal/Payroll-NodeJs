@@ -11,10 +11,10 @@
                 const deleteButton = section.querySelector("[id^=deleteButton]");
             
                 // Όταν πατιέται το updateButton:
-                disableButton(updateButton); // Απενεργοποίηση updateButton
-                enableButton(undoButton); // Ενεργοποίηση undoButton
-                enableButton(saveButton); // Ενεργοποίηση saveButton
-                disableButton(deleteButton); // Ενεργοποίηση deleteButton
+                disableButton_ReadOnly(updateButton); // Απενεργοποίηση updateButton
+                enableButton_ReadOnly(undoButton); // Ενεργοποίηση undoButton
+                enableButton_ReadOnly(saveButton); // Ενεργοποίηση saveButton
+                disableButton_ReadOnly(deleteButton); // Ενεργοποίηση deleteButton
         
                 // Ενεργοποίηση των input πεδίων
                 toggleReadonlyFields(false);
@@ -34,10 +34,10 @@
                 const deleteButton = section.querySelector("[id^=deleteButton]");
     
                 // Όταν πατιέται το undoButton:
-                enableButton(updateButton); // Ενεργοποίηση updateButton
-                disableButton(undoButton); // Απενεργοποίηση undoButton
-                disableButton(saveButton); // Απενεργοποίηση saveButton
-                enableButton(deleteButton); // Ενεργοποίηση deleteButton
+                enableButton_ReadOnly(updateButton); // Ενεργοποίηση updateButton
+                disableButton_ReadOnly(undoButton); // Απενεργοποίηση undoButton
+                disableButton_ReadOnly(saveButton); // Απενεργοποίηση saveButton
+                enableButton_ReadOnly(deleteButton); // Ενεργοποίηση deleteButton
             });
     
             // Κάνει όλα τα input fields readonly
@@ -227,11 +227,11 @@
         });
     }
 
-    function disableButton(button) {
+    function disableButton_ReadOnly(button) {
         button.classList.add("disabled-link");
     }
 
-    function enableButton(button) {
+    function enableButton_ReadOnly(button) {
         button.classList.remove("disabled-link");
         button.style.pointerEvents = "auto"; // Επιτρέπει το κλικ
         button.style.opacity = "1"; // Επαναφέρει την κανονική εμφάνιση
