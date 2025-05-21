@@ -93,15 +93,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // Μόλις φορτώσουν τα sharedParams
     document.addEventListener('sharedParamsReady', async () => {
         const sharedParams = window.sharedParams;
-        _KODIKOS_ETAIREIAS = sharedParams._KODIKOS_ETAIREIAS;
-        _ID_ETAIREIAS = sharedParams.ergazomenoi.company_kod;
-        _KODIKOS_ERGAZOMENOY = sharedParams.ergazomenoi.kodikos;
-        _HMEROMHNIA_PROSLHPSHS = sharedParams.ergazomenoi.hmeromhnia_proslhpshs;
-        _HMEROMHNIA_APOXORHSHS = sharedParams.ergazomenoi.hmeromhnia_apoxorhshs;
-        _HMERES_EBDOMADIASIAS_ERGASIAS = sharedParams.ergazomenoi.hmeres_ergasias_ebdomadas;
-        _PROYPHRESIA_ADEIAS = parseInt(sharedParams.ergazomenoi.proyphresia_adeias_se_eth);
-        _ETOS_XRHSHS = sharedParams._XRHSH;
-        _TYPOS_ERGAZOMENOY = sharedParams.ergazomenoi.typos_ergazomenon;
+
+        let _KODIKOS_ETAIREIAS = sharedParams._KODIKOS_ETAIREIAS;
+        let _ID_ETAIREIAS = sharedParams.ergazomenoi.company_kod;
+        let _KODIKOS_ERGAZOMENOY = sharedParams.ergazomenoi.kodikos;
+        let _HMEROMHNIA_PROSLHPSHS = sharedParams.ergazomenoi.hmeromhnia_proslhpshs;
+        let _HMEROMHNIA_APOXORHSHS = sharedParams.ergazomenoi.hmeromhnia_apoxorhshs;
+        let _HMERES_EBDOMADIASIAS_ERGASIAS = sharedParams.ergazomenoi.hmeres_ergasias_ebdomadas;
+        let _PROYPHRESIA_ADEIAS = parseInt(sharedParams.ergazomenoi.proyphresia_adeias_se_eth);
+        let _ETOS_XRHSHS = sharedParams._XRHSH;
+        let _TYPOS_ERGAZOMENOY = sharedParams.ergazomenoi.typos_ergazomenon;
 
         for (let i = 1; i <= parseInt(sharedParams.genikesParametroi[52].timh); i++) {
             diasthma_hmeron_adeias[`_HMERES_ADEIAS_0${i}`] = 0;
