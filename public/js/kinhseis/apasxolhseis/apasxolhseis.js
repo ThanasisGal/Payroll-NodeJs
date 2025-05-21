@@ -207,7 +207,6 @@ document.addEventListener("DOMContentLoaded", function() {
                     const devPath  = new URL('../typoiApodoxon/001.js', baseUrl);
 
                     module = await import(isProduction ? prodPath : devPath);
-                    // module = isProduction ? await import('/Payroll-NodeJs/public/min.js/kinhseis/001.min.js') : await import('../typoiApodoxon/001.js');
                     break;
         
                 default:
@@ -256,7 +255,13 @@ document.addEventListener("DOMContentLoaded", function() {
             const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';  // Ελέγχω ποιο module να φορτώσω
             switch (typos_apodoxon) {
                 case "001": // Τακτικές Αποδοχές
-                    module = isProduction ? await import('/min.js/kinhseis/001.min.js') : await import('../ypologismoi/001.js');
+                    const baseUrl = import.meta.url;
+                    const prodPath = new URL('../../min.js/kinhseis/001.min.js', baseUrl);
+                    const devPath  = new URL('../ypologismoi/001.js', baseUrl);
+
+                    module = await import(isProduction ? prodPath : devPath);
+
+                    // module = isProduction ? await import('/min.js/kinhseis/001.min.js') : await import('../ypologismoi/001.js');
                     break;
         
                 default:
@@ -1895,11 +1900,17 @@ document.addEventListener("DOMContentLoaded", function() {
             const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'; 
             
             // Χρησιμοποιούμε dynamic import()
-            if (isProduction) {
-                module = await import('/min.js/kinhseis/klimakiaForoy.min.js');
-            } else {
-                module = await import('../ypologismoi/klimakiaForoy.js');
-            }
+            const baseUrl = import.meta.url;
+            const prodPath = new URL('../../min.js/kinhseis/klimakiaForoy.min.js', baseUrl);
+            const devPath  = new URL('../ypologismoi/klimakiaForoy.js', baseUrl);
+
+            module = await import(isProduction ? prodPath : devPath);
+
+            // if (isProduction) {
+            //     module = await import('/min.js/kinhseis/klimakiaForoy.min.js');
+            // } else {
+            //     module = await import('../ypologismoi/klimakiaForoy.js');
+            // }
             
             // Απόσυγκέντρωση των συναρτήσεων αφού φορτωθεί το module
             const { 
