@@ -1892,44 +1892,71 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
     
+        // async function handleKlimakiaForoy() {
+        //     if (hasRecord) return;
+
+        //     try {
+        //         let module;
+        //         const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'; 
+                
+        //         // Χρησιμοποιούμε dynamic import()
+        //         const baseUrl = import.meta.url;
+        //         const prodPath = new URL('../../min.js/kinhseis/klimakiaForoy.min.js', baseUrl);
+        //         const devPath  = new URL('../ypologismoi/klimakiaForoy.js', baseUrl);
+
+        //         module = await import(isProduction ? prodPath : devPath);
+
+        //         // Απόσυγκέντρωση των συναρτήσεων αφού φορτωθεί το module
+        //         const { 
+        //             initializeKlimakiaForoy, 
+        //             fetchData, 
+        //             fetchEkptoshForoy, 
+        //             fetchEisodhmaProForoyMeioshs,
+        //             _EKPTOSH_FOROY 
+        //         } = module;
+                        
+        //         // Καλείται η συνάρτηση του module με το sharedParams
+        //         if (module) {
+        //             await initializeKlimakiaForoy();
+        //             await fetchData();
+        //             await fetchEkptoshForoy();
+        //             await fetchEisodhmaProForoyMeioshs();
+        //         }
+
+        //         // Επιστροφή των δεδομένων
+        //         return { _EKPTOSH_FOROY };
+
+        //     } catch (error) {
+        //         console.error(`Σφάλμα κατά τη φόρτωση του module:`, error);
+        //     }
+        // }
+
     async function handleKlimakiaForoy() {
         if (hasRecord) return;
 
         try {
-            let module;
-            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'; 
-            
-            // Χρησιμοποιούμε dynamic import()
+            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
             const baseUrl = import.meta.url;
             const prodPath = new URL('../../min.js/kinhseis/klimakiaForoy.min.js', baseUrl);
             const devPath  = new URL('../ypologismoi/klimakiaForoy.js', baseUrl);
 
-            module = await import(isProduction ? prodPath : devPath);
+            const module = await import(isProduction ? prodPath : devPath);
 
-            // if (isProduction) {
-            //     module = await import('/min.js/kinhseis/klimakiaForoy.min.js');
-            // } else {
-            //     module = await import('../ypologismoi/klimakiaForoy.js');
-            // }
-            
-            // Απόσυγκέντρωση των συναρτήσεων αφού φορτωθεί το module
-            const { 
-                initializeKlimakiaForoy, 
-                fetchData, 
-                fetchEkptoshForoy, 
+            const {
+                initializeKlimakiaForoy,
+                fetchData,
+                fetchEkptoshForoy,
                 fetchEisodhmaProForoyMeioshs,
-                _EKPTOSH_FOROY 
+                getEkptoshForoy // ✅ Η getter συνάρτηση που προστέθηκε
             } = module;
-                    
-            // Καλείται η συνάρτηση του module με το sharedParams
-            if (module) {
-                await initializeKlimakiaForoy();
-                await fetchData();
-                await fetchEkptoshForoy();
-                await fetchEisodhmaProForoyMeioshs();
-            }
 
-            // Επιστροφή των δεδομένων
+            await initializeKlimakiaForoy();
+            await fetchData();
+            await fetchEkptoshForoy();
+            await fetchEisodhmaProForoyMeioshs();
+
+            const _EKPTOSH_FOROY = getEkptoshForoy();  // ✅ Έτσι παίρνεις τα δεδομένα
+
             return { _EKPTOSH_FOROY };
 
         } catch (error) {
