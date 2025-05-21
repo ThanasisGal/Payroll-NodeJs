@@ -665,11 +665,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function loadTypoiApodoxon() {
         if (!_SELECTED_ERGAZOMENOS) return;
-            _TYPOS_APODOXON = document.getElementById("typ_apod").value;
+        let _TYPOS_APODOXON = document.getElementById("typ_apod").value;
 
-            typoiApodoxonDropdown.innerHTML = '';
-            const emptyOption = new Option('', '');
-            typoiApodoxonDropdown.appendChild(emptyOption);
+        typoiApodoxonDropdown.innerHTML = '';
+        const emptyOption = new Option('', '');
+        typoiApodoxonDropdown.appendChild(emptyOption);
 
         try {
             const response = await fetch("/api/kinhseis/typoiApodoxon");
