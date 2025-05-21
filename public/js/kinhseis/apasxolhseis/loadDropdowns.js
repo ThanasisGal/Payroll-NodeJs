@@ -485,26 +485,26 @@ document.addEventListener("DOMContentLoaded", function () {
     periodoiDropdown.addEventListener("change", async () => {
         // sharedParams = Αντικείμενο που περιέχει διάφορες μεταβλητές και το οποίο χρησιμοποιείται σε περίπτωση change μιας τιμής πχ περίοδος, όταν το addEventListener βρίσκεται σε εξωτερικό αρχείο JS
         window.sharedParams = {
-        ergazomenoi: _ergazomenoi,
-        sxeshErgasias: _sxeshErgasias,
-        kathestosApasxolhshs: _kathestosApasxolhshs,
-        oikogeneiakhKatastash: _oikogeneiakhKatastash,
-        typosErgazomenoy: _typosErgazomenoy,
-        genikesParametroi: _genikesParametroi,
-        asfalistikesKlaseis: _asfalistikesKlaseis,
-        astheneies: _astheneies,
-        etaireia: _etaireia,
-        _TEAM: document.getElementById("team").value,
-        _COMPANY: document.getElementById("company_kod").value,
-        _XRHSH: document.getElementById("etos").value,
-        _KODIKOS_ETAIREIAS: _etaireia.kod,
-        _SYNOLO_ERGASIMON_HMERON_MHNA: 0,
-        _ERGASIMES_HMERES_MHNA: 0,
-        _MH_ERGASIMES_HMERES_MHNA: 0,
-        _ETHSIES_ORES_YPERORION: 0,
-        _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
-        startDate: null,
-        endDate: null
+            ergazomenoi: _ergazomenoi,
+            sxeshErgasias: _sxeshErgasias,
+            kathestosApasxolhshs: _kathestosApasxolhshs,
+            oikogeneiakhKatastash: _oikogeneiakhKatastash,
+            typosErgazomenoy: _typosErgazomenoy,
+            genikesParametroi: _genikesParametroi,
+            asfalistikesKlaseis: _asfalistikesKlaseis,
+            astheneies: _astheneies,
+            etaireia: _etaireia,
+            _TEAM: document.getElementById("team").value,
+            _COMPANY: document.getElementById("company_kod").value,
+            _XRHSH: document.getElementById("etos").value,
+            _KODIKOS_ETAIREIAS: _etaireia.kod,
+            _SYNOLO_ERGASIMON_HMERON_MHNA: 0,
+            _ERGASIMES_HMERES_MHNA: 0,
+            _MH_ERGASIMES_HMERES_MHNA: 0,
+            _ETHSIES_ORES_YPERORION: 0,
+            _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
+            startDate: null,
+            endDate: null
         };
 
         let sharedParams = window.sharedParams;
@@ -525,7 +525,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const synoloYperorion_data = await fetch(`/api/kinhseis/getEthsioSynoloYperorion?team=${selectedTeam}&company=${selectedCompany}&employeeKod=${document.getElementById("kodikosHidden").value}&xrhsh=${document.getElementById("etos").value}`);
 
         const ethsiesYperories_result = await synoloYperorion_data.json();
-        _ETHSIES_ORES_YPERORION = parseFloat(ethsiesYperories_result.total_ores_yperorias);
+        let _ETHSIES_ORES_YPERORION = parseFloat(ethsiesYperories_result.total_ores_yperorias);
         document.getElementById("orioYperorion_Hidden").value = _ETHSIES_ORES_YPERORION;
         document.getElementById("aa_misthodosias_Hidden").value = document.getElementById("aaMisthodosias").value;
         

@@ -103,14 +103,14 @@
                 _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
                 startDate: null,
                 endDate: null
-              };
+            };
           
-              let sharedParams = window.sharedParams;
+            let sharedParams = window.sharedParams;
           
-              // Δημιουργία του CustomEvent με τις παραμέτρους
-              let event = new CustomEvent('sharedParamsLoaded', { detail: sharedParams });
-              // Πυροδότηση του event
-              document.dispatchEvent(event);
+            // Δημιουργία του CustomEvent με τις παραμέτρους
+            let event = new CustomEvent('sharedParamsLoaded', { detail: sharedParams });
+            // Πυροδότηση του event
+            document.dispatchEvent(event);
           
         } catch (err) {
             console.error(err);
