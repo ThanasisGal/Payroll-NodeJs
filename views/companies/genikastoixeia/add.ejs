@@ -1988,17 +1988,13 @@
     </div>
   </div>
 
-  <% if (process.env.NODE_ENV === 'production') { %>
-    <script src="/static/min.js/companies/genikastoixeia/companies_add_ejs.min.js"></script>
-  <% } else { %>
-    <script src="/static/js/companies/genikastoixeia/getFieldValues.js"></script>
-    <script src="/static/js/companies/genikastoixeia/loadDropdowns_add.js"></script>
-    <script src="/static/js/common/tooltips.js"></script>
-    <script src="/static/js/common/checkAfm.js"></script>  
-    <script src="/static/js/common/toggleLabel.js"></script>
-    <script src="/static/js/common/select-UnselectAndChangeButtonTextContent.js"></script>
-    <script src="/static/js/common/readAndPreviewImage.js"></script>
-    <script src="/static/js/common/changeInputTypeFile.js"></script>
-    <script src="/static/js/common/clearImage.js"></script>
-  <% } %>
+  <% const isProduction = NODE_ENV === 'production'; %>
+  <script>
+      window.RUNTIME_ENV = "<%= NODE_ENV %>";
+  </script>
+              
+  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_add<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
 </div>
