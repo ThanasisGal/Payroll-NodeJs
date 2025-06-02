@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
     const Schema = _Schema;
 
@@ -539,9 +539,9 @@ import { Schema as _Schema, model } from "mongoose";
     const IstorikoProslhpseonAllagonModel = model("IstorikoProslhpseonAllagon", IstorikoProslhpseonAllagonSchema);
 
 
-export default { ErgazomenoiModel,
-                 OrariaModel,
-                 OrariaFromCardsModel,
-                 OrariaApologistikaModel,
-                 IstorikoProslhpseonAllagonModel,
-               };
+module.exports =  { ErgazomenoiModel,
+                    OrariaModel,
+                    OrariaFromCardsModel,
+                    OrariaApologistikaModel,
+                    IstorikoProslhpseonAllagonModel,
+                  };

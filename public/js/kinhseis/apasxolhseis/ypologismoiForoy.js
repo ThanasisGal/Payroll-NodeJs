@@ -37,17 +37,10 @@ const synolo_foroy = document.getElementById("synolo_foroy");
 // const synoloForoy = document.getElementById("synolo_foroy");
 let allaghPlhroteoy = document.getElementById("allaghPlhroteoy_Hidden");
 
-window.calcForos = async function () {
-    let module;
-    const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'; 
-    
-    // Χρησιμοποιούμε dynamic import()
-    if (isProduction) {
-        module = await import('/min.js/kinhseis/klimakiaForoy.min.js');
-    } else {
-        module = await import('../ypologismoi/klimakiaForoy.js');
-    }
-    const { _AA_FOROLOGIKHS_KLIMAKAS, _KLIMAKA_FOROY } = module;
+async function calcForos() {
+    const _AA_FOROLOGIKHS_KLIMAKAS = window._AA_FOROLOGIKHS_KLIMAKAS;
+    const _KLIMAKA_FOROY = window._KLIMAKA_FOROY;
+    const _EKPTOSH_FOROY = window._EKPTOSH_FOROY;
 
     _MHNES_YPOLOGISMOY_FOROY = parseInt(sharedParams.genikesParametroi[29].timh);
     _SYNTELESTHS_PARAKRATHSHS_FOROY_EKTAKTON_AMOIBON = parseFloat(sharedParams.genikesParametroi[28].timh).toFixed(2);
@@ -70,7 +63,7 @@ window.calcForos = async function () {
         analogoyn_syntelesths.push(parseFloat(_KLIMAKA_FOROY[i][3]));
         analogoyn_syntelesths_eisforas_allhleggyhs.push(parseFloat(_KLIMAKA_FOROY[i][5]));
     }
-    forologhteo_poso = ethsio_forologhteo_poso_taktikon_apodoxon.value;
+    forologhteo_poso = parseFloat(ethsio_forologhteo_poso_taktikon_apodoxon.value || 0);
     
     for (let i = 0; i < parseInt(_AA_FOROLOGIKHS_KLIMAKAS); i++) {
         if (i == 0) {
@@ -114,21 +107,20 @@ window.calcForos = async function () {
     mhniaios_analogoyn_foros_pro_ekptoshs.value = _YPOLOGIZEI_FORO ? (parseFloat(analForos) / parseFloat(_MHNES_YPOLOGISMOY_FOROY)).toFixed(2) : 0;
     eisfora_allhleggyhs.value = (parseFloat(analogoysa_eisfora_allhleggyhs) / parseFloat(_MHNES_YPOLOGISMOY_FOROY)).toFixed(2);
 
-    let meiosh_ekptoshs_foroy = 0;
-
-    if (parseInt(sharedParams.ergazomenoi.arithmos_teknon) > 4) {
-        meiosh_ekptoshs_foroy = ekptosh_logo_oikogeneiakhs_katastashs.value;
-        ;
-    } else {
-        if (parseFloat(ethsio_forologhteo_poso_taktikon_apodoxon.value) <= parseFloat(_POSO_ENARJHS_MEIOSHS_THS_EKPTOSHS_FOROY)) {
-            meiosh_ekptoshs_foroy = ekptosh_logo_oikogeneiakhs_katastashs.value;
-        } else {
+    let meiosh_ekptoshs_foroy = parseFloat(_EKPTOSH_FOROY[parseInt(sharedParams.ergazomenoi.arithmos_teknon)] || 0);
+    ekptosh_logo_oikogeneiakhs_katastashs.value = parseFloat(meiosh_ekptoshs_foroy).toFixed(2);
+    // if (parseInt(sharedParams.ergazomenoi.arithmos_teknon) > 4) {
+    //     meiosh_ekptoshs_foroy = ekptosh_logo_oikogeneiakhs_katastashs.value;
+    // } else {
+        if (parseFloat(ethsio_forologhteo_poso_taktikon_apodoxon.value) > parseFloat(_POSO_ENARJHS_MEIOSHS_THS_EKPTOSHS_FOROY)) {
+        //     meiosh_ekptoshs_foroy = ekptosh_logo_oikogeneiakhs_katastashs.value;
+        // } else {
             meiosh_ekptoshs_foroy = (parseFloat(ekptosh_logo_oikogeneiakhs_katastashs.value) - ((parseFloat(ethsio_forologhteo_poso_taktikon_apodoxon.value) - parseFloat(_POSO_ENARJHS_MEIOSHS_THS_EKPTOSHS_FOROY)) * (_SYNTELESTHS_MEIOSHS_THS_EKPTOSHS_FOROY / 100))).toFixed(2);
         }
         if (parseFloat(meiosh_ekptoshs_foroy) > parseFloat(ekptosh_logo_oikogeneiakhs_katastashs.value) || parseFloat(meiosh_ekptoshs_foroy) < 0) {
             meiosh_ekptoshs_foroy = 0
         }
-    }
+    // }
     ekptosh_logo_oikogeneiakhs_katastashs.value = parseFloat(meiosh_ekptoshs_foroy).toFixed(2);
     mhniaia_ekptosh_logo_oikogeneiakhs_katastashs.value = (parseFloat(meiosh_ekptoshs_foroy) / parseFloat(_MHNES_YPOLOGISMOY_FOROY)).toFixed(2);
 
@@ -167,16 +159,11 @@ window.calcForos = async function () {
 }
 
 async function calcMiktesApodoxesApoPlhroteo() {
-    let module;
-    const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'; 
-    
-    // Χρησιμοποιούμε dynamic import()
-    if (isProduction) {
-        module = await import('/min.js/kinhseis/klimakiaForoy.min.js');
-    } else {
-        module = await import('../ypologismoi/klimakiaForoy.js');
-    }
-    const { _APODOXES_PRO_EKPTOSHS_FOROY, _KLIMAKA_FOROY } = module;
+    // const klimakia = window.KlimakiaForoyModule; // Βεβαιώσου ότι έχει φορτωθεί από <script>
+
+    const _APODOXES_PRO_EKPTOSHS_FOROY = window._APODOXES_PRO_EKPTOSHS_FOROY;
+    const _KLIMAKA_FOROY = window._KLIMAKA_FOROY;
+    const _EKPTOSH_FOROY = window._EKPTOSH_FOROY;
 
     _MHNES_YPOLOGISMOY_FOROY = parseInt(sharedParams.genikesParametroi[29].timh);
     _SYNTELESTHS_PARAKRATHSHS_FOROY_EKTAKTON_AMOIBON = parseFloat(sharedParams.genikesParametroi[28].timh).toFixed(2);
@@ -297,4 +284,15 @@ async function calcMiktesApodoxesApoPlhroteo() {
         diafora_apodoxon.value = 0
     }
 
+}
+
+// === ΚΑΝΕΙ ΤΗ ΣΥΝΑΡΤΗΣΗ ΔΙΑΘΕΣΙΜΗ ΣΤΟΝ BROWSER ===
+if (typeof window !== "undefined") {
+  window.calcForos = calcForos;
+  window.calcMiktesApodoxesApoPlhroteo = calcMiktesApodoxesApoPlhroteo;
+}
+
+// === ΚΑΝΕΙ EXPORT ΓΙΑ COMMONJS (π.χ. Node.js scripts) ===
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { calcForos, calcMiktesApodoxesApoPlhroteo };
 }

@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -579,7 +579,7 @@ const PerifereiesSchema = new Schema({
   });
   const Typoi_ApodoxonModel = model("Typoi_Apodoxon", Typoi_ApodoxonSchema);
 
-  export default {  AdeiesDiamonhsModel,
+  module.exports = {  AdeiesDiamonhsModel,
                     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
                     AntistoixishKadEidikothtesKpkEfkaModel,
                     ApasxolhseisBaseiSymbashsModel,

@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
+const mongoose = require("mongoose");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, PasswordsModel } = Models_C;
@@ -381,4 +381,4 @@ class passwordsController {
   }
 }
 
-export default passwordsController;
+module.exports = passwordsController;

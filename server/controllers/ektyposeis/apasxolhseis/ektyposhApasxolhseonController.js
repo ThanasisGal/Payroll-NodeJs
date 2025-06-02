@@ -1,23 +1,19 @@
-import mongoose from 'mongoose';
-import PizZip from 'pizzip';
-import ExcelJS from 'exceljs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
-import { PDFDocument, rgb } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import { getDocument } from 'pdfjs-dist';
-import * as pdfjsLib from 'pdfjs-dist';
+const mongoose = require('mongoose');
+const PizZip = require('pizzip');
+const ExcelJS = require('exceljs');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
+const fs = require('fs-extra');
+const { PDFDocument, rgb } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit');
+const { getDocument } = require('pdfjs-dist');
+const pdfjsLib = require('pdfjs-dist');
 
-import Models_A from "../../../models/stathera_arxeia.js";
-import Models_B from "../../../models/privileges.js";
-import Models_C from "../../../models/companies.js";
-import Models_D from "../../../models/ergazomenoi.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const Models_A = require('../../../models/stathera_arxeia');
+const Models_B = require('../../../models/privileges');
+const Models_C = require('../../../models/companies');
+const Models_D = require('../../../models/ergazomenoi');
 
 const { PoleisModel, 
         SxeseisErgasiasModel,
@@ -59,17 +55,19 @@ const docxPath = isWindows
     : '/home/ubuntu/Payroll-NodeJs/public/templates/' + fileName;
 
 // Καθορισμός εξόδου PDF
-const outputFolder = isWindows
+const ensureOutputFolder = async () => {
+  const outputFolder = isWindows
     ? 'C:/Payroll-NodeJs/public/xlsx/'
     : '/home/ubuntu/Payroll-NodeJs/public/xlsx/';
 
-// Δημιουργία φακέλου εξόδου αν δεν υπάρχει
-try {
+    // Δημιουργία φακέλου εξόδου αν δεν υπάρχει
+  try {
     await fs.access(outputFolder);
-} catch {
-    // Ο κατάλογος δεν υπάρχει, επομένως τον δημιουργούμε
+  } catch {
+    // Αν δεν υπάρχει, τον δημιουργούμε
     await fs.mkdir(outputFolder, { recursive: true });
-}
+  }
+};
 
 // Εύρση της θέσης του μοναδικού string "ΕΙΣΑΓΩΓΗ ΕΙΚΟΝΑΣ ΕΔΩ" για αντικατάσταση με εικόνα
 async function findTextInPdf(pdfPath, searchText) {
@@ -336,6 +334,8 @@ class ektyposhApasxolhseonController {
             description: "Web Payroll System",
         };
 
+        await ensureOutputFolder();
+        
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
         const sessionTeam = req.session.userTeam;
@@ -884,4 +884,4 @@ class ektyposhApasxolhseonController {
     }
 }
 
-export default ektyposhApasxolhseonController;
+module.exports = ektyposhApasxolhseonController;

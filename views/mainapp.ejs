@@ -1,27 +1,16 @@
-<style>
-  body {
-    background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    background-size: auto;
-    /* background-size: 35% 25%; */
-    background-position: 60% 50%;
-  }
-</style>
+<body class="<%= bodyClass || '' %>">
 
-<!-- <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background: url('/img/wps1.png') 0% 50% no-repeat;">
-  </br>
-</div> -->
-
-
-<div class="container">
+<div class="container-fluid" style="background-color: transparent;">
 </div>
 
-<script src="/static/js/common/getCompanyDescription.js"></script>
-<script src="/static/js/common/getXrhsh.js"></script>
-<script src="/static/js/common/getPeriod.js"></script>
-<script src="/static/js/common/getAppDate.js"></script>
-<script src="/static/js/common/getUser.js"></script>
-<script src="/static/js/common/tooltipsForButtons.js"></script>
-<!-- <script src="/static/js/changeUrl.js"></script> -->
+<% const isProduction = NODE_ENV === 'production'; %>
+<script>
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getAppDate<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

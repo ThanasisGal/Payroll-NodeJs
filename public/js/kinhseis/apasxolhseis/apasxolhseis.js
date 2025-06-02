@@ -1,4 +1,5 @@
 // Συνάρτηση υπολογισμού πραγματικών εργάσιμων ημερών του μήνα
+// export async function ypologismosPragmatikonErgasimonHmeronMhna(   year, 
 async function ypologismosPragmatikonErgasimonHmeronMhna(   year, 
                                                             month, 
                                                             hmeres, 
@@ -197,29 +198,18 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     
     async function handleTyposApodoxon(typos_apodoxon, sharedParams) {
-        try {
-            let module;
-            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';  // Ελέγχω ποιο module να φορτώσω
-            switch (typos_apodoxon) {
-                case "001": // Τακτικές Αποδοχές
-                    const baseUrl = import.meta.url;
-                    const prodPath = new URL('../../min.js/kinhseis/001.min.js', baseUrl);
-                    const devPath  = new URL('../typoiApodoxon/001.js', baseUrl);
+    try {
+        const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+        const functionName = `handleTypos${typos_apodoxon}`; // π.χ. handleTypos001
 
-                    module = await import(isProduction ? prodPath : devPath);
-                    break;
-        
-                default:
-                    return;
-            }
-        
-            // Καλείτε τη συνάρτηση του module με το sharedParams
-            if (module && typeof module.handleTypos001 === "function") {
-                await module.handleTypos001(sharedParams);
-            }
-        } catch (error) {
-            console.error(`Σφάλμα κατά τη φόρτωση του module:`, error);
+        if (typeof window[functionName] === "function") {
+            await window[functionName](sharedParams);
+        } else {
+            console.warn(`Η συνάρτηση ${functionName} δεν είναι φορτωμένη.`);
         }
+    } catch (error) {
+        console.error(`Σφάλμα κατά την εκτέλεση του υπολογισμού:`, error);
+    }
     }
 
     async function calcOresApoysias () {
@@ -251,32 +241,19 @@ document.addEventListener("DOMContentLoaded", function() {
 
     async function handleYpologismoi(typos_apodoxon, sharedParams) {
         try {
-            let module;
-            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';  // Ελέγχω ποιο module να φορτώσω
-            switch (typos_apodoxon) {
-                case "001": // Τακτικές Αποδοχές
-                    const baseUrl = import.meta.url;
-                    const prodPath = new URL('../../min.js/kinhseis/001.min.js', baseUrl);
-                    const devPath  = new URL('../ypologismoi/001.js', baseUrl);
-
-                    module = await import(isProduction ? prodPath : devPath);
-
-                    // module = isProduction ? await import('/min.js/kinhseis/001.min.js') : await import('../ypologismoi/001.js');
-                    break;
-        
-                default:
-                    return;
-            }
-        
-            // Καλείτε τη συνάρτηση του module με το sharedParams
-            if (module && typeof module.handleCalcs001 === "function") {
-                await module.handleCalcs001(sharedParams);
+            // const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+            const functionName = `handleCalcs${typos_apodoxon}`; // π.χ. handleCalcs001
+    
+            if (typeof window[functionName] === "function") {
+                await window[functionName](sharedParams);
+            } else {
+                console.warn(`Η συνάρτηση ${functionName} δεν είναι φορτωμένη.`);
             }
         } catch (error) {
-            console.error(`Σφάλμα κατά τη φόρτωση του module:`, error);
+            console.error(`Σφάλμα κατά την εκτέλεση του υπολογισμού:`, error);
         }
     }
-        
+
     window.calcHmeresErgasiasMeionApoysies = async function () {  // ΥΠΟΛΟΓΙΣΜΟΣ ΗΜΕΡΩΝ ΕΡΓΑΣΙΑΣ ΜΕΙΟΝ ΑΠΟΥΣΙΕΣ
         if (hasRecord) return;
 
@@ -1237,6 +1214,7 @@ document.addEventListener("DOMContentLoaded", function() {
             floatValue_ApallassomenesKrathseon
         ).toFixed(2);
 
+        console.log(forologhteo_poso_taktikon_apodoxon.value);
         forologhteo_poso_taktikon_apodoxon.value =
         (
             parseFloat(document.getElementById("synoloMiktonApodoxon").value || 0) -
@@ -1248,40 +1226,45 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("ethsio_forologhteo_poso_taktikon_apodoxon").value = ethsio_forologhteo_eisodhma;
 
         const result = await handleKlimakiaForoy();
+
         if (result) {
-            const {  _EKPTOSH_FOROY } = result;
-             document.getElementById("ekptosh_logo_oikogeneiakhs_katastashs").value = parseFloat(_EKPTOSH_FOROY[parseInt(arithmosPaidion)]).toFixed(2);
+            window._AA_FOROLOGIKHS_KLIMAKAS = result._AA_FOROLOGIKHS_KLIMAKAS;
+            window._KLIMAKA_FOROY = result._KLIMAKA_FOROY;
+            window._EKPTOSH_FOROY = result._EKPTOSH_FOROY;
+            window._APODOXES_PRO_EKPTOSHS_FOROY = result._APODOXES_PRO_EKPTOSHS_FOROY;
+            window._APODOXES_PRO_EKPTOSHS_FOROY_PIN0 = result._APODOXES_PRO_EKPTOSHS_FOROY_PIN0;
+            window._APODOXES_PRO_EKPTOSHS_FOROY_PIN1 = result._APODOXES_PRO_EKPTOSHS_FOROY_PIN1;
+
+            let synolo_foroy = 0;
+
+            if (!allaghForoy) {
+                await calcForos(); // Χρησιμοποιεί τα window._*
+                synolo_foroy = document.getElementById("synolo_foroy").value || '0.00';
+            } else {
+                synolo_foroy = document.getElementById("synoloForoy").value || '0.00';
+            }
+            let floatValue_SynoloForoy = parseFloat(synolo_foroy.replace(',', '.'));
+
+            document.getElementById("synoloForoy").value = parseFloat(floatValue_SynoloForoy).toFixed(2);
+
+            plhroteo.value =
+            (
+                parseFloat(document.getElementById("synoloMiktonApodoxon").value || 0) +
+                parseFloat(document.getElementById("meioshErgatikhsEisforas").value || 0) -
+                floatValue - floatValue_SynoloForoy
+            ).toFixed(2);
+
+            if (!allaghForoy) {
+                clearTimeout(plhroteoDebounceTimeout);
+                plhroteoDebounceTimeout = setTimeout(async () => {
+                    await updatePlhroteoWithComparison();
+                }, 300); // Χρονικό διάστημα σταθεροποίησης (300ms)
+            }
+
+            document.getElementById("exoflhsh").value = "0";
+            document.getElementById("poso_plhromhs").value = parseFloat(plhroteo.value) || 0;
+            document.getElementById("poso_plhromhs_Hidden").value = parseFloat(plhroteo.value) || 0;
         }
-
-        let synolo_foroy = 0;
-        if (!allaghForoy) {
-            await calcForos();
-            synolo_foroy = document.getElementById("synolo_foroy").value || '0.00';
-        } else {
-            synolo_foroy = document.getElementById("synoloForoy").value || '0.00';
-        }
-        let floatValue_SynoloForoy = parseFloat(synolo_foroy.replace(',', '.'));
-
-        document.getElementById("synoloForoy").value = parseFloat(floatValue_SynoloForoy).toFixed(2);
-
-        plhroteo.value =
-        (
-            parseFloat(document.getElementById("synoloMiktonApodoxon").value || 0) +
-            parseFloat(document.getElementById("meioshErgatikhsEisforas").value || 0) -
-            floatValue - floatValue_SynoloForoy
-        ).toFixed(2);
-
-        if (!allaghForoy) {
-            clearTimeout(plhroteoDebounceTimeout);
-            plhroteoDebounceTimeout = setTimeout(async () => {
-                await updatePlhroteoWithComparison();
-            }, 300); // Χρονικό διάστημα σταθεροποίησης (300ms)
-        }
-
-        document.getElementById("exoflhsh").value = "0";
-        document.getElementById("poso_plhromhs").value = parseFloat(plhroteo.value) || 0;
-        document.getElementById("poso_plhromhs_Hidden").value = parseFloat(plhroteo.value) || 0;
-
     }
     
     // ----------------------------- E V E N T   L I S T E N E R S ----------------------------------
@@ -1931,38 +1914,31 @@ document.addEventListener("DOMContentLoaded", function() {
         //     }
         // }
 
-    async function handleKlimakiaForoy() {
-        if (hasRecord) return;
+async function handleKlimakiaForoy() {
+    try {
+        let klimakiaForoyModule;
 
-        try {
-            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
-            const baseUrl = import.meta.url;
-            const prodPath = new URL('../../min.js/kinhseis/klimakiaForoy.min.js', baseUrl);
-            const devPath  = new URL('../ypologismoi/klimakiaForoy.js', baseUrl);
-
-            const module = await import(isProduction ? prodPath : devPath);
-
-            const {
-                initializeKlimakiaForoy,
-                fetchData,
-                fetchEkptoshForoy,
-                fetchEisodhmaProForoyMeioshs,
-                getEkptoshForoy // ✅ Η getter συνάρτηση που προστέθηκε
-            } = module;
-
-            await initializeKlimakiaForoy();
-            await fetchData();
-            await fetchEkptoshForoy();
-            await fetchEisodhmaProForoyMeioshs();
-
-            const _EKPTOSH_FOROY = getEkptoshForoy();  // ✅ Έτσι παίρνεις τα δεδομένα
-
-            return { _EKPTOSH_FOROY };
-
-        } catch (error) {
-            console.error(`Σφάλμα κατά τη φόρτωση του module:`, error);
+        if (typeof window !== "undefined" && window.KlimakiaForoyModule) {
+            klimakiaForoyModule = window.KlimakiaForoyModule;
+        } else if (typeof module !== "undefined" && typeof require === "function") {
+            klimakiaForoyModule = require("./klimakiaForoy.js");
+        } else {
+            throw new Error("KlimakiaForoy module not found in any environment");
         }
+
+        await klimakiaForoyModule.initializeKlimakiaForoy();
+        await klimakiaForoyModule.fetchData();
+        await klimakiaForoyModule.fetchEkptoshForoy();
+        await klimakiaForoyModule.fetchEisodhmaProForoyMeioshs();
+
+        // Επιστρέφουμε όλα τα αντικείμενα (Κλίμακα φόρου, έκπτωση φόρου κλπ)
+        return klimakiaForoyModule.getAllArraysFromKlimakiaForoy();
+
+    } catch (error) {
+        console.error("Error in handleKlimakiaForoy:", error);
+        return null;
     }
+}
 
     async function calcNeesSympsifisteesApodoxes() {
         if (hasRecord) return;

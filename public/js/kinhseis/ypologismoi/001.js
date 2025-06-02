@@ -1,4 +1,4 @@
-export async function handleCalcs001(sharedParams) {
+async function handleCalcs001(sharedParams) {
 	switch(sharedParams.ergazomenoi.xarakthrismos_ergazomenon) {
 		case true:    // ΥΠΑΛΛΗΛΟΣ
 			switch(sharedParams.ergazomenoi.typos_ergazomenon) {
@@ -97,4 +97,14 @@ export async function handleCalcs001(sharedParams) {
 			}
 			break;
 	}
+}
+
+// === ΚΑΝΕΙ ΤΗ ΣΥΝΑΡΤΗΣΗ ΔΙΑΘΕΣΙΜΗ ΣΤΟΝ BROWSER ===
+if (typeof window !== "undefined") {
+  window.handleCalcs001 = handleCalcs001;
+}
+
+// === ΚΑΝΕΙ EXPORT ΓΙΑ COMMONJS (π.χ. Node.js scripts) ===
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { handleCalcs001 };
 }

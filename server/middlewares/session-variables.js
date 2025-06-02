@@ -1,7 +1,6 @@
-var getSessionVars = async (req, res, next) =>{
+const getSessionVars = async (req, res, next) => {
   try {
     if (req.session) {
-    // if (req.session && req.session.userId) {
       res.locals.userId = req.session.userId;
       res.locals.userName = req.session.userName;
       res.locals.userTeam = req.session.userTeam;
@@ -19,8 +18,8 @@ var getSessionVars = async (req, res, next) =>{
     next();
   } catch (err) {
     console.error("Error in getSessionVars:", err);
-    next(err); // ή res.status(500).send("Something went wrong")
+    next(err);
   }
 };
 
-export default getSessionVars
+module.exports = getSessionVars;

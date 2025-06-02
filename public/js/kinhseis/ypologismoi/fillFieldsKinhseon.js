@@ -1,4 +1,4 @@
-export async function fillFields(result, sharedParams, loaderContainer) {
+async function fillFields(result, sharedParams, loaderContainer) {
     if (loaderContainer) loaderContainer.style.display = "grid";
     
     firstTimeCalcPlhroteo = true;
@@ -249,7 +249,7 @@ export async function fillFields(result, sharedParams, loaderContainer) {
 
 }
 
-export async function loadKrathseis_Edit(data, result) {
+async function loadKrathseis_Edit(data, result) {
     let flag = 0;
     const fieldsStoixeionKrathseon = ['kodikos', 'krathsh', 'asfalistikesApodoxes', 'pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'plasmatikh_axia', 'apaiteitai_apodoxes_asfalishs', 'anotato_orio_palion', 'anotato_orio_neon', 'kad', 'eidikothta', 'kpk', 'se_typos_apodoxon', 'epa'];
 
@@ -374,7 +374,7 @@ export async function loadKrathseis_Edit(data, result) {
     
 };
 
-export async function updatePosostaFields_Edit(i) {
+async function updatePosostaFields_Edit(i) {
     const index = i.toString().padStart(2, '0');
     const dropdown = document.getElementById(`krathsh_${index}`);
     const selectedOption = dropdown.options[dropdown.selectedIndex];
@@ -430,7 +430,7 @@ export async function updatePosostaFields_Edit(i) {
 
 }
 
-export function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
+function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
     const field = document.getElementById(fieldId);
 
     if (!field) {
@@ -457,7 +457,7 @@ export function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = 
     }
 }
 
-export async function clearRowFields_Edit(index) {
+async function clearRowFields_Edit(index) {
     const fields = [
         `krathsh_${index}`,
         `pososto_krathshs_ergazomenoy_${index}`,
@@ -518,5 +518,3 @@ export async function clearRowFields_Edit(index) {
   await ypologismosAxiasKrathseon();
 
 }
-
-

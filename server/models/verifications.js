@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 const VerifySchema = new Schema({
@@ -29,4 +29,5 @@ const VerifySchema = new Schema({
 });
 
 const VerifyModel = model("VerifyEmail", VerifySchema);
-export default VerifyModel;
+
+module.exports = VerifyModel;

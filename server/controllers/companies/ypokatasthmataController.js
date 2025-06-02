@@ -1,7 +1,7 @@
-import mongoose from "mongoose";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
-import Models from "../../models/stathera_arxeia.js";
+const mongoose = require("mongoose");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const Models = require("../../models/stathera_arxeia");
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, YpokatasthmataModel } = Models_C;
@@ -601,4 +601,4 @@ class ypokatasthmataController {
 
 }
 
-export default ypokatasthmataController;
+module.exports = ypokatasthmataController;

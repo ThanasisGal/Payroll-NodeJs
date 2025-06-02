@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -525,9 +525,8 @@ const AdeiesSchema = new Schema({
     apodoxes_adeias_05: { type: Number, default: 0 },
 });
 const AdeiesModel = model("Adeies", AdeiesSchema);
-
-export default {  ApoysiesModel,
-                  ApasxolhseisModel,
-                  AstheneiesModel,
-                  AdeiesModel
-               };
+module.exports = {  ApoysiesModel,
+                    ApasxolhseisModel,
+                    AstheneiesModel,
+                    AdeiesModel
+                 };

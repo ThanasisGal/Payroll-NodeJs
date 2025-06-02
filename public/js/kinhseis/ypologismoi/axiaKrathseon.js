@@ -1,4 +1,5 @@
-export async function ypologismosAxiasKrathseon(sharedParams) {
+// export async function ypologismosAxiasKrathseon(sharedParams) {
+async function ypologismosAxiasKrathseon(sharedParams) {
     //  Κύρια Συνάρτηση: ypologismosAxiasKrathseon
     async function ypologismosAxiasKrathseon(sharedParams) {
       // 12. Flag για Αποφυγή Αναδρομικών Ενημερώσεων

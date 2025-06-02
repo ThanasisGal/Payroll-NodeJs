@@ -1,4 +1,4 @@
-export async function handleTypos001(sharedParams) {
+async function handleTypos001(sharedParams) {
     // Λογική για τον τύπο αποδοχών 001 (Τακτικές Αποδοχές)
     switch(sharedParams.ergazomenoi.xarakthrismos_ergazomenon) {
         case true:    // ΥΠΑΛΛΗΛΟΣ
@@ -172,4 +172,14 @@ export async function handleTypos001(sharedParams) {
         return { fromDate: fromDateStr, toDate: toDateStr };
     }
                         
+}
+
+// === ΚΑΝΕΙ ΤΗ ΣΥΝΑΡΤΗΣΗ ΔΙΑΘΕΣΙΜΗ ΣΤΟΝ BROWSER ===
+if (typeof window !== "undefined") {
+  window.handleTypos001 = handleTypos001;
+}
+
+// === ΚΑΝΕΙ EXPORT ΓΙΑ COMMONJS (π.χ. Node.js scripts) ===
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { handleTypos001 };
 }

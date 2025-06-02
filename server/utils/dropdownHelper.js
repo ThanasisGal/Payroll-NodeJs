@@ -1,5 +1,9 @@
-import { createDropdownApi } from './createDropdownApi.js';
+const { createDropdownApi } = require("./createDropdownApi");
 
-export function buildDropdownRoute(model, options = {}) {
+function buildDropdownRoute(model, options = {}) {
   return createDropdownApi(model, options);
 }
+
+module.exports = {
+  buildDropdownRoute,
+};

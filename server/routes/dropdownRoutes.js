@@ -1,13 +1,15 @@
-import { Router } from 'express';
-import { buildDropdownRoute }   from '../utils/dropdownHelper.js';
-import statheraArxeiaModels     from '../models/stathera_arxeia.js';
-import companiesModels          from '../models/companies.js';
-import typoiApodoxon            from '../dropdowns/typoiApodoxon.js';
-import tmhmata                  from '../dropdowns/tmhmata.js';
-import periodoi                 from '../dropdowns/periodoi.js';
-import ypokatasthmata           from '../dropdowns/ypokatasthmata.js';
+const express = require("express");
+const router = express.Router();
 
-const router = Router();
+const { buildDropdownRoute } = require("../utils/dropdownHelper");
+const statheraArxeiaModels = require("../models/stathera_arxeia");
+const companiesModels = require("../models/companies");
+const typoiApodoxon = require("../dropdowns/typoiApodoxon");
+const tmhmata = require("../dropdowns/tmhmata");
+const periodoi = require("../dropdowns/periodoi");
+const ypokatasthmata = require("../dropdowns/ypokatasthmata");
+
+// const router = Router();
 
 const   {
             YpokatasthmataModel,
@@ -24,4 +26,4 @@ router.get('/periodoi',         buildDropdownRoute(PeriodsModel, periodoi.option
 router.get('/ypokatasthmata',   buildDropdownRoute(YpokatasthmataModel, ypokatasthmata.options));
 router.get('/tmhmata',          buildDropdownRoute(EidikothtesErganhModel, tmhmata.options));
 
-export default router;
+module.exports = router;

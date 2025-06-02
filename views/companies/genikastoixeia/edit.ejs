@@ -1,45 +1,45 @@
 <div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active">Σταθερά Στοιχεία</li>
-        <li>Δραστηριότητες</li>
-        <li>Τεχνικός Ασφαλείας</li>
-        <li>Ιατρός Εργασίας</li>
-        <li>Λογιστής</li>
-        <li>Διάφορα</li>
-        <li>Έμμεσος Εργοδότης</li>
-        <li>Διάδοχος Εργοδότης</li>
-      </ul>
+    <div class="container-fluid" style="height: 100vh !important; padding: 0;">
+        <div class="menu_Links">
+            <ul style="white-space: nowrap;">
+                <li class="active" style="margin-left: 1.5rem; margin-right: .5rem;">Σταθερά Στοιχεία</li>
+            <li>Δραστηριότητες</li>
+            <li>Τεχνικός Ασφαλείας</li>
+            <li>Ιατρός Εργασίας</li>
+            <li>Λογιστής</li>
+            <li>Διάφορα</li>
+            <li>Έμμεσος Εργοδότης</li>
+            <li>Διάδοχος Εργοδότης</li>
+        </ul>
     </div>
     <hr style="margin-top: -2rem" />
     
     <div class="sections">    
-      <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
-      <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
-      <input type="hidden" name="companyNomos" id="companyNomos" class="form-control" value="<%= company.nomos %>" />
-      <input type="hidden" name="companyDhmos" id="companyDhmos" class="form-control" value="<%= company.dhmos %>" />
-      <input type="hidden" name="companyPolh" id="companyPolh" class="form-control" value="<%= company.polh %>" />
-      <input type="hidden" name="companyLogisths" id="companyLogisths" class="form-control" value="<%= company.logisths ? company.logisths : '' %>" />
-      <input type="hidden" name="companyTexnikos" id="companyTexnikos" class="form-control" value="<%= company.texnikos_asfaleias ? company.texnikos_asfaleias : '' %>" />
-      <input type="hidden" name="companyIatros" id="companyIatros" class="form-control" value="<%= company.iatros_ergasias ? company.iatros_ergasias : '' %>" />
-      <input type="hidden" name="currentImage" id="currentImage" class="form-control" value="<%= company.sfragida ? company.sfragida : '' %>" />
-      <input type="hidden" name="imagePath" id="imagePath" class="form-control" value="<%= company.imagePath ? company.imagePath : '' %>" />
-      <input type="hidden" name="companyEmmesosErgodoths" id="companyEmmesosErgodoths" class="form-control" value="<%= company.emmesos_ergodoths ? company.emmesos_ergodoths : '' %>" />
-      <input type="hidden" name="companyDiadoxosErgodoths" id="companyDiadoxosErgodoths" class="form-control" value="<%= company.diadoxos_ergodoths ? company.diadoxos_ergodoths : '' %>" />
+        <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
+        <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+        <input type="hidden" name="companyNomos" id="companyNomos" class="form-control" value="<%= company.nomos %>" />
+        <input type="hidden" name="companyDhmos" id="companyDhmos" class="form-control" value="<%= company.dhmos %>" />
+        <input type="hidden" name="companyPolh" id="companyPolh" class="form-control" value="<%= company.polh %>" />
+        <input type="hidden" name="companyLogisths" id="companyLogisths" class="form-control" value="<%= company.logisths ? company.logisths : '' %>" />
+        <input type="hidden" name="companyTexnikos" id="companyTexnikos" class="form-control" value="<%= company.texnikos_asfaleias ? company.texnikos_asfaleias : '' %>" />
+        <input type="hidden" name="companyIatros" id="companyIatros" class="form-control" value="<%= company.iatros_ergasias ? company.iatros_ergasias : '' %>" />
+        <input type="hidden" name="currentImage" id="currentImage" class="form-control" value="<%= company.sfragida ? company.sfragida : '' %>" />
+        <input type="hidden" name="imagePath" id="imagePath" class="form-control" value="<%= company.imagePath ? company.imagePath : '' %>" />
+        <input type="hidden" name="companyEmmesosErgodoths" id="companyEmmesosErgodoths" class="form-control" value="<%= company.emmesos_ergodoths ? company.emmesos_ergodoths : '' %>" />
+        <input type="hidden" name="companyDiadoxosErgodoths" id="companyDiadoxosErgodoths" class="form-control" value="<%= company.diadoxos_ergodoths ? company.diadoxos_ergodoths : '' %>" />
 
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius"enctype="multipart/form-data">
-            <div class="card z-depth-5">
-              <label
-                class="card-header bg-header text-center headers-content">Συντήρηση Στοιχείων Εταιρείας ( Κωδ. <%= company.kod %> )</label
-              >
-              <div class="card-body">
-                <div class="row form-group g-3 align-items-center mb-0-5">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymia"
+        <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+            <div>
+                <form class="formRadius" enctype="multipart/form-data">
+                    <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <label
+                            class="card-header bg-header text-center headers-content">Συντήρηση Στοιχείων Εταιρείας ( Κωδ. <%= company.kod %> )
+                        </label>
+                        <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                            <div class="row form-group g-3 align-items-center mb-0-5">
+                                <div class="col-1-5 right-align">
+                                    <label
+                                        for="eponymia"
                       class="col-form-label label-font-size field-required"
                       >Επώνυμο/μία</label
                     >
@@ -1352,11 +1352,11 @@
       <section class="sel_6_section visible" data-section="Διάφορα">
         <div class="container">
           <form class="formRadius"enctype="multipart/form-data">
-            <div class="card z-depth-5">
+            <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%;">
               <label class="card-header bg-header text-center headers-content">
                 Συντήρηση Στοιχείων Εταιρείας - Διάφορα
               </label>
-              <div class="card-body">
+              <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
                 <div class="row form-group g-3 align-items-center mb-0-5">
                   <div class="col-4 right-align">
                     <label for="oikodomika" class="col-form-label label-font-size"

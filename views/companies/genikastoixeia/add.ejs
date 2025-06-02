@@ -1,65 +1,62 @@
 <div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active">Σταθερά Στοιχεία</li>
-        <li>Δραστηριότητες</li>
-        <li>Τεχνικός Ασφαλείας</li>
-        <li>Ιατρός Εργασίας</li>
-        <li>Λογιστής</li>
-        <li>Διάφορα</li>
-        <li>Έμμεσος Εργοδότης</li>
-        <li>Διάδοχος Εργοδότης</li>
-      </ul>
+    <div class="container-fluid" style="height: 100vh !important; padding: 0;">
+        <div class="menu_Links">
+            <ul style="white-space: nowrap;">
+                <li class="active" style="margin-left: 1.5rem; margin-right: .5rem;">Σταθερά Στοιχεία</li>
+            <li>Δραστηριότητες</li>
+            <li>Τεχνικός Ασφαλείας</li>
+            <li>Ιατρός Εργασίας</li>
+            <li>Λογιστής</li>
+            <li>Διάφορα</li>
+            <li>Έμμεσος Εργοδότης</li>
+            <li>Διάδοχος Εργοδότης</li>
+        </ul>
     </div>
     <hr style="margin-top: -2rem" />
 
     <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-            <div class="card z-depth-5">
-              <label
-                class="card-header bg-header text-center headers-content"
-                >Εισαγωγή Νέας Εταιρείας</label
-              >
-              <div class="card-body">
-                <div class="row form-group g-3 align-items-center mb-0-5">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymia"
-                      class="col-form-label label-font-size field-required"
-                      >Επώνυμο/μία</label
-                    >
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="eponymia"
-                      id="eponymia"
-                      class="form-control input-contents"
-                      value=""
-                      required
-                    />
-                  </div>
+        <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+            <div>
+                <form action="/companies/genikastoixeia/add" method="POST" class="formRadius" enctype="multipart/form-data">
+                    <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <label
+                            class="card-header bg-header text-center headers-content"
+                            >Εισαγωγή Νέας Εταιρείας
+                        </label>
+                        <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                            <div class="row form-group g-3 align-items-center mb-0-5">
+                                <div class="col-1-5 right-align">
+                                <label
+                                    for="eponymia"
+                                    class="col-form-label label-font-size field-required"
+                                    >Επώνυμο/μία
+                                </label>
+                            </div>
+                            <div class="col-5">
+                                <input
+                                    type="text"
+                                    name="eponymia"
+                                    id="eponymia"
+                                    class="form-control input-contents"
+                                    value=""
+                                    required />
+                            </div>
 
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="firstName"
-                      class="col-form-label label-font-size"
-                      >Όνομα</label
-                    >
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="firstName"
-                      id="firstName"
-                      class="form-control input-contents"
-                      value=""
-                    />
-                  </div>
-                </div>
+                            <div class="col-1-5 right-align">
+                                <label
+                                    for="firstName"
+                                    class="col-form-label label-font-size">Όνομα
+                                </label>
+                            </div>
+                            <div class="col-3">
+                                <input
+                                    type="text"
+                                    name="firstName"
+                                    id="firstName"
+                                    class="form-control input-contents"
+                                    value="" />
+                            </div>
+                        </div>
 
                 <div class="row form-group g-3 align-items-center mb-0-5">
                   <div class="col-1-5 right-align">

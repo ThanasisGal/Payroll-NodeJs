@@ -1,13 +1,13 @@
-import { set, connect } from "mongoose";
-set("strictQuery", false);
-  
+const mongoose = require("mongoose");
+mongoose.set("strictQuery", false);
+
 const connectDB = async () => {
   try {
-    const conn = await connect(process.env.MONGODB_URL);
+    const conn = await mongoose.connect(process.env.MONGODB_URL);
     console.log(`Database connected: ${conn.connection.host}`);
   } catch (error) {
-    console.log('Database not connected ',error);
+    console.log("Database not connected", error);
   }
 };
 
-export default connectDB;
+module.exports = connectDB;

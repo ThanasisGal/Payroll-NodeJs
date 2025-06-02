@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import Models from "../models/stathera_arxeia.js";
-import Models_Symbaseon from "../models/symbaseis.js";
+const mongoose = require("mongoose");
+const Models = require("../models/stathera_arxeia");
+const Models_Symbaseon = require("../models/symbaseis");
 
 const {
         PerifereiesModel,
@@ -1085,4 +1085,4 @@ class genikaAPIsController {
  
 }  
 
-export default genikaAPIsController;
+module.exports = genikaAPIsController;

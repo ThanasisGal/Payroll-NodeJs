@@ -1,10 +1,7 @@
-import mongoose from "mongoose";
-import Models_A from "../../models/stathera_arxeia.js";
-import Models_B from "../../models/privileges.js";
-// import Models_C from "../../models/companies.js";
-import Models_D from "../../models/ergazomenoi.js";
-// import { SymbolNodeDependencies } from "mathjs";
-// import Models_E from "../../models/param.js";
+const mongoose = require("mongoose");
+const Models_A = require("../../models/stathera_arxeia");
+const Models_B = require("../../models/privileges");
+const Models_D = require("../../models/ergazomenoi");
 
 const { KrathseisModel,
         PerifereiesModel,
@@ -12,14 +9,11 @@ const { KrathseisModel,
       } = Models_A;
 
 const { UserPrivilegesModel } = Models_B;
-// const { CompaniesModel, 
-//         AntistoixiseisModel,
-//       } = Models_C;
+
 const { ErgazomenoiModel,
         OrariaModel,
         IstorikoProslhpseonAllagonModel,
       } = Models_D;
-// const { ParamModel } = Models_E;
 
 let nextPageSearchTerm = "";
 
@@ -1338,4 +1332,4 @@ class ergazomenoiController {
 
 }
 
-export default ergazomenoiController;
+module.exports = ergazomenoiController;

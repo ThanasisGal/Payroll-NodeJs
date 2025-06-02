@@ -2,222 +2,222 @@
 <% var cardbodyHeight=totalRecs <= maxEntriesPerPage ? (totalRecs * 4) : (maxEntriesPerPage * 4); %> 
 
 <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-5 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-5 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 </div>
 
-<div class="card d-flex flex-column z-depth-5" style="width: 80%; margin-left: 10%">
-
-  <div class="card-header p-0" style="height: 3.5rem !important">
-    <label class="text-center w-100 headers-content mt-2">
-      <% if (sTerm && sTerm.length > 0) { %>
-        Εμφάνιση Υποκαταστημάτων ( με κριτήριο αναζήτησης "<%= sTerm %>" )
-      <% } else { %>
-        Εμφάνιση Υποκαταστημάτων
-      <% } %>
-    </label>
-  </div>
-  <div>
-    <table
-      class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
-      <thead style="font-size: 0.9vw;">
-        <tr>
-          <th scope="col" onclick="sortTable(0, this)" class="color-brown col-1" style="background-color: #8ca38c83 !important;">
-            Κωδ.
-            <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
-          </th>
-          <th scope="col" onclick="sortTable(1, this)" class="color-brown col-3">
-            Περιγραφή
-            <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
-          </th>
-          <th scope="col" onclick="sortTable(2, this)" class="color-brown col-3">
-            Οδός
-            <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
-          </th>
-          <th scope="col" onclick="sortTable(3, this)" class="color-brown col-1">
-            Αριθμός
-            <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
-          </th>
-          <th scope="col" onclick="sortTable(4, this)" class="color-brown col-3">
-            Δημοτικό Διαμέρισμα
-            <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
-          </th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-
-  <div class="card-body p-0 overflow-auto flex-grow-1" style="height: <%= cardbodyHeight %>vh; background-color: #ffffff">
-    <% if (ypokatasthmataFilteredRecs && ypokatasthmataFilteredRecs.length > 0) { %>
-      <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
-        <tbody>
-          <% ypokatasthmataFilteredRecs.forEach(element => { %>
-          <tr data-id="<%= element._id %>">
-            <td class="col-1"><%- element.kodikos %></td>
-            <td class="col-3"><%- element.perigrafh %></td>
-            <td class="col-3"><%- element.odos %></td>
-            <td class="col-1"><%- element.arithmos %></td>
-            <td class="col-3"><%- element.polhPerigrafh || 'Δεν ορίστηκε' %></td>
-          </tr>
-          <% }) %> 
-          
-          <% if (ypokatasthmataFilteredRecs.length === 0) { %>
-          <tr>
-            <td colspan="5" class="records-not-found">Δεν βρέθηκαν Υποκαταστήματα.</td>
-          </tr>
-          <% } %>
-        </tbody>
-      </table>
-    <% } else { %>
-      <p class="records-not-found" style="height: 10vh;">
-        Δεν βρέθηκαν Υποκαταστήματα που να πληρούν το κριτήριο αναζήτησης "<%= sTerm %>"
-      </p>
-    <% } %>
-  </div>
-
-  <div class="card-footer mt-auto">
-    <div class="d-inline-block d-flex"
-      style="
-        margin-top: -0.5rem !important;
-        margin-bottom: 2rem !important;
-        margin-left: 0.625rem !important;
-        margin-right: 0.625rem !important;
-        justify-content: space-around;">
-      
-      <a
-        id="edit-btn"
-        href="#"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>  disabled-link 
-        <% } %>"
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) {%>
-          onclick="event.preventDefault();" 
-        <% } %> >
-        <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
-      </a>
-
-      <a
-        id="delete-btn"
-        href="#"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> disabled-link 
-        <% } %>"
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>
-          onclick="event.preventDefault();" 
-        <% } %> >
-        <i class="buttons-content bi bi-trash"></i> Διαγραφή
-      </a>
-
-      <a
-        href="/companies/ypokatasthmata"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2"
-      >
-        <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
-      </a>
-
-      <% if (ypokatasthmataFilteredRecs) { %>
-        <nav class="col-2" aria-label="Dashboard Pagination">
-          <ul class="pagination pagination-sm justify-content-end mt-2">
-            <% if (current == 1) { %>
-              <li class="page-item disabled">
-                <a href="#" class="page-link">
-                  <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-              <li class="page-item disabled">
-                <a href="#" class="page-link">
-                  <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
+<div class="card d-flex flex-column z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
+    <div class="card-header">
+        <label class="text-center w-100 headers-content">
+            <% if (sTerm && sTerm.length > 0) { %>
+                Εμφάνιση Υποκαταστημάτων ( με κριτήριο αναζήτησης "<%= sTerm %>" )
             <% } else { %>
-              <li class="page-item">
-                <a href="/companies/ypokatasthmata/saerch/?page=1" class="page-link">
-                  <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-              <li class="page-item">
-                <a href="/companies/ypokatasthmata/search/?page=<%= Number(current) - 1 %>"
-                  class="page-link">
-                  <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-            <% } %> 
-            
-            <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
-            
-            <% if (i !== 1) { %>
-              <li class="page-item disabled">
-                <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
-              </li>
-            <% } %> 
-
-            <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %>
-              <% if (i == current) { %>
-                <li class="page-item">
-                  <a
-                    href="#"
-                    class="page-link pageItem"
-                    style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= i %>
-                  </a>
-                </li>
-              <% } else { %>
-                <li class="page-item" style="font-size: 0.7vw">
-                  <a
-                    href="/companies/ypokatasthmata/?page=<%= i %>"
-                    class="page-link"
-                    style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= i %>
-                  </a>
-                </li>
-              <% } %> 
-              
-              <% if (i == Number(current) + 2 && i < pages) { %>
-                <li class="page-item disabled">
-                  <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
-                </li>
-                <li class="page-item">
-                  <a
-                    href="/companies/ypokatasthmata/?page=<%= pages %>"
-                    class="page-link"
-                    style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= pages %>
-                  </a>
-                </li>
-              <% } %> 
-            <% } %> 
-            
-            <% if (current == pages) { %>
-              <li class="page-item disabled">
-                <a href="#" class="page-link">
-                  <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-              <li class="page-item disabled">
-                <a href="#" class="page-link">
-                  <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-            <% } else { %>
-              <li class="page-item">
-                <a
-                  href="/companies/ypokatasthmata/?page=<%= Number(current) + 1 %>"
-                  class="page-link">
-                  <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
-              <li class="page-item" style="font-size: 0.7vw">
-                <a
-                  href="/companies/ypokatasthmata/search/?page=<%= pages %>"
-                  class="page-link">
-                  <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
-                </a>
-              </li>
+                Εμφάνιση Υποκαταστημάτων
             <% } %>
-          </ul>
-        </nav>
-      <% } %>
+        </label>
     </div>
-  </div>
+
+    <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+        <div class="table-responsive">
+            <% if (ypokatasthmataFilteredRecs && ypokatasthmataFilteredRecs.length > 0) { %>
+
+                <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
+                    <thead id="myTableHeader" class="backgroundColor-brown" style="font-size: 1.1rem; text-align: center !important;">
+                        <tr>
+                            <th scope="col" class="color-brown col-1">
+                                Κωδ.
+                                <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
+                            </th>
+                            <th scope="col" class="color-brown col-3">
+                                Περιγραφή
+                                <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
+                            </th>
+                            <th scope="col" class="color-brown col-3">
+                                Οδός
+                                <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
+                            </th>
+                            <th scope="col" class="color-brown col-1">
+                                Αριθμός
+                                <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
+                            </th>
+                            <th scope="col" class="color-brown col-4">
+                                Δημοτικό Διαμέρισμα
+                                <i class="sort-icon bi" style="margin-left: 0.6rem; color: #002e00; font-size: 0.875vw; font-weight: 700;"></i>
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <% ypokatasthmataFilteredRecs.forEach(element => { %>
+                            <tr data-id="<%= element._id %>">
+                                <td class="col-1"><%- element.kodikos %></td>
+                                <td class="col-3"><%- element.perigrafh %></td>
+                                <td class="col-3"><%- element.odos %></td>
+                                <td class="col-1"><%- element.arithmos %></td>
+                                <td class="col-4"><%- element.polhPerigrafh || 'Δεν ορίστηκε' %></td>
+                            </tr>
+                        <% }) %> 
+
+                        <% if (ypokatasthmataFilteredRecs.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="records-not-found">Δεν βρέθηκαν Υποκαταστήματα.</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+
+                </table>
+            <% } else { %>
+                <p class="records-not-found">Δεν βρέθηκαν Υποκαταστήματα που να πλήρούν τα κριτήρια αναζήτησης "<%= sTerm %>"</p>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important">
+        <div
+            class="d-inline-block d-flex"
+            style="
+                margin-top: -0.5rem !important;
+                margin-bottom: 2rem !important;
+                margin-left: 0.625rem !important;
+                margin-right: 0.625rem !important;
+                justify-content: space-around;">
+      
+            <a
+                id="edit-btn"
+                href="#"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>
+                    disabled-link 
+                <% } %>"
+        
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) {%>
+                    onclick="event.preventDefault();" 
+                <% } %> >
+                <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+            </a>
+
+            <a
+                id="delete-btn"
+                href="#"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> 
+                    disabled-link 
+                <% } %>"
+
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>
+                    onclick="event.preventDefault();" 
+                <% } %> >
+                <i class="buttons-content bi bi-trash"></i> Διαγραφή
+            </a>
+
+            <a
+                href="/companies/ypokatasthmata"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
+                <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+            </a>
+
+            <% if (ypokatasthmataFilteredRecs) { %>
+                <nav class="col-2" aria-label="Dashboard Pagination">
+                    <ul class="pagination pagination-sm justify-content-end mt-2">
+                        <% if (current == 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a href="/companies/ypokatasthmata/saerch/?page=1" class="page-link">
+                                    <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a href="/companies/ypokatasthmata/search/?page=<%= Number(current) - 1 %>"
+                                    class="page-link">
+                                        <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } %> 
+            
+                        <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
+            
+                        <% if (i !== 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
+                            </li>
+                        <% } %> 
+
+                        <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %>
+                            <% if (i == current) { %>
+                                <li class="page-item">
+                                    <a
+                                        href="#"
+                                        class="page-link pageItem"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= i %>
+                                    </a>
+                                </li>
+                            <% } else { %>
+                                <li class="page-item" style="font-size: 0.7vw">
+                                    <a
+                                        href="/companies/ypokatasthmata/?page=<%= i %>"
+                                        class="page-link"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= i %>
+                                    </a>
+                                </li>
+                            <% } %> 
+              
+                            <% if (i == Number(current) + 2 && i < pages) { %>
+                                <li class="page-item disabled">
+                                    <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
+                                </li>
+                                <li class="page-item">
+                                    <a
+                                        href="/companies/ypokatasthmata/?page=<%= pages %>"
+                                        class="page-link"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"><%= pages %>
+                                    </a>
+                                </li>
+                            <% } %> 
+                        <% } %> 
+            
+                        <% if (current == pages) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a
+                                    href="/companies/ypokatasthmata/?page=<%= Number(current) + 1 %>"
+                                    class="page-link">
+                                    <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item" style="font-size: 0.7vw">
+                                <a
+                                    href="/companies/ypokatasthmata/search/?page=<%= pages %>"
+                                    class="page-link">
+                                    <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+    </div>
 </div>
 
 <script src="/static/js/common/getCompanyDescription.js"></script>

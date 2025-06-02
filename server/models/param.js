@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -13,4 +13,4 @@ const ParamSchema = new Schema({
 });
 const ParamModel = model("Param", ParamSchema);
   
-export default {  ParamModel };
+module.exports = {  ParamModel };

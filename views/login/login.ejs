@@ -101,8 +101,9 @@
     </form>
 </div>
 
-<% if (process.env.NODE_ENV === 'production') { %>
-    <script src="/static/min.js/views/login/login_ejs.min.js"></script>
-<% } else { %>
-    <script src="/static/js/common/getUserRole.js"></script>
-<% } %>
+<% const isProduction = NODE_ENV === 'production'; %>
+<script>
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+            
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

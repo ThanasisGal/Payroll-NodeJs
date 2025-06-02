@@ -1,279 +1,284 @@
 <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-5 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
+    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-5 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 </div>
 
-<div class="card z-depth-5">
-  <div class="card-header">
-    <label class="text-center w-100 headers-content">
-      Εμφάνιση Εταιρειών ( με κριτήριο αναζήτησης "<%= sTerm %>" )</label
-    >
-  </div>
-
-  <div class="card-body">
-    <div class="table-responsive">
-      <% if (companyFilteredRecs && companyFilteredRecs.length > 0) { %>
-
-        <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
-          <thead style="font-size: 0.9vw">
-            <tr>
-              <th scope="col" onclick="sortTable(0, this)" class="color-brown">
-                Κωδ.<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-              <th scope="col" onclick="sortTable(1, this)" class="color-brown">
-                Επώνυμο/μία<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-              <th scope="col" onclick="sortTable(2, this)" class="color-brown">
-                Όνομα<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-              <th scope="col" onclick="sortTable(3, this)" class="color-brown">
-                Πατρώνυμο<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-              <th scope="col" onclick="sortTable(4, this)" class="color-brown">
-                Δραστηριότητα<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-              <th scope="col" onclick="sortTable(5, this)" class="color-brown">
-                ΑΦΜ<i
-                  class="sort-icon bi"
-                  style="
-                    margin-left: 0.6rem;
-                    color: #002e00;
-                    font-size: 0.875vw;
-                    font-weight: 700;
-                  "
-                ></i>
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <% companyFilteredRecs.forEach(element => { %>
-              <tr data-id="<%= element._id %>">
-                <td><%- element.kod %></td>
-                <td><%- element.eponymia %></td>
-                <td><%- element.firstname %></td>
-                <td><%- element.fathername %></td>
-                <td><%- element.activity %></td>
-                <td><%- element.afm %></td>
-              </tr>
-            <% }) %> 
-
-            <% if (companyFilteredRecs.length === 0) { %>
-              <tr>
-                <td colspan="6">Δεν βρέθηκαν εγγραφές.</td>
-              </tr>
-            <% } %>
-          </tbody>
-        </table>
-      <% } else { %>
-        <p class="records-not-found">Δεν βρέθηκαν Εταιρείες που να ταιριάζουν με το κριτήριο αναζήτησης "<%= sTerm %>"</p>
-      <% } %>
+<div class="card d-flex flex-column z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
+    <div class="card-header">
+        <label class="text-center w-100 headers-content">
+            Εμφάνιση Εταιρειών ( με κριτήριο αναζήτησης "<%= sTerm %>" )
+        </label>
     </div>
-  </div>
 
-  <div
-    class="card-footer"
-    style="margin-left: 0.1rem !important; margin-right: 0.1rem !important"
-  >
-    <div
-      class="d-inline-block d-flex"
-      style="
-        margin-top: -0.5rem !important;
-        margin-bottom: 2rem !important;
-        margin-left: 0.625rem !important;
-        margin-right: 0.625rem !important;
-        justify-content: space-around;
-      "
-    >
-      <a
-        id="select-btn"
-        href="#"
-        role="button"
-        class="btn btn-success btn-success rounded-4 buttons-content mb-3 mt-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.read) { %> disabled-link <% } %>"
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.read) { %>
-        onclick="event.preventDefault();" <% } %> >
-        <i class="buttons-content bi bi-check2-circle"></i> Επιλογή Εταιρείας
-      </a>
+    <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+        <div class="table-responsive">
+            <% if (companyFilteredRecs && companyFilteredRecs.length > 0) { %>
 
-      <a
-        id="edit-btn"
-        href="#"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5 
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %> disabled-link <% } %>"
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>
-        onclick="event.preventDefault();" <% } %> >
-        <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
-      </a>
+                <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
+                    <thead id="myTableHeader" class="backgroundColor-brown" style="font-size: 1.1rem; text-align: center !important;">
+                        <tr>
+                            <th scope="col">
+                                Κωδ.
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;">
+                                </i>
+                            </th>
+                            <th scope="col" class="color-brown">
+                                Επώνυμο/μία
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;">
+                                </i>
+                            </th>
+                            <th scope="col" class="color-brown">
+                                Όνομα
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;">
+                                </i>
+                            </th>
+                            <th scope="col" class="color-brown">
+                                Πατρώνυμο
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;">
+                                </i>
+                            </th>
+                            <th scope="col" class="color-brown">
+                                Δραστηριότητα
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;"
+                                ></i>
+                            </th>
+                            <th scope="col" class="color-brown">
+                                ΑΦΜ
+                                <i
+                                    class="sort-icon bi"
+                                    style="
+                                        margin-left: 0.6rem;
+                                        color: #002e00;
+                                        font-size: 0.875vw;
+                                        font-weight: 700;">
+                                </i>
+                            </th>
+                        </tr>
+                    </thead>
 
-      <a
-        id="delete-btn"
-        href="#"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5 
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> disabled-link <% } %>"
-        <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> onclick="event.preventDefault();" <% } %> >
-        <i class="buttons-content bi bi-trash"></i> Διαγραφή
-      </a>
+                    <tbody>
+                        <% companyFilteredRecs.forEach(element => { %>
+                            <tr data-id="<%= element._id %>" id="myTableRow">
+                                <td><%- element.kod %></td>
+                                <td><%- element.eponymia %></td>
+                                <td><%- element.firstname %></td>
+                                <td><%- element.fathername %></td>
+                                <td><%- element.activity %></td>
+                                <td><%- element.afm %></td>
+                            </tr>
+                        <% }) %> 
 
-      <a
-        href="/companies/genikastoixeia"
-        role="button"
-        class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5"
-      >
-        <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
-      </a>
-
-      <% if (companyFilteredRecs) { %>
-      <nav class="col-2" aria-label="Dashboard Pagination">
-        <ul class="pagination pagination-sm justify-content-end mt-2">
-          <% if (current == 1) { %>
-            <li class="page-item disabled">
-              <a href="#" class="page-link"
-                ><i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i
-              ></a>
-            </li>
-            <li class="page-item disabled">
-              <a href="#" class="page-link"
-                ><i class="bi bi-chevron-left" style="font-size: 0.5vw"></i
-              ></a>
-            </li>
-          <% } else { %>
-            <li class="page-item">
-              <a href="/companies/genikastoixeia/?page=1" class="page-link"
-                ><i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i
-              ></a>
-            </li>
-            <li class="page-item">
-              <a
-                href="/companies/genikastoixeia/?page=<%= Number(current) - 1 %>"
-                class="page-link"
-                ><i class="bi bi-chevron-left" style="font-size: 0.5vw"></i
-              ></a>
-            </li>
-          <% } %> 
-          <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
-          <% if (i !== 1) { %>
-            <li class="page-item disabled">
-              <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
-            </li>
-          <% } %> 
-
-          <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %>
-            <% if (i == current) { %>
-              <li class="page-item">
-                <a
-                  href="#"
-                  class="page-link pageItem"
-                  style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"
-                  ><%= i %>
-                </a>
-              </li>
+                        <% if (companyFilteredRecs.length === 0) { %>
+                            <tr>
+                                <td colspan="6">Δεν βρέθηκαν εγγραφές.</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
             <% } else { %>
-              <li class="page-item" style="font-size: 0.7vw">
-                <a
-                  href="/companies/genikastoixeia/?page=<%= i %>" 
-                  class="page-link"
-                  style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"
-                  ><%= i %>
-                </a>
-              </li>
-            <% } %> 
-              
-            <% if (i == Number(current) + 2 && i < pages) { %>
-              <li class="page-item disabled">
-                <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
-              </li>
-              <li class="page-item">
-                <a
-                  href="/companies/genikastoixeia/?page=<%= pages %>"
-                  class="page-link"
-                  style="font-size: 0.5vw; padding-top: 8px; font-weight: 500"
-                  ><%= pages %>
-                </a>
-              </li>
+                <p class="records-not-found">Δεν βρέθηκαν Εταιρείες που να πληρούν τα κριτήρια αναζήτησης "<%= sTerm %>"</p>
             <% } %>
-          <% } %> 
-          
-          <% if (current == pages) { %>
-            <li class="page-item disabled">
-              <a href="#" class="page-link"
-                ><i class="bi bi-chevron-right" style="font-size: 0.5vw"></i
-              ></a>
-            </li>
-            <li class="page-item disabled">
-              <a href="#" class="page-link">
-                <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
-              </a>
-            </li>
-          <% } else { %>
-            <li class="page-item">
-              <a
-                href="/companies/genikastoixeia/?page=<%= Number(current) + 1 %>"
-                class="page-link">
-                <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
-              </a>
-            </li>
-            <li class="page-item" style="font-size: 0.7vw">
-              <a href="/companies/genikastoixeia/?page=<%= pages %>" class="page-link">
-              <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
-            </a>
-            </li>
-          <% } %>
-        </ul>
-      </nav>
-    <% } %>
+        </div>
     </div>
-  </div>
+
+    <div
+        class="card-footer"
+        style="margin-left: 0.1rem !important; margin-right: 0.1rem !important">
+        <div
+            class="d-inline-block d-flex"
+            style="
+                margin-top: -0.5rem !important;
+                margin-bottom: 2rem !important;
+                margin-left: 0.625rem !important;
+                margin-right: 0.625rem !important;
+                justify-content: space-around;">
+            <a
+                id="select-btn"
+                href="#"
+                role="button"
+                class="btn btn-success btn-success rounded-4 buttons-content mb-3 mt-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.read) { %> disabled-link <% } %>"
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.read) { %>
+                    onclick="event.preventDefault();" 
+                <% } %> >
+                <i class="buttons-content bi bi-check2-circle"></i> Επιλογή Εταιρείας
+            </a>
+
+            <a
+                id="edit-btn"
+                href="#"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5 
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %> 
+                    disabled-link 
+                <% } %>"
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>
+                    onclick="event.preventDefault();" 
+                <% } %> >
+                <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+            </a>
+
+            <a
+                id="delete-btn"
+                href="#"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5 
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> 
+                    disabled-link 
+                <% } %>"
+                <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %> 
+                    onclick="event.preventDefault();" 
+                <% } %> >
+                <i class="buttons-content bi bi-trash"></i> Διαγραφή
+            </a>
+
+            <a
+                href="/companies/genikastoixeia"
+                role="button"
+                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-5">
+                <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+            </a>
+
+            <% if (companyFilteredRecs) { %>
+                <nav class="col-2" aria-label="Dashboard Pagination">
+                    <ul class="pagination pagination-sm justify-content-end mt-2">
+                        <% if (current == 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a href="/companies/genikastoixeia/?page=1" class="page-link">
+                                    <i class="bi bi-chevron-bar-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a
+                                    href="/companies/genikastoixeia/?page=<%= Number(current) - 1 %>"
+                                    class="page-link">
+                                    <i class="bi bi-chevron-left" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } %> 
+                        
+                        <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
+                        <% if (i !== 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
+                            </li>
+                        <% } %> 
+
+                        <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %>
+                            <% if (i == current) { %>
+                                <li class="page-item">
+                                    <a
+                                        href="#"
+                                        class="page-link pageItem"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500">
+                                        <%= i %>
+                                    </a>
+                                </li>
+                            <% } else { %>
+                                <li class="page-item" style="font-size: 0.7vw">
+                                    <a
+                                        href="/companies/genikastoixeia/?page=<%= i %>" 
+                                        class="page-link"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500">
+                                        <%= i %>
+                                    </a>
+                                </li>
+                            <% } %> 
+                
+                            <% if (i == Number(current) + 2 && i < pages) { %>
+                                <li class="page-item disabled">
+                                    <a href="#" class="page-link" style="font-size: 0.5vw">...</a>
+                                </li>
+                                <li class="page-item">
+                                    <a
+                                        href="/companies/genikastoixeia/?page=<%= pages %>"
+                                        class="page-link"
+                                        style="font-size: 0.5vw; padding-top: 8px; font-weight: 500">
+                                        <%= pages %>
+                                    </a>
+                                </li>
+                            <% } %>
+                        <% } %> 
+            
+                        <% if (current == pages) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link">
+                                    <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a
+                                    href="/companies/genikastoixeia/?page=<%= Number(current) + 1 %>"
+                                    class="page-link">
+                                    <i class="bi bi-chevron-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                            <li class="page-item" style="font-size: 0.7vw">
+                                <a href="/companies/genikastoixeia/?page=<%= pages %>" class="page-link">
+                                    <i class="bi bi-chevron-bar-right" style="font-size: 0.5vw"></i>
+                                </a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+        </div>
+    </div>
 </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/static/min.js/companies/genikastoixeia/companies_search_ejs.min.js"></script>
+    <script src="/static/min.js/companies/genikastoixeia/companies_search_ejs.min.js"></script>
 <% } else { %>
-  <script src="/static/js/common/getCompanyDescription.js"></script>
-  <script src="/static/js/common/getXrhsh.js"></script>
-  <script src="/static/js/common/getPeriod.js"></script>
-  <script src="/static/js/common/getUser.js"></script>
-  <script src="/static/js/companies/genikastoixeia/selectRowInTable.js"></script>
-  <script src="/static/js/common/sortTable.js"></script>
-  <script src="/static/js/common/tooltipsForButtons.js"></script>
+    <script src="/static/js/common/getCompanyDescription.js"></script>
+    <script src="/static/js/common/getXrhsh.js"></script>
+    <script src="/static/js/common/getPeriod.js"></script>
+    <script src="/static/js/common/getUser.js"></script>
+    <script src="/static/js/companies/genikastoixeia/selectRowInTable.js"></script>
+    <script src="/static/js/common/sortTable.js"></script>
+    <script src="/static/js/common/tooltipsForButtons.js"></script>
 <% } %>

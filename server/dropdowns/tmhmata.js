@@ -1,31 +1,16 @@
-import statheraArxeiaModel from '../models/stathera_arxeia.js';
+const statheraArxeiaModel = require('../models/stathera_arxeia');
 
-// const   {
-//             TmhmataModel
-//         } = statheraArxeiaModel;
-        
-// export default {
-//     path: '/api/dropdown/tmhmata',
-//     model: TmhmataModel,
-//     options: {
-//         searchFields: ['perigrafh'],
-//         // extraQueryBuilder: (query) => ({
-//             // companyId: query.companyId,
-//         // }),
-//     }
-// };
-
-const   {
-    EidikothtesErganhModel
+const {
+  EidikothtesErganhModel
 } = statheraArxeiaModel;
 
-export default {
-path: '/api/dropdown/tmhmata',
-model: EidikothtesErganhModel,
-options: {
-searchFields: ['perigrafh'],
-// extraQueryBuilder: (query) => ({
-    // companyId: query.companyId,
-// }),
-}
+module.exports = {
+  path: '/api/dropdown/tmhmata',
+  model: EidikothtesErganhModel,
+  options: {
+    searchFields: ['perigrafh'],
+    // extraQueryBuilder: (query) => ({
+    //   companyId: query.companyId,
+    // }),
+  }
 };

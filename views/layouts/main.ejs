@@ -43,7 +43,7 @@
 
         </head>
 
-        <body>
+        <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
             <div class="loader-container">
             <div class="loader"></div>
             <div class="loader-text">Παρακαλώ περιμένετε...</div>
@@ -55,32 +55,31 @@
             <div class="row">
                 <%- include('../partials/sidebar.ejs') %>
 
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4"><%- body %></main>
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" style="background: transparent;"><%- body %></main>
 
             </div>
 
             <%- include('../partials/footer.ejs') %>
             </div>
 
-            <% if (process.env.NODE_ENV === 'production') { %>
-                <script src="/static/min.js/layouts/main_ejs.min.js"></script>
-                <!-- <script type="module" src="/static/min.js/utils/formatNumber.min.js"></script> -->
-            <% } else { %>
-                <script src="/static/js/utils/tree.js"></script>
-                <script src="/static/js/utils/scripts.js"></script>
-                <!-- <script type="module" src="/static/js/utils/formatNumber.js"></script> -->
-                <script src="/static/js/common/getUserRole.js"></script>
-                <script src="/static/js/common/getCompanyDescription.js"></script>
-                <script src="/static/js/common/getXrhsh.js"></script>
-                <script src="/static/js/common/getPeriod.js"></script>
-                <script src="/static/js/common/getUser.js"></script>
-                <script src="/static/js/common/navTabs.js"></script>
-                <script src="/static/js/common/tooltipsForButtons.js"></script>
-                <script src="/static/js/common/moveByEnter.js"></script>
-                <script src="/static/js/common/changeFontSizeSelectDropdownMenu.js"></script>
-                <script src="/static/js/common/countdown.js"></script>
-                <script src="/static/js/dates/convertDateToISO.js"></script>
-            <% } %>
+            <% const isProduction = NODE_ENV === 'production'; %>
+            <script>
+                window.RUNTIME_ENV = "<%= NODE_ENV %>";
+            </script>
+            
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/utils/tree<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/utils/scripts<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUserRole<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeFontSizeSelectDropdownMenu<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/countdown<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToIS<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
             <script>
                 window.addEventListener("load", function () {

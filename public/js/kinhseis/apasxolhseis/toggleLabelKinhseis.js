@@ -1,3 +1,5 @@
+// import { loadErgazomenoi } from './loadDropdowns.js';
+ 
 document.addEventListener("DOMContentLoaded", function () {
   var checkboxConfigurations = {
     "selectEmployes": {

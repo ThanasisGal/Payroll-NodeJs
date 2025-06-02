@@ -1,5 +1,5 @@
 <div class="tadded-container" id="apasxolhseisForm">
-    <div class="container-fluid">
+    <div class="wrapper-kinhseis">
         <div class="menu_Links">
             <ul>
                 <li class="apodoxes active">Αποδοχές</li>
@@ -18,11 +18,11 @@
                 <div>
                     <form class="formRadius">
 
-                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis ht-62" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="height: 82vh; width: 99%; margin-left: .5%; margin-top: -0.2rem; overflow: hidden !important;">
 
                             <%- include('./apasxolhseis/cardHeader_Apasxolhseis') %>
 
-                            <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+                            <div class="card-body" style="background-color: #ffffff;margin-top: -0.5rem;" >
                                 <input type="hidden" name="idHidden" id="idHidden" value="" />
                                 <input type="hidden" name="idKinhseonHidden" id="idKinhseonHidden" value="" />
                                 <input type="hidden" name="team" id="team" value="<%= sessionTeam %>" />
@@ -68,11 +68,11 @@
                 <div>
                     <form class="formRadius">
 
-                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="max-height: 72.5vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important;">
               
                             <%- include('./krathseis/cardHeader_Krathseis') %>
 
-                            <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+                            <div class="card-body" style="height: 72vh !important; background-color: #ffffff;margin-top: -0.5rem;" >
 
                                 <%- include('./krathseis/cardBody_Krathseis') %>
 
@@ -89,8 +89,7 @@
                 <div>
                     <form class="formRadius">
 
-                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
-              
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="max-height: 62.5vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important;">
                             <%- include('./foroi/cardHeader_Foroi') %>
 
                             <div class="card-body overflow-auto flex-grow-1" style="background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
@@ -110,7 +109,7 @@
                 <div>
                     <form class="formRadius">
 
-                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="height: 78vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important;">
               
                             <%- include('./astheneia/cardHeader_Astheneia') %>
 
@@ -137,11 +136,11 @@
                 <div>
                     <form class="formRadius">
 
-                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="width: 97%; margin-left: 1.5%; margin-top: -0.2rem;">
+                        <div class="card d-flex flex-column z-depth-5 form-apasxolhseis" style="height: 80vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important;">
               
                             <%- include('./adeies/cardHeader_Adeies') %>
 
-                            <div class="card-body overflow-auto flex-grow-1" style="height: 61.6vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
+                            <div class="card-body overflow-auto flex-grow-1" style="height: 58vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
 
                                 <input type="hidden" name="arithmos_grammon_adeion" id="arithmos_grammon_adeion" value="<%= arithmos_grammon_adeion %>" />
 
@@ -178,33 +177,93 @@
             </section>
 
         </div>
+
+        <% const isProduction = NODE_ENV === 'production'; %>
+        <script>
+            window.RUNTIME_ENV = "<%= NODE_ENV %>";
+        </script>
+
+        <% const payrollTypos = ['001']; %>
+
+        <% payrollTypos.forEach(function(typos) { %>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/typoiApodoxon/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
+        <% }); %>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/axiaKrathseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/fillFieldsKinhseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/klimakiaForoy<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatDates<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatTimes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/buttonPermissions<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/allaghReadonlyFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/loadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/removeGreekAccentsAndToUpper<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/modal<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/apasxolhseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/toggleLabelKinhseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/updateLabelFromHidden<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/clearFormFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/clearValueFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/showModal<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getFocusNumberFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/loadKrathseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/astheneies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/ypologismoiForoy<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/adeies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/putFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
         
-        <% if (process.env.NODE_ENV === 'production') { %>
-            <script type="module" src="/static/min.js/kinhseis/apasxolhseis_ejs.min.js"></script>
-        <% } else { %>
-            <script src="/static/js/common/moveByEnter.js"></script>
-            <script src="/static/js/common/formatDates.js"></script>
-            <script src="/static/js/common/formatTimes.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/buttonPermissions.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/allaghReadonlyFields.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/loadDropdowns.js"></script>
-            <script src="/static/js/common/removeGreekAccentsAndToUpper.js"></script>
-            <script src="/static/js/common/modal.js"></script>
-            <script type="module" src="/static/js/kinhseis/apasxolhseis/apasxolhseis.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/updateLabelFromHidden.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/clearFormFields.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/clearValueFields.js"></script>
-            <script src="/static/js/common/showModal.js"></script>
-            <script src="/static/js/common/scrollToTop.js"></script>
-            <script src="/static/js/common/getFocusNumberFields.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/loadKrathseis.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/astheneies.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/ypologismoiForoy.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/adeies.js"></script>
-            <script src="/static/js/kinhseis/apasxolhseis/putFieldValues.js"></script>
-        <% } %>
+
+
+
+
+
+
+
+
+        <!-- <% if (process.env.NODE_ENV === 'production') { %> -->
+            <!-- <script type="module" src="/static/min.js/kinhseis/apasxolhseis_ejs.min.js"></script> -->
+        <!-- <% } else { %> -->
+            <!-- <script src="/static/js/kinhseis/typoiApodoxon/001.js"></script>
+            <script src="/static/js/kinhseis/ypologismoi/001.js"></script>
+            <script src="/static/js/kinhseis/ypologismoi/axiaKrathseon.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/ypologismoi/fillFieldsKinhseon.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/ypologismoi/klimakiaForoy.js"></script> -->
+            <!-- <script src="/static/js/common/moveByEnter.js"></script> -->
+            <!-- <script src="/static/js/common/formatDates.js"></script> -->
+            <!-- <script src="/static/js/common/formatTimes.js"></script> -->
+
+            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/buttonPermissions.js"></script> -->
+            
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/buttonPermissions.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/allaghReadonlyFields.js"></script> -->
+
+            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/loadDropdowns.js"></script> -->
+            
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/loadDropdowns.js"></script> -->
+            <!-- <script src="/static/js/common/removeGreekAccentsAndToUpper.js"></script> -->
+            <!-- <script src="/static/js/common/modal.js"></script> -->
+
+            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/apasxolhseis.js"></script>
+            <script type="module" src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script> -->
+            
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/apasxolhseis.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/updateLabelFromHidden.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/clearFormFields.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/clearValueFields.js"></script> -->
+            <!-- <script src="/static/js/common/showModal.js"></script> -->
+            <!-- <script src="/static/js/common/scrollToTop.js"></script> -->
+            <!-- <script src="/static/js/common/getFocusNumberFields.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/loadKrathseis.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/astheneies.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/ypologismoiForoy.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/adeies.js"></script> -->
+            <!-- <script src="/static/js/kinhseis/apasxolhseis/putFieldValues.js"></script> -->
+        <!-- <% } %> -->
 
     </div>
 </div>

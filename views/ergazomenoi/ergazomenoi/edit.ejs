@@ -1,8 +1,8 @@
 <div class="tadded-container">
-  <div class="container-fluid">
+  <div class="container-fluid" style="height: 100vh !important; padding: 0;">
     <div class="menu_Links">
-      <ul>
-        <li class="active">Σταθερά Στοιχεία</li>
+      <ul style="white-space: nowrap;">
+        <li class="active" style="margin-left: 1.5rem;">Σταθερά Στοιχεία</li>
         <li>Αποδοχές</li>
         <li>Κρατήσεις</li>
         <li>Αλλοδαποί</li>
@@ -12,18 +12,18 @@
         <li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
       </ul>
     </div>
+  
     <hr style="margin-top: -2rem; margin-bottom: 1rem;" />
 
     <div class="sections">
       <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
         <div>
           <form class="formRadius">
-
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+            <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; height: 80vh !important; overflow: hidden;">
 
               <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section1') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100"  id="cardBody" style="height: 64vh; background-color: #ffffff;" >
+              <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
                 
                 <input type="hidden" name="ergazomenoiId" id="ergazomenoiId" class="form-control input-contents" value="<%= ergazomenoiData._id %>" />
                 <input type="hidden" name="istorikoId" id="istorikoId" class="form-control input-contents" value="<%= istorikoData._id %>" />
@@ -72,7 +72,7 @@
 
               <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+              <div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;" >
 
                 <input type="hidden" name="selectedSymbash" id="selectedSymbash" />
                 <input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />

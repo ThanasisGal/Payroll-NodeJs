@@ -2,8 +2,14 @@ const oneSpaces = '\u00A0'.repeat(1);
 const twoSpaces = '\u00A0'.repeat(2);
 const tenSpaces = '\u00A0'.repeat(10);
 
-let metrhths = 0;  // Μετρητής για αποφυγή flashing μεταξύ των tab κατά τον υπολογισμό του φόρου και του πληρωτέου
+// import { ypologismosPragmatikonErgasimonHmeronMhna } from './apasxolhseis.js';
+// export let hasRecord = false;
 let hasRecord = false;
+
+// Συνάρτηση φόρτωσης εργαζομένων
+// export async function loadErgazomenoi(energoi, ypokatasthma) {
+
+let metrhths = 0;  // Μετρητής για αποφυγή flashing μεταξύ των tab κατά τον υπολογισμό του φόρου και του πληρωτέου
 
 let _DOTO_PLHROTEO = false, _NEES_PLHROTEES_APODOXES = 0, _NEOS_FOROS = 0, _PROHGOYMENES_MIKTES_APODOXES = 0, _CHECK_HMERES_ASFALISHS = false;
 
@@ -105,7 +111,7 @@ const deleteButton = document.getElementById("deleteButton");
 document.addEventListener("DOMContentLoaded", function () {
     // Global variables
 
-    firstTimeCalcPlhroteo = false;
+    let firstTimeCalcPlhroteo = false;
 
     let selectedTeam = document.getElementById("team") ? document.getElementById("team").value : null;
     let selectedCompany = document.getElementById("company_kod") ? document.getElementById("company_kod").value : null;
@@ -181,19 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
         updateButtonStates();
     }
 
-    // Συνάρτηση για ενημέρωση της κατάστασης των κουμπιών
-    function updateButtonStates() {
-        const options = ergazomenoiDropdown.options;
-        const currentIndex = ergazomenoiDropdown.selectedIndex;
-
-        const firstIndex = options[0].value === '' ? 1 : 0;
-        const lastIndex = options.length - 1;
-
-        prevButton.disabled = currentIndex <= firstIndex;
-        nextButton.disabled = currentIndex >= lastIndex;
-    }
-
-    // Συνάρτηση χειρισμού αλλαγής του dropdown
+    // Συνάρτηση χειρισμού αλλαγής του dropdownload
     async function handleDropdownChange() {
         updateButtonStates();
 
@@ -335,18 +329,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Η κλήση κατά την αρχική φόρτωση των εργαζομένων γίνεται από το toggleLabelKinhseis.js
 
-    // Συνάρτηση φόρτωσης εργαζομένων
     async function loadErgazomenoi(energoi, ypokatasthma) {
-        // Ανάκτηση των τιμών team και company
-        selectedTeam = document.getElementById("team") ? document.getElementById("team").value : null;
-        const hmeromhnia_arxhs_periodoy = document.getElementById("etos").value + "-" + document.getElementById("mhnas").value + "-01" +  "T00:00:00.000"
-        selectedCompany = document.getElementById("company_kod") ? document.getElementById("company_kod").value : null;
+    // Ανάκτηση των τιμών team και company
+    const ergazomenoiDropdown = document.getElementById("ergazomenos_kin");
+    // const ergazomenoiDropdown = document.getElementById("ergazomenoi");
+    let selectedTeam = document.getElementById("team") ? document.getElementById("team").value : null;
+    const hmeromhnia_arxhs_periodoy = document.getElementById("etos").value + "-" + document.getElementById("mhnas").value + "-01" +  "T00:00:00.000"
+    let selectedCompany = document.getElementById("company_kod") ? document.getElementById("company_kod").value : null;
 
-        ergazomenoiDropdown.innerHTML = '';
-        const emptyOption = new Option('', '');
-        ergazomenoiDropdown.appendChild(emptyOption);
+    ergazomenoiDropdown.innerHTML = '';
+    const emptyOption = new Option('', '');
+    ergazomenoiDropdown.appendChild(emptyOption);
 
-        try {
+    // try {
         const response = await fetch(`/api/kinhseis/getErgazomenoi/${selectedTeam}/${selectedCompany}?energoi=${energoi}&ypokatasthma=${ypokatasthma}&hmeromhnia_arxhs_periodoy=${hmeromhnia_arxhs_periodoy}`);
         const data = await response.json();
         if (data.length === 0) {
@@ -377,7 +372,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
 
             const options = ergazomenoiDropdown.options;
-            if (options.length > 1) {
+            if (options && options.length > 1) {
                 const firstValidIndex = options[0].value === '' ? 1 : 0;
                 ergazomenoiDropdown.selectedIndex = firstValidIndex;
                 // Χωρίζουμε το string σε λέξεις χρησιμοποιώντας την `split` με βάση τα κενά (whitespace)
@@ -398,10 +393,21 @@ document.addEventListener("DOMContentLoaded", function () {
             // Ενημέρωση της κατάστασης των κουμπιών
             updateButtonStates();
         }
-        } catch (error) {
-        console.error(error);
-        }
-    }
+    // } catch (error) {
+    //     console.error(error);
+    // }
+}
+// Συνάρτηση για ενημέρωση της κατάστασης των κουμπιών
+function updateButtonStates() {
+    const options = ergazomenoiDropdown.options;
+    const currentIndex = ergazomenoiDropdown.selectedIndex;
+
+    const firstIndex = options[0].value === '' ? 1 : 0;
+    const lastIndex = options.length - 1;
+
+    prevButton.disabled = currentIndex <= firstIndex;
+    nextButton.disabled = currentIndex >= lastIndex;
+}
     
     window.loadErgazomenoi = loadErgazomenoi;
     window.navigateDropdown = navigateDropdown;

@@ -1,22 +1,21 @@
-import dotenv from "dotenv";
+// @ts-nocheck
+const dotenv = require("dotenv");
 dotenv.config();
 
-import express, { urlencoded, json } from "express";
-import expressLayout from "express-ejs-layouts";
-import methodOverride from "method-override";
-import flash from "connect-flash";
-import session from "express-session";
-import connectDB from "./server/config/db.js";
-import usersRoute from "./server/routes/usersRoute.js";
-import dropdownRoutes from "./server/routes/dropdownRoutes.js";
-import getSessionVars from "./server/middlewares/session-variables.js";
+const express = require("express");
+const { urlencoded, json } = require("express");
+const expressLayout = require("express-ejs-layouts");
+const methodOverride = require("method-override");
+const flash = require("connect-flash");
+const session = require("express-session");
+const connectDB = require("./server/config/db");
+const usersRoute = require("./server/routes/usersRoute");
+const dropdownRoutes = require("./server/routes/dropdownRoutes");
+const getSessionVars = require("./server/middlewares/session-variables");
 
-import path from "path";
-import { fileURLToPath } from "url";
+const path = require("path");
 
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const host = process.env.HOST || "localhost";
 const port = process.env.PORT || 80;
@@ -33,7 +32,8 @@ app.use(methodOverride("_method"));
 
 // 🗂 Static αρχεία
 app.use("/static", express.static(path.join(__dirname, "public")));
-// app.use("/js", express.static(path.join(__dirname, "client")));
+
+app.locals.NODE_ENV = process.env.NODE_ENV;
 
 // 🔐 Express Session
 app.use(

@@ -1,13 +1,15 @@
-import UserModel from "../models/userModel.js";
-import VerifyModel from "../models/verifications.js";
-import Models from "../models/stathera_arxeia.js";
-import Models_A from "../models/param.js";
-import Models_B from "../models/privileges.js";
-import Models_C from "../models/companies.js";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { jwtDecode } from "jwt-decode";
-import transporter from "../../config/emailConfig.js";
+const UserModel = require("../models/userModel");
+const VerifyModel = require("../models/verifications");
+const Models = require("../models/stathera_arxeia");
+const Models_A = require("../models/param");
+const Models_B = require("../models/privileges");
+const Models_C = require("../models/companies");
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const jwtDecode = require("jwt-decode").jwtDecode;
+
+const transporter = require("../../config/emailConfig");
 
 const { PeriodsModel } = Models;
 
@@ -663,7 +665,7 @@ class userController {
     if (redir == "/companies/genikastoixeia") {
       await res.redirect(redir);
     } else {
-      await res.render(redir, { messages, types, images });
+      await res.render(redir, { bodyClass: 'custom-background', messages, types, images });
     }
   };
 
@@ -992,4 +994,4 @@ class userController {
 
 }
 
-export default userController;
+module.exports = userController;

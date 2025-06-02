@@ -1,31 +1,31 @@
-import { Router } from "express";
-const router = Router();
+const express = require("express");
+const router = express.Router();
 
-import userController from "../controllers/userController.js";
-import companiesController from "../controllers/companies/companiesController.js";
-import mainAppController from "../controllers/mainAppController.js";
-import checkUserAuth from "../middlewares/auth-middleware.js";
-import getSessionVars from "../middlewares/session-variables.js";
-import checkAuth from "../middlewares/checkValidUser.js";
-import ypokatasthmataController from "../controllers/companies/ypokatasthmataController.js";
-import nomimoiekprosopoiController from "../controllers/companies/nomimoiekprosopoiController.js";
-import passwordsController from "../controllers/companies/passwordsController.js";
-import antistoixiseisController from "../controllers/companies/antistoixiseisController.js";
-import krathseisController from "../controllers/krathseisController.js";
-import genikaAPIsController from "../controllers/genikaAPIsController.js";
-import ergazomenoiController from "../controllers/ergazomenoi/ergazomenoiController.js";
-import symbaseisController from "../controllers/symbaseisController.js";
-import programmataController from "../controllers/ergazomenoi/programmataController.js";
-import erganhController from "../controllers/ergazomenoi/erganhController.js";
-import kinhseisController from "../controllers/Kinhseis/kinhseisController.js";
-import forosController from "../controllers/Kinhseis/forosContoller.js";
-import ektyposhSymbaseonController from "../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js";
-import ektyposhApasxolhseonController from "../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js";
+const userController = require("../controllers/userController.js");
+const companiesController = require("../controllers/companies/companiesController.js");
+const mainAppController = require("../controllers/mainAppController.js");
+const checkUserAuth = require("../middlewares/auth-middleware.js");
+const getSessionVars = require("../middlewares/session-variables.js");
+const checkAuth = require("../middlewares/checkValidUser.js");
+const ypokatasthmataController = require("../controllers/companies/ypokatasthmataController.js");
+const nomimoiekprosopoiController = require("../controllers/companies/nomimoiekprosopoiController.js");
+const passwordsController = require("../controllers/companies/passwordsController.js");
+const antistoixiseisController = require("../controllers/companies/antistoixiseisController.js");
+const krathseisController = require("../controllers/krathseisController.js");
+const genikaAPIsController = require("../controllers/genikaAPIsController.js");
+const ergazomenoiController = require("../controllers/ergazomenoi/ergazomenoiController.js");
+const symbaseisController = require("../controllers/symbaseisController.js");
+const programmataController = require("../controllers/ergazomenoi/programmataController.js");
+const erganhController = require("../controllers/ergazomenoi/erganhController.js");
+const kinhseisController = require("../controllers/Kinhseis/kinhseisController.js");
+const forosController = require("../controllers/Kinhseis/forosContoller.js");
+const ektyposhSymbaseonController = require("../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js");
+const ektyposhApasxolhseonController = require("../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js");
 
-// import { createDropdownApi } from '../utils/dropdownHelper.js';
+// const { createDropdownApi } = require('../utils/dropdownHelper.js');
 
-import TmhmataModel from '../models/stathera_arxeia.js';
-import PeriodsModel from '../models/stathera_arxeia.js';
+const TmhmataModel = require('../models/stathera_arxeia.js');
+const PeriodsModel = require('../models/stathera_arxeia.js');
 
 // Route Level Middlware - To Protected Route
 router.use("/changepassword", checkUserAuth);
@@ -391,4 +391,4 @@ router.post("/api/ektyposeis/symbaseis/ergazomenoi", ektyposhSymbaseonController
 router.post("/api/update_session_typosApodoxon", kinhseisController.update_session_typosApodoxon);
 router.post("/api/update_session_periodos", kinhseisController.update_session_periodos);
 
-export default router;
+module.exports =  router;

@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -204,7 +204,7 @@ const BanksPerCompanySchema = new Schema({
 
 const BanksPerCompanyModel = model("BanksPerCompany", BanksPerCompanySchema);
 
-export default {  CompaniesModel, 
+module.exports = {  CompaniesModel, 
                   YpokatasthmataModel, 
                   NomimoiEkprosopoiModel, 
                   PasswordsModel,

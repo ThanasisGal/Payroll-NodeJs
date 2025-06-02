@@ -1,16 +1,12 @@
-import statheraArxeiaModel from '../models/stathera_arxeia.js';
+const express = require("express");
+const router = express.Router();
 
-const   {
-            PeriodsModel
-        } = statheraArxeiaModel;
-        
-export default {
-    path: '/api/dropdown/tmhmata',
-    model: PeriodsModel,
-    options: {
-        searchFields: ['kodikos', 'perigrafh'],
-        extraQueryBuilder: (query) => ({
-            xrhsh: query.xrhsh || new Date().getFullYear().toString()
-        }),
-    }
-};
+const { buildDropdownRoute } = require("../utils/dropdownHelper");
+const tmhmataDropdown = require("../dropdowns/tmhmata");
+
+router.get(
+  tmhmataDropdown.path,
+  buildDropdownRoute(tmhmataDropdown.model, tmhmataDropdown.options)
+);
+
+module.exports = router;

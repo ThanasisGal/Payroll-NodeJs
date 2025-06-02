@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -54,9 +54,9 @@ const KlimakiaSymbaseonSchema = new Schema({
 });
 const KlimakiaSymbaseonModel = model("KlimakiaSymbaseon", KlimakiaSymbaseonSchema);
 
-export default {  SymbaseisModel,
-                  KathgoriesSymbaseonModel,
-                  EidikothtesAnaKathgoriaSymbaseonModel,
-                  StoixeiaSymbaseonModel,
-                  KlimakiaSymbaseonModel,
-                };
+module.exports = {  SymbaseisModel,
+                    KathgoriesSymbaseonModel,
+                    EidikothtesAnaKathgoriaSymbaseonModel,
+                    StoixeiaSymbaseonModel,
+                    KlimakiaSymbaseonModel,
+                  };

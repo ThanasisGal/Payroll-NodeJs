@@ -1,19 +1,15 @@
-import mongoose from 'mongoose';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
-import { PDFDocument } from 'pdf-lib';
+const mongoose = require("mongoose");
+const { exec } = require("child_process");
+const { promisify } = require("util");
+const path = require("path");
+const fs = require("fs-extra");
+const { PDFDocument } = require("pdf-lib");
 
-import Models_A from "../../models/stathera_arxeia.js";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
-import Models_D from "../../models/ergazomenoi.js";
-import Models_E from "../../models/kinhseis.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const Models_A = require("../../models/stathera_arxeia");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const Models_D = require("../../models/ergazomenoi");
+const Models_E = require("../../models/kinhseis");
 
 const { KathestosApasxolhshsModel,
         SxeseisErgasiasModel,
@@ -53,17 +49,24 @@ const host = process.env.HOST || 'localhost';
 const port = process.env.PORT || 5000;
 
 // Έλεγχος και δημιουργία του φακέλου downloads αν δεν υπάρχει
-if (isProduction) {
-    try {
-        const downloadPath = '/tmp/downloads';
-        await fs.access(downloadPath);
-    } catch {
-        // Ο κατάλογος δεν υπάρχει, επομένως τον δημιουργούμε
-        await fs.mkdir(downloadPath, { recursive: true });
-        // Δίνουμε πλήρη δικαιώματα (777) στον φάκελο
-        await fs.chmod(downloadPath, 0o777);
-     }
-}
+const handleProductionDownloadPath = async () => {
+  if (isProduction) {
+    const downloadPath = '/tmp/downloads';
+
+    const checkIfExists = async (path) => {
+      try {
+        await fs.access(path);
+        console.log("Download path exists");
+      } catch {
+        console.warn("Download path does not exist. Creating...");
+        await fs.mkdir(path, { recursive: true });
+        await fs.chmod(path, 0o777);
+      }
+    };
+
+    await checkIfExists(downloadPath);
+  }
+};
 
 const fieldsStoixeionKrathseon = ['kodikos', 'krathsh', 'asfalistikesApodoxes', 'pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'plasmatikh_axia', 'apaiteitai_apodoxes_asfalishs', 'anotato_orio_palion', 'anotato_orio_neon', 'kad', 'eidikothta', 'kpk', 'se_typos_apodoxon', 'epa'];
 const aa_krathseon = 7;
@@ -91,6 +94,8 @@ class kinhseisController {
         title: "Απασχολήσεις",
         description: "Web Payroll System",
         };
+
+        await handleProductionDownloadPath();
 
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
@@ -1249,4 +1254,4 @@ class kinhseisController {
     
 }
 
-export default kinhseisController;
+module.exports = kinhseisController;

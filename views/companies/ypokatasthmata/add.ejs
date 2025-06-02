@@ -1,917 +1,892 @@
 <div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active">Σταθερά Στοιχεία</li>
-        <li>Οικοδομικά Έργα</li>
-      </ul>
-    </div>
-    <hr style="margin-top: -2rem" />
-
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius">
-            <div class="card z-depth-5">
-              <label class="card-header bg-header text-center headers-content">
-                Εισαγωγή Νέου Υποκαταστήματος
-              </label>
-              <div class="card-body">
-                <input
-                  type="hidden"
-                  name="companyId"
-                  id="companyId"
-                  class="form-control"
-                  value="<%= company._id %>"
-                />
-                <input
-                  type="hidden"
-                  name="companyKodikos"
-                  id="companyKodikos"
-                  class="form-control"
-                  value="<%= company.kod %>"
-                />
-                <input
-                  type="hidden"
-                  name="companyTeam"
-                  id="companyTeam"
-                  class="form-control"
-                  value="<%= company.team %>"
-                />
-
-                <div class="row form-group g-3 align-items-center">
-                  <div class="col-1-5 right-align">
-                    <label class="col-form-label label-font-size">
-                      Επιλεγμένη Εταιρεία
-                    </label>
-                  </div>
-                  <div
-                    class="col-8 left-align"
-                    style="font-size: 1rem; color: #1f6d00">
-                    
-                    <label class="col-form-label field-required">
-                      <% if (company && company.kod && company.kod.length > 0) { %> 
-                        <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" + company.firstname %>
-                      <% } %>
-                    </label>
-                  </div>
-                </div>
-
-                <hr class="division"></hr>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="perigrafh"
-                      class="col-form-label label-font-size field-required">
-                        Περιγραφή
-                    </label>
-                  </div>
-                  <div class="col-10-5">
-                    <input
-                      type="text"
-                      name="perigrafh"
-                      id="perigrafh"
-                      class="form-control input-contents"
-                      value=""
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="odos" class="col-form-label label-font-size">
-                      Οδός
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="odos"
-                      id="odos"
-                      class="form-control input-contents"
-                      value=""
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label for="arithmos" class="col-form-label label-font-size">
-                      Αριθμός
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="arithmos"
-                      id="arithmos"
-                      class="form-control input-contents"
-                      value=""
-                    />
-                  </div>
-
-                  <div class="col-1 right-align">
-                    <label for="tk" class="col-form-label label-font-size">
-                      Τ.Κ.
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input
-                      type="text"
-                      name="tk"
-                      id="tk"
-                      class="form-control input-contents"
-                      value=""
-                      maxlength="5"
-                      pattern="[0-9]{1,}"
-                    />
-                  </div>
-                </div>
-
-                <div
-                  class="row form-group g-3 align-items-center field-required mb-1"
-                >
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="perifereies"
-                      class="col-form-label label-font-size">
-                        Περιφέρεια
-                    </label>
-                  </div>
-
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="perifereies"
-                      id="perifereies"
-                      required>
-                    </select>
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="nomos"
-                      class="col-form-label label-font-size field-required">
-                      Περιφ. Ενότητα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="nomos"
-                      id="nomos"
-                      style="font-size: 1vw"
-                      required
-                      disabled
-                    ></select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="dhmos"
-                      class="col-form-label label-font-size field-required">
-                        Δημοτ. Ενότητα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="dhmos"
-                      id="dhmos"
-                      style="font-size: 1vw"
-                      required
-                      disabled
-                    ></select>
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="polh"
-                      class="col-form-label label-font-size field-required">
-                      Δημοτ.Διαμέρισμα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="polh"
-                      id="polh"
-                      style="font-size: 1vw"
-                      required
-                      disabled
-                    ></select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="drasthriothta"
-                      class="col-form-label label-font-size">
-                      Δραστηριότητα
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="drasthriothta"
-                      id="drasthriothta"
-                      class="form-control input-contents"
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="pararthma_efka"
-                      class="col-form-label label-font-size">
-                      Παράρτημα ΕΦΚΑ
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="pararthma_efka"
-                      id="pararthma_efka"
-                    ></select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="thlefono" class="col-form-label label-font-size">
-                      Τηλέφωνο
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="thlefono"
-                      id="thlefono"
-                      class="form-control input-contents"
-                      value=""
-                      maxlength="10"
-                      pattern="[0-9]{1,}"
-                    />
-                  </div>
-
-                  <div class="col-1 right-align">
-                    <label for="fax" class="col-form-label label-font-size">
-                      Fax
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="fax"
-                      id="fax"
-                      class="form-control input-contents"
-                      value=""
-                      maxlength="10"
-                      pattern="[0-9]{1,}"
-                    />
-                  </div>
-                  <div class="col-1-5 right-align">
-                    <label for="email" class="col-form-label label-font-size">
-                      e-Mail
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
-                      class="form-control input-contents"
-                      value=""
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="epoxikothta"
-                      class="col-form-label label-font-size">
-                      Εποχ/τητα εργοδότη
-                    </label>
-                  </div>
-                  <div class="col-1 left-align checkbox-flex-center mb-1">
-                    <input class="form-check-input custom-checkbox checkbox-class" 
-                      type="checkbox"
-                      id="epoxikothta"
-                      name="epoxikothta"
-                      value=""
-                    />
-                    <label
-                      for="epoxikothta"
-                      id="label-epoxikothta"
-                      style="margin-left: 0.75rem; font-weight: 600">
-                      ΟΧΙ
-                    </label>
-                  </div>
-
-                  <div class="col-4"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="apasxolhsh5hmeron"
-                      class="col-form-label label-font-size">
-                      5ήμερη Απασχόληση
-                    </label>
-                  </div>
-                  <div class="col-1 left-align checkbox-flex-center">
-                    <input class="form-check-input custom-checkbox checkbox-class" 
-                      type="checkbox"
-                      id="apasxolhsh5hmeron"
-                      name="apasxolhsh5hmeron"
-                      value=""
-                    />
-                    <label
-                      for="apasxolhsh5hmeron"
-                      id="label-apasxolhsh5hmeron"
-                      style="margin-left: 0.75rem; font-weight: 600">
-                      ΟΧΙ
-                    </label>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="ap_pinaka"
-                      class="col-form-label label-font-size">
-                      Α.Π. Κατάθ. Πίνακα
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="ap_pinaka"
-                      id="ap_pinaka"
-                      class="form-control input-contents"
-                      value=""
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="hmnia_katatheshs"
-                      class="col-form-label label-font-size">
-                      Ημ/νία Κατάθεσης
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="date"
-                      name="hmnia_katatheshs"
-                      id="hmnia_katatheshs"
-                      class="date-control"
-                      value=""
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-4">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="sepe"
-                      class="col-form-label label-font-size">
-                      Παράρτημα ΣΕΠΕ
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="sepe"
-                      id="sepe">
-                    </select>
-                  </div>
-
-                  <div class="col-1"></div>
-                  
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="dypa"
-                      class="col-form-label label-font-size">
-                      Παράρτημα ΔΥΠΑ
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="dypa"
-                      id="dypa">
-                    </select>
-                  </div>
-                </div>
-
-                <div
-                  class="card-footer"
-                  style="
-                    margin-left: -1rem !important;
-                    margin-right: -1rem !important;
-                    margin-bottom: -1rem !important;
-                  "
-                >
-                  <div
-                    class="d-inline-block d-flex"
-                    style="
-                      margin-top: -0.5rem !important;
-                      margin-bottom: -1rem !important;
-                      margin-left: 10px !important;
-                      margin-right: 10px !important;
-                      justify-content: space-around;
-                    "
-                  >
-                    <button
-                      type="button"
-                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton"
-                    >
-                      <i class="bi bi-floppy"></i> Αποθήκευση
-                    </button>
-                    <a
-                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
-                      href="/companies/ypokatasthmata"
-                      ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </form>
+    <div class="container-fluid" style="height: 100vh !important; padding: 0;">
+        <div class="menu_Links">
+            <ul>
+                <li class="active" style="margin-left: 1.5rem; margin-right: .5rem;">Σταθερά Στοιχεία</li>
+                <li>Οικοδομικά Έργα</li>
+            </ul>
         </div>
-      </section>
+        <hr style="margin-top: -2rem" />
 
-      <section class="sel_2_section visible" data-section="Οικοδομικά Έργα">
-        <div class="container">
-          <form class="formRadius" enctype="multipart/form-data">
-            <div class="card z-depth-5">
-              <label class="card-header bg-header text-center headers-content">
-                Εισαγωγή Νέου Υποκαταστήματος
-              </label>
-              <div class="card-body">
-                <div class="row form-group g-3 align-items-center">
-                  <div class="col-1-5 right-align">
-                    <label class="col-form-label label-font-size">
-                      Επιλεγμένη Εταιρεία
-                    </label>
-                  </div>
+        <div class="sections">
+            <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+                <div>
+                    <form class="formRadius">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
 
-                  <div class="col-8 left-align">
-                    <label class="col-form-label field-required" style="font-size: 1.2rem; color: #1f6d00">
-                      <% if (company && company.kod && company.kod.length > 0) { %>
-                        <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" +
-                        company.firstname %>
-                      <% } %>
-                    </label>
-                  </div>
+                            <div class="card-header p-2" style="height: 3.5rem !important;">
+                                <label class="text-center w-100 headers-content">
+                                    Εισαγωγή Νέου Υποκαταστήματος (ΣΤΑΘΕΡΑ ΣΤΟΙΧΙΕΑ)
+                                </label>
+                            </div>
+
+                            <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                                <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
+                                <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
+                                <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="col-1-5 right-align">
+                                        <label  class="col-form-label label-font-size">
+                                            Επιλεγμένη Εταιρεία
+                                        </label>
+                                    </div>
+                                    <div
+                                        class="col-8 left-align"
+                                        style="font-size: 1rem; color: #1f6d00">
+                        
+                                        <label class="col-form-label field-required">
+                                            <% if (company && company.kod && company.kod.length > 0) { %> 
+                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" + company.firstname %>
+                                            <% } %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <hr class="division"></hr>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="perigrafh"
+                                            class="col-form-label label-font-size field-required">
+                                                Περιγραφή
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5">
+                                        <input
+                                            type="text"
+                                            name="perigrafh"
+                                            id="perigrafh"
+                                            class="form-control input-contents"
+                                            value=""
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label for="odos" class="col-form-label label-font-size">
+                                            Οδός
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="odos"
+                                            id="odos"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+                                    <div class="col-1-5 right-align">
+                                        <label for="arithmos" class="col-form-label label-font-size">
+                                            Αριθμός
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="arithmos"
+                                            id="arithmos"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+
+                                    <div class="col-1 right-align">
+                                        <label for="tk" class="col-form-label label-font-size">
+                                            Τ.Κ.
+                                        </label>
+                                    </div>
+                                    <div class="col-1">
+                                        <input
+                                            type="text"
+                                            name="tk"
+                                            id="tk"
+                                            class="form-control input-contents"
+                                            value=""
+                                            maxlength="5"
+                                            pattern="[0-9]{1,}" 
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center field-required mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="perifereies"
+                                            class="col-form-label label-font-size">
+                                                Περιφέρεια
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="perifereies"
+                                            id="perifereies"
+                                            required>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="nomos"
+                                            class="col-form-label label-font-size field-required">
+                                                Περιφ. Ενότητα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="nomos"
+                                            id="nomos"
+                                            style="font-size: 1vw"
+                                            required
+                                            disabled>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="dhmos"
+                                            class="col-form-label label-font-size field-required">
+                                                Δημοτ. Ενότητα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="dhmos"
+                                            id="dhmos"
+                                            style="font-size: 1vw"
+                                            required
+                                            disabled>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="polh"
+                                            class="col-form-label label-font-size field-required">
+                                                Δημοτ.Διαμέρισμα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="polh"
+                                            id="polh"
+                                            style="font-size: 1vw"
+                                            required
+                                            disabled>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="drasthriothta"
+                                            class="col-form-label label-font-size">
+                                                Δραστηριότητα
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="drasthriothta"
+                                            id="drasthriothta"
+                                            class="form-control input-contents" />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                        for="pararthma_efka"
+                                        class="col-form-label label-font-size">
+                                        Παράρτημα ΕΦΚΑ
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="pararthma_efka"
+                                            id="pararthma_efka">
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label for="thlefono" class="col-form-label label-font-size">
+                                            Τηλέφωνο
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="thlefono"
+                                            id="thlefono"
+                                            class="form-control input-contents"
+                                            value=""
+                                            maxlength="10"
+                                            pattern="[0-9]{1,}"
+                                        />
+                                    </div>
+
+                                    <div class="col-1 right-align">
+                                        <label for="fax" class="col-form-label label-font-size">
+                                            Fax
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="fax"
+                                            id="fax"
+                                            class="form-control input-contents"
+                                            value=""
+                                            maxlength="10"
+                                            pattern="[0-9]{1,}"
+                                        />
+                                    </div>
+                                    <div class="col-1-5 right-align">
+                                        <label for="email" class="col-form-label label-font-size">
+                                            e-Mail
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            id="email"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="epoxikothta"
+                                            class="col-form-label label-font-size">
+                                            Εποχ/τητα εργοδότη
+                                        </label>
+                                    </div>
+                                    <div class="col-1 left-align checkbox-flex-center mb-1">
+                                        <input class="form-check-input custom-checkbox checkbox-class" 
+                                            type="checkbox"
+                                            id="epoxikothta"
+                                            name="epoxikothta"
+                                            value=""
+                                        />
+                                        <label
+                                            for="epoxikothta"
+                                            id="label-epoxikothta"
+                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            ΟΧΙ
+                                        </label>
+                                    </div>
+
+                                    <div class="col-4"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="apasxolhsh5hmeron"
+                                            class="col-form-label label-font-size">
+                                            5ήμερη Απασχόληση
+                                        </label>
+                                    </div>
+                                    <div class="col-1 left-align checkbox-flex-center">
+                                        <input class="form-check-input custom-checkbox checkbox-class" 
+                                            type="checkbox"
+                                            id="apasxolhsh5hmeron"
+                                            name="apasxolhsh5hmeron"
+                                            value=""
+                                        />
+                                        <label
+                                            for="apasxolhsh5hmeron"
+                                            id="label-apasxolhsh5hmeron"
+                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            ΟΧΙ
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="ap_pinaka"
+                                            class="col-form-label label-font-size">
+                                            Α.Π. Κατάθ. Πίνακα
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="ap_pinaka"
+                                            id="ap_pinaka"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="hmnia_katatheshs"
+                                            class="col-form-label label-font-size">
+                                            Ημ/νία Κατάθεσης
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="date"
+                                            name="hmnia_katatheshs"
+                                            id="hmnia_katatheshs"
+                                            class="date-control"
+                                            value=""
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-4">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="sepe"
+                                            class="col-form-label label-font-size">
+                                            Παράρτημα ΣΕΠΕ
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="sepe"
+                                            id="sepe">
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+                                    
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="dypa"
+                                            class="col-form-label label-font-size">
+                                            Παράρτημα ΔΥΠΑ
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="dypa"
+                                            id="dypa">
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-footer"
+                                style="
+                                    margin-top: -1.5rem !important;
+                                    margin-left: -1rem !important;
+                                    margin-right: -1rem !important;
+                                    ">
+                                <div
+                                    class="d-inline-block d-flex"
+                                    style="
+                                    margin-top: -0.5rem !important;
+                                    margin-bottom: -1rem !important;
+                                    margin-left: 10px !important;
+                                    margin-right: 10px !important;
+                                    justify-content: space-around;">
+                                    <button
+                                        type="button"
+                                        class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
+                                        <i class="bi bi-floppy"></i> Αποθήκευση
+                                    </button>
+                                    <a
+                                        class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
+                                        href="/companies/ypokatasthmata"
+                                        ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
+            </section>
 
-                <hr class="division"></hr>
+            <section class="sel_2_section visible" data-section="Οικοδομικά Έργα">
+                <div>
+                    <form class="formRadius">
+                        <div class="card z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
 
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="oikodomika_erga"
-                      class="col-form-label label-font-size">
-                      Οικοδομικά Έργα
-                    </label>
-                  </div>
-                  <div class="col-1 left-align checkbox-flex-center">
-                    <input class="form-check-input custom-checkbox checkbox-class" 
-                      type="checkbox"
-                      id="oikodomika_erga"
-                      name="oikodomika_erga"
-                      value=""
-                    />
-                    <label
-                      for="oikodomika_erga"
-                      id="label-oikodomika_erga"
-                      style="margin-left: 0.75rem; font-weight: 600">
-                      ΟΧΙ
-                    </label>
-                  </div>
+                            <div class="card-header p-2" style="height: 3.5rem !important;">
+                                <label class="text-center w-100 headers-content">
+                                    Εισαγωγή Νέου Υποκαταστήματος (ΟΙΚΟΔΟΜΙΚΑ ΕΡΓΑ)
+                                </label>
+                            </div>
+
+                            <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="col-1-5 right-align">
+                                        <label class="col-form-label label-font-size">
+                                            Επιλεγμένη Εταιρεία
+                                        </label>
+                                    </div>
+
+                                    <div class="col-8 left-align">
+                                        <label class="col-form-label field-required" style="font-size: 1.2rem; color: #1f6d00">
+                                            <% if (company && company.kod && company.kod.length > 0) { %>
+                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" +
+                                                company.firstname %>
+                                            <% } %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <hr class="division" style="margin-bottom: -0.3rem;"></hr>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="oikodomika_erga"
+                                            class="col-form-label label-font-size">
+                                                Οικοδομικά Έργα
+                                        </label>
+                                    </div>
+                                    <div class="col-1 left-align checkbox-flex-center">
+                                        <input class="form-check-input custom-checkbox checkbox-class" 
+                                            type="checkbox"
+                                            id="oikodomika_erga"
+                                            name="oikodomika_erga"
+                                            value=""
+                                        />
+                                        <label
+                                            for="oikodomika_erga"
+                                            id="label-oikodomika_erga"
+                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            ΟΧΙ
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label for="amoe" class="col-form-label label-font-size">
+                                            Α.Μ.Ο.Ε.
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="amoe"
+                                            id="amoe"
+                                            class="form-control input-contents"
+                                            data-toggle="amoe"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="eidos_ergoy"
+                                            class="col-form-label label-font-size">
+                                                Περιγραφή Έργου
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <input
+                                            type="text"
+                                            name="eidos_ergoy"
+                                            id="eidos_ergoy"
+                                            class="form-control input-contents"
+                                            data-toggle="eidos_ergoy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="username_ergoy"
+                                            class="col-form-label label-font-size field-required">
+                                                Username Οικ.Έργου
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="username_ergoy"
+                                            id="username_ergoy"
+                                            class="form-control input-contents"
+                                            data-toggle="username_ergoy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="password_ergoy"
+                                            class="col-form-label label-font-size field-required">
+                                                Password Οικ.Έργου
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="password_ergoy"
+                                            id="password_ergoy"
+                                            class="form-control input-contents"
+                                            data-toggle="password_ergoy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="ypergolabia"
+                                            class="col-form-label label-font-size">
+                                                Υπεργολαβία
+                                        </label>
+                                    </div>
+                                    <div class="col-1 left-align checkbox-flex-center">
+                                        <input class="form-check-input custom-checkbox checkbox-class" 
+                                            type="checkbox"
+                                            data-toggle="ypergolabia"
+                                            id="ypergolabia"
+                                            name="ypergolabia"
+                                            value=""
+                                            disabled
+                                        />
+                                        <label
+                                            for="ypergolabia"
+                                            id="label-ypergolabia"
+                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            ΟΧΙ
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="ame_ergolaboy"
+                                            class="col-form-label label-font-size field-required">
+                                                Α.Μ.Ε. Εργολάβου
+                                        </label>
+
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="ame_ergolaboy"
+                                            id="ame_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="ame_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="eponymo_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Επώνυμο Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="eponymo_ergolaboy"
+                                            id="eponymo_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="eponymo_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="onoma_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Όνομα Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="onoma_ergolaboy"
+                                            id="onoma_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="onoma_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="patronymo_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Πατρ/μο Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="patronymo_ergolaboy"
+                                            id="patronymo_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="patronymo_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-2"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="afm_ergolaboy"
+                                            class="col-form-label label-font-size field-required">
+                                                Α.Φ.Μ. Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="afm_ergolaboy"
+                                            id="afm_ergolaboy"
+                                            class="form-control input-contents field-required"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="afm_ergolaboy"
+                                            value=""
+                                            maxlength="9"
+                                            pattern="[0-9]{1,}"
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="odos_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Δ/νση Εργολ. Οδός
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="odos_ergolaboy"
+                                            id="odos_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="odos_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="arithmos_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Αριθμός
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="arithmos_ergolaboy"
+                                            id="arithmos_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="arithmos_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-1 right-align">
+                                        <label
+                                            for="tk_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Τ.Κ.
+                                        </label>
+                                    </div>
+                                    <div class="col-1">
+                                        <input
+                                            type="text"
+                                            name="tk_ergolaboy"
+                                            id="tk_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="tk_ergolaboy"
+                                            value=""
+                                            maxlength="5"
+                                            pattern="[0-9]{1,}"
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="polh_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Πόλη Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="polh_ergolaboy"
+                                            id="polh_ergolaboy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="polh_ergolaboy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-2"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="pararthma_efka_ergolaboy"
+                                            class="col-form-label label-font-size-smaller">
+                                                Παράρτ.ΕΦΚΑ Εργ/βου
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="pararthma_efka_ergolaboy"
+                                            name="pararthma_efka_ergolaboy"
+                                            id="pararthma_efka_ergolaboy"
+                                        ></select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-4">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="username_ypergol_ergoy"
+                                            class="col-form-label label-font-size-smaller field-required">
+                                                Username Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="username_ypergol_ergoy"
+                                            id="username_ypergol_ergoy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="username_ypergol_ergoy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="password_ypergol_ergoy"
+                                            class="col-form-label label-font-size-smaller field-required">
+                                                Password Εργολάβου
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="password_ypergol_ergoy"
+                                            id="password_ypergol_ergoy"
+                                            class="form-control input-contents"
+                                            data-toggle-additional="ypergolabia"
+                                            data-toggle="username_ypergol_ergoy"
+                                            value=""
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-footer" style="margin-top: -1.5rem !important;"
+                                style="
+                                    margin-left: -1rem !important;
+                                    margin-right: -1rem !important;">
+                                <div
+                                    class="d-inline-block d-flex"
+                                    style="
+                                    margin-top: -0.5rem !important;
+                                    margin-bottom: -1rem !important;
+                                    margin-left: 10px !important;
+                                    margin-right: 10px !important;
+                                    justify-content: space-around;"
+                                >
+                                <button
+                                    type="button"
+                                    class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
+                                    <i class="bi bi-floppy"></i> Αποθήκευση
+                                </button>
+                                <a
+                                    class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
+                                    href="/companies/ypokatasthmata">
+                                    <i class="bi bi-chevron-double-left"></i> Επιστροφή
+                                </a>
+                            </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="amoe" class="col-form-label label-font-size">
-                      Α.Μ.Ο.Ε.
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="amoe"
-                      id="amoe"
-                      class="form-control input-contents"
-                      data-toggle="amoe"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eidos_ergoy"
-                      class="col-form-label label-font-size">
-                      Περιγραφή Έργου
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <input
-                      type="text"
-                      name="eidos_ergoy"
-                      id="eidos_ergoy"
-                      class="form-control input-contents"
-                      data-toggle="eidos_ergoy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="username_ergoy"
-                      class="col-form-label label-font-size field-required">
-                      Username Οικ.Έργου
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="username_ergoy"
-                      id="username_ergoy"
-                      class="form-control input-contents"
-                      data-toggle="username_ergoy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="password_ergoy"
-                      class="col-form-label label-font-size field-required">
-                      Password Οικ.Έργου
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="password_ergoy"
-                      id="password_ergoy"
-                      class="form-control input-contents"
-                      data-toggle="password_ergoy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="ypergolabia"
-                      class="col-form-label label-font-size">
-                      Υπεργολαβία
-                    </label>
-                  </div>
-                  <div class="col-1 left-align checkbox-flex-center">
-                    <input class="form-check-input custom-checkbox checkbox-class" 
-                      type="checkbox"
-                      data-toggle="ypergolabia"
-                      id="ypergolabia"
-                      name="ypergolabia"
-                      value=""
-                      disabled
-                    />
-                    <label
-                      for="ypergolabia"
-                      id="label-ypergolabia"
-                      style="margin-left: 0.75rem; font-weight: 600">
-                      ΟΧΙ
-                    </label>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="ame_ergolaboy"
-                      class="col-form-label label-font-size field-required">
-                      Α.Μ.Ε. Εργολάβου
-                  </label>
-
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="ame_ergolaboy"
-                      id="ame_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="ame_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymo_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Επώνυμο Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="eponymo_ergolaboy"
-                      id="eponymo_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="eponymo_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="onoma_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Όνομα Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="onoma_ergolaboy"
-                      id="onoma_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="onoma_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="patronymo_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Πατρ/μο Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="patronymo_ergolaboy"
-                      id="patronymo_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="patronymo_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-2"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="afm_ergolaboy"
-                      class="col-form-label label-font-size field-required">
-                      Α.Φ.Μ. Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="afm_ergolaboy"
-                      id="afm_ergolaboy"
-                      class="form-control input-contents field-required"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="afm_ergolaboy"
-                      value=""
-                      maxlength="9"
-                      pattern="[0-9]{1,}"
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="odos_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Δ/νση Εργολ. Οδός
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="odos_ergolaboy"
-                      id="odos_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="odos_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="arithmos_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Αριθμός
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="arithmos_ergolaboy"
-                      id="arithmos_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="arithmos_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-1 right-align">
-                    <label
-                      for="tk_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Τ.Κ.
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input
-                      type="text"
-                      name="tk_ergolaboy"
-                      id="tk_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="tk_ergolaboy"
-                      value=""
-                      maxlength="5"
-                      pattern="[0-9]{1,}"
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="polh_ergolaboy"
-                      class="col-form-label label-font-size">
-                      Πόλη Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="polh_ergolaboy"
-                      id="polh_ergolaboy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="polh_ergolaboy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-2"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="pararthma_efka_ergolaboy"
-                      class="col-form-label label-font-size-smaller">
-                      Παράρτ.ΕΦΚΑ Εργ/βου
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="pararthma_efka_ergolaboy"
-                      name="pararthma_efka_ergolaboy"
-                      id="pararthma_efka_ergolaboy"
-                    ></select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-4">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="username_ypergol_ergoy"
-                      class="col-form-label label-font-size-smaller field-required">
-                      Username Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="username_ypergol_ergoy"
-                      id="username_ypergol_ergoy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="username_ypergol_ergoy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="password_ypergol_ergoy"
-                      class="col-form-label label-font-size-smaller field-required">
-                      Password Εργολάβου
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="password_ypergol_ergoy"
-                      id="password_ypergol_ergoy"
-                      class="form-control input-contents"
-                      data-toggle-additional="ypergolabia"
-                      data-toggle="username_ypergol_ergoy"
-                      value=""
-                      disabled
-                    />
-                  </div>
-                </div>
-
-                <div
-                  class="card-footer"
-                  style="
-                    margin-left: -1rem !important;
-                    margin-right: -1rem !important;
-                    margin-bottom: -1rem !important;
-                  "
-                >
-                  <div
-                    class="d-inline-block d-flex"
-                    style="
-                      margin-top: -0.5rem !important;
-                      margin-bottom: -1rem !important;
-                      margin-left: 10px !important;
-                      margin-right: 10px !important;
-                      justify-content: space-around;
-                    "
-                  >
-                    <button
-                      type="button"
-                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton"
-                    >
-                      <i class="bi bi-floppy"></i> Αποθήκευση
-                    </button>
-                    <a
-                      class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
-                      href="/companies/ypokatasthmata"
-                      ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </form>
+            </section>
         </div>
-      </section>
     </div>
 
     <script src="/static/js/common/getCompanyDescription.js"></script>
@@ -924,5 +899,4 @@
     <script src="/static/js/common/tooltipsForButtons.js"></script>
     <script src="/static/js/common/moveByEnter.js"></script>
     <!-- <script src="/static/js/common/changeUrl.js"></script> -->
-  </div>
 </div>

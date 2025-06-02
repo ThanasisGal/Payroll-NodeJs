@@ -1,7 +1,7 @@
-import Models_A from "../models/param.js";
-import UserModel from "../models/userModel.js";
-import Models_C from "../models/companies.js";
-import Models from "../models/stathera_arxeia.js";
+const Models_A = require("../models/param");
+const UserModel = require("../models/userModel");
+const Models_C = require("../models/companies");
+const Models = require("../models/stathera_arxeia");
 
 const { ParamModel } = Models_A;
 
@@ -22,6 +22,7 @@ class mainAppController {
       description: "Web Payroll System",
     };
     res.render("mainapp", {
+      bodyClass: 'custom-background',
       locals,
     });
   };
@@ -338,4 +339,4 @@ class mainAppController {
   };
 };
 
-export default mainAppController;
+module.exports = mainAppController;

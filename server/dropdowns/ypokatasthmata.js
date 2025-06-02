@@ -1,10 +1,8 @@
-import companiesModel from '../models/companies.js';
+const companiesModel = require('../models/companies.js');
 
-const   {
-            YpokatasthmataModel
-        } = companiesModel;
-        
-export default {
+const YpokatasthmataModel = companiesModel.YpokatasthmataModel;
+
+module.exports = {
     path: '/api/dropdown/ypokatasthmata',
     model: YpokatasthmataModel,
     options: {

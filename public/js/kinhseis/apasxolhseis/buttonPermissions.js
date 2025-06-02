@@ -1,3 +1,5 @@
+// import { hasRecord } from './loadDropdowns.js';
+
 async function applyButtonPermissions(hasRecord) {
     document.querySelectorAll("section").forEach(section => {
         const saveButton = section.querySelector("[id^=saveButton]");

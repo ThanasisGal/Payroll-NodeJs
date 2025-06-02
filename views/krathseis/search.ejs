@@ -5,16 +5,16 @@
   class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-4 mt-3 pb-3 mb-4 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 </div>
 
-<div class="card d-flex flex-column z-depth-5">
-  <div class="card-header p-0" style="height: 3.5rem !important;">
-    <label class="text-center w-100 headers-content mt-2">
-      <% if (sTerm && sTerm.length > 0) { %>
-        Εμφάνιση Κρατήσεων ( με κριτήριο αναζήτησης "<%= sTerm %>" )
-      <% } else { %>
-        Εμφάνιση Κρατήσεων
-      <% } %>
-    </label>
-  </div>
+  <div class="card d-flex flex-column z-depth-5" style="width: 97%; margin-left: 1.5%; overflow-y: hidden; ">
+    <div class="card-header p-0" style="height: 3.5rem !important;">
+      <label class="text-center w-100 headers-content mt-2">
+        <% if (sTerm && sTerm.length > 0) { %>
+          Εμφάνιση Κρατήσεων ( με κριτήριο αναζήτησης "<%= sTerm %>" )
+        <% } else { %>
+          Εμφάνιση Κρατήσεων
+        <% } %>
+      </label>
+    </div>
   <div>
     <table 
       class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">

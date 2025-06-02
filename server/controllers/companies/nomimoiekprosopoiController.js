@@ -1,7 +1,7 @@
-import mongoose from "mongoose";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
-import Models from "../../models/stathera_arxeia.js";
+const mongoose = require("mongoose");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const Models = require("../../models/stathera_arxeia");
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
@@ -541,4 +541,4 @@ class nomimoiekprosopoiController {
   }
 }
 
-export default nomimoiekprosopoiController;
+module.exports = nomimoiekprosopoiController;

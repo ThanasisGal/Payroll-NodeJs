@@ -1,7 +1,7 @@
-import mongoose from "mongoose";
-import Models_A from "../../models/stathera_arxeia.js";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
+const mongoose = require("mongoose");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const Models_A = require("../../models/stathera_arxeia");
 
 const { KrathseisModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -455,4 +455,4 @@ class antistoixiseisController {
 
 }
 
-export default antistoixiseisController;
+module.exports = antistoixiseisController;

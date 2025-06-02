@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import Models_B from "../models/privileges.js";
-import Models from "../models/stathera_arxeia.js";
+const mongoose = require("mongoose");
+const Models_B = require("../models/privileges");
+const Models = require("../models/stathera_arxeia");
 
 const { UserPrivilegesModel } = Models_B;
 
@@ -677,4 +677,4 @@ class krathseisController {
     }
 };
  
-export default krathseisController;
+module.exports = krathseisController;

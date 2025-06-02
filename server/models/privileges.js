@@ -1,4 +1,4 @@
-import { Schema as _Schema, model } from "mongoose";
+const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
@@ -28,6 +28,6 @@ const sidebarStatusSchema = new Schema({
 
 const SidebarStatusModel = model("sidebarStatus", sidebarStatusSchema);
 
-export default { UserPrivilegesModel, 
+module.exports = { UserPrivilegesModel, 
                  SidebarStatusModel 
                };

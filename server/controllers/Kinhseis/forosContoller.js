@@ -1,17 +1,12 @@
-import mongoose from 'mongoose';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
+const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs-extra");
 
-import Models_A from "../../models/stathera_arxeia.js";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
-import Models_D from "../../models/ergazomenoi.js";
-import Models_E from "../../models/kinhseis.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+const Models_A = require("../../models/stathera_arxeia");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const Models_D = require("../../models/ergazomenoi");
+const Models_E = require("../../models/kinhseis");
 
 const { Klimaka_ForoyModel,
         EkptoshForoyModel,
@@ -90,4 +85,4 @@ class forosController {
 
 }
 
-export default forosController;
+module.exports = forosController;

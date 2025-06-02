@@ -1,15 +1,12 @@
-import mongoose from "mongoose";
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
-import Models_A from "../../models/param.js";
-import Models_B from "../../models/privileges.js";
-import Models_C from "../../models/companies.js";
-import UserModel from "../../models/userModel.js";
-import Models from "../../models/stathera_arxeia.js";
+const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs-extra");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const Models_A = require("../../models/param");
+const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
+const UserModel = require("../../models/userModel");
+const Models = require("../../models/stathera_arxeia");
 
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -1019,4 +1016,4 @@ class companiesController {
     }
 }
 
-export default companiesController;
+ module.exports = companiesController;
