@@ -1,0 +1,50 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+    <% for (let index = 1; index <= 6; index++) { %>
+        <div class="row form-group g-3 align-items-center mb-3">
+            <div class="col-1-5 right-align">
+                <label
+                    <% if (index === 1) { %>
+                        for=<%= `koddrast${index}` %>
+                        class="col-form-label label-font-size"
+                        >Κύρια Δραστηριότητα</label>
+                    <% } else if (index === 6) { %>
+                        for=<%= `koddrast${index}` %>
+                        class="col-form-label label-font-size"
+                        >ΚΑΔ Παραρτήματος</label>
+                    <% } else { %>
+                        for=<%= `koddrast${index}` %>
+                        class="col-form-label label-font-size"
+                        >Δευτ/σα Δραστ/τα #<%= index %></label>
+                    <% } %>
+            </div>
+                
+            <div class="col-1">
+                <input
+                    type="text"
+                    name=<%= `koddrast${index}` %>
+                    id=<%= `koddrast${index}` %>
+                    class="form-control input-contents"
+                    value=""
+                    placeholder="Αναζήτηση"
+                />
+            </div>
+                
+            <div class="col-8-5">
+                <select
+                    class="form-select selectpicker-dropdown-small"
+                    name=<%= `kad${index}` %>
+                    id=<%= `select_kad${index}` %>
+                    >
+                </select>
+            </div>
+            <i
+                id=<%= `tooltipIcon_${index}` %>
+                class="bi bi-info-circle-fill col-0-5"
+                style="
+                    cursor: pointer;
+                    font-size: 20px;
+                    color: rgb(128, 187, 253);">
+            </i>
+        </div>
+    <% } %>
+</div>

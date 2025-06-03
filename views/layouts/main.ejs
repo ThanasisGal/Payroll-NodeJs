@@ -26,7 +26,7 @@
 
             <link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
             <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
-            <script src="/static/js/common/tooltipsForButtons.js"></script>
+            <!-- <script src="/static/js/common/tooltipsForButtons.js"></script> -->
             <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
             <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
             <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
@@ -45,21 +45,21 @@
 
         <body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
             <div class="loader-container">
-            <div class="loader"></div>
-            <div class="loader-text">Παρακαλώ περιμένετε...</div>
+                <div class="loader"></div>
+                <div class="loader-text">Παρακαλώ περιμένετε...</div>
             </div>
             
             <%- include('../partials/header.ejs') %>
 
             <div class="container-fluid" style="overflow-y: auto">
-            <div class="row">
-                <%- include('../partials/sidebar.ejs') %>
+                <div class="row">
+                    <%- include('../partials/sidebar.ejs') %>
 
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" style="background: transparent;"><%- body %></main>
+                    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4" style="background: transparent;"><%- body %></main>
 
-            </div>
+                </div>
 
-            <%- include('../partials/footer.ejs') %>
+                <%- include('../partials/footer.ejs') %>
             </div>
 
             <% const isProduction = NODE_ENV === 'production'; %>
@@ -76,6 +76,7 @@
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+            <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeFontSizeSelectDropdownMenu<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
             <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/countdown<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

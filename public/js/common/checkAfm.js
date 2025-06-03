@@ -24,14 +24,18 @@ document.addEventListener("DOMContentLoaded", () => {
             focusConfirm: true,
             showConfirmButton: true,
             showCancelButton: false,
+            confirmButtonText: 'Επιστροφή',
             customClass: {
               confirmButton: "class-warning custom-confirm-button custom-swal-button",
               title: 'custom-title',
               popup: "custom-swal-popup",
+            },
+            didClose: () => {
+              field.value = "";
+              field.focus();
             }
           });
-          field.value = "";
-          field.focus();
+
           return;
         }
 

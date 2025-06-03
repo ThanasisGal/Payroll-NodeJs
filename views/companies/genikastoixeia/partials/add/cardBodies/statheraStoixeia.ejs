@@ -1,0 +1,481 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+        <label
+            for="eponymia"
+            class="col-form-label label-font-size field-required"
+            >Επώνυμο/μία
+        </label>
+    </div>
+    <div class="col-5">
+        <input
+            type="text"
+            name="eponymia"
+            id="eponymia"
+            class="form-control input-contents"
+            value=""
+            required />
+    </div>
+
+    <div class="col-1-5 right-align">
+        <label
+            for="firstName"
+            class="col-form-label label-font-size">Όνομα
+        </label>
+    </div>
+    <div class="col-3">
+        <input
+            type="text"
+            name="firstName"
+            id="firstName"
+            class="form-control input-contents"
+            value="" />
+    </div>
+</div>
+
+<div class="row form-group g-3 align-items-center mb-0-5">
+    <div class="col-1-5 right-align">
+        <label
+            for="fatherName"
+            class="col-form-label label-font-size">
+            Πατρώνυμο
+        </label>
+    </div>
+
+    <div class="col-3">
+        <input
+            type="text"
+            name="fatherName"
+            id="fatherName"
+            class="form-control input-contents"
+            value=""
+        />
+    </div>
+
+    <div class="col-2"></div>
+
+    <div class="col-1-5 right-align">
+        <label for="titlos" class="col-form-label label-font-size">
+            Τίτλος
+        </label>
+    </div>
+    <div class="col-4">
+        <input
+            type="text"
+            name="titlos"
+            id="titlos"
+            class="form-control input-contents"
+            value=""
+        />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="activity" class="col-form-label label-font-size">
+                Δραστηριότητα
+            </label>
+        </div>
+        <div class="col-10-5">
+            <input
+                type="text"
+                name="activity"
+                id="activity"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label
+                for="afm"
+                class="col-form-label label-font-size field-required">
+                    Α.Φ.Μ
+            </label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="afm"
+                id="afm"
+                class="form-control input-contents"
+                value=""
+                maxlength="9"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="adt" class="col-form-label label-font-size">
+                Α.Δ.Τ.
+            </label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="adt"
+                id="adt"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="odos" class="col-form-label label-font-size">
+                Οδός
+            </label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="odos"
+                id="odos"
+                class="form-control input-contents"
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="arithmos" class="col-form-label label-font-size">
+                Αριθμός
+            </label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="arithmos"
+                id="arithmos"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+
+        <div class="col-1 right-align">
+            <label for="tk" class="col-form-label label-font-size">
+                Τ.Κ.
+            </label>
+        </div>
+        <div class="col-1">
+            <input
+                type="text"
+                name="tk"
+                id="tk"
+                class="form-control input-contents"
+                value=""
+                maxlength="5"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label
+                for="perifereies"
+                class="col-form-label label-font-size">
+                    Περιφέρεια
+            </label>
+        </div>
+
+        <div class="col-4">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="perifereies"
+                id="perifereies">
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="nomos" class="col-form-label label-font-size">
+                Περιφ. Ενότητα
+            </label>
+        </div>
+        <div class="col-4">
+            <select 
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="nomos"
+                id="nomos"
+                style="font-size: 1vw"
+                disabled>
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="dhmos" class="col-form-label label-font-size">
+                Δημοτ. Ενότητα
+            </label>
+        </div>
+        <div class="col-4">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="dhmos"
+                id="dhmos"
+                style="font-size: 1vw"
+                disabled>
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="polh" class="col-form-label label-font-size">
+                Δημοτ.Διαμέρισμα
+            </label>
+        </div>
+        <div class="col-4">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="polh"
+                id="polh"
+                style="font-size: 1vw"
+                disabled>
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="thlefono" class="col-form-label label-font-size">
+                Τηλέφωνο
+            </label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="thlefono"
+                id="thlefono"
+                class="form-control input-contents"
+                value=""
+                maxlength="10"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="fax" class="col-form-label label-font-size">
+                Fax
+            </label>
+        </div>
+        <div class="col-2">
+            <input
+            type="text"
+            name="fax"
+            id="fax"
+            class="form-control input-contents"
+            value=""
+            maxlength="10"
+            pattern="[0-9]{1,}"
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="anenergh" class="col-form-label label-font-size">
+                Ανενεργή
+            </label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input  type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="anenergh" name="anenergh" value="" /> 
+            <label for="anenergh" id="label-anenergh" style="margin-left: 0.75rem; font-weight: 600;">ΟΧΙ</label>
+        </div>
+
+        <div class="col-4"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="email" class="col-form-label label-font-size">
+                e-Mail
+            </label>
+        </div>
+        <div class="col-4">
+            <input
+                type="email"
+                name="email"
+                id="email"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label
+                for="nomikhmorfh"
+                class="col-form-label label-font-size">
+                    Νομική Μορφή
+            </label>
+        </div>
+        <div class="col-5">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="nomikhmorfh"
+                id="nomikhmorfh">
+            </select>
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label
+                for="pararthmaefka"
+                class="col-form-label label-font-size">
+                    Παράρτημα ΕΦΚΑ
+            </label>
+        </div>
+        <div class="col-4">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="pararthmaefka"
+                id="pararthmaefka">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="doy" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
+        </div>
+        <div class="col-5">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="doy"
+                id="doy">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="tameio1" class="col-form-label label-font-size">
+                Ταμείο #1 (τ.ΙΚΑ)
+            </label>
+        </div>
+        <div class="col-4">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="tameio1"
+                id="tameio1">
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="ame1" class="col-form-label label-font-size">Α.Μ.Ε. #1</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="ame1"
+                id="ame1"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="tameio2" class="col-form-label label-font-size">Ταμείο #2</label>
+        </div>
+        <div class="col-4">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="tameio2"
+                id="tameio2">
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="ame2" class="col-form-label label-font-size">Α.Μ.Ε. #2</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="ame2"
+                id="ame2"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-1-5 right-align">
+            <label for="tameio3" class="col-form-label label-font-size">Ταμείο #3</label>
+        </div>
+        <div class="col-4">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="tameio3"
+                id="tameio3">
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="ame3" class="col-form-label label-font-size">Α.Μ.Ε. #3</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="ame3"
+                id="ame3"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-2">
+        <div class="col-1-5 right-align">
+            <label for="tameio4" class="col-form-label label-font-size">Ταμείο #4</label>
+        </div>
+        <div class="col-4">
+            <select  
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="tameio4"
+                id="tameio4">
+            </select>
+        </div>
+
+        <div class="col-1"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="ame4" class="col-form-label label-font-size">Α.Μ.Ε. #4</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="ame4"
+                id="ame4"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+</div>
