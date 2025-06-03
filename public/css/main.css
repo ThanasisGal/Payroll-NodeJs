@@ -1837,7 +1837,7 @@ a {
 }
 
 .swal2-container {
-  background-color: rgba(0, 0, 0, 0.2) !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
 }
 
 .wide-popup {
@@ -1856,23 +1856,19 @@ a {
 .custom-swal-popup {
   right: auto !important;
   left: 5% !important;
-  transform: translateX(0) !important;
-  width: auto !important; /* Αυτόματη προσαρμογή στο περιεχόμενο */
-  max-width: 30vw !important; /* Περιορίζει το max width για μεγάλες οθόνες */
-  min-width: 250px !important; /* Για να μη γίνεται υπερβολικά μικρό */
-  text-align: center !important; /* Κεντράρει το κείμενο */
-  padding: 1.5em !important; /* Δίνει χώρο στα περιθώρια */
-  border-radius: 5% !important; /* Μαλακότερες γωνίες */
-  background-color: rgb(255, 252, 220) !important; /* Προσαρμοσμένο χρώμα */
+  max-width: 30vw !important;
+  text-align: center !important;
+  padding: 1.5em !important;
+  border-radius: 12px !important;
+  background-color: rgb(255, 252, 220) !important;
 }
 
 .custom-swal-popup .swal2-html-container {
-  font-size: .9vw !important; /* Προσαρμοζόμενο μέγεθος γραμματοσειράς */
-  color: #333 !important; /* Σκούρο κείμενο για καλύτερη αναγνωσιμότητα */
-  max-width: 100% !important; /* Αποφυγή overflow */
-  line-height: 1.5 !important; /* Καλύτερη αναγνωσιμότητα */
-  white-space: normal !important; /* Επιτρέπει κανονικά line breaks */
-  word-wrap: break-word !important; /* Διασφαλίζει ότι το κείμενο δεν ξεφεύγει */
+  font-size: 1rem !important;
+  color: #333 !important;
+  line-height: 1.5 !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
 }
 
 .custom-confirm-button {

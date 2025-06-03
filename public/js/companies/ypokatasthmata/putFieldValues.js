@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Υποκαταστημάτων</li>
             </ul>
           `,
-          timer: 3000,
+          timer: 2000,
           confirmButtonText: "Κλείσιμο",
           customClass: {
             confirmButton: "class-success custom-confirm-button custom-swal-button",

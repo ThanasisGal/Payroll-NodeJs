@@ -58,11 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
         Swal.fire({
           icon: "success",
           title: " ",
-          html: `
-            <ul>
-              <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Υποκαταστημάτων</li>
-            </ul>
-          `,
           timer: 2500,
           confirmButtonText: 'Κλείσιμο',
           customClass: {

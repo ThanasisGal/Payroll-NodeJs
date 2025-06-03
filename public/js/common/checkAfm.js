@@ -19,14 +19,15 @@ document.addEventListener("DOMContentLoaded", () => {
           Swal.fire({
             icon: "warning",
             title: "Λάθος ΑΦΜ...",
-            text: "Πληκτρολογείστε τον σωστό ΑΦΜ ή αφήστε το πεδίο κενό....",
+            html: `<div>Πληκτρολογείστε τον σωστό ΑΦΜ ή αφήστε το πεδίο κενό...</div>`,
             timer: 2500,
             focusConfirm: true,
-            showConfirmButton: false,
+            showConfirmButton: true,
             showCancelButton: false,
             customClass: {
               confirmButton: "class-warning custom-confirm-button custom-swal-button",
-              title: 'custom-title'
+              title: 'custom-title',
+              popup: "custom-swal-popup",
             }
           });
           field.value = "";
@@ -76,14 +77,20 @@ async function fetchEtaireiaData(afm) {
     Swal.fire({
       icon: "error",
       title: "Προσοχή...",
-      text: `Η εταιρεία με ΑΦΜ ${data.afm} ( "${data.eponymia.trim()} ${data.firstname.trim()}" ) είναι ήδη καταχωρημένη. Δεν επιτρέπεται η διπλή ως προς το ΑΦΜ καταχώρηση...`,
-      timer: 4000,
-      confirmButtonText: 'Κλείσιμο',
+      html: `
+        Η εταιρεία με ΑΦΜ <strong>${data.afm}<br>
+        ("${data.eponymia.trim()} ${data.firstname.trim()}")</strong><br><br>
+        είναι ήδη καταχωρημένη.<br>
+        Δεν επιτρέπεται η διπλή ως προς το ΑΦΜ καταχώρηση...
+      `,
       customClass: {
         confirmButton: 'class-error custom-confirm-button custom-swal-button',
-        title: 'custom-title'
-      }
-    });
+        title: 'custom-title',
+        popup: 'custom-swal-popup'
+      },
+      confirmButtonText: 'Κλείσιμο',
+      timer: 4000
+    });  
   }
 }
 
