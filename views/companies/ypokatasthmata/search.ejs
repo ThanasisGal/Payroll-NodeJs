@@ -220,11 +220,15 @@
     </div>
 </div>
 
-<script src="/static/js/common/getCompanyDescription.js"></script>
-<script src="/static/js/common/getXrhsh.js"></script>
-<script src="/static/js/common/getPeriod.js"></script>
-<script src="/static/js/common/getUser.js"></script>
-<script src="/static/js/companies/ypokatasthmata/selectRowInTable.js"></script>
-<script src="/static/js/common/sortTable.js"></script>
-<script src="/static/js/common/tooltipsForButtons.js"></script>
-<!-- <script src="/static/js/common/changeUrl.js"></script> -->
+<% const isProduction = NODE_ENV === 'production'; %>
+<script>
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/ypokatasthmata/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

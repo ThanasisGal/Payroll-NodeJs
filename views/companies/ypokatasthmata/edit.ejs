@@ -893,15 +893,19 @@
         </div>
     </div>
 
-    <script src="/static/js/common/getCompanyDescription.js"></script>
-    <script src="/static/js/companies/ypokatasthmata/putFieldValues.js"></script>
-    <script src="/static/js/common/checkAfm.js"></script>  
-    <script src="/static/js/common/navTabs.js"></script>
-    <script src="/static/js/companies/ypokatasthmata/loadDropdowns_edit.js"></script>
-    <script src="/static/js/common/toggleLabel.js"></script>
-    <script src="/static/js/dates/convertDateToISO.js"></script>
-    <script src="/static/js/dates/getFieldsDate.js"></script>
-    <script src="/static/js/common/tooltipsForButtons.js"></script>
-    <script src="/static/js/common/moveByEnter.js"></script>
-    <!-- <script src="/static/js/common/changeUrl.js"></script> -->
+    <% const isProduction = NODE_ENV === 'production'; %>
+    <script>
+        window.RUNTIME_ENV = "<%= NODE_ENV %>";
+    </script>
+              
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/ypokatasthmata/putFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/ypokatasthmata/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/getFieldsDate<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 </div>
