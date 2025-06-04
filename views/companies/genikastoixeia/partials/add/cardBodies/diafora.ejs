@@ -1,0 +1,103 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody6" style="background-color: #ffffff;">
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
+            <label for="oikodomika" class="col-form-label label-font-size">Η εταιρεία εκτελεί οικοδομικά έργα</label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="oikodomika" name="oikodomika" value="" />
+            <label for="oikodomika" id="label-oikodomika" style="margin-left: .75rem; font-weight: 600;" >ΟΧΙ</label>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
+            <label for="doropasxa_apd" class="col-form-label label-font-size">Το Δώρο Πάσχα θα εμφανίζεται στην τρέχουσα ΑΠΔ</label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="doropasxa_apd" name="doropasxa_apd" value="" />
+            <label for="doropasxa_apd" id="label-doropasxa_apd" style="margin-left: .75rem; font-weight: 600;" >ΟΧΙ</label>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
+            <label for="doroxrist_apd" class="col-form-label label-font-size">Το Δώρο Χριστουγέννων θα εμφανίζεται στην τρέχουσα ΑΠΔ</label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="doroxrist_apd" name="doroxrist_apd" value="" />
+            <label for="doroxrist_apd" id="label-doroxrist_apd"style="margin-left: .75rem; font-weight: 600;" >ΟΧΙ</label>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
+            <label for="ypologismos_epi_pragmatikoy_oromisthioy" class="col-form-label label-font-size">Υπολογισμός Προσαυξήσεων επί Πραγματικού Ωρομισθίου</label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="ypologismos_epi_pragmatikoy_oromisthioy" name="ypologismos_epi_pragmatikoy_oromisthioy" value="" /> 
+            <label for="ypologismos_epi_pragmatikoy_oromisthioy" id="label-ypologismos_epi_pragmatikoy_oromisthioy" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+        </div>
+    </div>
+    
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
+            <label for="keimeno_exoflhshs" class="col-form-label label-font-size">Κείμενο Εξοφλητικής Απόδειξης</label>
+        </div>
+        <div class="col-8">
+            <textarea
+                class="form-control textarea-content use-default-enter"
+                name="keimeno_exoflhshs"
+                id="keimeno_exoflhshs"
+                cols="30"
+                rows="4"
+                style="height: 12vh;">
+                Έλεγξα τις αποδοχές και τις κρατήσεις της παρούσας ατομικής εκκαθάρισης και αφού διαπίστωσα ότι είναι οι πραγματικές, αποδέχομαι χωρίς καμία επιφύλαξη την παρούσα ατομική εκκαθάριση μισθοδοσίας. Μετά την καταβολή του παραπάνω αναγραφόμενου πληρωτέου ποσού (μέσω Τράπεζας και στο ΙΒΑΝ που έχω δηλώσει στην εταιρεία / επιχείρηση), δεν έχω καμία άλλη αξίωση από την προαναφερόμενη εταιρεία / επιχείρηση.
+            </textarea>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-1">
+        <div class="col-4 right-align">
+            <label for="selectedUsers" class="col-form-label label-font-size field-required">Επιλογή Χρηστών που έχουν πρόσβαση στην εταιρεία</label>
+        </div>
+        <div class="col-4">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                style="height: 8rem;"
+                data-live-search="true"
+                name="selectedUsers"
+                id="selectedUsers"
+                multiple>
+            </select>
+        </div>
+        
+        <div class="col-2">
+            <label class="col-form-label" style="font-size: smaller">Επιλογή πολλών χρηστών με Ctrl + click</label>
+        </div>
+
+        <div class="col-2">
+            <button type="button" id="select-all" class="btn btn-brown rounded-4 buttons-contents mt-2 w-100">
+                <i class="bi bi-check2-all"></i> Επιλογή Όλων
+            </button>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-2">
+        <div class="col-4 right-align">
+            <label class="col-form-label label-font-size">Επιλογή σφραγίδας-υπογραφής εταιρείας-εκπροσώπου</label>
+        </div>
+
+        <!-- <form id="upload-form" enctype="multipart/form-data"> -->
+        <div class="col-6 left-align">
+            <button type="button" id="customButton" class="btn btn-brown rounded-4 buttons-content w-40"><i class="bi bi-cloud-arrow-up"></i> Επιλέξτε Αρχείο</button>
+            <!-- Πραγματικό input πεδίο, κρυμμένο -->
+            <label for="sfragida" class="sr-only">Ανέβασμα σφραγίδας εταιρείας</label>
+            <input type="file" id="sfragida" name="sfragida" accept="image/*" style="display:none">
+            <img id="preview-image" style="width: 12.5rem; height: 6.25rem; display: none;" alt="Προεπισκόπηση σφραγίδας εταιρείας" title="Προεπισκόπηση σφραγίδας">
+        </div>
+        <!-- </form> -->
+        <div class="col-2">
+            <button type="button" id="clear-image" class="btn btn-brown rounded-4 buttons-contents w-100"><i class="bi bi-eraser"></i> Καθαρισμός</button>
+        </div>
+    </div>
+</div>

@@ -1,13 +1,13 @@
-<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
+<div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody5" style="background-color: #ffffff;">
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
-            <label for="kod_ta" class="col-form-label label-font-size">Κωδικός</label>
+            <label for="kod_lo" class="col-form-label label-font-size">Κωδικός</label>
         </div>
         <div class="col-1">
             <input
                 type="text"
-                name="kod_ta"
-                id="kod_ta"
+                name="kod_lo"
+                id="kod_lo"
                 class="form-control input-contents"
                 value=""
                 disabled
@@ -17,13 +17,13 @@
 
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
-            <label for="afm_ta" class="col-form-label label-font-size field-required" >Α.Φ.Μ</label>
+            <label for="afm_lo" class="col-form-label label-font-size field-required">Α.Φ.Μ</label>
         </div>
         <div class="col-2">
             <input
                 type="text"
-                name="afm_ta"
-                id="afm_ta"
+                name="afm_lo"
+                id="afm_lo"
                 class="form-control input-contents"
                 value=""
                 maxlength="9"
@@ -34,13 +34,13 @@
 
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
-            <label for="eponymo_ta" class="col-form-label label-font-size field-required">Επώνυμο/μία</label>
+            <label for="eponymo_lo" class="col-form-label label-font-size field-required">Επώνυμο/μία</label>
         </div>
         <div class="col-5">
             <input
                 type="text"
-                name="eponymo_ta"
-                id="eponymo_ta"
+                name="eponymo_lo"
+                id="eponymo_lo"
                 class="form-control input-contents"
                 value=""
                 required
@@ -48,13 +48,13 @@
         </div>
 
         <div class="col-1-5 right-align">
-            <label for="onoma_ta" class="col-form-label label-font-size">Όνομα</label>
+            <label for="onoma_lo" class="col-form-label label-font-size">Όνομα</label>
         </div>
         <div class="col-3">
             <input
                 type="text"
-                name="onoma_ta"
-                id="onoma_ta"
+                name="onoma_lo"
+                id="onoma_lo"
                 class="form-control input-contents"
                 value=""
             />
@@ -63,13 +63,13 @@
 
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
-            <label for="dieythynsh_ta" class="col-form-label label-font-size">Διεύθυνση</label>
+            <label for="dieythynsh_lo" class="col-form-label label-font-size">Διεύθυνση</label>
         </div>
         <div class="col-5">
             <input
                 type="text"
-                name="dieythynsh_ta"
-                id="dieythynsh_ta"
+                name="dieythynsh_lo"
+                id="dieythynsh_lo"
                 class="form-control input-contents"
                 value=""
                 required
@@ -77,13 +77,13 @@
         </div>
 
         <div class="col-1-5 right-align">
-            <label for="thlefono_ta" class="col-form-label label-font-size">Τηλέφωνο</label>
+            <label for="thlefono_lo" class="col-form-label label-font-size">Τηλέφωνο</label>
         </div>
         <div class="col-3">
             <input
                 type="text"
-                name="thlefono_ta"
-                id="thlefono_ta"
+                name="thlefono_lo"
+                id="thlefono_lo"
                 class="form-control input-contents"
                 value=""
             />
@@ -92,14 +92,28 @@
 
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
-            <label for="ores_ta" class="col-form-label label-font-size field-required">Ώρες Απασχ/σης</label>
+            <label for="doy_lo" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
+        </div>
+        <div class="col-5">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="doy_lo"
+                id="doy_lo">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="arithmos_adeias_lo" class="col-form-label label-font-size field-required">Αριθμός Άδειας</label>
         </div>
 
         <div class="col-2">
             <input
-                type="number"
-                name="ores_ta"
-                id="ores_ta"
+                type="text"
+                name="arithmos_adeias_lo"
+                id="arithmos_adeias_lo"
                 class="form-control input-contents"
                 value=""
                 required
@@ -109,47 +123,15 @@
         <div class="col-3"></div>
 
         <div class="col-1-5 right-align">
-            <label for="ap_katatheshs_ta" class="col-form-label label-font-size">Αρ.Πρωτ. Κατάθεσης</label>
+            <label for="kathgoria_adeias_lo" class="col-form-label label-font-size">Κατηγορία Άδειας</label>
         </div>
 
         <div class="col-2">
             <input
                 type="text"
-                name="ap_katatheshs_ta"
-                id="ap_katatheshs_ta"
+                name="kathgoria_adeias_lo"
+                id="kathgoria_adeias_lo"
                 class="form-control input-contents"
-                value=""
-            />
-        </div>
-    </div>
-
-    <div class="row form-group g-3 align-items-center mb-3">
-        <div class="col-1-5 right-align">
-            <label for="hmnia_katatheshs_ta" class="col-form-label label-font-size" >Ημ/νία Κατάθεσης</label>
-        </div>
-
-        <div class="col-2">
-            <input
-                type="date"
-                name="hmnia_katatheshs_ta"
-                id="hmnia_katatheshs_ta"
-                class="date-control"
-                value=""
-                required
-            />
-        </div>
-
-        <div class="col-3"></div>
-
-        <div class="col-1-5 right-align">
-            <label for="isxyei_eos_ta" class="col-form-label label-font-size" >Ισχύει Έως</label>
-        </div>
-        <div class="col-2">
-            <input
-                type="date"
-                name="isxyei_eos_ta"
-                id="isxyei_eos_ta"
-                class="date-control"
                 value=""
             />
         </div>
