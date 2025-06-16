@@ -1,3 +1,15 @@
+function createSafeTooltip(el, text) {
+  // 1️⃣ καθάρισε τυχόν παλιό instance
+  bootstrap.Tooltip.getInstance(el)?.dispose();
+
+  // 2️⃣ φτιάξε καινούριο με defaults – ΠΑΝΤΑ trigger
+  return new bootstrap.Tooltip(el, {
+    title     : text,
+    trigger   : 'hover focus',     // fallback -> δεν λείπει ποτέ
+    placement : 'top'
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const selectElements = document.querySelectorAll("[id^='select_']");
 
@@ -10,12 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
         option.setAttribute('data-bs-toggle', 'tooltip');
         option.setAttribute('data-bs-placement', 'top');
         option.setAttribute('title', option.textContent);
-        tooltipIcon.addEventListener('mouseover', () => {
-          new bootstrap.Tooltip(tooltipIcon, {
-            title: option.textContent,
-            placement: 'top',
-          });
-        });
+        createSafeTooltip(tooltipIcon, option.textContent);
         tooltipIcon.addEventListener('mouseleave', () => {
           const tooltip = bootstrap.Tooltip.getInstance(tooltipIcon);
           if (tooltip) {
@@ -28,15 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
     selectElement.addEventListener('change', (event) => {
       const selectedOption = event.target.selectedOptions[0];
       if (selectedOption.textContent.length > 97) {
-        new bootstrap.Tooltip(tooltipIcon, {
-          title: selectedOption.textContent,
-          placement: 'top',
-        });
+        createSafeTooltip(tooltipIcon, selectedOption.textContent);
       } else {
-        const tooltip = bootstrap.Tooltip.getInstance(tooltipIcon);
-        if (tooltip) {
-          tooltip.dispose();
-        }
+        bootstrap.Tooltip.getInstance(tooltipIcon)?.dispose();
       }
     });
   });

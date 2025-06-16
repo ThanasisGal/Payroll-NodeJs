@@ -16,14 +16,19 @@ const   {
         } = companiesModels;
 
 const   {
+            KadModel,
             Typoi_ApodoxonModel,
-            EidikothtesErganhModel,
+            TmhmataModel,
             PeriodsModel
         } = statheraArxeiaModels;
 
 router.get('/typoiApodoxon',    buildDropdownRoute(Typoi_ApodoxonModel, typoiApodoxon.options));
 router.get('/periodoi',         buildDropdownRoute(PeriodsModel, periodoi.options));
 router.get('/ypokatasthmata',   buildDropdownRoute(YpokatasthmataModel, ypokatasthmata.options));
-router.get('/tmhmata',          buildDropdownRoute(EidikothtesErganhModel, tmhmata.options));
+router.get('/tmhmata',          buildDropdownRoute(TmhmataModel, tmhmata.options));
+router.get('/kad',              buildDropdownRoute(KadModel, tmhmata.options));
 
 module.exports = router;
+
+
+// Μπαίνοντας στην φόρμα το ts φορτώνει κανονικά και δουλεύει και το infinite με limit 50. 

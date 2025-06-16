@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const remainingTimeElement = document.getElementById("remaining-time");
+  if (!remainingTimeElement) return;
   let intervalId; // Αποθηκεύει το ID του setInterval
 
   function formatTime(ms) {
@@ -21,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function updateRemainingTime() {
-    try {
+    // try {
       const response = await fetch("/remaining-time");
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -38,9 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
         remainingTimeElement.textContent = formatTime(data.remainingTime);
         updateTextColor(data.remainingTime); // Ενημέρωση του χρώματος
       }
-    } catch (error) {
-      console.error("Error:", error);
-    }
+    // } catch (error) {
+    //   console.error("Error:", error);
+    // }
   }
 
   function onSessionEnd() {

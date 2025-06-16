@@ -22,8 +22,6 @@ const forosController = require("../controllers/Kinhseis/forosContoller.js");
 const ektyposhSymbaseonController = require("../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js");
 const ektyposhApasxolhseonController = require("../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js");
 
-// const { createDropdownApi } = require('../utils/dropdownHelper.js');
-
 const TmhmataModel = require('../models/stathera_arxeia.js');
 const PeriodsModel = require('../models/stathera_arxeia.js');
 
@@ -139,6 +137,8 @@ router.post("/krathseis/pososta/add", krathseisController.postPosostaKrathseonFo
 router.get("/krathseis/posostaKrathseon/edit/:id", checkAuth, krathseisController.editPosostaKrathseonForm);
 router.delete("/krathseis/posostaKrathseon/delete/:id", krathseisController.deletePosostaKrathseon);
 router.get("/krathseis/updates", checkAuth, krathseisController.posostaKrathseonKrathshId);
+
+router.get("/kad/updates", checkAuth, krathseisController.kadKodikosSort);
 
 // Ergazomenoi Router
 router.get("/ergazomenoi/ergazomenoi", checkAuth, ergazomenoiController.mainErgazomenoiForm);
@@ -384,9 +384,6 @@ router.post("/api/kinhseis/prohgoymenes_adeies", kinhseisController.getSynoloPro
 router.post("/api/kinhseis/apodoxes_prohgoymenon_periodon", kinhseisController.getSynoloApodoxonProhgoymenonPeriodon);
 
 router.post("/api/ektyposeis/symbaseis/ergazomenoi", ektyposhSymbaseonController.createPdf);
-
-// router.get('/api/ektyposeis/apasxolhseis/tmhmata', createDropdownApi(TmhmataModel));
-// router.get('/api/ektyposeis/apasxolhseis/periodoi', createDropdownApi(PeriodsModel));
 
 router.post("/api/update_session_typosApodoxon", kinhseisController.update_session_typosApodoxon);
 router.post("/api/update_session_periodos", kinhseisController.update_session_periodos);

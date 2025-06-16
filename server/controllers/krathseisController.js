@@ -7,6 +7,7 @@ const { UserPrivilegesModel } = Models_B;
 const { KrathseisModel,
         PosostaKrathseonModel,
         TameiaModel,
+        KadModel,
       } = Models;
 
 let nextPageSearchTerm = "";
@@ -675,6 +676,32 @@ class krathseisController {
             res.status(500).send("An error occurred during the bulk update.");
         }
     }
+
+    static kadKodikosSort = async (req, res) => {
+        function kodikosToSortable(kodikos) {
+            if (!kodikos) return '';
+            return kodikos
+                .split('.')
+                .map(segment => segment.padStart(5, '0'))
+                .join('.');
+        }
+
+        try {
+            const cursor = KadModel.find().cursor();
+
+            for (let doc = await cursor.next(); doc != null; doc = await cursor.next()) {
+                const newSort = kodikosToSortable(doc.kodikos);
+                if (doc.kodikosSort !== newSort) {
+                    doc.kodikosSort = newSort;
+                    await doc.save();
+                    console.log(`✅ Updated ${doc.kodikos} => ${newSort}`);
+                }
+            }
+        } catch (err) {
+            console.error('Error during kad update:', err);
+            res.status(500).send("An error occurred during the kad update.");
+        }
+    }
 };
- 
+
 module.exports = krathseisController;

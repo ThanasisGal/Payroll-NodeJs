@@ -32,9 +32,13 @@
             <div>
                 <form class="formRadius" enctype="multipart/form-data">
                     <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
-                        <label
+                        <!-- <label
                             class="card-header bg-header text-center headers-content">Συντήρηση Στοιχείων Εταιρείας ( Κωδ. <%= company.kod %> )
-                        </label>
+                        </label> -->
+
+                        <%- include('./partials/edit/cardHeader') %>
+
+
                         <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
                             <div class="row form-group g-3 align-items-center mb-0-5">
                                 <div class="col-1-5 right-align">
@@ -1996,27 +2000,28 @@
 
     </div>
   </div>
-</div>
 
   <% const isProduction = NODE_ENV === 'production'; %>
   <script>
       window.RUNTIME_ENV = "<%= NODE_ENV %>";
   </script>
               
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadKadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/dropdownsValue<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadKadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
   <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
   <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadMultipleUsers<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/select-UnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/select-UnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+  <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
   <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-  
+</div>

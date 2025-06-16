@@ -674,6 +674,7 @@ small,
   margin-top: -0.3vw;
 }
 
+.col-0 { flex: 0 0 auto; width: 0.0001%; }
 .col-0-0-1 { flex: 0 0 auto; width: 0.083%; }
 .col-0-0-25 { flex: 0 0 auto; width: 0.2083%; }
 .col-0-0-5 { flex: 0 0 auto; width: 0.4165%; }
@@ -3253,7 +3254,7 @@ a[href] {
   position: relative;
   height: 32px;
   background-color: #fff;
-  border: 1px solid #ced4da;
+  border: 1px solid #c5c8cb;
   border-radius: 0.375rem;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -3263,20 +3264,36 @@ a[href] {
   padding: 0;
 }
 
-/* Προσθήκη εικονιδίου dropdown */
-/* .ts-wrapper.tom-dropdown::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0.75rem;
-  width: 12px;
-  height: 12px;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='%23495057' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 16 16'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-size: contain;
-  transform: translateY(-50%);
-  pointer-events: none;
-} */
+.ts-wrapper.focus .tom-dropdown {
+  border-color: #80bdff;                       /* ίδιο μπλε με το native select */
+  box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); /* το “glow” του bootstrap */
+}
+
+.ts-wrapper.focus .ts-control,
+.ts-wrapper.dropdown-active .ts-control {      /* και όταν είναι ανοικτό */
+  border-color: #80bdff;                       /* ίδιο μπλε με το native select */
+  box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); /* το “glow” του bootstrap */
+}
+
+/* 1. Input μέσα στο ανοιχτό dropdown – κίτρινο φόντο */
+.ts-dropdown .dropdown-input {
+  background-color: #fff7b35e;   /* ή όποιο κίτρινο θέλεις */
+}
+
+/* 2. Το κίτρινο input όταν παίρνει focus – διατηρούμε και το μπλε περίγραμμα */
+.ts-dropdown .dropdown-input:focus {
+  border-color: #80bdff;       /* το ίδιο μπλε με το native select */
+  outline: 0;                  /* προαιρετικά: κρύψε το default outline */
+  box-shadow: 0 0 0 .2rem rgba(0,123,255,.25);
+}
+
+.ts-wrapper .ts-control {
+  border-color: #ced4da;   /* το γκρι του bootstrap */
+}
+
+.tom-dropdown .option {
+  font-family: monospace;
+}
 
 /* ▼ εικονίδιο dropdown */
 .ts-wrapper.dropdown-wrapper::after {   /* ← άλλαξε μόνο τον selector */
@@ -3298,23 +3315,24 @@ a[href] {
 ===================================== */
 .ts-control {
   position: relative;
-  padding: 2px 36px 2px 8px !important; /* πάνω δεξιά κάτω αριστερά */
+  padding: 0px 36px 0px 8px !important;
   min-height: 32px;
   border: none !important;
+  border-top: 1px solid #c5c8cb !important;
+  border-bottom: 1px solid #c5c8cb !important;
   background-color: transparent !important;
-  padding: 0.375rem 0.75rem !important;
-  font-size: 0.875rem;
-  min-height: 32px;
+  border-color: #80bdff;
+  font-size: .875rem !important;
   width: 100%;
   display: flex !important;
-  flex-wrap: nowrap;           /* ❗ Μη γίνει wrap τα tags */
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.25rem;
   overflow: visible !important;
-  padding-right: 36px !important; /* ❗ Χώρος για το εικονίδιο */
+  padding-right: 36px !important;
   z-index: 1;
-  max-width: 100%;       /* ποτέ πέρα από τον wrapper */
-  overflow-x: hidden;    /* ✱ no horizontal scroll inside */
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Κάθε tag */
@@ -3352,7 +3370,7 @@ a[href] {
   /* width: auto !important; */
   min-width: 100px;
   padding: 0px 0px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   background: white !important;
   border: none;
   box-shadow: none;
@@ -3372,7 +3390,7 @@ a[href] {
 }
 
 .ts-dropdown-content{
-  max-height: 250px;
+  max-height: 150px;
   overflow-y: auto;    /* οριζόντιο όχι */
 }
 
@@ -3388,6 +3406,16 @@ a[href] {
   color: #0f5132 !important;
 }
 
+.ts-dropdown .dropdown-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
 /* Γραμμή που χωρίζει τα επιλεγμένα από τα μη επιλεγμένα */
 .ts-dropdown .ts-option--selected + .option:not(.ts-option--selected) {
   border-top: 1px solid #ced4da;
@@ -3399,6 +3427,7 @@ a[href] {
    +N Overflow Indicator
 ===================================== */
 .ts-overflow-indicator {
+  display:inline-block;
   background-color: #70b35670 !important;
   border-radius: 50%;
   width: 1.75rem;
@@ -3538,7 +3567,7 @@ a[href] {
 }
 .ts-wrapper.single .ts-control{
   display:flex;
-  align-items:center;
+  align-items:left;
 }
 .ts-wrapper.single .item{
   flex:1 1 auto;

@@ -11,5 +11,6 @@ module.exports = {
             team: query.team,
             companykod_object: query.company
         }),
+        sort: { kodikos: 1 }
     }
 };

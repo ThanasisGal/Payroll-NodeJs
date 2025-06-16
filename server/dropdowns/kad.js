@@ -1,14 +1,14 @@
 const statheraArxeiaModel = require('../models/stathera_arxeia');
 
 const {
-  TmhmataModel
+  KadModel
 } = statheraArxeiaModel;
 
 module.exports = {
-  path: '/api/dropdown/tmhmata',
-  model: TmhmataModel,
+  path: '/api/dropdown/kad',
+  model: KadModel,
   options: {
     searchFields: ['kodikos', 'perigrafh'],
-    sort: { kodikos: 1 }
+    sort: { kodikos: 1 },
   }
 };

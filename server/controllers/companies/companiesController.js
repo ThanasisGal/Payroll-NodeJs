@@ -340,7 +340,12 @@ class companiesController {
 
         try {
             const data = await PerifereiesModel.find().sort("kodikos");
-            res.render("companies/genikastoixeia/add", { locals, messages, data });
+            res.render("companies/genikastoixeia/add", { 
+                locals, 
+                messages, 
+                data,
+                rec: {},          // <— κενό αντικείμενο για «Νέα» εταιρεία. Χρησιμοποιείται στο "Δραστηριότητες"
+            });
         } catch (error) {
             console.log(error);
         }
@@ -674,6 +679,7 @@ class companiesController {
                 doys,
                 tameia,
                 company: companyData,
+                rec    : companyData,  // 👉 ΕΔΩ: περνάμε το ίδιο object ως "rec"
                 mimeType,
             });
         } catch (error) {

@@ -70,6 +70,7 @@ const PerifereiesSchema = new Schema({
   const KadSchema = new Schema({
     kodikos: { type: String, unique: true },
     perigrafh: { type: String, trim: true },
+    kodikosSort: { type: String, index: true },
   });
   const KadModel = model("Kad", KadSchema);
   
