@@ -75,3 +75,94 @@ function createDropdownApi(model, options = {}) {
 module.exports = {
     createDropdownApi,
 };
+
+
+
+// function createDropdownApi(model, options = {}) {
+//   const {
+//     codeField        = 'kodikos',
+//     searchFields     = null,
+//     extraQueryBuilder = () => ({}),
+//     mapItem          = null,
+//     baseUrl          = '',
+//   } = options;
+
+//   const _searchFields = searchFields || [codeField, 'perigrafh'];
+
+// const _mapItem = mapItem || ((item, pad = 11) => {
+//   const code   = item[codeField];
+//   const label  = `${(code || '')
+//                     .toString()
+//                     .padEnd(pad, '\u00A0')} - ${item.perigrafh}`;
+
+//   /* ➜ Επιστρέφουμε Ο,ΤΙ χρειάζεται το front-end */
+//   return {
+//     value     : code,                // γι’ αυτό κάνει   setValue(code)
+//     kodikos   : code,                // το template “ξέρει” αυτό το όνομα
+//     perigrafh : item.perigrafh,
+//     index     : parseInt(code.replace(/\D/g, ''), 10) || 0, // sortField
+//     label,                           // labelField = "label"
+//   };
+// });
+//   return async (req, res) => {
+//     const padLength = parseInt(req.query.padLength) || 11;
+//     try {
+//       const { search = '', page = 1, value } = req.query;
+
+//       /* ---------- PRE-SELECT ---------- */
+//         if (value) {
+//             // const rec = await model.findOne({ [codeField]: value }).lean();
+//             let rec = await model.findOne({ [codeField]: value }).lean();
+
+//             // fallback: αφαίρεσε μη ψηφία (τελείες, παύλες κ.λπ.)
+//             if (!rec) {
+//                 const numeric = value.replace(/\D/g, '');
+//                 if (numeric) {
+//                     rec = await model.findOne({ [codeField]: numeric }).lean();
+//                 }
+//             }
+
+//             return res.json({ items: rec ? [_mapItem(rec, padLength)] : [] });
+//         }
+
+//       /* ---------- LIVE SEARCH ---------- */
+//       const limit     = 50;
+//       const skip      = (parseInt(page) - 1) * limit;
+//       const regex     = new RegExp(search, 'i');
+//       const extra     = extraQueryBuilder(req.query);
+
+//       const searchQ   = search
+//         ? { $or: _searchFields.map(f => ({ [f]: regex })) }
+//         : {};
+
+//       const query = { ...extra, ...searchQ };
+
+//       const results = await model
+//         .find(query)
+//         .sort({ [codeField]: 1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean();
+
+//       const count   = await model.countDocuments(query);
+//       const hasMore = skip + results.length < count;
+//       const items   = results.map(item => _mapItem(item, padLength));
+
+//       /* ---------- nextPage link -------- */
+//       let nextPage = null;
+//       if (hasMore) {
+//         const urlBase = baseUrl || req.originalUrl.split('?')[0];
+//         const url     = new URL(urlBase, `${req.protocol}://${req.get('host')}`);
+//         url.searchParams.set('page', parseInt(page) + 1);
+//         nextPage = url.toString();
+//       }
+
+//       res.json({ items, hasMore, nextPage, totalCount: count });
+//     } catch (err) {
+//       console.error('Σφάλμα στο createDropdownApi:', err);
+//       res.status(500).send('Σφάλμα κατά την ανάκτηση δεδομένων.');
+//     }
+//   };
+// }
+
+// module.exports = { createDropdownApi };

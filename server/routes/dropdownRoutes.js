@@ -8,6 +8,7 @@ const typoiApodoxon = require("../dropdowns/typoiApodoxon");
 const tmhmata = require("../dropdowns/tmhmata");
 const periodoi = require("../dropdowns/periodoi");
 const ypokatasthmata = require("../dropdowns/ypokatasthmata");
+const kad = require('../dropdowns/kad');
 
 // const router = Router();
 
@@ -26,7 +27,7 @@ router.get('/typoiApodoxon',    buildDropdownRoute(Typoi_ApodoxonModel, typoiApo
 router.get('/periodoi',         buildDropdownRoute(PeriodsModel, periodoi.options));
 router.get('/ypokatasthmata',   buildDropdownRoute(YpokatasthmataModel, ypokatasthmata.options));
 router.get('/tmhmata',          buildDropdownRoute(TmhmataModel, tmhmata.options));
-router.get('/kad',              buildDropdownRoute(KadModel, tmhmata.options));
+router.get('/kad',              buildDropdownRoute(KadModel, kad.options));
 
 module.exports = router;
 

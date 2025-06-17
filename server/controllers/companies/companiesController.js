@@ -344,6 +344,7 @@ class companiesController {
                 locals, 
                 messages, 
                 data,
+                mode: 'add',
                 rec: {},          // <— κενό αντικείμενο για «Νέα» εταιρεία. Χρησιμοποιείται στο "Δραστηριότητες"
             });
         } catch (error) {
@@ -664,7 +665,11 @@ class companiesController {
             const tameia = await TameiaModel.find().sort("perigrafh");
 
             const companyId = req.params.id;
-            const companyData = await CompaniesModel.findById(companyId).exec();
+            const companyData = await CompaniesModel.findById(companyId).lean();
+            for (let i = 1; i <= 6; i++) {
+                companyData[`koddrast${i}`] = companyData[`kad${i}`] || '';
+            }
+
             // Εξαγωγή του MIME type από την Base64 encoded εικόνα
             const mimeType = companyData.sfragida
                 ? companyData.sfragida.split(";")[0].split(":")[1]
@@ -678,6 +683,7 @@ class companiesController {
                 pararthmata_efka,
                 doys,
                 tameia,
+                mode: 'edit',
                 company: companyData,
                 rec    : companyData,  // 👉 ΕΔΩ: περνάμε το ίδιο object ως "rec"
                 mimeType,

@@ -12,50 +12,50 @@ window.getSessionContext = () => currentSession;
  * και προσθέτει τους κατάλληλους event listeners
  */
 function autoBindFilterListeners() {
-  const fields = ['xrhsh', 'team', 'company', 'mhnas'];
+    const fields = ['xrhsh', 'team', 'company', 'mhnas'];
 
-  fields.forEach(field => {
-    document.querySelectorAll(`[data-${field}-related="true"]`).forEach(el => {
-      const tag = el.tagName.toLowerCase();
+    fields.forEach(field => {
+        document.querySelectorAll(`[data-${field}-related="true"]`).forEach(el => {
+            const tag = el.tagName.toLowerCase();
 
-      if (tag === 'input') {
-        el.addEventListener('input', e => {
-          updateFilter(field, e.target.value);
+            if (tag === 'input') {
+                el.addEventListener('input', e => {
+                    updateFilter(field, e.target.value);
+                });
+            }
+
+            if (tag === 'select') {
+                el.addEventListener('change', e => {
+                    updateFilter(field, e.target.value);
+                });
+            }
         });
-      }
-
-      if (tag === 'select') {
-        el.addEventListener('change', e => {
-          updateFilter(field, e.target.value);
-        });
-      }
     });
-  });
 }
 
 /**
  * 🚀 Εκκίνηση εφαρμογής αφού φέρει τις session τιμές
  */
 async function loadSessionAndInit() {
-  // try {
-    const res = await fetch('/api/session-data', {
-      credentials: 'include'
-    });
+    try {
+        const res = await fetch('/api/session-data', {
+            credentials: 'include'
+        });
 
-    const session = await res.json();
+        const session = await res.json();
 
-    currentSession = {
-      xrhsh: session.sessionEtos || new Date().getFullYear().toString(),
-      team: session.sessionTeam || 'DefaultTeam',
-      company: session.sessionCompanyInUse || 'DefaultCompany'
-    };
+        currentSession = {
+            xrhsh: session.sessionEtos || new Date().getFullYear().toString(),
+            team: session.sessionTeam || 'DefaultTeam',
+            company: session.sessionCompanyInUse || 'DefaultCompany'
+        };
 
-    initDropdowns();
-    autoBindFilterListeners();
+        initDropdowns();
+        autoBindFilterListeners();
 
-  // } catch (err) {
-  //   console.error("❌ Σφάλμα φόρτωσης session:", err);
-  // }
+    } catch (err) {
+        console.error("❌ Σφάλμα φόρτωσης session:", err);
+    }
 }
 
 loadSessionAndInit();

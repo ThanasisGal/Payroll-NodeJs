@@ -1,0 +1,55 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff; height: 53vh;">
+
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+    <% for (let index = 1; index <= 6; index++) { %>
+        <div class="row form-group g-3 align-items-center mb-3">
+            <div class="col-1-26 left-align">
+                <label
+                    <% if (index === 1) { %>
+                        for=<%= `select_kad${index}` %>
+                        class="col-form-label label-font-size"
+                        >Κύρια Δραστηριότητα</label>
+                    <% } else if (index === 6) { %>
+                        for=<%= `select_kad${index}` %>
+                        class="col-form-label label-font-size"
+                        >ΚΑΔ Παραρτήματος</label>
+                    <% } else { %>
+                        for=<%= `select_kad${index}` %>
+                        class="col-form-label label-font-size"
+                        >Δευτ/σα Δραστ/τα #<%= index %></label>
+                    <% } %>
+            </div>
+                
+            <input
+                type="hidden"
+                name="koddrast<%= index %>"
+                id="koddrast<%= index %>"
+                class="form-control input-contents"
+                value="<%= safe(`koddrast${index}`) %>"
+                readonly
+            />
+
+            <div class="col-10-25">
+                <select
+                    id=<%= `select_kad${index}` %>
+                    name=<%= `select_kad${index}` %>
+                    class="tom-dropdown left-align"
+                    aria-label="Κ.Α.Δ."
+                    data-api="/api/dropdown/kad"
+                    single
+                    data-target-input=<%= `koddrast${index}` %>
+                    data-preselect=<%= `koddrast${index}` %>
+                    data-skip-autoload="true"
+                    data-preload-all="false"
+                    data-pad-length="11"
+                    data-xrhsh-related="false"
+                    data-team-related="false"
+                    data-company-related="false"
+                    data-mhnas-related="false"
+                    placeholder="Αναζήτηση Κ.Α.Δ.">
+                </select>
+            </div>
+        </div>
+    <% } %>
+</div>

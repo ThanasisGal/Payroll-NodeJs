@@ -302,7 +302,10 @@ this.items.forEach(val => {
 
             const preSel = el.dataset.preselect;
             const code = document.getElementById(preSel)?.value?.trim();
-            if (code) {
+            const alreadyHasValue = el.getAttribute('data-has-value') === 'true';
+
+            if (code && !alreadyHasValue) {
+            // if (code) {
                 fetch(`${url}?value=${encodeURIComponent(code)}`, { credentials: 'include' })
                     .then(r => r.json())
                     .then(({ items }) => {
@@ -310,6 +313,12 @@ this.items.forEach(val => {
                             this.addOption(items[0]);
                             this.setValue(code, true);
                             selectedCache[code] = items[0];
+
+                            updateOverflow(this);
+
+                            // ✅ Flag για αποφυγή επανάληψης
+                            el.setAttribute('data-has-value', 'true');
+
                         }
                     })
                     .catch(console.error);
@@ -374,7 +383,6 @@ this.items.forEach(val => {
                     tom.addOption(item);
                     tom.setValue(preselectValue, true);
                     selectedCache[preselectValue] = item;
-                    console.log('✅ Preselect fetched & applied', item);
                 } else {
                     console.warn('⚠️ No matching item found in fetch for', preselectValue);
                 }

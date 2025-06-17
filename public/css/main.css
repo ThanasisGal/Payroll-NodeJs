@@ -3292,7 +3292,7 @@ a[href] {
 }
 
 .tom-dropdown .option {
-  font-family: monospace;
+  font-family: 'Roboto Mono', monospace;
 }
 
 /* ▼ εικονίδιο dropdown */
@@ -3322,7 +3322,9 @@ a[href] {
   border-bottom: 1px solid #c5c8cb !important;
   background-color: transparent !important;
   border-color: #80bdff;
-  font-size: .875rem !important;
+  font-size: 1.2rem !important;
+  font-weight: 600;
+  font-family: 'Roboto Mono', monospace;
   width: 100%;
   display: flex !important;
   flex-wrap: nowrap;

@@ -61,6 +61,9 @@ export function initDropdowns() {
     const allSelects = document.querySelectorAll('select[data-api]');
 
     allSelects.forEach(selectElement => {
+        if (selectElement.dataset.skipAutoload === 'true') {
+            return;
+        }
         const apiPath = selectElement.getAttribute('data-api');
         const relatedFields = [];
 
