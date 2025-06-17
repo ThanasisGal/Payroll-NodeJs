@@ -1,0 +1,154 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="kod_ta" class="col-form-label label-font-size">Κωδικός</label>
+        </div>
+        <div class="col-1">
+            <input
+                type="text"
+                name="kod_ta"
+                id="kod_ta"
+                class="form-control input-content"
+                value="<%= company.texnikos_asfaleias %>"
+                disabled
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="afm_ta" class="col-form-label label-font-size field-required">Α.Φ.Μ</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="afm_ta"
+                id="afm_ta"
+                class="form-control input-content"
+                value=""
+                maxlength="9"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="eponymo_ta" class="col-form-label label-font-size field-required">Επώνυμο/μία</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="eponymo_ta"
+                id="eponymo_ta"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="onoma_ta" class="col-form-label label-font-size">Όνομα</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="onoma_ta"
+                id="onoma_ta"
+                class="form-control input-content"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="dieythynsh_ta" class="col-form-label label-font-size">Διεύθυνση</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="dieythynsh_ta"
+                id="dieythynsh_ta"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="thlefono_ta" class="col-form-label label-font-size">Τηλέφωνο</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="thlefono_ta"
+                id="thlefono_ta"
+                class="form-control input-content"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="ores_ta" class="col-form-label label-font-size field-required">Ώρες Απασχ/σης</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="number"
+                name="ores_ta"
+                id="ores_ta"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="ap_katatheshs_ta" class="col-form-label label-font-size">Αρ.Πρωτ. Κατάθεσης</label>
+        </div>
+        <div class="col-2">
+            <input
+            type="text"
+            name="ap_katatheshs_ta"
+            id="ap_katatheshs_ta"
+            class="form-control input-content"
+            value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="hmnia_katatheshs_ta" class="col-form-label label-font-size">Ημ/νία Κατάθεσης</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="date"
+                name="hmnia_katatheshs_ta"
+                id="hmnia_katatheshs_ta"
+                class="date-control"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="isxyei_eos_ta" class="col-form-label label-font-size">Ισχύει Έως</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="date"
+                name="isxyei_eos_ta"
+                id="isxyei_eos_ta"
+                class="date-control"
+                value=""
+            />
+        </div>
+    </div>
+</div>

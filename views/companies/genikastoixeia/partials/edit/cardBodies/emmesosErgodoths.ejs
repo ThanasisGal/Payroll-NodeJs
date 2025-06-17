@@ -1,0 +1,181 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="kod_em_erg" class="col-form-label label-font-size">Κωδικός</label>
+        </div>
+        <div class="col-1">
+            <input
+                type="text"
+                name="kod_em_erg"
+                id="kod_em_erg"
+                class="form-control input-contents"
+                value="<%= company.emmesos_ergodoths %>"
+                disabled
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="afm_em_erg" class="col-form-label label-font-size field-required">Α.Φ.Μ</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="afm_em_erg"
+                id="afm_em_erg"
+                class="form-control input-contents"
+                value=""
+                maxlength="9"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="eponymo_em_erg" class="col-form-label label-font-size field-required">Επώνυμο/μία</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="eponymo_em_erg"
+                id="eponymo_em_erg"
+                class="form-control input-contents"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="onoma_em_erg" class="col-form-label label-font-size">Όνομα</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="onoma_em_erg"
+                id="onoma_em_erg"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="titlos_em_erg" class="col-form-label label-font-size">Διακριτικός Τίτλος</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="titlos_em_erg"
+                id="titlos_em_erg"
+                class="form-control input-contents"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="nomikh_morfh_em_erg" class="col-form-label label-font-size">Νομική Μορφή</label>
+        </div>
+        <div class="col-4">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="nomikh_morfh_em_erg"
+                id="nomikh_morfh_em_erg">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="drasthriothta_em_erg" class="col-form-label label-font-size">Αντικ. Δραστ/τητας</label>
+        </div>
+        <div class="col-10-5">
+            <input
+                type="text"
+                name="drasthriothta_em_erg"
+                id="drasthriothta_em_erg"
+                class="form-control input-contents"
+                value=""
+                required
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="dieythynsh_em_erg" class="col-form-label label-font-size">Διεύθυνση</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="dieythynsh_em_erg"
+                id="dieythynsh_em_erg"
+                class="form-control input-contents"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="thlefono_em_erg" class="col-form-label label-font-size">Τηλέφωνο</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="thlefono_em_erg"
+                id="thlefono_em_erg"
+                class="form-control input-contents"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="email_em_erg" class="col-form-label label-font-size">eMail</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="mail"
+                class="form-control input-contents"
+                name="email_em_erg"
+                id="email_em_erg"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="daneismos_epa_apo_em_erg" class="col-form-label label-font-size">Δανεισμός μέσω ΕΠΑ Από</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="date"
+                name="daneismos_epa_apo_em_erg"
+                id="daneismos_epa_apo_em_erg"
+                class="date-control"
+                value=""
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="daneismos_epa_eos_em_erg" class="col-form-label label-font-size">Έως</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="date"
+                name="daneismos_epa_eos_em_erg"
+                id="daneismos_epa_eos_em_erg"
+                class="date-control"
+                value=""
+            />
+        </div>
+    </div>
+</div>

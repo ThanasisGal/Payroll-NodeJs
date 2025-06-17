@@ -1,0 +1,140 @@
+<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="kod_lo" class="col-form-label label-font-size">Κωδικός</label>
+        </div>
+        <div class="col-1">
+            <input
+                type="text"
+                name="kod_lo"
+                id="kod_lo"
+                class="form-control input-content"
+                value="<%= company.logisths %>"
+                disabled
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="afm_lo" class="col-form-label label-font-size field-required" >Α.Φ.Μ</label>
+        </div>
+        <div class="col-2">
+            <input
+                type="text"
+                name="afm_lo"
+                id="afm_lo"
+                class="form-control input-content"
+                value=""
+                maxlength="9"
+                pattern="[0-9]{1,}"
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="eponymo_lo" class="col-form-label label-font-size field-required">Επώνυμο/μία</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="eponymo_lo"
+                id="eponymo_lo"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="onoma_lo" class="col-form-label label-font-size">Όνομα</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="onoma_lo"
+                id="onoma_lo"
+                class="form-control input-content"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="dieythynsh_lo" class="col-form-label label-font-size">Διεύθυνση</label>
+        </div>
+        <div class="col-5">
+            <input
+                type="text"
+                name="dieythynsh_lo"
+                id="dieythynsh_lo"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-1-5 right-align">
+            <label for="thlefono_lo" class="col-form-label label-font-size">Τηλέφωνο</label>
+        </div>
+        <div class="col-3">
+            <input
+                type="text"
+                name="thlefono_lo"
+                id="thlefono_lo"
+                class="form-control input-content"
+                value=""
+            />
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="doy_lo" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
+        </div>
+        <div class="col-5">
+            <select
+                class="form-select selectpicker-dropdown-normal"
+                data-live-search="true"
+                name="doy_lo"
+                id="doy_lo">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-3">
+        <div class="col-1-5 right-align">
+            <label for="arithmos_adeias_lo" class="col-form-label label-font-size field-required">Αριθμός Άδειας</label>
+        </div>
+
+        <div class="col-2">
+            <input
+                type="text"
+                name="arithmos_adeias_lo"
+                id="arithmos_adeias_lo"
+                class="form-control input-content"
+                value=""
+                required
+            />
+        </div>
+
+        <div class="col-3"></div>
+
+        <div class="col-1-5 right-align">
+            <label for="kathgoria_adeias_lo" class="col-form-label label-font-size">Κατηγορία Άδειας</label>
+        </div>
+
+        <div class="col-2">
+            <input
+                type="text"
+                name="kathgoria_adeias_lo"
+                id="kathgoria_adeias_lo"
+                class="form-control input-content"
+                value=""
+            />
+        </div>
+    </div>
+</div>
+

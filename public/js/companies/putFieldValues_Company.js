@@ -50,6 +50,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
+    console.log(formData);
+
     try {
       const companyId = document.getElementById("companyId").value;
       

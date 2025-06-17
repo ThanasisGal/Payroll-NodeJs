@@ -96,7 +96,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   var companyLogisths = document.getElementById('companyLogisths');
-  var kodLogisthsValue = document.getElementById('kod_ia').value;
+  var kodLoEl = document.getElementById('kod_lo');
+  var kodLogisthsValue = kodLoEl ? kodLoEl.value : '';
+  if (kodLoEl) {
+    var kodLogisthsValue = document.getElementById('kod_lo').value;
+  }
     // Έλεγχος αν η τιμή του companyLogisths είναι κενή και ενημέρωση αν ναι
   if (!companyLogisths.value && kodLogisthsValue) {
       companyLogisths.value = kodLogisthsValue;
