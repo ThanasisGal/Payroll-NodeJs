@@ -217,7 +217,7 @@ async function loadPararthmataEfka() {
 }
 
 async function loadDoyOptions() {
-  try {
+  // try {
     // Fetch τα δεδομένα DOY
     const doyResponse = await fetch('/api/doy');
     const doyData = await doyResponse.json();
@@ -233,9 +233,9 @@ async function loadDoyOptions() {
 
     fillSelectElement('doy', doyData, companyData.doy_company);
     fillSelectElement('doy_lo', doyData, logisthsData[0].doy);
-  } catch (error) {
-    console.error('Error loading data:', error);
-  }
+  // } catch (error) {
+  //   console.error('Error loading data:', error);
+  // }
 }
 
 async function loadTameiaOptions() {
@@ -262,6 +262,7 @@ async function loadTameiaOptions() {
 
 function fillSelectElement(selectId, data, selectedValue) {
   const selectElement = document.getElementById(selectId);
+  if (!selectElement) return;
   selectElement.innerHTML = ''; // Καθαρισμός προηγούμενων επιλογών
 
   // Προσθήκη κενής επιλογής

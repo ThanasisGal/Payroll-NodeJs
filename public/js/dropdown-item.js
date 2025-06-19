@@ -69,7 +69,7 @@ export const initTomDropdown = ({
         valueField      : 'value',
         labelField      : 'label',
         searchField     : ['label'],
-        sortField       : 'index',
+        sort            : false,
         /* custom score ώστε κενό search ⇒ όλα τα items */
         score(search) {
             if (!search || !Array.isArray(search.tokens) || !search.tokens.length) {
@@ -92,7 +92,6 @@ export const initTomDropdown = ({
 
         placeholder  : el.getAttribute('placeholder') || 'Αναζήτηση…',
         plugins      : [ ...(isMultiple ? ['remove_button'] : []), 'dropdown_input' ],
-        // plugins      : [ ...(isMultiple ? ['remove_button'] : ['clear_button']), 'dropdown_input' ],
 
         /* ------ async LOAD (σελίδα 1) ------------------------- */
         async load(searchText, callback) {
@@ -127,7 +126,6 @@ export const initTomDropdown = ({
 
                     if (!alreadyInOptions && cached) {
                         this.addOption(cached);
-                        console.log('✅ Re-added cached selected option:', v);
                     } else if (!cached) {
                         console.warn('⚠️ Cannot re-add – missing from cache:', v);
                     }
@@ -400,7 +398,6 @@ this.items.forEach(val => {
             // ✅ Αν δεν υπάρχει στο options, ξαναπέρασέ το
             if (!tom.options[value]) {
                 tom.addOption(data);
-                console.log('✅ Re-injected missing option on add', value);
             }
 
         } else {

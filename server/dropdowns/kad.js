@@ -9,6 +9,6 @@ module.exports = {
   model: KadModel,
   options: {
     searchFields: ['kodikos', 'perigrafh'],
-    sort: { kodikos: 1 },
+    sort: { kodikosSort: 1 },
   }
 };

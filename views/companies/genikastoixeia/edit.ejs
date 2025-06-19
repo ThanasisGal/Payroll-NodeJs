@@ -20,7 +20,7 @@
             <input type="hidden" name="companyNomos" id="companyNomos" class="form-control" value="<%= company.nomos %>" />
             <input type="hidden" name="companyDhmos" id="companyDhmos" class="form-control" value="<%= company.dhmos %>" />
             <input type="hidden" name="companyPolh" id="companyPolh" class="form-control" value="<%= company.polh %>" />
-            <input type="text" name="companyLogisths" id="companyLogisths" class="form-control" value="<%= company.logisths ? company.logisths : '' %>" />
+            <input type="hidden" name="companyLogisths" id="companyLogisths" class="form-control" value="<%= company.logisths ? company.logisths : '' %>" />
             <input type="hidden" name="companyTexnikos" id="companyTexnikos" class="form-control" value="<%= company.texnikos_asfaleias ? company.texnikos_asfaleias : '' %>" />
             <input type="hidden" name="companyIatros" id="companyIatros" class="form-control" value="<%= company.iatros_ergasias ? company.iatros_ergasias : '' %>" />
             <input type="hidden" name="currentImage" id="currentImage" class="form-control" value="<%= company.sfragida ? company.sfragida : '' %>" />
@@ -96,7 +96,7 @@
                         
                             <%- include('./partials/edit/cardHeader') %>
 
-                            <%- include('./partials/edit/cardBodies/texnikosAsfaleias') %>
+                            <%- include('./partials/edit/cardBodies/logisths') %>
 
                             <%- include('./partials/edit/cardFooter') %>
 
@@ -162,7 +162,6 @@
 <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
     <script type="module" src="/static/js/companies/genikastoixeia/initKadDropdowns.js"></script>  
 
@@ -176,6 +175,7 @@
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
 </div>

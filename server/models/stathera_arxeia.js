@@ -169,6 +169,7 @@ const PerifereiesSchema = new Schema({
   const PeriodsSchema = new Schema({
     xrhsh: { type: String, required: true },
     kodikos: { type: String, required: true },
+    kodikosSort: { type: Number },
     perigrafh: { type: String, trim: true },
     apo: { type: Date, default: null},
     eos: { type: Date, default: null},
