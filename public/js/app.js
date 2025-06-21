@@ -37,7 +37,7 @@ function autoBindFilterListeners() {
  * 🚀 Εκκίνηση εφαρμογής αφού φέρει τις session τιμές
  */
 async function loadSessionAndInit() {
-    try {
+    // try {
         const res = await fetch('/api/session-data', {
             credentials: 'include'
         });
@@ -53,9 +53,9 @@ async function loadSessionAndInit() {
         initDropdowns();
         autoBindFilterListeners();
 
-    } catch (err) {
-        console.error("❌ Σφάλμα φόρτωσης session:", err);
-    }
+    // } catch (err) {
+    //     console.error("❌ Σφάλμα φόρτωσης session:", err);
+    // }
 }
 
 loadSessionAndInit();

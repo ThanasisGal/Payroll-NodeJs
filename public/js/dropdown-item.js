@@ -19,8 +19,20 @@ export const initTomDropdown = ({
     minChars    = 0,
 } = {}) => {
     if (!selector || !url) return;
+
     const el = document.querySelector(selector);
     if (!el) return;
+    
+    // if (el.dataset.skipAutoload === 'true') {
+    //     // μην κάνεις pre-load • περιμένουμε ο χρήστης να πληκτρολογήσει
+    //     tom.settings.preload = false;
+    // }
+
+    // ✅ Ασφαλής καθαρισμός υπάρχοντος instance
+    if (el.tomselect) {
+        el.tomselect.destroy();
+    }
+
     // ⬅️ Αν υπάρχει pad-length στο HTML, πέρασέ το στα extraParams
     const padLength = el.dataset.padLength;
     if (padLength && !extraParams.padLength) {
@@ -44,7 +56,7 @@ export const initTomDropdown = ({
     };
 
     /* ---------------------------------------------------------------- */
-    const isMultiple = el.hasAttribute('multiple');
+    const isMultiple = el.hasAttribute('multiple') ;
     const preloadAll = el.dataset.preloadAll === 'true';
 
     /* helper για next‑page URL  -------------------------------------- */
@@ -70,6 +82,8 @@ export const initTomDropdown = ({
         labelField      : 'label',
         searchField     : ['label'],
         sort            : false,
+        dropdownDirection: 'auto',
+
         /* custom score ώστε κενό search ⇒ όλα τα items */
         score(search) {
             if (!search || !Array.isArray(search.tokens) || !search.tokens.length) {
@@ -90,7 +104,7 @@ export const initTomDropdown = ({
         loadThrottle : 0,
         shouldLoad   : (q) => preloadAll ? true : q.trim().length >= minChars,
 
-        placeholder  : el.getAttribute('placeholder') || 'Αναζήτηση…',
+        placeholder  : '',
         plugins      : [ ...(isMultiple ? ['remove_button'] : []), 'dropdown_input' ],
 
         /* ------ async LOAD (σελίδα 1) ------------------------- */
@@ -162,7 +176,9 @@ export const initTomDropdown = ({
             },
             item(optionData, e) {
                 if (!optionData || typeof optionData !== 'object' || !('value' in optionData)) {
-                    return '<div class="item">(???)</div>';
+                    // return '<div class="item">(???)</div>';
+                    const phText = el.getAttribute('placeholder') || '…';
+                    return `<div class="item placeholder-item" aria-placeholder="true">${e(phText)}</div>`;
                 }
                 const vKey = this.settings.valueField || 'value';
                 return `<div class="item" data-value="${e(optionData[vKey])}">${e(optionData.label)}</div>`;
@@ -237,6 +253,21 @@ export const initTomDropdown = ({
                         this.refreshOptions(false);
                     }
                 }
+
+                // ➜ Δυναμική τοποθέτηση dropdown πάνω ή κάτω
+                const controlRect = this.control.getBoundingClientRect();
+                const dropdownEl = this.dropdown;
+
+                const spaceAbove = controlRect.top;
+                const spaceBelow = window.innerHeight - controlRect.bottom;
+
+                if (spaceAbove > spaceBelow) {
+                    dropdownEl.style.top = 'auto';
+                    dropdownEl.style.bottom = `${controlRect.height}px`;
+                } else {
+                    dropdownEl.style.top = '100%';
+                    dropdownEl.style.bottom = 'auto';
+                }
             });
 
             /******************* B. Project‑specific setup *****************/
@@ -288,38 +319,42 @@ export const initTomDropdown = ({
              *  Προεπιλογή κωδικού από τη ΒΔ
             * ------------------------------------------------------------*/
 
-// 🔁 Re-render any missing tags manually (multi-select issue fix)
-this.items.forEach(val => {
-    const itemExists = this.control.querySelector(`.item[data-value="${val}"]`);
-    if (!itemExists) {
-        console.warn('⚠️ Missing tag for value:', val, '→ Re-adding...');
-        this.removeItem(val, true);
-        this.addItem(val);
-    }
-});
+            // 🔁 Re-render any missing tags manually (multi-select issue fix)
+            this.items.forEach(val => {
+                const itemExists = this.control.querySelector(`.item[data-value="${val}"]`);
+                if (!itemExists) {
+                    console.warn('⚠️ Missing tag for value:', val, '→ Re-adding...');
+                    this.removeItem(val, true);
+                    this.addItem(val);
+                }
+            });
 
-            const preSel = el.dataset.preselect;
-            const code = document.getElementById(preSel)?.value?.trim();
-            const alreadyHasValue = el.getAttribute('data-has-value') === 'true';
+            const preSelId  = el.dataset.preselect;
+            const preSelVal = document.getElementById(preSelId)?.value?.trim();
+            if (preSelVal && !el.hasAttribute('data-has-value')) {
 
-            if (code && !alreadyHasValue) {
-            // if (code) {
-                fetch(`${url}?value=${encodeURIComponent(code)}`, { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(({ items }) => {
-                        if (items?.length) {
-                            this.addOption(items[0]);
-                            this.setValue(code, true);
-                            selectedCache[code] = items[0];
+            const u = new URL(url, location.origin);
+// const u = url.startsWith('/')
+//     ? new URL(window.location.pathname.replace(/\/[^/]*$/, '') + url, location.origin)
+//     : new URL(url, location.origin);
 
-                            updateOverflow(this);
 
-                            // ✅ Flag για αποφυγή επανάληψης
-                            el.setAttribute('data-has-value', 'true');
+            Object.entries(extraParams || {})
+                .forEach(([k, v]) => v && u.searchParams.set(k, v));
+            u.searchParams.set('value', preSelVal);
 
-                        }
-                    })
-                    .catch(console.error);
+            fetch(u, { credentials: 'include' })
+                .then(r => r.json())
+                .then(({ items }) => {
+                if (items?.length) {
+                    tom.addOption(items[0]);
+                    tom.setValue(preSelVal, true);
+                    selectedCache[preSelVal] = items[0];
+                    updateOverflow(tom);          // διατηρεί το layout
+                    el.setAttribute('data-has-value', 'true');
+                }
+                })
+                .catch(console.error);
             }
 
             /* -----------------------------------------------------------------
@@ -332,7 +367,6 @@ this.items.forEach(val => {
                     if (input) input.value = val;
                 });
             }
-
         },
 
         onDropdownOpen () {
@@ -372,14 +406,25 @@ this.items.forEach(val => {
     const preselectId = el.dataset.preselect;
     const preselectValue = document.getElementById(preselectId)?.value;
 
-    if (preselectValue) {
-        fetch(`/api/dropdown/kad?value=${encodeURIComponent(preselectValue)}`)
+    if (preselectValue && url) {
+        const urlObj = new URL(url, location.origin);
+        urlObj.searchParams.set('value', preselectValue);
+
+        // ➕ Περνά όλα τα extraParams στο URL (π.χ. padLength)
+        Object.entries(extraParams || {}).forEach(([k, v]) => {
+            if (v !== undefined && v !== null) {
+                urlObj.searchParams.set(k, v);
+            }
+        });
+
+        fetch(urlObj.toString())
             .then(res => res.json())
             .then(data => {
                 const item = data.items?.[0]; // ή αναλόγως το format του API
                 if (item) {
                     tom.addOption(item);
                     tom.setValue(preselectValue, true);
+                    updateOverflow(tom);
                     selectedCache[preselectValue] = item;
                 } else {
                     console.warn('⚠️ No matching item found in fetch for', preselectValue);
@@ -387,6 +432,7 @@ this.items.forEach(val => {
             })
         .catch(err => console.error('❌ Preselect fetch failed:', err));
     }
+
     tom.on('item_add', (value, data) => {
         if (!data || !data.value) {
             data = tom.options?.[value];
@@ -483,9 +529,10 @@ const CLEAR_BTN_SELECTOR = '.ts-single-reset-btn';
 
 function clickClearIfVisible(ts) {
     const btn = ts.wrapper.querySelector(CLEAR_BTN_SELECTOR);
+    
     // ➜ offsetParent === null → το element είναι display:none ή hidden
     if (btn && btn.offsetParent !== null) {
-        btn.click();          // πυροδοτεί το 'clear' + ό,τι handler έχεις
+        btn.click();          // πυροδοτεί το 'clear' + ό,τι handler έχουμε
     }
 }
 

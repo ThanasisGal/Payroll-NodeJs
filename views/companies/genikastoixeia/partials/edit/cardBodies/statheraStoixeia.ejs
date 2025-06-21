@@ -1,4 +1,6 @@
 <div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-1-5 right-align">
             <label
@@ -283,28 +285,71 @@
 
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-1-5 right-align">
-            <label for="nomikhmorfh" class="col-form-label label-font-size">Νομική Μορφή</label>
+            <label
+                for="nomikhmorfh"
+                class="col-form-label label-font-size">
+                    Νομική Μορφή
+            </label>
         </div>
-        <div class="col-5">
+        <input
+            type="hidden"
+            name="nomikhmorfh_stathera"
+            id="nomikhmorfh_stathera"
+            class="form-control input-contents"
+            value="<%= safe("nomikhmorfh_stathera") %>"
+            readonly
+        />
+        <div class="col-3-75">
             <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="nomikhmorfh"
                 id="nomikhmorfh"
-                data-selected="<%= company.nomikh_morfh %>">
+                name="nomikhmorfh"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Νομική Μορφή"
+                data-api="/api/dropdown/nomikesMorfes"
+                single
+                data-target-input=<%= `nomikhmorfh_stathera` %>
+                data-preselect=<%= `nomikhmorfh_stathera` %>
+                data-preload-all="true"
+                data-pad-length="3"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Νομικής Μορφής">
             </select>
         </div>
 
+        <div class="col-1-25-1"></div>
+        
         <div class="col-1-5 right-align">
             <label for="pararthmaefka" class="col-form-label label-font-size">Παράρτημα ΕΦΚΑ</label>
         </div>
-        <div class="col-4">
+        <input
+            type="hidden"
+            name="pararthmaefka_stathera"
+            id="pararthmaefka_stathera"
+            class="form-control input-contents"
+            value="<%= safe("pararthmaefka_stathera") %>"
+            readonly
+        />
+
+        <div class="col-3-75">
             <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="pararthmaefka"
                 id="pararthmaefka"
-                data-selected="<%= company.pararthma_efka %>">
+                name="pararthmaefka"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Παράρτημα ΕΦΚΑ"
+                data-api="/api/dropdown/pararthmataEfka"
+                single
+                data-target-input=<%= `pararthmaefka_stathera` %>
+                data-preselect=<%= `pararthmaefka_stathera` %>
+                data-preload-all="true"
+                data-pad-length="3"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Παραρτήματος ΕΦΚΑ">
             </select>
         </div>
     </div>
@@ -313,130 +358,94 @@
         <div class="col-1-5 right-align">
             <label for="doy" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
         </div>
-        <div class="col-5">
+        <input
+            type="hidden"
+            name="doy_stathera"
+            id="doy_stathera"
+            class="form-control input-contents"
+            value="<%= safe("doy_stathera") %>"
+            readonly
+        />
+
+        <div class="col-10-25">
             <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="doy"
                 id="doy"
-                data-selected="<%= company.doy_company %>">
+                name="doy"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Δ.Ο.Υ."
+                data-api="/api/dropdown/doy"
+                single
+                data-target-input=<%= `doy_stathera` %>
+                data-preselect=<%= `doy_stathera` %>
+                data-preload-all="false"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Δ.Ο.Υ.">
             </select>
         </div>
     </div>
 
-    <div class="row form-group g-3 align-items-center mb-0-5">
-        <div class="col-1-5 right-align">
-            <label for="tameio1" class="col-form-label label-font-size">Ταμείο #1 (τ.ΙΚΑ)</label>
-        </div>
-        <div class="col-4">
-            <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="tameio1"
-                id="tameio1">
-            </select>
-        </div>
+    <% for (let index = 1; index <= 4; index++) { %>
+        <div class="row form-group g-3 align-items-center mb-0-5">
+            <div class="col-1-5 right-align">
+                <label
+                    for=<%= `select_tameio${index}` %>
+                    class="col-form-label label-font-size">
+                    Ταμείο #<%= index %>
+                </label>
+            </div>
 
-        <div class="col-1"></div>
-
-        <div class="col-1-5 right-align">
-            <label for="ame1" class="col-form-label label-font-size">Α.Μ.Ε. #1</label>
-        </div>
-        <div class="col-2">
             <input
-                type="text"
-                name="ame1"
-                id="ame1"
-                class="form-control input-content"
-                value="<%= company.ame1 %>"
+                type="hidden"
+                name="kodikos_tameioy<%= index %>"
+                id="kodikos_tameioy<%= index %>"
+                class="form-control input-contents"
+                value="<%= safe(`kodikos_tameioy${index}`) %>"
+                readonly
             />
-        </div>
-    </div>
 
-    <div class="row form-group g-3 align-items-center mb-0-5">
-        <div class="col-1-5 right-align">
-            <label for="tameio2" class="col-form-label label-font-size">Ταμείο #2</label>
-        </div>
-        <div class="col-4">
-            <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="tameio2"
-                id="tameio2">
-            </select>
-        </div>
+            <div class="col-3-75">
+                <select
+                    id=<%= `select_tameio${index}` %>
+                    name=<%= `select_tameio${index}` %>
+                    class="tom-dropdown left-align"
+                    aria-label="Ταμεία Ασφάλισης"
+                    data-api="/api/dropdown/tameia"
+                    single
+                    data-target-input=<%= `kodikos_tameioy${index}` %>
+                    data-preselect=<%= `kodikos_tameioy${index}` %>
+                    data-preload-all="true"
+                    data-pad-length="4"
+                    data-xrhsh-related="false"
+                    data-team-related="false"
+                    data-company-related="false"
+                    data-mhnas-related="false"
+                    placeholder="Αναζήτηση Ταμείου Ασφάλισης">
+                </select>
+            </div>
 
-        <div class="col-1"></div>
+            <div class="col-1-25"></div>
 
-        <div class="col-1-5 right-align">
-            <label for="ame2" class="col-form-label label-font-size">Α.Μ.Ε. #2</label>
-        </div>
-        <div class="col-2">
-            <input
-                type="text"
-                name="ame2"
-                id="ame2"
-                class="form-control input-content"
-                value="<%= company.ame2 %>"
-            />
-        </div>
-    </div>
+            <div class="col-1-5 right-align">
+                <label
+                    for=<%= `ame${index}` %>
+                    class="col-form-label label-font-size">
+                    A.Μ.Ε. #<%= index %>
+                </label>
+            </div>
 
-    <div class="row form-group g-3 align-items-center mb-0-5">
-        <div class="col-1-5 right-align">
-            <label for="tameio3" class="col-form-label label-font-size">Ταμείο #3</label>
+            <div class="col-1-5 right-align">
+                <input
+                    type="text"
+                    name="ame<%= index %>"
+                    id="ame<%= index %>"
+                    class="form-control input-contents"
+                    value="<%= company[`ame${index}`] || '' %>"
+                />
+            </div>
         </div>
-        <div class="col-4">
-            <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="tameio3"
-                id="tameio3">
-            </select>
-        </div>
-
-        <div class="col-1"></div>
-
-        <div class="col-1-5 right-align">
-            <label for="ame3" class="col-form-label label-font-size">Α.Μ.Ε. #3</label>
-        </div>
-        <div class="col-2">
-            <input
-                type="text"
-                name="ame3"
-                id="ame3"
-                class="form-control input-content"
-                value="<%= company.ame3 %>"
-            />
-        </div>
-    </div>
-
-    <div class="row form-group g-3 align-items-center mb-2">
-        <div class="col-1-5 right-align">
-            <label for="tameio4" class="col-form-label label-font-size">Ταμείο #4</label>
-        </div>
-        <div class="col-4">
-            <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="tameio4"
-                id="tameio4">
-            </select>
-        </div>
-
-        <div class="col-1"></div>
-
-        <div class="col-1-5 right-align">
-            <label for="ame4" class="col-form-label label-font-size">Α.Μ.Ε. #4</label>
-        </div>
-        <div class="col-2">
-            <input
-                type="text"
-                name="ame4"
-                id="ame4"
-                class="form-control input-content"
-                value="<%= company.ame4 %>"
-            />
-        </div>
-    </div>
+    <% } %>
 </div>

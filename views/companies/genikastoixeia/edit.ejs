@@ -157,24 +157,24 @@
         window.RUNTIME_ENV = "<%= NODE_ENV %>";
     </script>
               
-<!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
-<!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
-<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/dropdownsValue<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<!-- <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script> -->
+    <script type="module" src="/static/js/companies/genikastoixeia/initNomikesMorfesDropdowns.js"></script>  
+    <script type="module" src="/static/js/companies/genikastoixeia/initPararthmataEfkaDropdowns.js"></script>  
+    <script type="module" src="/static/js/companies/genikastoixeia/initDoyDropdowns.js"></script>  
+    <script type="module" src="/static/js/companies/genikastoixeia/initTameiaDropdowns.js"></script>  
     <script type="module" src="/static/js/companies/genikastoixeia/initKadDropdowns.js"></script>  
 
-<!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadKadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
-<!-- <script type="module" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/initKadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadMultipleUsers<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/select-UnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

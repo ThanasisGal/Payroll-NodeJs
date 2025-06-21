@@ -4,7 +4,7 @@
 
     <% for (let index = 1; index <= 6; index++) { %>
         <div class="row form-group g-3 align-items-center mb-3">
-            <div class="col-1-26 left-align">
+            <div class="col-1-35 right-align">
                 <label
                     <% if (index === 1) { %>
                         for=<%= `select_kad${index}` %>
@@ -21,16 +21,14 @@
                     <% } %>
             </div>
                 
-            <!-- <div class="col-0"> -->
-                <input
-                    type="hidden"
-                    name="koddrast<%= index %>"
-                    id="koddrast<%= index %>"
-                    class="form-control input-contents"
-                    value="<%= safe(`koddrast${index}`) %>"
-                    readonly
-                />
-            <!-- </div> -->
+            <input
+                type="hidden"
+                name="koddrast<%= index %>"
+                id="koddrast<%= index %>"
+                class="form-control input-contents"
+                value="<%= safe(`koddrast${index}`) %>"
+                readonly
+            />
 
             <!-- data-preload-all="true" → θέλω όλες τις εγγραφές (< 50) μόλις μπει focus.
             data-preload-all="false" → κρατάω το τρέχον behavior (αναζήτηση). -->

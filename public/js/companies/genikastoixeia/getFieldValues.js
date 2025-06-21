@@ -39,6 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
+        console.log(formData);
+        
         if (!formData.eponymia || formData.eponymia === "") {
             Swal.fire({
                 icon: "error",
