@@ -1,4 +1,6 @@
 <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody5" style="background-color: #ffffff;">
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
             <label for="kod_lo" class="col-form-label label-font-size">Κωδικός</label>
@@ -94,13 +96,41 @@
         <div class="col-1-5 right-align">
             <label for="doy_lo" class="col-form-label label-font-size">Δ.Ο.Υ.</label>
         </div>
-        <div class="col-5">
-            <select
+        <!-- <div class="col-5"> -->
+            <!-- <select
                 class="form-select selectpicker-dropdown-normal"
                 data-live-search="true"
                 name="doy_lo"
                 id="doy_lo">
+            </select> -->
+        <input
+            type="hidden"
+            name="doy_logisths"
+            id="doy_logisths"
+            class="form-control input-contents"
+            value="<%= safe("doy_logisths") %>"
+            readonly
+        />
+
+        <div class="col-9-5">
+            <select
+                id="doy_accountant"
+                name="doy_accountant"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Δ.Ο.Υ. Λογιστή"
+                data-api="/api/dropdown/logistes"
+                single
+                data-target-input=<%= `doy_logisths` %>
+                data-preselect=<%= `doy_logisths` %>
+                data-preload-all="false"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Δ.Ο.Υ. Λογιστή">
             </select>
+        </div>
         </div>
     </div>
 
@@ -109,7 +139,7 @@
             <label for="arithmos_adeias_lo" class="col-form-label label-font-size field-required">Αριθμός Άδειας</label>
         </div>
 
-        <div class="col-2">
+        <div class="col-1-5">
             <input
                 type="text"
                 name="arithmos_adeias_lo"
@@ -120,13 +150,13 @@
             />
         </div>
 
-        <div class="col-3"></div>
+        <div class="col-3-5"></div>
 
         <div class="col-1-5 right-align">
             <label for="kathgoria_adeias_lo" class="col-form-label label-font-size">Κατηγορία Άδειας</label>
         </div>
 
-        <div class="col-2">
+        <div class="col-1">
             <input
                 type="text"
                 name="kathgoria_adeias_lo"

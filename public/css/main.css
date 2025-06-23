@@ -30,6 +30,7 @@ body.custom-background {
   background-position: 60% 50%;
   transition: none !important;
 }
+
 .black-color {
   color: #000000;
 }
@@ -758,6 +759,7 @@ small,
 .col-3-85 { flex: 0 0 auto; width: 32.08%; }
 .col-3-95 { flex: 0 0 auto; width: 32.92%; }
 .col-3-99 { flex: 0 0 auto; width: 33.25%; }
+.col-4-00 { flex: 0 0 auto; width: 35.65%; }
 .col-4-01 { flex: 0 0 auto; width: 33.75%; }
 .col-4-1 { flex: 0 0 auto; width: 34.9%; }
 .col-4-2 { flex: 0 0 auto; width: 35%; }
@@ -1533,6 +1535,7 @@ a {
       font-size: 0.70vw !important;
     }
     .ml-0 { margin-left: .5vw; }
+    .col-4-00 { flex: 0 0 auto; width: 35.74%; }
     .col-4-9 { flex: 0 0 auto; width: 40.83%; }
 
     /* FIREFOX BROWSER */
@@ -3324,9 +3327,14 @@ select.tom-dropdown {
   background-repeat: no-repeat;
   background-size: contain;
   transform: translateY(-50%);
+  pointer-events: none;   /* αφήνει το click να περάσει στον wrapper */
   z-index: 2;          /* (προαιρετικό) για να κάθεται πάνω απ’ τα tags */
 }
 
+/* Όταν το dropdown είναι ανοιχτό → rotate 180° */
+.ts-wrapper.dropdown-wrapper.open::after{
+  transform:translateY(-50%) rotate(180deg);
+}
 /* =====================================
    Container input + tags
 ===================================== */
@@ -3619,7 +3627,6 @@ select.tom-dropdown {
   transform:translateY(-50%);
   background-color: #d4e7d4; /* ανοιχτό πράσινο */
   color: #2b6d2b;            /* σκούρο πράσινο */
-  /* border: 1px solid #2b6d2b; */
   border-radius: 4px;
   height: 28px;
   width: 28px;
@@ -3641,10 +3648,11 @@ select.tom-dropdown {
 }
 
 /* wrapper ώστε να «δέσει» το εικονίδιο πάνω στο input */
-.clearable-wrapper {
-  position: relative;
-  display: block;      /* ή inline-block + width:100% */
-  width: 100%;
+.clearable-wrapper{
+  position:relative;
+  display:inline-block;
+  width:100%;
+  overflow:visible;          /* τα πάντα εντός ορίων */
 }
 /* κόκκινο Χ */
 .clear-btn {
@@ -3652,13 +3660,16 @@ select.tom-dropdown {
   right: 0.6rem;                /* απόσταση από το δεξί άκρο */
   top: 50%;
   transform: translateY(-50%);
-  font-weight: bold;
+  font-weight: 300;
   cursor: pointer;
   color: #c62828;               /* κόκκινο */
-  font-size: 1rem;
+  font-size: 1vw;
   line-height: 1;
   opacity: 0;                   /* κρυφό όταν δεν έχει κείμενο */
   transition: opacity 0.15s;
 }
 
-.clear-btn:hover { opacity: 0.8; }
+.clear-btn:hover { 
+  font-weight: bolder;
+  opacity: 1 !important; 
+}

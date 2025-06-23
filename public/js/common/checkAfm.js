@@ -179,7 +179,7 @@ async function fetchLogisthsData(afm) {
         document.getElementById("kod_lo").value = data.doc.kodikos;
         document.getElementById("eponymo_lo").value = data.doc.eponymo;
         document.getElementById("onoma_lo").value = data.doc.onoma;
-        document.getElementById("dieythynsh_lo").value = data.doc.diethynsh;
+        document.getElementById("dieythynsh_lo").value = data.doc.dieythynsh;
         document.getElementById("thlefono_lo").value = data.doc.thlefono;
         document.getElementById("doy_lo").value = data.doc.doy;
         document.getElementById("arithmos_adeias_lo").value = data.doc.arithmos_adeias;

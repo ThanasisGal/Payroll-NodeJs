@@ -1,23 +1,74 @@
+// import { initTomDropdown } from '../../dropdown-item.js';
+
+// document.addEventListener('DOMContentLoaded', () => {
+//         const selectId = `doy`;
+//         const selectEl = document.getElementById(selectId);
+
+//         const tomKey = `#${selectId}`;
+
+//         // 🧹 FORCE CLEANUP μόνο για αυτό το dropdown (χωρίς να πειράζονται άλλα)
+//         const existing = window.__tomInstances?.[tomKey];
+//         if (existing) {
+//             existing.destroy(); // καθάρισε TomSelect
+//             delete window.__tomInstances[tomKey];
+//         }
+
+//         const api = selectEl.dataset.api;
+//         const preselectId = selectEl.dataset.preselect;
+//         const preselectValue = document.getElementById(preselectId)?.value?.trim();
+
+//         // ✅ Επανεκκίνηση dropdown
+//         initTomDropdown({
+//             selector    : tomKey,
+//             url         : api,
+//             extraParams : {},
+//             minChars    : 0
+//         });
+
+//         // ✅ Αν έχει τιμή -> κάνε preselect
+//         if (preselectValue) {
+//             fetch(`${api}?value=${encodeURIComponent(preselectValue)}`)
+//                 .then(res => res.json())
+//                 .then(({ items }) => {
+//                     if (items?.length) {
+//                         const item = items[0];
+//                         const tom = window.__tomInstances?.[tomKey];
+//                         if (tom) {
+//                             tom.addOption(item);
+//                             tom.setValue(item.value, true);
+//                         }
+//                     }
+//                 })
+//                 .catch(console.error);
+//         }
+// });
+
+
+
+
+
+
 import { initTomDropdown } from '../../dropdown-item.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-        const selectId = `doy`;
-        const selectEl = document.getElementById(selectId);
+    // βρίσκουμε ΟΛΑ τα select που ζητάνε Δ.Ο.Υ. (data-api τελειώνει σε /doy ή /logistes)
+    document.querySelectorAll('select[data-api$="doy"], select[data-api$="logistes"]')
+    .forEach(selectEl => {
+        const selectId   = selectEl.id;
+        const tomKey     = `#${selectId}`;
 
-        const tomKey = `#${selectId}`;
-
-        // 🧹 FORCE CLEANUP μόνο για αυτό το dropdown (χωρίς να πειράζονται άλλα)
+        // καθάρισμα παλιάς TomSelect, αν υπάρχει
         const existing = window.__tomInstances?.[tomKey];
         if (existing) {
-            existing.destroy(); // καθάρισε TomSelect
+            existing.destroy();
             delete window.__tomInstances[tomKey];
         }
 
-        const api = selectEl.dataset.api;
-        const preselectId = selectEl.dataset.preselect;
+        const api            = selectEl.dataset.api;
+        const preselectId    = selectEl.dataset.preselect;
         const preselectValue = document.getElementById(preselectId)?.value?.trim();
 
-        // ✅ Επανεκκίνηση dropdown
+        // init TomSelect
         initTomDropdown({
             selector    : tomKey,
             url         : api,
@@ -25,20 +76,21 @@ document.addEventListener('DOMContentLoaded', () => {
             minChars    : 0
         });
 
-        // ✅ Αν έχει τιμή -> κάνε preselect
+        // pre-select
         if (preselectValue) {
             fetch(`${api}?value=${encodeURIComponent(preselectValue)}`)
                 .then(res => res.json())
                 .then(({ items }) => {
                     if (items?.length) {
-                        const item = items[0];
+                        const [item] = items;
                         const tom = window.__tomInstances?.[tomKey];
                         if (tom) {
                             tom.addOption(item);
-                            tom.setValue(item.value, true);
+                            tom.setValue(item.value, true);   // silent = true
                         }
                     }
                 })
-                .catch(console.error);
+            .catch(console.error);
         }
+    });
 });

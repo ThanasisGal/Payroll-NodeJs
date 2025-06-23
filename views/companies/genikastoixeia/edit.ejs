@@ -31,7 +31,7 @@
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
                 <div>
                     <form class="formRadius" enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
 
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -47,7 +47,7 @@
             <section class="sel_2_section visible" data-section="Δραστηριότητες">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -62,7 +62,7 @@
             <section class="sel_3_section visible" data-section="Τεχνικός Ασφαλείας">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -77,7 +77,7 @@
             <section class="sel_4_section visible" data-section="Ιατρός Εργασίας">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -92,7 +92,7 @@
             <section class="sel_5_section visible" data-section="Λογιστής">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -107,6 +107,7 @@
             <section class="sel_6_section visible" data-section="Διάφορα">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%;">
                         
                             <%- include('./partials/edit/cardHeader') %>
@@ -122,7 +123,7 @@
             <section class="sel_7_section visible" data-section="Έμμεσος Εργοδότης">
                 <div>
                     <form class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -137,7 +138,7 @@
             <section class="sel_8_section visible" data-section="Διάδοχος Εργοδότης">
                 <div>
                     <form class="formRadius" enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
                         
                             <%- include('./partials/edit/cardHeader') %>
 
@@ -168,6 +169,7 @@
     <script type="module" src="/static/js/companies/genikastoixeia/initDoyDropdowns.js"></script>  
     <script type="module" src="/static/js/companies/genikastoixeia/initTameiaDropdowns.js"></script>  
     <script type="module" src="/static/js/companies/genikastoixeia/initKadDropdowns.js"></script>  
+    <!-- <script type="module" src="/static/js/companies/genikastoixeia/initDoyLogisthDropdowns.js"></script>   -->
 
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadMultipleUsers<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
@@ -175,7 +177,11 @@
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
-    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+    <!-- <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
 </div>

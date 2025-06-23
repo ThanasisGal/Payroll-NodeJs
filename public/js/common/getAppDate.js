@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const newAppDateInUse = await response.text();
         // Ανανεώνει το περιεχόμενο του αντίστοιχου <a> element
         document.getElementById("selectedDate").innerHTML =
-          "Ημερ.Χρήσης : " + `${newAppDateInUse.substring(9,11)}/${newAppDateInUse.substring(6,8)}/${newAppDateInUse.substring(1,5)}`;
+          "Ημ/νία Χρήσης : " + `${newAppDateInUse.substring(9,11)}/${newAppDateInUse.substring(6,8)}/${newAppDateInUse.substring(1,5)}`;
       } catch (error) {
         console.error("Πρόβλημα κατά την εμφάνιση της ημερομηνίας χρήσης της εφαρμογής:", error);
       }

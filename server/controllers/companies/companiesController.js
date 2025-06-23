@@ -434,6 +434,7 @@ class companiesController {
             texnikos_asfaleias: formData.kod_ta,
             iatros_ergasias: formData.kod_ia,
             logisths: formData.kod_lo,
+            doy_logisth: formData.doy_logisths,
             emmesos_ergodoths: formData.kod_em_erg,
             diadoxos_ergodoths: formData.kod_diad_erg,
             oikodomika: formData.oikodomika,
@@ -498,7 +499,7 @@ class companiesController {
                 afm: formData.afm_lo,
                 dieythynsh: formData.dieythynsh_lo,
                 thlefono: formData.thlefono_lo,
-                doy: formData.doy_lo,
+                doy: formData.doy_logisths,
                 arithmos_adeias: formData.arithmos_adeias_lo,
                 kathgoria_adeias: formData.kathgoria_adeias_lo,
                 createdAt: Date.now(),
@@ -599,7 +600,7 @@ class companiesController {
             title: "Payroll",
             description: "Web Payroll System",
         };
-
+        
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
 
@@ -645,42 +646,66 @@ class companiesController {
             images = req.flash("img");
             redir = "companies/companies/genikastoixeia";
         }
-        await res.render(redir, { messages, types, images });
+        await res.render(redir, {
+            messages,
+            types,
+            images,
+            bodyClass: "custom-background",
+            locals
+        });
     };
 
     static editCompanyForm = async (req, res) => {
+        /* ----- breadcrumbs / flash ------------------------------------ */
         const messages = await req.flash("info");
-        const locals = {
-            title: "Διόρθωση Εταιρείας",
-            description: "Web Payroll System",
+        const locals   = {
+            title       : "Διόρθωση Εταιρείας",
+            description : "Web Payroll System",
         };
 
         try {
-            const perifereies = await PerifereiesModel.find().sort("perigrafh");
-            const nomikes_morfes = await NomikesMorfesModel.find().sort("perigrafh");
-            const pararthmata_efka = await PararthmataEfkaModel.find().sort(
-                "perigrafh"
-            );
-            const doys = await DoyModel.find().sort("perigrafh");
-            const tameia = await TameiaModel.find().sort("perigrafh");
+            /* ----- look-ups (τρέχουν παράλληλα) -------------------------- */
+            const [
+                perifereies,
+                nomikes_morfes,
+                pararthmata_efka,
+                doys,
+                tameia,
+            ] = await Promise.all([
+                PerifereiesModel.find().sort("perigrafh"),
+                NomikesMorfesModel.find().sort("perigrafh"),
+                PararthmataEfkaModel.find().sort("perigrafh"),
+                DoyModel.find().sort("perigrafh"),
+                TameiaModel.find().sort("perigrafh"),
+            ]);
 
-            const companyId = req.params.id;
+            /* ----- δεδομένα εταιρείας ------------------------------------ */
+            const companyId   = req.params.id;
             const companyData = await CompaniesModel.findById(companyId).lean();
+
+            /* ––– προεπιλογές (σταθερά στοιχεία) ––– */
             for (let i = 1; i <= 6; i++) {
-                companyData[`koddrast${i}`] = companyData[`kad${i}`] || '';
+                companyData[`koddrast${i}`] = companyData[`kad${i}`] || "";
             }
-            companyData["nomikhmorfh_stathera"] = companyData["nomikh_morfh"] || '';
-            companyData["pararthmaefka_stathera"] = companyData["pararthma_efka"] || '';
-            companyData["doy_stathera"] = companyData["doy_company"] || '';
+            companyData.nomikhmorfh_stathera   = companyData.nomikh_morfh   || "";
+            companyData.pararthmaefka_stathera = companyData.pararthma_efka || "";
+            companyData.doy_stathera           = companyData.doy_company    || "";
             for (let i = 1; i <= 4; i++) {
-                companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || '';
+                companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || "";
             }
 
-            // Εξαγωγή του MIME type από την Base64 encoded εικόνα
+            /* ----- δεδομένα λογιστή (για pre-select ΔΟΥ) ------------------ */
+            const logisthsData = await LogisthsModel.findOne({ kodikos : companyData.logisths }).lean();
+
+            //  Περνάμε στο template την κρυφή τιμή για το dropdown
+            companyData.doy_logisths = logisthsData?.doy || "";
+
+            /* ----- mime type σφραγίδας ----------------------------------- */
             const mimeType = companyData.sfragida
                 ? companyData.sfragida.split(";")[0].split(":")[1]
                 : "";
 
+            /* ----- render ------------------------------------------------- */
             res.render("companies/genikastoixeia/edit", {
                 locals,
                 messages,
@@ -689,15 +714,22 @@ class companiesController {
                 pararthmata_efka,
                 doys,
                 tameia,
-                mode: 'edit',
+                mode   : "edit",
                 company: companyData,
-                rec    : companyData,  // 👉 ΕΔΩ: περνάμε το ίδιο object ως "rec"
+                rec    : companyData,   // alias για ευκολία
                 mimeType,
             });
-        } catch (error) {
-            console.log(error);
+
+        } catch (err) {
+            console.error("editCompanyForm error →", err);
+            res.status(500).send("Σφάλμα κατά τη φόρτωση δεδομένων.");
         }
     };
+    
+
+
+
+
 
     static getCompanyKads = async (req, res) => {
         try {

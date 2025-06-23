@@ -244,8 +244,13 @@ export const initTomDropdown = ({
                 setTimeout(() => this.refreshOptions(false));
             });
 
-            /* -- focus (dropdown_open) ----------------------------- */
+            /* ---------------------------------------------------------------
+            * dropdown_open  ➜  position + preload + trash btn κ.λπ.
+            * -------------------------------------------------------------*/
             this.on('dropdown_open', () => {
+                tom.wrapper.classList.add('open');
+
+                /* ---------- προαιρετικό preload ---------------------------------*/
                 if (this.settings._preloadAll && !this.control_input.value) {
                     if (Object.keys(this.options).length < 2) {
                         this.load('');
@@ -254,22 +259,64 @@ export const initTomDropdown = ({
                     }
                 }
 
-                // ➜ Δυναμική τοποθέτηση dropdown πάνω ή κάτω
-                const controlRect = this.control.getBoundingClientRect();
-                const dropdownEl = this.dropdown;
+                /* ---------- helper: έξυπνη τοποθέτηση --------------------------*/
+                const reposition = () => {
+                    const controlRect = this.control.getBoundingClientRect();
+                    const ddEl        = this.dropdown;
 
-                const spaceAbove = controlRect.top;
-                const spaceBelow = window.innerHeight - controlRect.bottom;
+                    /* 1. «ιδανικό» ύψος =  search + 5 rows */
+                    const searchH     = 36;   // fallback ύψος search
+                    const optionH     = 34;   // fallback ύψος μίας option
+                    const idealHeight = searchH + optionH * 6.5;
 
-                if (spaceAbove > spaceBelow) {
-                    dropdownEl.style.top = 'auto';
-                    dropdownEl.style.bottom = `${controlRect.height}px`;
-                } else {
-                    dropdownEl.style.top = '100%';
-                    dropdownEl.style.bottom = 'auto';
-                }
+                    /* 2. διαθέσιμος χώρος ΜΕΣΑ στο .card (για να μην «ξεχειλίζει» ) */
+                    const cardRect    = tom.wrapper.closest('.card')
+                        ?.getBoundingClientRect()
+                        ?? { top: 0, bottom: window.innerHeight };
+
+                    const spaceAbove  = controlRect.top    - cardRect.top;
+                    const spaceBelow  = cardRect.bottom    - controlRect.bottom;
+
+                    const placeBelow  = maxH => {
+                        ddEl.style.top = '100%';
+                        ddEl.style.bottom = 'auto';
+                        ddEl.style.maxHeight = `${maxH}px`;
+                    };
+                    const placeAbove  = maxH => {
+                    ddEl.style.bottom = `${controlRect.height}px`;
+                    ddEl.style.top = 'auto';
+                    ddEl.style.maxHeight = `${maxH}px`;
+                    };
+
+                    /* 3. λογική επιλογής */
+                    if (idealHeight <= spaceBelow) {
+                        placeBelow(idealHeight);            // χωράει κάτω
+                    } else if (idealHeight <= spaceAbove) {
+                        placeAbove(idealHeight);            // χωράει πάνω
+                    } else {
+                    /* δεν χωρά ολόκληρο: ΠΑΝΩ με scrollbar */
+                        placeAbove(Math.max(spaceAbove - 8, 150));  // 150 px ελάχιστο
+                    }
+                };
+
+                /* --- 1η τοποθέτηση (ανοίγει κενό αν skip-autoload) --------------*/
+                requestAnimationFrame(reposition);
+
+                /* --- 2η τοποθέτηση όταν φορτωθούν τα options --------------------*/
+                const origLoad = this.settings.load;
+                this.settings.load = (query, callback) => {
+                    // callback(items.length ? items : undefined);
+                    origLoad.call(this, query, items => {
+                        if (Array.isArray(items) && items.length) {
+                            callback(items);          // κανονική ροή
+                        } else {
+                            callback();               // κλείνει το spinner – δεν κρασάρει
+                        }
+
+                        requestAnimationFrame(reposition);   // ξαναϋπολόγισε με τα νέα ύψη
+                    });
+                };
             });
-
             /******************* B. Project‑specific setup *****************/
             this.wrapper.classList.add('dropdown-wrapper');
             this.control_input.classList.add('dropdown-input');
@@ -296,9 +343,25 @@ export const initTomDropdown = ({
                 this.load(query);
             }, 300));
 
-
             // overflow handling -----------------------------------
             updateOverflow(this);
+
+            /* =====================================================
+            *  ΕΜΦΑΝΙΣΗ 🗑 ΑΜΕΣΩΣ  μόλις προστεθεί/φορτωθεί επιλογή
+            * -----------------------------------------------------
+            * καλύπτει όλα τα σενάρια:
+            *   • προ-επιλογή από ΒΔ (fetch + setValue)
+            *   • preload remote data
+            *   • pagination / endless scroll
+            *   • αλλαγές από item_add / item_remove
+            * ====================================================*/
+            const overflowNow = () => requestAnimationFrame(() => updateOverflow(this));
+
+            this.on('load'     , overflowNow);   // fire μετά από κάθε async load
+            this.on('item_add' , overflowNow);   // single & multi
+            this.on('item_remove', overflowNow);
+            this.on('clear'    , overflowNow);
+            
             if (isMultiple && typeof hooks.onInit === 'function') hooks.onInit(this);
 
             if (isMultiple) {
@@ -334,11 +397,6 @@ export const initTomDropdown = ({
             if (preSelVal && !el.hasAttribute('data-has-value')) {
 
             const u = new URL(url, location.origin);
-// const u = url.startsWith('/')
-//     ? new URL(window.location.pathname.replace(/\/[^/]*$/, '') + url, location.origin)
-//     : new URL(url, location.origin);
-
-
             Object.entries(extraParams || {})
                 .forEach(([k, v]) => v && u.searchParams.set(k, v));
             u.searchParams.set('value', preSelVal);
@@ -350,7 +408,7 @@ export const initTomDropdown = ({
                     tom.addOption(items[0]);
                     tom.setValue(preSelVal, true);
                     selectedCache[preSelVal] = items[0];
-                    updateOverflow(tom);          // διατηρεί το layout
+                    requestAnimationFrame(() => updateOverflow(tom));
                     el.setAttribute('data-has-value', 'true');
                 }
                 })
@@ -386,6 +444,7 @@ export const initTomDropdown = ({
         },
 
         onDropdownClose () {
+            tom.wrapper.classList.remove('open');
             this.dropdown.querySelector('.dropdown-input')?.removeAttribute('placeholder');
         },
 
@@ -424,7 +483,7 @@ export const initTomDropdown = ({
                 if (item) {
                     tom.addOption(item);
                     tom.setValue(preselectValue, true);
-                    updateOverflow(tom);
+                    requestAnimationFrame(() => updateOverflow(tom));
                     selectedCache[preselectValue] = item;
                 } else {
                     console.warn('⚠️ No matching item found in fetch for', preselectValue);

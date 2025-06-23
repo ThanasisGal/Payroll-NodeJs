@@ -13,6 +13,7 @@ const pararthmataEfka = require('../dropdowns/pararthmataEfka');
 const doy = require('../dropdowns/doy');
 const tameia = require('../dropdowns/tameia');
 const kad = require('../dropdowns/kad');
+// const logisths = require('../dropdowns/logistes');
 
 const   {
             YpokatasthmataModel,
@@ -40,5 +41,6 @@ router.get('/doy',              buildDropdownRoute(DoyModel, doy.options));
 router.get('/tameia',           buildDropdownRoute(TameiaModel, tameia.options));
 
 router.get('/kad',              buildDropdownRoute(KadModel, kad.options));
+router.get('/logistes',         buildDropdownRoute(DoyModel, doy.options));
 
 module.exports = router;

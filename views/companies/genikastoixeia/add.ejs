@@ -50,7 +50,7 @@
             <section class="sel_3_section" data-section="Τεχνικός Ασφαλείας">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
 
                             <%- include('./partials/add/cardHeader') %>
 
@@ -142,8 +142,8 @@
                 
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_add<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>  
-    <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/select-UnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
@@ -151,4 +151,3 @@
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 </div>
-

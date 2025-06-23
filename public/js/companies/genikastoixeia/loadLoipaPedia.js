@@ -47,6 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const element = document.getElementById(id);
       if (element) {
         element.value = value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
       }
     });
   }
