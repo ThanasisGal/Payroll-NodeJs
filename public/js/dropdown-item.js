@@ -483,6 +483,7 @@ export const initTomDropdown = ({
                 if (item) {
                     tom.addOption(item);
                     tom.setValue(preselectValue, true);
+                    // tom.setValue(preselectValue);
                     requestAnimationFrame(() => updateOverflow(tom));
                     selectedCache[preselectValue] = item;
                 } else {

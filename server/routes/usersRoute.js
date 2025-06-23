@@ -277,7 +277,7 @@ router.get("/api/perifereies", genikaAPIsController.getPerifereies);
 router.get("/api/periodoi", mainAppController.getPeriods);
 router.get("/api/periodInUse", mainAppController.getPeriodInUse);
 router.get("/api/poleis", genikaAPIsController.getPoleis);
-router.get("/api/populatedoy", genikaAPIsController.getDoy);
+// router.get("/api/populatedoy", genikaAPIsController.getDoy);
 router.get("/api/populatekad", genikaAPIsController.getKad);
 router.get("/api/populatetameia", genikaAPIsController.getTameia);
 

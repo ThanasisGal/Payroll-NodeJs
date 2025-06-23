@@ -153,7 +153,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const dropdownData = await response.json();
       // Φόρτωση δεδομένων στα dropdowns
       loadDoyDataToDropdown(doyDropdown, dropdownData.doy);
-      // loadDoyDataToDropdown(doy_loDropdown, dropdownData.doy_lo);
     } catch (error) {
       console.error(error);
     }

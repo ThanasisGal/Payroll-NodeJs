@@ -86,7 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const tom = window.__tomInstances?.[tomKey];
                         if (tom) {
                             tom.addOption(item);
-                            tom.setValue(item.value, true);   // silent = true
+                            tom.setValue(item.value);
+                            // tom.setValue(item.value, true);   // silent = true
                         }
                     }
                 })
