@@ -20,17 +20,7 @@
   </form>
 </div>
 
-<% messages.forEach(element => { %>
-  <div class="auto-close alert alert-info alert-dismissible fade show" role="alert">
-    <b class="fw-bold"><i class="bi bi-check2-circle"></i></h2>&nbsp; <%= element %></b>
-    <button
-      type="button"
-      class="btn-close"
-      data-bs-dismiss="alert"
-      aria-label="Κλείσιμο"
-    ></button>
-  </div>
-<% }) %>
+<%- include('./partials/flash') %>
 
 <div class="card z-depth-5">
   <div class="card-body">

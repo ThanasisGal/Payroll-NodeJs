@@ -16,6 +16,7 @@ const userPrivilegesSchema = new Schema({
     }
 });
 
+userPrivilegesSchema.index({ userId: 1, form: 1 }, { unique: true });
 const UserPrivilegesModel = model("userPrivileges", userPrivilegesSchema);
 
 const sidebarStatusSchema = new Schema({
@@ -23,9 +24,11 @@ const sidebarStatusSchema = new Schema({
   li_Id: { type: String, required: true },
   situation_A: { type: Boolean, default: false },
   situation_C: { type: Boolean, default: false },
+  situation_U: { type: Boolean, default: false },
   situation_V: { type: Boolean, default: false }
 });
 
+sidebarStatusSchema.index({ userId: 1, li_Id: 1 }, { unique: true });
 const SidebarStatusModel = model("sidebarStatus", sidebarStatusSchema);
 
 module.exports = { UserPrivilegesModel, 

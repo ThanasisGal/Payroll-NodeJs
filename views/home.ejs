@@ -9,8 +9,9 @@
 </style>
 
 <div
-class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom"
->
+class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+
+<%- include('./partials/flash') %>
 
 <% if (!userId) { %> 
   <a
@@ -35,26 +36,3 @@ class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-cente
 <% } %>
 </div>
 
-<% messages.forEach(element => { %>
-  <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
-    <b class="fw-bold" style="font-size: 18px;">
-      <% if (images[0] == 'sign-stop') { %>
-      <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
-      <% } else if (images[0] == 'check-circle') { %>
-        <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
-      <% } else if (images[0] == 'exclamation-triangle') { %>
-        <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
-      <% } else if (images[0] == 'question-circle') { %>
-        <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
-      <% } %>
-     </h2>&nbsp; <%= element %></b>
-    <button
-      type="button"
-      class="btn-close"
-      data-bs-dismiss="alert"
-      aria-label="Κλείσιμο"
-    ></button>
-  </div>
-<% }) %>
-
-<!-- <script src="/static/js/changeUrl.js"></script> -->

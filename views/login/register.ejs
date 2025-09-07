@@ -3,29 +3,8 @@
   </br>
 </div>
 
-  <% messages.forEach(element => { %>
-    <% if (typeof types !== 'undefined' && types.length > 0) { %>
-      <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
-        <b class="fw-bold" style="font-size: 18px;">
-        <% if (images[0] == 'sign-stop') { %>
-          <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
-        <% } else if (images[0] == 'check-circle') { %>
-          <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
-        <% } else if (images[0] == 'exclamation-triangle') { %>
-          <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
-        <% } else if (images[0] == 'question-circle') { %>
-          <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
-        <% } %>
-        </h2>&nbsp; <%= element %></b>
-        <button
-          type="button"
-          class="btn-close"
-          data-bs-dismiss="alert"
-          aria-label="Κλείσιμο"
-        ></button>
-      </div>
-    <% } %>
-  <% }) %>
+<%- include('../partials/flash') %>
+
 </br></br>
 <div class="container w-50">
   <form action="/register/userRegistration" method="POST">
@@ -42,6 +21,7 @@
             id="tmpEmail"
             class="form-control"
             value=""
+            readonly
           />
         </div>
 
@@ -126,6 +106,8 @@
               id="team"
               class="form-control"
               value=""
+              maxlength="3"
+              title="Αν είστε supervisor ορίστε μία ομάδα εργασίας (μέχρι 3 χαρακτήρες), ενώ αν είστε απλός χρήστης πρέπει να απευθυνθείτε στον supervisor για να σας δηλώσει σε μια ομάδα εργασίας και να ορίσει τα δικαιώματά σας στην εφαρμογή"
             />
           </div>
         </div>

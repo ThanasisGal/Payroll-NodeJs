@@ -26,11 +26,7 @@ const {
     DiadoxosErgodothsModel,
 } = Models;
 
-var types,
-    redir,
-    messages,
-    images,
-  sTerm = "";
+var redir, sTerm = "";
 
 // Έλεγχος του λειτουργικού συστήματος
 const isWindows = process.platform === 'win32';
@@ -57,18 +53,8 @@ class companiesController {
             title: "Payroll",
             description: "Web Payroll System",
         };
-        await req.flash("message", "");
-        messages = req.flash("message");
-        await req.flash("type", process.env._INFO);
-        types = req.flash("type");
-        await req.flash("img", process.env._IMG_INFO);
-        images = req.flash("img");
-
         res.render("mainapp", {
             locals,
-            messages,
-            types,
-            images,
         });
     };
 
@@ -153,7 +139,6 @@ class companiesController {
                 company,
                 current: page,
                 pages: totalPages,
-                messages,
             });
         } catch (error) {
             console.log(error);
@@ -332,7 +317,6 @@ class companiesController {
     };
 
     static addCompanyForm = async (req, res) => {
-        const messages = await req.flash("info");
         const locals = {
         title: "Προσθήκη Νέας Εταιρείας",
         description: "Web Payroll System",
@@ -342,7 +326,6 @@ class companiesController {
             const data = await PerifereiesModel.find().sort("kodikos");
             res.render("companies/genikastoixeia/add", { 
                 locals, 
-                messages, 
                 data,
                 mode: 'add',
                 rec: {},          // <— κενό αντικείμενο για «Νέα» εταιρεία. Χρησιμοποιείται στο "Δραστηριότητες"
@@ -595,7 +578,6 @@ class companiesController {
     };
 
     static choiseCompanies = async (req, res) => {
-        const messages = await req.flash("info");
         const locals = {
             title: "Payroll",
             description: "Web Payroll System",
@@ -635,29 +617,16 @@ class companiesController {
             redir = "mainapp";
 
         } catch (error) {
-            await req.flash(
-                "message",
-                "Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή"
-            );
-            messages = req.flash("message");
-            await req.flash("type", process.env._ERROR);
-            types = req.flash("type");
-            await req.flash("img", process.env._IMG_ERROR);
-            images = req.flash("img");
+            await res.flash("warning", "Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή" );
             redir = "companies/companies/genikastoixeia";
         }
         await res.render(redir, {
-            messages,
-            types,
-            images,
             bodyClass: "custom-background",
             locals
         });
     };
 
     static editCompanyForm = async (req, res) => {
-        /* ----- breadcrumbs / flash ------------------------------------ */
-        const messages = await req.flash("info");
         const locals   = {
             title       : "Διόρθωση Εταιρείας",
             description : "Web Payroll System",
@@ -708,7 +677,6 @@ class companiesController {
             /* ----- render ------------------------------------------------- */
             res.render("companies/genikastoixeia/edit", {
                 locals,
-                messages,
                 perifereies,
                 nomikes_morfes,
                 pararthmata_efka,
@@ -881,6 +849,7 @@ class companiesController {
             texnikos_asfaleias: formData.kod_ta,
             iatros_ergasias: formData.kod_ia,
             logisths: formData.kod_lo,
+            doy_logisth: formData.doy_logisths,
             emmesos_ergodoths: formData.kod_em_erg,
             diadoxos_ergodoths: formData.kod_diad_erg,
             oikodomika: formData.oikodomika,

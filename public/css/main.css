@@ -948,6 +948,10 @@ input.disabled {
   border-bottom: var(--bs-card-border-width) solid var(--bs-card-border-color);
   border-top-left-radius: 1rem !important;
   border-top-right-radius: 1rem !important;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* .bg-header {
@@ -3672,4 +3676,31 @@ select.tom-dropdown {
 .clear-btn:hover { 
   font-weight: bolder;
   opacity: 1 !important; 
+}
+
+/* Success: πράσινο / άσπρο */
+.alert-success{
+  --bs-alert-bg: #16a34a;
+  --bs-alert-color: #ffffff;
+  --bs-alert-border-color: #16a34a;
+}
+
+/* Error: κόκκινο / άσπρο */
+.alert-danger{
+  --bs-alert-bg: #dc2626;
+  --bs-alert-color: #ffffff;
+  --bs-alert-border-color: #dc2626;
+}
+
+/* Warning: κίτρινο / μαύρο */
+.alert-warning{
+  --bs-alert-bg: #f5be0b;
+  --bs-alert-color: #111111;
+  --bs-alert-border-color: #f5be0b;
+}
+
+/* Προαιρετικό: να φαίνεται το X κλεισίματος πάνω σε σκούρο φόντο */
+.alert-success .btn-close,
+.alert-danger .btn-close{
+  filter: invert(1);
 }

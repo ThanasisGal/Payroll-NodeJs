@@ -1,0 +1,45 @@
+<%
+// Συγκέντρωση όλων των flash μηνυμάτων ανά τύπο
+const TYPES = ['success','error','warning','info'];
+const all = [];
+
+TYPES.forEach(function(type){
+    const arr = (typeof getFlashMessages === 'function') ? getFlashMessages(type) : [];
+    arr
+        .filter(m => typeof m === 'string' && m.trim().length > 0)
+        .forEach(m => all.push({ type, msg: m.trim() }));
+});
+
+// Αν δεν υπάρχουν μηνύματα, μην κάνεις render τίποτα
+%>
+<% if (all.length) { %>
+    <% all.forEach(({ type, msg }) => {
+        const bsType = (type === 'error') ? 'danger' : type;
+        const icon = (type === 'success') ? 'check-circle-fill'
+                : (type === 'error')   ? 'x-octagon-fill'
+                : (type === 'warning') ? 'exclamation-triangle-fill'
+                : 'info-circle-fill';
+    %>
+    <div class="auto-close alert alert-<%= bsType %> alert-dismissible fade show" role="alert" data-autoclose="true">
+        <b class="fw-bold" style="font-size: 18px;">
+            <i class="bi bi-<%= icon %>"></i>
+            &nbsp;<%= msg %>
+        </b>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Κλείσιμο"></button>
+    </div>
+    <% }) %>
+
+    <!-- Auto-close μετά από 5s (Bootstrap 5) -->
+    <script>
+        (function(){
+            document.querySelectorAll('.auto-close[data-autoclose="true"]').forEach(function(el){
+                setTimeout(function(){
+                    try {
+                        var inst = bootstrap.Alert.getOrCreateInstance(el);
+                        inst.close();
+                    } catch(e) { /* ignore */ }
+                }, 5000);
+            });
+        })();
+    </script>
+<% } %>

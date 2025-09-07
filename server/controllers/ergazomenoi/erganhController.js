@@ -503,6 +503,7 @@ class erganhController {
                 sessionTeam: sessionTeam,
                 companyId: companyId,
                 passwords: cleanedPasswordsData,
+                rec: {},
             });   
         } catch (error) {
             console.log("Error into erganhController -> mainEisagoghOrarionApoErganhForm :", error);

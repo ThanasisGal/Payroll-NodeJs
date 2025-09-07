@@ -1,3 +1,5 @@
+const logger = require("../../server/utils/logger");
+
 const Models_A = require("../models/param");
 const UserModel = require("../models/userModel");
 const Models_C = require("../models/companies");
@@ -13,7 +15,7 @@ const { XrhseisModel,
 
 const threeSpaces = '\u00A0'.repeat(3);
 
-var types, redir, messages, images;
+var redir;
 
 class mainAppController {
     static getMainAppForm = async (req, res) => {
@@ -72,7 +74,7 @@ class mainAppController {
 
     static getUser = async (req, res) => {
         const sessionUserId = req.session.userId;
-        console.log(req.session);
+        logger.debug(`Session = ${JSON.stringify(req.session, null, 2)}`);
         try {
             const user = await UserModel.findOne({ _id: sessionUserId }).select('firstName team');
             res.json(user);
@@ -142,9 +144,6 @@ class mainAppController {
             redir = "companies/genikastoixeia/companies";
         }
         await res.render(redir, {
-            messages,
-            types,
-            images,
             bodyClass: "custom-background"
         });
     };
@@ -230,34 +229,13 @@ class mainAppController {
             req.session.periodInUse = newPeriod;
             req.session.periodInUseDescr = newPeriodDescr;
         
-            await req.flash(
-                "message",
-                "Επιτυχής Αλλαγή Περιόδου Εργασίας."
-            );
-            messages = req.flash("message");
-            await req.flash("type", process.env._SUCCESS);
-            types = req.flash("type");
-            await req.flash("img", process.env._IMG_SUCCESS);
-            images = req.flash("img");
+            // await res.flash("success", "Επιτυχής Αλλαγή Περιόδου Εργασίας.");
             redir = "mainapp";
         } catch (error) {
-            await req.flash(
-            "message",
-            "Αδυναμία Αλλαγής Περιόδου Εργασίας. Επικοινωνείστε με τον Διαχειριστή"
-            );
-            messages = req.flash("message");
-            await req.flash("type", process.env._ERROR);
-            types = req.flash("type");
-            await req.flash("img", process.env._IMG_ERROR);
-            images = req.flash("img");
+            await res.flash("error", "Αδυναμία Αλλαγής Περιόδου Εργασίας. Επικοινωνείστε με τον Διαχειριστή");
             redir = "companies/companies/genikastoixeia";
         }
-        await res.render(redir, {
-            messages,
-            types,
-            images,
-            bodyClass: "custom-background"
-        });
+        await res.render(redir, { bodyClass: "custom-background" });
     };
 
     static getAppDateForm = async (req, res) => {
@@ -307,32 +285,13 @@ class mainAppController {
 
             req.session.appDate = newAppDate;
 
-            await req.flash(
-                "message",
-                "Επιτυχής Αλλαγή Ημερομηνίας Εφαρμογής."
-            );
-            messages = req.flash("message");
-            await req.flash("type", process.env._SUCCESS);
-            types = req.flash("type");
-            await req.flash("img", process.env._IMG_SUCCESS);
-            images = req.flash("img");
+            await res.flash("success", "Επιτυχής Αλλαγή Ημερομηνίας Εφαρμογής.");
             redir = "mainapp";
         } catch (error) {
-            await req.flash(
-                "message",
-                "Αδυναμία Αλλαγής Ημερομηνίας Εφαρμογής. Επικοινωνείστε με τον Διαχειριστή"
-            );
-            messages = req.flash("message");
-            await req.flash("type", process.env._ERROR);
-            types = req.flash("type");
-            await req.flash("img", process.env._IMG_ERROR);
-            images = req.flash("img");
+            await res.flash("error", "Αδυναμία Αλλαγής Ημερομηνίας Εφαρμογής. Επικοινωνείστε με τον Διαχειριστή");
             redir = "companies/companies/genikastoixeia";
         }
         await res.render(redir, {
-            messages,
-            types,
-            images,
             bodyClass: "custom-background"
         });
     };

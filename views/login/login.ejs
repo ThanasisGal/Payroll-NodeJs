@@ -2,30 +2,9 @@
     class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 </div>
 
-<div class="ht-12">
-    <% messages.forEach(element => { %>
-        <div class="auto-close alert alert-<%= types[0] %> alert-dismissible fade show" role="alert">
-            <b class="fw-bold" style="font-size: 18px;">
-            <% if (images[0] == 'sign-stop') { %>
-                <i class="bi bi-sign-stop-fill" style="color: red !important;"></i>
-            <% } else if (images[0] == 'check-circle') { %>
-                <i class="bi bi-check-circle-fill" style="color: green !important;"></i>
-            <% } else if (images[0] == 'exclamation-triangle') { %>
-                <i class="bi bi-exclamation-triangle-fill" style="color: yellow !important;"></i>
-            <% } else if (images[0] == 'question-circle') { %>
-                <i class="bi bi-question-circle-fill" style="color: rgb(104, 152, 255) !important;"></i>
-            <% } %>
-            </h2>&nbsp; <%= element %></b>
-            <button
-                type="button"
-                class="btn-close"
-                data-bs-dismiss="alert"
-                aria-label="Κλείσιμο"
-            ></button>
-        </div>
-    <% }) %>
-</div>
+<%- include('../partials/flash') %>
 
+</br> </br>
 <div class="container w-40">
     <form action="/login/userLogin" method="POST">
 
@@ -101,9 +80,3 @@
     </form>
 </div>
 
-<!-- <% const isProduction = NODE_ENV === 'production'; %>
-<script>
-    window.RUNTIME_ENV = "<%= NODE_ENV %>";
-</script>
-            
-<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
