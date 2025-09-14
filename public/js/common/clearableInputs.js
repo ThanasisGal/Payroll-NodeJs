@@ -1,45 +1,4 @@
-// document.addEventListener('DOMContentLoaded', () => {
-
-//     // βρίσκουμε ΟΛΑ τα input type="text"
-//     document.querySelectorAll('input[type="text"]').forEach(input => {
-//         if (input.parentElement?.classList.contains('clearable-wrapper')) return;
-
-//         /* --- φτιάχνουμε wrapper & button ---------------------------------- */
-//         const wrapper = document.createElement('span');
-//         wrapper.className = 'clearable-wrapper';
-
-//         const btn = document.createElement('span');
-//         btn.className = 'clear-btn';
-//         btn.innerHTML = '&times;';          // HTML entity για το Χ
-//         btn.setAttribute('aria-label', 'Καθαρισμός πεδίου');
-//         btn.setAttribute('role', 'button');
-//         wrapper.appendChild(input.cloneNode(true));  // αντιγράφει το input
-//         // wrapper.appendChild(input);
-//         wrapper.appendChild(btn);
-
-//         input.replaceWith(wrapper);         // αντικαθιστά το αρχικό input
-
-//         const txt = wrapper.querySelector('input'); // το «καινούργιο» input
-
-//         /* --- helper: δείχνει/κρύβει το Χ ---------------------------------- */
-//         const toggle = () => {
-//             btn.style.opacity = txt.value ? '1' : '0';
-//         };
-//         toggle();                           // αρχική κατάσταση
-
-//         /* --- events -------------------------------------------------------- */
-//         txt.addEventListener('input', toggle);
-
-//         btn.addEventListener('click', () => {
-//             txt.value = '';
-//             toggle();
-//             txt.focus();                      // κρατάμε το focus στο πεδίο
-//             txt.dispatchEvent(new Event('input')); // ενημερώνουμε τυχόν listeners
-//         });
-//     });
-// });
 document.addEventListener('DOMContentLoaded', () => {
-
     // βρίσκουμε ΟΛΑ τα input type="text"
     document.querySelectorAll('input[type="text"]').forEach(input => {
         if (input.parentElement?.classList.contains('clearable-wrapper')) return;
@@ -50,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btn = document.createElement('span');
         btn.className = 'clear-btn';
-        btn.innerHTML = '&times;';          // HTML entity για το Χ
+        btn.textContent = '×'; // αντί για innerHTML/&times;
         btn.setAttribute('aria-label', 'Καθαρισμός πεδίου');
         btn.setAttribute('role', 'button');
 
@@ -61,9 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.appendChild(input);
         wrapper.appendChild(btn);
 
-        /* --- helper: δείχνει/κρύβει το Χ ---------------------------------- */
+        /* --- helper: δείχνει/κρύβει το Χ χωρίς inline styles --------------- */
         const toggle = () => {
-            btn.style.opacity = input.value ? '1' : '0';
+            const visible = !!input.value;
+            btn.classList.toggle('is-visible', visible);
+            btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+            btn.tabIndex = visible ? 0 : -1; // μη εστιάζει όταν «κρυφό»
         };
         toggle(); // αρχική κατάσταση
 
@@ -74,7 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = '';
             toggle();
             input.focus(); // κρατάμε το focus στο πεδίο
-            input.dispatchEvent(new Event('input')); // ενημερώνουμε τυχόν listeners
+            input.dispatchEvent(new Event('input', { bubbles: true })); // ενημέρωσε listeners
+        });
+
+        // keyboard support (Enter/Space)
+        btn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                btn.click();
+            }
         });
     });
 });

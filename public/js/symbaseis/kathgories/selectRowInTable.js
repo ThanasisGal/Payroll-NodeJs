@@ -83,9 +83,9 @@ document.addEventListener("DOMContentLoaded", function () {
           const tableHtml = `<table>${data.results.map(r => {
             const spaces = '&nbsp;'.repeat(maxLength - r.modelNameInGreek.length + 10);
             return `<tr>
-                <td style="text-align: left;">${r.modelNameInGreek}</td>
+                <td class="ta-l">${r.modelNameInGreek}</td>
                 <td>${spaces}Εγγραφές: ${r.deletedCount}</td>
-                <td style="text-align: right;"><i class="bi bi-check" style="color: green"></i></td>
+                <td class="ta-r"><i class="bi bi-check cgreen"></i></td>
               </tr>`;
           }).join('')}</table>`;
 

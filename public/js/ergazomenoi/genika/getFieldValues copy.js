@@ -66,9 +66,9 @@ document.addEventListener("DOMContentLoaded", () => {
           title: "Επιτυχής ενημέρωση των αρχείων :",
           html: `
             <ul>
-              <li><i class="bi bi-check-lg" style="color: green"></i> Εργαζόμενων</li>
-              <li><i class="bi bi-check-lg" style="color: green"></i> Ωραρίων</li>
-              <li><i class="bi bi-check-lg" style="color: green"></i> Ιστορικό Προσλήψεων - Αλλαγών</li>
+              <li><i class="bi bi-check-lg cgreen"></i> Εργαζόμενων</li>
+              <li><i class="bi bi-check-lg cgreen"></i> Ωραρίων</li>
+              <li><i class="bi bi-check-lg cgreen"></i> Ιστορικό Προσλήψεων - Αλλαγών</li>
             </ul>
           `,
           timer: 2500,

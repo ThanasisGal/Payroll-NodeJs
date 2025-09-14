@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: " ",
           html: `
             <ul>
-              <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Αντιστοιχίσεων Κ.Π.Κ.</li>
+              <li class="fw600">Επιτυχής ενημέρωση του αρχείου των Αντιστοιχίσεων Κ.Π.Κ.</li>
             </ul>
           `,
           timer: 2500,

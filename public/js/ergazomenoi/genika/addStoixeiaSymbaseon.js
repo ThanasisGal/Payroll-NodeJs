@@ -34,7 +34,7 @@ function generateSelectRowsOfSymbaseis() {
 
   for (let i = 1; i <= 15; i++) {
     const rowHTML = `
-      <div class="row form-group align-items-center d-none showhide_row_${i.toString().padStart(2, '0')}" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem !important;" id="row_${i.toString().padStart(2, '0')}">
+      <div class="row form-group align-items-center d-none showhide_row_${i.toString().padStart(2, '0')} addStoixSymb001"  id="row_${i.toString().padStart(2, '0')}">
         <div class="col-1 text-center">
           <label class="col-form-label label-font-size">${i.toString()}</label>
         </div>
@@ -43,14 +43,14 @@ function generateSelectRowsOfSymbaseis() {
           </select>
         </div>
         <div class="col-1-5">
-          <input type="number" class="form-control input-contents right-align clearAble" name="poso_symbashs_${i.toString().padStart(2, '0')}" id="poso_symbashs_${i.toString().padStart(2, '0')}"  style="background-color: #eeff0223;" readonly />
+          <input type="number" class="form-control input-contents right-align clearAble addStoixSymb002" name="poso_symbashs_${i.toString().padStart(2, '0')}" id="poso_symbashs_${i.toString().padStart(2, '0')}" readonly />
         </div>
         <div class="col-0-5"></div>
         <div class="col-1-5">
-          <input type="text" class="form-control input-contents right-align numeric clearAble" name="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" id="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" style="background-color: #2b97001e" />
+          <input type="text" class="form-control input-contents right-align numeric clearAble addStoixSymb003" name="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" id="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" />
         </div>
-        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectSymbaseon-${i.toString().padStart(2, '0')}" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Στοιχείο Σύμβασης" data-bs-placement="bottom" data-target="stoixeio_symbashs_${i.toString().padStart(2, '0')}">
-          <i class="bi bi-trash" style="color: red"></i>
+        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectSymbaseon-${i.toString().padStart(2, '0')} bor0" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Στοιχείο Σύμβασης" data-bs-placement="bottom" data-target="stoixeio_symbashs_${i.toString().padStart(2, '0')}">
+          <i class="bi bi-trash cred"></i>
         </button>
       </div>
     `;

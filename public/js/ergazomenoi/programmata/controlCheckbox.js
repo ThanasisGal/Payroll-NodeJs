@@ -128,7 +128,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     if (_result.isConfirmed) {
-      document.querySelector(".loader-container").style.display = "grid";
+      const loader = document.querySelector(".loader-container")
+      loader.classList.remove("is-hidden");
+      loader.classList.add("visible");
       try {
         // Αίτημα στον server για να λάβουμε τα ωράρια
         const response = await fetch('/api/ergazomenoi/programmata/getOraria', {
@@ -156,7 +158,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const data = await response.json();
 
-        document.querySelector(".loader-container").style.display = "none";
+        const loader_1 = document.querySelector(".loader-container")
+        loader_1.classList.remove("visible");
+        loader_1.classList.add("is-hidden");
 
         if (data.checkMessage === "ok") {
           Swal.fire({
@@ -190,7 +194,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
       } catch (error) {
-        document.querySelector(".loader-container").style.display = "none";
+        const loader_2 = document.querySelector(".loader-container")
+        loader_2.classList.remove("visible");
+        loader_2.classList.add("is-hidden");
 
         Swal.fire({
           icon: "error",

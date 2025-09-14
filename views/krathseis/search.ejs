@@ -174,15 +174,15 @@
 </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/static/min.js/krathseis/krathseis_ejs.min.js"></script>
+  <script nonce="<%= nonce %>" src="/static/min.js/krathseis/krathseis_ejs.min.js"></script>
 <% } else { %>
-  <script src="/static/js/common/getCompanyDescription.js"></script>
-  <script src="/static/js/common/getXrhsh.js"></script>
-  <script src="/static/js/common/getPeriod.js"></script>
-  <script src="/static/js/common/getUser.js"></script>
-  <script src="/static/js/common/adjustFontSizeToFit.js"></script>
-  <script src="/static/js/krathseis/nestingTables.js"></script>
-  <script src="/static/js/krathseis/selectRowInTable.js"></script>
-  <script src="/static/js/krathseis/selectRowsInNestedTable.js"></script>
-  <script src="/static/js/common/tooltipsForButtons.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getXrhsh.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/adjustFontSizeToFit.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/krathseis/nestingTables.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/krathseis/selectRowInTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/krathseis/selectRowsInNestedTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
 <% } %>

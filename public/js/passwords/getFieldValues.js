@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: " ",
           html: `
             <ul>
-              <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Κωδικών Πρόσβασης</li>
+              <li class="fw600">Επιτυχής ενημέρωση του αρχείου των Κωδικών Πρόσβασης</li>
             </ul>
           `,
           timer: 2500,

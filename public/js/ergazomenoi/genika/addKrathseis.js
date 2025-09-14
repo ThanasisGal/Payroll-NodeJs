@@ -9,7 +9,7 @@ function generateSelectRowsOfKrathseis() {
 
   for (let i = 1; i <= 7; i++) {
     const rowHTML = `
-      <div class="row form-group align-items-center mt-2 showhide_row_${i.toString().padStart(2, '0')}" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem !important;" id="row_Kra_${i.toString().padStart(2, '0')}">
+      <div class="row form-group align-items-center mt-2 showhide_row_${i.toString().padStart(2, '0')} addKrat01"  id="row_Kra_${i.toString().padStart(2, '0')}">
         <div class="col-1 text-center">
           <label class="col-form-label label-font-size">${i.toString()}</label>
         </div>
@@ -22,8 +22,8 @@ function generateSelectRowsOfKrathseis() {
           <input type="text" class="form-control input-contents right-align clearAble" name="ama_krathshs_${i.toString().padStart(2, '0')}" id="ama_krathshs_${i.toString().padStart(2, '0')}" maxlength="9" />
         </div>
         <div class="col-0-2"></div>
-        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectKrathseon-${i.toString().padStart(2, '0')}" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Κράτηση" data-bs-placement="bottom" data-target="krathsh_${i.toString().padStart(2, '0')}">
-          <i class="bi bi-trash" style="color: red"></i>
+        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectKrathseon-${i.toString().padStart(2, '0')} bor0" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Κράτηση" data-bs-placement="bottom" data-target="krathsh_${i.toString().padStart(2, '0')}">
+          <i class="bi bi-trash cred"></i>
         </button>
       </div>
     `;

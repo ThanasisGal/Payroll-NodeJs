@@ -1,6 +1,310 @@
-<nav
-  id="sidebarMenu"
-  class="col-md-3 col-lg-2 d-md-block bg-sidebar-background"
->
-  <%- include('./sidebarLinks/userManagement.ejs') %>
-</nav>
+<!-- <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-sidebar-background"> -->
+<div id="sidebarMenu" class="col-md-3">
+    <div class="sidebar-content"> <!-- αφαίρεσε position-sticky/sidebar-sticky -->
+        <div class="sidebar-toolbar">
+            <div class="sidebar-toolbar-inner">
+                <input type="search" class="form-control form-control-sm sidebar-search"
+                    placeholder="Αναζήτηση στο μενού…" aria-label="Αναζήτηση μενού">
+                <div class="ms-auto btn-group" role="group" aria-label="Μενού">
+                    <button id="btn-collapse-all" type="button" class="btn btn-light btn-sm bg-collapse border-right borad-10" title="Σύμπτυξη όλων"><i class="bi bi-chevron-double-up"></i>
+                    </button>
+
+                    <button id="btn-expand-all" type="button" class="btn btn-light btn-sm bg-collapse borad-10" title="Ανάπτυξη όλων"> <i class="bi bi-chevron-double-down"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-scroll">
+            <ul id="nav-tree" class="menu">
+                <li id="li0" data-value="li0">
+                    <a class="disabled menu-li menu-item mt-1" href="/"> Αρχική Σελίδα</a>
+                </li>
+
+                <li id="li1" data-value="li1">
+                    <a class="menu-li menu-item disabled" href="/admin">Admin</a>
+                </li>
+
+                <li id="li2" data-value="li2">
+                    <a class="disabled menu-li menu-item"> Αρχεία <i class="bi bi-chevron-down chevron-icon mr--1px"></i></a>
+                    
+                    <ul class="submenu">
+                        <li id="li21" data-value="li21">
+
+                            <a class="disabled submenu-li menu-item"> Εταιρείες <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li211" data-value="li211">
+                                    <a id="companies_genikaStoixeia" class="disabled childmenu-li menu-item" href="/companies/genikastoixeia" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των γενικών στοιχείων των Εταιρειών"> 
+                                    Γενικά Στοιχεία
+                                    </a>
+                                </li>
+                                <li id="li212" data-value="li212">
+                                    <a id="companies_ypokatasthmata" class="disabled childmenu-li menu-item" href="/companies/ypokatasthmata" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των υποκαταστημάτων της επιλεγείσας εταιρείας"> 
+                                    Υποκαταστήματα
+                                    </a>
+                                </li>
+                                <li id="li213" data-value="li213">
+                                    <a id="nomimoi_ekprosopoi" class="disabled childmenu-li menu-item" href="/companies/nomimoi_ekprosopoi" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των νομίμων εκπροσώπων της επιλεγείσας εταιρείας"> 
+                                    Νόμιμοι Εκπρόσωποι
+                                    </a>
+                                </li>
+                                <li id="li214" data-value="li214">
+                                    <a id="passwords" class="disabled childmenu-li menu-item" href="/companies/passwords" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των Κωδικών Πρόσβασης"> 
+                                    Κωδικοί Πρόσβασης
+                                    </a>
+                                </li>
+                                <li id="li215" data-value="li215">
+                                    <a id="antistoixiseis" class="disabled childmenu-li menu-item" href="/companies/antistoixiseis" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των Αντιστοιχίσεων των Κ.Π.Κ με εναλλακτικούς κώδικούς ΑΠΔ ΕΦΚΑ"> 
+                                    Αντιστοιχίσεις Κ.Π.Κ.
+                                    </a>
+                                </li>
+                                <li id="li216" data-value="li216">
+                                    <a id="trapezes" class="disabled childmenu-li menu-item" href="/companies/trapezes" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Διαχείριση των Τραπεζών - Επαγγελματικών Λογαριασμών της Εταιρείας"> 
+                                    Τράπεζες Ανά Εταιρεία
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li id="li22" data-value="li22">
+                            <a class="disabled submenu-li menu-item ajustedGap mb-2"> Εργαζόμενοι <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+
+                            <ul class="submenu">
+
+                                <li id="li221" data-value="li221">
+                                    <a id="ergazomenoi" class="disabled childmenu-li menu-item" href="/ergazomenoi/ergazomenoi" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των γενικών στοιχείων, των συμβάσεων και των κρατήσεων των Εργαζομένων"> 
+                                    Στοιχεία Εργαζομένων
+                                    </a>
+                                </li>
+                                <li id="li222" data-value="li222">
+                                    <a id="miktesApoKatharesApodoxes" class="disabled childmenu-li menu-item ajustedGap" href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Υπολογισμός των μικτών αποδοχών βάσει του πληρωτέων ποσών">
+                                    Μικτές από Καθαρές Αποδοχές
+                                    </a>
+                                </li>
+                                <li id="li223" data-value="li223">
+                                    <a id="eme" class="disabled childmenu-li menu-item ajustedGap" href="#" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Υπολογισμός και προεπισκόπηση των Ετήσιων Μονάδων Εργασίας">
+                                    Ετήσιες Μονάδες Εργασίας (EME)
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li id="li23" data-value="li23">
+                            <a class="disabled submenu-li menu-item ajustedGap mb-2"> ΕΡΓΑΝΗ <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+                            <ul class="submenu">
+
+                                <li id="li231" data-value="li231">
+                                    <a id="synthrhshProgrammatosErgasias" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/programmaErgasias" data-multiline-1="true" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των προγραμμάτων εργασίας του εργαζόμενου">
+                                    Συντήρηση ωραρίων εργασίας
+                                    </a>
+                                </li>
+                                <li id="li232" data-value="li232">
+                                    <a id="antigrafhProgrammatos" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/antigrafhProgrammaton" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" data-multiline-3="true" title="Αντιγραφή Προγράμματος Εργασίας από προηγούμενη περίοδο ΚΑΙ από εργαζόμενο σε εργαζόμενο">
+                                    Αντιγραφή Προγράμματος Από Έως Ημερ/νία
+                                    </a>
+                                </li>
+
+                                <li id="li233" data-value="li233">
+                                    <a id="eisagoghOrarionApoErganh" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/eisagoghOrarionApoErganh" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" data-multiline-1_1="true" title="Εισαγωγή και δημιουργία ωραρίων εργασίας στην εφαρμογή, από Ψηφιακό Ωράριο ανεβασμένο  ήδη στο ΕΡΓΑΝΗ (προδηλωμένο)">
+                                    Εισαγωγή Ωραρίων από ΕΡΓΑΝΗ
+                                    </a>
+                                </li>
+
+                                <li id="li234" data-value="li234">
+                                    <a id="eisagoghOrarionApoKartes" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/eisagoghOrarionApoKartes" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" data-multiline-2_1="true" title="Εισαγωγή και δημιουργία ωραρίων εργασίας στην εφαρμογή, από το Ημερολόγιο Πραγματικών Απασχολήσεων του ΕΡΓΑΝΗ">
+                                    Εισαγωγή Ωραρίων από Κάρτες Εργασίας
+                                    </a>
+                                </li>
+
+                                <li id="li235" data-value="li235">
+                                    <a id="exagoghOrarionSeErganh" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/exagoghOrarionSeErganh" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" data-multiline-2_1="true" title="Εξαγωγή ωραρίων εργασίας απ' την εφαρμογή και ενημέρωση του Ψηφιακού Ωραρίου στο ΕΡΓΑΝΗ">
+                                    Ενημέρωση Ψηφιακού Ωραρίου ΕΡΓΑΝΗ
+                                    </a>
+                                </li>
+
+                                <li id="li236" data-value="li236">
+                                    <a id="apologistikosPinakasOrarion" class="disabled childmenu-li menu-item ajustedGap" href="/ergazomenoi/programmata/apologistikosPinakasOrarion" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Απολογιστικός Πίνακας Ωραρίων">
+                                    Απολογιστικός Πίνακας
+                                    </a>
+                                </li>
+
+                            </ul>
+                        </li>
+
+                        <li id="li24" data-value="li24" class="mt-neg-05">
+                            <a class="disabled submenu-li menu-item ajustedGap " data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των σταθερών στοιχείων των κρατήσεων καθώς και διαχείριση των ποσοστών αυτών" href="/krathseis/krathseis"> 
+                            Κρατήσεις
+                        </a>
+                        </li>
+
+                        <li id="li25" data-value="li25"><a class="submenu-li"> Συμβάσεις <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+                            <ul class="disabled submenu menu-item">
+
+                                <li id="li251" data-value="li251">
+                                    <a id="symbaseis_symbaseis" class="disabled childmenu-li menu-item ajustedGap" href="/symbaseis/symbaseis" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των στοιχείων των συμβάσεων">
+                                    Συμβάσεις
+                                    </a>
+                                </li>
+                                <li id="li252" data-value="li252">
+                                    <a class="disabled childmenu-li menu-item ajustedGap" id="symbaseis_kathgories" href="/symbaseis/kathgories" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των στοιχείων των κατηγοριών των συμβάσεων">
+                                    Κατηγορία Συμβάσεων
+                                    </a>
+                                </li>
+                                <li id="li253" data-value="li253">
+                                    <a id="symbaseis_eidikothtes" class="disabled childmenu-li menu-item ajustedGap" href="/symbaseis/eidikothtes" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των στοιχείων των ειδικοτήτων των συμβάσεων">
+                                    Ειδικότητες Συμβάσεων
+                                    </a>
+                                </li>  
+                                <li id="li254" data-value="li254">
+                                    <a id="symbaseis_stoixeiaSymbaseon" class="disabled childmenu-li menu-item ajustedGap" href="/symbaseis/stoixeiaSymbaseon" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των στοιχείων των στοιχείων των συμβάσεων">
+                                    Στοιχεία Συμβάσεων
+                                    </a>
+                                </li>  
+                                <li id="li255" data-value="li255">
+                                    <a id="symbaseis_klimakia" class="disabled childmenu-li menu-item ajustedGap" href="/symbaseis/klimakia" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των στοιχείων των κλιμακίων των συμβάσεων">
+                                    Κλιμάκια Συμβάσεων
+                                    </a>
+                                </li>  
+                                <li id="li256" data-value="li256">
+                                    <a id="symbaseis_ypologismoiKlimakion" class="disabled childmenu-li menu-item ajustedGap" href="/symbaseis/ypologismoiKlimakion" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" data-multiline-2_1="true" title="Υπολογισμός των κλιμακίων των συμβάσεων">
+                                    Υπολογισμός Κλιμακίων Συμβάσεων
+                                    </a>
+                                </li>  
+
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+
+                <li id="li3" data-value="li3">
+                    <a class="disabled menu-li menu-item"> Κινήσεις <i class="bi bi-chevron-down chevron-icon mr--1px"></i></a>
+                    <ul class="submenu">
+
+                        <li id="li31" data-value="li31">
+                            <a id="apoysies" class="disabled childmenu-li menu-item ajustedGap" href="/kinhseis/apoysies" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των απουσιών από την εργασία, του εργαζόμενου">
+                            Απουσίες
+                            </a>
+                        </li>
+
+                        <li id="li32" data-value="li32">
+                            <a id="apasxolhseis" class="disabled childmenu-li menu-item ajustedGap" href="/kinhseis/apasxolhseis" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Διαχείριση των απασχολήσεων του εργαζόμενου">
+                            Απασχολήσεις
+                            </a>
+                        </li>
+
+                        <li id="li33" data-value="li33">
+                            <a id="kartelaKinhseon" class="disabled childmenu-li menu-item ajustedGap" href="/kinhseis/kartelaKinhseon" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Καρτέλα των κινήσεων του εργαζόμενου">
+                            Καρτέλα Κινήσεων
+                            </a>
+                        </li>
+
+                    </ul>
+                </li>
+
+                <li id="li4" data-value="li4">
+                    <a class="disabled menu-li menu-item"> Εκτυπώσεις <i class="bi bi-chevron-down chevron-icon mr--1px"></i> </a>
+                    
+                    <ul class="submenu">
+                        <li id="li41" data-value="li41">
+
+                            <a class="disabled submenu-li menu-item"> Απασχολήσεις <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li411" data-value="li411">
+                                    <a id="ektyposhApodeixeonMisthodosias" class="disabled childmenu-li menu-item" href="/ektyposeis/apasxolhseis/ektyposhApasxolhseon" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Εκτύπωση ατομικών εκκαθαρίσεων εργαζομένων"> 
+                                    Αποδείξεις Μισθοδοσίας
+                                    </a>
+                                </li>
+                                <!-- <li id="li412" data-value="li412">
+                                    <a id="ektyposhSymbaseonErgazomenon" class="disabled childmenu-li menu-item" href="/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Σύμβαση εργασίας ανάλογα με τα στοιχεία του εργαζόμενου δηλ. αν είναι αορίστου ή ορισμένου χρόνου, πλήρους ή μερικής ή εκ περιτροπής απασχόλησης κλπ, ΕΡΓΑΖΟΜΕΝΩΝ πλην ΣΤΕΛΕΧΩΝ"> 
+                                    Εργαζόμενων
+                                    </a>
+                                </li> -->
+                            </ul>
+                        </li>
+
+                        <li id="li42" data-value="li42">
+
+                            <a class="disabled submenu-li menu-item"> Συμβάσεις <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li421" data-value="li421">
+                                    <a id="ektyposhSymbaseonStelexon" class="disabled childmenu-li menu-item" href="56825" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Σύμβαση εργασίας ανάλογα με τα στοιχεία του εργαζόμενου δηλ. αν είναι αορίστου ή ορισμένου χρόνου πλήρους ή μερικής ή εκ περιτροπής απασχόλησης, ΜΟΝΟ ΣΤΕΛΕΧΩΝ ΕΠΙΧΕΙΡΗΣΕΩΝ"> 
+                                    Στελεχών επιχειρήσεων
+                                    </a>
+                                </li>
+                                <li id="li422" data-value="li422">
+                                    <a id="ektyposhSymbaseonErgazomenon" class="disabled childmenu-li menu-item" href="/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="30rem" title="Σύμβαση εργασίας ανάλογα με τα στοιχεία του εργαζόμενου δηλ. αν είναι αορίστου ή ορισμένου χρόνου, πλήρους ή μερικής ή εκ περιτροπής απασχόλησης κλπ, ΕΡΓΑΖΟΜΕΝΩΝ πλην ΣΤΕΛΕΧΩΝ"> 
+                                    Εργαζόμενων
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                    </ul>
+
+                </li>
+
+                <li id="li5" data-value="li5">
+                    <a class="disabled menu-li menu-item"> Παράμετροι <i class="bi bi-chevron-down chevron-icon mr--1px"></i></a>
+                    <ul class="submenu">
+
+                        <li id="li51" data-value="li51">
+
+                            <a class="disabled submenu-li menu-item"> Ενημέρωση Αρχείων <i class="bi bi-chevron-down chevron-icon mr--4px"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li511" data-value="li511">
+                                    <a id="enhmerosh_pososton_me_id_krathseon" class="disabled childmenu-li menu-item" href="/krathseis/updates" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Ενημέρωση του πεδίου krathshId του αρχείου Ποσοστά Κρατήσεων με το ID του αρχείου κρατήσεων"> 
+                                    Ποσοστά Κρατήσεων
+                                    </a>
+                                </li>
+                                <li id="li512" data-value="li512">
+                                    <a id="enhmerosh_Kad" class="disabled childmenu-li menu-item" href="/kad/updates" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Ενημέρωση του πεδίου kodikosSort του αρχείου KadModel"> 
+                                    Κ.Α.Δ.
+                                    </a>
+                                </li>
+                                <li id="li513" data-value="li513">
+                                    <a id="enhmerosh_TypoiApodoxon" class="disabled childmenu-li menu-item" href="/typoiApodoxon/updates" data-bs-toggle="tooltip" data-bs-placement="right" data-tooltip-max-width="25vw" title="Ενημέρωση του πεδίου kodikosSort του αρχείου TypoiApodoxonModel"> 
+                                    Τύποι Αποδοχών
+                                    </a>
+                                </li>
+                            </ul>
+
+                        </li>
+
+                    </ul>
+                    <!-- more menu items -->
+                </li>
+
+                <li id="li6" data-value="li6">
+                    <a class="disabled menu-li  menu-item" href="#"> Επικοινωνία </a>
+                </li>
+
+            </ul>
+        </div>
+
+        <div class="logout-section cblack">
+            <a
+                id="li7"
+                type="button"
+                class="btn btn-small w-100 logout-btn"
+                href="../../../login/logout">
+                <i class="bi bi-power fs-20 cred"></i> Αποσύνδεση
+            </a>
+        </div>
+    </div>
+</div>
+<!-- </nav> -->
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+  window.RUNTIME_ENV = "<%= NODE_ENV %>";
+
+  window.WPS_USER_ID = "<%= (userId || '') %>";
+</script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sidebar<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
         Swal.fire({
           icon: "success",
           title: " ",
-          html: `<ul><li style="font-weight: 600">${message}</li></ul>`,
+          html: `<ul><li class="fw600">${message}</li></ul>`,
           timer: 3000,
           confirmButtonText: "Κλείσιμο",
           customClass: {

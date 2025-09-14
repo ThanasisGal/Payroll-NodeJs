@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: "Επιτυχής ενημέρωση του αρχείου:",
           html: `
             <ul>
-              <li style="font-weight: 600">των Κωδικών Πρόσβασης</li>
+              <li> <strong>των Κωδικών Πρόσβασης</strong> </li>
             </ul>
           `,
           timer: 3000,

@@ -11,16 +11,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateTextColor(remainingTime) {
-    const totalSeconds = Math.floor(remainingTime / 1000); // Υπολειπόμενος χρόνος σε δευτερόλεπτα
-    if (totalSeconds > 300) {
-      remainingTimeElement.style.color = "white"; // Από 15:00 έως 05:00
-    } else if (totalSeconds > 60) {
-      remainingTimeElement.style.color = "orange"; // Από 04:59 έως 01:00
+    const totalSeconds = Math.ceil(remainingTime / 1000); // προς τα πάνω για να μη χάνεις το 300
+    remainingTimeElement.classList.remove("rt-white", "rt-orange", "rt-red");
+
+    if (totalSeconds >= 900) {
+      remainingTimeElement.classList.add("rt-white");   // 30' - 15'
+    } else if (totalSeconds >= 300) {
+      remainingTimeElement.classList.add("rt-orange");  // 15' - 05'
     } else {
-      remainingTimeElement.style.color = "red"; // Κάτω από 01:00
+      remainingTimeElement.classList.add("rt-red");     // 05' - 00'
     }
   }
-
   async function updateRemainingTime() {
     // try {
       const response = await fetch("/remaining-time");
@@ -32,7 +33,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.remainingTime <= 0) {
         remainingTimeElement.textContent = "Λήξη!";
-        remainingTimeElement.style.color = "red"; // Κόκκινο χρώμα για τη λήξη
+        remainingTimeElement.classList.remove("white", "orange", "red");
+        remainingTimeElement.classList.add("red");        
         clearInterval(intervalId); // Σταματάει το setInterval
         document.dispatchEvent(new Event("sessionEnd")); // Ενεργοποιεί το SweetAlert2
       } else {

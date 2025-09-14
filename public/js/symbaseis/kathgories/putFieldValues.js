@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: "Επιτυχής ενημέρωση του αρχείου:",
           html: `
             <ul>
-              <li style="font-weight: 600">των Κατηγοριών Συμβάσεων</li>
+              <li class="fw600">των Κατηγοριών Συμβάσεων</li>
             </ul>
           `,
           timer: 3000,

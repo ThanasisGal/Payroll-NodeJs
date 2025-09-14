@@ -24,7 +24,7 @@ export const initTomDropdown = ({
     if (!el) return;
     
     // if (el.dataset.skipAutoload === 'true') {
-    //     // μην κάνεις pre-load • περιμένουμε ο χρήστης να πληκτρολογήσει
+        // μην κάνεις pre-load • περιμένουμε ο χρήστης να πληκτρολογήσει
     //     tom.settings.preload = false;
     // }
 
@@ -176,7 +176,6 @@ export const initTomDropdown = ({
             },
             item(optionData, e) {
                 if (!optionData || typeof optionData !== 'object' || !('value' in optionData)) {
-                    // return '<div class="item">(???)</div>';
                     const phText = el.getAttribute('placeholder') || '…';
                     return `<div class="item placeholder-item" aria-placeholder="true">${e(phText)}</div>`;
                 }
@@ -204,7 +203,6 @@ export const initTomDropdown = ({
             /* -- επιλέχθηκε item (ΜΟΝΟ στο multiple) --------------*/
             if (isMultiple) {
                 this.on('item_add', value => {
-
                     // ➜ αφήνουμε τον Tom-Select να ρίξει πρώτα το tag στο DOM
                     setTimeout(() => {
                         const q = this.lastQuery;
@@ -227,7 +225,6 @@ export const initTomDropdown = ({
                     setTimeout(() => (this.ignoreFocusOpen = false), 0);
                 });
             }
-
 
             // /* ➜ κλείσιμο + blur ΜΟΝΟ μετά από επιλογή */
             /* -- clear (σκουπιδάκι) -------------------------------- */
@@ -259,12 +256,12 @@ export const initTomDropdown = ({
                     }
                 }
 
-                /* ---------- helper: έξυπνη τοποθέτηση --------------------------*/
+                /* ---------- helper: έξυπνη τοποθέτηση (ΧΩΡΙΣ inline styles) -----*/
                 const reposition = () => {
                     const controlRect = this.control.getBoundingClientRect();
                     const ddEl        = this.dropdown;
 
-                    /* 1. «ιδανικό» ύψος =  search + 5 rows */
+                    /* 1. «ιδανικό» ύψος =  search + ~6.5 rows */
                     const searchH     = 36;   // fallback ύψος search
                     const optionH     = 34;   // fallback ύψος μίας option
                     const idealHeight = searchH + optionH * 6.5;
@@ -277,25 +274,19 @@ export const initTomDropdown = ({
                     const spaceAbove  = controlRect.top    - cardRect.top;
                     const spaceBelow  = cardRect.bottom    - controlRect.bottom;
 
-                    const placeBelow  = maxH => {
-                        ddEl.style.top = '100%';
-                        ddEl.style.bottom = 'auto';
-                        ddEl.style.maxHeight = `${maxH}px`;
-                    };
-                    const placeAbove  = maxH => {
-                    ddEl.style.bottom = `${controlRect.height}px`;
-                    ddEl.style.top = 'auto';
-                    ddEl.style.maxHeight = `${maxH}px`;
-                    };
+                    /* καθάρισε προηγούμενες κλάσεις θέσης/ύψους */
+                    ddEl.classList.remove('place-above','place-below','maxh-ideal','maxh-limited');
 
-                    /* 3. λογική επιλογής */
+                    /* 3. λογική επιλογής (ίδια με πριν, αλλά με κλάσεις) */
                     if (idealHeight <= spaceBelow) {
-                        placeBelow(idealHeight);            // χωράει κάτω
+                        // χωράει κάτω στο «ιδανικό»
+                        ddEl.classList.add('place-below','maxh-ideal');
                     } else if (idealHeight <= spaceAbove) {
-                        placeAbove(idealHeight);            // χωράει πάνω
+                        // χωράει πάνω στο «ιδανικό»
+                        ddEl.classList.add('place-above','maxh-ideal');
                     } else {
-                    /* δεν χωρά ολόκληρο: ΠΑΝΩ με scrollbar */
-                        placeAbove(Math.max(spaceAbove - 8, 150));  // 150 px ελάχιστο
+                        // δεν χωρά ολόκληρο: ΠΑΝΩ με περιορισμένο ύψος (scrollbar)
+                        ddEl.classList.add('place-above','maxh-limited');
                     }
                 };
 
@@ -305,22 +296,21 @@ export const initTomDropdown = ({
                 /* --- 2η τοποθέτηση όταν φορτωθούν τα options --------------------*/
                 const origLoad = this.settings.load;
                 this.settings.load = (query, callback) => {
-                    // callback(items.length ? items : undefined);
                     origLoad.call(this, query, items => {
                         if (Array.isArray(items) && items.length) {
                             callback(items);          // κανονική ροή
                         } else {
                             callback();               // κλείνει το spinner – δεν κρασάρει
                         }
-
                         requestAnimationFrame(reposition);   // ξαναϋπολόγισε με τα νέα ύψη
                     });
                 };
             });
-            /******************* B. Project‑specific setup *****************/
-            this.wrapper.classList.add('dropdown-wrapper');
+
+            /******************* B. Project-specific setup *****************/
+            this.wrapper.classList.add('dropdown-wrapper'); // CSS: position:relative κ.λπ.
             this.control_input.classList.add('dropdown-input');
-            this.wrapper.style.position = 'relative';
+            // (was) this.wrapper.style.position = 'relative';  ➜ αφαιρέθηκε λόγω CSP
             const phTxt = el.getAttribute('placeholder') || 'Αναζήτηση…';
             this.control_input.setAttribute('placeholder', phTxt);
 
@@ -348,19 +338,13 @@ export const initTomDropdown = ({
 
             /* =====================================================
             *  ΕΜΦΑΝΙΣΗ 🗑 ΑΜΕΣΩΣ  μόλις προστεθεί/φορτωθεί επιλογή
-            * -----------------------------------------------------
-            * καλύπτει όλα τα σενάρια:
-            *   • προ-επιλογή από ΒΔ (fetch + setValue)
-            *   • preload remote data
-            *   • pagination / endless scroll
-            *   • αλλαγές από item_add / item_remove
-            * ====================================================*/
+            * ----------------------------------------------------- */
             const overflowNow = () => requestAnimationFrame(() => updateOverflow(this));
 
-            this.on('load'     , overflowNow);   // fire μετά από κάθε async load
-            this.on('item_add' , overflowNow);   // single & multi
+            this.on('load'       , overflowNow);   // fire μετά από κάθε async load
+            this.on('item_add'   , overflowNow);   // single & multi
             this.on('item_remove', overflowNow);
-            this.on('clear'    , overflowNow);
+            this.on('clear'      , overflowNow);
             
             if (isMultiple && typeof hooks.onInit === 'function') hooks.onInit(this);
 
@@ -379,7 +363,7 @@ export const initTomDropdown = ({
             if (typeof userOnInit === 'function') userOnInit.call(this);
 
             /* -------------------------------------------------------------
-             *  Προεπιλογή κωδικού από τη ΒΔ
+            *  Προεπιλογή κωδικού από τη ΒΔ
             * ------------------------------------------------------------*/
 
             // 🔁 Re-render any missing tags manually (multi-select issue fix)
@@ -396,23 +380,23 @@ export const initTomDropdown = ({
             const preSelVal = document.getElementById(preSelId)?.value?.trim();
             if (preSelVal && !el.hasAttribute('data-has-value')) {
 
-            const u = new URL(url, location.origin);
-            Object.entries(extraParams || {})
-                .forEach(([k, v]) => v && u.searchParams.set(k, v));
-            u.searchParams.set('value', preSelVal);
+                const u = new URL(url, location.origin);
+                Object.entries(extraParams || {})
+                    .forEach(([k, v]) => v && u.searchParams.set(k, v));
+                u.searchParams.set('value', preSelVal);
 
-            fetch(u, { credentials: 'include' })
-                .then(r => r.json())
-                .then(({ items }) => {
-                if (items?.length) {
-                    tom.addOption(items[0]);
-                    tom.setValue(preSelVal, true);
-                    selectedCache[preSelVal] = items[0];
-                    requestAnimationFrame(() => updateOverflow(tom));
-                    el.setAttribute('data-has-value', 'true');
-                }
-                })
-                .catch(console.error);
+                fetch(u, { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(({ items }) => {
+                        if (items?.length) {
+                            tom.addOption(items[0]);
+                            tom.setValue(preSelVal, true);
+                            selectedCache[preSelVal] = items[0];
+                            requestAnimationFrame(() => updateOverflow(tom));
+                            el.setAttribute('data-has-value', 'true');
+                        }
+                    })
+                    .catch(console.error);
             }
 
             /* -----------------------------------------------------------------
@@ -429,23 +413,46 @@ export const initTomDropdown = ({
 
         onDropdownOpen () {
             // placeholder μέσα στο input του dropdown
-            this.dropdown.querySelector('.dropdown-input')
-                ?.setAttribute('placeholder', el.getAttribute('placeholder') || 'Αναζήτηση…');
+            const ddInput = this.dropdown?.querySelector('.dropdown-input');
+            if (ddInput) {
+                // αποθήκευση αρχικού placeholder για restore στο close
+                if (!this._origDdPlaceholderSaved) {
+                this._origDdPlaceholder = ddInput.getAttribute('placeholder') || '';
+                this._origDdPlaceholderSaved = true;
+                }
+                ddInput.setAttribute('placeholder', el.getAttribute('placeholder') || 'Αναζήτηση…');
+            }
 
             // bind once το χειροποίητο infinite scroll
             if (!this._infiniteBound) {
-                const content = this.dropdown.querySelector('.ts-dropdown-content');
+                const content = this.dropdown?.querySelector('.ts-dropdown-content');
                 if (content) {
-                    content.addEventListener('scroll', () => handleScroll(this, content), { passive:true });
-                    this._infiniteBound = true;
+                // κρατάμε ref για να μπορούμε να το αφαιρέσουμε αν ποτέ χρειαστεί
+                this._infiniteScrollHandler = () => handleScroll(this, content);
+                content.addEventListener('scroll', this._infiniteScrollHandler, { passive: true });
+                this._infiniteBound = true;
                 }
             }
+
+            // flag στο wrapper (αν χρειάζεσαι CSS εφέ κατά το άνοιγμα)
+            tom.wrapper.classList.add('open');
+
             hooks.onOpen?.(this);
         },
 
         onDropdownClose () {
+            // αφαίρεση open flag
             tom.wrapper.classList.remove('open');
-            this.dropdown.querySelector('.dropdown-input')?.removeAttribute('placeholder');
+
+            // επαναφορά placeholder όπως ήταν πριν το open
+            const ddInput = this.dropdown?.querySelector('.dropdown-input');
+            if (ddInput && this._origDdPlaceholderSaved) {
+                if (this._origDdPlaceholder) {
+                ddInput.setAttribute('placeholder', this._origDdPlaceholder);
+                } else {
+                ddInput.removeAttribute('placeholder');
+                }
+            }
         },
 
         onFocus () {
@@ -465,135 +472,140 @@ export const initTomDropdown = ({
     const preselectId = el.dataset.preselect;
     const preselectValue = document.getElementById(preselectId)?.value;
 
+// --- Προεπιλογή από ΒΔ (respect valueField & credentials, με abort) ---
     if (preselectValue && url) {
-        const urlObj = new URL(url, location.origin);
-        urlObj.searchParams.set('value', preselectValue);
+    const urlObj = new URL(url, location.origin);
+    urlObj.searchParams.set('value', preselectValue);
 
-        // ➕ Περνά όλα τα extraParams στο URL (π.χ. padLength)
-        Object.entries(extraParams || {}).forEach(([k, v]) => {
-            if (v !== undefined && v !== null) {
-                urlObj.searchParams.set(k, v);
+    // ➕ Πέρνα όλα τα extraParams στο URL (π.χ. padLength)
+    Object.entries(extraParams || {}).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+        urlObj.searchParams.set(k, v);
+        }
+    });
+
+    try {
+        // ακύρωσε τυχόν προηγούμενο preselect request
+        try { this._preselectAbort?.abort(); } catch {}
+        this._preselectAbort = new AbortController();
+
+        fetch(urlObj.toString(), { credentials: 'include', signal: this._preselectAbort.signal })
+        .then(res => res.json())
+        .then(data => {
+            const item = data?.items?.[0]; // ή αναλόγως το format του API
+            if (!item) {
+            console.warn('⚠️ No matching item found in fetch for', preselectValue);
+            return;
             }
-        });
 
-        fetch(urlObj.toString())
-            .then(res => res.json())
-            .then(data => {
-                const item = data.items?.[0]; // ή αναλόγως το format του API
-                if (item) {
-                    tom.addOption(item);
-                    tom.setValue(preselectValue, true);
-                    // tom.setValue(preselectValue);
-                    requestAnimationFrame(() => updateOverflow(tom));
-                    selectedCache[preselectValue] = item;
-                } else {
-                    console.warn('⚠️ No matching item found in fetch for', preselectValue);
-                }
-            })
-        .catch(err => console.error('❌ Preselect fetch failed:', err));
+            const key = tom.settings.valueField || 'value';
+            const id  = item[key] ?? preselectValue;
+
+            tom.addOption(item);
+            tom.setValue(id, true);
+            selectedCache[id] = item;
+            requestAnimationFrame(() => updateOverflow(tom));
+            el.setAttribute('data-has-value', 'true');
+        })
+        .catch(err => {
+            if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+        });
+    } catch (err) {
+        if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+    }
     }
 
-    tom.on('item_add', (value, data) => {
-        if (!data || !data.value) {
-            data = tom.options?.[value];
+    // --- Cache του επιλεγμένου option ώστε να μπορεί να «ξαναμπεί» αν λείπει ---
+    tom.on('item_add', (value /* , $itemEl */) => {
+    const key   = tom.settings.valueField || 'value';
+    const rec   = tom.options?.[value];  // πιο αξιόπιστο από το 2ο arg του event
+    const cacheId = rec?.[key] ?? value;
+
+    if (rec) {
+        selectedCache[cacheId] = rec;
+
+        // ✅ Αν δεν υπάρχει στο options (π.χ. από προ-επιλογή), ξαναπέρασέ το
+        if (!tom.options[cacheId]) {
+        tom.addOption(rec);
         }
-
-        if (data) {
-            selectedCache[value] = data;
-
-            // ✅ Αν δεν υπάρχει στο options, ξαναπέρασέ το
-            if (!tom.options[value]) {
-                tom.addOption(data);
-            }
-
-        } else {
-            console.error('❌ item_add: cannot cache or re-add', value);
-        }
+    } else {
+        console.error('❌ item_add: cannot cache or re-add', value);
+    }
     });
 
     /** ----------------------------------------------------------------
     *  Χειροποίητο infinite scroll
     * ----------------------------------------------------------------*/
     async function handleScroll (instance, content) {
+    // Φρένο αν δεν υπάρχει επόμενη σελίδα ή ήδη φορτώνουμε
+    if (!instance.nextPage || instance._loadingNext) return;
 
-        if (!instance.nextPage || instance._loadingNext) return;
-        if (content.scrollTop + content.clientHeight < content.scrollHeight - 50) return;
+    // Trigger όταν πλησιάσουμε ~50px από το τέλος
+    if (content.scrollTop + content.clientHeight < content.scrollHeight - 50) return;
 
-        instance._loadingNext = true;
-        const urlToFetch = instance.nextPage;
+    instance._loadingNext = true;
 
-        try {
-      
-            const json     = await fetch(urlToFetch, { credentials: 'include' }).then(r => r.json());
-            const items    = Array.isArray(json.items) ? json.items : [];
-            if (items.length < getLimitFromUrl(urlToFetch)) {
-                instance.nextPage = null;           // ⇠ ΤΕΛΟΣ – δεν υπάρχει άλλη σελίδα
-            }
+    const urlToFetch = instance.nextPage;
+    const limit      = getLimitFromUrl(urlToFetch);
 
-            const hasMore  = ('hasMore' in json)
-                    ? Boolean(json.hasMore)
-                    : items.length === getLimitFromUrl(urlToFetch);
+    try {
+        const json  = await fetch(urlToFetch, { credentials: 'include' }).then(r => r.json());
+        const items = Array.isArray(json.items) ? json.items : [];
 
-            /* ----- DEBUG & ασφαλιστική δικλίδα -------------------------------- */
-            /* Αν η τρέχουσα σελίδα γύρισε λιγότερα από limit ⟶ δεν υπάρχει άλλη */
-            if (items.length < getLimitFromUrl(urlToFetch)) {
-                instance.nextPage = null;   // σταματάει το infinite scroll
-            } else {
-                instance.nextPage = hasMore ? buildNextPageUrl(urlToFetch) : null;
-            }
-            
-            /* ------------------------------------------------------------------- */
-            /* ▸▸ 1.  Θυμόμαστε scroll & ύψος ΠΡΙΝ την προσθήκη */
-            const prevScroll  = content.scrollTop;
-            const prevHeight  = content.scrollHeight;
+        // hasMore: αν δίνεται ρητά, αλλιώς με βάση το limit
+        const hasMore = ('hasMore' in json) ? Boolean(json.hasMore) : items.length === limit;
+        instance.nextPage = hasMore ? buildNextPageUrl(urlToFetch) : null;
 
-            /* ▸▸ 2.  προσθέτουμε options */
-            let newCount = 0;
-            items.forEach(item => {
-                if (!instance.options[item.value]) {
-                    instance.addOption(item);
-                    newCount++;
-                }
-            });
-            instance.refreshOptions(false);
+        // 1) θυμόμαστε scroll & ύψος ΠΡΙΝ την προσθήκη
+        const prevScroll = content.scrollTop;
+        const prevHeight = content.scrollHeight;
 
-            /* Αν δεν προσθέσαμε τίποτα καινούργιο → τέλος infinite */
-            if (newCount === 0) {
-                instance.nextPage = null;
-                instance._loadingNext = false;
-                return;
-            }
-
-            /* ▸▸ 3.  επαναφέρουμε τη θέση 1-του-πριν */
-            requestAnimationFrame(() => {
-                const newHeight   = content.scrollHeight;
-                const delta       = newHeight - prevHeight;
-                // Αφήνουμε ένα περιθώριο ασφαλείας από το τέλος της scrollbar (σε pixel)
-                const SAFE = 500;
-
-                content.scrollTop = prevScroll + delta - SAFE;
-            });
-
-        } catch (err) {
-            console.error('❌ Dropdown next-page load failed', err);
-        } finally {
-            instance._loadingNext = false;
+        // 2) προσθέτουμε options (dedupe με βάση valueField)
+        const key = instance.settings.valueField || 'value';
+        let newCount = 0;
+        for (const it of items) {
+        const id = it?.[key];
+        if (id == null) continue;
+        if (!instance.options[id]) {
+            instance.addOption(it);
+            newCount++;
         }
+        }
+        instance.refreshOptions(false);
+
+        // Αν δεν προσθέσαμε τίποτα καινούργιο → τέλος infinite
+        if (newCount === 0) {
+        instance.nextPage = null;
+        return;
+        }
+
+        // 3) επαναφέρουμε τη θέση 1-του-πριν (με ένα «μαξιλαράκι» ασφαλείας)
+        requestAnimationFrame(() => {
+        const newHeight = content.scrollHeight;
+        const delta     = newHeight - prevHeight;
+        const SAFE      = 500; // pixel από το τέλος
+        content.scrollTop = prevScroll + delta - SAFE;
+        });
+
+    } catch (err) {
+        console.error('❌ Dropdown next-page load failed', err);
+    } finally {
+        instance._loadingNext = false;
+    }
     }
 
     /* --------------------------------------------------------------- */
     (window.__tomInstances ??= {})[selector] = tom;
-};
+}
 
 const CLEAR_BTN_SELECTOR = '.ts-single-reset-btn';
 
 function clickClearIfVisible(ts) {
-    const btn = ts.wrapper.querySelector(CLEAR_BTN_SELECTOR);
-    
-    // ➜ offsetParent === null → το element είναι display:none ή hidden
-    if (btn && btn.offsetParent !== null) {
-        btn.click();          // πυροδοτεί το 'clear' + ό,τι handler έχουμε
-    }
+  const btn = ts.wrapper.querySelector(CLEAR_BTN_SELECTOR);
+  // ➜ offsetParent === null → το element είναι display:none ή hidden
+  if (btn && btn.offsetParent !== null) {
+    btn.click(); // πυροδοτεί το 'clear' + ό,τι handler έχουμε
+  }
 }
 
 /* ------------------------------------------------------------------
@@ -602,253 +614,212 @@ function clickClearIfVisible(ts) {
  *   ▸ single-select:  trash-clear  (🗑)  +  ellipsis σε μακρύ label
  * ------------------------------------------------------------------ */
 function updateOverflow(tom) {
-    // 1. Safety checks -------------------------------------------------
-    if (!tom?.wrapper) return;
+  // 1. Safety checks -------------------------------------------------
+  if (!tom?.wrapper) return;
 
-    const wrapper = tom.wrapper;               // .ts-wrapper
-    const ctrl    = wrapper.querySelector('.ts-control');
-    if (!ctrl) return;
+  const wrapper = tom.wrapper;               // .ts-wrapper
+  const ctrl    = wrapper.querySelector('.ts-control');
+  if (!ctrl) return;
 
-    const isMulti = tom.settings.mode?.includes?.('multi');
+  const isMulti = tom.settings.mode?.includes?.('multi');
 
-    /* ==================================================================
-    *  SINGLE-SELECT MODE                                               */
-    /* ==================================================================*/
-    if (!isMulti) {
-        /* ----------------------------------------------------------------
-        * A. Δημιουργία / update του trash-clear κουμπιού
-        * ----------------------------------------------------------------*/
-        let trash = wrapper.querySelector('.ts-single-reset-btn');
-        if (!trash) {
-            // Στήνουμε relative ώστε το absolute να δουλέψει σωστά
-            if (getComputedStyle(wrapper).position === 'static') {
-                wrapper.style.position = 'relative';
-            }
-            wrapper.style.overflow = 'visible';
+  /* ==================================================================
+  *  SINGLE-SELECT MODE                                               */
+  /* ==================================================================*/
+  if (!isMulti) {
+    /* ----------------------------------------------------------------
+    * A. Δημιουργία / update του trash-clear κουμπιού
+    * ----------------------------------------------------------------*/
+    let trash = wrapper.querySelector('.ts-single-reset-btn');
+    if (!trash) {
+      trash           = document.createElement('button');
+      trash.type      = 'button';
+      trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
+      trash.title     = 'Καθαρισμός επιλογής';
+      trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
+      wrapper.appendChild(trash);
 
-            // κάνουμε flex το control ώστε το label να μπορεί να συρρικνωθεί
-            ctrl.style.display = 'flex';
-            ctrl.style.alignItems = 'center';
+      // Click handler – clear & refresh
+      trash.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!(tom.items || []).length) return;
 
-            trash           = document.createElement('button');
-            trash.type      = 'button';
-            trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
-            trash.title     = 'Καθαρισμός επιλογής';
-            trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
-            trash.style.cssText = [
-                'position:absolute',
-                'top:50%',
-                'left:calc(100% + 4px)', // 4 px δεξιά από το ts-control
-                'transform:translateY(-50%)',
-                'padding:0',
-                'padding:0 0.25rem',
-                'border:none',
-                'cursor:pointer',
-                'color:#6c757d',
-                'line-height:1',
-                'font-size:1rem',
-                'cursor:pointer',
-                'z-index:2'
-            ].join(';');
-            wrapper.appendChild(trash);
+        tom.ignoreFocusOpen = true;
+        tom.clear();
+        tom.close();
+        tom.control_input.blur();
+        tom.ignoreFocusOpen = false;
 
-            // Click handler – clear & refresh
-            trash.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!(tom.items || []).length) return;
-
-                tom.ignoreFocusOpen = true;
-                tom.clear();
-                tom.close();
-                tom.control_input.blur();
-                tom.ignoreFocusOpen = false;
-
-                setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
-            });
-        }
-
-        // Εμφάνιση / απόκρυψη ανάλογα με επιλογή
-        trash.style.display = (tom.items || []).length ? '' : 'none';
-        // ✔ Μόλις γίνει ορατό, πάρε focus
-        if (trash.style.display !== 'none') {
-            trash.focus();
-        }
-        /* ----------------------------------------------------------------
-        * B. Ellipsis στο label όταν είναι μακρύ
-        * ----------------------------------------------------------------*/
-        const itemEl = ctrl.querySelector('.item');
-        if (itemEl) {
-            itemEl.style.flex         = '1 1 auto';   // παίρνει διαθέσιμο χώρο
-            itemEl.style.minWidth     = '0';          // επιτρέπει shrink
-            itemEl.style.whiteSpace   = 'nowrap';
-            itemEl.style.overflow     = 'hidden';
-            itemEl.style.textOverflow = 'ellipsis';
-            itemEl.style.paddingRight = '0.75rem';    // οπτικό κενό
-            itemEl.style.backgroundColor = 'transparent';
-        }
-
-        return; // single-select τελείωσε εδώ
+        setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
+      });
     }
 
-    /* ==================================================================
-    *  MULTI-SELECT MODE                                                */
-    /* =================================================================*/
+    // Εμφάνιση / απόκρυψη ανάλογα με επιλογή (χωρίς inline styles)
+    trash.hidden = !(tom.items || []).length;
 
-    /* 2. resetBtn (+/−) — δημιουργείται ΠΑΝΤΑ μία φορά -----------------*/
-    if (!ctrl.querySelector('.ts-fill-reset-btn')) {
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'ts-fill-reset-btn';
-        resetBtn.type      = 'button';
-        resetBtn.title     = 'Επιλογή όλων ή Καθαρισμός';
-        resetBtn.innerHTML = '<i class="bi bi-plus-slash-minus"></i>';
-        resetBtn.style.cssText = 'margin-left:2.5rem!important';
-        ctrl.appendChild(resetBtn);
+    // ✔ Μόλις γίνει ορατό, πάρε focus
+    if (!trash.hidden) {
+      trash.focus();
+    }
 
-        /* ⇄ toggle: αν υπάρχουν tags → clear, αλλιώς → επίλεξε ΟΛΑ χωρίς dropdown */
-        resetBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+    /* ----------------------------------------------------------------
+    * B. Ellipsis στο label όταν είναι μακρύ (χωρίς inline styles)
+    * ----------------------------------------------------------------*/
+    const itemEl = ctrl.querySelector('.item');
+    if (itemEl) itemEl.classList.add('ts-item-ellipsis');
 
-            tom.ignoreFocusOpen = true; // stop auto-open
+    return; // single-select τελείωσε εδώ
+  }
 
-            try {
-                const hasTags = (tom.items || []).length > 0;
+  /* ==================================================================
+  *  MULTI-SELECT MODE                                                */
+  /* =================================================================*/
 
-                if (hasTags) {
-                    tom.clear();       // clear all
-                } else {
-                    /* ▸▸ Επιλογή ΟΛΩΝ ------------------------------------------------*/
-                    let allValues = Object.values(tom.options).map(o => o.value);
+  /* 2. resetBtn (+/−) — δημιουργείται ΠΑΝΤΑ μία φορά -----------------*/
+  if (!ctrl.querySelector('.ts-fill-reset-btn')) {
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'ts-fill-reset-btn';
+    resetBtn.type      = 'button';
+    resetBtn.title     = 'Επιλογή όλων ή Καθαρισμός';
+    resetBtn.innerHTML = '<i class="bi bi-plus-slash-minus"></i>';
+    ctrl.appendChild(resetBtn);
 
-                    // αν είναι κενό (π.χ. remote) → fetch
-                    if (!allValues.length && typeof url !== 'undefined') {
-                        const finalUrl = new URL(url, window.location.origin);
-                        if (typeof extraParams === 'object') {
-                            Object.entries(extraParams).forEach(([k, v]) => v && finalUrl.searchParams.set(k, v));
-                        }
-                        try {
-                            const json = await fetch(finalUrl, { credentials: 'include' }).then(r => r.json());
-                            const allItems = json.items || [];
-                            tom.addOptions(allItems);
-                            allValues = allItems.map(i => i.value);
-                        } catch (err) {
-                            console.error('❌ resetBtn remote load failed', err);
-                        }
-                    }
+    /* ⇄ toggle: αν υπάρχουν tags → clear, αλλιώς → επίλεξε ΟΛΑ χωρίς dropdown */
+    resetBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-                    if (allValues.length) {
-                        tom.setValue([], true);          // redraw trick
-                        tom.setValue(allValues, true);
-                    }
-                }
-                } finally {
-                    tom.close();
-                    tom.control_input.blur();
-                    tom.ignoreFocusOpen = false;
-                    setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
-                }
-            });
-        }
+      tom.ignoreFocusOpen = true; // stop auto-open
 
-        /* 3. Υπολογισμός overflow -----------------------------------------*/
-        const ARROW = 36, GAP = 28;
-        const wrapW = wrapper.getBoundingClientRect().width;
-        let avail   = wrapW - ARROW;
-        let total   = 0;
+      try {
+        const hasTags = (tom.items || []).length > 0;
 
-        const items = [...ctrl.querySelectorAll('.item')].filter(i => !i.closest('.ts-overflow-popup'));
+        if (hasTags) {
+          tom.clear();       // clear all
+        } else {
+          /* ▸▸ Επιλογή ΟΛΩΝ ------------------------------------------------*/
+          let allValues = Object.values(tom.options).map(o => o.value);
 
-        // καθάρισμα προηγούμενων δεικτών
-        ctrl.querySelector('.ts-overflow-indicator')?.remove();
-        ctrl.querySelector('.ts-overflow-popup')?.remove();
-
-        const hidden = [];
-        for (let i = 0; i < items.length; i++) {
-            const el = items[i];
-            el.style.display = '';
-            const w = el.offsetWidth + (parseInt(getComputedStyle(el).marginRight) || 0) + GAP;
-            if (total + w <= avail) {
-                total += w;
-            } else {
-                hidden.push(el);
+          // αν είναι κενό (π.χ. remote) → fetch
+          if (!allValues.length && typeof url !== 'undefined') {
+            const finalUrl = new URL(url, window.location.origin);
+            if (typeof extraParams === 'object') {
+              Object.entries(extraParams).forEach(([k, v]) => v && finalUrl.searchParams.set(k, v));
             }
+            try {
+              const json = await fetch(finalUrl, { credentials: 'include' }).then(r => r.json());
+              const allItems = json.items || [];
+              tom.addOptions(allItems);
+              allValues = allItems.map(i => i.value);
+            } catch (err) {
+              console.error('❌ resetBtn remote load failed', err);
+            }
+          }
+
+          if (allValues.length) {
+            tom.setValue([], true);          // redraw trick
+            tom.setValue(allValues, true);
+          }
         }
-        hidden.forEach(el => el.style.display = 'none');
-
-          if (!hidden.length) return;   // early exit (resetBtn κρατήθηκε)
-
-        /* 4. +N indicator & ταξινομημένο popup -----------------------------*/
-        const dot = document.createElement('div');
-        dot.className = 'ts-overflow-indicator';
-        dot.tabIndex  = -1;
-        dot.textContent = `+${hidden.length}`;
-        dot.title       = `Πατήστε για εμφάνιση (${hidden.length} ακόμη)`;
-        ctrl.appendChild(dot);
-
-        dot.addEventListener('click', (e) => {  
-            e.preventDefault();
-            e.stopPropagation();
-
-            tom.ignoreFocusOpen = true;
-            tom.control_input.blur();
-
-            setTimeout(() => {
-                tom.ignoreFocusOpen = false;
-                if (ctrl.querySelector('.ts-overflow-popup')) return;
-
-                const popup = document.createElement('div');
-                popup.className = 'ts-overflow-popup';
-
-                const sorted = hidden.slice().sort((a, b) => {
-                    const extract = (el) => {
-                        const lbl = (tom.options[el.dataset.value]?.label || el.dataset.value).split('-')[0].trim();
-                        return lbl;
-                    };
-                    return extract(a).localeCompare(extract(b), undefined, { numeric: true, sensitivity: 'base' });
-                });
-
-                popup.innerHTML = sorted.map(el => {
-                    const v = el.dataset.value;
-                    const l = tom.options[v]?.label || v;
-                    return `<div class="ts-popup-row"><span>${l}</span><button data-val="${v}" title="Αφαίρεση"><i class="bi bi-trash3"></i></button></div>`;
-                }).join('');
-
-                document.body.appendChild(popup);
-                const r = wrapper.getBoundingClientRect();
-                popup.style.cssText = `position:absolute;z-index:99999;top:${r.bottom + 2}px;left:${r.left}px;width:${r.width}px;`;
-
-                // auto-height με όριο 8 lines
-                const rowH = popup.querySelector('.ts-popup-row')?.offsetHeight || 32;
-                const lim  = Math.min(rowH * 8 + 8, window.innerHeight - r.bottom - 8);
-                if (popup.offsetHeight > lim) {
-                    popup.style.maxHeight = `${lim}px`;
-                    popup.style.overflowY = 'auto';
-                }
-
-                // κουμπάκια αφαίρεσης μέσα στο popup
-                popup.querySelectorAll('button').forEach(btn => {
-                    btn.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
-                    ctrl.querySelector(`.item[data-value="${btn.dataset.val}"] .remove`)?.click();
-                    popup.remove();
-                    updateOverflow(tom);
-                });
-            });
-
-            // κλείσιμο popup όταν κλικάρει έξω ή ξαναπατήσει το +N
-            document.addEventListener('click', function close(ev) {
-                if (!popup.contains(ev.target) && ev.target !== dot) {
-                    popup.remove();
-                    document.removeEventListener('click', close);
-                }
-            });
-        }, 0);
+      } finally {
+        tom.close();
+        tom.control_input.blur();
+        tom.ignoreFocusOpen = false;
+        setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
+      }
     });
+  }
+
+  /* 3. Υπολογισμός overflow -----------------------------------------*/
+  const ARROW = 36, GAP = 28;
+  const wrapW = wrapper.getBoundingClientRect().width;
+  let avail   = wrapW - ARROW;
+  let total   = 0;
+
+  const items = [...ctrl.querySelectorAll('.item')].filter(i => !i.closest('.ts-overflow-popup'));
+
+  // καθάρισμα προηγούμενων δεικτών
+  ctrl.querySelector('.ts-overflow-indicator')?.remove();
+  ctrl.querySelector('.ts-overflow-popup')?.remove();
+
+  const hidden = [];
+  for (let i = 0; i < items.length; i++) {
+    const el = items[i];
+    el.hidden = false; // δείξε το αρχικά
+    const w = el.offsetWidth + (parseInt(getComputedStyle(el).marginRight) || 0) + GAP;
+    if (total + w <= avail) {
+      total += w;
+    } else {
+      hidden.push(el);
+    }
+  }
+  hidden.forEach(el => (el.hidden = true));
+
+  if (!hidden.length) return;   // early exit (resetBtn κρατήθηκε)
+
+  /* 4. +N indicator & ταξινομημένο popup -----------------------------*/
+  const dot = document.createElement('div');
+  dot.className = 'ts-overflow-indicator';
+  dot.tabIndex  = -1;
+  dot.textContent = `+${hidden.length}`;
+  dot.title       = `Πατήστε για εμφάνιση (${hidden.length} ακόμη)`;
+  ctrl.appendChild(dot);
+
+  dot.addEventListener('click', (e) => {  
+    e.preventDefault();
+    e.stopPropagation();
+
+    tom.ignoreFocusOpen = true;
+    tom.control_input.blur();
+
+    setTimeout(() => {
+      tom.ignoreFocusOpen = false;
+      if (ctrl.querySelector('.ts-overflow-popup')) return;
+
+      const popup = document.createElement('div');
+      popup.className = 'ts-overflow-popup';
+
+      const sorted = hidden.slice().sort((a, b) => {
+        const extract = (el) => {
+          const lbl = (tom.options[el.dataset.value]?.label || el.dataset.value).split('-')[0].trim();
+          return lbl;
+        };
+        return extract(a).localeCompare(extract(b), undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      popup.innerHTML = sorted.map(el => {
+        const v = el.dataset.value;
+        const l = tom.options[v]?.label || v;
+        return `<div class="ts-popup-row"><span>${l}</span><button data-val="${v}" title="Αφαίρεση"><i class="bi bi-trash3"></i></button></div>`;
+      }).join('');
+
+      // ➜ Προσαρτούμε ΣΤΟΝ WRAPPER (όχι στο body), ώστε το CSS absolute να δουλεύει χωρίς inline τοποθέτηση
+      wrapper.appendChild(popup);
+
+      // κουμπάκια αφαίρεσης μέσα στο popup
+      popup.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          ctrl.querySelector(`.item[data-value="${btn.dataset.val}"] .remove`)?.click();
+          popup.remove();
+          updateOverflow(tom);
+        });
+      });
+
+      // κλείσιμο popup όταν κλικάρει έξω ή ξαναπατήσει το +N
+      document.addEventListener('click', function close(ev) {
+        if (!popup.contains(ev.target) && ev.target !== dot) {
+          popup.remove();
+          document.removeEventListener('click', close);
+        }
+      });
+    }, 0);
+  });
 }
 
-window.tomDropdownConfig={
-    setRender:(id,r)=>globalRenderMap[id]=r,
-    setHooks :(id,h)=>globalHookMap[id]=h,
-    setTemplate:(id,t)=>templateCache[id]=t
+window.tomDropdownConfig = {
+  setRender  : (id, r) => (globalRenderMap[id] = r),
+  setHooks   : (id, h) => (globalHookMap[id]  = h),
+  setTemplate: (id, t) => (templateCache[id]  = t)
 };

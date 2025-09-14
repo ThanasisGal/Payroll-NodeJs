@@ -54,19 +54,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 html: `
                 <div class="col-8 left-align checkbox-flex-center">
                     <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="employees" name="files" value="employees" checked />
-                    <label for="employees" id="label-employees" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                    <label for="employees" id="label-employees" class="ml0_75-fs-0_875vw">
                     Στοιχεία Εργαζόμενων
                     </label><br>
                 </div>
                 <div class="col-8 left-align checkbox-flex-center">
                     <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="schedules" name="files" value="schedules" checked />
-                    <label for="schedules" id="label-schedules" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                    <label for="schedules" id="label-schedules" class="ml0_75-fs-0_875vw">
                     Ωράρια ( ΕΡΓΑΝΗ ΙΙ )
                     </label><br>
                 </div>
                 <div class="col-8 left-align checkbox-flex-center">
                     <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="history" name="files" value="history" checked />
-                    <label for="history" id="label-history" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                    <label for="history" id="label-history" class="ml0_75-fs-0_875vw">
                     Ιστορικό Προσλήψεων - Αλλαγών Συμβάσεων
                     </label><br>
                 </div>`,
@@ -104,13 +104,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.success) {
                 let itemsList = `<ul>`;
                 if (result.value.employees) {
-                    itemsList += `<li><i class="bi bi-check-lg" style="color: green"></i> Εργαζομένων</li>`;
+                    itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Εργαζομένων</li>`;
                 }
                 if (result.value.schedules) {
-                    itemsList += `<li><i class="bi bi-check-lg" style="color: green"></i> Ωραρίων</li>`;
+                    itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Ωραρίων</li>`;
                 }
                 if (result.value.history) {
-                    itemsList += `<li><i class="bi bi-check-lg" style="color: green"></i> Ιστορικού Προσλήψεων - Αλλαγών</li>`;
+                    itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Ιστορικού Προσλήψεων - Αλλαγών</li>`;
                 }
                 itemsList += `</ul>`;
             

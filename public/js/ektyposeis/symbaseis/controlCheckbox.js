@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const rowCheckboxes = document.querySelectorAll('.row-checkbox');
     const rows = document.querySelectorAll('tbody tr');
     const getStoixeiaBtn = document.getElementById('get-stoixeia-btn');
+    const loader = document.querySelector(".loader-container");
 
     // Λειτουργία Select All
     selectAllCheckbox.addEventListener('change', function() {
@@ -84,7 +85,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (_result.isConfirmed) {
-            document.querySelector(".loader-container").style.display = "grid";
+            loader.classList.remove("is-hidden");
+            loader.classList.add("visible");
+
             try {
                 // Αίτημα στον server για να λάβουμε τα ωράρια
                 const response = await fetch('/api/ektyposeis/symbaseis/ergazomenoi', {
@@ -109,8 +112,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 const data = await response.json();
 
                 if (!data.success && data.checkMessage === "EBUSY") {
-                    document.querySelector(".loader-container").style.display = "none";
-                
+                    loader.classList.remove("visible");
+                    loader.classList.add("is-hidden");
+
                     await Swal.fire({
                         icon: 'error',
                         title: 'Υπάρχουν ανοιχτά αρχεία...',
@@ -128,8 +132,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     return; // 🔚 Σταματά η εκτέλεση εδώ
                 }
                 
-                document.querySelector(".loader-container").style.display = "none";
-                
+                loader.classList.remove("visible");
+                loader.classList.add("is-hidden");
+
                 Swal.fire({
                     icon: "success",
                     title: "Επιτυχής δημιουργία...",
@@ -165,7 +170,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     }                
                 });
             } catch (error) {
-                document.querySelector(".loader-container").style.display = "none";
+                loader.classList.remove("visible");
+                loader.classList.add("is-hidden");
 
                 Swal.fire({
                     icon: "error",

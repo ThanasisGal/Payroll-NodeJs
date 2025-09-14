@@ -1,4 +1,5 @@
 const logger = require("../../server/utils/logger");
+const { sessionOpts } = require('../../config/sessionOpts');
 
 const UserModel = require("../models/userModel");
 const VerifyModel = require("../models/verifications");
@@ -26,6 +27,8 @@ const month = String(now.getMonth() + 1).padStart(2, "0");
 const year = now.getFullYear();
 
 const monthNames = [ "ΙΑΝΟΥΑΡΙΟΣ", "ΦΕΒΡΟΥΑΡΙΟΣ", "ΜΑΡΤΙΟΣ", "ΑΠΡΙΛΙΟΣ", "ΜΑΙΟΣ", "ΙΟΥΝΙΟΣ", "ΙΟΥΛΙΟΣ", "ΑΥΓΟΥΣΤΟΣ", "ΣΕΠΤΕΜΒΡΙΟΣ", "ΟΚΤΩΒΡΙΟΣ", "ΝΟΕΜΒΡΙΟΣ", "ΔΕΚΕΜΒΡΙΟΣ", ];
+
+const isProd = process.env.NODE_ENV === 'production';
 
 let sTerm = "";
 var redir, tmpEmail;
@@ -350,103 +353,137 @@ class userController {
         }
     };
 
-    static verifyEmailForm = async (req, res) => {
-        const locals = {
-            title: "Verify Email",
-            description: "Web Payroll System",
-        };
+static verifyEmailForm = async (req, res) => {
+  const locals = { title: "Verify Email", description: "Web Payroll System" };
+  try {
+    res.render("login/verify_email", {
+      locals,
+      bodyClass: "custom-background",
+    });
+  } catch (error) {
+    res.redirect("/login");
+  }
+};
 
-        try {
-            res.render("login/verify_email", { locals });
-        } catch (error) {
-            res.redirect("/login");
+// ΑΠΑΡΑΙΤΗΤΑ imports στην κορυφή του αρχείου controller:
+// const jwt = require("jsonwebtoken");
+// const VerifyModel = require("../models/VerifyModel");  // προσαρμόσε το path
+// const transporter = require("../utils/mailer");         // προσαρμόσε το path
+// const APP_ORIGIN = process.env.APP_ORIGIN;
+
+static sendUserVerifyEmail = async (req, res) => {
+  // 1) Βασικός καθαρισμός/έλεγχος εισόδου
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const secret = process.env.JWT_SECRET_KEY;
+  const base = process.env.APP_ORIGIN || `http://localhost:${process.env.PORT || 5000}`;
+
+  if (!email) {
+    if (res.flash) await res.flash("error", "Συμπλήρωσε e-mail.");
+    return res.redirect("back");
+  }
+  if (!secret) {
+    console.error("JWT_SECRET_KEY is missing");
+    if (res.flash) await res.flash("error", "Πρόβλημα ρύθμισης. Επικοινωνήστε με τον διαχειριστή.");
+    return res.redirect("back");
+  }
+
+  try {
+    const now = new Date();
+
+    // 2) ΑΤΟΜΙΚΟ UPSERT για να αποφύγουμε race conditions & E11000
+    const doc = await VerifyModel.findOneAndUpdate(
+      { email },
+      {
+        $setOnInsert: { email, verify: false, createdAt: now },
+        $set: { updatedAt: now },
+      },
+      { new: true, upsert: true }
+    );
+
+    // 3) Δημιουργία token (λήξη 5')
+    const token = jwt.sign({ userID: doc._id }, secret, { expiresIn: "5m" });
+
+    // (προαιρετικό) Αποθήκευση token για audit/έλεγχο
+    await VerifyModel.updateOne(
+      { _id: doc._id },
+      { $set: { token, updatedAt: new Date() } }
+    );
+
+    // 4) Φτιάχνουμε link επαλήθευσης
+    const s3 = Buffer.from(email, "utf8").toString("hex");
+    const link = `${base}/verify-Email/?s1=${doc._id}&s2=${token}&s3=${s3}`;
+
+    // 5) Αποστολή email
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: "Επαλήθευση email - Web Payroll Solutions",
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height:1.6;">
+          <h2>Καλώς ήρθατε στο Web Payroll Solutions</h2>
+          <p>Γεια σας,</p>
+          <p>Ευχαριστούμε που εγγραφήκατε στην εφαρμογή <strong>Web Payroll Solutions</strong>.</p>
+          <p>Για να ολοκληρώσετε τη διαδικασία, επαληθεύστε το email σας (διάρκεια 5').</p>
+          <p style="margin:20px 0;">
+            <a href="${link}" style="background:#28a745; color:#fff; padding:10px 15px; border-radius:5px; text-decoration:none;">
+              Επαλήθευση Email
+            </a>
+          </p>
+          <p>Αν δεν δημιουργήσατε εσείς λογαριασμό, αγνοήστε αυτό το μήνυμα.</p>
+          <hr style="margin:20px 0;">
+          <p style="font-size:14px; color:#555;">
+            Για υποστήριξη, επικοινωνήστε με την ομάδα μας μέσω email.
+          </p>
+        </div>
+      `,
+    });
+
+    if (res.flash) {
+      await res.flash(
+        "info",
+        "Στάλθηκε email επαλήθευσης (ισχύει 5'). Ελέγξτε τα εισερχόμενα/ανεπιθύμητα."
+      );
+    }
+    // 6) PRG: redirect για να εμφανιστεί το flash και να μην ξαναγίνει POST με refresh
+    return res.redirect("/login/verify-email");
+
+  } catch (err) {
+    // Αν παρ' όλα αυτά προκύψει E11000 (σπάνιο με upsert), χειρίσου το ως "υπάρχον"
+    if (err && err.code === 11000) {
+      try {
+        const existing = await VerifyModel.findOne({ email });
+        if (existing) {
+          const token = jwt.sign({ userID: existing._id }, secret, { expiresIn: "5m" });
+          await VerifyModel.updateOne(
+            { _id: existing._id },
+            { $set: { token, updatedAt: new Date() } }
+          );
+          const s3 = Buffer.from(email, "utf8").toString("hex");
+          const link = `${base}/verify-Email/?s1=${existing._id}&s2=${token}&s3=${s3}`;
+
+          await transporter.sendMail({
+            from: process.env.EMAIL_FROM,
+            to: email,
+            subject: "Επαλήθευση email - Web Payroll Solutions",
+            html: `
+              <p>Το email υπάρχει ήδη. Σας στείλαμε νέο link επαλήθευσης (ισχύει 5').</p>
+              <p><a href="${link}">Επαλήθευση Email</a></p>
+            `,
+          });
+
+          if (res.flash) await res.flash("info", "Το e-mail υπάρχει ήδη — στείλαμε νέο link επαλήθευσης (5').");
+          return res.redirect("/login/verify-email");
         }
-    };
+      } catch (e2) {
+        console.error("dup-recover failed:", e2);
+      }
+    }
 
-    static sendUserVerifyEmail = async (req, res) => {
-        const { email } = req.body;
-        const secret = process.env.JWT_SECRET_KEY;
-
-        let id, newToken;
-
-        if (email) {
-            const verifyEmail = await VerifyModel.findOne({ email: email });
-            if (verifyEmail) {
-                const token = jwt.sign({ userID: verifyEmail._id }, secret, {
-                expiresIn: "10m",
-                });
-                id = verifyEmail._id;
-                newToken = token;
-            } else {
-                const newEmail = VerifyModel({
-                    email: email,
-                    verify: false,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                });
-                await VerifyModel.create(newEmail);
-
-                const verifyEmail = await VerifyModel.findOne({ email: email });
-                if (verifyEmail) {
-                    const token = jwt.sign({ userID: verifyEmail._id }, secret, {
-                        expiresIn: "5m",
-                    });
-
-                    id = verifyEmail._id;
-                    newToken = token;
-
-                    await VerifyModel.findByIdAndUpdate(
-                        verifyEmail._id,
-                        { token, updatedAt: new Date() },
-                        { new: true }
-                    );
-                }
-            }
-
-            const bufferText = Buffer.from(email, "utf8");
-            const s3 = bufferText.toString("hex");
-
-            const base = APP_ORIGIN || `http://localhost:${process.env.PORT || 5000}`;
-            const link = `${base}/verify-Email/?s1=${id}&s2=${newToken}&s3=${s3}`;
-
-            // Send Email
-            let info = await transporter.sendMail({
-                from: process.env.EMAIL_FROM,
-                to: email,
-                subject: "Επαλήθευση email - Web Payroll Solutions",
-                html: `
-                <div style="font-family: Arial, sans-serif; line-height:1.6;">
-                    <h2>Καλώς ήρθατε στο Web Payroll Solutions</h2>
-                    
-                    <p>Γεια σας,</p>
-                    <p>Ευχαριστούμε που εγγραφήκατε στην εφαρμογή <strong>Web Payroll Solutions</strong>.</p>
-                    <p>Για να ολοκληρώσετε τη διαδικασία εγγραφής και να ενεργοποιήσετε τον λογαριασμό σας, 
-                    θα χρειαστεί πρώτα να επαληθεύσετε το email σας. (διάρκεια 5')</p>
-                    
-                    <p style="margin:20px 0;">
-                        <a href="${link}" 
-                            style="background:#28a745; color:#fff; padding:10px 15px; border-radius:5px; text-decoration:none;">
-                            Επαλήθευση Email
-                        </a>
-                    </p>
-                    
-                    <p>Αν δεν δημιουργήσατε εσείς λογαριασμό στο Web Payroll Solutions, 
-                    μπορείτε να αγνοήσετε αυτό το μήνυμα.</p>
-                    
-                    <hr style="margin:20px 0;">
-                    
-                    <p style="font-size:14px; color:#555;">
-                    Για υποστήριξη - πληροφορίες, επικοινωνήστε μέσω του email με την ομάδα μας.
-                    </p>
-                </div>
-                `,
-            });
-
-            await res.flash("info", "Σας έχει αποσταλεί ένα email επαλήθευσης, το οποίο θα ισχύει για τα επόμενα 5 λεπτά. Παρακαλώ ΕΛΕΓΞΤΕ το email σας...");
-            redir = "home";
-        }
-        await res.render(redir);
-    };
+    console.error("sendUserVerifyEmail ERROR:", err);
+    if (res.flash) await res.flash("error", "Κάτι πήγε στραβά. Δοκιμάστε ξανά.");
+    return res.redirect("back");
+  }
+};
 
     static emailVerification = async (req, res, next) => {
         const paramsEmail = req.query.s3.toString("utf8");
@@ -497,16 +534,21 @@ class userController {
         const locals = {
             title: "Login",
             description: "Web Payroll System",
+            
         };
 
         try {
-            res.render("login/login", { locals });
+            res.render("login/login", { locals, bodyClass: "custom-background" });
         } catch (error) {
             res.redirect("/");
         }
     };
 
     static getUserRoles = async (req, res) => {
+        if (!req.session?.userId) {
+            return res.status(401).json({ permissions: {} });
+        }
+
         const user_Id = req.session.userId;
         const userPermission = req.session.userRole;
         const permissions = await userController.fetchPermissions(user_Id, userPermission);
@@ -534,6 +576,7 @@ class userController {
             const permissions = Object.fromEntries(
                 lis.map(li => [li.li_Id, Boolean(li[`situation_${userPermission}`])])
             );
+           
             return permissions;
         } catch (err) {
             logger.error(err);
@@ -596,49 +639,49 @@ class userController {
             const userIdStr = String(user._id); // ΠΟΛΥ ΣΗΜΑΝΤΙΚΟ: τα άλλα models έχουν userId: String
 
             await syncFromTemplate({
-            Model: UserPrivilegesModel,
-            userIdStr,
-            templateId: templateUserId,
-            uniqueKey: "form",
-            projection: { _id: 0, userId: 0, createdAt: 0, updatedAt: 0 },
+                Model: UserPrivilegesModel,
+                userIdStr,
+                templateId: templateUserId,
+                uniqueKey: "form",
+                projection: { _id: 0, userId: 0, createdAt: 0, updatedAt: 0 },
             });
 
             await syncFromTemplate({
-            Model: SidebarStatusModel,
-            userIdStr,
-            templateId: templateUserId,
-            uniqueKey: "li_Id",
-            projection: { _id: 0, userId: 0 },
+                Model: SidebarStatusModel,
+                userIdStr,
+                templateId: templateUserId,
+                uniqueKey: "li_Id",
+                projection: { _id: 0, userId: 0 },
             });
 
             // Διαβάζει από ParamModel και ενημερώνει το session
             const parameter = await ParamModel.findOne({ usrId: req.session.userId });
             if (parameter) {
-            if (parameter.usedYear) req.session.yearInUse = parameter.usedYear;
-            if (parameter.usedPeriod) req.session.periodInUse = parameter.usedPeriod;
-            if (parameter.usedPeriodDescr) req.session.periodInUseDescr = parameter.usedPeriodDescr;
-            if (parameter.appDate) req.session.appDate = parameter.appDate;
+                if (parameter.usedYear) req.session.yearInUse = parameter.usedYear;
+                if (parameter.usedPeriod) req.session.periodInUse = parameter.usedPeriod;
+                if (parameter.usedPeriodDescr) req.session.periodInUseDescr = parameter.usedPeriodDescr;
+                if (parameter.appDate) req.session.appDate = parameter.appDate;
 
-            if (parameter.companyId && parameter.companyId.length > 0) {
-                const companies = await CompaniesModel.findById(parameter.companyId);
-                if (companies) {
-                req.session.companyInUse = parameter.companyId;
-                req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`.trim();
+                if (parameter.companyId && parameter.companyId.length > 0) {
+                    const companies = await CompaniesModel.findById(parameter.companyId);
+                    if (companies) {
+                    req.session.companyInUse = parameter.companyId;
+                    req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`.trim();
+                    }
+                    redir = "/mainapp";
+                } else {
+                    redir = "/companies/genikastoixeia";
                 }
-                redir = "mainapp";
+
+                if (parameter.usedPeriod && parameter.usedYear) {
+                    const periodoi = await PeriodsModel.findOne({
+                    xrhsh: parameter.usedYear,
+                    kodikos: parameter.usedPeriod,
+                    });
+                    if (periodoi) req.session.periodInUseDescr = periodoi.perigrafh;
+                }
             } else {
                 redir = "/companies/genikastoixeia";
-            }
-
-            if (parameter.usedPeriod && parameter.usedYear) {
-                const periodoi = await PeriodsModel.findOne({
-                xrhsh: parameter.usedYear,
-                kodikos: parameter.usedPeriod,
-                });
-                if (periodoi) req.session.periodInUseDescr = periodoi.perigrafh;
-            }
-            } else {
-            redir = "/companies/genikastoixeia";
             }
 
         } catch (error) {
@@ -647,10 +690,13 @@ class userController {
             redir = "login/login";
         }
 
-        if (redir === "/companies/genikastoixeia") {
+        if (redir === "/mainapp") {
+            return res.redirect("/mainapp");
+        } else if (redir === "/companies/genikastoixeia") {
             return res.redirect("/companies/genikastoixeia");
-        }
-        return res.render(redir, { bodyClass: "custom-background" });
+        } else {
+            return res.render(redir, { bodyClass: "custom-background" });
+        }        
     };
 
     static registerForm = async (req, res) => {
@@ -1145,21 +1191,36 @@ class userController {
             description: "Web Payroll System",
         };
         try {
-            await res.render("login/logout", locals);
+            await res.render("login/logout", { locals, bodyClass: "custom-background" });
         } catch (error) {
             res.redirect("/");
         }
     };
 
-    static logout = async (req, res) => {
-        try {
-            await req.session.destroy();
-            await res.redirect("https://www.google.com");
-        } catch (error) {
-            res.redirect("/");
-        }
-    };
+    static logout = (req, res) => {
+        const sid = req.sessionID;
 
+        req.session.destroy(err => {
+            if (err) {
+                console.error('logout destroy error:', err);
+                return res.redirect('/');
+            }
+
+            // προαιρετικό – καθαρίζει και από το store
+            try { req.sessionStore?.destroy?.(sid); } catch {}
+
+            // καθάρισε το session cookie
+            res.clearCookie(sessionOpts.name || 'sid', {
+                path    : sessionOpts.cookie.path ?? '/',
+                sameSite: sessionOpts.cookie.sameSite ?? 'lax',
+                httpOnly: sessionOpts.cookie.httpOnly !== false,
+                secure  : sessionOpts.cookie.secure ?? false,
+            });
+            // console.log('Set-Cookie on logout:', res.getHeader('Set-Cookie'));
+            // για POST->GET redirect είναι σωστό το 303, δουλεύει τέλεια και για GET
+            return res.redirect(303, 'https://www.google.com');
+        });
+    }
 }
 
 module.exports = userController;

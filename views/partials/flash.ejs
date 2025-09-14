@@ -21,7 +21,7 @@ TYPES.forEach(function(type){
                 : 'info-circle-fill';
     %>
     <div class="auto-close alert alert-<%= bsType %> alert-dismissible fade show" role="alert" data-autoclose="true">
-        <b class="fw-bold" style="font-size: 18px;">
+        <b class="fw-bold fs18px">
             <i class="bi bi-<%= icon %>"></i>
             &nbsp;<%= msg %>
         </b>
@@ -30,7 +30,7 @@ TYPES.forEach(function(type){
     <% }) %>
 
     <!-- Auto-close μετά από 5s (Bootstrap 5) -->
-    <script>
+    <script nonce="<%= nonce %>">
         (function(){
             document.querySelectorAll('.auto-close[data-autoclose="true"]').forEach(function(el){
                 setTimeout(function(){

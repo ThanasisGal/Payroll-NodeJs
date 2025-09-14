@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: " ",
           html: `
             <ul>
-              <li style="font-weight: 600">${message}</li>
+              <li class="fw600">${message}</li>
             </ul>
           `,
           timer: 2500,

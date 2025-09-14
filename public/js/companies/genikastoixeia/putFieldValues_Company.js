@@ -74,16 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
         Swal.fire({
           icon: "success",
           title: "Επιτυχής ενημέρωση των αρχείων:",
-          // html: `
-          //   <ul>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Εταιρειών</li>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Τεχνικών Ασφαλείας</li>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Ιατρών Εργασίας</li>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Λογιστών</li>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Έμμεσων Εργοδοτών</li>
-          //     <li><i class="bi bi-check-lg" style="color: green"></i> Διάδοχων Εργοδοτών</li>
-          //   </ul>
-          // `,
           timer: 1500,
           confirmButtonText: "Κλείσιμο",
           customClass: {

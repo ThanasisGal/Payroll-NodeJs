@@ -37,9 +37,16 @@ router.get("/", userController.homepage);
 router.post("/search", (req, res) => res.redirect("/"));
 
 router.get("/login", userController.loginForm);
-router.get("/verifyEmail", userController.verifyEmailForm);
+router.get("/login/verify-email", userController.verifyEmailForm);
 router.get("/verify-Email", userController.emailVerification);
-router.post("/login/verify-email", userController.sendUserVerifyEmail);
+// router.post("/login/verify-email", userController.sendUserVerifyEmail);
+// 👇 Προσωρινό tap για να δούμε αν μπαίνει στο route μετά το CSRF
+router.post('/login/verify-email', (req, res, next) => {
+  console.log('HIT POST /login/verify-email, body =', req.body);
+  res.set('X-Route-Touched', '1'); // για να το δεις στο Network/Headers
+  next();
+}, userController.sendUserVerifyEmail);
+
 router.get("/register", userController.registerForm);
 router.post("/register/userRegistration", userController.userRegistration);
 router.post("/login/userLogin", userController.userLogin);

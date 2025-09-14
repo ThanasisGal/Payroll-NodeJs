@@ -138,11 +138,11 @@
         </div> -->
 
 <% const isProduction = NODE_ENV === 'production'; %>
-<script>
+<script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
               
-<script src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script type="module" src="/static/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js"></script>  
 
 
@@ -150,18 +150,18 @@
 
 <!-- 
         <% if (process.env.NODE_ENV === 'production') { %>
-            <script src="/static/min.js/ergazomenoi/programmata/eisagoghOrarionApoErganh.min.js"></script>
+            <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/programmata/eisagoghOrarionApoErganh.min.js"></script>
         <% } else { %>
-            <script src="/static/js/common/getCompanyDescription.js"></script>
-            <script src="/static/js/common/toggleLabel.js"></script>
-            <script src="/static/js/dates/convertDateToISO.js"></script>
-            <script src="/static/js/common/tooltipsForButtons.js"></script>
-            <script src="/static/js/common/moveByEnter.js"></script>
-            <script src="/static/js/common/scrollToTop.js"></script>
-            <script src="/static/js/ergazomenoi/programmata/loadDropdowns.js"></script>
-            <script src="/static/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script>
-            <script src="/static/js/ergazomenoi/programmata/importScheduleButton.js"></script>
-            <script src="/static/js/common/setupTabKeyNavigation.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/toggleLabel.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/dates/convertDateToISO.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/loadDropdowns.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/importScheduleButton.js"></script>
+            <script nonce="<%= nonce %>" src="/static/js/common/setupTabKeyNavigation.js"></script>
         <% } %>
 -->
     <!-- </div>

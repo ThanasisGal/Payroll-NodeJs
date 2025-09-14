@@ -143,13 +143,13 @@
 </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_search_ejs.min.js"></script>
+  <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_search_ejs.min.js"></script>
 <% } else { %>
-  <script src="/static/js/common/getCompanyDescription.js"></script>
-  <script src="/static/js/common/getXrhsh.js"></script>
-  <script src="/static/js/common/getPeriod.js"></script>
-  <script src="/static/js/common/getUser.js"></script>
-  <script src="/static/js/common/sortTable.js"></script>
-  <script src="/static/js/common/tooltipsForButtons.js"></script>
-  <script src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getXrhsh.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
 <% } %>

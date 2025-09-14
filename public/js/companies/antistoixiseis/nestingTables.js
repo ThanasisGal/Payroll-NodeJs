@@ -61,12 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
               antistoixiseisData.forEach(antistoixish => {
                 tableContent += `
                 <tr  onclick="selectRow(this)" data-id="${antistoixish._id}">
-                  <th class="col-1-5 text-center" style="font-size: 0.9vw;"></th>
-                  <td class="col-0-5 text-center" style="font-size: 0.9vw;">${antistoixish.kpk}</td>
-                  <td class="col-1 text-center" style="font-size: 0.9vw;">${antistoixish.apo_typos_apodoxon}</td>
-                  <td class="col-1 text-center" style="font-size: 0.9vw;">${antistoixish.se_typos_apodoxon}</td>
-                  <td class="col-1 text-center" style="font-size: 0.9vw;">${antistoixish.kad}</td>
-                  <td class="col-1 text-center" style="font-size: 0.9vw;">${antistoixish.eidikothta}</td>
+                  <th class="col-1-5 text-center fs0_9vw"></th>
+                  <td class="col-0-5 text-center fs0_9vw">${antistoixish.kpk}</td>
+                  <td class="col-1 text-center fs0_9vw">${antistoixish.apo_typos_apodoxon}</td>
+                  <td class="col-1 text-center fs0_9vw">${antistoixish.se_typos_apodoxon}</td>
+                  <td class="col-1 text-center fs0_9vw">${antistoixish.kad}</td>
+                  <td class="col-1 text-center fs0_9vw">${antistoixish.eidikothta}</td>
                 </tr>`;
               });
 

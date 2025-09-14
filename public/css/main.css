@@ -13,6 +13,11 @@
   --bg-d-flex-hover: #0066ff2d;
   --bs-body-color-rgb: 33, 37, 41;
   --bs-card-cap-bg: rgba(var(--bs-body-color-rgb), 0.5);
+  --sidebar-bg: #dbdbdb4f;
+  --sidebar-w: 21rem;   /* πλάτος sidebar */
+  --app-header-h: 56px;   
+  --app-footer-h: 28px;   /* ύψος του footer της σελίδας σου (πρόσθεσε όσο είναι ακριβώς) */
+  --logout-h: 48px;       /* ύψος της περιοχής του κουμπιού Αποσύνδεση */
   font-size: 1rem;
 }
 
@@ -22,14 +27,22 @@ html, body {
   overflow-y: hidden !important;
 }
 
-body.custom-background {
+.custom-background {
+  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps1.png");
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: auto;
+  background-position: 26% 7%;
+  transition: none !important;
+}
+/* .custom-background-body {
   background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-size: auto;
   background-position: 60% 50%;
   transition: none !important;
-}
+} */
 
 .black-color {
   color: #000000;
@@ -551,92 +564,52 @@ small,
 
 .form-control-dark {
   color: #fff;
-  background-color: hsla(0, 0%, 100%, 0.302);
-  border-color: rgba(255, 255, 255, 0.1);
+  background-color: #ffffff4d;
+  border-color: #ffffff1a;
 }
 
 .form-control-dark:focus {
   border-color: transparent;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 0 3px #ffffff40;
 }
 
-.w-5 {
-  width: 5% !important;
-}
-.w-10 {
-  width: 10% !important;
-}
-.w-11_5 {
-  width: 11.5% !important;
-}
-.w-15 {
-  width: 15% !important;
-}
-.w-20 {
-  width: 20% !important;
-}
-.w-25 {
-  width: 25% !important;
-}
-.w-30 {
-  width: 30% !important;
-}
-.w-35 {
-  width: 35% !important;
-}
-.w-40 {
-  width: 40% !important;
-}
-.w-45 {
-  width: 45% !important;
-}
-.w-50 {
-  width: 50% !important;
-}
-.w-55 {
-  width: 55% !important;
-}
-.w-60 {
-  width: 60% !important;
-}
-.w-65 {
-  width: 65% !important;
-}
-.w-70 {
-  width: 70% !important;
-}
-.w-75 {
-  width: 75% !important;
-}
-.w-80 {
-  width: 80% !important;
-}
-.w-85 {
-  width: 85% !important;
-}
-.w-90 {
-  width: 90% !important;
-}
-.w-97 {
-  width: 97% !important;
-}
+.w-5 { width: 5% !important; }
+.w-10 { width: 10% !important; }
+.w-11_5 { width: 11.5% !important; }
+.w-15 { width: 15% !important; }
+.w-20 { width: 20% !important; }
+.w-25 { width: 25% !important; }
+.w-30 { width: 30% !important; }
+.w-35 { width: 35% !important; }
+.w-40 { width: 40% !important; }
+.w-45 { width: 45% !important; }
+.w-50 { width: 50% !important; }
+.w-55 { width: 55% !important; }
+.w-60 { width: 60% !important; }
+.w-65 { width: 65% !important; }
+.w-70 { width: 70% !important; }
+.w-75 { width: 75% !important; }
+.w-80 { width: 80% !important; }
+.w-85 { width: 85% !important; }
+.w-90 { width: 90% !important; }
+.w-92 { width: 97% !important; }
+.w-97 { width: 97% !important; }
 
-.mb-0-5 {
-  margin-bottom: 0.225rem !important;
-}
-.mb-1-5 {
-  margin-bottom: 0.375rem !important;
-}
+.mb-0-5 { margin-bottom: 0.225rem !important; }
+.mb-1-5 { margin-bottom: 0.375rem !important; }
+
 .mt-2-5 { margin-top: 0.625rem !important; }
 .mt-5-5 { margin-top: 4rem !important; }
 .mt-10 { margin-top: 10rem !important; }
 
+.mt-n-0-5 { margin-top: -0.5rem; }
+.mt-n-1 { margin-top: -1rem; }
 .mt-n-1-3 { margin-top: -1.3rem; }
 .mt-n-1-3-0 { margin-top: -1.3rem; }
 .mt-n-1-55 { margin-top: -1.55rem; }
 .mt-n-1-7 { margin-top: -1.7rem; }
 
-.fs-72 { font-size: .72rem; }
+.fsrem-72 { font-size: .72rem; }
 .ht-12 { height: 12vh; }
 .ht-62 { height: 81vh !important; }
 .pt-3-0 { padding-top: 1.65rem; }
@@ -823,7 +796,7 @@ small,
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   font-size: 0.85vw;
-  background-color: #00975859;
+  background-color: #009758be;
   border: 0;
   color: var(--dark);
 }
@@ -1062,7 +1035,7 @@ input.disabled {
 
 .loader-text {
   margin-top: 0.75rem;
-  margin-left: -2.5rem;
+  /* margin-left: -2.5rem; */
   font-size: 0.8rem;
   font-weight: 700;
   color: #673b14; /* Χρώμα για το κείμενο */
@@ -1527,7 +1500,6 @@ a {
 .ml-7 { margin-left: 7vw !important;}
 .ml-8 { margin-left: 8vw !important;}
 
-
 @media only screen and (max-width: 1440px) and (max-height: 932px) {
     .form-apasxolhseis {
         height: 82vh !important;
@@ -1570,7 +1542,7 @@ a {
     
     .firefox .col-4-9 { flex: 0 0 auto; width: 40.83%; }
 
-    .firefox .fs-72 {font-size: .65rem;}
+    .firefox .fsrem-72 {font-size: .65rem;}
     .firefox .ht-12 {height: 12vh !important;}
     .firefox .ht-62 {height: 85vh !important;}
 
@@ -1668,7 +1640,7 @@ a {
     
     .edge .col-4-9 { flex: 0 0 auto; width: 40.83%; }
 
-    .edge .fs-72 {font-size: .65rem;}
+    .edge .fsrem-72 {font-size: .65rem;}
     .edge .ht-12 {height: 12vh !important;}
     .edge .ht-62 {height: 85vh !important;}
     .edge .pt-3-0 { padding-top: .5rem !important; }
@@ -1700,7 +1672,7 @@ a {
     .chrome .mt-n-1-55 { margin-top: -1.1rem !important; }
     .chrome .mt-n-1-7 { margin-top: -1.8rem !important; }
     
-    .chrome .fs-72 {font-size: .65rem !important;}
+    .chrome .fsrem-72 {font-size: .65rem !important;}
     .chrome .ht-12 {height: 12vh !important;}
     .chrome .ht-62 {height: 86vh !important;}
     .chrome .pt-3-0 { padding-top: 1rem !important; }
@@ -1909,14 +1881,13 @@ a {
   justify-content: center !important;
 }
 
-.custom-title {
-  font-size: 1.2rem;
-  font-weight: bold;
-}
+.custom-title { font-size: 1.2rem; font-weight: bold; }
 
 .custom-confirm-button, .custom-cancel-button {
   width: 150px;
 }
+
+.class-error { background: #dc3545; color: #fff; }
 
 th {
   cursor: pointer;
@@ -2809,15 +2780,17 @@ mark, .mark {
 
 #sidebarMenu {
   max-width: 20rem;
-  height: 100vh; /* Να καλύπτει όλο το ύψος της οθόνης */
-  position: fixed; /* Για να μείνει σταθερό το sidebar */
+  height: 100vh; 
+  position: fixed;
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Σπρώχνει το κουμπί αποσύνδεσης στο κάτω μέρος */
-  overflow-y: auto; /* Να επιτρέπει scrolling αν το περιεχόμενο είναι μεγαλύτερο από το ύψος */
+  justify-content: space-between;
+  /* overflow-y: auto; */
+  background-color: var(--sidebar-bg);
+
 }
 
-.sidebar-content {
+ .sidebar-content {
   position: fixed;
   width: 20rem;
   max-width:18.5rem;
@@ -2825,34 +2798,47 @@ mark, .mark {
   left: 0;
   top: 0;
   bottom: 0;
-  background-color: transparent;
+  background-color: var(--sidebar-bg);
+}
+
+.sidebar-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--sidebar-bg);
+  border-bottom: 1px solid rgba(0,0,0,.1);
+}
+
+.sidebar-toolbar-inner {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .5rem;
 }
 
 #nav-tree {
   padding: 0;
-  list-style-type: none; /* Αφαίρεση των bullets από τα <ul> */
+  list-style-type: none;
 }
 
 #nav-tree li {
   position: relative;
-  margin-bottom: 5px; /* Σταθερή απόσταση μεταξύ των στοιχείων της λίστας */
+  margin-bottom: 5px;
   list-style-type: none;
 }
 
 #nav-tree li a {
   display: block;
   position: relative;
-  /* padding: 5px 15px; */
   padding-bottom: 10px;
   text-decoration: none;
   color: #333;
-  /* font-weight: bold; */
   word-wrap: break-word;
   white-space: normal;
   line-height: 1.3;
   width: 100%;
   box-sizing: border-box;
-}
+} 
 
 #nav-tree li a[data-multiline-3="true"] {
   padding: 5px 15px 40px 15px !important;
@@ -2993,22 +2979,6 @@ a[href] {
   /* font-size: .9rem; */
 }
 
-.logout-section {
-  position: fixed;         /* Σταθερή θέση */
-  bottom: 25px;            /* 25px πριν από το κάτω μέρος της οθόνης */
-  left: 0;                 /* Ευθυγράμμιση με το sidebar */
-  width: 16.6%;             /* Πλάτος όσο το πλάτος του sidebar (κληρονομείται από το container) */
-}
-
-/* Στυλ για το κουμπί */
-.logout-section a {
-  display: block;
-  width: 100%;             /* Το κουμπί καταλαμβάνει όλο το πλάτος του container */
-  text-align: center;      /* Κεντράρισμα περιεχομένου */
-  padding: 3px;           /* Προσαρμόσιμο padding για το κουμπί */
-  color: #3c553c;
-  text-decoration: none;   /* Αφαίρεση του υπογραμμισμένου */
-}
 
 /* Το κουμπί αποσύνδεσης στο κάτω μέρος */
 #li7 {
@@ -3213,8 +3183,8 @@ a[href] {
 }
 
 .highlight-letter {
-  color: orange;
-  font-weight: 700;
+  color: #ffa500;
+  font-weight: 600;
 }
 
 .highlight-letter-blue {
@@ -3299,7 +3269,14 @@ select.tom-dropdown {
 
 /* 1. Input μέσα στο ανοιχτό dropdown – κίτρινο φόντο */
 .ts-dropdown .dropdown-input {
-  background-color: #fff7b35e;   /* ή όποιο κίτρινο θέλεις */
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background-color: #fff7b35e;
 }
 
 /* 2. Το κίτρινο input όταν παίρνει focus – διατηρούμε και το μπλε περίγραμμα */
@@ -3320,7 +3297,7 @@ select.tom-dropdown {
 }
 
 /* ▼ εικονίδιο dropdown */
-.ts-wrapper.dropdown-wrapper::after {   /* ← άλλαξε μόνο τον selector */
+.ts-wrapper.dropdown-wrapper::after {   /* ← κράτα αυτόν τον selector */
   content: "";
   position: absolute;
   top: 50%;
@@ -3339,6 +3316,7 @@ select.tom-dropdown {
 .ts-wrapper.dropdown-wrapper.open::after{
   transform:translateY(-50%) rotate(180deg);
 }
+
 /* =====================================
    Container input + tags
 ===================================== */
@@ -3382,7 +3360,7 @@ select.tom-dropdown {
   line-height: 22px; /* ⬅️ Να κεντράρεται σωστά το κείμενο */
   padding: 0 0.5rem;
   font-size: 0.75rem;
-  background-color: #e9ecef;
+  background-color: #e9ecef; 
   color: #212529;
   border-radius: 0.25rem;
   margin-right: 0.25rem;
@@ -3396,7 +3374,11 @@ select.tom-dropdown {
   max-width: 100%;
   flex: none;
 }
-
+.ts-wrapper.single .ts-control .item {
+  background: transparent !important;
+  /* (προαιρετικά) αν δε θέλεις «μαξιλαράκι» τύπου tag: */
+  /* padding: 0; margin: 0; border-radius: 0; */
+}
 /* Κουμπί διαγραφής σε κάθε tag */
 .ts-wrapper.multi .remove {
   color: #dc3545;
@@ -3435,8 +3417,9 @@ select.tom-dropdown {
   overflow: visible;
 }
 
+/* ⬇️ ΑΦΑΙΡΟΥΜΕ το fixed cap για να δουλέψουν τα maxh-* στο .ts-dropdown */
 .ts-dropdown-content{
-  max-height: 150px;
+  /* max-height: 150px;  <-- αφαιρέθηκε */
   overflow-y: auto;    /* οριζόντιο όχι */
 }
 
@@ -3450,16 +3433,6 @@ select.tom-dropdown {
 .ts-dropdown .ts-option--selected {
   background-color: #bee1fcbd !important;
   color: #0f5132 !important;
-}
-
-.ts-dropdown .dropdown-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 6px 10px;
-  margin-bottom: 4px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.875rem;
 }
 
 /* Γραμμή που χωρίζει τα επιλεγμένα από τα μη επιλεγμένα */
@@ -3506,8 +3479,7 @@ select.tom-dropdown {
   position: absolute;
   top: calc(100% + 2px);         /* ❗ 2px κάτω από το select */
   right: 0;
-  /* transform: translateX(4px); ✅ Μετατόπιση δεξιά 3px */
-  /* z-index: 1060;                ❗ Πάνω από το dropdown */
+  /* z-index: 1060; */           /* (αν χρειαστεί) πάνω από το dropdown */
   background: #ebebeb !important;
   border: 1px solid #ced4da;
   border-radius: 0.25rem;
@@ -3615,7 +3587,9 @@ select.tom-dropdown {
   display:flex;
   align-items:left;
 }
-.ts-wrapper.single .item{
+/* Ellipsis για single label (ταιριάζει με το JS που κάνει add 'ts-item-ellipsis') */
+.ts-wrapper.single .item,
+.ts-item-ellipsis{
   flex:1 1 auto;
   min-width:0;           /* επιτρέπει shrink */
   width: 100%;
@@ -3624,6 +3598,7 @@ select.tom-dropdown {
   text-overflow:ellipsis;
   padding-right:0.75rem; /* κενό δίπλα στο εικονίδιο */
 }
+
 .ts-single-reset-btn{
   position:absolute;
   top:50%;
@@ -3638,6 +3613,25 @@ select.tom-dropdown {
   cursor: pointer;
   padding: 0;
 }
+
+/* -------- Τοποθέτηση & ύψη dropdown για CSP-safe JS -------- */
+.ts-dropdown.place-below { top: 100%; bottom: auto; }
+.ts-dropdown.place-above { top: auto; bottom: var(--ts-control-h, 36px); }
+
+.ts-dropdown.maxh-ideal   { max-height: clamp(220px, 45vh, 420px); overflow-y:auto; }
+.ts-dropdown.maxh-limited { max-height: clamp(150px, 35vh, 360px); overflow-y:auto; }
+
+.ts-wrapper.dropdown-wrapper { position: relative; }
+
+/* Προαιρετικό για bootstrap-icons */
+.bi { pointer-events: none; }
+
+.ts-dropdown { z-index: 1050; }
+.ts-overflow-popup { z-index: 1061; }
+.ts-wrapper.ts-has-overflow-popup { z-index: 1062; }
+
+/* (προαιρετικό) ο δείκτης +N να είναι πάντα clickable πάνω από tags */
+.ts-overflow-indicator { z-index: 2; }
 
 .sr-only {
   position: absolute;
@@ -3658,6 +3652,9 @@ select.tom-dropdown {
   width:100%;
   overflow:visible;          /* τα πάντα εντός ορίων */
 }
+.clearable-wrapper > input[type="text"] {
+  padding-right: 2rem;
+}
 /* κόκκινο Χ */
 .clear-btn {
   position: absolute;
@@ -3666,13 +3663,18 @@ select.tom-dropdown {
   transform: translateY(-50%);
   font-weight: 300;
   cursor: pointer;
+  user-select: none;
   color: #c62828;               /* κόκκινο */
   font-size: 1vw;
   line-height: 1;
   opacity: 0;                   /* κρυφό όταν δεν έχει κείμενο */
-  transition: opacity 0.15s;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
 }
-
+.clear-btn.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 .clear-btn:hover { 
   font-weight: bolder;
   opacity: 1 !important; 
@@ -3704,3 +3706,386 @@ select.tom-dropdown {
 .alert-danger .btn-close{
   filter: invert(1);
 }
+
+/* ============================================================================================== */
+
+.container-scroll { overflow-y: auto; }
+.main-bg-transparent { background: transparent; }
+
+/* .bg-hero {
+  background-image: url('/assets/img/wps1.png');
+  background-repeat: no-repeat;
+  background-position: 0% 50%;
+} */
+.bg-hero-cdn {
+  background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png');
+  background-repeat: no-repeat;
+  background-position: 0% 50%;
+}
+
+.hero-row {
+  min-height: 48px;              /* ρύθμισέ το κατά βούληση */
+}
+
+.span-padding-top-10px { padding-top: 10px; }
+
+.fs25px-fw600 { font-size: 24px; font-weight: 600; }
+.fs1_15vw-fw600 { font-size: 1.15vw; font-weight: 600; }
+
+.fs18px { font-size: 18px; }
+.fs0_9vw { font-size: 0.9vw; }
+.fs0_75vw { font-size: 0.75vw !important; }
+.fs4rem { font-size: 4rem; }
+
+.fw500 { font-weight: 500; }
+.fw600 { font-weight: 600; }
+.fw700 { font-weight: 700 !important; }
+
+.js-sb { justify-content: space-between; }
+
+.addKrat01  { background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem important; }
+
+.cred { color: red; }
+.cgreen { color: #008000; }
+.cwhite { color: #ffffff; }
+.cblack { color: #000000; }
+.corange { color: #ffa500;}
+
+.bor0 { border: 0; }
+.border-right { border-right: 1px solid #ffffff;}
+
+.bg-green {background-color: #008141;}
+.bg-white { background-color: #ffffff; }
+.bg-collapse { background-color: #5e6e5a; }
+
+.ta-r { text-align: right; }
+.ta-l { text-align: left; }
+.ta-c { text-align: center; }
+
+.ml-0_1rem { margin-left: -0.1rem; }
+.ml-0_2rem { margin-left: -0.2rem; }
+.ml-0_3rem { margin-left: 0.3rem; }
+.ml-0_7rem { margin-left: 0.7rem; }
+
+.ml0_75-fs-0_875vw { margin-left: 0.75rem; font-size: 0.875vw; }
+
+.mt-0_4rem { margin-left: -0.4rem; }
+.mt-0_5rem-fs0_7rem-bor0 { margin-top: -0.5rem; font-size: 0.7rem; border: 0; }
+.mt0_4rem-mb0_3rem { margin-top: 0.4rem; margin-bottom: 0.3rem;}
+.dispno-mt-0_4rem { display: none; margin-top: -0.4rem;}
+
+.loginConnect { margin-top: -7px; font-size: 1.1rem; font-weight: 700; }
+.cardFooter { margin-left: 0.1rem !important; margin-right: 0.1rem !important; }
+
+.cardFooter01 {
+  margin-top: -0.5rem !important;
+  margin-bottom: -1rem !important;
+  margin-left: 10px !important;
+  margin-right: 10px !important;
+  justify-content: space-around;
+}
+
+.fs70px_cWarning { font-size: 70px; --bs-warning: #d8a600; }
+
+.addStoixSymb001 { background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem !important;}
+.addStoixSymb002 { background-color: #eeff0223;}
+.addStoixSymb002 { background-color: #2b97001e}
+
+/* Ασφαλείς, ειδικές κλάσεις για να μην συγκρούονται */
+#remaining-time.rt-white  { color: #fff; }
+#remaining-time.rt-orange { color: #ffa500; }
+#remaining-time.rt-red    { color: red; }
+
+.loader-container.visible { display: grid; }
+.loader-container.is-hidden { display: none !important; }
+.loader-hidden { display: none !important; }
+
+.iban-input { color: black; }         /* default */
+.iban-input--ok { color: #004200; }   /* έγκυρο */
+.iban-input--error { border-color: #e53e3e; outline: 0; }
+.iban-input, .iban-input--ok { transition: color .15s ease, border-color .15s ease; }
+
+.btn {
+  opacity: 1;
+  color: white;
+  pointer-events: auto;
+}
+
+.btn.is-disabled {
+  opacity: .5;
+  color: #bbb;
+  pointer-events: none; /* μπλοκάρει το κλικ */
+}
+
+.chevron-icon { font-size: 1rem; }
+.mr--1px { margin-right: -1px; }
+.mr--4px { margin-right: -4px; }
+.mt-neg-05 { margin-top: -0.5rem; }
+
+.logout-btn { 
+  font-weight: 600 !important; 
+  font-size: 1.1rem !important; 
+  background-color: #0097589c !important;
+  color: #000000c7;
+ }
+.power-icon { color: #d30000 !important; font-size: 1.1vw !important; }
+
+/* === Home background  */
+.home-bg {
+  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
+  background-repeat: no-repeat;
+  background-attachment: inherit;
+  background-size: auto;
+  background-position: 60% 50% !important;
+}
+
+.mainapp-bg {
+  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
+  background-repeat: no-repeat;
+  background-attachment: inherit;
+  background-size: auto;
+  background-position: center center !important;
+}
+
+.bg-404.custom-background {
+  background-image:
+    url("https://cdn.webpayrollsolutions.com/assets/img/pageNotFound.png"),
+    url("https://cdn.webpayrollsolutions.com/assets/img/wps1.png");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 63% 45%, 26% 7%;
+  background-attachment: fixed, fixed;
+  background-size: auto, auto;
+}
+
+/* === Buttons που είχαν inline style === */
+.returnAppBtn {
+  margin-top: -7px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* === Κύριο main background που ήταν inline === */
+.main-transparent {
+  background: transparent;
+}
+
+.menu-item--mb-2 { margin-bottom: 2px; }
+.menu-item--nopad { padding: 0 !important; }
+
+.chevron-fixed {
+  position: absolute; right: .5rem; top: 50%; visibility: visible;
+}
+
+.li-pos { position: relative; min-height: auto; }
+.li-hover {
+  background: #e0e0e0;
+}
+.li-autoheight { height: auto; }
+
+.style-404 { 
+  position: absolute;
+  left: 53%;
+  right: 38%;
+  top: 76%;
+  bottom: 20%;
+  margin: auto;
+  background-color: #00000060;
+}
+
+.ml-n-1 { margin-left: -1rem !important; }
+
+.mr-n-1 { margin-right: -1rem !important; }
+
+.pad-0 { padding: 0; }
+.padptop-8 { padding-top: 8px;}
+
+.widthper-60 { width: 60%; }
+.widthrem-18_5 { width: 18.5rem; }
+
+.mlper-20 { margin-left: 20%; }
+
+.height-3_5 { height: 3.5rem !important; }
+.height-58 { height: 58vh !important; }
+.height-90 { height: 90vh !important; }
+
+.logout-icon { font-size: 50px; color: #d48a01; }
+.logout-footer-btn { color: var(--bs-gray-800); }
+
+/* default line-height */
+.wrapper .options li { line-height: 22px; }
+/* «μακρύ» κείμενο */
+.wrapper .options li.li-long { line-height: 44px; }
+
+.fs-8  { font-size: 8px;  }
+.fs-9  { font-size: 9px;  }
+.fs-10 { font-size: 10px; }
+.fs-11 { font-size: 11px; }
+.fs-12 { font-size: 12px; }
+.fs-13 { font-size: 13px; }
+.fs-14 { font-size: 14px; }
+.fs-15 { font-size: 15px; }
+.fs-16 { font-size: 16px; }
+.fs-17 { font-size: 17px; }
+.fs-18 { font-size: 18px; }
+.fs-19 { font-size: 19px; }
+.fs-20 { font-size: 20px; }
+.fs-21 { font-size: 21px; }
+.fs-22 { font-size: 22px; }
+.fs-23 { font-size: 23px; }
+.fs-24 { font-size: 24px; }
+
+.fsvw-0_5 { font-size: 0.5vw; }
+.fsvw-0_7 { font-size: 0.7vw; }
+.fsvw-1_1 { font-size: 1.1vw; }
+.fsvw-1_3 { font-size: 1.3vw; }
+
+.fsrem-1_1 { font-size: 1.1rem; }
+.borad-10 { border-radius: 10px; }
+
+.mlperc { margin-left: 1% }
+
+.overflow-hidden { overflow: hidden;}
+.overflow-visible { overflow: visible; }
+
+#nav-tree li.open > .submenu { display: block; }
+#nav-tree li > a .chevron-icon { transition: transform .2s; }
+#nav-tree li.open > a .chevron-icon { transform: rotate(180deg); }
+
+:root{
+  /* Ύψος footer εφαρμογής (η πράσινη μπάρα στο κάτω μέρος της σελίδας) */
+  --app-footer-h: 28px;
+}
+
+/* ΣΤΑΘΕΡΟ sidebar μέχρι ΠΑΝΩ από το footer */
+/* Το sidebar καταλαμβάνει όλο το ύψος εκτός του footer */
+#sidebarMenu{
+  position: fixed;
+  flex: 0 0 auto;
+  width: 25%;
+  left: 0;
+  top: 0;
+  height: calc(100vh - var(--footer-h));
+  width: 25% !important;
+  min-width: 25% !important;
+  max-width: 25% !important;
+  display: block;                /* όχι flex εδώ */
+  overflow: hidden !important;   /* scroll δεν γίνεται εδώ */
+  background-color: var(--sidebar-bg);
+}
+
+/* Εσωτερικό grid: [toolbar] [scroll] [logout] */
+#sidebarMenu .sidebar-content{
+  display: grid;
+  grid-template-rows: auto 1fr auto;  /* επάνω, μέση (scroll), κάτω */
+  top: var(--app-header-h) !important;
+  height: calc(100vh - var(--app-header-h) - var(--app-footer-h)) !important;
+}
+
+.sidebar-scroll{
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 !important;        /* κανένα δεξί padding */
+  margin: 0 !important;
+  scrollbar-gutter: auto !important;
+}
+
+#sidebarMenu, #sidebarMenu::after{
+  box-shadow: none !important;
+}
+
+.logout-section{
+  position: static !important;   /* ακυρώνει fixed/absolute */
+  inset: auto !important;
+  width: 100% !important;
+  margin-bottom: -0.4rem;
+  height: auto;
+  padding: .5rem;
+  background-color: var(--sidebar-bg);
+  box-sizing: border-box;
+}
+.logout-section a{
+  display:block; width:100%; text-align:center; padding:3px;
+}
+/* Το δέντρο κρατά τα δικά σου styles */
+#nav-tree{ margin:0; padding:0; list-style:none; }
+#nav-tree li > a{
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: 8px 14px 10px 14px;   /* ΔΕΝ αγγίζουμε τη .sidebar-scroll */
+  width: 100%;
+  box-sizing: border-box;
+}
+#nav-tree li{ padding-right: 8px; }  /* λίγος αέρας πριν τη μπάρα */
+#nav-tree .chevron-icon{ margin-left: auto; flex: 0 0 auto;   font-size: 0.95rem; /* προσαρμοσμένο μέγεθος */ }
+
+/* μικρό extra δεξί padding στο LI (δεν μετακινεί τη scrollbar) */
+#nav-tree li { padding-right: 8px; }
+
+.body-with-sidebar{
+  margin-left: var(--sidebar-w);   /* ίδιο με το πλάτος του sidebar */
+}
+
+/* ===== TOOLBOX ΜΟΝΟ ===== */
+
+/* Το toolbox μένει πάντα ορατό στην κορυφή του sidebar */
+#sidebarMenu .sidebar-toolbar{
+  position: sticky;
+  top: 0;
+  z-index: 2;                     /* να περνάει πάνω από το scroll περιεχόμενο */
+  background: var(--sidebar-bg, #f8f9fa);
+  border-bottom: 1px solid rgba(0,0,0,.1);
+}
+
+/* Διάταξη: input αριστερά, κουμπιά δεξιά */
+#sidebarMenu .sidebar-toolbar-inner{
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem;
+}
+
+/* Το πεδίο αναζήτησης να «γεμίζει» τον διαθέσιμο χώρο */
+#sidebarMenu .sidebar-toolbar .sidebar-search{
+  flex: 1 1 auto;
+  min-width: 0;                   /* για να μην σπάει σε μικρά πλάτη */
+}
+
+/* Προληπτικά: τα δύο κουμπιά να μην τυλίγονται */
+#sidebarMenu #btn-collapse-all,
+#sidebarMenu #btn-expand-all{
+  white-space: nowrap;
+}
+
+/* Hover/active/focus για το κουμπί Αποσύνδεση */
+#sidebarMenu .logout-btn{
+  display: block;                 /* full-width click */
+  cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .02s ease;
+}
+
+#sidebarMenu .logout-btn:hover{
+  background-color: #157347 !important; /* πιο σκούρο (Bootstrap hover) */
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+
+#sidebarMenu .logout-btn:active{
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+#sidebarMenu .logout-btn:focus-visible{
+  outline: 2px solid rgba(21,115,71,.7);
+  outline-offset: 2px;
+}
+
+/* Ασφάλεια: να μην το «σκεπάζει» τίποτα κοντά στο footer */
+#sidebarMenu .logout-section{
+  position: relative;  /* δεν αλλάζει layout */
+  z-index: 10;         /* πάνω από το οτιδήποτε δίπλα/κάτω */
+  pointer-events: auto;
+}
+
+.header-app-title { color: #F28C38; font-weight: 700; letter-spacing: 2.6px; }
+.header-app-title:hover { color: #FFB169; }

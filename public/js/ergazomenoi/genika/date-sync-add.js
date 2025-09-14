@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
           <input type="hidden" name="holiday_overtimeParanomh_hours_day_${i1}" id="holiday_overtimeParanomh_hours_day_${i1}" value="0" />
           <input type="hidden" name="night_holiday_overtimeParanomh_hours_day_${i1}" id="night_holiday_overtimeParanomh_hours_day_${i1}" value="0" />
 
-          <div class="row form-group align-items-center" style="background-color: #ffffff;">
+          <div class="row form-group align-items-center bg-white">
             <div class="col-0-5 text-center">
               <label for="hmeromhnia_${i1}" class="col-form-label field-required" id="day_label_${i1}"></label>
             </div>
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
                       <input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
                     </div>
 
-                    <div class="col-1-2" style="margin-left: -0.1rem;">
+                    <div class="col-1-2 ml-0_1rem">
                       <input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
                     </div>
 
@@ -209,32 +209,32 @@ document.addEventListener('DOMContentLoaded', function() {
                       <input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
                     </div>
 
-                    <div class="col-1-2" style="margin-left: -0.2rem;">
+                    <div class="col-1-2 ml-0_2rem">
                       <input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
                     </div>
 
                     <div class="col-0-5"></div>
 
-                    <div class="col-0-5 center-align checkbox-flex-center" style="margin-top: -0.4rem;">
+                    <div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
                       <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" value="" />
-                      <label for="repo_${i1}" id="label-repo_${i1}" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      <label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
                         ΟΧΙ
                       </label>
                     </div>
 
-                    <div class="col-0-5 center-align checkbox-flex-center" style="display: none; margin-top: -0.4rem;">
+                    <div class="col-0-5 center-align checkbox-flex-center dispno-mt-0_4rem">
                       <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="argia_${i1}" name="argia_${i1}" value="" />
-                      <label for="argia_${i1}" id="label-argia_${i1}" style="margin-left: 0.75rem; font-size: 0.875vw;">
+                      <label for="argia_${i1}" class="ml0_75-fs-0_875vw" id="label-argia_${i1}">
                         ΟΧΙ
                       </label>
                     </div>`;
               } else {
                 divHtml += `
-                  <div class="row form-group align-items-center" style="background-color: #ffffff; ">`;
+                  <div class="row form-group align-items-center bg-white">`;
                     if (j === 2) {
                       divHtml += `
                         <div class="col-5 left-align">
-                          <input type="text" class="argia-label" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" style="margin-top: -0.5rem; font-size: 0.7rem; border: 0;" readonly />
+                          <input type="text" class="argia-label mt-0_5rem-fs0_7rem-bor0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
                         </div>`;
                     } else {
                       divHtml += `
@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>`;
                     }
                     divHtml += `
-                      <div class="col-1-2" style="margin-left: .7rem;">
+                      <div class="col-1-2 ml-0_7rem">
                         <input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
                       </div>
 
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                       <div class="col-0-5"></div>
 
-                      <div class="col-1-2" style="margin-left: .3rem;">
+                      <div class="col-1-2 ml-0_3rem">
                         <input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
                       </div>
 
@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   </div>`;
               }
             }
-        divHtml += `<hr style="margin-top: 0.4rem; margin-bottom: 0.3rem;" /></div>`;
+        divHtml += `<hr class="mt0_4rem-mb0_3rem" /></div>`;
         container.innerHTML += divHtml;
       }
         

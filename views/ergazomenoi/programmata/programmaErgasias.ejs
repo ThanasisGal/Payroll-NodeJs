@@ -324,22 +324,22 @@
     </div>
 
     <% if (process.env.NODE_ENV === 'production') { %>
-      <script src="/static/min.js/ergazomenoi/programmata/programmaErgasias.min.js"></script>
+      <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/programmata/programmaErgasias.min.js"></script>
     <% } else { %>
-      <script src="/static/js/common/moveByEnter.js"></script>
-      <script src="/static/js/common/getCompanyDescription.js"></script>
-      <script src="/static/js/common/toggleLabel.js"></script>
-      <script src="/static/js/dates/convertDateToISO.js"></script>
-      <script src="/static/js/common/tooltipsForButtons.js"></script>
-      <script src="/static/js/common/scrollToTop.js"></script>
-      <script src="/static/js/ergazomenoi/programmata/loadDropdowns.js"></script>
-      <script src="/static/js/ergazomenoi/programmata/date-sync.js"></script>
-      <script src="/static/js/ergazomenoi/genika/selectRepo.js"></script>
-      <script src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script><!-- Εμφάνιση των ημερών απασχόλησης (Δε, Τρ...) και έλεγχος των ημερών αργίας -->
-      <script src="/static/js/ergazomenoi/genika/calcOresApasxolhshs.js"></script>
-      <script src="/static/js/ergazomenoi/programmata/putFieldValues.js"></script>
-      <script src="/static/js/ergazomenoi/programmata/deleteButton.js"></script>
-      <!-- <script src="/static/js/common/changeUrl.js"></script> -->
+      <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/toggleLabel.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/dates/convertDateToISO.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/loadDropdowns.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/date-sync.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRepo.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script><!-- Εμφάνιση των ημερών απασχόλησης (Δε, Τρ...) και έλεγχος των ημερών αργίας -->
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/calcOresApasxolhshs.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/putFieldValues.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/deleteButton.js"></script>
+      <!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
     <% } %>
   </div>
 </div>

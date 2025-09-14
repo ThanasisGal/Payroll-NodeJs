@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: " ",
           html: `
             <ul>
-              <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Κρατήσεων</li>
+              <li <strong>Επιτυχής ενημέρωση του αρχείου των Κρατήσεων</strong> </li>
             </ul>
           `,
           timer: 2500,

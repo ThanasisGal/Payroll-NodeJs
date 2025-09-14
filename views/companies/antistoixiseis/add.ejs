@@ -11,6 +11,7 @@
       <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
         <div class="container">
           <form class="formRadius">
+            <%- include('../partials/_csrfField') %>
 
             <div class="card d-flex flex-column z-depth-5">
 
@@ -161,12 +162,12 @@
       </section>
     </div>
 
-    <script src="/static/js/common/getCompanyDescription.js"></script>
-    <script src="/static/js/common/navTabs.js"></script>
-    <script src="/static/js/common/tooltipsForButtons.js"></script>
-    <script src="/static/js/common/moveByEnter.js"></script>
-    <script src="/static/js/companies/antistoixiseis/getFieldValues.js"></script>
-    <script src="/static/js/companies/antistoixiseis/fillValuesWithZeroes.js"></script>
-    <!-- <script src="/static/js/common/changeUrl.js"></script> -->
+    <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/common/navTabs.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/companies/antistoixiseis/getFieldValues.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/companies/antistoixiseis/fillValuesWithZeroes.js"></script>
+    <!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
   </div>
 </div>

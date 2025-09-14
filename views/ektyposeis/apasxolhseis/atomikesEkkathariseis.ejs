@@ -183,18 +183,18 @@
 </section>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/static/min.js/ektyposeis/atomikesEkkathariseis.min.js"></script>
+  <script nonce="<%= nonce %>" src="/static/min.js/ektyposeis/atomikesEkkathariseis.min.js"></script>
 <% } else { %>
-  <script src="/static/js/common/moveByEnter.js"></script>
-  <script src="/static/js/common/scrollToTop.js"></script>
-  <script src="/static/js/common/sortTable.js"></script>
-  <script src="/static/js/common/setupTabKeyNavigation.js"></script>
-  <script src="/static/js/common/setupTabKeyNavigation.js"></script>
-  <script src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/setupTabKeyNavigation.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/setupTabKeyNavigation.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
   <!-- <script type="module" src="/static/js/app.js"></script>
   <script type="module" src="/static/js/dropdownManager.js"></script> -->
-  <!-- <script src="/static/js/common/tooltipsForButtons.js"></script> -->
+  <!-- <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script> -->
 
-  <!-- <script src="/static/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script> -->
-  <!-- <script src="/static/js/ektyposeis/symbaseis/controlCheckbox.js"></script>
+  <!-- <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/loadDropdownsYpokatasthmata.js"></script> -->
+  <!-- <script nonce="<%= nonce %>" src="/static/js/ektyposeis/symbaseis/controlCheckbox.js"></script>
 <% } %>

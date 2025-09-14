@@ -1,6 +1,5 @@
 <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
-  </br>
+    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3-0 pb-2-0 mb-3 mt-2-5 border-bottom">
 </div>
 
 <%- include('../partials/flash') %>
@@ -8,6 +7,9 @@
 </br></br>
 <div class="container w-50">
   <form action="/register/userRegistration" method="POST">
+
+    <%- include('../partials/_csrfField') %>
+
     <div class="card z-depth-5">
       <label class="card-header bg-header text-center"
         ><h4>Εγγραφή Χρήστη</h4></label
@@ -198,16 +200,9 @@
           />
         </div>
       </div>
-      <div class="card-footer" style="margin-left: 0.1rem !important; margin-right: 0.1rem !important;">
+      <div class="card-footer cardFooter">
         <div
-          class="d-inline-block d-flex"
-          style="
-          margin-top: -0.5rem !important;
-          margin-bottom: -1rem !important;
-          margin-left: 10px !important;
-          margin-right: 10px !important;
-          justify-content: space-around;"
-        >
+          class="d-inline-block d-flex cardFooter01">
           <button type="submit" class="btn btn-brown rounded-4 w-40 mb-1 mt-2"><i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
           </button>
           <a class="btn btn-brown rounded-4 w-40 mb-1 mt-2" href="/login"
@@ -219,7 +214,7 @@
   </form>
 </div>
 
-<script>
+<script nonce="<%= nonce %>">
   window.addEventListener('DOMContentLoaded', (event) => {
     let url = new URL(document.location.href);
     let params = new URLSearchParams(url.search);

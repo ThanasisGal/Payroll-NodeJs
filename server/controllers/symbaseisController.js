@@ -369,7 +369,7 @@ class symbaseisController {
         try {
           const result = await model.deleteMany({ [field]: pattern });
           if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check" style="color: green"></i>`);
+            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
           }
         } catch (error) {
           console.error(`Error deleting records in ${model.modelName}: `, error);
@@ -815,7 +815,7 @@ class symbaseisController {
         try {
           const result = await model.deleteMany({ [field]: pattern });
           if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check" style="color: green"></i>`);
+            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
           }
         } catch (error) {
           console.error(`Error deleting records in ${model.modelName}: `, error);
@@ -1270,7 +1270,7 @@ class symbaseisController {
         try {
           const result = await model.deleteMany({ [field]: pattern });
           if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check" style="color: green"></i>`);
+            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
           }
         } catch (error) {
           console.error(`Error deleting records in ${model.modelName}: `, error);
@@ -1707,7 +1707,7 @@ class symbaseisController {
         try {
           const result = await model.deleteMany({ [field]: pattern });
           if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check" style="color: green"></i>`);
+            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
           }
         } catch (error) {
           console.error(`Error deleting records in ${model.modelName}: `, error);

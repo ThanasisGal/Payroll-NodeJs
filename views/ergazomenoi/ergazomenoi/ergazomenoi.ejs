@@ -172,8 +172,8 @@
 </div>
 
 <% if (process.env.NODE_ENV === 'production') { %>
-  <script src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_ejs.min.js"></script>
+  <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_ejs.min.js"></script>
 <% } else { %>
-  <script src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
-  <script src="/static/js/common/sortTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
+  <script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
 <% } %>

@@ -227,13 +227,22 @@
         });
     }
 
-    function disableButton_ReadOnly(button) {
-        button.classList.add("disabled-link");
+    function enableButton_ReadOnly(button) {
+        if (button.tagName.toLowerCase() === "button") {
+            button.disabled = false;
+        } else if (button.tagName.toLowerCase() === "a") {
+            button.classList.remove("is-disabled", "disabled-link");
+            button.removeAttribute("aria-disabled");
+            button.tabIndex = 0; // επιτρέπει focus
+        }
     }
 
-    function enableButton_ReadOnly(button) {
-        button.classList.remove("disabled-link");
-        button.style.pointerEvents = "auto"; // Επιτρέπει το κλικ
-        button.style.opacity = "1"; // Επαναφέρει την κανονική εμφάνιση
-        button.style.color = "white";
+    function disableButton_ReadOnly(button) {
+        if (button.tagName.toLowerCase() === "button") {
+            button.disabled = true;
+        } else if (button.tagName.toLowerCase() === "a") {
+            button.classList.add("is-disabled", "disabled-link");
+            button.setAttribute("aria-disabled", "true");
+            button.tabIndex = -1;
+        }
     }

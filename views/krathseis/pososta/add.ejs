@@ -211,15 +211,15 @@
     </div>
 
     <% if (process.env.NODE_ENV === 'production') { %>
-      <script src="/static/min.js/krathseis/krathseis_pososta_add_ejs.min.js"></script>
+      <script nonce="<%= nonce %>" src="/static/min.js/krathseis/krathseis_pososta_add_ejs.min.js"></script>
     <% } else { %>
-      <script src="/static/js/common/getCompanyDescription.js"></script>
-      <script src="/static/js/krathseis/getFieldValues.js"></script>
-      <script src="/static/js/krathseis/getFieldValuesPososton.js"></script>
-      <script src="/static/js/krathseis/loadKrathseis_add.js"></script>
-      <script src="/static/js/krathseis/calcTotalPosostonKrathseon.js"></script>
-      <script src="/static/js/common/navTabs.js"></script>
-      <script src="/static/js/dates/convertDateToISO.js"></script>
-      <script src="/static/js/common/tooltipsForButtons.js"></script>
-      <script src="/static/js/common/moveByEnter.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/krathseis/getFieldValues.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/krathseis/getFieldValuesPososton.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/krathseis/loadKrathseis_add.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/krathseis/calcTotalPosostonKrathseon.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/navTabs.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/dates/convertDateToISO.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+      <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
     <% } %>

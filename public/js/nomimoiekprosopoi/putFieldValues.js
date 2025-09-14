@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
           title: "Επιτυχής ενημέρωση του αρχείων:",
           html: `
             <ul>
-              <li style="font-weight: 600">Επιτυχής ενημέρωση του αρχείου των Νομίμων Εκπροσώπων</li>
+              <li> <strong>Επιτυχής ενημέρωση του αρχείου των Νομίμων Εκπροσώπων</strong> </li>
             </ul>
           `,
           timer: 3000,
