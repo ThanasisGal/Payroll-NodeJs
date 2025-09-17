@@ -6,7 +6,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title><%= locals.title %></title>
         <meta name="description" content="<%= locals.description %>" />
-
+        <meta name="csrf-token" content="<%= csrfToken %>">
+        
         <!-- Επιτρέπεται από strict CSP μέσω nonce -->
         <script nonce="<%= nonce %>">
         (function() {
@@ -51,7 +52,6 @@
             <div class="row">
                 <%- include('../partials/sidebar.ejs') %>
 
-                <!-- Αντί για inline style, βάλαμε κλάση -->
                 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent"><%- body %></main>
             </div>
 

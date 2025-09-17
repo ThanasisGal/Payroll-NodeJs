@@ -24,8 +24,8 @@ class mainAppController {
             description: "Web Payroll System",
         };
         res.render("mainapp", {
-            bodyClass: 'home-bg-cdn',
             locals,
+            bodyClass: 'home-bg-cdn',
         });
     };
 

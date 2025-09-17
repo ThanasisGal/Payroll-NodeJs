@@ -1848,7 +1848,7 @@ a {
   text-align: center !important;
   padding: 1.5em !important;
   border-radius: 12px !important;
-  background-color: rgb(255, 252, 220) !important;
+  background-color: #fffcdc !important;
 }
 
 .custom-swal-popup .swal2-html-container {
@@ -3723,10 +3723,6 @@ select.tom-dropdown {
   background-position: 0% 50%;
 }
 
-.hero-row {
-  min-height: 48px;              /* ρύθμισέ το κατά βούληση */
-}
-
 .span-padding-top-10px { padding-top: 10px; }
 
 .fs25px-fw600 { font-size: 24px; font-weight: 600; }
@@ -3818,9 +3814,44 @@ select.tom-dropdown {
 }
 
 .chevron-icon { font-size: 1rem; }
-.mr--1px { margin-right: -1px; }
-.mr--4px { margin-right: -4px; }
-.mt-neg-05 { margin-top: -0.5rem; }
+
+.margin-right--1px      { margin-right: -1px; }
+.margin-right--4px      { margin-right: -4px; }
+.margin-right--1rem     { margin-right: -1rem !important; }
+.margin-right--0_5rem   { margin-right: 0.5rem; }
+
+.margin-top--0_5rem     { margin-top: -0.5rem; }
+.margin-top--2rem       { margin-top: -2rem; }
+
+.margin-left--1rem      { margin-left: -1rem !important; }
+.margin-left-0_75rem    { margin-left: 0.75rem; }
+.margin-left-1_5rem     { margin-left: 1.5rem; }
+
+.margin-left-percent-2  { margin-left: 2%; }
+
+.padding-0              { padding: 0; }
+.padptop-8              { padding-top: 8px;}
+
+.white-space-nowrap     { white-space: nowrap; }
+
+.width-percent-60       { width: 60%; }
+.width-percent-96       { width: 96%; }
+
+.width-rem-18_5         { width: 18.5rem; }
+
+.margin-left-percent-20 { margin-left: 20%; }
+
+.height-rem-3_5         { height: 3.5rem !important; }
+
+.height-vh-12           { height: 12vh !important; }
+.height-vh-53           { height: 53vh !important; }
+.height-vh-58           { height: 58vh !important; }
+.height-vh-90           { height: 90vh !important; }
+.height-vh-100          { height: 100vh !important; }
+
+.height-rem-8           { height: 8rem !important; }
+
+.text-align-left        { text-align: left !important; }
 
 .logout-btn { 
   font-weight: 600 !important; 
@@ -3828,23 +3859,14 @@ select.tom-dropdown {
   background-color: #0097589c !important;
   color: #000000c7;
  }
-.power-icon { color: #d30000 !important; font-size: 1.1vw !important; }
 
 /* === Home background  */
-.home-bg {
+.home-bg-cdn {
   background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
   background-repeat: no-repeat;
   background-attachment: inherit;
   background-size: auto;
   background-position: 60% 50% !important;
-}
-
-.mainapp-bg {
-  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
-  background-repeat: no-repeat;
-  background-attachment: inherit;
-  background-size: auto;
-  background-position: center center !important;
 }
 
 .bg-404.custom-background {
@@ -3869,19 +3891,6 @@ select.tom-dropdown {
   background: transparent;
 }
 
-.menu-item--mb-2 { margin-bottom: 2px; }
-.menu-item--nopad { padding: 0 !important; }
-
-.chevron-fixed {
-  position: absolute; right: .5rem; top: 50%; visibility: visible;
-}
-
-.li-pos { position: relative; min-height: auto; }
-.li-hover {
-  background: #e0e0e0;
-}
-.li-autoheight { height: auto; }
-
 .style-404 { 
   position: absolute;
   left: 53%;
@@ -3892,47 +3901,63 @@ select.tom-dropdown {
   background-color: #00000060;
 }
 
-.ml-n-1 { margin-left: -1rem !important; }
-
-.mr-n-1 { margin-right: -1rem !important; }
-
-.pad-0 { padding: 0; }
-.padptop-8 { padding-top: 8px;}
-
-.widthper-60 { width: 60%; }
-.widthrem-18_5 { width: 18.5rem; }
-
-.mlper-20 { margin-left: 20%; }
-
-.height-3_5 { height: 3.5rem !important; }
-.height-58 { height: 58vh !important; }
-.height-90 { height: 90vh !important; }
-
 .logout-icon { font-size: 50px; color: #d48a01; }
 .logout-footer-btn { color: var(--bs-gray-800); }
 
-/* default line-height */
 .wrapper .options li { line-height: 22px; }
 /* «μακρύ» κείμενο */
 .wrapper .options li.li-long { line-height: 44px; }
 
-.fs-8  { font-size: 8px;  }
-.fs-9  { font-size: 9px;  }
-.fs-10 { font-size: 10px; }
-.fs-11 { font-size: 11px; }
-.fs-12 { font-size: 12px; }
-.fs-13 { font-size: 13px; }
-.fs-14 { font-size: 14px; }
-.fs-15 { font-size: 15px; }
-.fs-16 { font-size: 16px; }
-.fs-17 { font-size: 17px; }
-.fs-18 { font-size: 18px; }
-.fs-19 { font-size: 19px; }
-.fs-20 { font-size: 20px; }
-.fs-21 { font-size: 21px; }
-.fs-22 { font-size: 22px; }
-.fs-23 { font-size: 23px; }
-.fs-24 { font-size: 24px; }
+.font-size-px-1  { font-size: 1px;  }
+.font-size-px-2  { font-size: 2px;  }
+.font-size-px-3  { font-size: 3px;  }
+.font-size-px-4  { font-size: 4px;  }
+.font-size-px-5  { font-size: 5px;  }
+.font-size-px-6  { font-size: 6px;  }
+.font-size-px-7  { font-size: 7px;  }
+.font-size-px-8  { font-size: 8px;  }
+.font-size-px-9  { font-size: 9px;  }
+.font-size-px-10 { font-size: 10px; }
+.font-size-px-11 { font-size: 11px; }
+.font-size-px-12 { font-size: 12px; }
+.font-size-px-13 { font-size: 13px; }
+.font-size-px-14 { font-size: 14px; }
+.font-size-px-15 { font-size: 15px; }
+.font-size-px-16 { font-size: 16px; }
+.font-size-px-17 { font-size: 17px; }
+.font-size-px-18 { font-size: 18px; }
+.font-size-px-19 { font-size: 19px; }
+.font-size-px-20 { font-size: 20px; }
+.font-size-px-21 { font-size: 21px; }
+.font-size-px-22 { font-size: 22px; }
+.font-size-px-23 { font-size: 23px; }
+.font-size-px-24 { font-size: 24px; }
+
+.font-size-vw-0_65  { font-size: 0.65vw; }
+.font-size-vw-1  { font-size: 1vw; }
+.font-size-vw-2  { font-size: 2vw; }
+.font-size-vw-3  { font-size: 3vw; }
+.font-size-vw-4  { font-size: 4vw; }
+.font-size-vw-5  { font-size: 5vw; }
+.font-size-vw-6  { font-size: 6vw; }
+.font-size-vw-7  { font-size: 7vw; }
+.font-size-vw-8  { font-size: 8vw; }
+.font-size-vw-9  { font-size: 9vw; }
+.font-size-vw-10 { font-size: 10vw; }
+.font-size-vw-11 { font-size: 11vw; }
+.font-size-vw-12 { font-size: 12vw; }
+.font-size-vw-13 { font-size: 13vw; }
+.font-size-vw-14 { font-size: 14vw; }
+.font-size-vw-15 { font-size: 15vw; }
+.font-size-vw-16 { font-size: 16vw; }
+.font-size-vw-17 { font-size: 17vw; }
+.font-size-vw-18 { font-size: 18vw; }
+.font-size-vw-19 { font-size: 19vw; }
+.font-size-vw-20 { font-size: 20vw; }
+.font-size-vw-21 { font-size: 21vw; }
+.font-size-vw-22 { font-size: 22vw; }
+.font-size-vw-23 { font-size: 23vw; }
+.font-size-vw-24 { font-size: 24vw; }
 
 .fsvw-0_5 { font-size: 0.5vw; }
 .fsvw-0_7 { font-size: 0.7vw; }
@@ -3940,7 +3965,9 @@ select.tom-dropdown {
 .fsvw-1_3 { font-size: 1.3vw; }
 
 .fsrem-1_1 { font-size: 1.1rem; }
-.borad-10 { border-radius: 10px; }
+
+.display-none { display: none;}
+.border-radius-10 { border-radius: 10px; }
 
 .mlperc { margin-left: 1% }
 
@@ -4087,5 +4114,13 @@ select.tom-dropdown {
   pointer-events: auto;
 }
 
-.header-app-title { color: #F28C38; font-weight: 700; letter-spacing: 2.6px; }
+.header-app-title { color: #e7e1dce7; font-weight: 700; letter-spacing: 2.7px; padding-top: 0.9rem !important; }
 .header-app-title:hover { color: #FFB169; }
+.header-app-style-company { color: #eeff02; text-align: left !important; font-size: 0.75vw; font-weight: 400; height: 3.2rem; padding-top: 1.1rem !important; line-height: 1rem; }
+.header-app-style-other { color: #dfffc1e7; text-align: center !important; font-size: 0.72vw; font-weight: 400; height: 3.2rem; padding-top: 1.1rem !important; line-height: 1rem; }
+.header-app-style-user { color: #dfffc1e7; text-align: center !important; font-size: 0.72vw; font-weight: 400; height: 3.2rem; padding-top: 1.1rem !important; line-height: 1rem; }
+.header-app-style-company:hover { color: #eeff02; font-weight: 700; }
+.header-app-style-other:hover { color: #ffffff; font-weight: 700; }
+.header-app-style-user:hover { color: #ffffff; font-weight: 700; }
+
+.preview-image-style { width: 12.5rem; height: 6.25rem; display: none; }

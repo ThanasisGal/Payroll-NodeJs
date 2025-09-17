@@ -152,53 +152,58 @@ app.use((req, res, next) => {
 });
 
 // Content-Security-Policy
+const cspDirectives = {
+    "default-src": ["'self'"],
+    // Όλα τα scripts πρέπει να έχουν nonce. Το 'strict-dynamic' επιτρέπει δυναμικά imports όταν υπάρχει nonce.
+    "script-src": [
+        "'self'",
+        (req, res) => `'nonce-${res.locals.nonce}'`,
+        "'strict-dynamic'",
+        "https://cdn.webpayrollsolutions.com"
+    ],
+    // Styles: επιτρέπουμε inline ATTRS (class style attrs) και <style> (όσο χρειάζεται για βιβλιοθήκες)
+    "style-src-elem": [
+        "'self'",
+        "https://fonts.googleapis.com",
+        "https://cdn.webpayrollsolutions.com",
+        "'unsafe-inline'"
+    ],
+    "style-src-attr": ["'unsafe-inline'"],
+    "style-src": [
+        "'self'",
+        "https://fonts.googleapis.com",
+        "https://cdn.webpayrollsolutions.com"
+    ],
+    "font-src": [
+        "'self'",
+        "https://fonts.gstatic.com",
+        "https://cdn.webpayrollsolutions.com",
+        "data:"
+    ],
+    "img-src": ["'self'", "https://cdn.webpayrollsolutions.com", "data:", "blob:"],
+    "connect-src": [
+        "'self'",
+        "https://cdn.webpayrollsolutions.com",
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com"
+        // πρόσθεσε εδώ άλλα API origins αν χρειαστεί
+    ],
+    "worker-src": ["'self'", "blob:"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"], // επιτρέπουμε POST μόνο προς τον ίδιο origin
+    "frame-src": ["'self'"],
+    "frame-ancestors": ["'none'"],
+};
+if (isProd) {
+     cspDirectives["upgrade-insecure-requests"] = [];
+}
+app.use(helmet.contentSecurityPolicy({ useDefaults: false, directives: cspDirectives }));
+
 app.use(
     helmet.contentSecurityPolicy({
         useDefaults: false,
-        directives: {
-            "default-src": ["'self'"],
-            // Όλα τα scripts πρέπει να έχουν nonce. Το 'strict-dynamic' επιτρέπει δυναμικά imports όταν υπάρχει nonce.
-            "script-src": [
-                "'self'",
-                (req, res) => `'nonce-${res.locals.nonce}'`,
-                "'strict-dynamic'",
-                "https://cdn.webpayrollsolutions.com"
-            ],
-            // Styles: επιτρέπουμε inline ATTRS (class style attrs) και <style> (όσο χρειάζεται για βιβλιοθήκες)
-            "style-src-elem": [
-                "'self'",
-                "https://fonts.googleapis.com",
-                "https://cdn.webpayrollsolutions.com",
-                "'unsafe-inline'"
-            ],
-            "style-src-attr": ["'unsafe-inline'"],
-            "style-src": [
-                "'self'",
-                "https://fonts.googleapis.com",
-                "https://cdn.webpayrollsolutions.com"
-            ],
-            "font-src": [
-                "'self'",
-                "https://fonts.gstatic.com",
-                "https://cdn.webpayrollsolutions.com",
-                "data:"
-            ],
-            "img-src": ["'self'", "https://cdn.webpayrollsolutions.com", "data:", "blob:"],
-            "connect-src": [
-                "'self'",
-                "https://cdn.webpayrollsolutions.com",
-                "https://fonts.googleapis.com",
-                "https://fonts.gstatic.com"
-                // πρόσθεσε εδώ άλλα API origins αν χρειαστεί
-            ],
-            "worker-src": ["'self'", "blob:"],
-            "object-src": ["'none'"],
-            "base-uri": ["'self'"],
-            "form-action": ["'self'"], // επιτρέπουμε POST μόνο προς τον ίδιο origin
-            "frame-src": ["'self'"],
-            "frame-ancestors": ["'none'"],
-            "upgrade-insecure-requests": []
-        }
+        directives: cspDirectives,
     })
 );
 

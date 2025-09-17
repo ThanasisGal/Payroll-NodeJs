@@ -1,10 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const fiveSpaces = '\u00A0'.repeat(5);
-    const fifteenSpaces = '\u00A0'.repeat(25);
-    const twentyfiveSpaces = '\u00A0'.repeat(25);
+    const twelveSpaces = '\u00A0'.repeat(12);
     
-    // const initialUser = '<%= typeof userName !== "undefined" ? userName : "" %>';
-    const initialUser = "Χρήστης : " + twentyfiveSpaces + "Group : " + fifteenSpaces;
+    const initialUser = "Χρήστης : " + "Group : ";
     document.getElementById("selectedUser").innerHTML =
     initialUser;
   
@@ -14,10 +11,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const newUser = await response.json();
         
         if (newUser) {
+          let firstName = newUser.firstName;
+          let paddedFirstName = firstName.length > 12 ? firstName.substring(0, 12) : firstName + twelveSpaces.substring(0, 12 - firstName.length);
+
           document.getElementById("selectedUser").innerHTML =
-            "Χρήστης : " + newUser.firstName + fiveSpaces + "Group : " + newUser.team;
+            "Χρήστης: " + paddedFirstName + " ➜ " + "Group: " + newUser.team;
         } else {
-            "Χρήστης : " + fiveSpaces + "Group : ";
+            "Χρήστης :  Group : ";
         }
       } catch (error) {
         console.error("Πρόβλημα κατά την εμφάνιση του ονόματος και της ομάδας εργασίας του χρήστη:", error);

@@ -1,5 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const isEmpty = v => !String(v ?? "").trim();
+    const isEmptyArray = v => !Array.isArray(v) || v.length === 0;
+  
     async function handleFormSubmit(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
         const formData = {};
         const filePromises = [];
         const sections = document.querySelectorAll(".card-body");
@@ -13,98 +19,169 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (input.type === "date" && input.value === "") {
                         formData[input.name] = null;
                     } else if (input.type === "file" && input.files.length > 0) {
-                        const filePromise = new Promise((resolve, reject) => {
+                        filePromises.push(new Promise((resolve, reject) => {
                             const reader = new FileReader();
-                            reader.onload = function (e) {
-                                formData[input.name] = e.target.result;
-                                resolve();
-                            };
+                            reader.onload = (e) => { formData[input.name] = e.target.result; resolve(); };
                             reader.onerror = reject;
                             reader.readAsDataURL(input.files[0]);
-                        });
-                        filePromises.push(filePromise);
+                        }));
                     } else {
                         formData[input.name] = input.value;
                     }
-                } else if(input.tagName === "TEXTAREA") {
+                } else if (input.tagName === "TEXTAREA") {
                     formData[input.name] = input.value;
                 } else if (input.tagName === "SELECT") {
                     if (input.multiple) {
-                        const selectedOptions = Array.from(input.selectedOptions).map(option => option.value);
-                        formData[input.name] = selectedOptions.length > 0 ? selectedOptions : [];
+                        const selected = Array.from(input.selectedOptions).map(o => o.value);
+                        formData[input.name] = selected.length ? selected : [];
                     } else {
-                        formData[input.name] = input.selectedIndex === -1 ? null : input.options[input.selectedIndex].value;
+                        formData[input.name] = (input.selectedIndex === -1) ? null : input.options[input.selectedIndex].value;
                     }
                 }
             });
         });
 
-        console.log(formData);
-        
-        if (!formData.eponymia || formData.eponymia === "") {
-            Swal.fire({
-                icon: "error",
-                title: "Προσοχή !!!",
-                html: `Το πεδίο Επώνυμο/μία είναι <strong>ΥΠΟΧΡΕΩΤΙΚΟ</strong>`,
-                timer: 3000,
-                confirmButtonText: 'Κλείσιμο',
-                customClass: {
-                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                    title: 'custom-title',
-                    popup: 'custom-swal-popup'
-                }
-            });
-            return;
-        }
-            
         try {
             await Promise.all(filePromises);
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+
+            const errors = [];
+            if (isEmpty(formData.eponymia)) errors.push("Επώνυμο/μία");
+            if (isEmpty(formData.afm))      errors.push("Α.Φ.Μ.");
+            let selectedUsersArr = Array.isArray(formData.selectedUsers) ? formData.selectedUsers : [];
+            // αν χρειάζεται, καθαρίζουμε κενά/άδεια
+            selectedUsersArr = selectedUsersArr.map(v => String(v ?? "").trim()).filter(Boolean);
+            if (isEmptyArray(selectedUsersArr)) {
+                errors.push("Επιλογή Χρηστών (τουλάχιστον 1)");
+            }
+            //  else {
+            // // προαιρετικά: αφαίρεσε διπλότυπα και ξαναγράψε στο formData
+            // formData.selectedUsers = [...new Set(selectedUsersArr)];
+            // }
+
+            if (errors.length) {
+                Swal.fire({
+                    icon: "error",
+                    title: "Προσοχή!",
+                    html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
+                    confirmButtonText: "Κλείσιμο",
+                    customClass: {
+                        confirmButton: "class-error custom-confirm-button custom-swal-button",
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    },
+                });
+                return;
+            }
             const response = await fetch("/companies/genikastoixeia/add", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                "Content-Type": "application/json",
+                "CSRF-Token": csrfToken,   // ✅ για csurf
                 },
+                credentials: "include",      // ✅ στείλε session cookies
                 body: JSON.stringify(formData),
             });
-  
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+
+            // 1) αν ο browser ακολούθησε redirect
+            if (response.redirected && response.url) {
+                window.location.href = response.url;
+                return;
             }
-  
-            const data = await response.json();
-            if (data.success) {
+
+            // 2) 3xx χωρίς auto-follow (σπάνιο)
+            if (response.status >= 300 && response.status < 400) {
+                const loc = response.headers.get("Location") || response.headers.get("location");
+                if (loc) {
+                const abs = loc.startsWith("http") ? loc : new URL(loc, window.location.origin).toString();
+                window.location.href = abs;
+                return;
+                }
+                throw new Error(`Redirect ${response.status} χωρίς Location header`);
+            }
+
+            // 3) CSRF/Forbidden
+            if (response.status === 403) {
+                throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
+            }
+
+            // 4) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
+            if (response.status === 204) {
                 Swal.fire({
                     icon: "success",
-                    title: "Επιτυχής ενημέρωση των αρχείων",
-                    timer: 1500,
-                    confirmButtonText: 'Κλείσιμο',
+                    title: "Επιτυχής καταχώριση!",
+                    timer: 1200,
+                    showConfirmButton: false,
                     customClass: {
-                        title: 'custom-title',
+                        confirmButton: "class-success custom-confirm-button custom-swal-button",
+                        title: "custom-title",
                         popup: "custom-swal-popup",
-                        confirmButton: 'class-success custom-confirm-button custom-swal-button',
-                    }
-                }).then(() => {
-                    window.location.href = data.redirectUrl;
-                });
-            } else {
-                Swal.fire({
-                    icon: "error",
-                    title: "Προσοχή !!!",
-                    html: `Πρέπει να γίνει <strong>ΥΠΟΧΡΕΩΤΙΚΑ</strong> Επιλογή Χρηστών, που θα έχουν πρόσβαση στην εταιρεία, δηλώνοντάς τους <br><strong>στη σελίδα Διάφορα</strong>`,
-                    timer: 4000,
-                    confirmButtonText: 'Κλείσιμο',
-                    customClass: {
-                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                        title: 'custom-title',
-                        popup: 'custom-swal-popup'
-                    }
-                });
+                    },
+                }).then(() => window.location.href = "/companies/genikastoixeia");
+                return;
             }
-        } catch (error) {
-            console.log("Σφάλμα:", error);
-        }  
+
+            // 5) JSON απάντηση
+            const ct = response.headers.get("content-type") || "";
+            if (ct.includes("application/json")) {
+                const data = await response.json();
+                if (!response.ok || !data?.success) {
+                    throw new Error(`HTTP ${response.status} / success=${data?.success}`);
+                }
+                Swal.fire({
+                    icon: "success",
+                    title: "Επιτυχής καταχώριση!",
+                    timer: 1200,
+                    showConfirmButton: false,
+                    customClass: {
+                        confirmButton: "class-success custom-confirm-button custom-swal-button",
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    },
+                }).then(() => {
+                    window.location.href = data.redirectUrl || "/companies/genikastoixeia";
+                });
+                return;
+            }
+
+            // 6) Άλλος content-type αλλά OK (π.χ. HTML)
+            if (response.ok) {
+                Swal.fire({
+                    icon: "success",
+                    title: "Επιτυχής καταχώριση!",
+                    timer: 1200,
+                    showConfirmButton: false,
+                    customClass: {
+                        confirmButton: "class-success custom-confirm-button custom-swal-button",
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    },
+                }).then(() => window.location.href = "/companies/genikastoixeia");
+                return;
+            }
+
+            // 7) Σφάλμα HTTP
+            throw new Error(`HTTP error ${response.status}`);
+
+        } catch (err) {
+            Swal.fire({
+                icon: "error",
+                title: "Αποτυχία αποθήκευσης",
+                timer: 1200,
+                text: String(err?.message || err),
+                showConfirmButton: true,
+                confirmButtonText: "Κλείσιμο",
+                customClass: {
+                    confirmButton: "class-error custom-confirm-button custom-swal-button",
+                    title: "custom-title",
+                    popup: "custom-swal-popup",
+                },
+            });
+        }
     }
 
+    // Προσθήκη event listeners σε όλα τα κουμπιά με κλάση submitButton
     const buttons = document.querySelectorAll(".submitButton");
 
     buttons.forEach((button) => {

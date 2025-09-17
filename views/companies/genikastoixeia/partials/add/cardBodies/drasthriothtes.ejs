@@ -1,4 +1,4 @@
-<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff; height: 53vh;">
+<div class="card-body overflow-auto flex-grow-1 w-100 bg-white height-vh-53" id="cardBody2">
 
     <% const safe = (k) => (rec && rec[k]) || ''; %>
 
@@ -17,7 +17,7 @@
                     <% } else { %>
                         for=<%= `select_kad${index}` %>
                         class="col-form-label label-font-size"
-                        >Δευτ/σα Δραστ/τα #<%= index %></label>
+                        >Δευτ/σα Δραστ/τα #<%= index - 1 %></label>
                     <% } %>
             </div>
                 

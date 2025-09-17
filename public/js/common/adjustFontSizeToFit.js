@@ -15,9 +15,9 @@ function adjustFontSizeToFit(elementId, maxRemWidth, opts = {}) {
   // helper για set/remove της κλάσης fs-XX
   let appliedPx = null;
   const apply = (px) => {
-    if (appliedPx != null) el.classList.remove(`fs-${appliedPx}`);
+    if (appliedPx != null) el.classList.remove(`font-size-px-${appliedPx}`);
     appliedPx = px;
-    el.classList.add(`fs-${px}`);
+    el.classList.add(`font-size-px-${px}`);
   };
 
   // αρχική εφαρμογή

@@ -1,10 +1,9 @@
-<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
-
+<div class="card-body overflow-auto flex-grow-1 w-100 bg-white height-vh-53" id="cardBody2">
     <% const safe = (k) => (rec && rec[k]) || ''; %>
 
     <% for (let index = 1; index <= 6; index++) { %>
-        <div class="row form-group g-3 align-items-center mb-4">
-            <div class="col-1-35 left-align">
+        <div class="row form-group g-3 align-items-center mb-3">
+            <div class="col-1-35 right-align">
                 <label
                     <% if (index === 1) { %>
                         for=<%= `select_kad${index}` %>
@@ -17,7 +16,7 @@
                     <% } else { %>
                         for=<%= `select_kad${index}` %>
                         class="col-form-label label-font-size"
-                        >Δευτ/σα Δραστ/τα #<%= index %></label>
+                        >Δευτ/σα Δραστ/τα #<%= index - 1 %></label>
                     <% } %>
             </div>
                 
@@ -30,6 +29,9 @@
                 readonly
             />
 
+            <!-- data-preload-all="true" → θέλω όλες τις εγγραφές (< 50) μόλις μπει focus.
+            data-preload-all="false" → κρατάω το τρέχον behavior (αναζήτηση). -->
+
             <div class="col-10-25">
                 <select
                     id=<%= `select_kad${index}` %>
@@ -40,7 +42,6 @@
                     single
                     data-target-input=<%= `koddrast${index}` %>
                     data-preselect=<%= `koddrast${index}` %>
-                    data-skip-autoload="true"
                     data-preload-all="false"
                     data-pad-length="11"
                     data-xrhsh-related="false"

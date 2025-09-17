@@ -190,6 +190,8 @@ export const initTomDropdown = ({
 
         /* ===== onInitialize (core + project specific + χρήστη) ===== */
         onInitialize() {
+            const ts = this; // ← alias του instance
+
             /******************* A. Core reset logic *******************/
             const resetList = () => {
                 this.setTextboxValue('');
@@ -245,7 +247,7 @@ export const initTomDropdown = ({
             * dropdown_open  ➜  position + preload + trash btn κ.λπ.
             * -------------------------------------------------------------*/
             this.on('dropdown_open', () => {
-                tom.wrapper.classList.add('open');
+                ts.wrapper.classList.add('open');
 
                 /* ---------- προαιρετικό preload ---------------------------------*/
                 if (this.settings._preloadAll && !this.control_input.value) {
@@ -267,7 +269,7 @@ export const initTomDropdown = ({
                     const idealHeight = searchH + optionH * 6.5;
 
                     /* 2. διαθέσιμος χώρος ΜΕΣΑ στο .card (για να μην «ξεχειλίζει» ) */
-                    const cardRect    = tom.wrapper.closest('.card')
+                    const cardRect    = ts.wrapper.closest('.card')
                         ?.getBoundingClientRect()
                         ?? { top: 0, bottom: window.innerHeight };
 
@@ -376,28 +378,50 @@ export const initTomDropdown = ({
                 }
             });
 
-            const preSelId  = el.dataset.preselect;
+            const doPreselect = async () => {
+            const preSelId = el.dataset.preselect;
+            if (!preSelId) return;
+
             const preSelVal = document.getElementById(preSelId)?.value?.trim();
-            if (preSelVal && !el.hasAttribute('data-has-value')) {
+            if (!preSelVal) return;
 
-                const u = new URL(url, location.origin);
-                Object.entries(extraParams || {})
-                    .forEach(([k, v]) => v && u.searchParams.set(k, v));
-                u.searchParams.set('value', preSelVal);
+            if (el.hasAttribute('data-has-value')) return;
 
-                fetch(u, { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(({ items }) => {
-                        if (items?.length) {
-                            tom.addOption(items[0]);
-                            tom.setValue(preSelVal, true);
-                            selectedCache[preSelVal] = items[0];
-                            requestAnimationFrame(() => updateOverflow(tom));
-                            el.setAttribute('data-has-value', 'true');
-                        }
-                    })
-                    .catch(console.error);
+            // Φτιάξε URL + extra params
+            const u = new URL(url, location.origin);
+            Object.entries(extraParams || {}).forEach(([k, v]) => v && u.searchParams.set(k, v));
+            u.searchParams.set('value', preSelVal);
+
+            // Abort τυχόν προηγούμενο preselect
+            try { ts._preselectAbort?.abort(); } catch {}
+            const controller = new AbortController();
+            ts._preselectAbort = controller;
+
+            try {
+                const res   = await fetch(u, { credentials: 'include', signal: controller.signal });
+                const json  = await res.json();
+                const item  = json?.items?.[0];
+                if (!item) return;
+
+                // Αν στο μεταξύ έγινε άλλο preselect → μην συνεχίσεις (stale)
+                if (ts._preselectAbort !== controller) return;
+
+                const key = ts.settings.valueField || 'value';
+                const id  = item[key] ?? preSelVal;
+
+                ts.addOption(item);
+                ts.setValue(id, true);
+                selectedCache[id] = item;
+                requestAnimationFrame(() => updateOverflow(ts));
+                el.setAttribute('data-has-value', 'true');
+            } catch (err) {
+                if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+            } finally {
+                if (ts._preselectAbort === controller) ts._preselectAbort = null;
             }
+            };
+
+            doPreselect();
 
             /* -----------------------------------------------------------------
             *  Α. Ενημέρωση κρυφού input  ΜΟΝΟ στο single
@@ -469,51 +493,51 @@ export const initTomDropdown = ({
         }
     });
 
-    const preselectId = el.dataset.preselect;
-    const preselectValue = document.getElementById(preselectId)?.value;
+//     const preselectId = el.dataset.preselect;
+//     const preselectValue = document.getElementById(preselectId)?.value;
 
-// --- Προεπιλογή από ΒΔ (respect valueField & credentials, με abort) ---
-    if (preselectValue && url) {
-    const urlObj = new URL(url, location.origin);
-    urlObj.searchParams.set('value', preselectValue);
+// // --- Προεπιλογή από ΒΔ (respect valueField & credentials, με abort) ---
+//     if (preselectValue && url) {
+//     const urlObj = new URL(url, location.origin);
+//     urlObj.searchParams.set('value', preselectValue);
 
-    // ➕ Πέρνα όλα τα extraParams στο URL (π.χ. padLength)
-    Object.entries(extraParams || {}).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') {
-        urlObj.searchParams.set(k, v);
-        }
-    });
+//     // ➕ Πέρνα όλα τα extraParams στο URL (π.χ. padLength)
+//     Object.entries(extraParams || {}).forEach(([k, v]) => {
+//         if (v !== undefined && v !== null && v !== '') {
+//         urlObj.searchParams.set(k, v);
+//         }
+//     });
 
-    try {
-        // ακύρωσε τυχόν προηγούμενο preselect request
-        try { this._preselectAbort?.abort(); } catch {}
-        this._preselectAbort = new AbortController();
+//     try {
+//         // ακύρωσε τυχόν προηγούμενο preselect request
+//         try { this._preselectAbort?.abort(); } catch {}
+//         this._preselectAbort = new AbortController();
 
-        fetch(urlObj.toString(), { credentials: 'include', signal: this._preselectAbort.signal })
-        .then(res => res.json())
-        .then(data => {
-            const item = data?.items?.[0]; // ή αναλόγως το format του API
-            if (!item) {
-            console.warn('⚠️ No matching item found in fetch for', preselectValue);
-            return;
-            }
+//         fetch(urlObj.toString(), { credentials: 'include', signal: this._preselectAbort.signal })
+//         .then(res => res.json())
+//         .then(data => {
+//             const item = data?.items?.[0]; // ή αναλόγως το format του API
+//             if (!item) {
+//             console.warn('⚠️ No matching item found in fetch for', preselectValue);
+//             return;
+//             }
 
-            const key = tom.settings.valueField || 'value';
-            const id  = item[key] ?? preselectValue;
+//             const key = tom.settings.valueField || 'value';
+//             const id  = item[key] ?? preselectValue;
 
-            tom.addOption(item);
-            tom.setValue(id, true);
-            selectedCache[id] = item;
-            requestAnimationFrame(() => updateOverflow(tom));
-            el.setAttribute('data-has-value', 'true');
-        })
-        .catch(err => {
-            if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
-        });
-    } catch (err) {
-        if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
-    }
-    }
+//             tom.addOption(item);
+//             tom.setValue(id, true);
+//             selectedCache[id] = item;
+//             requestAnimationFrame(() => updateOverflow(tom));
+//             el.setAttribute('data-has-value', 'true');
+//         })
+//         .catch(err => {
+//             if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+//         });
+//     } catch (err) {
+//         if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+//     }
+//     }
 
     // --- Cache του επιλεγμένου option ώστε να μπορεί να «ξαναμπεί» αν λείπει ---
     tom.on('item_add', (value /* , $itemEl */) => {

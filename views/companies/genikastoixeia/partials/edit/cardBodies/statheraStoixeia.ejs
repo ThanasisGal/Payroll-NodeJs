@@ -1,4 +1,4 @@
-<div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;">
+<div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody1">
     <% const safe = (k) => (rec && rec[k]) || ''; %>
 
     <div class="row form-group g-3 align-items-center mb-0-5">
@@ -185,11 +185,10 @@
         </div>
         <div class="col-4">
             <select
-                class="form-select selectpicker-dropdown-normal"
+                class="form-select selectpicker-dropdown-normal font-size-vw-1"
                 data-live-search="true"
                 name="nomos"
-                id="nomos"
-                style="font-size: 1vw">
+                id="nomos">
             </select>
         </div>
     </div>
@@ -200,12 +199,11 @@
         </div>
         <div class="col-4">
             <select
-                class="form-select selectpicker-dropdown-normal"
+                class="form-select selectpicker-dropdown-normal font-size-vw-1"
                 data-live-search="true"
                 name="dhmos"
-                id="dhmos"
-                style="font-size: 1vw"
-            ></select>
+                id="dhmos"></select>
+            </select>
         </div>
 
         <div class="col-1"></div>
@@ -215,12 +213,11 @@
         </div>
         <div class="col-4">
             <select
-                class="form-select selectpicker-dropdown-normal"
+                class="form-select selectpicker-dropdown-normal font-size-vw-1"
                 data-live-search="true"
                 name="polh"
-                id="polh"
-                style="font-size: 1vw"
-            ></select>
+                id="polh">
+            </select>
         </div>
     </div>
 
@@ -264,7 +261,7 @@
         </div>
         <div class="col-1 left-align checkbox-flex-center">
             <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="anenergh" name="anenergh" <%= company.anenergh ? 'checked' : '' %> value="" /> 
-            <label for="anenergh" id="label-anenergh" class="input-content" style="margin-left: .75rem; font-weight: 600;">ΟΧΙ</label>
+            <label for="anenergh" id="label-anenergh" class="input-content margin-left-0_75rem fw600">ΟΧΙ</label>
         </div>
 
         <div class="col-4"></div>

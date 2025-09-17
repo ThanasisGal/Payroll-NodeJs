@@ -1,8 +1,8 @@
 <div class="tadded-container">
-    <div class="container-fluid" style="height: 100vh !important; padding: 0;">
+    <div class="container-fluid height-vh-100 padding-0">
         <div class="menu_Links">
-            <ul style="white-space: nowrap;">
-                <li class="active" style="margin-left: 1.5rem; margin-right: .5rem;">Σταθερά Στοιχεία</li>
+            <ul class="white-space-nowrap">
+                <li class="active margin-left-1_5rem margin-right--0_5rem">Σταθερά Στοιχεία</li>
                 <li>Δραστηριότητες</li>
                 <li>Τεχνικός Ασφαλείας</li>
                 <li>Ιατρός Εργασίας</li>
@@ -12,13 +12,16 @@
                 <li>Διάδοχος Εργοδότης</li>
             </ul>
         </div>
-        <hr style="margin-top: -2rem" />
+        <hr class="margin-top--2rem" />
 
         <div class="sections">
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius" enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
 
                             <%- include('./partials/add/cardHeader') %>
                       
@@ -34,7 +37,10 @@
             <section class="sel_2_section" data-section="Δραστηριότητες">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
 
                             <%- include('./partials/add/cardHeader') %>
 
@@ -50,7 +56,10 @@
             <section class="sel_3_section" data-section="Τεχνικός Ασφαλείας">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: visible;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
 
                             <%- include('./partials/add/cardHeader') %>
 
@@ -66,7 +75,10 @@
             <section class="sel_4_section" data-section="Ιατρός Εργασίας">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
                             <%- include('./partials/add/cardHeader') %>
 
                             <%- include('./partials/add/cardBodies/iatrosErgasias') %>
@@ -80,7 +92,10 @@
             <section class="sel_5_section" data-section="Λογιστής">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
                             <%- include('./partials/add/cardHeader') %>
 
                             <%- include('./partials/add/cardBodies/logisths') %>
@@ -94,7 +109,10 @@
             <section class="sel_6_section" data-section="Διάφορα">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
                             <%- include('./partials/add/cardHeader') %>
 
                             <%- include('./partials/add/cardBodies/diafora') %>
@@ -108,7 +126,10 @@
             <section class="sel_7_section" data-section="Έμμεσος Εργοδότης">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
                             <%- include('./partials/add/cardHeader') %>
 
                             <%- include('./partials/add/cardBodies/emmesosErgodoths') %>
@@ -122,7 +143,10 @@
             <section class="sel_8_section" data-section="Διάδοχος Εργοδότης">
                 <div>
                     <form action="/companies/genikastoixeia/add" method="POST" class="formRadius"enctype="multipart/form-data">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; overflow: hidden;">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-96 margin-left-percent-2 overflow-visible">
                             <%- include('./partials/add/cardHeader') %>
 
                             <%- include('./partials/add/cardBodies/diadoxosErgodoths') %>
@@ -136,6 +160,7 @@
     </div>
 
     <% const isProduction = NODE_ENV === 'production'; %>
+
     <script nonce="<%= nonce %>">
         window.RUNTIME_ENV = "<%= NODE_ENV %>";
     </script>
@@ -146,10 +171,18 @@
 
     <script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
 
+    <script nonce="<%= nonce %>" type="module" src="/static/js/companies/genikastoixeia/initNomikesMorfesDropdowns.js"></script>  
+    <script nonce="<%= nonce %>" type="module" src="/static/js/companies/genikastoixeia/initPararthmataEfkaDropdowns.js"></script>  
+    <script nonce="<%= nonce %>" type="module" src="/static/js/companies/genikastoixeia/initDoyDropdowns.js"></script>  
+    <script nonce="<%= nonce %>" type="module" src="/static/js/companies/genikastoixeia/initTameiaDropdowns.js"></script>  
+    <script nonce="<%= nonce %>" type="module" src="/static/js/companies/genikastoixeia/initKadDropdowns.js"></script>  
+
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/selectUnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 </div>

@@ -1,25 +1,25 @@
 <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow ">
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fsvw-1_3 mt-n-1-55 fw700 header-app-title widthrem-18_5" href="/">&nbsp; Payroll<i class="bi bi-arrow-right-short"></i>NodeJs</a>
+    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3  mt-n-1-55 header-app-title width-rem-18_5" href="/">&nbsp; Payroll<i class="bi bi-arrow-right-short"></i>NodeJs</a>
 
 
     <form class="nav col-12 col-md-auto flex-fill mb-2 justify-content-center mb-md-0">
         <div class="input-group">
 
             <div class="col-4-00">
-                <a href="/companies/genikastoixeia/" id="selectedCompany" class="form-control form-control-dark rounded-0 border-0" style="color: #eeff02; text-align: left !important; font-size: 0.75vw; font-weight: 500; height: 3.2rem; padding-top: 1rem; line-height: 1rem;" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή εταιρείας">
+                <a href="/companies/genikastoixeia/" id="selectedCompany" class="form-control form-control-dark rounded-0 border-0 header-app-style-company" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή εταιρείας">
                     <% if (typeof companyDescription !== 'undefined' && companyDescription.length > 0) { %> Εταιρεία : <%= companyDescription %> <% } %>
                 </a>
             </div>
 
             <div class="col-1-25">
-                <a href="/dates/getYearsForm" id="selectedYear" class="form-control form-control-dark rounded-0 border-0" style="color: #dfffc1e7; text-align: center !important; font-size: 0.75vw; font-weight: 400; height: 3.2rem; padding-top: 1rem; line-height: 1rem;" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή έτους χρήσης">
+                <a href="/dates/getYearsForm" id="selectedYear" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή έτους χρήσης">
                     <% if (typeof yearInUse !== 'undefined' && yearInUse.length > 0) { %>
                     Χρήση : <%= yearInUse %> <% } %>
                 </a>
             </div>
 
             <div class="col-1-75">
-                <a href="/dates/getPeriodsForm" id="selectedPeriod" class="form-control form-control-dark rounded-0 border-0" style=" color: #dfffc1e7; text-align: center !important; font-size: 0.72vw; font-weight: 400; height: 3.2rem; padding-top: 0.85rem; line-height: 1rem;" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή περιόδου">
+                <a href="/dates/getPeriodsForm" id="selectedPeriod" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή περιόδου">
                     <% if (typeof periodInUseDescr !== 'undefined' && periodInUseDescr.length > 0) { %>
                         Περίοδος : <%= periodInUseDescr %>
                     <% } %>
@@ -27,7 +27,7 @@
             </div>
 
             <div class="col-2-25">
-                <a href="/dates/getAppDateForm" id="selectedDate" class="form-control form-control-dark rounded-0 border-0" style=" color: #dfffc1e7; text-align: center !important; font-size: 0.75vw; font-weight: 400; height: 3.2rem; padding-top: 0.85rem; line-height: 1rem;" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή ημερομηνίας χρήσης της εφαρμογής">
+                <a href="/dates/getAppDateForm" id="selectedDate" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή ημερομηνίας χρήσης της εφαρμογής">
                     <% if (typeof appDate !== 'undefined' && appDate.length > 0) { %>
                         Ημ/νία Χρήσης : 
                         <%= `${appDate.substring(8,10)}/${appDate.substring(5,7)}/${appDate.substring(0,4)}` %> 
@@ -38,11 +38,11 @@
             </div>
 
             <div class="col-2-5">
-                <a href="/login" id="selectedUser" class="form-control form-control-dark rounded-0 border-0" style="color: #dfffc1e7; text-align: right !important; font-size: 0.75vw; font-weight: 400; height: 3.2rem; padding-top: 0.85rem; line-height: 1rem;" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή χρήστη">
+                <a href="/login" id="selectedUser" class="form-control form-control-dark rounded-0 border-0 header-app-style-user" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή χρήστη">
                     <% if (typeof userΝame != 'undefined' && userΝame.length > 0) { %>
-                        Χρήστης : <%= userΝame %> &nbsp;&nbsp;Group : [<%= userΤeam %>] 
+                        Χρήστης : <%= userΝame %> <i class="bi bi-arrow-right"></i> Group : [<%= userΤeam %>] 
                     <% } else { %>
-                        Χρήστης : &nbsp;&nbsp;&nbsp;Group : [ ]
+                        Χρήστης : Group : 
                     <% } %>
                 </a>
             </div>
