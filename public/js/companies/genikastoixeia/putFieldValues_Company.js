@@ -36,6 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         try {
+            await Promise.all(filePromises);   // ✅ Περίμενε να διαβαστούν τα αρχεία
+            
             const companyId = document.getElementById("companyId").value;
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
 

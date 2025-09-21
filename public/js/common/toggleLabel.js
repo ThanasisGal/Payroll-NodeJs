@@ -56,9 +56,29 @@ function toggleCheckboxState(checkboxId) {
 
 function setFieldsDisabled(fieldIds, disabled) {
   fieldIds.forEach(function (fieldId) {
-    var field = document.getElementById(fieldId);
-    if (field) {
-      field.disabled = disabled;
+    var el = document.getElementById(fieldId);
+    if (!el) return;
+
+    // 1) Native disabled
+    el.disabled = disabled;
+
+    // 2) Αν είναι checkbox και το απενεργοποιούμε, ξε-τικάρ’ το και συγχρόνισε την ετικέτα
+    if (el.type === "checkbox" && disabled) {
+      el.checked = false;
+      toggleCheckboxState(fieldId);
     }
+
+    // 3) Tom Select (instance διαθέσιμο ως el.tomselect)
+    if (el.tomselect) {
+      disabled ? el.tomselect.disable() : el.tomselect.enable();
+    }
+
+    // 4) bootstrap-select (εάν χρησιμοποιείται)
+    // if (window.jQuery && jQuery.fn.selectpicker && jQuery(el).hasClass("selectpicker")) {
+    //   jQuery(el).prop("disabled", disabled).selectpicker("refresh");
+    // }
+
+    // 5) Εξαναγκασμός redraw/ενημέρωσης listeners
+    el.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }

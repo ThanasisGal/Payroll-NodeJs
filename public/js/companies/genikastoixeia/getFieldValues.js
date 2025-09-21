@@ -1,3 +1,5 @@
+// public\js\companies\genikastoixeia\getFieldValues.js
+
 document.addEventListener("DOMContentLoaded", () => {
     const isEmpty = v => !String(v ?? "").trim();
     const isEmptyArray = v => !Array.isArray(v) || v.length === 0;

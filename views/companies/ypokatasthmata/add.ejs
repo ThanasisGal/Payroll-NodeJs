@@ -1,26 +1,31 @@
 <div class="tadded-container">
-    <div class="container-fluid" style="height: 100vh !important; padding: 0;">
+    <div class="container-fluid height-vh-100 padding-0">
         <div class="menu_Links">
             <ul>
-                <li class="active" style="margin-left: 1.5rem; margin-right: .5rem;">Σταθερά Στοιχεία</li>
+                <li class="active margin-left-1_5rem margin-right--0_5rem">Σταθερά Στοιχεία</li>
                 <li>Οικοδομικά Έργα</li>
             </ul>
         </div>
-        <hr style="margin-top: -2rem" />
+        <hr class="margin-top--2rem" />
+
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+        <body data-mode="<%= mode %>" data-context="<%= context %>"></body>
 
         <div class="sections">
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
                 <div>
-                    <form class="formRadius">
-                        <div class="card d-flex flex-column z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
+                    <form action="/companies/ypokatasthmata/add" method="POST" class="formRadius">
 
-                            <div class="card-header p-2" style="height: 3.5rem !important;">
-                                <label class="text-center w-100 headers-content">
-                                    Εισαγωγή Νέου Υποκαταστήματος (ΣΤΑΘΕΡΑ ΣΤΟΙΧΙΕΑ)
-                                </label>
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content sectionTitle"> </label>
                             </div>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody">
                                 <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
                                 <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
                                 <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
@@ -31,13 +36,11 @@
                                             Επιλεγμένη Εταιρεία
                                         </label>
                                     </div>
-                                    <div
-                                        class="col-8 left-align"
-                                        style="font-size: 1rem; color: #1f6d00">
-                        
-                                        <label class="col-form-label field-required">
-                                            <% if (company && company.kod && company.kod.length > 0) { %> 
-                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" + company.firstname %>
+                                    <div class="col-8 left-align font-size-rem-1_1 cgreen">
+                                        <label>
+                                            <% if (company && company.kod && company.kod.length > 0) { %>
+                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" +
+                                                company.firstname %>
                                             <% } %>
                                         </label>
                                     </div>
@@ -123,7 +126,7 @@
                                     </div>
                                     <div class="col-4">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
+                                            class="form-select selectpicker-dropdown-normal font-size-vw-1"
                                             data-live-search="true"
                                             name="perifereies"
                                             id="perifereies"
@@ -142,11 +145,10 @@
                                     </div>
                                     <div class="col-4">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
+                                            class="form-select selectpicker-dropdown-normal font-size-vw-1"
                                             data-live-search="true"
                                             name="nomos"
                                             id="nomos"
-                                            style="font-size: 1vw"
                                             required
                                             disabled>
                                         </select>
@@ -163,11 +165,10 @@
                                     </div>
                                     <div class="col-4">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
+                                            class="form-select selectpicker-dropdown-normal font-size-vw-1"
                                             data-live-search="true"
                                             name="dhmos"
                                             id="dhmos"
-                                            style="font-size: 1vw"
                                             required
                                             disabled>
                                         </select>
@@ -184,11 +185,10 @@
                                     </div>
                                     <div class="col-4">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
+                                            class="form-select selectpicker-dropdown-normal font-size-vw-1"
                                             data-live-search="true"
                                             name="polh"
                                             id="polh"
-                                            style="font-size: 1vw"
                                             required
                                             disabled>
                                         </select>
@@ -213,17 +213,38 @@
 
                                     <div class="col-1-5 right-align">
                                         <label
-                                        for="pararthma_efka"
-                                        class="col-form-label label-font-size">
-                                        Παράρτημα ΕΦΚΑ
+                                            for="pararthma_efka"
+                                            class="col-form-label label-font-size">
+                                                Παράρτημα ΕΦΚΑ
                                         </label>
                                     </div>
-                                    <div class="col-4">
+
+                                    <input
+                                        type="hidden"
+                                        name="pararthma_efka_stathera"
+                                        id="pararthma_efka_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= safe("pararthma_efka_stathera") %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
-                                            data-live-search="true"
+                                            id="pararthma_efka"
                                             name="pararthma_efka"
-                                            id="pararthma_efka">
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Παράρτημα ΕΦΚΑ"
+                                            data-api="/api/dropdown/pararthmataEfka"
+                                            single
+                                            data-target-input=<%= `pararthma_efka_stathera` %>
+                                            data-preselect=<%= `pararthma_efka_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Παραρτήματος ΕΦΚΑ">
                                         </select>
                                     </div>
                                 </div>
@@ -296,7 +317,7 @@
                                         <label
                                             for="epoxikothta"
                                             id="label-epoxikothta"
-                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            class="margin-left-0_75rem fw600">
                                             ΟΧΙ
                                         </label>
                                     </div>
@@ -320,7 +341,7 @@
                                         <label
                                             for="apasxolhsh5hmeron"
                                             id="label-apasxolhsh5hmeron"
-                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            class="margin-left-0_75rem fw600">
                                             ΟΧΙ
                                         </label>
                                     </div>
@@ -369,52 +390,83 @@
                                         <label
                                             for="sepe"
                                             class="col-form-label label-font-size">
-                                            Παράρτημα ΣΕΠΕ
+                                                Παράρτημα ΣΕΠΕ
                                         </label>
                                     </div>
-                                    <div class="col-4">
+
+                                    <input
+                                        type="hidden"
+                                        name="sepe_stathera"
+                                        id="sepe_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= safe("sepe_stathera") %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
-                                            data-live-search="true"
+                                            id="sepe"
                                             name="sepe"
-                                            id="sepe">
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Παράρτημα ΣΕΠΕ"
+                                            data-api="/api/dropdown/ypokatasthmata/sepe"
+                                            single
+                                            data-target-input=<%= `sepe_stathera` %>
+                                            data-preselect=<%= `sepe_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Παραρτήματος ΣΕΠΕ">
                                         </select>
                                     </div>
 
-                                    <div class="col-1"></div>
-                                    
+                                    <div class="col-1-25-1"></div>
+
                                     <div class="col-1-5 right-align">
                                         <label
                                             for="dypa"
                                             class="col-form-label label-font-size">
-                                            Παράρτημα ΔΥΠΑ
+                                                Παράρτημα ΔΥΠΑ
                                         </label>
                                     </div>
-                                    <div class="col-4">
+
+                                    <input
+                                        type="hidden"
+                                        name="dypa_stathera"
+                                        id="dypa_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= safe("dypa_stathera") %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
                                         <select
-                                            class="form-select selectpicker-dropdown-normal"
-                                            data-live-search="true"
+                                            id="dypa"
                                             name="dypa"
-                                            id="dypa">
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Παράρτημα ΔΥΠΑ"
+                                            data-api="/api/dropdown/ypokatasthmata/dypa"
+                                            single
+                                            data-target-input=<%= `dypa_stathera` %>
+                                            data-preselect=<%= `dypa_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Παραρτήματος ΔΥΠΑ">
                                         </select>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="card-footer"
-                                style="
-                                    margin-top: -1.5rem !important;
-                                    margin-left: -1rem !important;
-                                    margin-right: -1rem !important;
-                                    ">
+                            <div class="card-footer cardFooter">
                                 <div
-                                    class="d-inline-block d-flex"
-                                    style="
-                                    margin-top: -0.5rem !important;
-                                    margin-bottom: -1rem !important;
-                                    margin-left: 10px !important;
-                                    margin-right: 10px !important;
-                                    justify-content: space-around;">
+                                    class="d-inline-block d-flex cardFooter01">
                                     <button
                                         type="button"
                                         class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
@@ -435,24 +487,24 @@
             <section class="sel_2_section visible" data-section="Οικοδομικά Έργα">
                 <div>
                     <form class="formRadius">
-                        <div class="card z-depth-5" style="width: 97%; margin-left: 1.5%; overflow: hidden;">
 
-                            <div class="card-header p-2" style="height: 3.5rem !important;">
-                                <label class="text-center w-100 headers-content">
-                                    Εισαγωγή Νέου Υποκαταστήματος (ΟΙΚΟΔΟΜΙΚΑ ΕΡΓΑ)
-                                </label>
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content sectionTitle"> </label>
                             </div>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody1">
                                 <div class="row form-group g-3 align-items-center">
                                     <div class="col-1-5 right-align">
-                                        <label class="col-form-label label-font-size">
+                                        <label  class="col-form-label label-font-size">
                                             Επιλεγμένη Εταιρεία
                                         </label>
                                     </div>
-
-                                    <div class="col-8 left-align">
-                                        <label class="col-form-label field-required" style="font-size: 1.2rem; color: #1f6d00">
+                                    <div class="col-8 left-align font-size-rem-1_1 cgreen">
+                                        <label>
                                             <% if (company && company.kod && company.kod.length > 0) { %>
                                                 <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" +
                                                 company.firstname %>
@@ -461,7 +513,7 @@
                                     </div>
                                 </div>
 
-                                <hr class="division" style="margin-bottom: -0.3rem;"></hr>
+                                <hr class="division"></hr>
 
                                 <div class="row form-group g-3 align-items-center mb-1">
                                     <div class="col-1-5 right-align">
@@ -481,7 +533,7 @@
                                         <label
                                             for="oikodomika_erga"
                                             id="label-oikodomika_erga"
-                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            class="margin-left-0_75rem fw600">
                                             ΟΧΙ
                                         </label>
                                     </div>
@@ -589,7 +641,7 @@
                                         <label
                                             for="ypergolabia"
                                             id="label-ypergolabia"
-                                            style="margin-left: 0.75rem; font-weight: 600">
+                                            class="margin-left-0_75rem fw600">
                                             ΟΧΙ
                                         </label>
                                     </div>
@@ -796,6 +848,45 @@
                                     <div class="col-1-5 right-align">
                                         <label
                                             for="pararthma_efka_ergolaboy"
+                                            class="col-form-label label-font-size">
+                                                Παράρτημα ΕΦΚΑ
+                                        </label>
+                                    </div>
+
+                                    <input
+                                        type="hidden"
+                                        name="pararthma_efka_ergolaboy_oikodomika"
+                                        id="pararthma_efka_ergolaboy_oikodomika"
+                                        class="form-control input-contents"
+                                        value="<%= safe("pararthma_efka_ergolaboy_oikodomika") %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
+                                        <select
+                                            id="pararthma_efka_ergolaboy"
+                                            name="pararthma_efka_ergolaboy"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Παράρτημα ΕΦΚΑ"
+                                            data-api="/api/dropdown/ypokatasthmata/pararthmataEfkaErgolaboy"
+                                            single
+                                            data-target-input=<%= `pararthma_efka_ergolaboy_oikodomika` %>
+                                            data-preselect=<%= `pararthma_efka_ergolaboy_oikodomika` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Παραρτήματος ΕΦΚΑ">
+                                        </select>
+                                    </div>
+
+
+
+                                    <!-- <div class="col-1-5 right-align">
+                                        <label
+                                            for="pararthma_efka_ergolaboy"
                                             class="col-form-label label-font-size-smaller">
                                                 Παράρτ.ΕΦΚΑ Εργ/βου
                                         </label>
@@ -809,7 +900,7 @@
                                             name="pararthma_efka_ergolaboy"
                                             id="pararthma_efka_ergolaboy"
                                         ></select>
-                                    </div>
+                                    </div> -->
                                 </div>
 
                                 <div class="row form-group g-3 align-items-center mb-4">
@@ -857,19 +948,9 @@
                                 </div>
                             </div>
 
-                            <div class="card-footer" style="margin-top: -1.5rem !important;"
-                                style="
-                                    margin-left: -1rem !important;
-                                    margin-right: -1rem !important;">
+                            <div class="card-footer cardFooter">
                                 <div
-                                    class="d-inline-block d-flex"
-                                    style="
-                                    margin-top: -0.5rem !important;
-                                    margin-bottom: -1rem !important;
-                                    margin-left: 10px !important;
-                                    margin-right: 10px !important;
-                                    justify-content: space-around;"
-                                >
+                                    class="d-inline-block d-flex cardFooter01">
                                 <button
                                     type="button"
                                     class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
@@ -899,8 +980,15 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/ypokatasthmata/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/ypokatasthmata/loadDropdowns_add<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+
+<script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>  
+
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

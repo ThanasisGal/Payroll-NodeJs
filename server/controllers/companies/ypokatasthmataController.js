@@ -130,6 +130,9 @@ class ypokatasthmataController {
         locals,
         company,
         data,
+        mode: 'add',
+        context: "branch",
+        rec: {},
       });
     } catch (error) {
       console.log(error);
@@ -470,7 +473,6 @@ class ypokatasthmataController {
   };
 
   static editYpokatasthmataForm = async (req, res) => {
-    const messages = await req.flash("info");
     const locals = {
       title: "Συντήρηση Υποκ/των",
       description: "Web Payroll System",
@@ -480,15 +482,18 @@ class ypokatasthmataController {
       const perifereies = await PerifereiesModel.find().sort("perigrafh");
 
       const ypokatasthmaId = req.params.id;
-      const ypokatasthma = await YpokatasthmataModel.findById(ypokatasthmaId);
+      const ypokatasthma = await YpokatasthmataModel.findById(ypokatasthmaId).lean();
       const company = await CompaniesModel.findOne({ _id: ypokatasthma.companykod_object }).lean();
 
+      console.log("Υποκατάστημα ΕΦΚΑ Εργολάβου :", ypokatasthma.pararthma_efka_ergolaboy);
       res.render("companies/ypokatasthmata/edit", {
         locals,
-        messages,
         perifereies,
         ypokatasthma,
-        company, 
+        company,
+        mode   : "edit",
+        context: "branch",
+        rec    : ypokatasthma,
       });
     } catch (error) {
       console.log(error);

@@ -139,6 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (resp.redirected && resp.url) {
                     await Swal.fire({
                         title: "Επιτυχής διαγραφή",
+                        timer: 1200,
                         icon: "success",
                         showConfirmButton: false,
                         customClass: {
@@ -156,6 +157,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (loc) {
                     await Swal.fire({
                         title: "Επιτυχής διαγραφή",
+                        timer: 1200,
                         icon: "success",
                         showConfirmButton: false,
                         customClass: {
@@ -179,6 +181,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (resp.status === 204) {
                     await Swal.fire({
                         title: "Επιτυχής διαγραφή",
+                        timer: 1200,
                         icon: "success",
                         showConfirmButton: false,
                         customClass: {
@@ -200,6 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                     await Swal.fire({
                         title: "Επιτυχής διαγραφή",
+                        timer: 1200,
                         icon: "success",
                         showConfirmButton: false,
                         customClass: {
@@ -215,6 +219,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (resp.ok) {
                     await Swal.fire({
                         title: "Επιτυχής διαγραφή",
+                        timer: 1200,
                         icon: "success",
                         showConfirmButton: false,
                         customClass: {
@@ -238,6 +243,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         title: "custom-title",
                         popup: "custom-swal-popup",
                         confirmButton: "class-normal custom-confirm-button custom-swal-button",
+                    },
+                    willClose: () => {
+                      window.location.href = "/companies/genikastoixeia"; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
                     },
                 });
             }

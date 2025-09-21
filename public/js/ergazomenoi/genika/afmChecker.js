@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
             icon: "warning",
             title: "Λάθος ΑΦΜ...",
             text: "Πληκτρολογείστε τον σωστό ΑΦΜ ή αφήστε το πεδίο κενό....",
-            timer: 2500,
+            timer: 2000,
             focusConfirm: true,
             showConfirmButton: false,
             showCancelButton: false,
@@ -72,7 +72,7 @@ async function fetchErgazomenoiData(afm) {
       icon: "error",
       title: "Προσοχή...",
       text: `Ο εργαζόμενος με ΑΦΜ ${data.afm} ( "${data.eponymo} ${data.onoma}" ) είναι ήδη καταχωρημένος. Δεν επιτρέπεται η διπλή ως προς το ΑΦΜ καταχώρηση...`,
-      timer: 4000,
+      timer: 3000,
       confirmButtonText: 'Κλείσιμο',
       customClass: {
         confirmButton: 'class-error custom-confirm-button custom-swal-button',

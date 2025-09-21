@@ -1,118 +1,141 @@
-const fiveSpaces = '\u00A0'.repeat(5);
-const sixSpaces = '\u00A0'.repeat(6);
-const sevenSpaces = '\u00A0'.repeat(7);
-const nineSpaces = '\u00A0'.repeat(9);
-const tenSpaces = '\u00A0'.repeat(10);
-const fifteenSpaces = '\u00A0'.repeat(15);
+// public\js\companies\genikastoixeia\loadDropdowns_add.js
 
 document.addEventListener("DOMContentLoaded", function () {
-  const perifereiesDropdown = document.getElementById("perifereies");
-  const nomosDropdown = document.getElementById("nomos");
-  const dhmosDropdown = document.getElementById("dhmos");
-  const polhDropdown = document.getElementById("polh");
-  const allUsersDropdown = document.getElementById("selectedUsers");
+    // === CSRF setup ===
+    let CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || null;
+    const ensureCsrfToken = async () => {
+        if (CSRF_TOKEN) return;
+        const r = await fetch("/api/csrf-token", { credentials: "same-origin" });
+        if (!r.ok) throw new Error("CSRF token fetch failed");
+        const j = await r.json();
+        CSRF_TOKEN = j.csrfToken;
+    };
 
-  // Load data to the 'perifereies' dropdown from MongoDB
-  const loadPerifereies = async () => {
-    perifereiesDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/perifereies");
-      const data = await response.json();
-      data.forEach((perifereia) => {
-        const option = new Option(perifereia.perigrafh, perifereia.kodikos);
-        perifereiesDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
+    const apiFetch = (url, options = {}) => {
+        const headers = new Headers(options.headers || {});
+        headers.set("Accept", "application/json");
+        if (CSRF_TOKEN) headers.set("X-CSRF-Token", CSRF_TOKEN);
+        return fetch(url, { credentials: "same-origin", ...options, headers });
+    };
 
-  // Change event listener for 'perifereies' dropdown
-  perifereiesDropdown.addEventListener("change", async () => {
-    const selectedPerifereia = perifereiesDropdown.value;
-    nomosDropdown.innerHTML = '<option value="" selected></option>';
-    nomosDropdown.disabled = true;
+    // === Elements ===
+    const perifereiesDropdown = document.getElementById("perifereies");
+    const nomosDropdown       = document.getElementById("nomos");
+    const dhmosDropdown       = document.getElementById("dhmos");
+    const polhDropdown        = document.getElementById("polh");
+    const allUsersDropdown    = document.getElementById("selectedUsers");
 
-    if (selectedPerifereia) {
-      try {
-        const response = await fetch(
-          `/api/nomoi?perifereia=${selectedPerifereia}`
-        );
-        const data = await response.json();
+    const resetSelect = (el) => { el.innerHTML = '<option value="" selected></option>'; el.disabled = true; };
+    const enableSelect = (el) => { el.disabled = false; };
 
-        data.forEach((nomos) => {
-          const option = new Option(nomos.perigrafh, nomos.kodikos);
-          nomosDropdown.appendChild(option);
-        });
+    // Προαιρετικά: ακύρωση προηγούμενων fetch για να αποφεύγεις “γλιστρήματα” επιλογών
+    let controllers = { nomoi:null, dhmoi:null, poleis:null, users:null };
+    const newController = (key) => {
+        if (controllers[key]) controllers[key].abort();
+        controllers[key] = new AbortController();
+        return controllers[key].signal;
+    };
 
-        nomosDropdown.disabled = false;
-      } catch (error) {
-        console.error(error);
-      }
-    }
-  });
+    // === Loaders ===
+    const loadPerifereies = async () => {
+        resetSelect(perifereiesDropdown);
+        try {
+            await ensureCsrfToken();
+            const response = await apiFetch("/api/perifereies");
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            data.forEach((perifereia) => {
+                const option = new Option(perifereia.perigrafh, perifereia.kodikos);
+                perifereiesDropdown.appendChild(option);
+            });
+            enableSelect(perifereiesDropdown);
+        } catch (err) {
+            console.error("Αποτυχία φόρτωσης περιφερειών:", err);
+        }
+    };
 
-  // Change event listener for 'nomos' dropdown
-  nomosDropdown.addEventListener("change", async () => {
-    const selectedNomos = nomosDropdown.value;
-    dhmosDropdown.innerHTML = '<option value="" selected></option>';
-    dhmosDropdown.disabled = true;
+    perifereiesDropdown.addEventListener("change", async () => {
+        const selectedPerifereia = perifereiesDropdown.value;
+        resetSelect(nomosDropdown); resetSelect(dhmosDropdown); resetSelect(polhDropdown);
 
-    if (selectedNomos) {
-      try {
-        const response = await fetch(`/api/dhmoi?nomos=${selectedNomos}`);
-        const data = await response.json();
+        if (!selectedPerifereia) return;
+        try {
+            await ensureCsrfToken();
+            const url = `/api/nomoi?perifereia=${encodeURIComponent(selectedPerifereia)}`;
+            const response = await apiFetch(url, { signal: newController("nomoi") });
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            data.forEach((nomos) => {
+                const option = new Option(nomos.perigrafh, nomos.kodikos);
+                nomosDropdown.appendChild(option);
+            });
+            enableSelect(nomosDropdown);
+        } catch (err) {
+            if (err.name !== "AbortError") console.error("Αποτυχία φόρτωσης νομών:", err);
+        }
+    });
 
-        data.forEach((dhmos) => {
-          const option = new Option(dhmos.perigrafh, dhmos.kodikos);
-          dhmosDropdown.appendChild(option);
-        });
+    nomosDropdown.addEventListener("change", async () => {
+        const selectedNomos = nomosDropdown.value;
+        resetSelect(dhmosDropdown); resetSelect(polhDropdown);
 
-        dhmosDropdown.disabled = false;
-      } catch (error) {
-        console.error(error);
-      }
-    }
-  });
+        if (!selectedNomos) return;
+        try {
+            await ensureCsrfToken();
+            const url = `/api/dhmoi?nomos=${encodeURIComponent(selectedNomos)}`;
+            const response = await apiFetch(url, { signal: newController("dhmoi") });
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            data.forEach((dhmos) => {
+                const option = new Option(dhmos.perigrafh, dhmos.kodikos);
+                dhmosDropdown.appendChild(option);
+            });
+            enableSelect(dhmosDropdown);
+        } catch (err) {
+            if (err.name !== "AbortError") console.error("Αποτυχία φόρτωσης δήμων:", err);
+        }
+    });
 
-  // Change event listener for 'dhmos' dropdown
-  dhmosDropdown.addEventListener("change", async () => {
-    const selectedDhmos = dhmosDropdown.value;
-    polhDropdown.innerHTML = '<option value="" selected></option>';
-    polhDropdown.disabled = true;
+    dhmosDropdown.addEventListener("change", async () => {
+        const selectedDhmos = dhmosDropdown.value;
+        resetSelect(polhDropdown);
 
-    if (selectedDhmos) {
-      try {
-        const response = await fetch(`/api/poleis?dhmos=${selectedDhmos}`);
-        const data = await response.json();
+        if (!selectedDhmos) return;
+        try {
+            await ensureCsrfToken();
+            const url = `/api/poleis?dhmos=${encodeURIComponent(selectedDhmos)}`;
+            const response = await apiFetch(url, { signal: newController("poleis") });
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            data.forEach((polis) => {
+                const option = new Option(polis.perigrafh, polis.kodikos);
+                polhDropdown.appendChild(option);
+            });
+            enableSelect(polhDropdown);
+        } catch (err) {
+            if (err.name !== "AbortError") console.error("Αποτυχία φόρτωσης πόλεων:", err);
+        }
+    });
 
-        data.forEach((poleis) => {
-          const option = new Option(poleis.perigrafh, poleis.kodikos);
-          polhDropdown.appendChild(option);
-        });
+    const loadAllUsers = async () => {
+        try {
+            await ensureCsrfToken();
+            const response = await apiFetch("/api/allUser", { signal: newController("users") });
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            // προαιρετικά: καθάρισε πριν γεμίσεις
+            allUsersDropdown.innerHTML = "";
+            data.forEach((u) => {
+                // Χρησιμοποιούμε new Option ώστε να μπει σαν text, όχι HTML
+                const option = new Option(`${u.lastName} ${u.firstName}`, u._id);
+                allUsersDropdown.appendChild(option);
+            });
+        } catch (err) {
+            if (err.name !== "AbortError") console.error("Αποτυχία φόρτωσης χρηστών:", err);
+        }
+    };
 
-        polhDropdown.disabled = false;
-      } catch (error) {
-        console.error(error);
-      }
-    }
-  });
-
-  const loadAllUsers = async () => {
-    try {
-      const response = await fetch("/api/allUser");
-      const data = await response.json();
-      data.forEach((allusers) => {
-        const option = new Option(
-          allusers.lastName + " " + allusers.firstName, allusers._id
-        );
-        allUsersDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  loadPerifereies();
-  loadAllUsers();
+    // αρχικές φορτώσεις
+    loadPerifereies();
+    loadAllUsers();
 });

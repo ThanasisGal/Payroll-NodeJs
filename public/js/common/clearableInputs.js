@@ -1,50 +1,54 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // βρίσκουμε ΟΛΑ τα input type="text"
     document.querySelectorAll('input[type="text"]').forEach(input => {
         if (input.parentElement?.classList.contains('clearable-wrapper')) return;
 
-        /* --- φτιάχνουμε wrapper & button ---------------------------------- */
         const wrapper = document.createElement('span');
         wrapper.className = 'clearable-wrapper';
 
         const btn = document.createElement('span');
         btn.className = 'clear-btn';
-        btn.textContent = '×'; // αντί για innerHTML/&times;
+        btn.textContent = '×';
         btn.setAttribute('aria-label', 'Καθαρισμός πεδίου');
         btn.setAttribute('role', 'button');
 
-        // Τοποθετούμε το wrapper πριν το input
         input.insertAdjacentElement('beforebegin', wrapper);
-
-        // Μετακινούμε το input μέσα στο wrapper (όχι clone)
         wrapper.appendChild(input);
         wrapper.appendChild(btn);
 
-        /* --- helper: δείχνει/κρύβει το Χ χωρίς inline styles --------------- */
+        const isLocked = () => input.disabled || input.readOnly;
+
         const toggle = () => {
-            const visible = !!input.value;
+            const visible = !!input.value && !isLocked();
             btn.classList.toggle('is-visible', visible);
             btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
-            btn.tabIndex = visible ? 0 : -1; // μη εστιάζει όταν «κρυφό»
+            btn.tabIndex = visible ? 0 : -1;
+            btn.classList.toggle('is-locked', isLocked());
         };
-        toggle(); // αρχική κατάσταση
 
-        /* --- events -------------------------------------------------------- */
+        // keep visibility up-to-date
+        toggle();
+
         input.addEventListener('input', toggle);
+        input.addEventListener('change', toggle);
 
+        // ΔΕΝ καθαρίζει αν είναι disabled/readonly
         btn.addEventListener('click', () => {
+            if (isLocked()) return; 
             input.value = '';
             toggle();
-            input.focus(); // κρατάμε το focus στο πεδίο
-            input.dispatchEvent(new Event('input', { bubbles: true })); // ενημέρωσε listeners
+            input.focus();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
         });
 
-        // keyboard support (Enter/Space)
         btn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if ((e.key === 'Enter' || e.key === ' ') && !isLocked()) {
                 e.preventDefault();
                 btn.click();
             }
         });
+
+        // Αν αλλάξει δυναμικά disabled/readonly, ανανέωσε την κατάσταση του Χ
+        const mo = new MutationObserver(toggle);
+        mo.observe(input, { attributes: true, attributeFilter: ['disabled', 'readonly'] });
     });
 });

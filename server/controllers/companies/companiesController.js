@@ -328,6 +328,7 @@ class companiesController {
                 locals, 
                 data,
                 mode: 'add',
+                context: "company",
                 rec: {},          // <— κενό αντικείμενο για «Νέα» εταιρεία. Χρησιμοποιείται στο "Δραστηριότητες"
             });
         } catch (error) {
@@ -563,7 +564,7 @@ class companiesController {
             const teams = sessionUserTeam;
             
             if (formData.sfragida && formData.sfragida !== "") {
-                renameAndMoveImage(originalPath, company, formDataValues, teams);
+                await renameAndMoveImage(originalPath, company, formDataValues, teams);
             } else {
                 imagePath = '';
             }
@@ -683,6 +684,7 @@ class companiesController {
                 doys,
                 tameia,
                 mode   : "edit",
+                context: "company",
                 company: companyData,
                 rec    : companyData,   // alias για ευκολία
                 mimeType,
@@ -797,11 +799,16 @@ class companiesController {
         if (!formData.sfragida) {
             imagePath = '';
         } else {
-            renameAndMoveImage(originalPath, company, formDataValues, teams);
+            try {
+                await renameAndMoveImage(originalPath, company, formDataValues, teams);
+            } catch (error) {
+                imagePath = '';
+            }
+
         }
 
         if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
-            return res.json({ success: false, message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (μερικών ή όλων), <strong> στη σελίδα Διάφορα</strong>, στην που θα έχουν πρόσβαση στην εταιρεία` });
+            return res.json({ success: false, message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (τουλάχιστον 1), <strong> στη σελίδα Διάφορα</strong>, που θα έχουν πρόσβαση στην εταιρεία` });
         }
 
         const texnikosAsfaleiasKodikos = formData.kod_ta;

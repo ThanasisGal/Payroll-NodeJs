@@ -18,6 +18,9 @@
   --app-header-h: 56px;   
   --app-footer-h: 28px;   /* ύψος του footer της σελίδας σου (πρόσθεσε όσο είναι ακριβώς) */
   --logout-h: 48px;       /* ύψος της περιοχής του κουμπιού Αποσύνδεση */
+  --disabled-bg: #dbdbdb8a;
+  --disabled-text: #6c757d; /* muted */
+  --disabled-border: #bdbdbd;
   font-size: 1rem;
 }
 
@@ -372,7 +375,6 @@ small,
 .input-content {
   font-size: 0.875vw !important;
   font-weight: 600 !important;
-  /* color: #0000b3 !important; */
 }
 
 .input-content-regular {
@@ -385,6 +387,8 @@ small,
   font-size: 0.86vw !important;
   font-weight: 400 !important;
   line-height: 20px !important;
+  padding-left: 4 !important;
+  padding-right: 4 !important;
 }
 
 /* .selectpicker-dropdown-normal {
@@ -3246,7 +3250,7 @@ a[href] {
   line-height: 1.5;
   display: flex;
   align-items: center;
-  box-shadow: none;
+  box-shadow: none !important;
   padding: 0;
 }
 
@@ -3258,7 +3262,7 @@ select.tom-dropdown {
 
 .ts-wrapper.focus .tom-dropdown {
   border-color: #80bdff;                       /* ίδιο μπλε με το native select */
-  box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); /* το “glow” του bootstrap */
+  box-shadow: 0 0 0 .2rem rgba(0,123,255,.25); 
 }
 
 .ts-wrapper.focus .ts-control,
@@ -3286,10 +3290,40 @@ select.tom-dropdown {
   box-shadow: 0 0 0 .2rem rgba(0,123,255,.25);
 }
 
+.ts-wrapper.disabled .ts-control{
+  background-color: var(--disabled-bg) !important;
+  color: var(--disabled-text) !important;
+  /* border-color: var(--disabled-border) !important; */
+  /* border: 1px solid var(--disabled-border) !important; */
+  border: var(--bs-border-width) solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  box-shadow: none !important;
+  opacity: 1;               /* κρατάμε το opacity κανονικό */
+  cursor: not-allowed;
+}
+
+/* Κείμενο/placeholder μέσα στο control */
+.ts-wrapper.disabled .ts-control input{
+  background-color: transparent !important;
+  color: var(--disabled-text) !important;
+}
+
+/* Τα tags / selected items */
+.ts-wrapper.disabled .item{
+  color: var(--disabled-text) !important;
+}
+
+/* Προαιρετικά: κρύψε κουμπάκια remove/clear όταν είναι disabled */
+.ts-wrapper.disabled .remove,
+.ts-wrapper.disabled .clear-button{
+  pointer-events: none;
+  opacity: .5;
+}
+
 .ts-wrapper .ts-control {
   width: 100%;
   max-width: 100%;
-  border-color: #ced4da;   /* το γκρι του bootstrap */
+  border-color: #e2e3e5;   /* το γκρι του bootstrap */
 }
 
 .tom-dropdown .option {
@@ -3395,7 +3429,7 @@ select.tom-dropdown {
   font-size: .85vw;
   background: white !important;
   border: none;
-  box-shadow: none;
+  box-shadow: none !important;
   outline: none;
   color: #495057;
 }
@@ -3411,7 +3445,8 @@ select.tom-dropdown {
 ===================================== */
 .ts-dropdown { 
   border-radius: 0.375rem;
-  box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+  /* box-shadow: 0 .5rem 1rem rgba(0,0,0,.15); */
+  box-shadow: none !important;
   z-index: 1050;
   font-size: 0.875rem;
   overflow: visible;
@@ -3824,26 +3859,34 @@ select.tom-dropdown {
 .margin-top--2rem       { margin-top: -2rem; }
 
 .margin-left--1rem      { margin-left: -1rem !important; }
-.margin-left-0_75rem    { margin-left: 0.75rem; }
+.margin-left-0_75rem    { margin-left: 0.75rem !important; }
 .margin-left-1_5rem     { margin-left: 1.5rem; }
 
-.margin-left-percent-2  { margin-left: 2%; }
+.margin-left-percent-1  { margin-left: 1% !important; }
+.margin-left-percent-1_5  { margin-left: 1.5% !important; }
+.margin-left-percent-2  { margin-left: 2% !important; }
+.margin-left-percent-4  { margin-left: 4% !important; }
+.margin-left-percent-20 { margin-left: 20%; }
+
+/* .margin-bottom--0_3rem  { margin-bottom: -0.3rem !important;} */
+.margin-bottom--0_5rem  { margin-bottom: -0.5rem !important;}
 
 .padding-0              { padding: 0; }
-.padptop-8              { padding-top: 8px;}
+.padding-top-px-8       { padding-top: 8px;}
 
 .white-space-nowrap     { white-space: nowrap; }
 
 .width-percent-60       { width: 60%; }
 .width-percent-96       { width: 96%; }
+.width-percent-97       { width: 97%; }
 
 .width-rem-18_5         { width: 18.5rem; }
 
-.margin-left-percent-20 { margin-left: 20%; }
 
 .height-rem-3_5         { height: 3.5rem !important; }
 
 .height-vh-12           { height: 12vh !important; }
+.height-vh-48           { height: 48vh !important; }
 .height-vh-53           { height: 53vh !important; }
 .height-vh-58           { height: 58vh !important; }
 .height-vh-90           { height: 90vh !important; }
@@ -3933,6 +3976,7 @@ select.tom-dropdown {
 .font-size-px-23 { font-size: 23px; }
 .font-size-px-24 { font-size: 24px; }
 
+.font-size-vw-0_5  { font-size: 0.5vw; }
 .font-size-vw-0_65  { font-size: 0.65vw; }
 .font-size-vw-1  { font-size: 1vw; }
 .font-size-vw-2  { font-size: 2vw; }
@@ -3959,17 +4003,14 @@ select.tom-dropdown {
 .font-size-vw-23 { font-size: 23vw; }
 .font-size-vw-24 { font-size: 24vw; }
 
-.fsvw-0_5 { font-size: 0.5vw; }
+.font-size-rem-1_1 { font-size: 1.1rem; }
+
 .fsvw-0_7 { font-size: 0.7vw; }
 .fsvw-1_1 { font-size: 1.1vw; }
 .fsvw-1_3 { font-size: 1.3vw; }
 
-.fsrem-1_1 { font-size: 1.1rem; }
-
 .display-none { display: none;}
-.border-radius-10 { border-radius: 10px; }
-
-.mlperc { margin-left: 1% }
+.border-radius-10 { border-radius: 10px !important; }
 
 .overflow-hidden { overflow: hidden;}
 .overflow-visible { overflow: visible; }
@@ -4124,3 +4165,26 @@ select.tom-dropdown {
 .header-app-style-user:hover { color: #ffffff; font-weight: 700; }
 
 .preview-image-style { width: 12.5rem; height: 6.25rem; display: none; }
+
+.clearable-wrapper {
+  position: relative;
+  display: inline-block;
+}
+.clearable-wrapper .clear-btn {
+  position: absolute;
+  right: .5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;       /* default: όχι κλικ */
+  user-select: none;
+}
+.clearable-wrapper .clear-btn.is-visible {
+  opacity: 1;
+  pointer-events: auto;       /* γίνεται clickable μόνο όταν είναι ορατό */
+}
+.clearable-wrapper .clear-btn.is-locked {
+  opacity: 0;                 /* ή άφησέ το χαμηλά: 0.4 αν θες να φαίνεται disabled */
+  pointer-events: none;
+}

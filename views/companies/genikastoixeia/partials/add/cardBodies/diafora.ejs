@@ -44,14 +44,7 @@
             <label for="keimeno_exoflhshs" class="col-form-label label-font-size">Κείμενο Εξοφλητικής Απόδειξης</label>
         </div>
         <div class="col-8">
-            <textarea
-                class="form-control textarea-content use-default-enter height-vh-12"
-                name="keimeno_exoflhshs"
-                id="keimeno_exoflhshs"
-                cols="30"
-                rows="4">
-                Έλεγξα τις αποδοχές και τις κρατήσεις της παρούσας ατομικής εκκαθάρισης και αφού διαπίστωσα ότι είναι οι πραγματικές, αποδέχομαι χωρίς καμία επιφύλαξη την παρούσα ατομική εκκαθάριση μισθοδοσίας. Μετά την καταβολή του παραπάνω αναγραφόμενου πληρωτέου ποσού (μέσω Τράπεζας και στο ΙΒΑΝ που έχω δηλώσει στην εταιρεία / επιχείρηση), δεν έχω καμία άλλη αξίωση από την προαναφερόμενη εταιρεία / επιχείρηση.
-            </textarea>
+            <textarea class="form-control textarea-content use-default-enter height-vh-12" name="keimeno_exoflhshs" id="keimeno_exoflhshs" cols="30" rows="4">Έλεγξα τις αποδοχές και τις κρατήσεις της παρούσας ατομικής εκκαθάρισης και αφού διαπίστωσα ότι είναι οι πραγματικές, αποδέχομαι χωρίς καμία επιφύλαξη την παρούσα ατομική εκκαθάριση μισθοδοσίας. Μετά την καταβολή του παραπάνω αναγραφόμενου πληρωτέου ποσού (μέσω Τράπεζας και στο ΙΒΑΝ που έχω δηλώσει στην εταιρεία / επιχείρηση), δεν έχω καμία άλλη αξίωση από την προαναφερόμενη εταιρεία / επιχείρηση.</textarea>
         </div>
     </div>
 
@@ -87,7 +80,19 @@
 
         <!-- <form id="upload-form" enctype="multipart/form-data"> -->
         <div class="col-6 left-align">
-            <button type="button" id="customButton" class="btn btn-brown rounded-4 buttons-content w-40"><i class="bi bi-cloud-arrow-up"></i> Επιλέξτε Αρχείο</button>
+            <button 
+                type="button" 
+                id="customButton" 
+                class="btn btn-brown rounded-4 buttons-content w-40"
+                title="Πριν επιλέξετε την εικόνα βεβαιωθείτε ότι την έχετε προηγουμένως αποθηκεύσει σαν sfragida.png στον φάκελο C:\stamps και μετά αναζητήστε την στον προαναφερόμενο φάκελο και επιλέξτε την..."
+                data-bs-toggle="tooltip"
+                data-bs-placement="bottom"
+                data-bs-container="body"
+                data-tooltip-max-width="15vw">
+                <i class="bi bi-cloud-arrow-up"></i> 
+                Επιλέξτε Αρχείο
+            </button>
+
             <!-- Πραγματικό input πεδίο, κρυμμένο -->
             <label for="sfragida" class="sr-only">Ανέβασμα σφραγίδας εταιρείας</label>
             <input type="file" id="sfragida" name="sfragida" accept="image/*" class="display-none">

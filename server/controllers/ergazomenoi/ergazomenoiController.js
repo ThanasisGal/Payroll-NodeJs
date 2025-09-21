@@ -106,7 +106,6 @@ class ergazomenoiController {
   };
 
   static editErgazomenoiForm = async (req, res) => {
-    const messages = await req.flash("info");
     const locals = {
       title: "Συντήρηση Στοιχείων Εργαζομένων",
       description: "Web Payroll System",
@@ -127,7 +126,6 @@ class ergazomenoiController {
 
       res.render("ergazomenoi/ergazomenoi/edit", {
         locals,
-        messages,
         perifereies,
         genikesParametroi,
         istorikoData,
@@ -140,7 +138,6 @@ class ergazomenoiController {
   };
 
   static getIstorikoData = async (req, res) => {
-    const messages = await req.flash("info");
     const locals = {
       title: "Συντήρηση Στοιχείων Εργαζομένων",
       description: "Web Payroll System",
