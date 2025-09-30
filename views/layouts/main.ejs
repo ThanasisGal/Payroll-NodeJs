@@ -41,7 +41,11 @@
         <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
     </head>
 
-    <body data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>" class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+    <body
+        data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>"
+        data-context="<%= typeof context !== 'undefined' ? context : '' %>"
+        class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+
         <div class="loader-container">
             <div class="loader"></div>
             <div class="loader-text">Παρακαλώ περιμένετε...</div>

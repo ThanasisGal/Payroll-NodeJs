@@ -41,16 +41,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.preventDefault();
                 e.stopPropagation();
                 await Swal.fire({
-                title: "Καμία επιλογή",
-                html: `Παρακαλώ επιλέξτε πρώτα μία εταιρεία από τον πίνακα.`,
-                icon: "info",
-                showConfirmButton: true,
-                confirmButtonText: "Κλείσιμο",
-                customClass: {
-                    title: "custom-title",
-                    popup: "custom-swal-popup",
-                    confirmButton: "class-info custom-confirm-button custom-swal-button",
-                },
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Καμία επιλογή",
+                    html: `Παρακαλώ επιλέξτε πρώτα μία εταιρεία από τον πίνακα.`,
+                    icon: "info",
+                    showConfirmButton: true,
+                    confirmButtonText: "Κλείσιμο",
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                        confirmButton: "class-info custom-confirm-button custom-swal-button",
+                    },
                 });
                 return;
             }
@@ -87,6 +89,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (!selectedRowId) {
                 await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     title: "Καμία επιλογή",
                     html: `Παρακαλώ επιλέξτε πρώτα μία εταιρεία από τον πίνακα.`,
                     icon: "info",
@@ -102,6 +106,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             const result = await Swal.fire({
+                backdrop: false,            // overlay
+                allowOutsideClick: false,
                 title: "Είστε σίγουρος/η;",
                 html: `ΠΡΟΣΟΧΗ!<br>Δεν θα μπορείτε να αναιρέσετε αυτή την ενέργεια.
                     Με τη διαγραφή της εταιρείας θα διαγραφούν (από όλα τα αρχεία) οι εγγραφές που την αφορούν.`,
@@ -112,10 +118,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 confirmButtonText: "Διαγραφή",
                 cancelButtonText: "Ακύρωση",
                 customClass: {
-                title: "custom-title",
-                popup: "custom-swal-popup",
-                confirmButton: "class-error custom-confirm-button custom-swal-button",
-                cancelButton: "custom-cancel-button custom-swal-button",
+                    title: "custom-title",
+                    popup: "custom-swal-popup",
+                    confirmButton: "class-error custom-confirm-button custom-swal-button",
+                    cancelButton: "custom-cancel-button custom-swal-button",
                 },
                 didOpen: () => Swal.getCancelButton()?.focus(),
             });
@@ -138,6 +144,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 // auto-follow redirect
                 if (resp.redirected && resp.url) {
                     await Swal.fire({
+                        backdrop: false,            // overlay
+                        allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
                         timer: 1200,
                         icon: "success",
@@ -156,6 +164,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 const loc = resp.headers.get("Location") || resp.headers.get("location");
                 if (loc) {
                     await Swal.fire({
+                        backdrop: false,            // overlay
+                        allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
                         timer: 1200,
                         icon: "success",
@@ -180,6 +190,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 // 204 No Content
                 if (resp.status === 204) {
                     await Swal.fire({
+                        backdrop: false,            // overlay
+                        allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
                         timer: 1200,
                         icon: "success",
@@ -202,6 +214,8 @@ document.addEventListener("DOMContentLoaded", function () {
                         throw new Error(`HTTP ${resp.status} / success=${data?.success}`);
                     }
                     await Swal.fire({
+                        backdrop: false,            // overlay
+                        allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
                         timer: 1200,
                         icon: "success",
@@ -218,6 +232,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Άλλος content-type αλλά OK (π.χ. HTML)
                 if (resp.ok) {
                     await Swal.fire({
+                        backdrop: false,            // overlay
+                        allowOutsideClick: false,
                         title: "Επιτυχής διαγραφή",
                         timer: 1200,
                         icon: "success",
@@ -235,6 +251,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             } catch (error) {
                 await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "error",
                     title: "Σφάλμα κατά τη διαγραφή",
                     html: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>«Επικοινωνία»</strong>.<br><small>${String(error?.message || error)}</small>`,

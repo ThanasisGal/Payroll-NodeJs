@@ -1,668 +1,765 @@
-<div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
-      </ul>
-    </div>
+<div class="tadded-container margin-top-1rem">
+    <div class="container-fluid height-vh-100 padding-0">
+        
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius">
+        <div class="sections margin-top-1rem">
+            <section class="sel_1_section visible" data-section="">
+                <div>
+                    <form class="formRadius">
 
-            <div class="card z-depth-5" style="height: 79vh;">
+                        <%- include('../../partials/_csrfField') %>
 
-              <div class="card-header">
-                <label class="text-center headers-content">
-                  Συντήρηση Στοιχείων Νομίμων Εκπροσώπων
-                </label>
-              </div>
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
 
-              <div class="card-body" style="background-color: #ffffff;" >
-                <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
-                <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
-                <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
-                <input type="hidden" name="nomimosEkprosoposId" id="nomimosEkprosoposId" class="form-control" value="<%= nomimosEkprosopos._id %>" />
-                <input type="hidden" name="nomimosEkprosoposNomos" id="nomimosEkprosoposNomos" class="form-control" value="<%= nomimosEkprosopos.nomos %>" />
-                <input type="hidden" name="nomimosEkprosoposDhmos" id="nomimosEkprosoposDhmos" class="form-control" value="<%= nomimosEkprosopos.dhmos %>" />
-                <input type="hidden" name="nomimosEkprosoposPolh" id="nomimosEkprosoposPolh" class="form-control" value="<%= nomimosEkprosopos.polh %>" />
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content">                  Συντήρηση Στοιχείων Νομίμων Εκπροσώπων
+                                </label>
+                            </div>
 
-                <div class="row form-group g-3 align-items-center">
-                  <div class="col-1-5 right-align">
-                    <label class="col-form-label label-font-size">
-                      Επιλεγμένη Εταιρεία
-                    </label>
-                  </div>
-                  <div
-                    class="col-8 left-align"
-                    style="font-size: 1rem; color: #1f6d00">
-                    
-                    <label class="col-form-label field-required">
-                      <% if (company && company.kod && company.kod.length > 0) { %> 
-                        <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" + company.firstname %>
-                      <% } %>
-                    </label>
-                  </div>
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody">
+                                <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
+                                <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
+                                <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+                                <input type="hidden" name="nomimosEkprosoposId" id="nomimosEkprosoposId" class="form-control" value="<%= nomimosEkprosopos._id %>" />
+                                <input type="hidden" name="nomimosEkprosoposNomos" id="nomimosEkprosoposNomos" class="form-control" value="<%= nomimosEkprosopos.nomos %>" />
+                                <input type="hidden" name="nomimosEkprosoposDhmos" id="nomimosEkprosoposDhmos" class="form-control" value="<%= nomimosEkprosopos.dhmos %>" />
+                                <input type="hidden" name="nomimosEkprosoposPolh" id="nomimosEkprosoposPolh" class="form-control" value="<%= nomimosEkprosopos.polh %>" />
 
-                  <div class="col-1-5 right-align">
-                    <label class="col-form-label label-font-size"
-                      >Κωδ.Νομ.Εκπροσώπου
-                    </label>
-                  </div>
 
-                  <div class="col-1">
-                    <input
-                      type="text"
-                      name="kodikos"
-                      id="kodikos"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.kodikos %>"
-                      readonly
-                    />
-                  </div>
+
+
+
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="col-1-5 right-align">
+                                        <label class="col-form-label label-font-size">
+                                            Επιλεγμένη Εταιρεία
+                                        </label>
+                                    </div>
+                                    <div class="col-8 left-align font-size-rem-1_1 cgreen">
+                                        <label>
+                                            <% if (company && company.kod && company.kod.length > 0) { %>
+                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" + company.firstname %>
+                                            <% } %>
+                                        </label>
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label class="col-form-label label-font-size">
+                                            Κωδ.Νομ.Εκπροσώπου
+                                        </label>
+                                    </div>
+
+                                    <div class="col-1">
+                                        <input
+                                            type="text"
+                                            name="kodikos"
+                                            id="kodikos"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.kodikos %>"
+                                            readonly
+                                        />
+                                    </div>
+                                </div>
+
+                                <hr class="division"></hr>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+
+                                    <div class="col-1-5 right-align">
+                                        <label 
+                                            for="afm_ekprosopoy" class="col-form-label label-font-size field-required">
+                                            ΑΦΜ
+                                        </label>
+                                    </div>
+                                    <div class="col-1-5">
+                                        <input 
+                                            type="text" 
+                                            name="afm" 
+                                            id="afm_ekprosopoy" 
+                                            class="form-control input-contents" 
+                                            value="<%= nomimosEkprosopos.afm %>"
+                                            readonly
+                                        />
+                                    </div>
+                                    
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="nomiko_prosopo"
+                                            class="col-form-label label-font-size">
+                                            Νομικό Πρόσωπο
+                                        </label>
+                                    </div>
+                                    <div class="col-1 left-align checkbox-flex-center">
+                                        <input 
+                                            class="form-check-input custom-checkbox checkbox-class" 
+                                            type="checkbox"
+                                            id="nomiko_prosopo"
+                                            name="nomiko_prosopo"<%= nomimosEkprosopos.nomiko_prosopo ? 'checked' : '' %>
+                                            value=""
+                                        />
+                                        <label
+                                            for="nomiko_prosopo"
+                                            id="label-nomiko_prosopo"
+                                            class="margin-left-0_75rem fw600">
+                                            ΟΧΙ
+                                        </label>
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="nomikhmorfh"
+                                            class="col-form-label label-font-size">
+                                            Νομική Μορφή
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="hidden"
+                                        name="nomikhmorfh_stathera"
+                                        id="nomikhmorfh_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= (nomimosEkprosopos && nomimosEkprosopos.nomikh_morfh)
+                                            ? String(nomimosEkprosopos.nomikh_morfh)
+                                            : String(safe('nomikhmorfh_stathera')) %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
+                                        <select
+                                            id="nomikhmorfh"
+                                            name="nomikhmorfh"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Νομική Μορφή"
+                                            data-api="/api/dropdown/nomikesMorfes"
+                                            single
+                                            data-target-input="<%= `nomikhmorfh_stathera` %>"
+                                            data-preselect="<%= `nomikhmorfh_stathera` %>"
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Νομικής Μορφής"
+                                            data-depends-on="nomiko_prosopo"
+                                            data-enable-if-checked="true">
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="eponymia"
+                                            class="col-form-label label-font-size field-required">
+                                                Επώνυμο/μία
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="eponymia"
+                                            id="eponymia"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.eponymia %>"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                        for="onoma"
+                                        class="col-form-label label-font-size">
+                                            Όνομα
+                                        </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                        type="text"
+                                        name="onoma"
+                                        id="onoma"
+                                        class="form-control input-contents"
+                                        value="<%= nomimosEkprosopos.onoma %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="eponymo_patera"
+                                            class="col-form-label label-font-size">
+                                                Επώνυμο Πατέρα
+                                            </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="eponymo_patera"
+                                            id="eponymo_patera"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.eponymo_patera %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="onoma_patera"
+                                            class="col-form-label label-font-size">
+                                                Όνομα Πατέρα
+                                        </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="onoma_patera"
+                                            id="onoma_patera"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.onoma_patera %>"
+                                            />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="onoma_mhteras"
+                                            class="col-form-label label-font-size">
+                                                Όνομα Μητέρας
+                                            </label>
+                                    </div>
+
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="onoma_mhteras"
+                                            id="onoma_mhteras"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.onoma_mhteras %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="eponymo_syzygoy"
+                                            class="col-form-label label-font-size">
+                                                Επώνυμο Συζύγου
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="eponymo_syzygoy"
+                                            id="eponymo_syzygoy"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.eponymo_syzygoy %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="onoma_syzygoy"
+                                            class="col-form-label label-font-size">
+                                                Όνομα Συζύγου
+                                            </label>
+                                    </div>
+                                    <div class="col-3">
+                                        <input
+                                            type="text"
+                                            name="onoma_syzygoy"
+                                            id="onoma_syzygoy"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.onoma_syzygoy %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="topos_gennhshs"
+                                            class="col-form-label label-font-size">
+                                            Τόπος Γέννησης
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="topos_gennhshs"
+                                            id="topos_gennhshs"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.topos_gennhshs %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="hmnia_gennhshs"
+                                            class="col-form-label label-font-size">
+                                            Ημ/νία Γέννησης
+                                        </label>
+                                    </div>
+
+                                    <% const dateForInput = d => d ? new Date(d).toISOString().slice(0,10) : '' ; %>
+
+                                    <div class="col-2">
+                                        <input
+                                            type="date"
+                                            name="hmnia_gennhshs"
+                                            id="hmnia_gennhshs"
+                                            class="date-control"
+                                            value="<%= dateForInput(nomimosEkprosopos.hmnia_gennhshs) %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label 
+                                            for="odos" 
+                                            class="col-form-label label-font-size">
+                                            Οδός
+                                        </label>
+                                    </div>
+                                    <div class="col-5">
+                                        <input
+                                            type="text"
+                                            name="odos"
+                                            id="odos"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.odos %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label for="arithmos" class="col-form-label label-font-size">
+                                        Αριθμός
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="arithmos"
+                                            id="arithmos"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.arithmos %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-1 right-align">
+                                        <label for="tk" class="col-form-label label-font-size">
+                                        Τ.Κ.
+                                        </label>
+                                    </div>
+                                    <div class="col-1">
+                                        <input
+                                            type="text"
+                                            name="tk"
+                                            id="tk"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.tk %>"
+                                            maxlength="5"
+                                            pattern="[0-9]{1,}"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center field-required mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="perifereies"
+                                            class="col-form-label label-font-size">
+                                            Περιφέρεια
+                                        </label>
+                                    </div>
+
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="perifereies"
+                                            id="perifereies">
+                                            <% perifereies.forEach(function(perifereia) { %> 
+                                                <option 
+                                                    value="<%= perifereia.kodikos %>"
+                                                    <% if(perifereia.kodikos == nomimosEkprosopos.perifereia) { %>
+                                                        selected
+                                                    <% } %> >
+                                                    <%= perifereia.perigrafh %>
+                                                </option>
+                                            <% }); %>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="nomos"
+                                            class="col-form-label label-font-size field-required">
+                                            Περιφ. Ενότητα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="nomos"
+                                            id="nomos"
+                                            style="font-size: 1vw"
+                                            required>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="dhmos"
+                                            class="col-form-label label-font-size field-required">
+                                            Δημοτ. Ενότητα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="dhmos"
+                                            id="dhmos"
+                                            style="font-size: 1vw"
+                                            required>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="polh"
+                                            class="col-form-label label-font-size field-required">
+                                            Δημοτ.Διαμέρισμα
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <select
+                                            class="form-select selectpicker-dropdown-normal"
+                                            data-live-search="true"
+                                            name="polh"
+                                            id="polh"
+                                            style="font-size: 1vw"
+                                            required>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label for="thlefono" class="col-form-label label-font-size">
+                                        Τηλέφωνο
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="thlefono"
+                                            id="thlefono"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.thlefono %>"
+                                            maxlength="10"
+                                            pattern="[0-9]{1,}"
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label for="email" class="col-form-label label-font-size">
+                                        e-Mail
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            id="email"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.email %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="taytothtaEkprosopoy"
+                                            class="col-form-label label-font-size">
+                                            ΤύποςΤαυτότητας
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="hidden"
+                                        name="taytothta_stathera"
+                                        id="taytothta_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= (nomimosEkprosopos && nomimosEkprosopos.typos_taytothtas)
+                                            ? String(nomimosEkprosopos.typos_taytothtas)
+                                            : String(safe('taytothta_stathera')) %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-3-75">
+                                        <select
+                                            id="taytothtaEkprosopoy"
+                                            name="taytothtaEkprosopoy"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Νομιμοποιητικά έγγραφα"
+                                            data-api="/api/dropdown/nomimoiEkprosopoi/taytothta"
+                                            single
+                                            data-target-input=<%= `taytothta_stathera` %>
+                                            data-preselect=<%= `taytothta_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="6"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Τύπων Νομιμοποιητικών Εγγράφων">
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1"></div>
+
+                                    <div class="col-1-75 right-align">
+                                        <label
+                                            for="arithmos_taytothtas"
+                                            class="col-form-label label-font-size">
+                                            Αριθμός Ταυτ/τας
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="arithmos_taytothtas"
+                                            id="arithmos_taytothtas"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.arithmos_taytothtas %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="hmnia_ekdoshs"
+                                            class="col-form-label label-font-size">
+                                            Ημ/νία Έκδοσης
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="date"
+                                            name="hmnia_ekdoshs"
+                                            id="hmnia_ekdoshs"
+                                            class="date-control"
+                                            value="<%= dateForInput(nomimosEkprosopos.hmnia_ekdoshs) %>"
+                                        />
+                                    </div>
+
+                                    <div class="col-3"></div>
+
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="arxh_ekdoshs"
+                                            class="col-form-label label-font-size">
+                                            Αρχή Έκδοσης
+                                        </label>
+                                    </div>
+                                    <div class="col-4">
+                                        <input
+                                            type="text"
+                                            name="arxh_ekdoshs"
+                                            id="arxh_ekdoshs"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.arxh_ekdoshs %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="doyEkprosopoy"
+                                            class="col-form-label label-font-size">
+                                            Δ.Ο.Υ.
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="hidden"
+                                        name="doy_stathera"
+                                        id="doy_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= (nomimosEkprosopos && nomimosEkprosopos.doy)
+                                            ? String(nomimosEkprosopos.doy)
+                                            : String(safe('doy_stathera')) %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-4-75">
+                                        <select
+                                            id="doyEkprosopoy"
+                                            name="doyEkprosopoy"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Δ.Ο.Υ. Εκπροσώπου"
+                                            data-api="/api/dropdown/doy"
+                                            single
+                                            data-target-input=<%= `doy_stathera` %>
+                                            data-preselect=<%= `doy_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Δ.Ο.Υ. Εκπροσώπου">
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1-75 right-align">
+                                        <label
+                                            for="ame"
+                                            class="col-form-label label-font-size">
+                                            Α.Μ.Ε.
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="text"
+                                            name="ame"
+                                            id="ame"
+                                            class="form-control input-contents"
+                                            value="<%= nomimosEkprosopos.ame %>"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-2">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="idiothtaEkprosopoy"
+                                            class="col-form-label label-font-size">
+                                            Ιδιότητα
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="hidden"
+                                        name="idiothta_stathera"
+                                        id="idiothta_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= (nomimosEkprosopos && nomimosEkprosopos.idiothta)
+                                            ? String(nomimosEkprosopos.idiothta)
+                                            : String(safe('idiothta_stathera')) %>"
+                                        readonly
+                                    />
+
+                                    <div class="col-4-75">
+                                        <select
+                                            id="idiothtaEkprosopoy"
+                                            name="idiothtaEkprosopoy"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Ιδιότητα Εκπροσώπου"
+                                            data-api="/api/dropdown/nomimoiEkprosopoi/idiothta"
+                                            single
+                                            data-target-input=<%= `idiothta_stathera` %>
+                                            data-preselect=<%= `idiothta_stathera` %>
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Ιδιότητας Εκπροσώπου">
+                                        </select>
+                                    </div>
+
+                                    <div class="col-1-75 right-align">
+                                        <label
+                                            for="hmnia_enarjhs_idiothtas"
+                                            class="col-form-label label-font-size">
+                                            Έναρξης Ιδιότητας
+                                        </label>
+                                    </div>
+                                    <div class="col-2">
+                                        <input
+                                            type="date"
+                                            name="hmnia_enarjhs_idiothtas"
+                                            id="hmnia_enarjhs_idiothtas"
+                                            class="date-control"
+                                            value="<%= dateForInput(nomimosEkprosopos.hmnia_enarjhs_idiothtas) %>"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-footer mt-auto cardFooter">
+                                <div class="d-inline-block d-flex cardFooter01">
+                                    <button
+                                        type="button"
+                                        class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton">
+                                        <i class="bi bi-floppy"></i> Ενημέρωση
+                                    </button>
+                                    <a
+                                        class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
+                                        href="/companies/nomimoi_ekprosopoi"
+                                        ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-
-                <hr class="division"></hr>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="nomiko_prosopo"
-                      class="col-form-label label-font-size">
-                      Νομικό Πρόσωπο
-                    </label>
-                  </div>
-                  <div class="col-1 left-align checkbox-flex-center">
-                    <input class="form-check-input custom-checkbox checkbox-class" 
-                      type="checkbox"
-                      id="nomiko_prosopo"
-                      name="nomiko_prosopo"<%= nomimosEkprosopos.nomiko_prosopo ? 'checked' : '' %>
-                      value=""
-                    />
-                    <label
-                      for="nomiko_prosopo"
-                      id="label-nomiko_prosopo"
-                      style="margin-left: 0.75rem; font-size: 0.875vw; font-weight: 600">
-                      ΟΧΙ
-                    </label>
-                  </div>
-
-                  <div class="col-4"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="nomikh_morfh"
-                      class="col-form-label label-font-size-smaller">
-                      Νομική Μορφή
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      data-toggle="nomikh_morfh"
-                      name="nomikh_morfh"
-                      id="nomikh_morfh"
-                      data-selected="<%= nomimosEkprosopos.nomikh_morfh %>" >
-                    </select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymia"
-                      class="col-form-label label-font-size field-required">
-                        Επώνυμο/μία
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="eponymia"
-                      id="eponymia"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.eponymia %>"
-                      required
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="onoma"
-                      class="col-form-label label-font-size">
-                        Όνομα
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="onoma"
-                      id="onoma"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.onoma %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymo_patera"
-                      class="col-form-label label-font-size">
-                        Επώνυμο Πατέρα
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="eponymo_patera"
-                      id="eponymo_patera"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.eponymo_patera %>"
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="onoma_patera"
-                      class="col-form-label label-font-size">
-                        Όνομα Πατέρα
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="onoma_patera"
-                      id="onoma_patera"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.onoma_patera %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="onoma_mhteras"
-                      class="col-form-label label-font-size">
-                        Όνομα Μητέρας
-                    </label>
-                  </div>
-
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="onoma_mhteras"
-                      id="onoma_mhteras"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.onoma_mhteras %>"
-                    />
-                  </div>
-
-                  <div class="col-2"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label for="afm" class="col-form-label label-font-size field-required">
-                      ΑΦΜ
-                    </label>
-                  </div>
-                  <div class="col-1-5">
-                    <input type="text" 
-                      name="afm" 
-                      id="afm" 
-                      class="form-control input-contents" 
-                      value="<%= nomimosEkprosopos.afm %>" 
-                      maxlength="9" 
-                      pattern="[0-9]{1,}" 
-                    />
-                  </div>
-              
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="eponymo_syzygoy"
-                      class="col-form-label label-font-size">
-                        Επώνυμο Συζύγου
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="eponymo_syzygoy"
-                      id="eponymo_syzygoy"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.eponymo_syzygoy %>"
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="onoma_syzygoy"
-                      class="col-form-label label-font-size">
-                        Όνομα Συζύγου
-                    </label>
-                  </div>
-                  <div class="col-3">
-                    <input
-                      type="text"
-                      name="onoma_syzygoy"
-                      id="onoma_syzygoy"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.onoma_syzygoy %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="topos_gennhshs"
-                      class="col-form-label label-font-size">
-                      Τόπος Γέννησης
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="topos_gennhshs"
-                      id="topos_gennhshs"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.topos_gennhshs %>"
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="hmnia_gennhshs"
-                      class="col-form-label label-font-size">
-                      Ημ/νία Γέννησης
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="date"
-                      name="hmnia_gennhshs"
-                      id="hmnia_gennhshs"
-                      class="date-control"
-                      value="<%= nomimosEkprosopos.hmnia_gennhshs %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="odos" class="col-form-label label-font-size">
-                      Οδός
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <input
-                      type="text"
-                      name="odos"
-                      id="odos"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.odos %>"
-                    />
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label for="arithmos" class="col-form-label label-font-size">
-                      Αριθμός
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="arithmos"
-                      id="arithmos"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.arithmos %>"
-                    />
-                  </div>
-
-                  <div class="col-1 right-align">
-                    <label for="tk" class="col-form-label label-font-size">
-                      Τ.Κ.
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input
-                      type="text"
-                      name="tk"
-                      id="tk"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.tk %>"
-                      maxlength="5"
-                      pattern="[0-9]{1,}"
-                    />
-                  </div>
-                </div>
-
-                <div
-                  class="row form-group g-3 align-items-center field-required mb-1"
-                >
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="perifereies"
-                      class="col-form-label label-font-size">
-                        Περιφέρεια
-                    </label>
-                  </div>
-
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="perifereies"
-                      id="perifereies">
-                      <% perifereies.forEach(function(perifereia) { %> 
-                        <option value="<%= perifereia.kodikos %>"
-                          <% if(perifereia.kodikos == nomimosEkprosopos.perifereia) { %>
-                            selected
-                          <% } %> >
-                          <%= perifereia.perigrafh %>
-                        </option>
-                      <% }); %>
-                    </select>
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="nomos"
-                      class="col-form-label label-font-size field-required">
-                      Περιφ. Ενότητα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="nomos"
-                      id="nomos"
-                      style="font-size: 1vw"
-                      required>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="dhmos"
-                      class="col-form-label label-font-size field-required">
-                        Δημοτ. Ενότητα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="dhmos"
-                      id="dhmos"
-                      style="font-size: 1vw"
-                      required>
-                    </select>
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="polh"
-                      class="col-form-label label-font-size field-required">
-                      Δημοτ.Διαμέρισμα
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="polh"
-                      id="polh"
-                      style="font-size: 1vw"
-                      required>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="thlefono" class="col-form-label label-font-size">
-                      Τηλέφωνο
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="thlefono"
-                      id="thlefono"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.thlefono %>"
-                      maxlength="10"
-                      pattern="[0-9]{1,}"
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label for="email" class="col-form-label label-font-size">
-                      e-Mail
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.email %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="typos_taytothtas"
-                      class="col-form-label label-font-size">
-                        Τύπος Ταυτότητας
-                    </label>
-                  </div>
-
-                  <div class="col-4">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="typos_taytothtas"
-                      id="typos_taytothtas"
-                      data-selected="<%= nomimosEkprosopos.typos_taytothtas %>" >
-                    </select>
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="arithmos_taytothtas"
-                      class="col-form-label label-font-size">
-                      Αριθμός Ταυτ/τας
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="arithmos_taytothtas"
-                      id="arithmos_taytothtas"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.arithmos_taytothtas %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="hmnia_ekdoshs"
-                      class="col-form-label label-font-size">
-                      Ημ/νία Έκδοσης
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="date"
-                      name="hmnia_ekdoshs"
-                      id="hmnia_ekdoshs"
-                      class="date-control"
-                      value="<%= nomimosEkprosopos.hmnia_ekdoshs %>"
-                    />
-                  </div>
-
-                  <div class="col-3"></div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="arxh_ekdoshs"
-                      class="col-form-label label-font-size">
-                      Αρχή Έκδοσης
-                    </label>
-                  </div>
-                  <div class="col-4">
-                    <input
-                      type="text"
-                      name="arxh_ekdoshs"
-                      id="arxh_ekdoshs"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.arxh_ekdoshs %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="doy"
-                      class="col-form-label label-font-size">
-                        Δ.Ο.Υ.
-                    </label>
-                  </div>
-
-                  <div class="col-5">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="doy"
-                      id="doy"
-                      data-selected="<%= nomimosEkprosopos.doy %>" >
-                    </select>
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="ame"
-                      class="col-form-label label-font-size">
-                      Α.Μ.Ε.
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="text"
-                      name="ame"
-                      id="ame"
-                      class="form-control input-contents"
-                      value="<%= nomimosEkprosopos.ame %>"
-                    />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center mb-2">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="idiothta"
-                      class="col-form-label label-font-size">
-                      Ιδιότητα
-                    </label>
-                  </div>
-                  <div class="col-5">
-                    <select
-                      class="form-select selectpicker-dropdown-normal"
-                      data-live-search="true"
-                      name="idiothta"
-                      id="idiothta"
-                      data-selected="<%= nomimosEkprosopos.idiothta %>" >
-                    </select>
-                  </div>
-
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="hmnia_enarjhs_idiothtas"
-                      class="col-form-label label-font-size">
-                      Έναρξης Ιδιότητας
-                    </label>
-                  </div>
-                  <div class="col-2">
-                    <input
-                      type="date"
-                      name="hmnia_enarjhs_idiothtas"
-                      id="hmnia_enarjhs_idiothtas"
-                      class="date-control"
-                      value="<%= nomimosEkprosopos.hmnia_enarjhs_idiothtas %>"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div
-                class="card-footer mt-auto"
-              >
-                <div
-                  class="d-inline-block d-flex"
-                  style="
-                    margin-top: -0.5rem !important;
-                    margin-bottom: -1rem !important;
-                    margin-left: 10px !important;
-                    margin-right: 10px !important;
-                    justify-content: space-around;
-                  "
-                >
-                  <button
-                    type="button"
-                    class="btn btn-brown rounded-4 buttons-contents mt-2 w-20 submitButton"
-                  >
-                    <i class="bi bi-floppy"></i> Αποθήκευση
-                  </button>
-                  <a
-                    class="btn btn-brown rounded-4 buttons-contents mt-2 w-20"
-                    href="/companies/nomimoi_ekprosopoi"
-                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                  </a>
-                </div>
-              </div>
-            </div>
-          </form>
+            </section>
         </div>
-      </section>
     </div>
-    <% if (process.env.NODE_ENV === 'production') { %>
-      <script nonce="<%= nonce %>" src="/static/min.js/companies/nomimoiekprosopoi/nomimoi_ekprosopoi_edit_ejs.min.js"></script>
-    <% } else { %>
-      <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/companies/nomimoiekprosopoi/putFieldValues.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/common/checkAfm.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/common/navTabs.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/companies/nomimoiekprosopoi/loadDropdowns_edit.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/common/toggleLabel.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/dates/convertDateToISO.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/dates/getFieldsDate.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
-      <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-    <% } %>
-  </div>
 </div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/nomimoiekprosopoi/putFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/nomimoiekprosopoi/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+
+<script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>
+
+<!-- Enabled/Disablet των ts ανάλογα με το checkbox -->
+<script nonce="<%= nonce %>" type="module">
+    import { bindCheckboxControlsSelect } from '/static/js/common/dependentSelectToggle.js';
+
+    // Νομική μορφή
+    bindCheckboxControlsSelect({
+        checkboxId: 'nomiko_prosopo',
+        selectId  : 'nomikhmorfh',
+        hiddenId  : 'nomikhmorfh_stathera'
+    });
+
+    //   Για 2o, 3ο κλπ ts πχ Ιδιότητα εκπροσώπου κλπ έχω σχολιασμένο κώδικα στο /nomimoi_ekprosopoi/add.ejs
+</script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/getFieldsDate<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

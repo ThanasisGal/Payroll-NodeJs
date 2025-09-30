@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (j === 2) {
                       divHtml += `
                         <div class="col-5 left-align">
-                          <input type="text" class="argia-label mt-0_5rem-fs0_7rem-bor0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
+                          <input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
                         </div>`;
                     } else {
                       divHtml += `

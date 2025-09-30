@@ -683,9 +683,9 @@ function updateOverflow(tom) {
     trash.hidden = !(tom.items || []).length;
 
     // ✔ Μόλις γίνει ορατό, πάρε focus
-    if (!trash.hidden) {
-      trash.focus();
-    }
+    // if (!trash.hidden) {
+    //   trash.focus();
+    // }
 
     /* ----------------------------------------------------------------
     * B. Ellipsis στο label όταν είναι μακρύ (χωρίς inline styles)

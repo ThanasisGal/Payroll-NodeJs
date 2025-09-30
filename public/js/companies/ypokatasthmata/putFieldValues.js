@@ -1,103 +1,3 @@
-// document.addEventListener("DOMContentLoaded", () => {
-//   async function handleFormSubmit(event) {
-//     event.preventDefault(); // Προλαβαίνει την προεπιλεγμένη συμπεριφορά της υποβολής φόρμας
-//     const formData = {};
-//     const filePromises = [];
-//     const sections = document.querySelectorAll(".card-body");
-
-//     sections.forEach((section) => {
-//       const inputs = section.querySelectorAll("input, select, textarea");
-//       inputs.forEach((input) => {
-//         if (input.tagName === "INPUT") {
-//           if (input.type === "checkbox") {
-//             formData[input.name] = input.checked;
-//           } else if (input.type === "file") {
-//             if (input.files.length > 0) {
-//               // Υπάρχει νέο αρχείο, το διαβάζει και το προσθέτει στο formData
-//               const filePromise = new Promise((resolve, reject) => {
-//                 const reader = new FileReader();
-//                 reader.onload = function (e) {
-//                   formData[input.name] = e.target.result; // Το νέο αρχείο σε Base64
-//                   resolve();
-//                 };
-//                 reader.onerror = reject;
-//                 reader.readAsDataURL(input.files[0]);
-//               });
-//               filePromises.push(filePromise);
-//             } else if (formData['currentImage']) { // <input type="hidden" name="currentImage" id="currentImage"..... στη φόρμα ypokatasthmata/edit.ejs
-//               // Δεν υπάρχει νέο αρχείο αλλά το κρυφό πεδίο περιέχει την τρέχουσα τιμή της εικόνας
-//               // Δεν απαιτείται ενέργεια εδώ, καθώς η τρέχουσα εικόνα έχει ήδη προστεθεί στο formData μέσω του κρυφού πεδίου
-//             }
-//           } else {
-//             formData[input.name] = input.value;
-//           }
-//         } else if (input.tagName === "TEXTAREA") {
-//           formData[input.name] = input.value;
-//         } else if (input.tagName === "SELECT") {
-//           if (input.multiple) {
-//             const selectedOptions = Array.from(input.selectedOptions).map(
-//               (option) => option.value
-//             );
-//             formData[input.name] =
-//               selectedOptions.length > 0 ? selectedOptions : [];
-//           } else {
-//             formData[input.name] =
-//               input.selectedIndex === -1
-//                 ? null
-//                 : input.options[input.selectedIndex].value;
-//           }
-//         }
-//       });
-//     });
-
-//     try {
-//       const ypokatasthmaId = document.getElementById("ypokatasthmaId").value;
-      
-//       await Promise.all(filePromises);
-//       const response = await fetch("/api/ypokatasthmata/update/" + ypokatasthmaId, {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//         },
-//         body: JSON.stringify(formData),
-//       });
-
-//       if (!response.ok) {
-//         throw new Error(`HTTP error! status: ${response.status}`);
-//       }
-
-//       const data = await response.json();
-//       // Χειρισμός της επιτυχούς απόκρισης
-//       if (data.success) {
-//         Swal.fire({
-//           icon: "success",
-//           title: "Επιτυχής ενημέρωση του αρχείων:",
-//           html: `
-//             <ul>
-//               <li class="fw600">Επιτυχής ενημέρωση του αρχείου των Υποκαταστημάτων</li>
-//             </ul>
-//           `,
-//           timer: 2000,
-//           confirmButtonText: "Κλείσιμο",
-//           customClass: {
-//             confirmButton: "class-success custom-confirm-button custom-swal-button",
-//           },
-//         }).then(() => {
-//           window.location.href = data.redirectUrl;
-//         });
-//       }
-//     } catch (error) {
-//       console.error("Σφάλμα:", error);
-//     }
-//   }
-
-//   // Προσθήκη event listeners σε όλα τα κουμπιά των sections με κλάση submitButton
-//   const buttons = document.querySelectorAll(".submitButton");
-//   buttons.forEach((button) => {
-//     button.addEventListener("click", handleFormSubmit);
-//   });
-// });
-
 document.addEventListener("DOMContentLoaded", () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
@@ -177,6 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // 4) 204 No Content → δικό μας redirect
             if (response.status === 204) {
                 Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -198,6 +100,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
                 Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -214,6 +118,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // 6) Άλλος content-type αλλά ok
             if (response.ok) {
                 Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -231,8 +137,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(`HTTP error ${response.status}`);
 
         } catch (err) {
-            console.error("Σφάλμα:", err);
             Swal.fire({
+                backdrop: false,            // overlay
+                allowOutsideClick: false,
                 icon: "error",
                 title: "Αποτυχία αποθήκευσης",
                 timer: 1200,

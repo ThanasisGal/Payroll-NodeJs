@@ -424,8 +424,6 @@ small,
 
 #myTableRow:hover {
   font-weight: 700 !important;
-  /* font-size: larger !important;
-  color: #49494900 !important; */
 }
 
 .red-bold {
@@ -596,7 +594,7 @@ small,
 .w-80 { width: 80% !important; }
 .w-85 { width: 85% !important; }
 .w-90 { width: 90% !important; }
-.w-92 { width: 97% !important; }
+.w-92 { width: 92% !important; }
 .w-97 { width: 97% !important; }
 
 .mb-0-5 { margin-bottom: 0.225rem !important; }
@@ -714,6 +712,8 @@ small,
 .col-2-41 { flex: 0 0 auto; width: 20.41%; }
 .col-2-48 { flex: 0 0 auto; width: 20.67%; }
 .col-2-5 { flex: 0 0 auto; width: 20.83%; }
+.col-2-75 { flex: 0 0 auto; width: 22.92%; }
+.col-2-76 { flex: 0 0 auto; width: 23%; }
 .col-2-65 { flex: 0 0 auto; width: 22.09%; }
 .col-2-82 { flex: 0 0 auto; width: 23.5%; }
 .col-2-83 { flex: 0 0 auto; width: 23.59%; }
@@ -747,6 +747,7 @@ small,
 .col-4-55 { flex: 0 0 auto; width: 37.92%; }
 .col-4-69 { flex: 0 0 auto; width: 39.08%; }
 .col-4-71 { flex: 0 0 auto; width: 39.2%; }
+.col-4-75 { flex: 0 0 auto; width: 39.58%; }
 .col-4-9 { flex: 0 0 auto; width: 40.83%; }
 .col-5-4 { flex: 0 0 auto; width: 45%; }
 .col-5-5 { flex: 0 0 auto; width: 45.83%; }
@@ -1803,18 +1804,28 @@ a {
 }
 
 .swal2-confirm.class-error {
-  background-color: #dc3545 !important;
+  background-color: #c50000 !important;
   color: #ffffff !important;
 }
 
 .swal2-confirm.class-success {
-  background-color: #198754 !important;
+  background-color: #0b8800 !important;
   color: #ffffff !important;
 }
 
 .swal2-confirm.class-normal {
   background-color: #3332049a !important;
   color: #ffffff !important;
+}
+
+.swal2-icon.swal2-error {
+  color: #c50000 !important;           /* το εσωτερικό σύμβολο */
+  border-color: #c50000 !important;    /* το περίγραμμα του κύκλου */
+}
+
+.swal2-icon.swal2-success {
+  color: #0b8800 !important;           /* το εσωτερικό σύμβολο */
+  border-color: #0b8800 !important;    /* το περίγραμμα του κύκλου */
 }
 
 .swal2-popup {
@@ -1829,8 +1840,13 @@ a {
 }
 
 .swal2-container {
-  background-color: rgba(0, 0, 0, 0.3) !important;
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; width : 100% !important; height: 100% !important;
+  background-color: rgba(0,0,0,0.5) !important; /* χρώμα overlay */
+  z-index: 9999998 !important;
+  display: flex; justify-content: center; align-items: center;
 }
+
 
 .wide-popup {
   right: auto !important;
@@ -1852,7 +1868,7 @@ a {
   text-align: center !important;
   padding: 1.5em !important;
   border-radius: 12px !important;
-  background-color: #fffcdc !important;
+  background-color: #e6e6e6 !important;
 }
 
 .custom-swal-popup .swal2-html-container {
@@ -1891,7 +1907,7 @@ a {
   width: 150px;
 }
 
-.class-error { background: #dc3545; color: #fff; }
+.class-error { background: #c50000; color: #fff; }
 
 th {
   cursor: pointer;
@@ -3654,7 +3670,7 @@ select.tom-dropdown {
 .ts-dropdown.place-above { top: auto; bottom: var(--ts-control-h, 36px); }
 
 .ts-dropdown.maxh-ideal   { max-height: clamp(220px, 45vh, 420px); overflow-y:auto; }
-.ts-dropdown.maxh-limited { max-height: clamp(150px, 35vh, 360px); overflow-y:auto; }
+.ts-dropdown.maxh-limited { max-height: clamp(150px, 35vh, 260px); overflow-y:auto; }
 
 .ts-wrapper.dropdown-wrapper { position: relative; }
 
@@ -3717,9 +3733,9 @@ select.tom-dropdown {
 
 /* Success: πράσινο / άσπρο */
 .alert-success{
-  --bs-alert-bg: #16a34a;
+  --bs-alert-bg: #0b8800;
   --bs-alert-color: #ffffff;
-  --bs-alert-border-color: #16a34a;
+  --bs-alert-border-color: #0b8800;
 }
 
 /* Error: κόκκινο / άσπρο */
@@ -3731,9 +3747,9 @@ select.tom-dropdown {
 
 /* Warning: κίτρινο / μαύρο */
 .alert-warning{
-  --bs-alert-bg: #f5be0b;
+  --bs-alert-bg: #ffc107;
   --bs-alert-color: #111111;
-  --bs-alert-border-color: #f5be0b;
+  --bs-alert-border-color: #ffc107;
 }
 
 /* Προαιρετικό: να φαίνεται το X κλεισίματος πάνω σε σκούρο φόντο */
@@ -3764,8 +3780,9 @@ select.tom-dropdown {
 .fs1_15vw-fw600 { font-size: 1.15vw; font-weight: 600; }
 
 .fs18px { font-size: 18px; }
-.fs0_9vw { font-size: 0.9vw; }
+.fs0_65vw { font-size: 0.65vw !important; }
 .fs0_75vw { font-size: 0.75vw !important; }
+.fs0_9vw { font-size: 0.9vw; }
 .fs4rem { font-size: 4rem; }
 
 .fw500 { font-weight: 500; }
@@ -3776,17 +3793,20 @@ select.tom-dropdown {
 
 .addKrat01  { background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem important; }
 
-.cred { color: red; }
+.cred { color: #ff0000 !important; }
 .cgreen { color: #008000; }
+.cdarkgreen { color: #005000; }
 .cwhite { color: #ffffff; }
 .cblack { color: #000000; }
 .corange { color: #ffa500;}
 
-.bor0 { border: 0; }
+.border-0 { border: 0 !important; }
+
 .border-right { border-right: 1px solid #ffffff;}
 
 .bg-green {background-color: #008141;}
-.bg-white { background-color: #ffffff; }
+.bg-white { background-color: #ffffff !important; }
+.bg-gray { background-color: #f0f0f0 !important; }
 .bg-collapse { background-color: #5e6e5a; }
 
 .ta-r { text-align: right; }
@@ -3801,9 +3821,11 @@ select.tom-dropdown {
 .ml0_75-fs-0_875vw { margin-left: 0.75rem; font-size: 0.875vw; }
 
 .mt-0_4rem { margin-left: -0.4rem; }
-.mt-0_5rem-fs0_7rem-bor0 { margin-top: -0.5rem; font-size: 0.7rem; border: 0; }
+.mt-0_5rem-fs0_7rem-border-0 { margin-top: -0.5rem; font-size: 0.7rem; border: 0; }
 .mt0_4rem-mb0_3rem { margin-top: 0.4rem; margin-bottom: 0.3rem;}
 .dispno-mt-0_4rem { display: none; margin-top: -0.4rem;}
+
+.font-weight-600 { font-weight: 600; }
 
 .loginConnect { margin-top: -7px; font-size: 1.1rem; font-weight: 700; }
 .cardFooter { margin-left: 0.1rem !important; margin-right: 0.1rem !important; }
@@ -3816,7 +3838,12 @@ select.tom-dropdown {
   justify-content: space-around;
 }
 
-.fs70px_cWarning { font-size: 70px; --bs-warning: #d8a600; }
+.cardFooter02 {
+  width: 65%; 
+  justify-content: space-around;
+}
+
+.fs70px_cWarning { font-size: 70px; --bs-warning: #ffc107; }
 
 .addStoixSymb001 { background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem !important;}
 .addStoixSymb002 { background-color: #eeff0223;}
@@ -3858,27 +3885,43 @@ select.tom-dropdown {
 .margin-top--0_5rem     { margin-top: -0.5rem; }
 .margin-top--2rem       { margin-top: -2rem; }
 
+.margin-top-1rem        { margin-top: 1rem; }
+.margin-top-1_5rem      { margin-top: 1.5rem; }
+.margin-top-2rem        { margin-top: 2rem; }
+.margin-top-2_5rem      { margin-top: 2.5rem; }
+.margin-top-2_6rem      { margin-top: 2.6rem; }
+.margin-top-2_7rem      { margin-top: 2.7rem; }
+.margin-top-2_8rem      { margin-top: 2.8rem; }
+.margin-top-3rem        { margin-top: 3rem; }
+
 .margin-left--1rem      { margin-left: -1rem !important; }
 .margin-left-0_75rem    { margin-left: 0.75rem !important; }
 .margin-left-1_5rem     { margin-left: 1.5rem; }
 
 .margin-left-percent-1  { margin-left: 1% !important; }
-.margin-left-percent-1_5  { margin-left: 1.5% !important; }
+.margin-left-percent-1_5{ margin-left: 1.5% !important; }
 .margin-left-percent-2  { margin-left: 2% !important; }
 .margin-left-percent-4  { margin-left: 4% !important; }
+.margin-left-percent-5  { margin-left: 5% !important; }
+.margin-left-percent-10 { margin-left: 10% !important; }
 .margin-left-percent-20 { margin-left: 20%; }
 
-/* .margin-bottom--0_3rem  { margin-bottom: -0.3rem !important;} */
+.margin-bottom--0_1rem  { margin-bottom: -0.1rem !important;}
+.margin-bottom--0_3rem  { margin-bottom: -0.3rem !important;}
 .margin-bottom--0_5rem  { margin-bottom: -0.5rem !important;}
 
 .padding-0              { padding: 0; }
 .padding-top-px-8       { padding-top: 8px;}
+.padding-top-px-10      { padding-top: 10px;}
 
 .white-space-nowrap     { white-space: nowrap; }
 
+.width-percent-15       { width: 15%; }
 .width-percent-60       { width: 60%; }
 .width-percent-96       { width: 96%; }
 .width-percent-97       { width: 97%; }
+
+.width-vw-4_67          { width: 4.67vw !important; }
 
 .width-rem-18_5         { width: 18.5rem; }
 
@@ -3886,6 +3929,10 @@ select.tom-dropdown {
 .height-rem-3_5         { height: 3.5rem !important; }
 
 .height-vh-12           { height: 12vh !important; }
+.height-vh-25           { height: 25vh !important; }
+.height-vh-35           { height: 35vh !important; }
+.height-vh-42           { height: 42vh !important; }
+.height-vh-45           { height: 45vh !important; }
 .height-vh-48           { height: 48vh !important; }
 .height-vh-53           { height: 53vh !important; }
 .height-vh-58           { height: 58vh !important; }
@@ -4006,10 +4053,14 @@ select.tom-dropdown {
 .font-size-rem-1_1 { font-size: 1.1rem; }
 
 .fsvw-0_7 { font-size: 0.7vw; }
+.fsvw-0_8 { font-size: 0.8vw; }
+.fsvw-0_9 { font-size: 0.9vw; }
 .fsvw-1_1 { font-size: 1.1vw; }
 .fsvw-1_3 { font-size: 1.3vw; }
 
-.display-none { display: none;}
+.display-none { display: none !important;}
+
+.border-radius-7  { border-radius: 7px !important; }
 .border-radius-10 { border-radius: 10px !important; }
 
 .overflow-hidden { overflow: hidden;}
@@ -4179,6 +4230,7 @@ select.tom-dropdown {
   opacity: 0;
   pointer-events: none;       /* default: όχι κλικ */
   user-select: none;
+  
 }
 .clearable-wrapper .clear-btn.is-visible {
   opacity: 1;
@@ -4188,3 +4240,249 @@ select.tom-dropdown {
   opacity: 0;                 /* ή άφησέ το χαμηλά: 0.4 αν θες να φαίνεται disabled */
   pointer-events: none;
 }
+
+/* #myTable thead th.sticky { position: sticky; top: 0; z-index: 2; } */
+
+/* --- Main table --- */
+#myTable th, #myTable td { vertical-align: middle; }
+#myTable tbody tr td { transition: font-size .15s ease, font-weight .15s ease; }
+
+/* Ενεργή (ανοιχτή) κύρια γραμμή */
+#myTable > tbody > tr.active-row > th,
+#myTable > tbody > tr.active-row > td {
+  background-color: #3f6f4f9d !important;
+  color: #ffff00de !important;
+}
+
+#myTable > tbody > tr.active-row > td:nth-child(2),
+#myTable > tbody > tr.active-row > td:nth-child(3) {
+  font-size: 1vw;
+  font-weight: 700;
+  color: #ffff00c0;
+}
+
+/* Η γραμμή-κάδος που φιλοξενεί το nested: να είναι λευκή & “καθαρό” container */
+#myTable > tbody > tr.collapse-row > td {
+  background-color: #fff !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+/* --- Nested tables --- */
+.nested-table { 
+  table-layout: fixed; 
+  width: 100%; 
+  --bs-border-color: #9aa3a7;
+  border-color: var(--bs-border-color) !important;
+}
+
+.nested-table.table-bordered > :not(caption) > * > * {
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Πλήρης ακύρωση των borders στην 1η στήλη των nested tables */
+.nested-table.table-bordered > thead > tr > :first-child,
+.nested-table.table-bordered > tbody > tr > :first-child,
+.nested-table.table-bordered > tfoot > tr > :first-child {
+  background-color: #fff !important;
+  border-left: 0 !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+}
+
+/* Εξουδετέρωση του γενικού κανόνα του Bootstrap για όλα τα κελιά */
+.nested-table.table-bordered > :not(caption) > * > :first-child {
+  border-left-width: 0 !important;
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+}
+
+/* Αν βλέπεις γραμμή στο ΤΕΛΕΥΤΑΙΟ κελί της 1ης στήλης */
+.nested-table.table-bordered > tbody > tr:last-child > :first-child {
+  border-bottom: 0 !important;
+}
+
+/* Αν θες να φύγει και το αριστερό border της 1ης στήλης (προαιρετικό) */
+.nested-table.table-bordered > :not(caption) > * > :first-child {
+  border-left: 0 !important;
+}
+
+/* Τα stripes να μην “βάφουν” την 1η στήλη */
+.nested-table.table-striped > tbody > tr:nth-of-type(odd) > :first-child {
+  background-color: #fff !important;
+}
+
+/* Επιλεγμένη γραμμή μέσα στο nested */
+.collapse.show tbody tr.selected-row > th,
+.collapse.show tbody tr.selected-row > td {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* ίδια κάθετη “ανάσα” σε όλα τα cells */
+#myTable tbody tr > th,
+#myTable tbody tr > td {
+  padding-top: .55rem;
+  padding-bottom: .55rem;
+}
+
+/* η 1η στήλη: βγάλε το padding από το κελί... */
+#myTable tbody tr > td:first-child {
+  padding: 0;
+}
+
+/* ...και δώσ’ το στο κουμπί ώστε να κεντράρει το icon */
+#myTable tbody tr > td:first-child .btn-nesting {
+  display: flex;
+  align-items: center;    /* κάθετα κέντρο */
+  justify-content: center;/* οριζόντια κέντρο */
+  width: 100%;
+  padding: .55rem 0;      /* ίδιο με τα υπόλοιπα κελιά */
+  line-height: 1;         /* μην “φουσκώνει” από font metrics */
+}
+
+/* (προαιρετικό) ένα τσικ οπτική διόρθωση */
+#myTable tbody tr > td:first-child .btn-nesting i {
+  transform: translateY(1px);
+}
+
+/* ΜΟΝΟ η 1η στήλη του nested: κρύψε top/bottom border χωρίς να πειραχτούν των άλλων */
+.nested-table.table-bordered > thead > tr > :first-child,
+.nested-table.table-bordered > tbody > tr > :first-child,
+.nested-table.table-bordered > tfoot > tr > :first-child {
+  position: relative;
+  background-color: #fff;     /* πάντα λευκή */
+  border-top: 0;              /* το border του ΚΕΛΙΟΥ (όχι του row) */
+  border-bottom: 0;
+}
+
+/* “Μάσκα” πάνω/κάτω για να καλύψει τα row borders μόνο στην 1η στήλη */
+.nested-table.table-bordered > thead > tr > :first-child::before,
+.nested-table.table-bordered > tbody > tr > :first-child::before,
+.nested-table.table-bordered > tfoot > tr > :first-child::before,
+.nested-table.table-bordered > thead > tr > :first-child::after,
+.nested-table.table-bordered > tbody > tr > :first-child::after,
+.nested-table.table-bordered > tfoot > tr > :first-child::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;                           /* ίδιο πάχος με το Bootstrap border */
+  background: #fff;                      /* ίδιο με το background */
+  pointer-events: none;
+}
+
+.nested-table.table-bordered > * > tr > :first-child::before { top: -1px; }    /* κρύβει το top row-border */
+.nested-table.table-bordered > * > tr > :first-child::after  { bottom: -1px; } /* κρύβει το bottom row-border */
+
+/* Αν .table-striped, μην “βάφει” την 1η στήλη */
+.nested-table.table-striped > tbody > tr:nth-of-type(odd) > :first-child {
+  background-color: #fff !important;
+}
+
+.nested-table thead tr:first-child th {
+  border: 0 !important;  /* καθάρισε όλα τα borders σε αυτή τη γραμμή */
+}
+
+/* border μόνο στη 3η στήλη της 1ης γραμμής (το κελί με το colspan=2) */
+.nested-table thead tr:first-child th:nth-child(3) {
+  border: 2px solid var(--bs-border-color, #9aa3a7) !important;
+}
+
+.nested-table thead th { 
+  padding-top:.4rem !important; 
+  padding-bottom:.4rem !important; 
+}
+
+/* default κατάσταση του εικονιδίου: λίγο “σβηστό” */
+#myTable tbody tr:not(.collapse-row) td:first-child .btn-nesting i {
+  color: #6c757d;           /* muted */
+  opacity: .35;
+  transition: color .15s ease, opacity .15s ease, transform .15s ease;
+}
+
+/* HOVER σε κύρια γραμμή (όχι στη collapse-row, όχι στην ήδη ενεργή) */
+#myTable tbody tr:not(.collapse-row):not(.active-row):hover td:first-child .btn-nesting i {
+  color: #000 !important;   /* μαύρο */
+  opacity: 1;
+}
+
+/* HOVER: οι υπόλοιπες στήλες να γίνονται έντονες */
+#myTable tbody tr:not(.collapse-row):not(.active-row):hover td:not(:first-child) {
+  font-weight: 700;
+  color: #222;              /* ελαφρώς πιο σκούρο κείμενο */
+  transition: color .15s ease, font-weight .15s ease;
+}
+
+/* Προαιρετικό: δείξε “hand” για να καταλαβαίνει ο χρήστης ότι είναι clickable */
+#myTable tbody tr.trigger-collapse { cursor: pointer; }
+
+/* default: διακριτικό */
+#myTable tbody tr:not(.collapse-row) td:first-child .btn-nesting i{
+  color:#6c757d; opacity:.35; transition:color .15s, opacity .15s, transform .15s;
+}
+
+/* hover: μαύρο και έντονο */
+#myTable tbody tr:not(.collapse-row):not(.selected-row):hover td:first-child .btn-nesting i{
+  color:#000 !important; opacity:1;
+}
+
+/* selected: λευκό */
+#myTable tbody tr.selected-row td:first-child .btn-nesting i{
+  color:#fff !important; opacity:1;
+}
+
+/* Επιλεγμένη γραμμή ΜΕΣΑ στον nested πίνακα: άσπρα γράμματα */
+.collapse.show .nested-table tbody tr.selected-row > th,
+.collapse.show .nested-table tbody tr.selected-row > td {
+  background-color: #356b49 !important; /* ή ό,τι σκούρο θες */
+  color: #fff !important;
+}
+
+/* Αν έχεις links ή icons μέσα στα cells, κάν’ τα κι αυτά άσπρα */
+.collapse.show .nested-table tbody tr.selected-row a,
+.collapse.show .nested-table tbody tr.selected-row i,
+.collapse.show .nested-table tbody tr.selected-row .bi {
+  color: #fff !important;
+}
+
+/* Προαιρετικό: η 1η στήλη του nested μένει λευκή, ώστε να “σπάει” οπτικά */
+.collapse.show .nested-table tbody tr.selected-row > :first-child {
+  background-color: #fff !important;
+  color: inherit; /* ή #000, αν τη θες σκούρα */
+}
+
+/* ΠΑΝΤΑ λευκό το βελάκι στην επιλεγμένη (active) κύρια γραμμή */
+#myTable > tbody > tr.active-row .btn-nesting i.bi {
+  color: #fff !important;
+}
+
+/* Στις μη ενεργές γραμμές, επέστρεψε στο default */
+#myTable > tbody > tr:not(.active-row) .btn-nesting i.bi {
+  color: inherit; /* ή π.χ. #6c757d αν θέλεις σταθερό γκρι */
+}
+
+/* --- ΠΑΝΤΑ λευκό το βελάκι στην ενεργή (active-row) γραμμή --- */
+#myTable > tbody > tr.active-row td .btn-nesting i.bi,
+#myTable > tbody > tr.active-row td .btn-nesting i.bi::before,
+#myTable > tbody > tr.active-row:hover td .btn-nesting i.bi,
+#myTable > tbody > tr.active-row:hover td .btn-nesting i.bi::before,
+#myTable > tbody > tr.active-row:focus-within td .btn-nesting i.bi,
+#myTable > tbody > tr.active-row:focus-within td .btn-nesting i.bi::before {
+  color: #fff !important;
+}
+
+/* Αν χρησιμοποιείς στο JS την κλάση 'icon-white', κλείδωσέ τη κι αυτή */
+i.icon-white,
+i.icon-white::before {
+  color: #fff !important;
+}
+
+/* ΕΞΑΙΡΕΣΗ: διατήρησε το κόκκινο στην 1η στήλη "κενής εγγραφής"
+   ακόμη κι όταν η γραμμή είναι selected */
+#myTable .collapse.show tbody tr.selected-row > th.cred,
+#myTable .collapse.show tbody tr.selected-row > th.first-col.cred {
+  color: #ff0000 !important; 
+}
+

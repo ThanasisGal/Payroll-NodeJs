@@ -62,9 +62,15 @@ const CompaniesSchema = new Schema({
   ],
   sfragida: String,
   imagePath: { type: String, trim: true },
-  createdAt: { type: Date, default: Date.now() },
-  updatedAt: { type: Date, default: Date.now() },
-});
+  },
+  {
+    timestamps: {
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
+      currentTime: () => Date.now(), // προαιρετικό: ενιαία πηγή χρόνου
+    },
+  }
+);
 const CompaniesModel = model("Companies", CompaniesSchema);
 
 const YpokatasthmataSchema = new Schema({
@@ -148,9 +154,15 @@ const NomimoiEkprosopoiSchema = new Schema({
   ame: { type: String, trim: true },
   idiothta: { type: String, trim: true },
   hmnia_enarjhs_idiothtas: { type: Date },
-  createdAt: { type: Date, default: Date.now() },
-  updatedAt: { type: Date, default: Date.now() },
-});
+},
+  {
+    timestamps: {
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
+      currentTime: () => Date.now(), // προαιρετικό: ενιαία πηγή χρόνου
+    },
+  }
+);
 
 const NomimoiEkprosopoiModel = model("NomimoiEkprosopoi", NomimoiEkprosopoiSchema);
 

@@ -16,6 +16,8 @@ const kad                                   = require('../dropdowns/kad');
 const sepe                                  = require('../dropdowns/ypokatasthmata/sepe');
 const dypa                                  = require('../dropdowns/ypokatasthmata/dypa');
 const pararthmataEfkaErgolaboy              = require('../dropdowns/ypokatasthmata/pararthmataEfkaErgolaboy');
+const idiothtes                             = require('../dropdowns/nomimoiEkprosopoi/idiothtes');
+const taytothtes                            = require('../dropdowns/nomimoiEkprosopoi/taytothtes');
 
 const   {
             YpokatasthmataModel,
@@ -31,7 +33,9 @@ const   {
             TmhmataModel,
             PeriodsModel,
             SepeModel,
-            DypaModel
+            DypaModel,
+            IdiothtesModel,
+            TypoiTaytothtonModel
         } = statheraArxeiaModels;
 
 // ================================ ΕΚΤΥΠΩΣΕΙΣ -> ΑΠΑΣΧΟΛΗΣΕΙΣ ==================================
@@ -63,6 +67,10 @@ router.get('/ypokatasthmata/dypa',                      buildDropdownRoute(DypaM
 
 router.get('/ypokatasthmata/pararthmataEfkaErgolaboy',  buildDropdownRoute(PararthmataEfkaModel, pararthmataEfkaErgolaboy.options));
 
+// ================================ ΕΤΑΙΡΕΙΕΣ -> ΝΟΜΙΜΟΙ ΕΚΠΡΟΣΩΠΟΙ ===============================
+
+router.get('/nomimoiEkprosopoi/idiothta',               buildDropdownRoute(IdiothtesModel, idiothtes.options));
+router.get('/nomimoiEkprosopoi/taytothta',              buildDropdownRoute(TypoiTaytothtonModel, taytothtes.options));
 
 
 module.exports = router;

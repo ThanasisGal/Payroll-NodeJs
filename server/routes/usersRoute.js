@@ -277,7 +277,9 @@ router.post("/api/logisths", genikaAPIsController.checkLogisths);
 router.get("/api/logisths/:kodikosLogisth", genikaAPIsController.getLogisths);
 
 router.get("/api/nomikesMorfes", genikaAPIsController.getNomikesMorfes);
-router.post("/api/nomimoiEkprosopoi/update/:nomimosEkprosoposId", nomimoiekprosopoiController.postNomimoiEkprosopoiUpdate);
+router.post("/companies/api/nomimosEkprosopos", genikaAPIsController.checkNomimosEkprosopos);
+router.get("/companies/api/nomimosEkprosopos/:kodikosNomimoyEkprosopoy", genikaAPIsController.getNomimosEkprosopos);
+router.post("/api/nomimoi_ekprosopoi/update/:nomimosEkprosoposId", nomimoiekprosopoiController.postNomimoiEkprosopoiUpdate);
 router.get("/api/nomoi", genikaAPIsController.getNomoi);
 
 router.get("/api/pararthmataEfka", genikaAPIsController.getPararthmataEfka);

@@ -124,7 +124,8 @@ const PerifereiesSchema = new Schema({
   });
   const LogisthsModel = model("Logisths", LogisthsSchema);
   
-  const EmmesosErgodothsSchema = new Schema({
+const EmmesosErgodothsSchema = new Schema(
+  {
     team: { type: String, trim: true },
     company_cod: { type: String, trim: true },
     kodikos: { type: String, trim: true },
@@ -136,13 +137,23 @@ const PerifereiesSchema = new Schema({
     titlos: { type: String, trim: true },
     nomikhMorfh: { type: String, trim: true },
     drasthriothta: { type: String, trim: true },
-    email: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
     daneismosApo: { type: Date },
     daneismosEos: { type: Date },
-    createdAt: { type: Date, default: Date.now() },
-    updatedAt: { type: Date, default: Date.now() },
-  });
-  const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
+    // ΔΕΝ χρειάζεται να δηλώσεις createdAt/updatedAt εδώ αν βάλεις timestamps πιο κάτω
+  },
+  {
+    timestamps: {
+      createdAt: "createdAt",
+      updatedAt: "updatedAt",
+      currentTime: () => Date.now(), // προαιρετικό: ενιαία πηγή χρόνου
+    },
+  }
+);
+
+// Unique σύνθετος δείκτης (team+kodikos), με partial για να ισχύει μόνο όταν υπάρχουν έγκυρες τιμές
+EmmesosErgodothsSchema.index( { team: 1, kodikos: 1 }, { unique: true, partialFilterExpression: {team: { $exists: true, $type: "string", $gt: "" }, kodikos: { $exists: true, $type: "string", $gt: "" } } });
+const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   
   const DiadoxosErgodothsSchema = new Schema({
     team: { type: String, trim: true },
@@ -159,6 +170,8 @@ const PerifereiesSchema = new Schema({
     createdAt: { type: Date, default: Date.now() },
     updatedAt: { type: Date, default: Date.now() },
   });
+
+  DiadoxosErgodothsSchema.index({ kodikos: 1, team: 1 }, { unique: true });
   const DiadoxosErgodothsModel = model("DiadoxosErgodoths", DiadoxosErgodothsSchema);
   
   const XrhseisSchema = new Schema({

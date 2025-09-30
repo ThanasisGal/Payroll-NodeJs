@@ -73,11 +73,6 @@ function setFieldsDisabled(fieldIds, disabled) {
       disabled ? el.tomselect.disable() : el.tomselect.enable();
     }
 
-    // 4) bootstrap-select (εάν χρησιμοποιείται)
-    // if (window.jQuery && jQuery.fn.selectpicker && jQuery(el).hasClass("selectpicker")) {
-    //   jQuery(el).prop("disabled", disabled).selectpicker("refresh");
-    // }
-
     // 5) Εξαναγκασμός redraw/ενημέρωσης listeners
     el.dispatchEvent(new Event("change", { bubbles: true }));
   });

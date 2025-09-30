@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const path = require("path");
+const { ObjectId } = require('mongodb');
 const fs = require("fs-extra");
 
 const Models_A = require("../../models/param");
@@ -26,192 +26,144 @@ const {
     DiadoxosErgodothsModel,
 } = Models;
 
-var redir, sTerm = "";
 
-// Έλεγχος του λειτουργικού συστήματος
-const isWindows = process.platform === 'win32';
+let redir, sTerm = "";
 
-async function renameAndMoveImage(originalPath, company, formDataValues, teams) {
-    // Δημιουργία του νέου ονόματος βάσει των μεταβλητών
-    const newName = `${company}_${formDataValues.eponymia.trim()}_${formDataValues.fatherName.substring(0, 3)}_${formDataValues.firstName.trim()}_sfragida.png`;
+// OS check
+const isWindows = process.platform === "win32";
 
-    // Ορισμός της νέας διαδρομής
-    const newPath = path.join('C:/Payroll-NodeJs/public/stamps/teams/', teams, newName);
+/* ---------------------------- helpers ---------------------------------- */
+const normalizeStr = (v) => String(v ?? "").trim();
+const normalizeUpper = (v) => normalizeStr(v).toUpperCase();
 
+const stampsDir = (team) =>
+    isWindows
+        ? path.join("C:\\Payroll-NodeJs\\public\\stamps\\teams", team)
+        : path.join("/home/ubuntu/Payroll-NodeJs/public/stamps/teams", team);
+
+async function renameAndMoveImage(originalPath, companyId, { eponymia, fatherName, firstName }, team) {
+    const dir = stampsDir(team);
+    await fs.mkdir(dir, { recursive: true });
+    const newName = `${companyId}_${normalizeStr(eponymia)}_${normalizeStr(fatherName).substring(0, 3)}_${normalizeStr(firstName)}_sfragida.png`;
+    const dest = path.join(dir, newName);
+    await fs.rename(originalPath, dest);
+    return dest;
+}
+
+async function upsertSafe(Model, filter, set, setOnInsert = {}, options = {}) {
+    const baseOpts = { upsert: true, new: true, setDefaultsOnInsert: true, ...options };
     try {
-        // Μεταφορά του αρχείου με το νέο όνομα
-        await fs.rename(originalPath, newPath);
-        console.log('Το αρχείο μετονομάστηκε και μεταφέρθηκε επιτυχώς.');
-    } catch (error) {
-        console.error('Σφάλμα κατά τη μετονομασία ή μεταφορά του αρχείου:', error);
+        return await Model.findOneAndUpdate(filter, { $set: set, $setOnInsert: setOnInsert }, baseOpts).exec();
+    } catch (e) {
+        // handle race: second writer may see E11000
+        if (e?.code === 11000) {
+            return await Model.findOneAndUpdate(filter, { $set: set }, { new: true }).exec();
+        }
+        throw e;
     }
 }
 
+/* -------------------------- controller --------------------------------- */
 class companiesController {
     static mainAppForm = async (req, res) => {
-        const locals = {
-            title: "Payroll",
-            description: "Web Payroll System",
-        };
-        res.render("mainapp", {
-            locals,
-        });
+        const locals = { title: "Payroll", description: "Web Payroll System" };
+        res.render("mainapp", { locals });
     };
 
     static mainCompaniesForm = async (req, res) => {
-        const locals = {
-            title: "Εταιρείες",
-            description: "Web Payroll System",
-        };
+        const locals = { title: "Εταιρείες", description: "Web Payroll System" };
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
+        const page = Math.max(Number(req.query.page) || 1, 1);
+
+        if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+        const userId   = ObjectId.createFromHexString(sessionUserId);
 
         try {
-            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-            const userPrivileges = await UserPrivilegesModel.findOne({
-                userId: sessionUserId,
-                form: "Companies",
-            }).exec();
+            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
 
-            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-            const countPipeline = [
-                {
-                    $match: {
-                        team: sessionUserTeam,
-                        users: new mongoose.Types.ObjectId(sessionUserId),
-                    },
-                },
-                {
-                    $count: "total",
-                },
-            ];
+            // const userId = new ObjectId(sessionUserId);
+            const matchBase = { team: sessionUserTeam, users: userId };
 
-            const countResults = await CompaniesModel.aggregate(countPipeline).exec();
+            const countResults = await CompaniesModel.aggregate([{ $match: matchBase }, { $count: "total" }]).exec();
+            const totalRecords = countResults[0]?.total || 0;
+            const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
+            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-
-            // Aggregation query για την ανάκτηση δεδομένων
-            const queryPipeline = [
-                {
-                    $match: {
-                        team: sessionUserTeam,
-                        users: new mongoose.Types.ObjectId(sessionUserId),
-                    },
-                },
-                {
-                    $match: {
-                        anenergh: false, // Φιλτράρει τις εγγραφές με το αν είναι ή όχι ανενεργή η εταιρεία
-                    },
-                },
-                {
-                    $lookup: {
-                        from: "users",
-                        localField: "users",
-                        foreignField: "_id",
-                        as: "userData",
-                    },
-                },
-                {
-                    $sort: {
-                        eponymia: 1,
-                        onoma: 1,
-                    },
-                },
-                {
-                    $skip: skipRecords,
-                },
-                {
-                    $limit: limitPerPage,
-                },
-            ];
-
-            const company = await CompaniesModel.aggregate(queryPipeline).exec();
+            const company = await CompaniesModel.aggregate([
+                { $match: matchBase },
+                { $match: { anenergh: false } },
+                { $lookup: { from: "users", localField: "users", foreignField: "_id", as: "userData" } },
+                { $sort: { eponymia: 1, onoma: 1 } },
+                { $skip: skipRecords },
+                { $limit: perPage },
+            ]).exec();
 
             res.render("companies/genikastoixeia/companies", {
-                userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+                userPrivileges: userPrivileges?.privileges || {},
                 locals,
                 company,
                 current: page,
                 pages: totalPages,
             });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            res.status(500).send("Σφάλμα");
         }
     };
 
     static searchPostCompanies = async (req, res) => {
-        const locals = {
-            title: "Αναζήτηση Εταιρειών",
-            description: "Web Payroll System",
-        };
+        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll System" };
 
         try {
-            let searchTerm = req.body.searchTerm;
-
+            const searchTerm = normalizeStr(req.body.searchTerm);
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, "");
-            const perPage = Number(process.env.EGGRAFES);
-            let page = req.query.page || 1;
+            const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
+            const page = Math.max(Number(req.query.page) || 1, 1);
 
-            sTerm = searchNoSpecialChar;
+            sTerm = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, "");
 
-            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-            const userPrivileges = await UserPrivilegesModel.findOne({
-                userId: sessionUserId,
-                form: "Companies",
-            }).exec();
+            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
 
-            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-            const countPipeline = [
-                {
-                    $match: {
-                        team: sessionUserTeam,
-                        users: new mongoose.Types.ObjectId(sessionUserId),
-                    },
-                },
-                {
-                    $count: "total",
-                },
-            ];
+            if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+            const userId   = ObjectId.createFromHexString(sessionUserId);
 
-            const countResults = await CompaniesModel.aggregate(countPipeline).exec();
+            const countResults = await CompaniesModel.aggregate([
+                { $match: { team: sessionUserTeam, users: userId } },
+                { $count: "total" },
+            ]).exec();
+            const totalRecords = countResults[0]?.total || 0;
+            const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
+            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-
+            const re = new RegExp(searchTerm, "i");
             const companyFilteredRecs = await CompaniesModel.find({
                 $or: [
-                    { kod: { $regex: new RegExp(searchTerm, "i") } },
-                    { eponymia: { $regex: new RegExp(searchTerm, "i") } },
-                    { firstname: { $regex: new RegExp(searchTerm, "i") } },
-                    { fathername: { $regex: new RegExp(searchTerm, "i") } },
-                    { activity: { $regex: new RegExp(searchTerm, "i") } },
-                    { afm: { $regex: new RegExp(searchTerm, "i") } },
+                    { kod: { $regex: re } },
+                    { eponymia: { $regex: re } },
+                    { firstname: { $regex: re } },
+                    { fathername: { $regex: re } },
+                    { activity: { $regex: re } },
+                    { afm: { $regex: re } },
                 ],
             })
             .skip(skipRecords)
-            .limit(limitPerPage);
+            .limit(perPage)
+            .lean();
 
-            const highlightedRecords = companyFilteredRecs.map((record) => {
-                return {
-                    ...record.toObject(),
-                    kod: companiesController.highlightText(record.kod, searchTerm),
-                    eponymia: companiesController.highlightText(record.eponymia, searchTerm),
-                    firstname: companiesController.highlightText(record.firstname, searchTerm),
-                    fathername: companiesController.highlightText(record.fathername, searchTerm),
-                    activity: companiesController.highlightText(record.activity, searchTerm),
-                    afm: companiesController.highlightText(record.afm, searchTerm),
-                };
-            });
+            const highlight = companiesController.highlightText;
+            const highlightedRecords = companyFilteredRecs.map((r) => ({
+                ...r,
+                kod: highlight(r.kod || "", searchTerm),
+                eponymia: highlight(r.eponymia || "", searchTerm),
+                firstname: highlight(r.firstname || "", searchTerm),
+                fathername: highlight(r.fathername || "", searchTerm),
+                activity: highlight(r.activity || "", searchTerm),
+                afm: highlight(r.afm || "", searchTerm),
+            }));
 
             res.render("companies/genikastoixeia/search", {
                 companyFilteredRecs: highlightedRecords,
@@ -222,130 +174,92 @@ class companiesController {
                 userPrivileges,
             });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            res.status(500).send("Σφάλμα");
         }
     };
 
     static searchGetCompanies = async (req, res) => {
-        const locals = {
-            title: "Αναζήτηση Εταιρειών",
-            description: "Web Payroll System",
-        };
+        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll System" };
 
         try {
-            let searchTerm = req.body.searchTerm;
-
+            const searchTerm = normalizeStr(req.body?.searchTerm || "");
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, "");
-            const perPage = Number(process.env.EGGRAFES);
-            let page = req.query.page || 1;
+            const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
+            const page = Math.max(Number(req.query.page) || 1, 1);
 
-            sTerm = searchNoSpecialChar;
+            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
 
-            // try {
-            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-            const userPrivileges = await UserPrivilegesModel.findOne({
-                userId: sessionUserId,
-                form: "Companies",
-            }).exec();
+            if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+            const userId   = ObjectId.createFromHexString(sessionUserId);
 
-            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-            const countPipeline = [
-                {
-                    $match: {
-                        team: sessionUserTeam,
-                        users: new mongoose.Types.ObjectId(sessionUserId),
-                    },
-                },
-                {
-                    $count: "total",
-                },
-            ];
+            const countResults = await CompaniesModel.aggregate([
+                { $match: { team: sessionUserTeam, users: userId } },
+                { $count: "total" },
+            ]).exec();
+            const totalRecords = countResults[0]?.total || 0;
+            const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
+            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            const countResults = await CompaniesModel.aggregate(countPipeline).exec();
-            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-
+            const re = new RegExp(searchTerm, "i");
             const companyFilteredRecs = await CompaniesModel.find({
                 $or: [
-                    { kod: { $regex: new RegExp(searchTerm, "i") } },
-                    { eponymia: { $regex: new RegExp(searchTerm, "i") } },
-                    { firstname: { $regex: new RegExp(searchTerm, "i") } },
-                    { fathername: { $regex: new RegExp(searchTerm, "i") } },
-                    { activity: { $regex: new RegExp(searchTerm, "i") } },
-                    { afm: { $regex: new RegExp(searchTerm, "i") } },
+                    { kod: { $regex: re } },
+                    { eponymia: { $regex: re } },
+                    { firstname: { $regex: re } },
+                    { fathername: { $regex: re } },
+                    { activity: { $regex: re } },
+                    { afm: { $regex: re } },
                 ],
             })
             .skip(skipRecords)
-            .limit(limitPerPage);
+            .limit(perPage)
+            .lean();
 
-            const highlightedRecords = companyFilteredRecs.map((record) => {
-                return {
-                    ...record.toObject(),
-                    kod: companiesController.highlightText(record.kod, searchTerm),
-                    eponymia: companiesController.highlightText(record.eponymia, searchTerm),
-                    firstname: companiesController.highlightText(
-                        record.firstname,
-                        searchTerm
-                    ),
-                    fathername: companiesController.highlightText(
-                        record.fathername,
-                        searchTerm
-                    ),
-                    activity: companiesController.highlightText(
-                        record.activity,
-                        searchTerm
-                    ),
-                    afm: companiesController.highlightText(record.afm, searchTerm),
-                };
-            });
+            const highlight = companiesController.highlightText;
+            const highlightedRecords = companyFilteredRecs.map((r) => ({
+                ...r,
+                kod: highlight(r.kod || "", searchTerm),
+                eponymia: highlight(r.eponymia || "", searchTerm),
+                firstname: highlight(r.firstname || "", searchTerm),
+                fathername: highlight(r.fathername || "", searchTerm),
+                activity: highlight(r.activity || "", searchTerm),
+                afm: highlight(r.afm || "", searchTerm),
+            }));
 
             res.render("companies/genikastoixeia/search", {
                 companyFilteredRecs: highlightedRecords,
                 locals,
                 current: page,
                 pages: totalPages,
-                // sTerm: searchTerm,
                 userPrivileges,
             });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            res.status(500).send("Σφάλμα");
         }
     };
 
     static addCompanyForm = async (req, res) => {
-        const locals = {
-        title: "Προσθήκη Νέας Εταιρείας",
-        description: "Web Payroll System",
-        };
-
+        const locals = { title: "Προσθήκη Νέας Εταιρείας", description: "Web Payroll System" };
         try {
             const data = await PerifereiesModel.find().sort("kodikos");
-            res.render("companies/genikastoixeia/add", { 
-                locals, 
-                data,
-                mode: 'add',
-                context: "company",
-                rec: {},          // <— κενό αντικείμενο για «Νέα» εταιρεία. Χρησιμοποιείται στο "Δραστηριότητες"
-            });
+            res.render("companies/genikastoixeia/add", { locals, data, mode: "add", context: "company", rec: {} });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            res.status(500).send("Σφάλμα");
         }
     };
 
     static checkAfmEtaireias = async (req, res) => {
         try {
             const { afm } = req.body;
-            const doc = await CompaniesModel.findOne({ afm: afm });
-
-            if (doc) {
-                res.json(doc);
-            }
+            const doc = await CompaniesModel.findOne({ afm }).lean();
+            if (doc) return res.json(doc);
+            return res.json(null);
         } catch (err) {
-                res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
+            res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
         }
     };
 
@@ -353,295 +267,245 @@ class companiesController {
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
 
-        let aa_kod = null;
-
         const formData = req.body;
-
         if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
             return res.json({ success: false });
         }
 
         try {
-            const lastRecord = await CompaniesModel.find({ team: sessionUserTeam })
-                .sort({ _id: -1 })
-                .limit(1);
-            let kodValue = lastRecord[0] && lastRecord[0].kod ? parseInt(lastRecord[0].kod, 10) : null;
-            if (kodValue !== null) {
-                kodValue++;
-            } else {
-                kodValue = 1;
+            // produce next kod
+            const lastRecord = await CompaniesModel.find({ team: sessionUserTeam }).sort({ _id: -1 }).limit(1).lean();
+            let kodValue = lastRecord[0]?.kod ? parseInt(lastRecord[0].kod, 10) : 0;
+            const aa_kod = (isNaN(kodValue) ? 0 : kodValue) + 1;
+
+            const newCompany = new CompaniesModel({
+                team: sessionUserTeam,
+                user_id: sessionUserId,
+                kod: aa_kod.toString().padStart(4, "0"),
+                eponymia: formData.eponymia,
+                firstname: formData.firstName,
+                fathername: formData.fatherName,
+                activity: formData.activity,
+                afm: formData.afm,
+                adt: formData.adt,
+                titlos: formData.titlos,
+                odos: formData.odos,
+                arithmos: formData.arithmos,
+                tk: formData.tk,
+                perifereia: formData.perifereies,
+                nomos: formData.nomos,
+                dhmos: formData.dhmos,
+                polh: formData.polh,
+                thlefono: formData.thlefono,
+                fax: formData.fax,
+                email: formData.email,
+                anenergh: formData.anenergh,
+                nomikh_morfh: formData.nomikhmorfh_stathera,
+                pararthma_efka: formData.pararthmaefka_stathera,
+                doy_company: formData.doy_stathera,
+                tameio1: formData.kodikos_tameioy1,
+                tameio2: formData.kodikos_tameioy2,
+                tameio3: formData.kodikos_tameioy3,
+                tameio4: formData.kodikos_tameioy4,
+                ame1: formData.ame1,
+                ame2: formData.ame2,
+                ame3: formData.ame3,
+                ame4: formData.ame4,
+                kad1: formData.koddrast1,
+                kad2: formData.koddrast2,
+                kad3: formData.koddrast3,
+                kad4: formData.koddrast4,
+                kad5: formData.koddrast5,
+                kad6: formData.koddrast6,
+                texnikos_asfaleias: formData.kod_ta,
+                iatros_ergasias: formData.kod_ia,
+                logisths: formData.kod_lo,
+                doy_logisth: formData.doy_logisths,
+                emmesos_ergodoths: formData.kod_em_erg,
+                diadoxos_ergodoths: formData.kod_diad_erg,
+                oikodomika: formData.oikodomika,
+                doropasxa_apd: formData.doropasxa_apd,
+                doroxrist_apd: formData.doroxrist_apd,
+                ypologismos_epi_pragmatikoy_oromisthioy: formData.ypologismos_epi_pragmatikoy_oromisthioy,
+                keimeno_exoflhshs: formData.keimeno_exoflhshs,
+                users: formData.selectedUsers,
+                sfragida: formData.sfragida,
+            });
+
+            // upserts for related entities (race-safe)
+            const team = normalizeUpper(sessionUserTeam);
+
+            if (formData.kod_ta) {
+                const kod = normalizeUpper(formData.kod_ta);
+                await upsertSafe(
+                    TexnikosAsfaleiasModel,
+                    { team, kodikos: kod },
+                    {
+                        company_kod: aa_kod,
+                        eponymo: formData.eponymo_ta,
+                        onoma: formData.onoma_ta,
+                        afm: formData.afm_ta,
+                        dieythynsh: formData.dieythynsh_ta,
+                        thlefono: formData.thlefono_ta,
+                        ores: formData.ores_ta,
+                        ap_katatheshs: formData.ap_katatheshs_ta,
+                        hmnia_katatheshs: formData.hmnia_katatheshs_ta,
+                        isxyei_eos: formData.isxyei_eos_ta,
+                    },
+                    { team, kodikos: kod }
+                );
             }
-            aa_kod = kodValue;
-        } catch (error) {
-            console.log("Σφάλμα :", error);
-        }
 
-        const newCompany = CompaniesModel({
-            team: sessionUserTeam,
-            user_id: sessionUserId,
-            kod: aa_kod.toString().padStart(4, "0"),
-            eponymia: formData.eponymia,
-            firstname: formData.firstName,
-            fathername: formData.fatherName,
-            activity: formData.activity,
-            afm: formData.afm,
-            adt: formData.adt,
-            titlos: formData.titlos,
-            odos: formData.odos,
-            arithmos: formData.arithmos,
-            tk: formData.tk,
-            perifereia: formData.perifereies,
-            nomos: formData.nomos,
-            dhmos: formData.dhmos,
-            polh: formData.polh,
-            thlefono: formData.thlefono,
-            fax: formData.fax,
-            email: formData.email,
-            anenergh: formData.anenergh,
-            nomikh_morfh: formData.nomikhmorfh_stathera,
-            pararthma_efka: formData.pararthmaefka_stathera,
-            doy_company: formData.doy_stathera,
-            tameio1: formData.kodikos_tameioy1,
-            tameio2: formData.kodikos_tameioy2,
-            tameio3: formData.kodikos_tameioy3,
-            tameio4: formData.kodikos_tameioy4,
-            ame1: formData.ame1,
-            ame2: formData.ame2,
-            ame3: formData.ame3,
-            ame4: formData.ame4,
-            kad1: formData.koddrast1,
-            kad2: formData.koddrast2,
-            kad3: formData.koddrast3,
-            kad4: formData.koddrast4,
-            kad5: formData.koddrast5,
-            kad6: formData.koddrast6,
-            texnikos_asfaleias: formData.kod_ta,
-            iatros_ergasias: formData.kod_ia,
-            logisths: formData.kod_lo,
-            doy_logisth: formData.doy_logisths,
-            emmesos_ergodoths: formData.kod_em_erg,
-            diadoxos_ergodoths: formData.kod_diad_erg,
-            oikodomika: formData.oikodomika,
-            doropasxa_apd: formData.doropasxa_apd,
-            doroxrist_apd: formData.doroxrist_apd,
-            ypologismos_epi_pragmatikoy_oromisthioy: formData.ypologismos_epi_pragmatikoy_oromisthioy,
-            keimeno_exoflhshs: formData.keimeno_exoflhshs,
-            users: formData.selectedUsers,
-            sfragida: formData.sfragida,
-            imagePath: formData.imagePath,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-        });
+            if (formData.kod_ia) {
+                const kod = normalizeUpper(formData.kod_ia);
+                await upsertSafe(
+                    IatrosErgasiasModel,
+                    { team, kodikos: kod },
+                    {
+                        company_kod: aa_kod,
+                        eponymo: formData.eponymo_ia,
+                        onoma: formData.onoma_ia,
+                        afm: formData.afm_ia,
+                        dieythynsh: formData.dieythynsh_ia,
+                        thlefono: formData.thlefono_ia,
+                        ores: formData.ores_ia,
+                        ap_katatheshs: formData.ap_katatheshs_ia,
+                        hmnia_katatheshs: formData.hmnia_katatheshs_ia,
+                        isxyei_eos: formData.isxyei_eos_ia,
+                    },
+                    { team, kodikos: kod }
+                );
+            }
 
-        if (formData.kod_ta !== null && formData.kod_ta !== "") {
-            const newTexnikosAsfaleias = TexnikosAsfaleiasModel({
-                team: sessionUserTeam,
-                company_kod: aa_kod,
-                kodikos: formData.kod_ta,
-                eponymo: formData.eponymo_ta,
-                onoma: formData.onoma_ta,
-                afm: formData.afm_ta,
-                dieythynsh: formData.dieythynsh_ta,
-                thlefono: formData.thlefono_ta,
-                ores: formData.ores_ta,
-                ap_katatheshs: formData.ap_katatheshs_ta,
-                hmnia_katatheshs: formData.hmnia_katatheshs_ta,
-                isxyei_eos: formData.isxyei_eos_ta,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            await TexnikosAsfaleiasModel.create(newTexnikosAsfaleias);
-        }
+            if (formData.kod_lo) {
+                const kod = normalizeUpper(formData.kod_lo);
+                await upsertSafe(
+                    LogisthsModel,
+                    { team, kodikos: kod },
+                    {
+                        company_kod: aa_kod,
+                        eponymo: formData.eponymo_lo,
+                        onoma: formData.onoma_lo,
+                        afm: formData.afm_lo,
+                        dieythynsh: formData.dieythynsh_lo,
+                        thlefono: formData.thlefono_lo,
+                        doy: formData.doy_logisths,
+                        arithmos_adeias: formData.arithmos_adeias_lo,
+                        kathgoria_adeias: formData.kathgoria_adeias_lo,
+                    },
+                    { team, kodikos: kod }
+                );
+            }
 
-        if (formData.kod_ia !== null && formData.kod_ia !== "") {
-            const newIatrosErgasias = IatrosErgasiasModel({
-                team: sessionUserTeam,
-                company_kod: aa_kod,
-                kodikos: formData.kod_ia,
-                eponymo: formData.eponymo_ia,
-                onoma: formData.onoma_ia,
-                afm: formData.afm_ia,
-                dieythynsh: formData.dieythynsh_ia,
-                thlefono: formData.thlefono_ia,
-                ores: formData.ores_ia,
-                ap_katatheshs: formData.ap_katatheshs_ia,
-                hmnia_katatheshs: formData.hmnia_katatheshs_ia,
-                isxyei_eos: formData.isxyei_eos_ia,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            await IatrosErgasiasModel.create(newIatrosErgasias);
-        }
+            if (formData.kod_em_erg) {
+                const kod = normalizeUpper(formData.kod_em_erg);
+                await upsertSafe(
+                    EmmesosErgodothsModel,
+                    { team, kodikos: kod },
+                    {
+                        company_kod: aa_kod,
+                        eponymo: formData.eponymo_em_erg,
+                        onoma: formData.onoma_em_erg,
+                        dieythynsh: formData.dieythynsh_em_erg,
+                        thlefono: formData.thlefono_em_erg,
+                        afm: formData.afm_em_erg,
+                        doy: formData.doy_em_erg,
+                        titlos: formData.titlos_em_erg,
+                        nomikhMorfh: formData.nomikhmorfh_emmesosErgodoths,
+                        drasthriothta: formData.drasthriothta_em_erg,
+                        email: formData.email_em_erg,
+                        daneismosApo: formData.daneismos_epa_apo_em_erg,
+                        daneismosEos: formData.daneismos_epa_eos_em_erg,
+                    },
+                    { team, kodikos: kod }
+                );
+            }
 
-        if (formData.kod_lo !== null && formData.kod_lo !== "") {
-            const newLogisths = LogisthsModel({
-                team: sessionUserTeam,
-                company_kod: aa_kod,
-                kodikos: formData.kod_lo,
-                eponymo: formData.eponymo_lo,
-                onoma: formData.onoma_lo,
-                afm: formData.afm_lo,
-                dieythynsh: formData.dieythynsh_lo,
-                thlefono: formData.thlefono_lo,
-                doy: formData.doy_logisths,
-                arithmos_adeias: formData.arithmos_adeias_lo,
-                kathgoria_adeias: formData.kathgoria_adeias_lo,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            await LogisthsModel.create(newLogisths);
-        }
+            if (formData.kod_diad_erg) {
+                const kod = normalizeUpper(formData.kod_diad_erg);
+                await upsertSafe(
+                    DiadoxosErgodothsModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_diad_erg,
+                        onoma: formData.onoma_diad_erg,
+                        dieythynsh: formData.dieythynsh_diad_erg,
+                        thlefono: formData.thlefono_diad_erg,
+                        afm: formData.afm_diad_erg,
+                        doy: formData.doy_diad_erg,
+                        titlos: formData.titlos_diad_erg,
+                        nomikhMorfh: formData.nomikhmorfh_diadoxosErgodoths,
+                        drasthriothta: formData.drasthriothta_diad_erg,
+                        email: formData.email_diad_erg,
+                    },
+                    { team, kodikos: kod }
+                );
+            }
 
-        if (formData.kod_em_erg !== null && formData.kod_em_erg !== "") {
-            const newEmmesosErgodoths = EmmesosErgodothsModel({
-                team: sessionUserTeam,
-                company_kod: aa_kod,
-                kodikos: formData.kod_em_erg,
-                eponymo: formData.eponymo_em_erg,
-                onoma: formData.onoma_em_erg,
-                dieythynsh: formData.dieythynsh_em_erg,
-                thlefono: formData.thlefono_em_erg,
-                afm: formData.afm_em_erg,
-                doy: formData.doy_em_erg,
-                titlos: formData.titlos_em_erg,
-                nomikhMorfh: formData.nomikh_morfh_em_erg,
-                drasthriothta: formData.drasthriothta_em_erg,
-                email: formData.email_em_erg,
-                daneismosApo: formData.daneismos_epa_apo_em_erg,
-                daneismosEos: formData.daneismos_epa_eos_em_erg,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            await EmmesosErgodothsModel.create(newEmmesosErgodoths);
-        }
-
-        if (formData.kod_diad_erg !== null && formData.kod_diad_erg !== "") {
-            const newDiadoxosErgodoths = DiadoxosErgodothsModel({
-                team: sessionUserTeam,
-                kodikos: formData.kod_diad_erg,
-                eponymo: formData.eponymo_diad_erg,
-                onoma: formData.onoma_diad_erg,
-                dieythynsh: formData.dieythynsh_diad_erg,
-                thlefono: formData.thlefono_diad_erg,
-                afm: formData.afm_diad_erg,
-                doy: formData.doy_diad_erg,
-                titlos: formData.titlos_diad_erg,
-                nomikhMorfh: formData.nomikh_morfh_diad_erg,
-                drasthriothta: formData.drasthriothta_diad_erg,
-                email: formData.email_diad_erg,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            });
-            await DiadoxosErgodothsModel.create(newDiadoxosErgodoths);
-        }
-
-        try {
             const savedCompany = await CompaniesModel.create(newCompany);
-            const companyId = savedCompany._id;
+            const companyId = savedCompany._id.toString();
 
-            const teamsInStampsPath = isWindows
-                ? 'C:/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/'
-                : '/home/ubuntu/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/';
-        
-            // Δημιουργία φακέλου stamps/team αν δεν υπάρχει
-            try {
-                await fs.access(teamsInStampsPath);
-            } catch {
-                await fs.mkdir(teamsInStampsPath, { recursive: true });
+            // handle stamp
+            const originalPath = isWindows ? "C:\\stamps\\sfragida.png" : "/home/ubuntu/stamps/sfragida.png";
+            let imagePath = "";
+            if (formData.sfragida && normalizeStr(formData.sfragida) !== "") {
+                const formDataValues = { eponymia: formData.eponymia, fatherName: formData.fatherName, firstName: formData.firstName };
+                try {
+                    imagePath = await renameAndMoveImage(originalPath, companyId, formDataValues, sessionUserTeam);
+                } catch (_) {
+                    imagePath = "";
+                }
             }
-        
-            let imagePath = isWindows
-                ? 'C:/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId.toString() + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png'
-                : '/home/ubuntu/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId.toString() + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png';
 
-            const originalPath = 'C:/stamps/sfragida.png';
-            const company = companyId.toString();
-            const formDataValues = {
-                eponymia: formData.eponymia.trim(),
-                fatherName: formData.fatherName.substring(0, 3),
-                firstName: formData.firstName.trim()
-            };
-            const teams = sessionUserTeam;
-            
-            if (formData.sfragida && formData.sfragida !== "") {
-                await renameAndMoveImage(originalPath, company, formDataValues, teams);
-            } else {
-                imagePath = '';
+            if (imagePath) {
+                await CompaniesModel.findByIdAndUpdate(companyId, { $set: { imagePath } }, { new: true }).exec();
             }
-    
-            newCompany.imagePath = imagePath; // Αποθηκεύω την τελική διαδρομή της εικόνας στο μοντέλο CompaniesModel
-            await newCompany.save(); // Ενημέρωση της εγγραφής με τη νέα διαδρομή εικόνας
 
-            res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
+            return res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
         } catch (error) {
-            console.log(error);
+            console.error(error);
+            return res.status(500).json({ success: false, message: "Σφάλμα δημιουργίας" });
         }
     };
 
     static choiseCompanies = async (req, res) => {
-        const locals = {
-            title: "Payroll",
-            description: "Web Payroll System",
-        };
-        
+        const locals = { title: "Payroll", description: "Web Payroll System" };
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
 
         try {
-            const companies = await CompaniesModel.findOne({ _id: req.params.id });
-            const parameter = await ParamModel.findOne({ usrId: sessionUserId });
-            const newParameters = ParamModel({
-                usrId: sessionUserId,
-                usrTeam: sessionUserTeam,
-                companyId: req.params.id,
-                usedPeriod: "",
-                usedYear: "",
-                appDate: "",
-            });
+            const companies = await CompaniesModel.findById(req.params.id).lean();
+            const parameter = await ParamModel.findOne({ usrId: sessionUserId }).lean();
 
             if (!parameter) {
-                await newParameters.save();
+                await new ParamModel({ usrId: sessionUserId, usrTeam: sessionUserTeam, companyId: req.params.id, usedPeriod: "", usedYear: "", appDate: "" }).save();
             } else {
                 await ParamModel.findByIdAndUpdate(parameter._id, {
-                    usrId: sessionUserId,
-                    usrTeam: sessionUserTeam,
-                    companyId: req.params.id,
-                    usedPeriod: parameter.usedPeriod,
-                    usedYear: parameter.usedYear,
-                    appDate: parameter.appDate,
-                });
+                        usrId: sessionUserId,
+                        usrTeam: sessionUserTeam,
+                        companyId: req.params.id,
+                        usedPeriod: parameter.usedPeriod,
+                        usedYear: parameter.usedYear,
+                        appDate: parameter.appDate,
+                }).exec();
             }
 
             req.session.companyInUse = req.params.id;
-            req.session.companyDescription = companies.eponymia + " " + companies.firstname;
-
+            req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`;
             redir = "mainapp";
-
         } catch (error) {
-            await res.flash("warning", "Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή" );
+            await res.flash("warning", "Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή");
             redir = "companies/companies/genikastoixeia";
         }
-        await res.render(redir, {
-            bodyClass: "custom-background",
-            locals
-        });
+
+        res.render(redir, { bodyClass: "custom-background", locals });
     };
 
     static editCompanyForm = async (req, res) => {
-        const locals   = {
-            title       : "Διόρθωση Εταιρείας",
-            description : "Web Payroll System",
-        };
+        const locals = { title: "Διόρθωση Εταιρείας", description: "Web Payroll System" };
 
         try {
-            /* ----- look-ups (τρέχουν παράλληλα) -------------------------- */
-            const [
-                perifereies,
-                nomikes_morfes,
-                pararthmata_efka,
-                doys,
-                tameia,
-            ] = await Promise.all([
+            const [perifereies, nomikes_morfes, pararthmata_efka, doys, tameia] = await Promise.all([
                 PerifereiesModel.find().sort("perigrafh"),
                 NomikesMorfesModel.find().sort("perigrafh"),
                 PararthmataEfkaModel.find().sort("perigrafh"),
@@ -649,33 +513,26 @@ class companiesController {
                 TameiaModel.find().sort("perigrafh"),
             ]);
 
-            /* ----- δεδομένα εταιρείας ------------------------------------ */
-            const companyId   = req.params.id;
+            const companyId = req.params.id;
             const companyData = await CompaniesModel.findById(companyId).lean();
 
-            /* ––– προεπιλογές (σταθερά στοιχεία) ––– */
-            for (let i = 1; i <= 6; i++) {
-                companyData[`koddrast${i}`] = companyData[`kad${i}`] || "";
-            }
-            companyData.nomikhmorfh_stathera   = companyData.nomikh_morfh   || "";
+            for (let i = 1; i <= 6; i++) companyData[`koddrast${i}`] = companyData[`kad${i}`] || "";
+            companyData.nomikhmorfh_stathera = companyData.nomikh_morfh || "";
             companyData.pararthmaefka_stathera = companyData.pararthma_efka || "";
-            companyData.doy_stathera           = companyData.doy_company    || "";
-            for (let i = 1; i <= 4; i++) {
-                companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || "";
-            }
+            companyData.doy_stathera = companyData.doy_company || "";
+            for (let i = 1; i <= 4; i++) companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || "";
 
-            /* ----- δεδομένα λογιστή (για pre-select ΔΟΥ) ------------------ */
-            const logisthsData = await LogisthsModel.findOne({ kodikos : companyData.logisths }).lean();
-
-            //  Περνάμε στο template την κρυφή τιμή για το dropdown
+            const logisthsData = await LogisthsModel.findOne({ kodikos: companyData.logisths }).lean();
             companyData.doy_logisths = logisthsData?.doy || "";
 
-            /* ----- mime type σφραγίδας ----------------------------------- */
-            const mimeType = companyData.sfragida
-                ? companyData.sfragida.split(";")[0].split(":")[1]
-                : "";
+            const emmesosErgodothsData = await EmmesosErgodothsModel.findOne({ kodikos: companyData.emmesos_ergodoths }).lean();
+            companyData.nomikhmorfh_emmesoyErgodoth = emmesosErgodothsData?.nomikhMorfh || "";
 
-            /* ----- render ------------------------------------------------- */
+            const diadoxosErgodothsData = await DiadoxosErgodothsModel.findOne({ kodikos: companyData.diadoxos_ergodoths }).lean();
+            companyData.nomikhmorfh_diadoxoyErgodoth = diadoxosErgodothsData?.nomikhMorfh || "";
+
+            const mimeType = companyData.sfragida ? companyData.sfragida.split(";")[0].split(":")[1] : "";
+
             res.render("companies/genikastoixeia/edit", {
                 locals,
                 perifereies,
@@ -683,31 +540,22 @@ class companiesController {
                 pararthmata_efka,
                 doys,
                 tameia,
-                mode   : "edit",
+                mode: "edit",
                 context: "company",
                 company: companyData,
-                rec    : companyData,   // alias για ευκολία
+                rec: companyData,
                 mimeType,
             });
-
         } catch (err) {
             console.error("editCompanyForm error →", err);
             res.status(500).send("Σφάλμα κατά τη φόρτωση δεδομένων.");
         }
     };
-    
-
-
-
-
 
     static getCompanyKads = async (req, res) => {
         try {
             const companyId = req.params.companyId;
-            const companyData = await CompaniesModel.findOne(
-                { _id: companyId },
-                "kad1 kad2 kad3 kad4 kad5 kad6"
-            );
+            const companyData = await CompaniesModel.findById(companyId, "kad1 kad2 kad3 kad4 kad5 kad6").lean();
             res.json(companyData);
         } catch (error) {
             console.error(error);
@@ -717,12 +565,10 @@ class companiesController {
 
     static getKadForEditForm = async (req, res) => {
         try {
-            const prefix = req.query.prefix;
-            const results = await KadModel.find({
-                kodikos: { $regex: `^${prefix}` },
-            });
+            const prefix = normalizeStr(req.query.prefix);
+            const results = await KadModel.find({ kodikos: { $regex: `^${prefix}` } });
             res.json(results);
-            } catch (error) {
+        } catch (error) {
             console.error(error);
             res.status(500).json({ message: "Σφάλμα κατά την ανάκτηση των ΚΑΔ" });
         }
@@ -731,36 +577,31 @@ class companiesController {
     static getCompanies = async (req, res) => {
         try {
             const companyId = req.params.companyId;
-            const companyData = await CompaniesModel.findOne({ _id: companyId });
+            const companyData = await CompaniesModel.findById(companyId).lean();
             res.json(companyData);
         } catch (error) {
             console.error(error);
-            res
-                .status(500)
-                .json({ message: "Σφάλμα κατά την ανάκτηση των λογιστών" });
+            res.status(500).json({ message: "Σφάλμα κατά την ανάκτηση των λογιστών" });
         }
     };
 
     static populateCompanyUsers = async (req, res) => {
         try {
             const companyId = req.params.companyId;
-            const companyUsers = await CompaniesModel.findOne({
-                _id: companyId,
-            }).populate("users");
+            const companyUsers = await CompaniesModel.findById(companyId).populate("users");
             res.json(companyUsers);
         } catch (error) {
-            res.json();
+            res.json(null);
         }
     };
 
     static getAllUsersByTeam = async (req, res) => {
-        const companyTeam = req.params.companyTeam;
-
         try {
+            const companyTeam = req.params.companyTeam;
             const user = await UserModel.find({ team: companyTeam });
             res.json(user);
         } catch (error) {
-            res.json();
+            res.json([]);
         }
     };
 
@@ -768,54 +609,32 @@ class companiesController {
         const sessionUserTeam = req.session.userTeam;
         const companyId = req.params.companyId;
 
-        // Καθορισμός διαδρομής για το αρχείο .png
-        const teamsInStampsPath = isWindows
-            ? 'C:/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/'
-            : '/home/ubuntu/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/';
-
-        // Δημιουργία φακέλου stamps/team αν δεν υπάρχει
         try {
-            await fs.access(teamsInStampsPath);
-        } catch {
-            // Ο κατάλογος δεν υπάρχει, επομένως τον δημιουργούμε
-            await fs.mkdir(teamsInStampsPath, { recursive: true });
-        }
-        
+            // ensure stamps dir exists
+            await fs.mkdir(stampsDir(sessionUserTeam), { recursive: true });
+        } catch (_) {}
+
         const formData = req.body;
 
-        let imagePath = isWindows
-            ? 'C:/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png'
-            : '/home/ubuntu/Payroll-NodeJs/public/stamps/teams/' + sessionUserTeam + '/' + companyId + '_' + formData.eponymia.trim() + '_' + formData.fatherName.substring(0, 3) + '_' + formData.firstName.trim() + '_sfragida.png';
-
-        const originalPath = 'C:/stamps/sfragida.png';
-        const company = companyId;
         const formDataValues = {
-            eponymia: formData.eponymia.trim(),
-            fatherName: formData.fatherName.substring(0, 3),
-            firstName: formData.firstName.trim()
+            eponymia: normalizeStr(formData.eponymia),
+            fatherName: normalizeStr(formData.fatherName).substring(0, 3),
+            firstName: normalizeStr(formData.firstName),
         };
-        const teams = sessionUserTeam;
-        
-        if (!formData.sfragida) {
-            imagePath = '';
-        } else {
-            try {
-                await renameAndMoveImage(originalPath, company, formDataValues, teams);
-            } catch (error) {
-                imagePath = '';
-            }
 
+        const originalPath = isWindows ? "C:\\stamps\\sfragida.png" : "/home/ubuntu/stamps/sfragida.png";
+        let imagePath = "";
+        if (formData.sfragida) {
+            try {
+                imagePath = await renameAndMoveImage(originalPath, companyId, formDataValues, sessionUserTeam);
+            } catch (_) {
+                imagePath = "";
+            }
         }
 
         if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
             return res.json({ success: false, message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (τουλάχιστον 1), <strong> στη σελίδα Διάφορα</strong>, που θα έχουν πρόσβαση στην εταιρεία` });
         }
-
-        const texnikosAsfaleiasKodikos = formData.kod_ta;
-        const iatrosErgasiasKodikos = formData.kod_ia;
-        const logisthsKodikos = formData.kod_lo;
-        const emmesosErgodothsKodikos = formData.kod_em_erg;
-        const diadoxosErgodothsKodikos = formData.kod_diad_erg;
 
         const filteredDataCompany = {
             eponymia: formData.eponymia,
@@ -866,162 +685,138 @@ class companiesController {
             keimeno_exoflhshs: formData.keimeno_exoflhshs,
             users: formData.selectedUsers,
             sfragida: formData.sfragida,
-            imagePath: imagePath,
-            updatedAt: Date.now(),
+            ...(imagePath ? { imagePath } : {}),
         };
 
-        // Τώρα μπορώ να χρησιμοποιήσω το filteredDataCompany στη $set: για ενημέρωση
-        await CompaniesModel.findOneAndUpdate(
-            { _id: companyId },
-            { $set: filteredDataCompany },
-            { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
-        );
+        try {
+            await CompaniesModel.findByIdAndUpdate(companyId, { $set: filteredDataCompany }, { new: true }).exec();
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ success: false, message: "Σφάλμα ενημέρωσης εταιρείας" });
+        }
 
-        if (texnikosAsfaleiasKodikos !== null && texnikosAsfaleiasKodikos !== "") {
-            const filteredDataTexnikosAsfaleias = {
-                eponymo: formData.eponymo_ta,
-                onoma: formData.onoma_ta,
-                afm: formData.afm_ta,
-                dieythynsh: formData.dieythynsh_ta,
-                thlefono: formData.thlefono_ta,
-                ores: formData.ores_ta,
-                ap_katatheshs: formData.ap_katatheshs_ta,
-                hmnia_katatheshs: formData.hmnia_katatheshs_ta,
-                isxyei_eos: formData.isxyei_eos_ta,
-                updatedAt: Date.now(),
-            };
-            await TexnikosAsfaleiasModel.findOneAndUpdate(
-                { kodikos: texnikosAsfaleiasKodikos },
-                {
-                    $set: filteredDataTexnikosAsfaleias,
-                    $setOnInsert: {
-                        // Όταν θέλω να οριστούν μόνο κατά τη δημιουργία εγγραφής
-                        team: sessionUserTeam,
-                        kodikos: formData.Kod_ta,
-                        createdAt: new Date(),
+        // related upserts (race-safe)
+        const team = normalizeUpper(sessionUserTeam);
+
+        const upserts = [];
+
+        if (normalizeStr(formData.kod_ta)) {
+            const kod = normalizeUpper(formData.kod_ta);
+            upserts.push(
+                upsertSafe(
+                    TexnikosAsfaleiasModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_ta,
+                        onoma: formData.onoma_ta,
+                        afm: formData.afm_ta,
+                        dieythynsh: formData.dieythynsh_ta,
+                        thlefono: formData.thlefono_ta,
+                        ores: formData.ores_ta,
+                        ap_katatheshs: formData.ap_katatheshs_ta,
+                        hmnia_katatheshs: formData.hmnia_katatheshs_ta,
+                        isxyei_eos: formData.isxyei_eos_ta,
                     },
-                },
-                { upsert: true, new: true }
+                    { team, kodikos: kod }
+                )
             );
         }
 
-        if (iatrosErgasiasKodikos !== null && iatrosErgasiasKodikos !== "") {
-            const filteredDataIatrosErgasias = {
-                eponymo: formData.eponymo_ia,
-                onoma: formData.onoma_ia,
-                afm: formData.afm_ia,
-                dieythynsh: formData.dieythynsh_ia,
-                thlefono: formData.thlefono_ia,
-                ores: formData.ores_ia,
-                ap_katatheshs: formData.ap_katatheshs_ia,
-                hmnia_katatheshs: formData.hmnia_katatheshs_ia,
-                isxyei_eos: formData.isxyei_eos_ia,
-                updatedAt: Date.now(),
-            };
-            await IatrosErgasiasModel.findOneAndUpdate(
-                { kodikos: iatrosErgasiasKodikos },
-                {
-                    $set: filteredDataIatrosErgasias,
-                    $setOnInsert: {
-                        // Όταν θέλω να οριστούν μόνο κατά τη δημιουργία εγγραφής
-                        team: sessionUserTeam,
-                        kodikos: formData.Kod_ia,
-                        createdAt: new Date(),
-                    },
-                },
-                { upsert: true, new: true }
+        if (normalizeStr(formData.kod_ia)) {
+            const kod = normalizeUpper(formData.kod_ia);
+            upserts.push(
+                upsertSafe(
+                    IatrosErgasiasModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_ia,
+                        onoma: formData.onoma_ia,
+                        afm: formData.afm_ia,
+                        dieythynsh: formData.dieythynsh_ia,
+                        thlefono: formData.thlefono_ia,
+                        ores: formData.ores_ia,
+                        ap_katatheshs: formData.ap_katatheshs_ia,
+                        hmnia_katatheshs: formData.hmnia_katatheshs_ia,
+                        isxyei_eos: formData.isxyei_eos_ia,
+                    },    
+                    { team, kodikos: kod }
+                )
             );
         }
 
-        if (logisthsKodikos !== null && logisthsKodikos !== "") {
-            const filteredDataLogisths = {
-                eponymo: formData.eponymo_lo,
-                onoma: formData.onoma_lo,
-                afm: formData.afm_lo,
-                dieythynsh: formData.dieythynsh_lo,
-                thlefono: formData.thlefono_lo,
-                doy: formData.doy_lo,
-                arithmos_adeias: formData.arithmos_adeias_lo,
-                kathgoria_adeias: formData.kathgoria_adeias_lo,
-                updatedAt: Date.now(),
-            };
-            await LogisthsModel.findOneAndUpdate(
-                { kodikos: logisthsKodikos },
-                {
-                    $set: filteredDataLogisths,
-                    $setOnInsert: {
-                        // Όταν θέλω να οριστούν μόνο κατά τη δημιουργία εγγραφής
-                        team: sessionUserTeam,
-                        kodikos: formData.Kod_lo,
-                        createdAt: new Date(),
+        if (normalizeStr(formData.kod_lo)) {
+            const kod = normalizeUpper(formData.kod_lo);
+            upserts.push(
+                upsertSafe(
+                    LogisthsModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_lo,
+                        onoma: formData.onoma_lo,
+                        afm: formData.afm_lo,
+                        dieythynsh: formData.dieythynsh_lo,
+                        thlefono: formData.thlefono_lo,
+                        doy: formData.doy_logisths,
+                        arithmos_adeias: formData.arithmos_adeias_lo,
+                        kathgoria_adeias: formData.kathgoria_adeias_lo,
                     },
-                },
-                { upsert: true, new: true }
+                    { team, kodikos: kod }
+                )
             );
         }
 
-        if (emmesosErgodothsKodikos !== null && emmesosErgodothsKodikos !== "") {
-            const filteredDataEmmesosErgodoths = {
-                eponymo: formData.eponymo_em_erg,
-                onoma: formData.onoma_em_erg,
-                dieythynsh: formData.dieythynsh_em_erg,
-                thlefono: formData.thlefono_em_erg,
-                afm: formData.afm_em_erg,
-                titlos: formData.titlos_em_erg,
-                nomikhMorfh: formData.nomikh_morfh_em_erg,
-                drasthriothta: formData.drasthriothta_em_erg,
-                email: formData.email_em_erg,
-                daneismosApo: formData.daneismos_epa_apo_em_erg,
-                daneismosEos: formData.daneismos_epa_eos_em_erg,
-                updatedAt: Date.now(),
-            };
-            await EmmesosErgodothsModel.findOneAndUpdate(
-                { kodikos: emmesosErgodothsKodikos },
-                {
-                    $set: filteredDataEmmesosErgodoths,
-                    $setOnInsert: {
-                        // Όταν θέλω να οριστούν μόνο κατά τη δημιουργία εγγραφής
-                        team: sessionUserTeam,
-                        kodikos: formData.Kod_em_erg,
-                        createdAt: new Date(),
+        if (normalizeStr(formData.kod_em_erg)) {
+            const kod = normalizeUpper(formData.kod_em_erg);
+            upserts.push(
+                upsertSafe(
+                    EmmesosErgodothsModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_em_erg,
+                        onoma: formData.onoma_em_erg,
+                        dieythynsh: formData.dieythynsh_em_erg,
+                        thlefono: formData.thlefono_em_erg,
+                        afm: formData.afm_em_erg,
+                        titlos: formData.titlos_em_erg,
+                        nomikhMorfh: formData.nomikhmorfh_emmesoyErgodoth,
+                        drasthriothta: formData.drasthriothta_em_erg,
+                        email: formData.email_em_erg,
+                        daneismosApo: formData.daneismos_epa_apo_em_erg,
+                        daneismosEos: formData.daneismos_epa_eos_em_erg,
                     },
-                },
-                { upsert: true, new: true }
+                    { team, kodikos: kod }
+                )
             );
         }
 
-        if (diadoxosErgodothsKodikos !== null && diadoxosErgodothsKodikos !== "") {
-            const filteredDataDiadoxosErgodoths = {
-                eponymo: formData.eponymo_diad_erg,
-                onoma: formData.onoma_diad_erg,
-                dieythynsh: formData.dieythynsh_diad_erg,
-                thlefono: formData.thlefono_diad_erg,
-                afm: formData.afm_diad_erg,
-                titlos: formData.titlos_diad_erg,
-                nomikhMorfh: formData.nomikh_morfh_diad_erg,
-                drasthriothta: formData.drasthriothta_diad_erg,
-                email: formData.email_diad_erg,
-                updatedAt: Date.now(),
-            };
-            await DiadoxosErgodothsModel.findOneAndUpdate(
-                { kodikos: diadoxosErgodothsKodikos },
-                {
-                    $set: filteredDataDiadoxosErgodoths,
-                    $setOnInsert: {
-                        // Όταν θέλω να οριστούν μόνο κατά τη δημιουργία εγγραφής
-                        team: sessionUserTeam,
-                        kodikos: formData.Kod_em_erg,
-                        createdAt: new Date(),
+        if (normalizeStr(formData.kod_diad_erg)) {
+            const kod = normalizeUpper(formData.kod_diad_erg);
+            upserts.push(
+                upsertSafe(
+                    DiadoxosErgodothsModel,
+                    { team, kodikos: kod },
+                    {
+                        eponymo: formData.eponymo_diad_erg,
+                        onoma: formData.onoma_diad_erg,
+                        dieythynsh: formData.dieythynsh_diad_erg,
+                        thlefono: formData.thlefono_diad_erg,
+                        afm: formData.afm_diad_erg,
+                        titlos: formData.titlos_diad_erg,
+                        nomikhMorfh: formData.nomikhmorfh_diadoxoyErgodoth,
+                        drasthriothta: formData.drasthriothta_diad_erg,
+                        email: formData.email_diad_erg,
                     },
-                },
-                { upsert: true, new: true }
+                    { team, kodikos: kod }
+                )
             );
         }
 
         try {
-            res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
+            await Promise.all(upserts);
+            return res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
         } catch (error) {
-            throw error;
+            console.error(error);
+            return res.status(500).json({ success: false, message: "Σφάλμα ενημέρωσης" });
         }
     };
 
@@ -1030,16 +825,25 @@ class companiesController {
             await CompaniesModel.deleteOne({ _id: req.params.id });
             res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
         } catch (error) {
-            throw error;
+            res.status(500).json({ success: false, message: "Σφάλμα διαγραφής" });
         }
+  
+
+
+
+
+
+
     };
 
-    static highlightText(text, term) {
+    static highlightText(text = "", term = "") {
         const highlightStartTag = "<span class='highlight'>";
         const highlightEndTag = "</span>";
-        const regex = new RegExp(`(${term})`, "gi");
-        return text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
+        const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (!safe) return text;
+        const regex = new RegExp(`(${safe})`, "gi");
+        return String(text).replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
     }
 }
 
- module.exports = companiesController;
+module.exports = companiesController;

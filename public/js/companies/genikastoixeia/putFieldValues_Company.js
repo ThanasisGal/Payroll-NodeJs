@@ -76,7 +76,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 4) 204 No Content → δικό μας redirect
             if (response.status === 204) {
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -86,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         title: "custom-title",
                         popup: "custom-swal-popup",
                     },
-                }).then(() => window.location.href = `/companies/genikastoixeia/edit/${companyId}`);
+                }).then(() => window.location.href = "/companies/genikastoixeia");
+                // }).then(() => window.location.href = `/companies/genikastoixeia/edit/${companyId}`);
                 return;
             }
 
@@ -97,7 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -107,13 +112,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         title: "custom-title",
                         popup: "custom-swal-popup",
                     },
-                }).then(() => window.location.href = data.redirectUrl || `/companies/genikastoixeia/edit/${companyId}`);
+                }).then(() => window.location.href = data.redirectUrl || "/companies/genikastoixeia");
+                // }).then(() => window.location.href = data.redirectUrl || `/companies/genikastoixeia/edit/${companyId}`);
                 return;
             }
 
             // 6) Άλλος content-type αλλά ok
             if (response.ok) {
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής ενημέρωση!",
                     timer: 1200,
@@ -123,7 +131,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         title: "custom-title",
                         popup: "custom-swal-popup",
                     },
-                }).then(() => window.location.href = `/companies/genikastoixeia/edit/${companyId}`);
+                }).then(() => window.location.href = "/companies/genikastoixeia");
+                // }).then(() => window.location.href = `/companies/genikastoixeia/edit/${companyId}`);
                 return;
             }
 
@@ -131,8 +140,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(`HTTP error ${response.status}`);
 
         } catch (err) {
-            console.error("Σφάλμα:", err);
-            Swal.fire({
+            await Swal.fire({
+                backdrop: false,            // overlay
+                allowOutsideClick: false,
                 icon: "error",
                 title: "Αποτυχία αποθήκευσης",
                 timer: 1200,

@@ -1,26 +1,41 @@
+const twoSpaces = '\u00A0'.repeat(2);
+
 document.addEventListener("DOMContentLoaded", async function () {
   const companyId = document.getElementById("companyId").value;
   const companyTeam = document.getElementById("companyTeam").value;
 
-  async function fetchAllUsers(companyTeam) {
-    const response = await fetch(`/api/allUsersByTeam/${companyTeam}`);
-    if (!response.ok) throw new Error("Failed to fetch users");
-    return await response.json();
+  const csrfToken = document
+    .querySelector('meta[name="csrf-token"]')
+    ?.getAttribute("content");
+
+  const fetchOpts = {
+    credentials: "same-origin", // στέλνει cookies στο ίδιο origin
+    headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+  };
+
+  async function fetchAllUsers(team) {
+    const res = await fetch(`/api/allUsersByTeam/${encodeURIComponent(team)}`, fetchOpts);
+    if (!res.ok) throw new Error("Failed to fetch users");
+    return res.json();
   }
 
-  async function fetchCompanyUsers(companyId) {
-    const response = await fetch(`/api/companyUsers/${companyId}`);
-    if (!response.ok) throw new Error("Failed to fetch company users");
-    return await response.json();
+  async function fetchCompanyUsers(id) {
+    const res = await fetch(`/api/companyUsers/${encodeURIComponent(id)}`, fetchOpts);
+    if (!res.ok) throw new Error("Failed to fetch company users");
+    return res.json();
   }
 
   try {
-    const allUsers = await fetchAllUsers(companyTeam);
-    const companyUsers = await fetchCompanyUsers(companyId);
-    const selectedUserIds = companyUsers.users.map((user) => user._id);
+    const [allUsers, companyUsers] = await Promise.all([
+      fetchAllUsers(companyTeam),
+      fetchCompanyUsers(companyId),
+    ]);
+
+    const selectedUserIds = (companyUsers.users || []).map(u => u._id);
     const selectElement = document.getElementById("selectedUsers");
 
     allUsers.forEach((user) => {
+      // ασφάλεια: ποτέ innerHTML εδώ — χρησιμοποιούμε το Option constructor (ok)
       const option = new Option(
         user.lastName + twoSpaces + user.firstName,
         user._id,

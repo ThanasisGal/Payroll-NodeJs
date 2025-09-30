@@ -66,66 +66,69 @@
     </div>
 
     <div class="card-footer cardFooter">
-        <div
-            class="d-inline-block d-flex cardFooter01">
-            <a 
-                id="add-btn"
-                href="/companies/genikastoixeia/add"
-                role="button"
-                data-bs-toggle="tooltip" title="Προσθήκη νέας εταιρείας."
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-1-3 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-plus-circle"></i> Νέα Εταιρεία
-            </a>
+        <div class="d-inline-block d-flex cardFooter01">
+            <div class="d-flex cardFooter02">
+                <a 
+                    id="add-btn"
+                    href="/companies/genikastoixeia/add"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Προσθήκη νέας εταιρείας."
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-plus-circle"></i> Νέα Εταιρεία
+                </a>
 
-            <a 
-                id="edit-btn"
-                href="#"
-                role="button"
-                data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση..."
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-3 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
-            </a>
+                <a 
+                    id="edit-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση..."
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+                </a>
 
-            <a 
-                id="select-btn"
-                href="#"
-                role="button"
-                data-bs-toggle="tooltip" title="Επιλέξτε την εταιρεία..."
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-success rounded-4 buttons-content mb-3 mt-2 col-3-5 <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-check2-circle"></i> Επιλογή Εταιρείας
-            </a>
+                <a 
+                    id="select-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Επιλέξτε την εταιρεία..."
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-success rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-check2-circle"></i> Επιλογή Εταιρείας
+                </a>
 
-            <a 
-                id="delete-btn"
-                href="#"
-                role="button"
-                data-bs-toggle="tooltip" title="Διαγραφή της επιλεγμένης εταιρείας."
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-3 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-trash"></i> Διαγραφή
-            </a>
+                <a 
+                    id="delete-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Διαγραφή της επιλεγμένης εταιρείας."
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-trash"></i> Διαγραφή
+                </a>
 
-            <a 
-                href="/mainapp"
-                role="button"
-                data-bs-toggle="tooltip"
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
-                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-1-3">
-                <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
-            </a>
+                <a 
+                    href="/mainapp"
+                    role="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
+                    <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+            </div>
+
+            <div class="d-flex width-percent-15"></div>
 
             <% if (company) { %>
                 <nav class="col-2" aria-label="Dashboard Pagination">

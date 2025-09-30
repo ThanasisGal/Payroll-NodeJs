@@ -22,7 +22,7 @@
     </form>
 </div>
 
-<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-1 overflow-hidden"">
+<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-4 overflow-hidden"">
     <div class="card-header p-0 height-rem-3_5">
         <label class="text-center w-100 headers-content mt-2">
         Διαχείριση Υποκαταστημάτων
@@ -45,7 +45,7 @@
 
     <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-58 bg-white">
         <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
-            <body>
+            <tbody>
                 <% if (ypokatasthmata.length !== 0) { %>
                     <% ypokatasthmata.forEach(element => { %>
                         <tr class="input-content-regular" data-id="<%= element._id %>" id="myTableRow">
@@ -61,59 +61,62 @@
                         <td colspan="5" class="records-not-found">Δεν βρέθηκαν εγγραφές.</td>
                     </tr>
                 <% } %>
-            </body>
+            </tbody>
         </table>
     </div>
 
     <div class="card-footer mt-auto cardFooter">
         <div class="d-inline-block d-flex cardFooter01">
+            <div class="d-flex cardFooter02">
+                <a 
+                    id="add-btn""
+                    href="/companies/ypokatasthmata/add" 
+                    role="button"
+                    data-bs-toggle="tooltip" title="Προσθήκη νέου υποκαταστήματος"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-plus-circle"></i> Εισαγωγή
+                </a>
+            
+                <a 
+                    id="edit-btn""
+                    href="#" 
+                    role="button"
+                    data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου υποκαταστήματος"
+                    data-tooltip-max-width="15vw"
+                    data-bs-placement="top" 
+                    class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+                </a>
+            
+                <a 
+                    id="delete-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Διαγραφή των στοιχείων του επιλεγμένου υποκαταστήματος"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-trash"></i> Διαγραφή
+                </a>
 
-            <a 
-                id="add-btn""
-                href="/companies/ypokatasthmata/add" 
-                role="button"
-                data-bs-toggle="tooltip" title="Προσθήκη νέου υποκαταστήματος"
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-plus-circle"></i> Εισαγωγή
-            </a>
-        
-            <a 
-                id="edit-btn""
-                href="#" 
-                role="button"
-                data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου υποκαταστήματος"
-                data-tooltip-max-width="15vw"
-                data-bs-placement="top" 
-                class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
-            </a>
-        
-            <a 
-                id="delete-btn"
-                href="#"
-                role="button"
-                data-bs-toggle="tooltip" title="Διαγραφή των στοιχείων του επιλεγμένου υποκαταστήματος"
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
-                data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
-                <i class="buttons-content bi bi-trash"></i> Διαγραφή
-            </a>
+                <a 
+                    href="/mainapp"
+                    role="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2-5">
+                    <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+            </div>
 
-            <a 
-                href="/mainapp"
-                role="button"
-                data-bs-toggle="tooltip"
-                data-bs-placement="top"
-                data-tooltip-max-width="15vw"
-                title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
-                class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
-                <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
-            </a>
+            <div class="d-flex width-percent-15"></div>
 
             <% if (ypokatasthmata) { %>
                 <nav class="col-2" aria-label="Dashboard Pagination">

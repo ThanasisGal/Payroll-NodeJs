@@ -1,4 +1,6 @@
-<div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody9">
+<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-48 bg-white" id="cardBody9">
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
             <label for="kod_em_erg" class="col-form-label label-font-size">Κωδικός</label>
@@ -77,14 +79,37 @@
         </div>
 
         <div class="col-1-5 right-align">
-            <label for="nomikh_morfh_em_erg" class="col-form-label label-font-size">Νομική Μορφή</label>
+            <label
+                for="nomikhmorfh_emmesoyErgodoth"
+                class="col-form-label label-font-size">
+                    Νομική Μορφή
+            </label>
         </div>
-        <div class="col-4">
+        <input
+            type="hidden"
+            name="nomikhmorfh_emmesoyErgodoth"
+            id="nomikhmorfh_emmesoyErgodoth"
+            class="form-control input-contents"
+            value="<%= safe("nomikhmorfh_emmesoyErgodoth") %>"
+            readonly
+        />
+        <div class="col-3-75">
             <select
-                class="form-select selectpicker-dropdown-normal"
-                data-live-search="true"
-                name="nomikh_morfh_em_erg"
-                id="nomikh_morfh_em_erg">
+                id="nomikh_morfh_emmesoy_Ergodoth"
+                name="nomikh_morfh_emmesoy_Ergodoth"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Νομική Μορφή"
+                data-api="/api/dropdown/emmesosErgodoths"
+                single
+                data-target-input=<%= `nomikhmorfh_emmesoyErgodoth` %>
+                data-preselect=<%= `nomikhmorfh_emmesoyErgodoth` %>
+                data-preload-all="true"
+                data-pad-length="3"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Νομικής Μορφής">
             </select>
         </div>
     </div>

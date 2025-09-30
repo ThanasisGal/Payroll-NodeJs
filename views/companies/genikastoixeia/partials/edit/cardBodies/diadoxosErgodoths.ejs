@@ -1,4 +1,6 @@
-<div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody8">
+<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-48 bg-white" id="cardBody8">
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
     <div class="row form-group g-3 align-items-center mb-3">
         <div class="col-1-5 right-align">
             <label for="kod_diad_erg" class="col-form-label label-font-size">Κωδικός</label>
@@ -77,6 +79,40 @@
         </div>
 
         <div class="col-1-5 right-align">
+            <label
+                for="nomikhmorfh_diadoxoyErgodoth"
+                class="col-form-label label-font-size">
+                    Νομική Μορφή
+            </label>
+        </div>
+        <input
+            type="hidden"
+            name="nomikhmorfh_diadoxoyErgodoth"
+            id="nomikhmorfh_diadoxoyErgodoth"
+            class="form-control input-contents"
+            value="<%= safe("nomikhmorfh_diadoxoyErgodoth") %>"
+            readonly
+        />
+        <div class="col-3-75">
+            <select
+                id="nomikh_morfh_diadoxoy_Ergodoth"
+                name="nomikh_morfh_diadoxoy_Ergodoth"
+                class="tom-dropdown selectpicker-dropdown-normal left-align"
+                aria-label="Νομική Μορφή"
+                data-api="/api/dropdown/diadoxosErgodoths"
+                single
+                data-target-input=<%= `nomikhmorfh_diadoxoyErgodoth` %>
+                data-preselect=<%= `nomikhmorfh_diadoxoyErgodoth` %>
+                data-preload-all="true"
+                data-pad-length="3"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Νομικής Μορφής">
+            </select>
+        </div>
+        <!-- <div class="col-1-5 right-align">
             <label for="nomikh_morfh_diad_erg" class="col-form-label label-font-size">Νομική Μορφή</label>
         </div>
         <div class="col-4">
@@ -86,7 +122,7 @@
                 name="nomikh_morfh_diad_erg"
                 id="nomikh_morfh_diad_erg">
             </select>
-        </div>
+        </div> -->
     </div>
 
     <div class="row form-group g-3 align-items-center mb-3">

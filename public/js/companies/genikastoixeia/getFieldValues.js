@@ -63,7 +63,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // }
 
             if (errors.length) {
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "error",
                     title: "Προσοχή!",
                     html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
@@ -110,7 +112,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 4) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
             if (response.status === 204) {
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής καταχώριση!",
                     timer: 1200,
@@ -131,7 +135,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής καταχώριση!",
                     timer: 1200,
@@ -149,7 +155,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 6) Άλλος content-type αλλά OK (π.χ. HTML)
             if (response.ok) {
-                Swal.fire({
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
                     icon: "success",
                     title: "Επιτυχής καταχώριση!",
                     timer: 1200,
@@ -167,7 +175,9 @@ document.addEventListener("DOMContentLoaded", () => {
             throw new Error(`HTTP error ${response.status}`);
 
         } catch (err) {
-            Swal.fire({
+            await Swal.fire({
+                backdrop: false,            // overlay
+                allowOutsideClick: false,
                 icon: "error",
                 title: "Αποτυχία αποθήκευσης",
                 timer: 1200,

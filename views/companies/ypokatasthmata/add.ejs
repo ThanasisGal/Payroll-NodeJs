@@ -10,12 +10,10 @@
 
         <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-        <body data-mode="<%= mode %>" data-context="<%= context %>"></body>
-
         <div class="sections">
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
                 <div>
-                    <form action="/companies/ypokatasthmata/add" method="POST" class="formRadius">
+                    <form class="formRadius">
 
                         <%- include('../../partials/_csrfField') %>
 
@@ -26,9 +24,15 @@
                             </div>
 
                             <div class="card-body overflow-auto flex-grow-1 w-100 bg-white" id="cardBody">
-                                <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
-                                <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
-                                <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+                                <input 
+                                    type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" 
+                                />
+                                <input 
+                                    type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" 
+                                />
+                                <input 
+                                    type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" 
+                                />
 
                                 <div class="row form-group g-3 align-items-center">
                                     <div class="col-1-5 right-align">
@@ -881,26 +885,6 @@
                                             placeholder="Αναζήτηση Παραρτήματος ΕΦΚΑ">
                                         </select>
                                     </div>
-
-
-
-                                    <!-- <div class="col-1-5 right-align">
-                                        <label
-                                            for="pararthma_efka_ergolaboy"
-                                            class="col-form-label label-font-size-smaller">
-                                                Παράρτ.ΕΦΚΑ Εργ/βου
-                                        </label>
-                                    </div>
-                                    <div class="col-4">
-                                        <select
-                                            class="form-select selectpicker-dropdown-normal"
-                                            data-live-search="true"
-                                            data-toggle-additional="ypergolabia"
-                                            data-toggle="pararthma_efka_ergolaboy"
-                                            name="pararthma_efka_ergolaboy"
-                                            id="pararthma_efka_ergolaboy"
-                                        ></select>
-                                    </div> -->
                                 </div>
 
                                 <div class="row form-group g-3 align-items-center mb-4">
@@ -972,6 +956,7 @@
 </div>
 
 <% const isProduction = NODE_ENV === 'production'; %>
+
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>

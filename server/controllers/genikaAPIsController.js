@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Models = require("../models/stathera_arxeia");
+const Models_Companies = require("../models/companies");
 const Models_Symbaseon = require("../models/symbaseis");
 
 const {
@@ -57,6 +58,8 @@ const {
         KathgoriesAdeiasModel,
         GenikesParametroiModel
       } = Models;
+
+const { NomimoiEkprosopoiModel } = Models_Companies
 
 const { SymbaseisModel,
         KathgoriesSymbaseonModel,
@@ -398,6 +401,40 @@ class genikaAPIsController {
     }
   };
 
+  static checkNomimosEkprosopos = async (req, res) => {
+    try {
+      const { afm_ekprosopoy } = req.body;
+      let aa_kod_ekpr = null;
+      const lastRecord_ekpr = await NomimoiEkprosopoiModel.find({})
+        .sort({ _id: -1 })
+        .limit(1);
+      aa_kod_ekpr =
+        lastRecord_ekpr[0] && lastRecord_ekpr[0].kodikos
+          ? parseInt(lastRecord_ekpr[0].kodikos, 10)
+          : null;
+
+      const doc = await NomimoiEkprosopoiModel.findOne({ afm: afm_ekprosopoy });
+
+      const afm_nomimoy_ekprosopoy = doc && doc.afm !== undefined ? doc.afm : null;
+
+      if (aa_kod_ekpr === null && afm_ekprosopoy !== null) {
+        aa_kod_ekpr = 1;
+      } else if (aa_kod_ekpr !== null && afm_nomimoy_ekprosopoy != null) {
+        aa_kod_ekpr = null;
+      } else if (aa_kod_ekpr !== null && afm_nomimoy_ekprosopoy === null) {
+        aa_kod_ekpr++;
+      } else if (aa_kod_ekpr === null && afm_ekprosopoy === null) {
+        aa_kod_ekpr = null;
+      }
+
+      if (doc || aa_kod_ekpr) {
+        res.json({ doc, aa_kod_ekpr });
+      }
+    } catch (err) {
+      res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
+    }
+  };
+
   static getKad = async (req, res) => {
     try {
       const searchData = [];
@@ -587,6 +624,21 @@ class genikaAPIsController {
       res.json(typosTaytothtas);
     } catch (error) {
       res.status(500).send(error);
+    }
+  };
+
+    static getNomimosEkprosopos = async (req, res) => {
+    try {
+      const kodikosNomimoyEkprosopoy = req.params.kodikosNomimoyEkprosopoy;
+      const nomimoiEkprosopoi = await NomimoiEkprosopoiModel.find({
+        kodikos: kodikosNomimoyEkprosopoy,
+      }).sort("eponymia");
+      res.json(nomimoiEkprosopoi);
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Σφάλμα κατά την ανάκτηση των Νόμιμων Εκπροσώπων" });
     }
   };
 
