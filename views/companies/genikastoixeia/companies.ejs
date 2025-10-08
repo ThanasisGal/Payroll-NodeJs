@@ -21,7 +21,7 @@
     </form>
 </div>
 
-<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-1 overflow-hidden">
+<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-4 overflow-hidden">
 
     <div class="card-header p-0 height-rem-3_5">
         <label class="text-center w-100 headers-content mt-2"> Διαχείριση Εταιρειών </label>
@@ -48,7 +48,7 @@
                 <% if (company) { %>
                     <% company.forEach(element => { %>
                         <tr class="input-content-regular" data-id="<%= element._id %>" id="myTableRow">
-                            <td class="col-1"><%= element.kod %></td>
+                            <td class="col-1 padding-left-rem-0_5"><%= element.kod %></td>
                             <td class="col-3-25"><%= element.eponymia %></td>
                             <td class="col-2"><%= element.firstname %></td>
                             <td class="col-1-75"><%= element.fathername %></td>
@@ -131,9 +131,10 @@
             <div class="d-flex width-percent-15"></div>
 
             <% if (company) { %>
+                <!-- Pagination -->
                 <nav class="col-2" aria-label="Dashboard Pagination">
                     <ul class="pagination pagination-sm justify-content-end mt-2">
-                        <% if (current == 1) { %>
+                        <% if (Number(current) === 1) { %>
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
                             </li>
@@ -147,33 +148,38 @@
                             <li class="page-item">
                                 <a href="/companies/genikastoixeia/?page=<%= Number(current) - 1 %>" class="page-link"><i class="bi bi-chevron-left font-size-vw-0_5"></i></a>
                             </li>
-                        <% } %> 
-                        <% var i = Number(current) > 2 ? Number(current) -1 : 1 %> 
-                        
+                        <% } %>
+
+                        <% var i = Number(current) > 2 ? Number(current) - 1 : 1; %>
+
                         <% if (i !== 1) { %>
-                            <li class="page-item disabled"><a href="#" class="page-link font-size-vw-0_5">...</a></li>
-                        <% } %> 
-                        
-                        <% for( ; i <= (Number(current) + 2) && i <= pages; i++) { %> 
-                            <% if (i == current) { %>
-                                <li class="page-item">
-                                    <a href="#" class="page-link pageItem font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></a>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link font-size-vw-0_5">...</a>
+                            </li>
+                        <% } %>
+
+                        <% for (; i <= (Number(current) + 1) && i <= pages; i++) { %>
+                            <% if (i === Number(current)) { %>
+                                <li class="page-item is-current" aria-current="page">
+                                    <span class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></span>
                                 </li>
                             <% } else { %>
                                 <li class="page-item fsvw-0_7">
                                     <a href="/companies/genikastoixeia/?page=<%= i %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></a>
                                 </li>
-                            <% } %> 
-                    
-                            <% if (i == Number(current) + 2 && i < pages) { %>
-                                <li class="page-item disabled"><a href="#" class="page-link font-size-vw-0_5">...</a></li>
+                            <% } %>
+
+                            <% if (i === Number(current) + 1 && i < pages) { %>
+                                <li class="page-item disabled">
+                                    <a href="#" class="page-link font-size-vw-0_5">...</a>
+                                </li>
                                 <li class="page-item">
                                     <a href="/companies/genikastoixeia/?page=<%= pages %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= pages %></a>
                                 </li>
-                            <% } %> 
-                        <% } %> 
-                        
-                        <% if (current == pages) { %>
+                            <% } %>
+                        <% } %>
+
+                        <% if (Number(current) === Number(pages)) { %>
                             <li class="page-item disabled">
                                 <a href="#" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
                             </li>
@@ -185,8 +191,7 @@
                                 <a href="/companies/genikastoixeia/?page=<%= Number(current) + 1 %>" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
                             </li>
                             <li class="page-item fsvw-0_7">
-                                <a href="/companies/genikastoixeia/?page=<%= pages %>" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i
-                                ></a>
+                                <a href="/companies/genikastoixeia/?page=<%= pages %>" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i></a>
                             </li>
                         <% } %>
                     </ul>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- top-left arrow -->
+    <path d="M8 3H4v4"/>
+    <path d="M4 3l5 5"/>
+    <!-- top-right arrow -->
+    <path d="M16 3h4v4"/>
+    <path d="M20 3l-5 5"/>
+    <!-- bottom-left arrow -->
+    <path d="M8 21H4v-4"/>
+    <path d="M4 21l5-5"/>
+    <!-- bottom-right arrow -->
+    <path d="M16 21h4v-4"/>
+    <path d="M20 21l-5-5"/>
+  </g>
+</svg>

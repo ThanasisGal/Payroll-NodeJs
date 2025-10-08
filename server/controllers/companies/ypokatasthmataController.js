@@ -162,64 +162,64 @@ class ypokatasthmataController {
         }
 
         const newYpokatasthma = YpokatasthmataModel({
-        team: formData.companyTeam,
-        companykod_object: formData.companyId,
-        companykod: formData.companyKodikos,
-        kodikos: formatNumber(aa_kod, 4),
-        perigrafh: formData.perigrafh,
-        odos: formData.odos,
-        arithmos: formData.arithmos,
-        tk: formData.tk,
-        perifereia: (formData.perifereies =
-            formData.perifereies === null || formData.perifereies === ""
-            ? "00"
-            : formData.perifereies),
-        nomos: (formData.nomos =
-            formData.nomos === null || formData.nomos === ""
-            ? "0000"
-            : formData.nomos),
-        dhmos: (formData.dhmos =
-            formData.dhmos === null || formData.dhmos === ""
-            ? "0000"
-            : formData.dhmos),
-        polh: (formData.polh =
-            formData.polh === null || formData.polh === ""
-            ? "00000000"
-            : formData.polh),
-        pararthma_efka: formData.pararthma_efka,
-        drasthriothta: formData.drasthriothta,
-        thlefono: formData.thlefono,
-        fax: formData.fax,
-        email: formData.email,
-        apasxolhsh5hmeron: formData.apasxolhsh5hmeron,
-        epoxikothta: formData.epoxikothta,
-        ap_pinaka: formData.ap_pinaka,
-        hmnia_katatheshs: formData.hmnia_katatheshs,
-        oikodomika_erga: formData.oikodomika_erga,
-        amoe: formData.amoe,
-        eidos_ergoy: formData.eidos_ergoy,
-        username_ergoy: formData.username_ergoy,
-        password_ergoy: formData.password_ergoy,
-        ypergolabia: formData.ypergolabia,
-        afm_ergolaboy: formData.afm_ergolaboy,
-        eponymo_ergolaboy: formData.eponymo_ergolaboy,
-        onoma_ergolaboy: formData.onoma_ergolaboy,
-        patronymo_ergolaboy: formData.patronymo_ergolaboy,
-        odos_ergolaboy: formData.odos_ergolaboy,
-        arithmos_ergolaboy: formData.arithmos_ergolaboy,
-        tk_ergolaboy: formData.tk_ergolaboy,
-        polh_ergolaboy: formData.polh_ergolaboy,
-        ame_ergolaboy: formData.ame_ergolaboy,
-        pararthma_efka_ergolaboy: (formData.pararthma_efka_ergolaboy =
-            formData.pararthma_efka_ergolaboy === null || formData.pararthma_efka_ergolaboy === ""
-            ? "   "
-            : formData.pararthma_efka_ergolaboy),
-        sepe_ergoy: formData.sepe,
-        dypa_ergoy: formData.dypa,
-        username_ypergol_ergoy: formData.username_ypergol_ergoy,
-        password_ypergol_ergoy: formData.password_ypergol_ergoy,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+            team: formData.companyTeam,
+            companykod_object: formData.companyId,
+            companykod: formData.companyKodikos,
+            kodikos: formatNumber(aa_kod, 4),
+            perigrafh: formData.perigrafh,
+            odos: formData.odos,
+            arithmos: formData.arithmos,
+            tk: formData.tk,
+            perifereia: (formData.perifereies =
+                formData.perifereies === null || formData.perifereies === ""
+                ? "00"
+                : formData.perifereies),
+            nomos: (formData.nomos =
+                formData.nomos === null || formData.nomos === ""
+                ? "0000"
+                : formData.nomos),
+            dhmos: (formData.dhmos =
+                formData.dhmos === null || formData.dhmos === ""
+                ? "0000"
+                : formData.dhmos),
+            polh: (formData.polh =
+                formData.polh === null || formData.polh === ""
+                ? "00000000"
+                : formData.polh),
+            pararthma_efka: formData.pararthma_efka,
+            drasthriothta: formData.drasthriothta,
+            thlefono: formData.thlefono,
+            fax: formData.fax,
+            email: formData.email,
+            apasxolhsh5hmeron: formData.apasxolhsh5hmeron,
+            epoxikothta: formData.epoxikothta,
+            ap_pinaka: formData.ap_pinaka,
+            hmnia_katatheshs: formData.hmnia_katatheshs,
+            oikodomika_erga: formData.oikodomika_erga,
+            amoe: formData.amoe,
+            eidos_ergoy: formData.eidos_ergoy,
+            username_ergoy: formData.username_ergoy,
+            password_ergoy: formData.password_ergoy,
+            ypergolabia: formData.ypergolabia,
+            afm_ergolaboy: formData.afm_ergolaboy,
+            eponymo_ergolaboy: formData.eponymo_ergolaboy,
+            onoma_ergolaboy: formData.onoma_ergolaboy,
+            patronymo_ergolaboy: formData.patronymo_ergolaboy,
+            odos_ergolaboy: formData.odos_ergolaboy,
+            arithmos_ergolaboy: formData.arithmos_ergolaboy,
+            tk_ergolaboy: formData.tk_ergolaboy,
+            polh_ergolaboy: formData.polh_ergolaboy,
+            ame_ergolaboy: formData.ame_ergolaboy,
+            pararthma_efka_ergolaboy: (formData.pararthma_efka_ergolaboy =
+                formData.pararthma_efka_ergolaboy === null || formData.pararthma_efka_ergolaboy === ""
+                ? "   "
+                : formData.pararthma_efka_ergolaboy),
+            sepe_ergoy: formData.sepe,
+            dypa_ergoy: formData.dypa,
+            username_ypergol_ergoy: formData.username_ypergol_ergoy,
+            password_ypergol_ergoy: formData.password_ypergol_ergoy,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
         });
 
         try {

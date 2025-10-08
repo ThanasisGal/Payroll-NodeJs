@@ -144,7 +144,7 @@ class mainAppController {
             redir = "companies/genikastoixeia/companies";
         }
         await res.render(redir, {
-            bodyClass: "custom-background"
+            bodyClass: "home-bg-cdn"
         });
     };
 
@@ -235,7 +235,7 @@ class mainAppController {
             await res.flash("error", "Αδυναμία Αλλαγής Περιόδου Εργασίας. Επικοινωνείστε με τον Διαχειριστή");
             redir = "companies/companies/genikastoixeia";
         }
-        await res.render(redir, { bodyClass: "custom-background" });
+        await res.render(redir, { bodyClass: "home-bg-cdn" });
     };
 
     static getAppDateForm = async (req, res) => {

@@ -54,14 +54,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 await Swal.fire({
                     backdrop: false,            // overlay
                     allowOutsideClick: false,
-                    icon: "error",
+                    icon: "warning",
                     title: "Προσοχή!",
                     html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
                     confirmButtonText: "Κλείσιμο",
                     showConfirmButton: true,
                     confirmButtonText: "Κλείσιμο",
                     customClass: {
-                        confirmButton: "class-error custom-confirm-button custom-swal-button",
+                        confirmButton: "class-warning custom-confirm-button custom-swal-button",
                         title: "custom-title",
                         popup: "custom-swal-popup",
                     },

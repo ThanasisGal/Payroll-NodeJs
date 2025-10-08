@@ -54,7 +54,6 @@
                                         </label>
                                     </div>
 
-
                                     <div class="col-1-5 right-align">
                                         <label for="aa_eggrafhs" class="col-form-label label-font-size black"> 
                                             α/α Εγγραφής 
@@ -66,6 +65,7 @@
                                         </label>
                                     </div>
                                 </div>
+                                <input type="hidden" name="aa_eggrafhs" id="aa_eggrafhs" value="<%= totalRecs.toString().padStart(4, '0') %>" />
 
                                 <hr class="division"></hr>
 
@@ -165,10 +165,17 @@
     </div>
 </div>
 
-<script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/navTabs.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/companies/antistoixiseis/getFieldValues.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/companies/antistoixiseis/fillValuesWithZeroes.js"></script>
-<!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/fillValuesWithZeroes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

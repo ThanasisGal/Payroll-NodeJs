@@ -665,7 +665,10 @@ class genikaAPIsController {
       const banks = await BanksModel.find().sort("perigrafh");
       res.json(banks);
     } catch (error) {
-      res.status(500).send(error);
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: "Σφάλμα κατά την ανάκτηση των Τραπεζών" });
     }
   };
 

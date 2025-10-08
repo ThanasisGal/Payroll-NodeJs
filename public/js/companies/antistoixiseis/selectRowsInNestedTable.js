@@ -1,102 +1,222 @@
 // selectRowsInNestedTable.js
 document.addEventListener('DOMContentLoaded', () => {
-  // πιάνουμε το σταθερό table container
-  const table = document.getElementById('myTable');
-  if (!table) return;
+    // Αν το nestingTables.js ελέγχει τα κουμπιά/URLs, εδώ μένει ΜΟΝΟ το delete.
+    const table     = document.getElementById('myTable');
+    const deleteBtn = document.getElementById('delete-btn');
+    if (!table || !deleteBtn) return;
 
-  // Helpers για κουμπιά
-  function setHref(id, href) {
-    const el = document.getElementById(id);
-    if (el) el.href = href;
-  }
-  function resetHrefs() {
-    ['add-btn','edit-btn','delete-btn'].forEach(id => setHref(id, '#'));
-    if (table.dataset) delete table.dataset.currentNestedId;
-  }
-
-  // Επιλογή σε nested row (ΜΟΝΟ όταν υπάρχει .collapse.show)
-  table.addEventListener('click', (event) => {
-    const nestedRow = event.target.closest('.collapse.show tbody tr[data-id]');
-    if (!nestedRow || !table.contains(nestedRow)) return;
-
-    // μη «ανέβει» στο main handler
-    event.stopPropagation();
-
-    const wasSelected = nestedRow.classList.contains('selected-row');
-    table.querySelectorAll('.collapse.show .selected-row')
-      .forEach(r => r.classList.remove('selected-row'));
-
-    if (!wasSelected) {
-      nestedRow.classList.add('selected-row');
-      const nestedId = nestedRow.dataset.id;
-
-      // Ρύθμιση κουμπιών για NESTED context
-      setHref('add-btn',  `/companies/antistoixiseis/addFromNested/${nestedId}`);
-      setHref('edit-btn', `/companies/antistoixiseis/edit/${nestedId}`);
-      table.dataset.currentNestedId = nestedId; // για το DELETE
-    } else {
-      resetHrefs();
-    }
-  });
-
-  // DELETE για NESTED (εδώ απλά κρατάμε τη συμπεριφορά – ο κώδικάς σου που κάνει Swal/CSRF κ.λπ. είναι σε άλλο αρχείο αν το προτιμάς)
-  const deleteBtn = document.getElementById('delete-btn');
-  if (deleteBtn) {
     deleteBtn.addEventListener('click', async (event) => {
-      event.preventDefault();
-      const nestedId = table.dataset.currentNestedId;
-      if (!nestedId) return;
+        // Guard: αν είναι disabled ή δεν υπάρχει επιλεγμένο nested id, μην κάνεις τίποτα
+        if (
+            deleteBtn.classList.contains('disabled') ||
+            deleteBtn.classList.contains('disabled-link') ||
+            deleteBtn.getAttribute('aria-disabled') === 'true' ||
+            deleteBtn.href.endsWith('#')
+        ) {
+            event.preventDefault();
+            return;
+        }
 
-      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-      const deleteUrl = `/companies/antistoixiseis/deleteFromNested/${nestedId}`;
+        event.preventDefault();
 
-      const result = await Swal.fire({
-        title: 'Είστε σίγουρος/η;',
-        text: 'ΠΡΟΣΟΧΗ! Η ενέργεια δεν αναιρείται.',
-        icon: 'error',
-        showCancelButton: true,
-        focusConfirm: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#3332049a',
-        confirmButtonText: 'Διαγραφή',
-        cancelButtonText: 'Ακύρωση',
-        customClass: {
-          confirmButton: 'class-error custom-confirm-button custom-swal-button',
-          cancelButton:  'custom-cancel-button custom-swal-button',
-        },
-        didOpen: () => Swal.getCancelButton().focus(),
-      });
-      if (!result.isConfirmed) return;
+        const nestedId = table.dataset.currentNestedId;
+        if (!nestedId) return;
 
-      try {
-        const resp = await fetch(deleteUrl, {
-          method: 'DELETE',
-          headers: {
-            'X-CSRF-Token': csrf,
-            'Accept': 'application/json'
-          },
-          credentials: 'same-origin'
+        const csrf      = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const deleteUrl = `/companies/antistoixiseis/deleteFromNested/${nestedId}`;
+
+        const result = await Swal.fire({
+            backdrop: false,            // overlay
+            allowOutsideClick: false,
+            title: "Είστε σίγουρος/η;",
+            html: `ΠΡΟΣΟΧΗ!<br>Δεν θα μπορείτε να αναιρέσετε αυτή την ενέργεια.`,
+            icon: "warning",
+            showConfirmButton: true,
+            showCancelButton: true,
+            focusCancel: true,
+            confirmButtonText: "Διαγραφή",
+            cancelButtonText: "Ακύρωση",
+            customClass: {
+                title: "custom-title",
+                popup: "custom-swal-popup",
+                confirmButton: "class-warning custom-confirm-button custom-swal-button",
+                cancelButton: "custom-cancel-button custom-swal-button",
+            },
+            didOpen: () => Swal.getCancelButton().focus(),
         });
-        if (!resp.ok) throw new Error('Network response was not ok');
-        const data = await resp.json();
+        if (!result.isConfirmed) return;
 
-        await Swal.fire({
-          icon: 'success',
-          title: 'Επιτυχής Διαγραφή της Αντιστοίχισης Κ.Π.Κ',
-          timer: 3000,
-          customClass: { confirmButton: 'class-success custom-confirm-button custom-swal-button' }
-        });
-        window.location.href = data.redirectUrl;
-      } catch (error) {
-        await Swal.fire({
-          icon: 'error',
-          title: 'Σφάλμα κατά τη Διαγραφή των Αντιστοιχίσεων Κ.Π.Κ.',
-          html: 'Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>',
-          timer: 4000,
-          customClass: { confirmButton: 'class-normal custom-confirm-button custom-swal-button' }
-        });
-        window.location.href = '/companies/antistoixiseis';
-      }
+        try {
+            const resp = await fetch(deleteUrl, {
+                method: 'DELETE',
+                headers: {
+                'X-CSRF-Token': csrf,
+                'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+
+            // auto-follow redirect
+            if (resp.redirected && resp.url) {
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Επιτυχής διαγραφή",
+                    icon: "success",
+                    timer: 1200,
+                    showConfirmButton: false,
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    }
+                });
+                location.href = resp.url;
+                return;
+            }
+
+            // version 3xx χωρίς auto-follow
+            if (resp.status >= 300 && resp.status < 400) {
+            const loc = resp.headers.get("Location") || resp.headers.get("location");
+            if (loc) {
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Επιτυχής διαγραφή",
+                    timer: 1200,
+                    icon: "success",
+                    showConfirmButton: false,
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    }
+                });
+                location.href = loc.startsWith("http") ? loc : new URL(loc, location.origin).toString();
+                return;
+            }
+                throw new Error(`Redirect ${resp.status} χωρίς Location header`);
+            }
+
+            // CSRF/Forbidden
+            if (resp.status === 403) {
+                const t = await resp.text().catch(() => "");
+                throw new Error("CSRF/Forbidden (403). " + t.slice(0, 120));
+            }
+
+            // 204 No Content
+            if (resp.status === 204) {
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Επιτυχής διαγραφή",
+                    timer: 1200,
+                    icon: "success",
+                    showConfirmButton: false,
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    }
+                });
+
+                location.href = "/companies/antistoixiseis";
+                return;
+            }
+
+            // JSON απάντηση
+            const ct = resp.headers.get("content-type") || "";
+            if (ct.includes("application/json")) {
+                const data = await resp.json();
+                if (!resp.ok || data?.success === false) {
+                    throw new Error(`HTTP ${resp.status} / success=${data?.success}`);
+                }
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Επιτυχής διαγραφή",
+                    timer: 1200,
+                    icon: "success",
+                    showConfirmButton: false,
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    }
+                });
+                location.href = data.redirectUrl || "/companies/antistoixiseis";
+                return;
+            }
+
+            // Άλλος content-type αλλά OK (π.χ. HTML)
+            if (resp.ok) {
+                await Swal.fire({
+                    backdrop: false,            // overlay
+                    allowOutsideClick: false,
+                    title: "Επιτυχής διαγραφή",
+                    timer: 1200,
+                    icon: "success",
+                    showConfirmButton: false,
+                    customClass: {
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    }
+                });
+                location.href = "/companies/antistoixiseis";
+                return;
+            }
+
+            throw new Error(`HTTP error ${resp.status}`);
+
+        } catch (error) {
+            await Swal.fire({
+                backdrop: false,            // overlay
+                allowOutsideClick: false,
+                icon: "error",
+                title: "Σφάλμα κατά τη διαγραφή",
+                html: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>«Επικοινωνία»</strong>.<br><small>${String(error?.message || error)}</small>`,
+                confirmButtonText: "Κλείσιμο",
+                customClass: {
+                    title: "custom-title",
+                    popup: "custom-swal-popup",
+                    confirmButton: "class-normal custom-confirm-button custom-swal-button",
+                },
+                willClose: () => {
+                    window.location.href = "/companies/antistoixiseis"; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
+                },
+            });
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //     if (!resp.ok) throw new Error('Network response was not ok');
+        //     const data = await resp.json();
+
+        //     await Swal.fire({
+        //         icon: 'success',
+        //         title: 'Επιτυχής Διαγραφή της Αντιστοίχισης Κ.Π.Κ',
+        //         timer: 3000,
+        //         customClass: { confirmButton: 'class-success custom-confirm-button custom-swal-button' }
+        //     });
+        //     window.location.href = data.redirectUrl;
+        // } catch (error) {
+        //     await Swal.fire({
+        //         icon: 'error',
+        //         title: 'Σφάλμα κατά τη Διαγραφή των Αντιστοιχίσεων Κ.Π.Κ.',
+        //         html: 'Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>',
+        //         timer: 4000,
+        //         customClass: { confirmButton: 'class-normal custom-confirm-button custom-swal-button' }
+        //     });
+        //     window.location.href = '/companies/antistoixiseis';
+        // }
     });
-  }
 });

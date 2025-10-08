@@ -315,7 +315,7 @@ app.use((req, res) => {
     res.status(404).render("404", {
         title: "Σελίδα δεν βρέθηκε",
         description: "404 - Page not found",
-        bodyClass: "bg-404 custom-background",
+        bodyClass: "custom-background",
         NODE_ENV: process.env.NODE_ENV,
         nonce: res.locals.nonce,
     });

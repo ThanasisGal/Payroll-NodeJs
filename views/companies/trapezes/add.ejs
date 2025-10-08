@@ -1,0 +1,212 @@
+<div class="margin-top-1rem">
+    <div class="container-fluid height-vh-100 padding-0">
+        
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+        <div class="sections margin-top-1rem">
+            <section class="sel_1_section visible" data-section="">
+                <div>
+                    <form class="formRadius">
+
+                        <%- include('../../partials/_csrfField') %>
+
+                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
+
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content">
+                                Εισαγωγή Νέας Τράπεζας
+                                </label>
+                            </div>
+
+                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-42 bg-white" id="cardBody">
+                                <input type="hidden" name="companyId" id="companyId" class="form-control" value="<%= company._id %>" />
+                                <input type="hidden" name="companyKodikos" id="companyKodikos" class="form-control" value="<%= company.kod %>" />
+                                <input type="hidden" name="companyTeam" id="companyTeam" class="form-control" value="<%= company.team %>" />
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="col-1-5 right-align">
+                                        <label class="col-form-label label-font-size">
+                                            Επιλεγμένη Εταιρεία
+                                        </label>
+                                    </div>
+                                    <div class="col-8 left-align font-size-rem-1_1 cgreen">
+                                        <label>
+                                            <% if (company && company.kod && company.kod.length > 0) { %>
+                                                <%- company.kod + "&nbsp;&nbsp;&nbsp; " + company.eponymia + " &nbsp;&nbsp;" +
+                                                company.firstname %>
+                                            <% } %>
+                                        </label>
+                                    </div>
+                                </div>  
+
+                                <hr class="division"></hr>
+
+                                <div class="row form-group g-3 align-items-center mb-3">
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="kodikos"
+                                            class="col-form-label label-font-size field-required">
+                                            Κωδικός
+                                        </label>
+                                    </div>
+    
+                                    <div class="col-1-5">
+                                        <input
+                                            type="text"
+                                            name="Kodikos"
+                                            id="Kodikos"
+                                            class="form-control input-contents"
+                                            value=""
+                                            required
+                                            maxlength="4"
+                                            pattern="[0-9]{1,}"
+                                            disabled
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-3">
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="perigrafh"
+                                            class="col-form-label label-font-size">
+                                            Τράπεζα
+                                        </label>
+                                    </div>
+
+                                    <input
+                                        type="hidden"
+                                        name="kodikos_dias_stathera"
+                                        id="kodikos_dias_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= safe("kodikos_dias_stathera") %>"
+                                    />
+
+                                    <input 
+                                        type="hidden"
+                                        id="perigrafh_stathera"
+                                        name="perigrafh_stathera"
+                                        class="form-control input-contents"
+                                        value="<%= safe('perigrafh_stathera') %>" 
+                                    />
+                                    
+                                    <div class="col-5-75">
+                                        <select
+                                            id="perigrafh"
+                                            name="perigrafh"
+                                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                                            aria-label="Τράπεζα"
+                                            data-api="/api/dropdown/trapezes/trapeza"
+                                            single
+                                            data-target-input="<%= `kodikos_dias_stathera` %>"
+                                            data-preselect="<%= `kodikos_dias_stathera` %>"
+                                            data-preload-all="true"
+                                            data-pad-length="3"
+                                            data-xrhsh-related="false"
+                                            data-team-related="false"
+                                            data-company-related="false"
+                                            data-mhnas-related="false"
+                                            placeholder="Αναζήτηση Τράπεζας">
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-3">
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="logariasmos_1"
+                                            class="col-form-label label-font-size">
+                                            IBAN 1ου Λογαριασμού
+                                        </label>
+                                    </div>
+                                    <div class="col-6">
+                                        <input
+                                            type="text"
+                                            name="logariasmos_1"
+                                            id="logariasmos_1"
+                                            class="form-control input-contents"
+                                            value=""
+                                            maxlength="33"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-3">
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="logariasmos_2"
+                                            class="col-form-label label-font-size">
+                                            IBAN 2ου Λογαριασμού
+                                        </label>
+                                    </div>
+                                    <div class="col-6">
+                                        <input
+                                            type="text"
+                                            name="logariasmos_2"
+                                            id="logariasmos_2"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center mb-3">
+                                    <div class="col-2-5 right-align">
+                                        <label
+                                            for="logariasmos_3"
+                                            class="col-form-label label-font-size">
+                                            IBAN 3ου Λογαριασμού
+                                        </label>
+                                    </div>
+                                    <div class="col-6">
+                                        <input
+                                            type="text"
+                                            name="logariasmos_3"
+                                            id="logariasmos_3"
+                                            class="form-control input-contents"
+                                            value=""
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-footer mt-auto cardFooter">
+                                <div class="d-inline-block d-flex cardFooter01">
+                                    <button
+                                        type="button"
+                                        class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
+                                        <i class="bi bi-floppy"></i> Αποθήκευση
+                                    </button>
+                                    <a
+                                        class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                                        href="/companies/trapezes"
+                                        ><i class="bi bi-chevron-double-left"></i> Επιστροφή
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+
+<script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/trapezes/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/ibanChecker<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/trapezes/loadMultiFieldsToHiddenInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

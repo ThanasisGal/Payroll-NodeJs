@@ -358,7 +358,7 @@ static verifyEmailForm = async (req, res) => {
   try {
     res.render("login/verify_email", {
       locals,
-      bodyClass: "custom-background",
+      bodyClass: "home-bg-cdn",
     });
   } catch (error) {
     res.redirect("/login");
@@ -538,7 +538,7 @@ static sendUserVerifyEmail = async (req, res) => {
         };
 
         try {
-            res.render("login/login", { locals, bodyClass: "custom-background" });
+            res.render("login/login", { locals, bodyClass: "home-bg-cdn" });
         } catch (error) {
             res.redirect("/");
         }
@@ -591,29 +591,29 @@ static sendUserVerifyEmail = async (req, res) => {
             const { email, password } = req.body || {};
             if (!email || !password) {
                 await res.flash("info", "Όλα τα πεδία είναι υποχρεωτικά...");
-                return res.render("login/login", { bodyClass: "custom-background" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             const user = await UserModel.findOne({ email: String(email).trim().toLowerCase() });
             if (!user) {
                 await res.flash("warning", "Δεν είστε εγγεγραμμένος χρήστης. Εγγραφείτε για να συνεχίσετε...");
-                return res.render("login/login", { bodyClass: "custom-background" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             if (!user.isVerified) {
                 await res.flash("error", "Δεν έχετε κάνει επαλήθευση του Email σας. Επαληθεύστε το email και συνεχίστε...");
-                return res.render("login/login", { bodyClass: "custom-background" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             if (user.situation === "I") {
                 await res.flash("error", "Είστε απενεργοποιημένος χρήστης. Επικοινωνήστε με τον διαχειριστή...");
-                return res.render("login/login", { bodyClass: "custom-background" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!(user.email === String(email).trim().toLowerCase() && isMatch)) {
                 await res.flash("error", "Το email ή ο κωδικός πρόσβασης δεν είναι έγκυρα...");
-                return res.render("login/login", { bodyClass: "custom-background" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             // JWT (αν το χρειάζομαι, να βάλω cookie)
@@ -695,7 +695,7 @@ static sendUserVerifyEmail = async (req, res) => {
         } else if (redir === "/companies/genikastoixeia") {
             return res.redirect("/companies/genikastoixeia");
         } else {
-            return res.render(redir, { bodyClass: "custom-background" });
+            return res.render(redir, { bodyClass: "home-bg-cdn" });
         }        
     };
 
@@ -1191,7 +1191,7 @@ static sendUserVerifyEmail = async (req, res) => {
             description: "Web Payroll System",
         };
         try {
-            await res.render("login/logout", { locals, bodyClass: "custom-background" });
+            await res.render("login/logout", { locals, bodyClass: "home-bg-cdn" });
         } catch (error) {
             res.redirect("/");
         }

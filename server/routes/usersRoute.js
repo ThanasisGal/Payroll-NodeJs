@@ -10,6 +10,7 @@ const checkAuth = require("../middlewares/checkValidUser.js");
 const ypokatasthmataController = require("../controllers/companies/ypokatasthmataController.js");
 const nomimoiekprosopoiController = require("../controllers/companies/nomimoiekprosopoiController.js");
 const passwordsController = require("../controllers/companies/passwordsController.js");
+const trapezesController = require("../controllers/companies/trapezesController.js");
 const antistoixiseisController = require("../controllers/companies/antistoixiseisController.js");
 const krathseisController = require("../controllers/krathseisController.js");
 const genikaAPIsController = require("../controllers/genikaAPIsController.js");
@@ -121,6 +122,15 @@ router.get("/companies/passwords/search", checkAuth, passwordsController.searchG
 router.post("/companies/passwords/search", passwordsController.searchPostPasswords);
 router.get("/companies/passwords/edit/:id", checkAuth, passwordsController.editPasswordsForm);
 router.delete("/companies/passwords/delete/:id", checkAuth, passwordsController.deletePasswords);
+
+// Trapezes Router
+router.get("/companies/trapezes", checkAuth, trapezesController.mainTrapezesForm);
+router.get("/companies/trapezes/add", checkAuth, trapezesController.addTrapezesForm);
+router.post("/companies/trapezes/add", trapezesController.postTrapezesForm);
+router.get("/companies/trapezes/search", checkAuth, trapezesController.searchGetTrapezes);
+router.post("/companies/trapezes/search", trapezesController.searchPostTrapezes);
+router.get("/companies/trapezes/edit/:id", checkAuth, trapezesController.editTrapezesForm);
+router.delete("/companies/trapezes/delete/:id", checkAuth, trapezesController.deleteTrapezes);
 
 // Antistoixiseis Router
 router.get("/companies/antistoixiseis", checkAuth, antistoixiseisController.mainAntistoixiseisForm);
@@ -372,6 +382,7 @@ router.get("/api/xrhseis", mainAppController.getXrhseis);
 
 router.get("/api/yearInUse", mainAppController.getYearInUse);
 router.post("/api/ypokatasthmata/update/:ypokatasthmaId", ypokatasthmataController.postYpokatasthmaUpdate);
+router.post("/api/trapezes/update/:trapezesId", trapezesController.postTrapezesUpdate);
 
 router.get("/api/kinhseis/getErgazomenoi/:selectedTeam/:selectedCompany", kinhseisController.getErgazomenoi);
 router.get("/api/kinhseis/getLoipaStoixeiaErgazomenoy/:selectedTeam/:selectedCompany/:selectedKodikos", kinhseisController.loipaStoixeiaErgazomenoy);

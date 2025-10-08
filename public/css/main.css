@@ -13,7 +13,7 @@
   --bg-d-flex-hover: #0066ff2d;
   --bs-body-color-rgb: 33, 37, 41;
   --bs-card-cap-bg: rgba(var(--bs-body-color-rgb), 0.5);
-  --sidebar-bg: #dbdbdb4f;
+  --sidebar-bg: #c9c9c9d0;
   --sidebar-w: 21rem;   /* πλάτος sidebar */
   --app-header-h: 56px;   
   --app-footer-h: 28px;   /* ύψος του footer της σελίδας σου (πρόσθεσε όσο είναι ακριβώς) */
@@ -21,6 +21,7 @@
   --disabled-bg: #dbdbdb8a;
   --disabled-text: #6c757d; /* muted */
   --disabled-border: #bdbdbd;
+  --app-w: 100%;
   font-size: 1rem;
 }
 
@@ -31,21 +32,18 @@ html, body {
 }
 
 .custom-background {
-  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps1.png");
+  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/pageNotFound.png");
   background-repeat: no-repeat;
   background-attachment: fixed;
-  background-size: auto;
-  background-position: 26% 7%;
+  background-position: 63% 40%;
+  background-size: clamp(
+    var(--hero-min-pageNotFound),
+    calc(var(--hero-fluid-pageNotFound) * var(--heroScale-pageNotFound)),
+    var(--hero-max-pageNotFound)
+  ) auto;
   transition: none !important;
 }
-/* .custom-background-body {
-  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  background-size: auto;
-  background-position: 60% 50%;
-  transition: none !important;
-} */
+
 
 .black-color {
   color: #000000;
@@ -482,7 +480,7 @@ small,
 
 .sidebar {
   position: fixed;
-  width: 16.7vw;
+  width: 6.7vw;
   white-space: nowrap;
   text-overflow: ellipsis;
   top: 0;
@@ -530,13 +528,6 @@ small,
 .sidebar-heading {
   font-size: 0.75vw;
 }
-
-/* #sidebarMenu li a {
-  opacity: 0.6;
-  pointer-events: none;
-  cursor: default;
-  font-size: 0.75vw;
-} */
 
 /*
   * Navbar
@@ -596,6 +587,7 @@ small,
 .w-90 { width: 90% !important; }
 .w-92 { width: 92% !important; }
 .w-97 { width: 97% !important; }
+.w-100 { width: 100% !important; }
 
 .mb-0-5 { margin-bottom: 0.225rem !important; }
 .mb-1-5 { margin-bottom: 0.375rem !important; }
@@ -736,6 +728,7 @@ small,
 .col-3-85 { flex: 0 0 auto; width: 32.08%; }
 .col-3-95 { flex: 0 0 auto; width: 32.92%; }
 .col-3-99 { flex: 0 0 auto; width: 33.25%; }
+/* .col-4-00 { flex: 0 0 auto; width: 35.4265%; } */
 .col-4-00 { flex: 0 0 auto; width: 35.65%; }
 .col-4-01 { flex: 0 0 auto; width: 33.75%; }
 .col-4-1 { flex: 0 0 auto; width: 34.9%; }
@@ -751,6 +744,7 @@ small,
 .col-4-9 { flex: 0 0 auto; width: 40.83%; }
 .col-5-4 { flex: 0 0 auto; width: 45%; }
 .col-5-5 { flex: 0 0 auto; width: 45.83%; }
+.col-5-75 { flex: 0 0 auto; width: 47.32%; }
 .col-7-5 { flex: 0 0 auto; width: 62.5%; }
 .col-7-9 { flex: 0 0 auto; width: 65.83%; }
 .col-8-5 { flex: 0 0 auto; width: 70.83%; }
@@ -888,7 +882,7 @@ a.enabled {
 a.enabled:hover {
   color: rgb(0, 54, 0);
   font-size: 0.875vw;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .navbar-split {
@@ -1794,13 +1788,13 @@ a {
 }
 
 .swal2-confirm.class-warning {
-  background-color: #ffc107 !important;
+  background-color: #df9100 !important;
   color: #000000 !important;
 }
 
 .swal2-confirm.class-info {
   background-color: #0dcaf0 !important;
-  color: #ffffff !important;
+  color: #000000 !important;
 }
 
 .swal2-confirm.class-error {
@@ -1819,13 +1813,42 @@ a {
 }
 
 .swal2-icon.swal2-error {
-  color: #c50000 !important;           /* το εσωτερικό σύμβολο */
   border-color: #c50000 !important;    /* το περίγραμμα του κύκλου */
 }
 
+.swal2-icon.swal2-error .swal2-x-mark-line-left,
+.swal2-icon.swal2-error .swal2-x-mark-line-right {
+  background-color: #c50000 !important;   /* το εσωτερικό σύμβολο */
+}
+
+/* Περίγραμμα κύκλου */
 .swal2-icon.swal2-success {
-  color: #0b8800 !important;           /* το εσωτερικό σύμβολο */
-  border-color: #0b8800 !important;    /* το περίγραμμα του κύκλου */
+  border-color: #00771a !important;              /* πιο σκούρο πράσινο */
+}
+
+/* Το "τικ" (οι δύο γραμμές) */
+.swal2-icon.swal2-success .swal2-success-line-tip,
+.swal2-icon.swal2-success .swal2-success-line-long {
+  background-color: #00771a !important;
+}
+
+/* Το ring γύρω από το "τικ" (default ημιδιαφανές → το κάνουμε ίδιο χρώμα) */
+.swal2-icon.swal2-success .swal2-success-ring {
+  border: 0.25em solid #00771a !important;       /* αντί για rgba(..., .3) */
+}
+
+/* (προαιρετικό) Εξομαλύνει τις δύο μισές καμπύλες του κύκλου */
+.swal2-icon.swal2-success .swal2-success-circular-line-left,
+.swal2-icon.swal2-success .swal2-success-circular-line-right {
+  background-color: transparent !important;
+}
+
+.swal2-icon.swal2-warning {
+  border-color: #df9100 !important;    /* το περίγραμμα του κύκλου */
+}
+
+.swal2-icon.swal2-warning .swal2-icon-content {
+  color: #df9100 !important;
 }
 
 .swal2-popup {
@@ -2798,134 +2821,9 @@ mark, .mark {
   border-color: #888;
 }
 
-#sidebarMenu {
-  max-width: 20rem;
-  height: 100vh; 
-  position: fixed;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  /* overflow-y: auto; */
-  background-color: var(--sidebar-bg);
-
-}
-
- .sidebar-content {
-  position: fixed;
-  width: 20rem;
-  max-width:18.5rem;
-  min-width: 17.5rem;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  background-color: var(--sidebar-bg);
-}
-
-.sidebar-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background-color: var(--sidebar-bg);
-  border-bottom: 1px solid rgba(0,0,0,.1);
-}
-
-.sidebar-toolbar-inner {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .5rem .5rem;
-}
-
 #nav-tree {
   padding: 0;
   list-style-type: none;
-}
-
-#nav-tree li {
-  position: relative;
-  margin-bottom: 5px;
-  list-style-type: none;
-}
-
-#nav-tree li a {
-  display: block;
-  position: relative;
-  padding-bottom: 10px;
-  text-decoration: none;
-  color: #333;
-  word-wrap: break-word;
-  white-space: normal;
-  line-height: 1.3;
-  width: 100%;
-  box-sizing: border-box;
-} 
-
-#nav-tree li a[data-multiline-3="true"] {
-  padding: 5px 15px 40px 15px !important;
-}
-
-#nav-tree li a[data-multiline-2="true"] {
-  padding: 5px 15px 40px 15px !important;
-}
-
-#nav-tree li a[data-multiline-2_1="true"] {
-  padding: 5px 15px 43px 15px !important;
-}
-
-@media screen and (max-width: 1375px) {
-  #nav-tree li a[data-multiline-3="true"] {
-    padding: 5px 15px 65px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-2="true"] {
-    padding: 5px 15px 58px 15px !important;
-  }
-
-    #nav-tree li a[data-multiline-2_1="true"] {
-    padding: 5px 15px 45px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-1="true"] {
-    padding: 5px 15px 40px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-1_1="true"] {
-    padding: 5px 15px 40px 15px !important;
-  }
-}
-
-@media screen and (max-width: 1456px) {
-  #nav-tree li a[data-multiline-3="true"] {
-    padding: 5px 15px 60px 15px !important;
-  }
-}
-
-@media screen and (max-width: 1603px) {
-  #nav-tree li a[data-multiline-3="true"] {
-    padding: 5px 15px 45px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-2="true"] {
-    padding: 5px 15px 45px 15px !important;
-  }
-
-    #nav-tree li a[data-multiline-2_1="true"] {
-    padding: 5px 15px 45px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-1="true"] {
-    padding: 5px 15px 45px 15px !important;
-  }
-
-  #nav-tree li a[data-multiline-1_1="true"] {
-    padding: 5px 15px 40px 15px !important;
-  }
-}
-
-@media screen and (max-width: 1686px) {
-  #nav-tree li a[data-multiline-1_1="true"] {
-    padding: 5px 15px 40px 15px !important;
-  }
 }
 
 #nav-tree li:hover {
@@ -2935,7 +2833,7 @@ mark, .mark {
 #nav-tree li a:hover {
   background-color: #24a41323;
   color: #1c5c00;
-  font-weight: bold;
+  /* font-weight: bold; */
   font-size: .83rem;
 }
 
@@ -3763,16 +3661,44 @@ select.tom-dropdown {
 .container-scroll { overflow-y: auto; }
 .main-bg-transparent { background: transparent; }
 
-/* .bg-hero {
-  background-image: url('/assets/img/wps1.png');
-  background-repeat: no-repeat;
-  background-position: 0% 50%;
-} */
-.bg-hero-cdn {
-  background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png');
-  background-repeat: no-repeat;
-  background-position: 0% 50%;
+
+/* ρυθμίζεις μόνο αυτά τα δύο νούμερα */
+.bg-hero-cdn{
+  position: relative;
+  isolation: isolate;            /* ασφαλές layer για το ::before */
 }
+
+/* full-bleed ψευδοστοιχείο που ευθυγραμμίζει στην άκρη του viewport */
+.bg-hero-cdn::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+
+  /* ΑΓΚΙΣΤΡΩΣΗ στο viewport:
+     ξεκίνα από (sidebar + gap + nudge) και άπλωσε μέχρι δεξί άκρο */
+  left: 50%;
+  margin-left: calc(
+    -50vw + var(--leftW) + var(--heroGap) + var(--heroNudge)
+    + var(--sbWidth, 0px)   /* αν μετράς και τη scrollbar */
+  );
+  width: calc(
+    100vw - var(--leftW) - var(--heroGap) - var(--heroNudge)
+    - var(--sbWidth, 0px)
+  );
+
+  /* εικόνα */
+  background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps1.png");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: clamp(
+    var(--hero-min),
+    calc(var(--hero-fluid) * var(--heroScale)),
+    var(--hero-max)
+  ) auto;
+}
+/* για να φαίνεται, δώσε ένα ελάχιστο ύψος στην περιοχή του hero */
+/* .bg-hero-cdn{ min-height: 200px; } */
 
 .span-padding-top-10px { padding-top: 10px; }
 
@@ -3877,6 +3803,9 @@ select.tom-dropdown {
 
 .chevron-icon { font-size: 1rem; }
 
+
+
+
 .margin-right--1px      { margin-right: -1px; }
 .margin-right--4px      { margin-right: -4px; }
 .margin-right--1rem     { margin-right: -1rem !important; }
@@ -3904,6 +3833,7 @@ select.tom-dropdown {
 .margin-left-percent-4  { margin-left: 4% !important; }
 .margin-left-percent-5  { margin-left: 5% !important; }
 .margin-left-percent-10 { margin-left: 10% !important; }
+.margin-left-percent-15 { margin-left: 15% !important; }
 .margin-left-percent-20 { margin-left: 20%; }
 
 .margin-bottom--0_1rem  { margin-bottom: -0.1rem !important;}
@@ -3913,6 +3843,8 @@ select.tom-dropdown {
 .padding-0              { padding: 0; }
 .padding-top-px-8       { padding-top: 8px;}
 .padding-top-px-10      { padding-top: 10px;}
+.padding-left-rem-0_5   { padding-left: .5rem !important;}
+.padding-left-rem-1     { padding-left: 1rem !important;}
 
 .white-space-nowrap     { white-space: nowrap; }
 
@@ -3923,19 +3855,24 @@ select.tom-dropdown {
 
 .width-vw-4_67          { width: 4.67vw !important; }
 
+.width-rem-17_5         { width: 17.5rem; }
 .width-rem-18_5         { width: 18.5rem; }
 
-
+.button-height-rem-2    {height: 2rem !important;}
 .height-rem-3_5         { height: 3.5rem !important; }
 
 .height-vh-12           { height: 12vh !important; }
 .height-vh-25           { height: 25vh !important; }
 .height-vh-35           { height: 35vh !important; }
+.height-vh-38           { height: 39vh !important; }
+.height-vh-40           { height: 40vh !important; }
 .height-vh-42           { height: 42vh !important; }
 .height-vh-45           { height: 45vh !important; }
 .height-vh-48           { height: 48vh !important; }
 .height-vh-53           { height: 53vh !important; }
 .height-vh-58           { height: 58vh !important; }
+.height-vh-62           { height: 62vh !important; }
+.height-vh-64           { height: 64vh !important; }
 .height-vh-90           { height: 90vh !important; }
 .height-vh-100          { height: 100vh !important; }
 
@@ -3943,12 +3880,12 @@ select.tom-dropdown {
 
 .text-align-left        { text-align: left !important; }
 
-.logout-btn { 
+/* .logout-btn { 
   font-weight: 600 !important; 
-  font-size: 1.1rem !important; 
+  font-size: 1rem !important; 
   background-color: #0097589c !important;
   color: #000000c7;
- }
+ } */
 
 /* === Home background  */
 .home-bg-cdn {
@@ -3959,15 +3896,14 @@ select.tom-dropdown {
   background-position: 60% 50% !important;
 }
 
-.bg-404.custom-background {
+/* .custom-background {
   background-image:
-    url("https://cdn.webpayrollsolutions.com/assets/img/pageNotFound.png"),
-    url("https://cdn.webpayrollsolutions.com/assets/img/wps1.png");
-  background-repeat: no-repeat, no-repeat;
-  background-position: 63% 45%, 26% 7%;
-  background-attachment: fixed, fixed;
-  background-size: auto, auto;
-}
+    url("https://cdn.webpayrollsolutions.com/assets/img/pageNotFound.png");
+  background-repeat: no-repeat;
+  background-position: 63% 45%;
+  background-attachment: fixed;
+  background-size: auto;
+} */
 
 /* === Buttons που είχαν inline style === */
 .returnAppBtn {
@@ -3983,7 +3919,7 @@ select.tom-dropdown {
 
 .style-404 { 
   position: absolute;
-  left: 53%;
+  left: 51%;
   right: 38%;
   top: 76%;
   bottom: 20%;
@@ -4050,6 +3986,9 @@ select.tom-dropdown {
 .font-size-vw-23 { font-size: 23vw; }
 .font-size-vw-24 { font-size: 24vw; }
 
+.font-size-rem-0_80 { font-size: 0.80rem; }
+.font-size-rem-0_85 { font-size: 0.85rem; }
+.font-size-rem-1 { font-size: 1rem; }
 .font-size-rem-1_1 { font-size: 1.1rem; }
 
 .fsvw-0_7 { font-size: 0.7vw; }
@@ -4075,56 +4014,10 @@ select.tom-dropdown {
   --app-footer-h: 28px;
 }
 
-/* ΣΤΑΘΕΡΟ sidebar μέχρι ΠΑΝΩ από το footer */
-/* Το sidebar καταλαμβάνει όλο το ύψος εκτός του footer */
-#sidebarMenu{
-  position: fixed;
-  flex: 0 0 auto;
-  width: 25%;
-  left: 0;
-  top: 0;
-  height: calc(100vh - var(--footer-h));
-  width: 25% !important;
-  min-width: 25% !important;
-  max-width: 25% !important;
-  display: block;                /* όχι flex εδώ */
-  overflow: hidden !important;   /* scroll δεν γίνεται εδώ */
-  background-color: var(--sidebar-bg);
-}
-
-/* Εσωτερικό grid: [toolbar] [scroll] [logout] */
-#sidebarMenu .sidebar-content{
-  display: grid;
-  grid-template-rows: auto 1fr auto;  /* επάνω, μέση (scroll), κάτω */
-  top: var(--app-header-h) !important;
-  height: calc(100vh - var(--app-header-h) - var(--app-footer-h)) !important;
-}
-
-.sidebar-scroll{
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 0 !important;        /* κανένα δεξί padding */
-  margin: 0 !important;
-  scrollbar-gutter: auto !important;
-}
-
 #sidebarMenu, #sidebarMenu::after{
   box-shadow: none !important;
 }
 
-.logout-section{
-  position: static !important;   /* ακυρώνει fixed/absolute */
-  inset: auto !important;
-  width: 100% !important;
-  margin-bottom: -0.4rem;
-  height: auto;
-  padding: .5rem;
-  background-color: var(--sidebar-bg);
-  box-sizing: border-box;
-}
-.logout-section a{
-  display:block; width:100%; text-align:center; padding:3px;
-}
 /* Το δέντρο κρατά τα δικά σου styles */
 #nav-tree{ margin:0; padding:0; list-style:none; }
 #nav-tree li > a{
@@ -4142,27 +4035,10 @@ select.tom-dropdown {
 #nav-tree li { padding-right: 8px; }
 
 .body-with-sidebar{
-  margin-left: var(--sidebar-w);   /* ίδιο με το πλάτος του sidebar */
+  margin-left: var(--sidebar-w) !important;   /* ίδιο με το πλάτος του sidebar */
 }
 
 /* ===== TOOLBOX ΜΟΝΟ ===== */
-
-/* Το toolbox μένει πάντα ορατό στην κορυφή του sidebar */
-#sidebarMenu .sidebar-toolbar{
-  position: sticky;
-  top: 0;
-  z-index: 2;                     /* να περνάει πάνω από το scroll περιεχόμενο */
-  background: var(--sidebar-bg, #f8f9fa);
-  border-bottom: 1px solid rgba(0,0,0,.1);
-}
-
-/* Διάταξη: input αριστερά, κουμπιά δεξιά */
-#sidebarMenu .sidebar-toolbar-inner{
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .5rem;
-}
 
 /* Το πεδίο αναζήτησης να «γεμίζει» τον διαθέσιμο χώρο */
 #sidebarMenu .sidebar-toolbar .sidebar-search{
@@ -4176,15 +4052,8 @@ select.tom-dropdown {
   white-space: nowrap;
 }
 
-/* Hover/active/focus για το κουμπί Αποσύνδεση */
-#sidebarMenu .logout-btn{
-  display: block;                 /* full-width click */
-  cursor: pointer;
-  transition: background-color .15s ease, box-shadow .15s ease, transform .02s ease;
-}
-
 #sidebarMenu .logout-btn:hover{
-  background-color: #157347 !important; /* πιο σκούρο (Bootstrap hover) */
+  background-color: #157347 !important;
   color: #fff !important;
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
 }
@@ -4197,13 +4066,6 @@ select.tom-dropdown {
 #sidebarMenu .logout-btn:focus-visible{
   outline: 2px solid rgba(21,115,71,.7);
   outline-offset: 2px;
-}
-
-/* Ασφάλεια: να μην το «σκεπάζει» τίποτα κοντά στο footer */
-#sidebarMenu .logout-section{
-  position: relative;  /* δεν αλλάζει layout */
-  z-index: 10;         /* πάνω από το οτιδήποτε δίπλα/κάτω */
-  pointer-events: auto;
 }
 
 .header-app-title { color: #e7e1dce7; font-weight: 700; letter-spacing: 2.7px; padding-top: 0.9rem !important; }
@@ -4486,3 +4348,519 @@ i.icon-white::before {
   color: #ff0000 !important; 
 }
 
+/* 1) Πάντα άσπρο το πρώτο κελί (th/td) */
+.nested-table tbody tr > th.first-col,
+.nested-table tbody tr > td.first-col {
+  background-color: #fff !important;
+  --bs-table-accent-bg: #fff !important; /* ακυρώνει το striping */
+}
+
+/* 2) Μείνε άσπρο στις ρίγες */
+.nested-table.table-striped > tbody > tr:nth-of-type(odd) > th.first-col,
+.nested-table.table-striped > tbody > tr:nth-of-type(odd) > td.first-col {
+  background-color: #fff !important;
+  --bs-table-accent-bg: #fff !important;
+}
+
+/* 3) Μείνε άσπρο στο hover */
+.nested-table.table-hover > tbody > tr:hover > th.first-col,
+.nested-table.table-hover > tbody > tr:hover > td.first-col {
+  background-color: #fff !important;
+  --bs-table-accent-bg: #fff !important;
+}
+
+/* 4) Μείνε άσπρο και όταν είναι επιλεγμένη γραμμή */
+.nested-table tbody tr.selected-row > th.first-col,
+.nested-table tbody tr.selected-row > td.first-col {
+  background-color: #fff !important;
+  --bs-table-accent-bg: #fff !important;
+}
+
+.z-index { z-index: 1; }
+
+/* ===============================
+   Sidebar: fixed toolbar (κάτω από navbar),
+   fixed logout (πάνω από footer),
+   scroll μόνο στο περιεχόμενο ανάμεσά τους
+   =============================== */
+
+:root{
+  /* κοινά μεγέθη – ρύθμισέ τα αν διαφέρουν στο project σου */
+  --leftW: clamp(220px, 15vw, 400px); /* ίδιο πλάτος brand & sidebar */
+  --navH: 52px;        /* ΠΡΑΓΜΑΤΙΚΟ ύψος navbar */
+  --toolbarH: 46px;    /* ύψος μπάρας αναζήτησης + κουμπιών */
+  --logoutH: 46px;     /* ύψος περιοχής Logout    */     /* 52px για divice-switcher */
+  --footerH: 22px;     /* ΠΡΑΓΜΑΤΙΚΟ ύψος footer  */     /* 35px για divice-switcher */
+  --sbWidth: 12px;     /* μέσο πάχος κάθετης scrollbar στα Windows */
+  --sidebar-bg: #e9e9e96b;
+  --sbTrack: #dfdfdfce;             /* χρώμα αυλακιού */
+  --sbThumb: #b5c2b4;             /* χρώμα “κομματιού” */
+  --sbThumbHover: #91a399;        /* hover */
+  --logoutNudge: -7px; /* αρνητικό = προς τα πάνω, άλλαξέ το σε -2/-4px κλπ */
+  --hero-min: 220px;             /* ελάχιστο πλάτος εικόνας */
+  --hero-fluid: 25vw;            /* ρευστό πλάτος ως % του viewport */
+  --hero-max: 560px;             /* μέγιστο πλάτος εικόνας */
+  --hero-min-pageNotFound: 260px;             /* ελάχιστο πλάτος εικόνας */
+  --hero-fluid-pageNotFound: 30vw;            /* ρευστό πλάτος ως % του viewport */
+  --hero-max-pageNotFound: 800px;             /* μέγιστο πλάτος εικόνας */
+  --heroGap: 10px;         /* απόσταση από το δεξί άκρο του sidebar */
+  --heroNudge: -8vw;      /* μετατόπιση προς τα αριστερά */
+  --heroScale: 1.3;       /* +12% πιο μεγάλο */
+  --heroScale-pageNotFound: 1.5;       /* +12% πιο μεγάλο */
+}
+
+html, body { overflow-x: hidden; }
+
+/* ===== Σταθερή αριστερή στήλη ===== */
+#sidebarMenu{
+  position: fixed;
+  inset: 0 auto 0 0;                 /* top:0; left:0; bottom:0 */
+  width: var(--leftW);
+  max-width: var(--leftW);
+  flex: 0 0 var(--leftW);
+  background: var(--sidebar-bg);
+  z-index: 1;
+  overflow: visible;                  /* για το +5px χείλος δεξιά */
+}
+
+/* ===== Toolbar: σταθερό ακριβώς κάτω από το navbar ===== */
+#sidebarMenu .sidebar-toolbar{
+  position: fixed;
+  top: var(--navH);
+  left: 0;
+  width: var(--leftW);
+  height: var(--toolbarH);
+  background: #c7c7c781;
+  border-bottom: 1px solid rgba(0,0,0,.1);
+  z-index: 1030;
+}
+#sidebarMenu .sidebar-toolbar-inner{
+  display:flex; align-items:center; gap:.5rem;
+  height:100%;
+  padding:0 .5rem 0 .5rem;
+  /* τα /\ \/ να απέχουν 1vw από το αριστερό άκρο της scrollbar */
+  padding-right: calc(var(--sbWidth) + .1vw);
+}
+
+/* ===== Logout: σταθερό ακριβώς πάνω από το footer ===== */
+#sidebarMenu .logout-section{
+  position: fixed;
+  left: 0;
+  bottom: var(--footerH);
+  width: var(--leftW);
+  height: calc(var(--logoutH) - 2px);
+  background: #c7c7c781;
+  display:flex; align-items:center;
+  padding:.9rem;
+  box-shadow: 0 -1px 0 rgba(0,0,0,.08);
+  z-index:1030;
+}
+#sidebarMenu .logout-btn{ 
+  width:100%; 
+  font-weight: 600 !important; 
+  font-size: 1.05rem !important; 
+  background-color: #51dda39c !important;
+  color: #00000093;
+}
+
+#sidebarMenu .logout-section .logout-btn > *{
+  padding-top: .05rem;   /* μικρότερο πάνω */
+  padding-bottom: .35rem;/* μεγαλύτερο κάτω = φαίνεται πιο πάνω */
+  line-height: 1.2;      /* λίγο πιο “μαζεμένο” */
+}
+
+/* ===== Περιεχόμενο που σκρολάρει ΑΚΡΙΒΩΣ ανάμεσα σε toolbar & logout ===== */
+#sidebarMenu .sidebar-content{
+  position: fixed;
+  left: 0;
+  width: var(--leftW);
+  /* ακριβώς κάτω από το toolbar … */
+  top: calc(var(--navH) + var(--toolbarH));
+  /* … και ακριβώς πάνω από το logout + footer */
+  bottom: calc(var(--footerH) + var(--logoutH));
+  overflow-y: auto;            /* πάντα ορατή κάθετη μπάρα */
+  overflow-x: hidden;
+  scrollbar-gutter: stable both-edges;
+  background: var(--sidebar-bg);
+  z-index: 0;
+  scrollbar-width: thin;                              /* auto | thin | none */
+  scrollbar-color: var(--sbThumb) var(--sbTrack);     /* thumb track */
+}
+
+/* Chrome/Edge/Safari (WebKit) */
+#sidebarMenu .sidebar-content::-webkit-scrollbar{
+  width: var(--sbWidth);
+}
+#sidebarMenu .sidebar-content::-webkit-scrollbar-track{
+  background: var(--sbTrack);
+  border-radius: 8px;
+}
+#sidebarMenu .sidebar-content::-webkit-scrollbar-thumb{
+  background-color: var(--sbThumb);
+  border-radius: 8px;
+  border: 3px solid var(--sbTrack); /* για “μαξιλάρι” γύρω από το thumb */
+}
+#sidebarMenu .sidebar-content::-webkit-scrollbar-thumb:hover{
+  background-color: var(--sbThumbHover);
+}
+/* Ανοιχτό γκρι υπόβαθρο = πλάτος μενού + scrollbar + 5px */
+/* #sidebarMenu .sidebar-content::before{
+  content:"";
+  position:absolute; inset:0 auto 0 0;
+  width: calc(100% + var(--sbWidth) + 5px);
+  background:#f1f3f5;
+  pointer-events:none;
+  z-index:-1;
+} */
+
+/* Το container της λίστας – δεν χρειάζεται overflow εδώ */
+#sidebarMenu .sidebar-scroll{ position:relative; overflow:visible; padding-right:0; }
+
+/* ===== Menu ===== */
+#nav-tree{ list-style:none; margin:0; padding:0; }
+#nav-tree li{ list-style:none; margin:0 0 5px 0; }
+#nav-tree a.menu-item{
+  display:block; width:100%; position:relative;
+  text-decoration:none; color:#333; line-height:1.3; padding-bottom:10px;
+}
+
+/* οπτική προέκταση +2vw χωρίς να χαλάει τα clicks/overflow */
+#nav-tree a.menu-item::after{
+  content:""; position:absolute; top:0; right:-2vw; width:2vw; height:100%;
+  background:inherit; pointer-events:none;
+}
+
+/* ===== Brand στην navbar: το συνολικό πλάτος (περιεχόμενο+padding+border) = var(--leftW) */
+.navbar .header-app-title{
+  width: var(--leftW);
+  max-width: var(--leftW);
+  flex: 0 0 var(--leftW);
+  display:block;
+  box-sizing: border-box;   /* μετράει padding/border μέσα στο width */
+  margin-right: 0;          /* bootstrap δίνει 1rem – μηδένισέ το */
+}
+
+.navbar .header-app-title.px-3{
+  padding-left: 0;
+  padding-right: 0;         /* αλλιώς τρώει από το πλάτος */
+}
+
+.navbar,
+.navbar > .container,
+.navbar > .container-fluid,
+.navbar .navbar-collapse{
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+
+/* ===== Κύριο περιεχόμενο δεξιά του sidebar ===== */
+main{ margin-left: var(--leftW); }
+
+/* box-sizing για σιγουριά */
+#sidebarMenu*, #sidebarMenu*::before, #sidebarMenu*::after{ box-sizing: border-box; }
+
+
+
+
+
+
+/* σβήσε ό,τι παλιό layer είχε το LI */
+#nav-tree li::before{ content:none !important; opacity:0 !important; }
+
+/* Βάση link */
+#nav-tree a.menu-item{
+  display:block !important;
+  width:100%;
+  box-sizing:border-box;
+  white-space:normal !important;
+  text-decoration:none;
+  color:#333;
+  background:transparent !important;
+  border-radius:10px;
+  /* ασύμμετρο padding + line-height (default) */
+  padding:.38rem .75rem .90rem;
+  line-height:1.38;
+}
+
+/* αν κρατάς .disabled του Bootstrap */
+#nav-tree a.menu-item.disabled{ pointer-events:auto; }
+
+/* Hover ΜΟΝΟ στο link – ανοιχτό πράσινο */
+#nav-tree a.menu-item:hover,
+#nav-tree a.menu-item:focus-visible{
+  box-shadow:
+    inset 0 0 0 9999px #9ff7c77a,
+    inset 0 0 0 1px #9bd3af;
+  border-radius:10px;
+}
+
+/* ===== Breakpoints με data-ml-* (padding + line-height ανά πλήθος γραμμών) ===== */
+
+/* >= 1913 */
+@media (min-width:1913px){
+  #nav-tree a.ajustedGap-menu{ width: 13.94vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 13.9vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13.2vw !important; }
+  #nav-tree a.ajustedGap-submenu:hover{ width: 13.2vw !important;}
+
+  #nav-tree a.menu-item[data-ml-1913="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1913="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1913="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1913="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.3vw !important }
+  
+  #nav-tree a.menu-item[data-ml-1913="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.9vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 12.9vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 12.9vw !important;}
+}
+
+/* 1680–1912 */
+@media (min-width:1672px) and (max-width:1912px){
+  #nav-tree a.ajustedGap-menu{ width: 13.94vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 13.9vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13.2vw !important; }
+  /* #nav-tree a.ajustedGap-submenu:hover{ width: 13.2vw !important;} */
+
+  #nav-tree a.menu-item[data-ml-1680="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1680="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1680="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.3vw !important }
+  #nav-tree a.menu-item[data-ml-1680="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.3vw !important }
+  
+  #nav-tree a.menu-item[data-ml-1680="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.2vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 12.9vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 12.9vw !important;}
+}
+
+/* 1600  -->  1592–1679 */
+@media (min-width:1600px) and (max-width:1671px){
+  #nav-tree a.ajustedGap-menu{ width: 13.9vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 13.9vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13vw !important; }
+  /* #nav-tree a.ajustedGap-submenu:hover{ width: 13vw !important;} */
+  
+  #nav-tree a.menu-item[data-ml-1600="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.15vw !important }
+  #nav-tree a.menu-item[data-ml-1600="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.15vw !important }
+  #nav-tree a.menu-item[data-ml-1600="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.15vw !important }
+  #nav-tree a.menu-item[data-ml-1600="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.15vw !important }
+
+  #nav-tree a.menu-item[data-ml-1600="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 12.8vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 12.8vw !important;}
+}
+
+/* 1440  -->  1432–1591 */
+@media (min-width:1432px) and (max-width:1591px){
+  #nav-tree a.ajustedGap-menu{ width: 14vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 13.93vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13.1vw !important; }
+
+  #nav-tree a.menu-item[data-ml-1440="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.1vw !important }
+  #nav-tree a.menu-item[data-ml-1440="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.1vw !important }
+  #nav-tree a.menu-item[data-ml-1440="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.1vw !important }
+  #nav-tree a.menu-item[data-ml-1440="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.1vw !important }
+
+  #nav-tree a.menu-item[data-ml-1440="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.1vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 13vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 13vw !important;}
+}
+
+/* 1440  -> 1366–1431 */
+@media (min-width:1366px) and (max-width:1431px){
+  #nav-tree a.ajustedGap-menu{ width: 14.8vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 14.75vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13.8vw !important; }
+  
+  #nav-tree a.menu-item[data-ml-1366="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.75vw !important }
+  #nav-tree a.menu-item[data-ml-1366="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.75vw !important }
+  #nav-tree a.menu-item[data-ml-1366="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.75vw !important }
+  #nav-tree a.menu-item[data-ml-1366="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.75vw !important }
+
+  #nav-tree a.menu-item[data-ml-1366="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.8vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 13.7vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 13.7vw !important;}
+}
+
+/* 1360  ->  1352–1365 */
+@media (min-width:1352px) and (max-width:1365px){
+  #nav-tree a.ajustedGap-menu{ width: 14.8vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 14.75vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 13.8vw !important; }
+  
+  #nav-tree a.menu-item[data-ml-1360="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 12.7vw !important }
+  #nav-tree a.menu-item[data-ml-1360="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 12.7vw !important }
+  #nav-tree a.menu-item[data-ml-1360="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 12.7vw !important }
+  #nav-tree a.menu-item[data-ml-1360="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 12.7vw !important }
+
+  #nav-tree a.menu-item[data-ml-1360="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.8vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 13.8vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 13.8vw !important;}
+}
+
+/* 1280   -->   1272–1351 */
+@media (min-width:1272px) and (max-width:1351px){
+  #nav-tree a.ajustedGap-menu{ width: 16.1vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 16.1vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 15.1vw !important; }
+  /* #nav-tree a.ajustedGap-menu:hover{ width: 15vw !important; font-size: 1rem;} */
+
+  #nav-tree a.menu-item[data-ml-1280="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 13.6vw !important }
+  #nav-tree a.menu-item[data-ml-1280="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 13.6vw !important }
+  #nav-tree a.menu-item[data-ml-1280="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 13.6vw !important }
+  #nav-tree a.menu-item[data-ml-1280="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 13.6vw !important }
+
+  #nav-tree a.menu-item[data-ml-1280="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 15.1vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 14.6vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 14.6vw !important;}
+}
+
+/* 1152  -->  1144–1271 */
+@media (min-width:1144px) and (max-width:1271px){
+  #nav-tree a.ajustedGap-menu{ width: 17.5vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 17.5vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 16.3vw !important; }
+  
+  #nav-tree a.menu-item[data-ml-1152="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 15.2vw !important }
+  #nav-tree a.menu-item[data-ml-1152="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 15.2vw !important }
+  #nav-tree a.menu-item[data-ml-1152="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 15.2vw !important }
+  #nav-tree a.menu-item[data-ml-1152="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 15.2vw !important }
+
+  #nav-tree a.menu-item[data-ml-1152="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 16.3vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 16.2vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 16.2vw !important;}
+}
+
+/* 1024  -->  1016–1143 */
+@media (min-width:1016px) and (max-width:1143px){
+  #nav-tree a.ajustedGap-menu{ width: 19.5vw !important; font-size: 1rem;}
+  #nav-tree a.ajustedGap-menu:hover{ width: 19.5vw !important; font-size: 1rem;}
+
+  #nav-tree a.ajustedGap-submenu{ width: 18.3vw !important; }
+  
+  #nav-tree a.menu-item[data-ml-1024="1"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 17vw !important }
+  #nav-tree a.menu-item[data-ml-1024="2"]{ padding: 0.35rem 0.75rem 2.50rem; line-height:1.3; width: 17vw !important }
+  #nav-tree a.menu-item[data-ml-1024="3"]{ padding: 0.35rem 0.75rem 3.50rem; line-height:1.3; margin-bottom: -1rem !important; width: 17vw !important }
+  #nav-tree a.menu-item[data-ml-1024="4"]{ padding: 0.35rem 0.75rem 4.50rem; line-height:1.3; margin-bottom: 0.30rem !important; width: 17vw !important }
+
+  #nav-tree a.menu-item[data-ml-1024="11"]{ padding: .6rem 0.75rem .2rem; line-height:1.3; width: 18.3vw !important }
+
+  #nav-tree a.ajustedGap-link{ width: 18.2vw !important; }
+  #nav-tree a.ajustedGap-link:hover{ width: 18.2vw !important;}
+}
+
+
+/* Footer base font size */
+.footer { font-size: 22px; }
+
+/* Device Switcher Styles */
+.deviceSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 5vw;          /* keep 5vw gap from #remaining-time on the right */
+  background: transparent;
+}
+
+.deviceSwitcher .device-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.deviceSwitcher .device-btn:hover,
+.deviceSwitcher .device-btn:focus-visible {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.45);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.12), 0 6px 14px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.deviceSwitcher svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* ====================== Αφορά το deviceSwitcher.js (footer) ====================================== */
+/* Allow filled parts inside some icons to appear white */
+/* .deviceSwitcher svg [fill="currentColor"] { fill: currentColor; }
+
+#app-viewport {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+} */
+
+/* ΟΛΗ η εφαρμογή μέσα εδώ. Αυτό θα αλλάζουμε σε πλάτος. */
+/* #app-inner {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  transition: max-width .3s ease;
+} */
+
+/* Προαιρετικό: αν κάποια fixed/absolute λερώσει οριζόντια, κόψε overflow */
+/* #app-viewport{
+  width:100%;
+  display:flex;
+  justify-content:center;
+  overflow-x: clip;
+}
+
+#app-inner{
+  width:100%;
+  max-width: var(--app-w);
+  margin:0 auto;
+  transition:max-width .3s ease;
+  overflow-x: clip;
+}
+
+.deviceSwitcher .is-active{
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(255,255,255,0.6);
+}
+
+#app-inner.sim-fit {
+  transform-origin: top center;
+}
+
+#app-inner, .container-fluid.container-scroll{
+  width:100%;
+  max-width:100%;
+  margin:0 auto;
+  transition:max-width .3s ease;
+} */
+/* ================================================================================================== */
+
+.pagination .page-item.is-current .page-link {
+  background-color: #d68b00;
+  /* border-color: #2a3642; */
+  color: #fff;
+  pointer-events: none; /* δεν είναι κλικ */
+  cursor: default;
+}

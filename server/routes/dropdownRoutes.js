@@ -18,6 +18,7 @@ const dypa                                  = require('../dropdowns/ypokatasthma
 const pararthmataEfkaErgolaboy              = require('../dropdowns/ypokatasthmata/pararthmataEfkaErgolaboy');
 const idiothtes                             = require('../dropdowns/nomimoiEkprosopoi/idiothtes');
 const taytothtes                            = require('../dropdowns/nomimoiEkprosopoi/taytothtes');
+const trapezes                              = require('../dropdowns/trapezes/trapezes');
 
 const   {
             YpokatasthmataModel,
@@ -35,7 +36,8 @@ const   {
             SepeModel,
             DypaModel,
             IdiothtesModel,
-            TypoiTaytothtonModel
+            TypoiTaytothtonModel,
+            BanksModel
         } = statheraArxeiaModels;
 
 // ================================ ΕΚΤΥΠΩΣΕΙΣ -> ΑΠΑΣΧΟΛΗΣΕΙΣ ==================================
@@ -72,5 +74,24 @@ router.get('/ypokatasthmata/pararthmataEfkaErgolaboy',  buildDropdownRoute(Parar
 router.get('/nomimoiEkprosopoi/idiothta',               buildDropdownRoute(IdiothtesModel, idiothtes.options));
 router.get('/nomimoiEkprosopoi/taytothta',              buildDropdownRoute(TypoiTaytothtonModel, taytothtes.options));
 
+// ================================ ΕΤΑΙΡΕΙΕΣ -> ΤΡΑΠΕΖΕΣ =========================================
+// Επειδή στο crateDropdownApi.js διαχειρίζομαι τα πεδία kodikow και perigrafh ενώ εδώ σαν pripary key
+// έχω το kodikos_dias με το mapItem: item, pad = 3) => ({... αντιστοιχίζω το kodikos με το item.kodikos_dias
+// και το περνάω σαν options.
+
+router.get(
+  '/trapezes/trapeza',
+  buildDropdownRoute(BanksModel, {
+    pk: 'kodikos_dias',
+    searchFields: ['kodikos_dias', 'perigrafh'],
+    sort: { perigrafh: 1 },
+    mapItem: (item, pad = 3) => ({
+      value: item.kodikos_dias,
+      kodikos: item.kodikos_dias,
+      perigrafh: item.perigrafh,
+      label: `${(item.kodikos_dias?.trim() || '').padEnd(pad, '\u00A0')} - ${item.perigrafh}`,
+    }),
+  })
+);
 
 module.exports = router;

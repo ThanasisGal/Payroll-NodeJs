@@ -498,7 +498,7 @@ class companiesController {
             redir = "companies/companies/genikastoixeia";
         }
 
-        res.render(redir, { bodyClass: "custom-background", locals });
+        res.render(redir, { bodyClass: "home-bg-cdn", locals });
     };
 
     static editCompanyForm = async (req, res) => {
