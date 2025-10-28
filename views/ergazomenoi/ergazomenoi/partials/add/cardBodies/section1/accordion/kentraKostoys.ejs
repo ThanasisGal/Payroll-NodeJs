@@ -1,12 +1,87 @@
 <div class="accordion-item">
-  <h2 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseSix" aria-expanded="false" aria-controls="panelsStayOpen-collapseSix" style="background-color: #3d4e001e !important; font-size: 1vw; font-weight: 700; color: #525114">
-      Κέντρα Κόστους
-    </button>
-  </h2>
-  <div id="panelsStayOpen-collapseSix" class="accordion-collapse collapse show">
-    <div class="accordion-body">
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
+    <h2 class="accordion-header">
+        <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFive" aria-expanded="true" aria-controls="panelsStayOpen-collapseFive" 
+        tabindex="-1">
+        Κέντρα Κόστους
+        </button>
+    </h2>
+
+    <div id="panelsStayOpen-collapseFive" class="accordion-collapse collapse show">
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+        <div class="accordion-body bg-white margin-bottom--0_5rem">
+            <% for (let index = 1; index <= 4; index++) { %>
+
+                <% if (index === 1) { %>
+                    <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <% } else { %>
+                    <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <% } %>
+                
+                    <div class="col-2 left-align">
+                        <label for=<%= `kentro_kostoys_${index}` %> class="col-form-label label-font-size">
+                        Κέντρο Κόστους #<%= index %>
+                        </label>
+                    </div>
+                        
+                    <input
+                        type="hidden"
+                        name="kentro_kostoys_<%= index %>_stathera"
+                        id="kentro_kostoys_<%= index %>_stathera"
+                        class="form-control input-contents"
+                        value="<%= safe(`kentro_kostoys_${index}_stathera`) %>"
+                    />
+
+                    <div class="col-3-75">
+                        <select
+                            id=<%= `kentro_kostoys_${index}` %>
+                            name=<%= `kentro_kostoys_${index}` %>
+                            class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                            aria-label="Κέντρα Κόστους <%= index %>"
+                            data-api="/api/dropdown/ergazomenoi/kentro_kostoys"
+                            single
+                            data-target-input=<%= `kentro_kostoys_${index}_stathera` %>
+                            data-preselect=<%= `kentro_kostoys_${index}_stathera` %>
+                            data-preload-all="true"
+                            data-skip-autoload="false"
+                            data-pad-length="3"
+                            data-xrhsh-related="false"
+                            data-team-related="false"
+                            data-company-related="false"
+                            data-mhnas-related="false"
+                            placeholder="Αναζήτηση Κέντρο Κόστους <%= index %>">
+                        </select>
+                    </div>
+
+                    <div class="col-0-25"></div>
+
+                    <div class="col-2 left-align">
+                        <label for=<%= `pososto_apasxolhshs_kk${index}` %> class="col-form-label label-font-size">
+                        % Απασχόλησης Κ.Κ. #<%= index %>
+                        </label>
+                    </div>
+
+                    <div class="col-1-5">
+                        <input 
+                            type="number" 
+                            name=<%= `pososto_apasxolhshs_kk${index}` %> 
+                            id=<%= `pososto_apasxolhshs_kk${index}` %> 
+                            class="form-control input-contents right-align percentTotal" 
+                            value="0" 
+                            min="0" 
+                            max="100" 
+                            step="0.10"
+                        />
+                    </div>
+                </div>
+
+                <div class="height-vh-0_2"></div>
+
+            <% } %>
+        </div>
+    </div>
+</div>
+<!-- 
         <div class="col-2 left-align">
           <label for="kentro_kostoys_1" class="col-form-label label-font-size">
             Κέντρο Κόστους #1
@@ -91,4 +166,4 @@
       </div>
     </div>
   </div>
-</div>
+</div> -->

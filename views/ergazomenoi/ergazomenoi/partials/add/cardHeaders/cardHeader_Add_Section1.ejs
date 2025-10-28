@@ -1,42 +1,51 @@
-<div class="card-header" style="height: 10.8vh !important;">
-  <label class="text-center headers-content">
-    Εισαγωγή Νέου Εργαζόμενου
-  </label>
-  <div class="row form-group g-3 align-items-center mt-1 mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-    <div class="col-1 right-align">
-      <label for="eponymo" class="col-form-label label-font-size field-required" style="color: #000000;">
-        Επώνυμο
-      </label>
-    </div>
-    <div class="col-3">
-      <input type="text" name="eponymo" id="eponymo" class="form-control input-contents" value="" />
+<div class="row form-group g-3 align-items-center margin-bottom--0_5rem">
+    <div class="card-header">
+        <label class="text-center headers-content sectionTitle">
+        Εισαγωγή Νέου Εργαζόμενου
+        </label>
     </div>
 
-    <div class="col-0-75 right-align">
-      <label for="onoma" class="col-form-label label-font-size field-required" style="color: #000000;">
-        Όνομα
-      </label>
-    </div>
-    <div class="col-2">
-      <input type="text" name="onoma" id="onoma" class="form-control input-contents" value="" />
-    </div>
+    <div class="row form-group g-0 header-row">
+        <div class="col-1 right-align-header">
+            <label for="eponymo" class="col-form-label label-font-size field-required cblack">
+            Επώνυμο &nbsp;
+            </label>
+        </div>
+        <div class="col-3">
+            <input type="text" name="eponymo" id="eponymo" class="form-control input-contents" value="" />
+        </div>
 
-    <div class="col-1 right-align">
-      <label for="afm" class="col-form-label label-font-size field-required" style="color: #000000;">
-        ΑΦΜ
-      </label>
-    </div>
-    <div class="col-1-5">
-      <input type="text" name="afm" id="afm" class="form-control input-contents" value="" maxlength="9" pattern="[0-9]{1,}" />
-    </div>
+        <div class="col-0-75 right-align-header">
+            <label for="onoma" class="col-form-label label-font-size field-required cblack">
+            Όνομα &nbsp;
+            </label>
+        </div>
+        <div class="col-2">
+            <input type="text" name="onoma" id="onoma" class="form-control input-contents" value="" />
+        </div>
 
-    <div class="col-1 right-align">
-      <label for="amka" class="col-form-label label-font-size field-required" style="color: #000000;">
-        ΑΜΚΑ
-      </label>
+        <div class="col-1 right-align-header">
+            <label for="afm" class="col-form-label label-font-size field-required cblack">
+            ΑΦΜ &nbsp;
+            </label>
+        </div>
+        <div class="col-1-5">
+            <input type="text" name="afm" id="afm_ergazomenoy" class="form-control input-contents" value="" maxlength="9" pattern="[0-9]{1,}" />
+        </div>
+
+        <div class="col-1 right-align-header">
+            <label for="amka" class="col-form-label label-font-size field-required cblack right-align">
+            ΑΜΚΑ &nbsp;
+            </label>
+        </div>
+        <div class="col-1-5">
+            <input type="text" name="amka" id="amka_ergazomenoy" class="form-control input-contents amka-input" value="" maxlength="11" pattern="[0-9]{1,}" />
+        </div>
+
+        <div class="col"></div>
     </div>
-    <div class="col-1-5">
-      <input type="text" name="amka" id="amka" class="form-control input-contents amka-input" value="" maxlength="11" pattern="[0-9]{1,}" />
+    
+    <div>
+        <hr class="hr-style-header"></hr>
     </div>
-  </div>
 </div>

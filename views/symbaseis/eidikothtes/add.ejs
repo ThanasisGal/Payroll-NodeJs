@@ -1,30 +1,27 @@
-<div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
-      </ul>
-    </div>
-    <!-- <hr style="margin-top: -2rem" /> -->
+<div class="margin-top-1rem">
+    <div class="container-fluid height-vh-100 padding-0">
+        
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius">
+        <div class="sections margin-top-1rem">
+            <section class="sel_1_section visible" data-section="">
+                <div>
+                    <form class="formRadius">
 
-            </br></br></br></br>
+                        <%- include('../../partials/_csrfField') %>
+                        </br> </br> </br>
+                        
+                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
 
-            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content">
+                                Εισαγωγή Νέας Ειδικότητας Σύμβασης
+                                </label>
+                            </div>
 
-              <div class="card-header">
-                <label class="text-center headers-content">
-                  Εισαγωγή Νέας Ειδικότητας Σύμβασης
-                </label>
-              </div>
-
-              <div class="card-body overflow-auto flex-grow-1" style="height: 29vh; background-color: #ffffff;" >
-                <input type="hidden" name="aa" id="aa" value="<%= aa_value.toString().padStart(4, '0') %>" />
-                <input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %>" />
+                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-25 bg-white" id="cardBody">
+								<input type="hidden" name="aa" id="aa" value="<%= aa_value.toString().padStart(4, '0') %>" />
+								<input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %>" />
           
                 <div class="row form-group g-3 align-items-center mb-1">
                   <div class="col-1-5 right-align">

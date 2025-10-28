@@ -75,7 +75,9 @@ class companiesController {
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
-        const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
+        const basePer = Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
         const page = Math.max(Number(req.query.page) || 1, 1);
 
         if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
@@ -107,6 +109,10 @@ class companiesController {
                 company,
                 current: page,
                 pages: totalPages,
+                perx,                       // <-- για το UI πολλαπλασιαστή
+                basePer,                    // (προαιρετικό, αν το δείχνεις)
+                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.error(error);

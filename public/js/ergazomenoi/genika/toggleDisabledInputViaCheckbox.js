@@ -1,28 +1,70 @@
 // Αυτή η συνάρτηση ενεργοποιεί ή απενεργοποιεί τα input fields ανάλογα με την κατάσταση του συσχετισμένου checkbox
+// function toggleInputs(checkboxId, inputIds) {
+//   var checkbox = document.getElementById(checkboxId);
+//   checkbox.addEventListener('change', function() {
+//     inputIds.forEach(function(inputId) {
+//       var input = document.getElementById(inputId);
+//       if (input) {
+//         input.disabled = !checkbox.checked;
+//       }
+//       if (!checkbox.checked) {
+//         input.value = "";
+//       }
+//     });
+//   });
+
+//   // Ενεργοποιεί/απενεργοποιεί τα inputs αμέσως με βάση την αρχική κατάσταση του checkbox
+//   inputIds.forEach(function(inputId) {
+//     var input = document.getElementById(inputId);
+//     if (input) {
+//       input.disabled = !checkbox.checked;
+//     }
+//     if (!checkbox.checked) {
+//       input.value = "";
+//     }
+//   });
+// }
+
+// Αντικατάσταση της παλιάς toggleInputs
 function toggleInputs(checkboxId, inputIds) {
   var checkbox = document.getElementById(checkboxId);
-  checkbox.addEventListener('change', function() {
+  if (!checkbox) {
+    console.warn('toggleInputs: δεν βρέθηκε checkbox:', checkboxId);
+    return;
+  }
+
+  function apply() {
     inputIds.forEach(function(inputId) {
       var input = document.getElementById(inputId);
-      if (input) {
-        input.disabled = !checkbox.checked;
+      if (!input) {
+        console.warn('toggleInputs: δεν βρέθηκε input:', inputId);
+        return;
       }
-      if (!checkbox.checked) {
-        input.value = "";
+
+      var enabled = checkbox.checked;
+
+      // 1) Property
+      input.disabled = !enabled;
+
+      // 2) Attribute (για στοιχεία που ξεκινούν με disabled στο markup)
+      if (enabled) {
+        input.removeAttribute('disabled');
+      } else {
+        input.setAttribute('disabled', 'disabled');
+        // Προαιρετικό καθάρισμα όταν κλείνει
+        if (input._flatpickr) input._flatpickr.clear();
+        else input.value = '';
+        input.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
-  });
+  }
 
-  // Ενεργοποιεί/απενεργοποιεί τα inputs αμέσως με βάση την αρχική κατάσταση του checkbox
-  inputIds.forEach(function(inputId) {
-    var input = document.getElementById(inputId);
-    if (input) {
-      input.disabled = !checkbox.checked;
-    }
-    if (!checkbox.checked) {
-      input.value = "";
-    }
-  });
+  // Δέσιμο event (σε κάποια custom checkboxes το 'input' πιάνει καλύτερα)
+  checkbox.addEventListener('change', apply);
+  checkbox.addEventListener('input', apply);
+
+  // Αρχική εφαρμογή
+  apply();
 }
 
 // Εξασφαλίζει ότι οι λειτουργίες θα εκτελεστούν μόλις το DOM είναι πλήρως φορτωμένο
@@ -36,4 +78,5 @@ document.addEventListener('DOMContentLoaded', function() {
   toggleInputs('kataggelia_katopin_eggrafhs_proeidopoihshs', ['hmeromhnia_eggrafhs_proeidopoihshs']);
   toggleInputs('omadikh_apolysh', ['arithmos_apofashs_gia_omadikh_apolysh', 'hmeromhnia_apofashs_gia_omadikh_apolysh']);
   toggleInputs('epidosh_me_dikastiko_epimelhth', ['hmeromhnia_epidoshs']);
+  
 });

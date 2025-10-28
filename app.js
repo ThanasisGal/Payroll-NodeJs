@@ -29,6 +29,7 @@ const connectDB = require("./server/config/db");
 const geoGuard = require("./server/middlewares/geoGuard");
 const usersRoute = require("./server/routes/usersRoute");
 const dropdownRoutes = require("./server/routes/dropdownRoutes");
+const apiRoutes = require("./server/routes/apiRoutes");
 const getSessionVars = require("./server/middlewares/session-variables");
 const logger = require("./server/utils/logger");
 
@@ -40,6 +41,7 @@ const port = Number(process.env.PORT || 5000);
 const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 30); // λεπτά
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
+const EGGRAFES = Number.parseInt(process.env.EGGRAFES ?? '15', 10) || 15;
 
 logger.info(`NODE_ENV at startup = ${node_env}`);
 if (isProd) app.set("trust proxy", 1); // απαιτείται πίσω από reverse proxy για secure cookies & σωστό req.ip
@@ -198,7 +200,6 @@ const cspDirectives = {
 if (isProd) {
      cspDirectives["upgrade-insecure-requests"] = [];
 }
-app.use(helmet.contentSecurityPolicy({ useDefaults: false, directives: cspDirectives }));
 
 app.use(
     helmet.contentSecurityPolicy({
@@ -270,6 +271,11 @@ app.set("view engine", "ejs");
 app.use(expressLayout);
 app.set("layout", "./layouts/main");
 
+app.use((req, res, next) => {
+  res.locals.CONFIG = { EGGRAFES };
+  next();
+});
+
 /* -------------------------------------------------------------------------- */
 /*                                    API                                     */
 /* -------------------------------------------------------------------------- */
@@ -294,6 +300,7 @@ app.use(
 
 app.use("/reset_password", isProd ? loginLimiter : (req,res,next)=>next(), isProd ? geoGuard : (req,res,next)=>next());
 
+app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
 

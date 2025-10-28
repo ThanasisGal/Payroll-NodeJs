@@ -1,396 +1,603 @@
 <div class="accordion-item">
-  <h2 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="false" aria-controls="panelsStayOpen-collapseThree" style="background-color: #3d4e001e !important; font-size: 1vw; font-weight: 700; color: #525114">
-      Στοιχεία Απασχόλησης
-    </button>
-  </h2>
-  <div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show">
-    <div class="accordion-body">
-      <input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
+    <h2 class="accordion-header">
+        <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="true" aria-controls="panelsStayOpen-collapseThree" 
+        tabindex="-1">
+        Στοιχεία Απασχόλησης
+        </button>
+    </h2>
+  
+    <div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show">
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="plhrhs_apasxolhsh" class="col-form-label label-font-size">
-            Πλήρης Απασχόληση
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="plhrhs_apasxolhsh" name="plhrhs_apasxolhsh" value="" />
-          <label for="plhrhs_apasxolhsh" id="label-plhrhs_apasxolhsh" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+        <div class="accordion-body bg-white margin-bottom--0_5rem">
+            <input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="col-2 left-align">
+                    <label for="plhrhs_apasxolhsh" class="col-form-label label-font-size">
+                    Πλήρης Απασχόληση
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="plhrhs_apasxolhsh" name="plhrhs_apasxolhsh" value="" />
+                    <label for="plhrhs_apasxolhsh" id="label-plhrhs_apasxolhsh" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="dieythethsh_xronoy_ergasias" class="col-form-label label-font-size">
-            Διευθέτηση Χρόνου Εργαίας
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="dieythethsh_xronoy_ergasias" name="dieythethsh_xronoy_ergasias" value="" />
-          <label for="dieythethsh_xronoy_ergasias" id="label-dieythethsh_xronoy_ergasias" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="dieythethsh_xronoy_ergasias" class="col-form-label label-font-size">
+                    Διευθέτηση Χρόνου Εργαίας
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="dieythethsh_xronoy_ergasias" name="dieythethsh_xronoy_ergasias" value="" />
+                    <label for="dieythethsh_xronoy_ergasias" id="label-dieythethsh_xronoy_ergasias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="hmeres_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
-            Ημέρες Εβδ/διαίας Εργασίας
-          </label>
-        </div>
-        <div class="col-1">
-          <input type="number" name="hmeres_ergasias_ebdomadas" id="hmeres_ergasias_ebdomadas" class="form-control input-contents" value="" min="1" max="7" />
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="hmeres_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
+                    Ημέρες Εβδ/διαίας Εργασίας
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="number" name="hmeres_ergasias_ebdomadas" id="hmeres_ergasias_ebdomadas" class="form-control input-contents right-align" value="" min="1" max="7" />
+                </div>
 
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="ores_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
-            Ώρες Εβδ/διαίας Εργασίας
-          </label>
-        </div>
-        <div class="col-1">
-          <input type="number" name="ores_ergasias_ebdomadas" id="ores_ergasias_ebdomadas" class="form-control input-contents" value="" min="0" max="40" />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="ores_ergasias_ebdomadas" class="col-form-label label-font-size field-required">
+                    Ώρες Εβδ/διαίας Εργασίας
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="number" name="ores_ergasias_ebdomadas" id="ores_ergasias_ebdomadas" class="form-control input-contents right-align" value="" min="0" max="40" />
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="dialleima_se_lepta" class="col-form-label label-font-size field-required">
-            Διάλλειμα (Σε Λεπτά)
-          </label>
-        </div>
-        <div class="col-1">
-          <input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents" value="30" min="0" max="45" />
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="dialleima_se_lepta" class="col-form-label label-font-size field-required">
+                    Διάλλειμα (Σε Λεπτά)
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents right-align" value="30" min="0" max="30" />
+                </div>
 
-        <div class="col-0-3"></div>
+                <div class="col-0-3"></div>
 
-        <div class="col-1-7 left-align">
-          <label for="dialleima_entos_ektos_orarioy" class="col-form-label label-font-size">
-            Εντός/Εκτός Ωραρίου
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="dialleima_entos_ektos_orarioy" name="dialleima_entos_ektos_orarioy" value="" />
-          <label for="dialleima_entos_ektos_orarioy" id="label-dialleima_entos_ektos_orarioy" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΕΚΤΟΣ
-          </label>
-        </div>
+                <div class="col-1-7 left-align">
+                    <label for="dialleima_entos_ektos_orarioy" class="col-form-label label-font-size">
+                    Εντός/Εκτός Ωραρίου
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="dialleima_entos_ektos_orarioy" name="dialleima_entos_ektos_orarioy" value="" />
+                    <label for="dialleima_entos_ektos_orarioy" id="label-dialleima_entos_ektos_orarioy" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΕΚΤΟΣ
+                    </label>
+                </div>
 
-        <div class="col-2 left-align">
-          <label for="symbatikes_ores_ergasias" class="col-form-label label-font-size field-required">
-            Συμβατικές Ώρες Εργασίας
-          </label>
-        </div>
-        <div class="col-1">
-          <input type="number" name="symbatikes_ores_ergasias" id="symbatikes_ores_ergasias" class="form-control input-contents" value="40" min="0" max="40" />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="symbatikes_ores_ergasias" class="col-form-label label-font-size field-required">
+                    Συμβατικές Ώρες Εργασίας
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="number" name="symbatikes_ores_ergasias" id="symbatikes_ores_ergasias" class="form-control input-contents right-align" value="40" min="0" max="40" />
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="typos_orarioy" class="col-form-label label-font-size">
-            Τύπος Ωραρίου
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_orarioy" name="typos_orarioy" value="" />
-          <label for="typos_orarioy" id="label-typos_orarioy" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΣΤΑΘΕΡΟ
-          </label>
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="typos_orarioy" class="col-form-label label-font-size">
+                    Τύπος Ωραρίου
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="typos_orarioy" name="typos_orarioy" value="" />
+                    <label for="typos_orarioy" id="label-typos_orarioy" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΣΤΑΘΕΡΟ
+                    </label>
+                </div>
+                
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="synexes_diakekomeno" class="col-form-label label-font-size">
+                    Συνεχές / Διακεκομμένο
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="synexes_diakekomeno" name="synexes_diakekomeno" value="" />
+                    <label for="synexes_diakekomeno" id="label-synexes_diakekomeno" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΣΥΝΕΧΕΣ
+                    </label>
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+
+                <div class="col-2 left-align">
+                    <label for="pshfiakh_organosh" class="col-form-label label-font-size">
+                    Ψηφιακή Οργάνωση 
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="pshfiakh_organosh" name="pshfiakh_organosh" value="" />
+                    <label for="pshfiakh_organosh" id="label-pshfiakh_organosh" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+                
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="apasxolhsh_basei_symbashs" class="col-form-label label-font-size">
+                    Απασχόληση Βάσει Σύμβασης
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="apasxolhsh_basei_symbashs_stathera"
+                    id="apasxolhsh_basei_symbashs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("apasxolhsh_basei_symbashs_stathera") %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="apasxolhsh_basei_symbashs"
+                        name="apasxolhsh_basei_symbashs"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Απασχόληση Βάσει Σύμβασης"
+                        data-api="/api/dropdown/ergazomenoi/apasxolhsh_basei_symbashs"
+                        single
+                        data-target-input=<%= `apasxolhsh_basei_symbashs_stathera` %>
+                        data-preselect=<%= `apasxolhsh_basei_symbashs_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Απασχόλησης Βάσει Σύμβασης">
+                    </select>
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="karta_ergasias" class="col-form-label label-font-size field-required">
+                    Κάρτα Εργασίας
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="karta_ergasias" name="karta_ergasias" value="" />
+                    <label for="karta_ergasias" id="label-karta_ergasias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="synexes_diakekomeno" class="col-form-label label-font-size">
-            Συνεχές / Διακεκομμένο
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="synexes_diakekomeno" name="synexes_diakekomeno" value="" />
-          <label for="synexes_diakekomeno" id="label-synexes_diakekomeno" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΣΥΝΕΧΕΣ
-          </label>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="evelikth_proselefsh" class="col-form-label label-font-size">
+                    Ευέλικτη Προσέλευση (λεπτά)
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="evelikth_proselefsh" name="evelikth_proselefsh" class="form-control input-contents right-align" min="0" max="120" value="0" disabled />
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="pshfiakh_organosh" class="col-form-label label-font-size">
-            Ψηφιακή Οργάνωση 
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="pshfiakh_organosh" name="pshfiakh_organosh" value="" />
-          <label for="pshfiakh_organosh" id="label-pshfiakh_organosh" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+
+                <div class="col-2 left-align">
+                    <label for="apasxolhsh_gia_proth_fora" class="col-form-label label-font-size">
+                    Απασχόληση για 1η φορά
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apasxolhsh_gia_proth_fora" name="apasxolhsh_gia_proth_fora" value="" />
+                    <label for="apasxolhsh_gia_proth_fora" id="label-apasxolhsh_gia_proth_fora" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="apasxolhsh_basei_symbashs" class="col-form-label label-font-size">
-            Απασχόληση Βάσει Σύμβασης
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="apasxolhsh_basei_symbashs" id="apasxolhsh_basei_symbashs">
-          </select>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="ora_enarxhs_proths_foras" class="col-form-label label-font-size field-required">
+                    Ώρα Έναρξης την 1η ημέρα
+                    </label>
+                </div>
+                <div class="col-1-1 left-align">
+                    <input type="time" id="ora_enarxhs_proths_foras" name="ora_enarxhs_proths_foras" class="date-control" value="" />
+                </div>
+                
+                <div class="col-0-3"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="karta_ergasias" class="col-form-label label-font-size field-required">
-            Κάρτα Εργασίας
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="karta_ergasias" name="karta_ergasias" value="" />
-          <label for="karta_ergasias" id="label-karta_ergasias" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+                <div class="col-1-4-5-5 left-align">
+                    <label for="ora_apoxorhshs_proths_foras" class="col-form-label label-font-size field-required">
+                    Ώρα Αποχώρησης
+                    </label>
+                </div>
+                <div class="col-1-1 left-align">
+                    <input type="time" id="ora_apoxorhshs_proths_foras" name="ora_apoxorhshs_proths_foras" class="date-control" value="" />
+                </div>
+            </div>
+
+            <hr class="hr-style" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="asfalish_me_tekmarta" class="col-form-label label-font-size">
+                    Τεκμαρτή Ασφάλιση 
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="asfalish_me_tekmarta" name="asfalish_me_tekmarta" class="form-check-input custom-checkbox checkbox-class" data-related-select="asfalistikh_klash" value="" />
+                    <label for="asfalish_me_tekmarta" id="label-asfalish_me_tekmarta" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="evelikth_proselefsh" class="col-form-label label-font-size">
-            Ευέλικτη Προσέλευση (λεπτά)
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="evelikth_proselefsh" name="evelikth_proselefsh" class="form-control input-contents" min="0" max="120" value="0" />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="asfalistikh_klash" class="col-form-label label-font-size">
+                    Ασφαλιστική Κλάση
+                    </label>
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="apasxolhsh_gia_proth_fora" class="col-form-label label-font-size">
-            Απασχόληση για 1η φορά
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="apasxolhsh_gia_proth_fora" name="apasxolhsh_gia_proth_fora" value="" />
-          <label for="apasxolhsh_gia_proth_fora" id="label-apasxolhsh_gia_proth_fora" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-        
-        <div class="col-3"></div>
+                <input
+                    type="hidden"
+                    name="asfalistikh_klash_stathera"
+                    id="asfalistikh_klash_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("asfalistikh_klash_stathera") %>"
+                />
 
-        <div class="col-2 left-align">
-          <label for="ora_enarxhs_proths_foras" class="col-form-label label-font-size field-required">
-            Ώρα Έναρξης την 1η ημέρα
-          </label>
-        </div>
-        <div class="col-1-1 left-align">
-          <input type="time" id="ora_enarxhs_proths_foras" name="ora_enarxhs_proths_foras" class="date-control" value="" />
-        </div>
-        
-        <div class="col-0-3"></div>
+                <div class="col-3-75">
+                    <select
+                        id="asfalistikh_klash"
+                        name="asfalistikh_klash"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Ασφαλιστική Κλάση"
+                        data-api="/api/dropdown/ergazomenoi/asfalistikh_klash"
+                        data-dd-wide="true"
+                        single
+                        data-target-input=<%= `asfalistikh_klash_stathera` %>
+                        data-preselect=<%= `asfalistikh_klash_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Ασφαλιστικής Κλάσης">
+                    </select>
+                </div>
+            </div>
 
-        <div class="col-1-4-5-5 left-align">
-          <label for="ora_apoxorhshs_proths_foras" class="col-form-label label-font-size field-required">
-            Ώρα Αποχώρησης
-          </label>
-        </div>
-        <div class="col-1-1 left-align">
-          <input type="time" id="ora_apoxorhshs_proths_foras" name="ora_apoxorhshs_proths_foras" class="date-control" value="" />
-        </div>
-      </div>
+            <div class="height-vh-0_2"></div>
 
-      <hr class="hr-style" />
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="epoxikos" class="col-form-label label-font-size">
+                    Εποχικός
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="epoxikos" name="epoxikos" value="" />
+                    <label for="epoxikos" id="label-epoxikos" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+            
+                <div class="col-3"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="asfalish_me_tekmarta" class="col-form-label label-font-size">
-            Τεκμαρτή Ασφάλιση 
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="asfalish_me_tekmarta" name="asfalish_me_tekmarta" class="form-check-input custom-checkbox checkbox-class" data-related-select="asfalistikh_klash" value="" />
-          <label for="asfalish_me_tekmarta" id="label-asfalish_me_tekmarta" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-        
-        <div class="col-3"></div>
+                <div class="col-2 left-align">
+                    <label for="tmhma" class="col-form-label label-font-size">
+                    Τμήματα
+                    </label>
+                </div>
 
-        <div class="col-2 left-align">
-          <label for="asfalistikh_klash" class="col-form-label label-font-size">
-            Ασφαλιστική Κλάση
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal select-class" data-live-search="true" name="asfalistikh_klash" id="asfalistikh_klash">
-          </select>
-        </div>
-      </div>
+                <input
+                    type="hidden"
+                    name="tmhma_stathera"
+                    id="tmhma_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("tmhma_stathera") %>"
+                />
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="epoxikos" class="col-form-label label-font-size">
-            Εποχικός
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="epoxikos" name="epoxikos" value="" />
-          <label for="epoxikos" id="label-epoxikos" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-        
-        <div class="col-3"></div>
+                <div class="col-3-74">
+                    <select
+                        id="tmhma"
+                        name="tmhma"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Τμήμα"
+                        data-api="/api/dropdown/ergazomenoi/tmhma"
+                        single
+                        data-target-input=<%= `tmhma_stathera` %>
+                        data-preselect=<%= `tmhma_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Τμήματος">
+                    </select>
+                </div>
+            </div>
 
-        <div class="col-2 left-align">
-          <label for="tmhma" class="col-form-label label-font-size">
-            Τμήμα
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="tmhma" id="tmhma">
-          </select>
-        </div>
-      </div>
+            <div class="height-vh-0_2"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="ekpaideytiko_epipedo" class="col-form-label label-font-size">
-            Εκπαιδευτικό Επίπεδο
-          </label>
-        </div>
-        <div class="col-4">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="ekpaideytiko_epipedo" id="ekpaideytiko_epipedo">
-          </select>
-        </div>
-        
-        <div class="col-2 left-align">
-          <label for="eidikothta" class="col-form-label label-font-size">
-            Ειδικότητα
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta" id="eidikothta">
-          </select>
-        </div>
-      </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="ekpaideytiko_epipedo" class="col-form-label label-font-size">
+                    Εκπαιδευτικό Επίπεδο
+                    </label>
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="antikeimeno_ergasion" class="col-form-label label-font-size">
-            Αντικείμενο Εργασιών
-          </label>
-        </div>
-        <div class="col-10">
-          <textarea
-            class="form-control textarea-content"
-            name="antikeimeno_ergasion"
-            id="antikeimeno_ergasion"
-            cols="150"
-            rows="1"
-            style="height: 1vh !important;">
-          </textarea>
-        </div>
-      </div>
+                <input
+                    type="hidden"
+                    name="ekpaideytiko_epipedo_stathera"
+                    id="ekpaideytiko_epipedo_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("ekpaideytiko_epipedo_stathera") %>"
+                />
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="typos_ergazomenon" class="col-form-label label-font-size">
-            Τύπος Εργαζομένου
-          </label>
-        </div>
-        <div class="col-4">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="typos_ergazomenon" id="typos_ergazomenon">
-          </select>
-        </div>
-        
-        <div class="col-2 left-align">
-          <label for="ypokatasthma" class="col-form-label label-font-size">
-            Υποκατάστημα
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="ypokatasthma" id="ypokatasthma">
-          </select>
-        </div>
-      </div>
+                <div class="col-3-75">
+                    <select
+                        id="ekpaideytiko_epipedo"
+                        name="ekpaideytiko_epipedo"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Εκπαιδευτικό Επίπεδο"
+                        data-api="/api/dropdown/ergazomenoi/ekpaideytiko_epipedo"
+                        single
+                        data-target-input=<%= `ekpaideytiko_epipedo_stathera` %>
+                        data-preselect=<%= `ekpaideytiko_epipedo_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Εκπαιδευτικού Επιπέδου">
+                    </select>
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="xarakthrismos_ergazomenon" class="col-form-label label-font-size">
-            Χαρακτηρισμός Εργαζομένου
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="xarakthrismos_ergazomenon" name="xarakthrismos_ergazomenon" value="" />
-          <label for="xarakthrismos_ergazomenon" id="label-xarakthrismos_ergazomenon" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΕΡΓΑΤΗΣ
-          </label>
-        </div>
-        
-        <div class="col-3"></div>
+                <div class="col-0-25"></div>
 
-        <div class="col-2 left-align">
-          <label for="eidikothta_erganh" class="col-form-label label-font-size field-required">
-            Ειδικότητα ΕΡΓΑΝΗ
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select select2-results selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_erganh" id="eidikothta_erganh">
-          </select>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="eidikothta" class="col-form-label label-font-size">
+                    Ειδικότητα
+                    </label>
+                </div>
 
-      <hr class="hr-style" />
+                <input
+                    type="hidden"
+                    name="eidikothta_stathera"
+                    id="eidikothta_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("eidikothta_stathera") %>"
+                />
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="diathesimothta" class="col-form-label label-font-size">
-            Βρίσκεται σε διαθεσιμότητα
-          </label>
+                <div class="col-3-74">
+                    <select
+                        id="eidikothta"
+                        name="eidikothta"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Ειδικότητα"
+                        data-api="/api/dropdown/ergazomenoi/eidikothta"
+                        single
+                        data-target-input=<%= `eidikothta_stathera` %>
+                        data-preselect=<%= `eidikothta_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Ειδικότητας">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="antikeimeno_ergasion" class="col-form-label label-font-size">
+                    Αντικείμενο Εργασιών
+                    </label>
+                </div>
+                <div class="col-10">
+                    <textarea
+                        class="form-control textarea-content height-vh-0_8" name="antikeimeno_ergasion" id="antikeimeno_ergasion" cols="150" rows="1">
+                    </textarea>
+                </div>
+            </div>
+
+            <div class="height-vh-0_3"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="typos_ergazomenon" class="col-form-label label-font-size">
+                    Τύπος Εργαζομένου
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="typos_ergazomenon_stathera"
+                    id="typos_ergazomenon_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("typos_ergazomenon_stathera") %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="typos_ergazomenon"
+                        name="typos_ergazomenon"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Τύπος Εργαζομένου"
+                        data-api="/api/dropdown/ergazomenoi/typos_ergazomenon"
+                        single
+                        data-target-input=<%= `typos_ergazomenon_stathera` %>
+                        data-preselect=<%= `typos_ergazomenon_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Τύπου Εργαζομένου">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="ypokatasthma" class="col-form-label label-font-size">
+                    Υποκατάστημα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="ypokatasthma_stathera"
+                    id="ypokatasthma_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("ypokatasthma_stathera") %>"
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="ypokatasthma"
+                        name="ypokatasthma"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Υποκατάστημα"
+                        data-api="/api/dropdown/ergazomenoi/ypokatasthma"
+                        single
+                        data-target-input=<%= `ypokatasthma_stathera` %>
+                        data-preselect=<%= `ypokatasthma_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Υποκαταστήματος">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="xarakthrismos_ergazomenon" class="col-form-label label-font-size">
+                    Χαρακτηρισμός Εργαζομένου
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="xarakthrismos_ergazomenon" name="xarakthrismos_ergazomenon" value="" />
+                    <label for="xarakthrismos_ergazomenon" id="label-xarakthrismos_ergazomenon" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΕΡΓΑΤΗΣ
+                    </label>
+                </div>
+
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="eidikothta_erganh" class="col-form-label label-font-size">
+                    Ειδικότητα ΕΡΓΑΝΗ
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="eidikothta_erganh_stathera"
+                    id="eidikothta_erganh_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("eidikothta_erganh_stathera") %>"
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="eidikothta_erganh"
+                        name="eidikothta_erganh"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Ειδικότητα ΕΡΓΑΝΗ"
+                        data-api="/api/dropdown/ergazomenoi/eidikothta_erganh"
+                        single
+                        data-dd-width="40vw"
+                        data-target-input=<%= `eidikothta_erganh_stathera` %>
+                        data-preselect=<%= `eidikothta_erganh_stathera` %>
+                        data-preload-all="false"
+                        data-pad-length="6"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Ειδικότητας ΕΡΓΑΝΗ">
+                    </select>
+                </div>
+            </div>
+
+            <hr class="hr-style" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="diathesimothta" class="col-form-label label-font-size">
+                    Βρίσκεται σε διαθεσιμότητα
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="diathesimothta" name="diathesimothta" value="" />
+                    <label for="diathesimothta" id="label-diathesimothta" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="enarxh_diathesimothtas" class="col-form-label label-font-size">
+                    Ημ/νία Έναρξης Διαθ/τητας
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="enarxh_diathesimothtas" id="enarxh_diathesimothtas" class="date-control" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-6"></div>
+
+                <div class="col-2 left-align">
+                    <label for="lhxh_diathesimothtas" class="col-form-label label-font-size">
+                    Ημ/νία Λήξης Διαθ/τητας
+                    </label>
+                    </div>
+                    <div class="col-1-5">
+                        <input type="date" name="lhxh_diathesimothtas" id="lhxh_diathesimothtas" class="date-control" value="" />
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="diathesimothta" name="diathesimothta" value="" />
-          <label for="diathesimothta" id="label-diathesimothta" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-
-        <div class="col-3"></div>
-
-        <div class="col-2 left-align">
-          <label for="enarxh_diathesimothtas" class="col-form-label label-font-size">
-            Ημ/νία Έναρξης Διαθ/τητας
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="date" name="enarxh_diathesimothtas" id="enarxh_diathesimothtas" class="date-control" value="" />
-        </div>
-      </div>
-
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-6"></div>
-
-        <div class="col-2 left-align">
-          <label for="lhxh_diathesimothtas" class="col-form-label label-font-size">
-            Ημ/νία Λήξης Διαθ/τητας
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="date" name="lhxh_diathesimothtas" id="lhxh_diathesimothtas" class="date-control" value="" />
-        </div>
-      </div>
-
-      <hr class="hr-style" />
-
     </div>
-  </div>
-</div>

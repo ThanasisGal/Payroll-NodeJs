@@ -1,337 +1,613 @@
-  <div class="accordion-item">
+<div class="accordion-item margin-top--0_5rem">
     <h2 class="accordion-header">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" style="background-color: #3d4e001e !important; font-size: 1vw; font-weight: 700; color: #525114">
+        <button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" tabindex="-1">
         Προσωπικά Στοιχεία
-      </button>
+        </button>
     </h2>
+
     <div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show">
-      <div class="accordion-body">
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="eponymo_patera" class="col-form-label label-font-size">
-              Επώνυμο Πατέρα
-            </label>
-          </div>
-          <div class="col-4">
-            <input type="text" name="eponymo_patera" id="eponymo_patera" class="form-control input-contents" value="" />
-          </div>
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+        <div class="accordion-body bg-white margin-bottom--0_5rem">
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="col-2 left-align">
+                    <label for="eponymo_patera" class="col-form-label label-font-size">
+                    Επώνυμο Πατέρα
+                    </label>
+                </div>
+                <div class="col-4">
+                    <input type="text" name="eponymo_patera" id="eponymo_patera" class="form-control input-contents" value="" />
+                </div>
           
-          <div class="col-2 left-align">
-            <label for="patronymo" class="col-form-label label-font-size field-required">
-              Όνομα Πατέρα
-            </label>
-          </div>
-          <div class="col-3">
-            <input type="text" name="patronymo" id="patronymo" class="form-control input-contents" value="" />
-          </div>
+                <div class="col-2 left-align">
+                    <label for="patronymo" class="col-form-label label-font-size field-required">
+                    Όνομα Πατέρα
+                    </label>
+                </div>
+                <div class="col-3">
+                    <input type="text" name="patronymo" id="patronymo" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="eponymo_mhteras" class="col-form-label label-font-size">
+                    Επώνυμο Μητέρας
+                    </label>
+                </div>
+                <div class="col-4">
+                    <input type="text" name="eponymo_mhteras" id="eponymo_mhteras" class="form-control input-contents field-required" value="" />
+                </div>
+            
+                <div class="col-2 left-align">
+                    <label for="mhtronymo" class="col-form-label label-font-size field-required">
+                    Όνομα Μητέρας
+                    </label>
+                </div>
+                <div class="col-3">
+                    <input type="text" name="mhtronymo" id="mhtronymo" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="energos" class="col-form-label label-font-size">
+                    Κατάσταση Εργαζομένου
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="energos" name="energos" value="" />
+                    <label for="energos" id="label-energos" class="margin-left-0_75rem  font-size-vw-0_875 margin-top--0_2rem">
+                    ΑΝΕΝΕΡΓΟΣ
+                    </label>
+                </div>
+            
+                <div class="col-0-5"></div>
+
+                <div class="col-1 right-align">
+                    <label for="fylo" class="col-form-label label-font-size">
+                    Φύλο
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="fylo" name="fylo" value="" />
+                    <label for="fylo" id="label-fylo" class="margin-left-0_75rem  font-size-vw-0_875 margin-top--0_2rem">
+                    ΑΝΔΡΑΣ
+                    </label>
+                </div>
+
+                <div class="col-0-5"></div>
+
+                <div class="col-2 left-align">
+                    <label for="doy" class="col-form-label label-font-size field-required">Δ.Ο.Υ.</label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="doy_stathera"
+                    id="doy_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("doy_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="doy"
+                        name="doy"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Δ.Ο.Υ."
+                        data-api="/api/dropdown/doy"
+                        single
+                        data-target-input=<%= `doy_stathera` %>
+                        data-preselect=<%= `doy_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Δ.Ο.Υ.">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="typos_taytothtas" class="col-form-label label-font-size">
+                    Τύπος Νομ/κού Εγγράφου
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="taytothta_stathera"
+                    id="taytothta_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("taytothta_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="typos_taytothtas"
+                        name="typos_taytothtas"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Νομιμοποιητικά έγγραφα"
+                        data-api="/api/dropdown/nomimoiEkprosopoi/taytothta"
+                        single
+                        data-target-input=<%= `taytothta_stathera` %>
+                        data-preselect=<%= `taytothta_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="6"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Τύπων Νομιμοποιητικών Εγγράφων">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="adt" class="col-form-label label-font-size field-required">
+                    Αριθ.Νομιμ/κού Εγγράφου
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="text" name="adt" id="adt" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_ekdoshs" class="col-form-label label-font-size">
+                    Ημ/νία Έκδοσης / Λήξης
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_ekdoshs" id="hmeromhnia_ekdoshs" class="date-control" value="" />
+                </div>
+
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="" />
+                </div>
+        
+                <div class="col-1"></div>
+
+                <div class="col-2 left-align">
+                    <label for="arxh_ekdoshs" class="col-form-label label-font-size">
+                    Αρχή Έκδοσης
+                    </label>
+                </div>
+                <div class="col-3-99">
+                    <input type="text" name="arxh_ekdoshs" id="arxh_ekdoshs" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_gennhshs" class="col-form-label label-font-size field-required">
+                    Ημ/νία Γέννησης
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_gennhshs" id="hmeromhnia_gennhshs" class="date-control" value="" />
+                </div>
+
+                <div class="col-2-5 left-align">
+                    <label id="label-anhlikos" class="col-form-label"> </label>
+                </div>
+
+                <div class="col-2 left-align">
+                    <label for="topos_gennhshs" class="col-form-label label-font-size">
+                    Τόπος Γέννησης
+                    </label>
+                </div>
+                <div class="col-3-99">
+                    <input type="text" name="topos_gennhshs" id="topos_gennhshs" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="arithmos_bibliarioy_anhlikoy" class="col-form-label label-font-size">
+                    Αριθ. Βιβλ. Ανηλίκου
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="" />
+                </div>
+
+                <div class="col-2"></div>
+
+                <div class="col-2 left-align">
+                    <label for="email" class="col-form-label label-font-size field-required">
+                    eMail
+                    </label>
+                </div>
+                <div class="col-4">
+                    <input type="text" name="email" id="email" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="yphkoothta" class="col-form-label label-font-size">
+                    Υπηκοότητα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="yphkoothta_stathera"
+                    id="yphkoothta_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("yphkoothta_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="yphkoothta"
+                        name="yphkoothta"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Υπηκοότητες"
+                        data-api="/api/dropdown/ergazomenoi/yphkoothta"
+                        single
+                        data-target-input=<%= `yphkoothta_stathera` %>
+                        data-preselect=<%= `yphkoothta_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Υπηκοότητας">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="eidikh_kathgoria_ergazomenoy" class="col-form-label label-font-size">
+                    Ειδική Κατηγορία
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="eidikh_kathgoria_stathera"
+                    id="eidikh_kathgoria_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("eidikh_kathgoria_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="eidikh_kathgoria_ergazomenoy"
+                        name="eidikh_kathgoria_ergazomenoy"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Ειδικές κατηγορίες εργαζομένων"
+                        data-api="/api/dropdown/ergazomenoi/eidikh_kathgoria"
+                        single
+                        data-target-input=<%= `eidikh_kathgoria_stathera` %>
+                        data-preselect=<%= `eidikh_kathgoria_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Ειδικής Κατηγορίας">
+                    </select>
+                </div>
+            </div>
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem ">
+                <div class="col-2 left-align">
+                    <label for="oikogeneiakh_katastash" class="col-form-label label-font-size">
+                    Οικογενειακή Κατάσταση
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="oikogeneiakh_katastash_stathera"
+                    id="oikogeneiakh_katastash_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("oikogeneiakh_katastash_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="oikogeneiakh_katastash"
+                        name="oikogeneiakh_katastash"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Οικογενειακή Κατάσταση"
+                        data-api="/api/dropdown/ergazomenoi/oikogeneiakh_katastash"
+                        single
+                        data-target-input=<%= `oikogeneiakh_katastash_stathera` %>
+                        data-preselect=<%= `oikogeneiakh_katastash_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Οικογενειακής Κατάστασης">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="arithmos_teknon" class="col-form-label label-font-size">
+                    Αριθ. Τέκνων/Προστ.Μελών
+                    </label>
+                </div>
+                <div class="col-0-75">
+                    <input type="number" name="arithmos_teknon" id="arithmos_teknon" class="form-control input-contents right-align" value="0" min="0" max="9" />
+                </div>
+            </div>
+
+            <hr class="hr-style" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+                <div class="col-2 left-align">
+                    <label for="odos" class="col-form-label label-font-size">
+                    Οδός
+                    </label>
+                </div>
+                <div class="col-4">
+                    <input type="text" name="odos" id="odos" class="form-control input-contents field-required" value="" />
+                </div>
+                
+                <div class="col-2 left-align">
+                    <label for="arithmos" class="col-form-label label-font-size">
+                    Αριθμός
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="text" name="arithmos" id="arithmos" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="tk" class="col-form-label label-font-size">
+                    Ταχ.Κώδικας
+                    </label>
+                </div>
+                <div class="col-1">
+                    <input type="text" name="tk" id="tk" class="form-control input-contents field-required" value="" />
+                </div>
+
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="thlefono" class="col-form-label label-font-size">
+                    Τηλέφωνο
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="thlefono" id="thlefono" class="form-control input-contents" value="" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="perifereia" class="col-form-label label-font-size">
+                    Περιφέρεια
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="perifereia_stathera"
+                    id="perifereia_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("perifereia_stathera") %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="perifereia"
+                        name="perifereia"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Περιφέρεια"
+                        data-api="/api/dropdown/ergazomenoi/perifereia"
+                        single
+                        data-target-input=<%= `perifereia_stathera` %>
+                        data-preselect=<%= `perifereia_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Περιφερειών">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="nomos" class="col-form-label label-font-size">
+                    Περιφερειακή Ενότητα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="nomos_stathera"
+                    id="nomos_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("nomos_stathera") %>"
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="nomos"
+                        name="nomos"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Περιφερειακή Ενότητα"
+                        data-api="/api/dropdown/ergazomenoi/nomos"
+                        single
+                        data-target-input=<%= `nomos_stathera` %>
+                        data-preselect=<%= `nomos_stathera` %>
+                        data-preload-all="false"
+                        data-skip-autoload="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Περιφερειακών Ενοτήτων"
+                        >
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="dhmos" class="col-form-label label-font-size">
+                    Δημοτική Ενότητα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="dhmos_stathera"
+                    id="dhmos_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("dhmos_stathera") %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="dhmos"
+                        name="dhmos"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Δημοτική Ενότητα"
+                        data-api="/api/dropdown/ergazomenoi/dhmos"
+                        single
+                        data-target-input=<%= `dhmos_stathera` %>
+                        data-preselect=<%= `dhmos_stathera` %>
+                        data-preload-all="false"
+                        data-skip-autoload="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Δημοτικών Ενοτήτων"
+                        disabled>
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="polh" class="col-form-label label-font-size">
+                    Δημοτικό Διαμέρισμα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="polh_stathera"
+                    id="polh_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("polh_stathera") %>"
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="polh"
+                        name="polh"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Δημοτικό Διαμέρισμα"
+                        data-api="/api/dropdown/ergazomenoi/polh"
+                        single
+                        data-target-input=<%= `polh_stathera` %>
+                        data-preselect=<%= `polh_stathera` %>
+                        data-preload-all="false"
+                        data-skip-autoload="true"
+                        data-pad-length="8"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Δημοτικών Διαμερισμάτων"
+                        disabled>
+                    </select>
+                </div>
+            </div>
+
+            <hr  class="hr-style" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+                <div class="col-2 left-align">
+                    <label for="trapeza" class="col-form-label label-font-size">
+                    Τράπεζα Κατάθεσης Μισθού
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="trapeza_stathera"
+                    id="trapeza_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("trapeza_stathera") %>"
+                    readonly
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="trapeza"
+                        name="trapeza"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Τράπεζα"
+                        data-api="/api/dropdown/ergazomenoi/trapeza"
+                        single
+                        data-target-input=<%= `trapeza_stathera` %>
+                        data-preselect=<%= `trapeza_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Τράπεζας">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="iban" class="col-form-label label-font-size">
+                    IBAN
+                    </label>
+                </div>
+                <div class="col-3-99">
+                    <input type="text" name="iban" id="iban" class="form-control input-contents" value="GR" />
+                </div>
+            </div>
         </div>
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="eponymo_mhteras" class="col-form-label label-font-size">
-              Επώνυμο Μητέρας
-            </label>
-          </div>
-          <div class="col-4">
-            <input type="text" name="eponymo_mhteras" id="eponymo_mhteras" class="form-control input-contents field-required" value="" />
-          </div>
-          
-          <div class="col-2 left-align">
-            <label for="mhtronymo" class="col-form-label label-font-size field-required">
-              Όνομα Μητέρας
-            </label>
-          </div>
-          <div class="col-3">
-            <input type="text" name="mhtronymo" id="mhtronymo" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="energos" class="col-form-label label-font-size">
-              Κατάσταση Εργαζομένου
-            </label>
-          </div>
-          <div class="col-1 left-align checkbox-flex-center">
-            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="energos" name="energos" value="" />
-            <label for="energos" id="label-energos" style="margin-left: 0.75rem; font-size: 0.875vw;">
-              ΑΝΕΝΕΡΓΟΣ
-            </label>
-          </div>
-          
-          <div class="col-0-5"></div>
-
-          <div class="col-1 left-align">
-            <label for="fylo" class="col-form-label label-font-size">
-              Φύλο
-            </label>
-          </div>
-          <div class="col-1 left-align checkbox-flex-center">
-            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="fylo" name="fylo" value="" />
-            <label for="fylo" id="label-fylo" style="margin-left: 0.75rem; font-size: 0.875vw;">
-              ΑΝΔΡΑΣ
-            </label>
-          </div>
-
-          <div class="col-0-5"></div>
-
-          <div class="col-2 left-align">
-            <label for="doy" class="col-form-label label-font-size field-required">
-              Δ.Ο.Υ.
-            </label>
-          </div>
-          <div class="col-3-99">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="doy" id="doy">
-            </select>
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="typos_taytothtas" class="col-form-label label-font-size field-required">
-              Τύπος Νομ/κού Εγγράφου
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="typos_taytothtas" id="typos_taytothtas">
-            </select>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="adt" class="col-form-label label-font-size field-required">
-              Αριθ.Νομιμ/κού Εγγράφου
-            </label>
-          </div>
-          <div class="col-1-5">
-            <input type="text" name="adt" id="adt" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="hmeromhnia_ekdoshs" class="col-form-label label-font-size">
-              Ημ/νία Έκδοσης / Λήξης
-            </label>
-          </div>
-          <div class="col-1-5">
-            <input type="date" name="hmeromhnia_ekdoshs" id="hmeromhnia_ekdoshs" class="date-control" value="" />
-          </div>
-
-          <div class="col-1-5">
-            <input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="" />
-          </div>
-      
-          <div class="col-1"></div>
-
-          <div class="col-2 left-align">
-            <label for="arxh_ekdoshs" class="col-form-label label-font-size">
-              Αρχή Έκδοσης
-            </label>
-          </div>
-          <div class="col-3-99">
-            <input type="text" name="arxh_ekdoshs" id="arxh_ekdoshs" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="hmeromhnia_gennhshs" class="col-form-label label-font-size field-required">
-              Ημ/νία Γέννησης
-            </label>
-          </div>
-          <div class="col-1-5">
-            <input type="date" name="hmeromhnia_gennhshs" id="hmeromhnia_gennhshs" class="date-control" value="" />
-          </div>
-
-          <div class="col-2-5 left-align">
-            <label id="label-anhlikos" class="col-form-label"> </label>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="topos_gennhshs" class="col-form-label label-font-size">
-              Τόπος Γέννησης
-            </label>
-          </div>
-          <div class="col-3-99">
-            <input type="text" name="topos_gennhshs" id="topos_gennhshs" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="arithmos_bibliarioy_anhlikoy" class="col-form-label label-font-size">
-              Αριθ. Βιβλ. Ανηλίκου
-            </label>
-          </div>
-          <div class="col-2">
-            <input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="" />
-          </div>
-
-          <div class="col-2"></div>
-
-          <div class="col-2 left-align">
-            <label for="email" class="col-form-label label-font-size">
-              eMail
-            </label>
-          </div>
-          <div class="col-4">
-            <input type="text" name="email" id="email" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="yphkoothta" class="col-form-label label-font-size field-required">
-              Υπηκοότητα
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="yphkoothta" id="yphkoothta">
-            </select>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="eidikh_kathgoria_ergazomenoy" class="col-form-label label-font-size">
-              Ειδική Κατηγορία
-            </label>
-          </div>
-          <div class="col-3-99">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikh_kathgoria_ergazomenoy" id="eidikh_kathgoria_ergazomenoy">
-            </select>
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="oikogeneiakh_katastash" class="col-form-label label-font-size">
-              Οικογενειακή Κατάσταση
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="oikogeneiakh_katastash" id="oikogeneiakh_katastash">
-            </select>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="arithmos_teknon" class="col-form-label label-font-size">
-              Αριθ. Τέκνων/Προστ.Μελών
-            </label>
-          </div>
-          <div class="col-0-75">
-            <input type="number" name="arithmos_teknon" id="arithmos_teknon" class="form-control input-contents" value="0" min="0" max="9" />
-          </div>
-        </div>
-
-        <hr class="hr-style" />
-
-        <div class="row form-group g-3 align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="odos" class="col-form-label label-font-size">
-              Οδός
-            </label>
-          </div>
-          <div class="col-4">
-            <input type="text" name="odos" id="odos" class="form-control input-contents field-required" value="" />
-          </div>
-          
-          <div class="col-2 left-align">
-            <label for="arithmos" class="col-form-label label-font-size">
-              Αριθμός
-            </label>
-          </div>
-          <div class="col-1">
-            <input type="text" name="arithmos" id="arithmos" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="tk" class="col-form-label label-font-size">
-              Ταχ.Κώδικας
-            </label>
-          </div>
-          <div class="col-1">
-            <input type="text" name="tk" id="tk" class="form-control input-contents field-required" value="" />
-          </div>
-
-          <div class="col-3"></div>
-
-          <div class="col-2 left-align">
-            <label for="thlefono" class="col-form-label label-font-size">
-              Τηλέφωνο
-            </label>
-          </div>
-          <div class="col-2">
-            <input type="text" name="thlefono" id="thlefono" class="form-control input-contents" value="" />
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="perifereia" class="col-form-label label-font-size field-required">
-              Περιφέρεια
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="perifereia" id="perifereia">
-            </select>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="nomos" class="col-form-label label-font-size field-required">
-              Περιφερειακή Ενότητα
-            </label>
-          </div>
-          <div class="col-3-99">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="nomos" id="nomos" disabled>
-            </select>
-          </div>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="dhmos" class="col-form-label label-font-size field-required">
-              Δημοτική Ενότητα
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="dhmos" id="dhmos" disabled>
-            </select>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="polh" class="col-form-label label-font-size field-required">
-              Δημοτικό Διαμέρισμα
-            </label>
-          </div>
-          <div class="col-3-99">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="polh" id="polh" disabled>
-            </select>
-          </div>
-        </div>
-
-        <hr  class="hr-style" />
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="trapeza" class="col-form-label label-font-size">
-              Τράπεζα Κατάθεσης Μισθού
-            </label>
-          </div>
-          <div class="col-4">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="trapeza" id="trapeza">
-            </select>
-            <input type="hidden" name="bankCode" id="bankCode" value=""/>
-          </div>
-
-          <div class="col-2 left-align">
-            <label for="iban" class="col-form-label label-font-size">
-              IBAN
-            </label>
-          </div>
-          <div class="col-3-99">
-            <input type="text" name="iban" id="iban" class="form-control input-contents" value="GR" />
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
+</div>

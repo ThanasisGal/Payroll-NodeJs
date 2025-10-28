@@ -444,9 +444,11 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
     perigrafh: { type: String, trim: true },
     isxyei_apo_etos: { type: String, trim: true, length: 4 },
     isxyei_apo_mhna: { type: String, trim: true, length: 2 },
+    isxyei_eos_etos: { type: String, trim: true, length: 4 },
+    isxyei_eos_mhna: { type: String, trim: true, length: 2 },
   });
   const KpkEfkaModel = model("KpkEfka", KpkEfkaSchema);
-  
+
   const AntistoixishKadEidikothtesKpkEfkaSchema = new Schema({
     aa:{ type: String, unique: true},
     kodikos_kad: { type: String, trim: true},
@@ -470,9 +472,10 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
     isxyei_eos_mhna: { type: String, trim: true, length: 2 },
   });
   const AntistoixishEidikhsPeriptoshsKpkEfkaModel = model("AntistoixishEidikhsPeriptoshsKpkEfka", AntistoixishEidikhsPeriptoshsKpkEfkaSchema);
-  
+
   const ProgrammataDypaSchema = new Schema({
     kodikos: { type: String, unique: true, index: true},
+    kodikos_programmatos: { type: String, unique: true, index: true},
     titlos: { type: String, trim: true },
     url_link: { type: String, trim: true },
     anoixto_kleisto: { type: Boolean, default: false },
@@ -594,9 +597,16 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   });
   const Typoi_ApodoxonModel = model("Typoi_Apodoxon", Typoi_ApodoxonSchema);
 
+  const ForologikesKlimakesSchema = new Schema({
+    xrhsh: { type: String, trim: true },
+    kodikos: { type: String, trim: true },
+    perigrafh: { type: String, trim: true },
+  });
+  const ForologikesKlimakesModel = model("ForologikesKlimakes", ForologikesKlimakesSchema);
+
   module.exports = {  AdeiesDiamonhsModel,
-                    AntistoixishEidikhsPeriptoshsKpkEfkaModel,
-                    AntistoixishKadEidikothtesKpkEfkaModel,
+    AntistoixishEidikhsPeriptoshsKpkEfkaModel,
+    AntistoixishKadEidikothtesKpkEfkaModel,
                     ApasxolhseisBaseiSymbashsModel,
                     AsfalistikesKlaseisModel,
                     ArgiesModel,
@@ -604,6 +614,7 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     DhmoiModel, 
                     DiadoxosErgodothsModel, 
                     DoyModel, 
+                    DypaModel, 
                     EidikesPeriptoseisEfkaModel,
                     EidikesKathgoriesModel, 
                     EidikesPeriptoseisModel,
@@ -615,6 +626,7 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     EkptoshForoyModel,
                     EmmesosErgodothsModel, 
                     ForeisEkpaideyshsModel,
+                    ForologikesKlimakesModel,
                     GenikesParametroiModel,
                     IatrosErgasiasModel, 
                     IdiothtesModel, 
@@ -638,7 +650,7 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     PoleisModel, 
                     PosostaKrathseonModel, 
                     ProgrammataDypaModel,
-                    SepeModel, DypaModel, 
+                    SepeModel, 
                     SxeseisErgasiasModel, 
                     SyggenikesSxeseisModel, 
                     TameiaModel, 

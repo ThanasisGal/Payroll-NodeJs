@@ -1,93 +1,89 @@
-<div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
-      </ul>
-    </div>
-    <!-- <hr style="margin-top: -2rem" /> -->
+<div class="margin-top-1rem">
+    <div class="container-fluid height-vh-100 padding-0">
+        
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius">
+        <div class="sections margin-top-1rem">
+            <section class="sel_1_section visible" data-section="">
+                <div>
+                    <form class="formRadius">
 
-            </br></br></br></br>
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+                        </br> </br> </br>
 
-              <div class="card-header">
-                <label class="text-center headers-content">
-                  Συντήρηση Σύμβασης
-                </label>
-              </div>
+                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
 
-              <div class="card-body overflow-auto flex-grow-1" style="height: 21vh; background-color: #ffffff;" >
-                <input type="hidden" name="symbaseisId" id="symbaseisId" class="form-control" value="<%= symbaseis._id %>" 
-                />
+                            <div class="card-header p-2 height-rem-3_5">
+                                <label class="text-center w-100 headers-content">
+                                Συντήρηση Σύμβασης
+                                </label>
+                            </div>
 
-                </br>
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="kodikos"
-                      class="col-form-label label-font-size field-required">
-                      Κωδικός
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= symbaseis.kodikos.toString().padStart(4, '0') %>" readonly />
-                  </div>
-                </div>
+                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-25 bg-white" id="cardBody">
+                                <input type="hidden" name="symbaseisId" id="symbaseisId" class="form-control" value="<%= symbaseis._id %>" />
+
+                                </br> </br>
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            for="kodikos"
+                                            class="col-form-label label-font-size field-required">
+                                            Κωδικός
+                                        </label>
+                                    </div>
                 
-                </br>
-                
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label for="perigrafh" class="col-form-label label-font-size field-required">
-                        Περιγραφή
-                    </label>
-                  </div>
-                  <div class="col-10-5">
-                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="<%= symbaseis.perigrafh %>" />
-                  </div>
-                </div>
-              </div>
-              <div
-                class="card-footer mt-auto"
-              >
-                <div
-                  class="d-inline-block d-flex"
-                  style="
-                    margin-top: -0.5rem !important;
-                    margin-bottom: -1rem !important;
-                    margin-left: 10px !important;
-                    margin-right: 10px !important;
-                    justify-content: space-around;
-                  "
-                >
-                  <button
-                    type="button"
-                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton" 
-                  >
-                    <i class="bi bi-floppy"></i> Αποθήκευση
-                  </button>
-                  <a
-                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
-                    href="/symbaseis/symbaseis"
-                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                  </a>
-                </div>
-              </div>
+                                    <div class="col-1-2">
+                                        <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= symbaseis.kodikos.toString().padStart(4, '0') %>" readonly />
+                                    </div>
+                                </div>
+                    
+                                </br>
+                    
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                    <label
+                                        for="perigrafh"
+                                        class="col-form-label label-font-size field-required">
+                                        Περιγραφή
+                                    </label>
+                                </div>
+                                <div class="col-10">
+                                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="<%= symbaseis.perigrafh %>" />
+                                </div>
+                            </div>
+                        </div>
+                    
+                        <div class="card-footer mt-auto cardFooter">
+                            <div class="d-inline-block d-flex cardFooter01">
+                                <button
+                                    type="button"
+                                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
+                                    <i class="bi bi-floppy"></i> Αποθήκευση
+                                </button>
+                                <a
+                                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                                    href="/symbaseis/symbaseis">
+                                    <i class="bi bi-chevron-double-left"></i> 
+                                    Επιστροφή
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
-          </form>
-        </div>
-      </section>
+        </section>
     </div>
-
-    <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/symbaseis/symbaseis/putFieldValues.js"></script>
-    <!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
-  </div>
 </div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/symbaseis/putFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

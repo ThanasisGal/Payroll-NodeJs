@@ -133,6 +133,22 @@ export const initTomDropdown = ({
                                         .then(r => r.json());
                 let items = Array.isArray(json.items) ? json.items : [];
 
+                // ✅ Normalize items: ensure every record has value + label/text (strings)
+                const vKey = this.settings.valueField || 'value';
+                const lKey = this.settings.labelField || 'label';
+                items = items
+                  .filter(it => it && (it[vKey] != null || it.value != null || it.id != null || it.kodikos != null))
+                  .map(it => {
+                    const rawVal = (it[vKey] ?? it.value ?? it.id ?? (it.kodikos != null ? String(it.kodikos).padStart(4,'0') : ''));
+                    const val = String(rawVal).trim();
+                    const label = String(
+                      it[lKey] ?? it.label ?? it.text ??
+                      (it.kodikos != null ? `${String(it.kodikos).padStart(4,'0')} - ${it.perigrafh ?? ''}` : val)
+                    );
+                    return { ...it, [vKey]: val, [lKey]: label, value: val, label, text: label };
+                  })
+                  .filter(it => it[vKey] !== '');
+
                 /* 4. πρόσθεσε ΟΠΟΙΟ επιλεγμένο λείπει */
                 this.items.forEach(v => {
                     const cached = selectedCache[v];
@@ -172,7 +188,10 @@ export const initTomDropdown = ({
         /* ------ render ----------------------------------------- */
         render : {
             option(optionData, e) {
-                return `<div class="ts-option">${e(optionData.label)}</div>`;
+                const v = (optionData && (optionData.value ?? optionData.id)) ?? '';
+                const l = (optionData && (optionData.label ?? optionData.text ?? '')) || '';
+                if (!v) return `<div class="option disabled" aria-disabled="true">${e(l)}</div>`;
+                return `<div class="option" data-value="${e(String(v))}">${e(String(l))}</div>`;
             },
             item(optionData, e) {
                 if (!optionData || typeof optionData !== 'object' || !('value' in optionData)) {
@@ -180,10 +199,51 @@ export const initTomDropdown = ({
                     return `<div class="item placeholder-item" aria-placeholder="true">${e(phText)}</div>`;
                 }
                 const vKey = this.settings.valueField || 'value';
-                return `<div class="item" data-value="${e(optionData[vKey])}">${e(optionData.label)}</div>`;
-                },
+                const lbl = optionData.label ?? optionData.text ?? optionData[vKey] ?? '';
+                return `<div class="item" data-value="${e(optionData[vKey])}">${e(String(lbl))}</div>`;
+            },
             ...render,
         },
+
+// /* ------ render ----------------------------------------- */
+// render : {
+//   option(optionData, e) {
+//     // ✅ ΜΟΝΟ για το <select id="asfalistikh_klash">
+//     const isAK = el && el.id === 'asfalistikh_klash';
+//     if (isAK && optionData?.label) {
+//       const SEP = ' - ';
+//       const i = optionData.label.indexOf(SEP);
+//       if (i > -1) {
+//         const c1   = optionData.label.slice(0, i);               // 1η στήλη (π.χ. "01")
+//         const rest = optionData.label.slice(i + SEP.length);
+//         const DESC_W = 19;                                       // ίδιο με server-side
+//         const c2   = rest.slice(0, DESC_W);                      // 2η στήλη (περιγραφή)
+//         let remain = rest.slice(DESC_W).replace(/^[ \u00A0]+/, '');
+//         const m    = remain.match(/^([^\u00A0 ]+)/);             // 3η στήλη (π.χ. "12.28")
+//         const c3   = m ? m[1] : '';
+//         const afterC3 = remain.slice(c3.length);
+
+//         return `<div class="ts-option ts-ak">
+// <span class="c1">${e(c1)}</span>${e(SEP)}${e(c2)} <span class="c3">${e(c3)}</span>${e(afterC3)}
+// </div>`;
+//       }
+//     }
+//     // default για όλα τα άλλα dropdowns (ή αν δεν "έσπασε" σωστά)
+//     return `<div class="ts-option">${e(optionData.label || '')}</div>`;
+//   },
+
+//   // ΚΡΑΤΑ το δικό σου item() όπως είναι
+//   item(optionData, e) {
+//     if (!optionData || typeof optionData !== 'object' || !('value' in optionData)) {
+//       const phText = el.getAttribute('placeholder') || '…';
+//       return `<div class="item placeholder-item" aria-placeholder="true">${e(phText)}</div>`;
+//     }
+//     const vKey = this.settings.valueField || 'value';
+//     return `<div class="item" data-value="${e(optionData[vKey])}">${e(optionData.label)}</div>`;
+//   },
+
+//   ...render, // (ό,τι περάσεις από έξω συνεχίζει να υπερισχύει)
+// },
 
         /* flag ώστε να είναι διαθέσιμο στο onInitialize */
         _preloadAll : preloadAll,
@@ -447,6 +507,22 @@ export const initTomDropdown = ({
                 ddInput.setAttribute('placeholder', el.getAttribute('placeholder') || 'Αναζήτηση…');
             }
 
+
+            // Guard: block clicks on options without data-value to avoid TS internal errors
+            const dd = this.dropdown;
+            if (dd && !this._guardedNoValue) {
+                dd.addEventListener('mousedown', (e) => {
+                    const opt = e.target.closest('.option, .ts-option');
+                    if (!opt) return;
+                    const v = opt.getAttribute('data-value');
+                    if (v == null || v === '' || v === 'undefined') {
+                        if (e.preventDefault) e.preventDefault();
+                        if (e.stopPropagation) e.stopPropagation();
+                        return false;
+                    }
+                }, true);
+                this._guardedNoValue = true;
+            }
             // bind once το χειροποίητο infinite scroll
             if (!this._infiniteBound) {
                 const content = this.dropdown?.querySelector('.ts-dropdown-content');
@@ -479,10 +555,18 @@ export const initTomDropdown = ({
             }
         },
 
-        onFocus () {
-            // ➜ αν φαίνεται σκουπιδάκι, «πάτα» το
-            clickClearIfVisible(this);
+        // onFocus () {
+        //     // ➜ αν φαίνεται σκουπιδάκι, «πάτα» το
+        //     clickClearIfVisible(this);
 
+        //     if (!this.ignoreFocusOpen) this.open();
+        // },
+        onFocus () {
+            // ΜΗΝ καθαρίζεις τίποτα στο focus εκτός κι αν ζητηθεί ρητά
+            if (this.input?.dataset?.autoclearOnFocus === 'true' ||
+                this.wrapper?.dataset?.autoclearOnFocus === 'true') {
+                clickClearIfVisible(this);
+            }
             if (!this.ignoreFocusOpen) this.open();
         },
 
@@ -624,12 +708,24 @@ export const initTomDropdown = ({
 
 const CLEAR_BTN_SELECTOR = '.ts-single-reset-btn';
 
+function makeUnfocusable(btn) {
+    if (!btn) return;
+    // βγάλ’ το από το tab order
+    btn.tabIndex = -1;
+    // αν πάρει focus κατά λάθος, βγάλ’ το αμέσως
+    btn.addEventListener('focus', () => { try { btn.blur(); } catch(_){} }, true);
+    // με mouse/touch μην επιτρέπεις μεταφορά εστίασης (το click συνεχίζει να δουλεύει)
+    const stop = (e) => { try { e.preventDefault(); } catch(_){} };
+    btn.addEventListener('mousedown', stop, true);
+    btn.addEventListener('touchstart', stop, { capture: true, passive: false });
+}
+
 function clickClearIfVisible(ts) {
-  const btn = ts.wrapper.querySelector(CLEAR_BTN_SELECTOR);
-  // ➜ offsetParent === null → το element είναι display:none ή hidden
-  if (btn && btn.offsetParent !== null) {
-    btn.click(); // πυροδοτεί το 'clear' + ό,τι handler έχουμε
-  }
+    const btn = ts.wrapper.querySelector(CLEAR_BTN_SELECTOR);
+    // ➜ offsetParent === null → το element είναι display:none ή hidden
+    if (btn && btn.offsetParent !== null) {
+        btn.click(); // πυροδοτεί το 'clear' + ό,τι handler έχουμε
+    }
 }
 
 /* ------------------------------------------------------------------
@@ -656,13 +752,17 @@ function updateOverflow(tom) {
     * ----------------------------------------------------------------*/
     let trash = wrapper.querySelector('.ts-single-reset-btn');
     if (!trash) {
-      trash           = document.createElement('button');
-      trash.type      = 'button';
-      trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
-      trash.title     = 'Καθαρισμός επιλογής';
-      trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
-      wrapper.appendChild(trash);
-
+        trash           = document.createElement('button');
+        trash.type      = 'button';
+        trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
+        trash.title     = 'Καθαρισμός επιλογής';
+        // trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
+        trash.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
+        <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
+        </svg>`;
+        wrapper.appendChild(trash);
+        makeUnfocusable(trash); // ⬅️ ΝΕΟ: ποτέ focus στο σκουπιδάκι
+        
       // Click handler – clear & refresh
       trash.addEventListener('click', (e) => {
         e.preventDefault();

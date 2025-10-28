@@ -18,8 +18,9 @@ class antistoixiseisController {
         };
 
         const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const basePer = Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
@@ -41,6 +42,8 @@ class antistoixiseisController {
 
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+            const page = Math.min( totalPages, Math.max(1, parseInt(req.query.page, 10) || 1));
+
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
             let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
@@ -69,6 +72,10 @@ class antistoixiseisController {
                 current: page,
                 pages: totalPages,
                 krathseis,
+                perx,                       // <-- για το UI πολλαπλασιαστή
+                basePer,                    // (προαιρετικό, αν το δείχνεις)
+                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.log(error);

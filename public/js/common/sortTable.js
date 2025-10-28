@@ -1,86 +1,85 @@
-document.addEventListener('DOMContentLoaded', function() {
-  // Προσθήκη event listeners στις κεφαλίδες των στηλών για την ταξινόμηση
-  document.querySelectorAll('#myTableHeader th').forEach((th, index) => {
-    th.addEventListener('click', function() {
-      sortTable(index, this);
+// /common/sortTable.js
+document.addEventListener('DOMContentLoaded', function () {
+    // click στα headers
+    document.querySelectorAll('#myTableHeader th').forEach((th, index) => {
+		th.addEventListener('click', function () {
+			sortTable(index, this);
+      	});
     });
-  });
 
-  // Η συνάρτηση για την ταξινόμηση του πίνακα
-  function sortTable(column, thElement) {
-    var table, rows, switching, i, x, y, shouldSwitch, dir = "asc", switchcount = 0;
-    table = document.getElementById("myTable");
-    switching = true; // Σημαία για έναρξη ταξινόμησης
-    resetSortIcons(); // Επαναφορά εικονιδίων ταξινόμησης
+    const getCellText = (cell) =>
+      	(cell?.textContent || cell?.innerText || '').trim();
 
-    // Έλεγχος αν η στήλη είναι αριθμητική ή όχι
-    var isNumericColumn = isNumeric(table.rows[0].cells[column].innerText || table.rows[0].cells[column].textContent);
+    const isNumeric = (v) => v !== '' && !isNaN(parseFloat(v)) && isFinite(v);
 
-    while (switching) {
-      switching = false;
-      rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
-
-      for (i = 0; i < (rows.length - 1); i++) {
-        shouldSwitch = false;
-        x = rows[i].getElementsByTagName("TD")[column];
-        y = rows[i + 1].getElementsByTagName("TD")[column];
-
-        var xVal = isNumericColumn ? parseFloat(x.innerHTML) : x.innerHTML.toLowerCase();
-        var yVal = isNumericColumn ? parseFloat(y.innerHTML) : y.innerHTML.toLowerCase();
-
-        if (dir == "asc") {
-          if (xVal > yVal) {
-            shouldSwitch = true;
-            break;
-          }
-        } else if (dir == "desc") {
-          if (xVal < yVal) {
-            shouldSwitch = true;
-            break;
-          }
-        }
-      }
-
-      if (shouldSwitch) {
-        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-        switching = true;
-        switchcount++;
-      } else {
-        if (switchcount == 0 && dir == "asc") {
-          dir = "desc";
-          switching = true;
-        }
-      }
+    function detectNumericColumn(table, colIdx) {
+		const rows = table.tBodies[0]?.rows || [];
+		for (let i = 0; i < rows.length; i++) {
+			const txt = getCellText(rows[i].cells[colIdx]);
+			if (txt !== '') return isNumeric(txt);
+		}
+		return false;
     }
 
-    // Ενημέρωση του εικονιδίου ταξινόμησης
-    updateSortIcon(thElement, dir, isNumericColumn);
-  }
+    function sortTable(column, thElement) {
+		const table = document.getElementById('myTable');
+		if (!table || !table.tBodies[0]) return;
 
-  // Έλεγχος αν μια τιμή είναι αριθμητική
-  function isNumeric(n) {
-    return !isNaN(parseFloat(n)) && isFinite(n);
-  }
+		const tbody = table.tBodies[0];
+		const rows = Array.from(tbody.rows);
 
-  // Επαναφορά των εικονιδίων ταξινόμησης στην αρχική κατάσταση
-  function resetSortIcons() {
-    document.querySelectorAll("#myTableHeader th .sort-icon").forEach(icon => {
-      icon.className = 'sort-icon bi';
-    });
-  }
+		// 1) Διάβασε ΠΡΙΝ κάνεις reset
+		const prevDir = thElement.dataset.dir || '';     // 'asc' | 'desc' | ''
+		const dir = prevDir === 'asc' ? 'desc' : 'asc';  // toggle
 
-  // Ενημέρωση της κλάσης του εικονιδίου με βάση την κατεύθυνσης
+		// 2) Αν είναι numeric στήλη
+		const numeric = detectNumericColumn(table, column);
 
-  function updateSortIcon(th, direction, isNumeric) {
-    const icon = th.querySelector(".sort-icon");
-    if (!icon) return;
-    icon.className = 'sort-icon bi'; // Επαναφέρει τις αρχικές κλάσεις
+		// 3) Ταξινόμηση
+		rows.sort((r1, r2) => {
+			const x = getCellText(r1.cells[column]);
+			const y = getCellText(r2.cells[column]);
 
-    // Ενημερώνει την κλάση του εικονιδίου ανάλογα με την κατεύθυνση και τον τύπο της στήλης
-    if (direction === 'asc') {
-      icon.classList.add(isNumeric ? "bi-sort-numeric-down" : "bi-sort-alpha-down");
-    } else {
-      icon.classList.add(isNumeric ? "bi-sort-numeric-down-alt" : "bi-sort-alpha-down-alt");
+			let a = x, b = y;
+			if (numeric) {
+				a = parseFloat(x) || 0;
+				b = parseFloat(y) || 0;
+			} else {
+				a = x.toLowerCase();
+				b = y.toLowerCase();
+			}
+
+			if (a < b) return dir === 'asc' ? -1 : 1;
+			if (a > b) return dir === 'asc' ? 1 : -1;
+			return 0;
+		});
+
+		rows.forEach(tr => tbody.appendChild(tr));
+
+		// 4) ΜΕΤΑ το sort, καθάρισε όλα τα εικονίδια/dirs
+		resetSortIcons();
+
+		// 5) Γράψε το νέο dir στο τρέχον <th> και ενημέρωσε εικονίδιο
+		thElement.dataset.dir = dir;
+		updateSortIcon(thElement, dir, numeric);
     }
-  }
+
+    function resetSortIcons() {
+		document.querySelectorAll('#myTableHeader th').forEach(th => {
+			th.removeAttribute('data-dir');
+			const icon = th.querySelector('.sort-icon');
+			if (icon) icon.className = 'sort-icon bi';
+		});
+    }
+
+    function updateSortIcon(th, direction, isNumericCol) {
+		const icon = th.querySelector('.sort-icon');
+		if (!icon) return;
+		icon.className = 'sort-icon bi';
+		if (direction === 'asc') {
+			icon.classList.add(isNumericCol ? 'bi-sort-numeric-down' : 'bi-sort-alpha-down');
+		} else {
+			icon.classList.add(isNumericCol ? 'bi-sort-numeric-down-alt' : 'bi-sort-alpha-down-alt');
+		}
+    }
 });

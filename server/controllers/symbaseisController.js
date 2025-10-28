@@ -5,223 +5,299 @@ const Models_C = require("../models/companies");
 const Models_D = require("../models/ergazomenoi");
 const Models_E = require("../models/symbaseis");
 
-const { GenikesParametroiModel, 
-        KrathseisModel 
-      } = Models_A;
+const   { GenikesParametroiModel, 
+            KrathseisModel 
+        } = Models_A; 
 
-const { UserPrivilegesModel } = Models_B;
+const   { UserPrivilegesModel } = Models_B;
 
-const { CompaniesModel, 
-        AntistoixiseisModel,
-      } = Models_C;
+const   { CompaniesModel, 
+            AntistoixiseisModel,
+        } = Models_C;
 
-const { ErgazomenoiModel } = Models_D;
+const   { ErgazomenoiModel } = Models_D;
 
-const { SymbaseisModel,
-        KathgoriesSymbaseonModel,
-        EidikothtesAnaKathgoriaSymbaseonModel,
-        StoixeiaSymbaseonModel,
-        KlimakiaSymbaseonModel,
-      } =Models_E
+const   { SymbaseisModel,
+            KathgoriesSymbaseonModel,
+            EidikothtesAnaKathgoriaSymbaseonModel,
+            StoixeiaSymbaseonModel,
+            KlimakiaSymbaseonModel,
+        } =Models_E
+
+function formatNumber(number, totalLength) {
+    return number.toString().padStart(totalLength, '0');
+}
 
 let nextPageSearchTerm = "";
 let nextPageSelectedSymbash = "";
 let nextPageSelectedSymbash_Kathgoria = "";
 let nextPageSelectedSymbash_Kathgoria_Eidikothta = "";
 
+function to4(v) {
+	const d = String(v ?? "").replace(/\D/g, "");
+	if (!d) return "";
+	const n = parseInt(d, 10);
+	return Number.isFinite(n) ? String(n).padStart(4, "0") : d.slice(-4).padStart(4, "0");
+}
+
 class symbaseisController {
 
-  // ======================================== Συμβάσεις ==========================================
-  
-  static mainSymbaseisForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Συμβάσεων",
-      description: "Web Payroll System",
-    };
+	// static mainSymbaseisForm = async (req, res) => {
+	// 	const locals = { 
+	// 		title: "Διαχείριση Συμβάσεων",
+	// 		description: "Web Payroll System" 
+	// 	};
 
+	// 	const sessionUserId = req.session.userId;
+	// 	const basePer = Number(process.env.EGGRAFES) || 10;
+	// 	const perx = Math.min(5, Math.max(1, parseInt(req.query.perx || '1', 10))); // 1..5
+	// 	const perPage = basePer * perx;
+	// 	// const perPage = Number(process.env.EGGRAFES);
+	// 	let page = req.query.page || 1;
+
+	// 	try {
+	// 		// Έλεγχος CRUD των δικαιωμάτων του χρήστη
+	// 		const userPrivileges = await UserPrivilegesModel.findOne({
+	// 			userId: sessionUserId,
+	// 			form: "Symbaseis",
+	// 		}).exec();
+
+	// 		// Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+	// 		const countPipeline = [
+	// 			{
+	// 				$count: "total",
+	// 			},
+	// 		];
+
+	// 		const countResults = await SymbaseisModel.aggregate(
+	// 			countPipeline
+	// 		).exec();
+
+	// 		let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+	// 		let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+	// 		let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+	// 		let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+
+	// 		// Aggregation query για την ανάκτηση δεδομένων
+	// 		const queryPipeline = [
+	// 			{
+	// 				$sort: {
+	// 					perigrafh: 1,
+	// 				},
+	// 			},
+	// 			{
+	// 				$skip: skipRecords,
+	// 			},
+	// 			{
+	// 				$limit: limitPerPage,
+	// 			},
+	// 		];
+
+	// 		const symbaseis = await SymbaseisModel.aggregate(
+	// 			queryPipeline
+	// 		).exec();
+
+	// 		res.render("symbaseis/symbaseis/symbaseis", {
+	// 			userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+	// 			locals,
+	// 			current: page,
+	// 			pages: totalPages,
+	// 			symbaseis,
+	// 		});
+	// 	} catch (error) {
+	// 		console.log(error);
+	// 	}
+	// };
+
+
+// controllers/symbaseisController.js
+static mainSymbaseisForm = async (req, res, next) => {
+  const locals = {
+    title: "Διαχείριση Συμβάσεων",
+    description: "Web Payroll System",
+  };
+
+  try {
     const sessionUserId = req.session.userId;
-    const perPage = Number(process.env.EGGRAFES);
-    let page = req.query.page || 1;
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "Symbaseis",
-      }).exec();
+    // 1) Βάση + πολλαπλασιαστής
+    const basePer = Number(process.env.EGGRAFES) || 10;
+    const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+    const perPage = basePer * perx;
 
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $count: "total",
-        },
-      ];
+    // 2) Σύνολο εγγραφών
+    const [{ total = 0 } = {}] = await SymbaseisModel.aggregate([
+      { $count: "total" },
+    ]).exec();
 
-      const countResults = await SymbaseisModel.aggregate(
-        countPipeline
-      ).exec();
+    // 3) Σελίδα με ασφάλεια (1..totalPages)
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    const page = Math.min(
+      totalPages,
+      Math.max(1, parseInt(req.query.page, 10) || 1)
+    );
 
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+    // 4) skip/limit (δεν χρειάζεται να "κόβεις" το limit στην τελευταία σελίδα)
+    const skip = (page - 1) * perPage;
 
-      // Aggregation query για την ανάκτηση δεδομένων
-      const queryPipeline = [
-        {
-          $sort: {
-            kodikos: 1,
-          },
-        },
-        {
-          $skip: skipRecords,
-        },
-        {
-          $limit: limitPerPage,
-        },
-      ];
+    // 5) Δικαιώματα
+    const userPrivDoc = await UserPrivilegesModel
+      .findOne({ userId: sessionUserId, form: "Symbaseis" })
+      .lean();
+    const userPrivileges = userPrivDoc?.privileges || {};
 
-      const symbaseis = await SymbaseisModel.aggregate(
-        queryPipeline
-      ).exec();
+    // 6) Δεδομένα σελίδας (σταθερό sort)
+    const symbaseis = await SymbaseisModel.aggregate([
+      { $sort: { perigrafh: 1, _id: 1 } },
+      { $skip: skip },
+      { $limit: perPage },
+    ]).exec();
 
-      res.render("symbaseis/symbaseis/symbaseis", {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: page,
-        pages: totalPages,
-        symbaseis,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  static addSymbaseisForm = async (req, res) => {
-    const locals = {
-      title: "Προσθήκη Νέας Σύμβασης",
-      description: "Web Payroll System",
-    };
-    
-    let aa_kodikos = null;
-
-    try {
-      const lastRecord = await SymbaseisModel.find()
-        .sort({ _id: -1 })
-        .limit(1);
-      let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
-      if (kodValue !== null) {
-        kodValue++;
-      } else {
-        kodValue = 1;
-      }
-      aa_kodikos = kodValue;
-      res.render("symbaseis/symbaseis/add", {
-        locals,
-        aa_kodikos,
-      });
-    } catch (error) {
-      console.log("Σφάλμα :", error);
-    }
-  };
-
-  static postSymbaseisForm = async (req, res) => {
-    const formData = req.body;
-
-    const newSymbash = SymbaseisModel({
-      kodikos: formData.kodikos,
-      perigrafh: formData.perigrafh,
+    // 7) Render – ΠΕΡΝΑ το perx!
+    return res.render("symbaseis/symbaseis/symbaseis", {
+      userPrivileges,
+      locals,
+      current: page,
+      pages: totalPages,
+      perx,              // <-- για το UI πολλαπλασιαστή
+      basePer,           // (προαιρετικό, αν το δείχνεις)
+      entries: perPage,  // (προαιρετικό: πόσα/σελίδα)
+      totalRecs: total,  // (προαιρετικό: συνολικά)
+      symbaseis,
     });
+  } catch (error) {
+    console.error(error);
+    return next(error);
+  }
+};
 
-    try {
-      await SymbaseisModel.create(newSymbash);
-      res.json({ success: true, redirectUrl: "/symbaseis/symbaseis" });
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
-  static searchPostSymbaseis = async (req, res) => {
-    const locals = {
-      title: "Αναζήτηση Συμβάσεων",
-      description: "Web Payroll System",
-    };
+  	static addSymbaseisForm = async (req, res) => {
+		const locals = {
+			title: "Προσθήκη Νέας Σύμβασης",
+			description: "Web Payroll System",
+		};
+    
+    	let aa_kodikos = null;
 
-    try {
-      let searchTerm = req.body.searchTerm;
+    	try {
+			const lastRecord = await SymbaseisModel.find()
+			.sort({ _id: -1 })
+        	.limit(1);
+      		let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
+      		if (kodValue !== null) {
+        		kodValue++;
+      		} else {
+        		kodValue = 1;
+      		}
+      		aa_kodikos = kodValue;
+      		res.render("symbaseis/symbaseis/add", {
+				locals,
+        		aa_kodikos,
+        		context: "symbash",
+        		rec: {},
+      		});
+    	} catch (error) {
+      		console.log("Σφάλμα :", error);
+    	}
+  	};
 
-      const sessionUserId = req.session.userId;
-      const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
-      const perPage = Number(process.env.EGGRAFES);
-      let page = req.query.page || 1;
+	static postSymbaseisForm = async (req, res) => {
+		const formData = req.body;
 
-      let sTerm = searchNoSpecialChar;
-      nextPageSearchTerm = searchNoSpecialChar;
+		const newSymbash = SymbaseisModel({
+			kodikos: formatNumber(formData.kodikos, 4),
+			perigrafh: formData.perigrafh,
+		});
 
-      // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "Symbaseis",
-      }).exec();
+		try {
+			await SymbaseisModel.create(newSymbash);
+			res.json({ success: true, redirectUrl: "/symbaseis/symbaseis" });
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(sTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-            ]
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
+    static searchPostSymbaseis = async (req, res) => {
+        const locals = {
+        title: "Αναζήτηση Συμβάσεων",
+        description: "Web Payroll System",
+        };
 
-      const countResults = await SymbaseisModel.aggregate(countPipeline).exec();
+        try {
+            let searchTerm = req.body.searchTerm;
 
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-      
+            const sessionUserId = req.session.userId;
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9() ]/g, "");
+            const perPage = Number(process.env.EGGRAFES);
+            let page = req.query.page || 1;
 
-      // Αναζήτηση και επισήμανση
-      const symbaseisFilteredRecs = await SymbaseisModel.aggregate([
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(sTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-            ]
-          }
+            let sTerm = searchNoSpecialChar;
+            nextPageSearchTerm = searchNoSpecialChar;
+
+            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: "Symbaseis",
+            }).exec();
+
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [
+                {
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
+                            { perigrafh: { $regex: new RegExp(sTerm, "i") } },
+                        ]
+                    },
+                },
+                {
+                    $count: "total",
+                },
+            ];
+
+            const countResults = await SymbaseisModel.aggregate(countPipeline).exec();
+
+            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+        
+            // Αναζήτηση και επισήμανση
+            const symbaseisFilteredRecs = await SymbaseisModel.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
+                            { perigrafh: { $regex: new RegExp(sTerm, "i") } },
+                        ]
+                    }
+                }
+            ])
+            .skip(skipRecords)
+            .limit(limitPerPage);
+    
+            // Εφαρμογή της επισήμανσης
+            const highlightedRecords = symbaseisFilteredRecs.map((record) => ({
+                ...record,
+                kodikos: this.highlightText(record.kodikos, sTerm),
+                perigrafh: this.highlightText(record.perigrafh, sTerm),
+            }));
+
+            res.render("symbaseis/symbaseis/search", {
+                userPrivileges,
+                locals,
+                current: page,
+                pages: totalPages,
+                sTerm: sTerm,
+                entries: perPage,
+                totalRecs: totalRecords,
+                symbaseisFilteredRecs: highlightedRecords,
+            });
+        } catch (error) {
+            console.log(error);
         }
-      ])
-      .skip(skipRecords)
-      .limit(limitPerPage);
-  
-      // Εφαρμογή της επισήμανσης
-      const highlightedRecords = symbaseisFilteredRecs.map((record) => ({
-        ...record,
-        kodikos: this.highlightText(record.kodikos, sTerm),
-        perigrafh: this.highlightText(record.perigrafh, sTerm),
-      }));
-
-      res.render("symbaseis/symbaseis/search", {
-        userPrivileges,
-        locals,
-        current: page,
-        pages: totalPages,
-        sTerm: sTerm,
-        entries: perPage,
-        totalRecs: totalRecords,
-        symbaseisFilteredRecs: highlightedRecords,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
+    };
 
   static searchGetSymbaseis = async (req, res) => {
     const locals = {
@@ -299,644 +375,636 @@ class symbaseisController {
     }
   };
 
-  static editSymbaseisForm = async (req, res) => {
-    const locals = {
-      title: "Συντήρηση Συμβάσεων",
-      description: "Web Payroll System",
-    };
+	static editSymbaseisForm = async (req, res) => {
+		const locals = {
+			title: "Συντήρηση Συμβάσεων",
+			description: "Web Payroll System",
+		};
 
-    try {
-      const symbaseisId = req.params.id;
-      
-      const symbaseis = await SymbaseisModel.findById(symbaseisId);
+		try {
+			const symbaseisId = req.params.id;
+			
+			const symbaseis = await SymbaseisModel.findById(symbaseisId);
 
-      res.render("symbaseis/symbaseis/edit", {
-        locals,
-        symbaseis,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
+			res.render("symbaseis/symbaseis/edit", {
+				locals,
+				symbaseis,
+			});
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
-  static postSymbaseisUpdate = async (req, res) => {
-    const symbaseisId = req.params.symbaseisId;
-    const formData = req.body;
+	static postSymbaseisUpdate = async (req, res) => {
+		const symbaseisId = req.params.symbaseisId;
+		const formData = req.body;
 
-    const filteredDataSymbaseis = {
-      perigrafh: formData.perigrafh,
-    };
+		const filteredDataSymbaseis = {
+			perigrafh: formData.perigrafh,
+		};
 
-    // Τώρα μπορώ να χρησιμοποιήσω το filteredDataSymbaseis στη $set: για ενημέρωση
-    await SymbaseisModel.findOneAndUpdate(
-      { _id: symbaseisId },
-      { $set: filteredDataSymbaseis },
-      { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
-    );
+		await SymbaseisModel.findOneAndUpdate(
+			{ _id: symbaseisId },
+			{ $set: filteredDataSymbaseis },
+			{ new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
+		);
 
-    try {
-      res.json({ success: true, redirectUrl: "/symbaseis/symbaseis" });
-    } catch (error) {
-      throw error;
-    }
-  };
+		try {
+			res.json({ success: true, redirectUrl: "/symbaseis/symbaseis" });
+		} catch (error) {
+			throw error;
+		}
+	};
 
-  static deleteSymbaseis = async (req, res) => {
-    try {
-      const symbaseisId = req.params.id;
-      const symbaseis = await SymbaseisModel.findById(symbaseisId);
-      if (!symbaseis) {
-        return res.status(404).json({ message: 'Συμβάση δεν βρέθηκε.' });
-      }
-  
-      const kodikos_symbashs = symbaseis.kodikos;
-      // Δημιουργία ενός regex pattern που αντιστοιχεί στον κωδικό συμβάσεως στην αρχή του string
-      const pattern = new RegExp(`^${kodikos_symbashs}`);
-  
-      await SymbaseisModel.deleteOne({ _id: symbaseisId });
-  
-      const deletionResults = [];
-  
-      // Πίνακας με τα μοντέλα και τα αντίστοιχα πεδία για διαγραφή
-      const modelsToDeleteFrom = [
-        { model: KathgoriesSymbaseonModel, field: 'afora_thn_symbash', pattern, modelNameInGreek: "Κατηγορίες Συμβάσεων" },
-        { model: EidikothtesAnaKathgoriaSymbaseonModel, field: 'afora_thn_symbash_kathgoria', pattern, modelNameInGreek: "Ειδικότητες Κατηγορίας Συμβάσεων" },
-        { model: StoixeiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta', pattern, modelNameInGreek: "Στοιχεία Συμβάσεων" },
-        { model: KlimakiaSymbaseonModel, field: 'kodikos_symbashs', pattern: new RegExp(`^${kodikos_symbashs}`), modelNameInGreek: "Κλιμάκια Συμβάσεων" },
-      ];
-  
-      for (const { model, field, pattern } of modelsToDeleteFrom) {
-        try {
-          const result = await model.deleteMany({ [field]: pattern });
-          if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
-          }
-        } catch (error) {
-          console.error(`Error deleting records in ${model.modelName}: `, error);
-        }
-      }
-  
-      res.json({
-        success: true,
-        message: 'Η συμβάση και όλες οι σχετικές εγγραφές διαγράφηκαν επιτυχώς.',
-        redirectUrl: "/symbaseis/symbaseis",
-        results: deletionResults, // Επιστρέφουμε τα αποτελέσματα της διαγραφής
-      });
-    } catch (error) {
-      console.error('Σφάλμα κατά την επεξεργασία της αίτησης: ', error);
-      res.status(500).json({ message: 'Σφάλμα κατά την επεξεργασία της αίτησης.' });
-    }
-  };
+  	static deleteSymbaseis = async (req, res) => {
+		try {
+			const symbaseisId = req.params.id;
+			const symbaseis = await SymbaseisModel.findById(symbaseisId);
+			if (!symbaseis) {
+				return res.status(404).json({ message: 'Συμβάση δεν βρέθηκε.' });
+			}
+	
+			const kodikos_symbashs = symbaseis.kodikos;
+			// Δημιουργία ενός regex pattern που αντιστοιχεί στον κωδικό συμβάσεως στην αρχή του string
+			const pattern = new RegExp(`^${kodikos_symbashs}`);
+		
+			await SymbaseisModel.deleteOne({ _id: symbaseisId });
+		
+			const deletionResults = [];
+		
+			// Πίνακας με τα μοντέλα και τα αντίστοιχα πεδία για διαγραφή
+			const modelsToDeleteFrom = [
+				{ model: KathgoriesSymbaseonModel, field: 'afora_thn_symbash', pattern, modelNameInGreek: "Κατηγορίες Συμβάσεων" },
+				{ model: EidikothtesAnaKathgoriaSymbaseonModel, field: 'afora_thn_symbash_kathgoria', pattern, modelNameInGreek: "Ειδικότητες Κατηγορίας Συμβάσεων" },
+				{ model: StoixeiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta', pattern, modelNameInGreek: "Στοιχεία Συμβάσεων" },
+				{ model: KlimakiaSymbaseonModel, field: 'kodikos_symbashs', pattern: new RegExp(`^${kodikos_symbashs}`), modelNameInGreek: "Κλιμάκια Συμβάσεων" },
+			];
+		
+			for (const { model, field, pattern } of modelsToDeleteFrom) {
+				try {
+					const result = await model.deleteMany({ [field]: pattern });
+					if (result.deletedCount > 0) {
+						deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
+					}
+				} catch (error) {
+					console.error(`Error deleting records in ${model.modelName}: `, error);
+				}
+			}
+	
+			res.json({
+				success: true,
+				message: 'Η συμβάση και όλες οι σχετικές εγγραφές διαγράφηκαν επιτυχώς.',
+				redirectUrl: "/symbaseis/symbaseis",
+				results: deletionResults, // Επιστρέφουμε τα αποτελέσματα της διαγραφής
+			});
+		} catch (error) {
+			console.error('Σφάλμα κατά την επεξεργασία της αίτησης: ', error);
+			res.status(500).json({ message: 'Σφάλμα κατά την επεξεργασία της αίτησης.' });
+		}
+	};
   
   // ================================== Κατηγορίες Συμβάσεων =====================================
 
-  static mainKathgoriesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Κατηγοριών Συμβάσεων",
-      description: "Web Payroll System",
-    };
-    const sessionUserId = req.session.userId;
+	static mainKathgoriesSymbaseonForm = async (req, res) => {
+		const locals = {
+			title: "Διαχείριση Κατηγοριών Συμβάσεων",
+			description: "Web Payroll System",
+		};
+		const sessionUserId = req.session.userId;
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "KathgoriesSymbaseon",
-      }).exec();
+		try {
+			// Έλεγχος CRUD των δικαιωμάτων του χρήστη
+			const userPrivileges = await UserPrivilegesModel.findOne({
+				userId: sessionUserId,
+				form: "KathgoriesSymbaseon",
+			}).exec();
 
-      res.render("symbaseis/kathgories/kathgories", {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: 1,
-        pages: 1,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
+			res.render("symbaseis/kathgories/kathgories", {
+				userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+				locals,
+				current: 1,
+				pages: 1,
+				context: "symbash",
+				rec: {},
+			});
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
-  static loadKathgoriesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Κατηγοριών Συμβάσεων",
-      description: "Web Payroll System",
-    };
-    const symbash_kodikos = req.params.symbashId;
+	static addKathgoriesSymbaseonForm = async (req, res) => {
+		const locals = {
+			title: "Προσθήκη Νέας Κατηγορίας",
+			description: "Web Payroll System",
+		};
 
-    const sessionUserId = req.session.userId;
-    const perPage = Number(process.env.EGGRAFES);
-    let page = req.query.page || 1;
+		try {
+			const lastRecord = await KathgoriesSymbaseonModel.find()
+				.lean()
+				.sort({ _id: -1 })
+				.limit(1);
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "KathgoriesSymbaseon",
-      }).exec();
+				let aa_value = lastRecord?.[0]?.aa ? parseInt(lastRecord[0].aa, 10) + 1 : 1;
 
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            afora_thn_symbash: symbash_kodikos,
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
+			const kodikos_symbashs = req.params.kodikosSymbashs;
+			const symbash = await SymbaseisModel.find({ kodikos: kodikos_symbashs}).lean()
 
-      const countResults = await KathgoriesSymbaseonModel.aggregate(
-        countPipeline
-      ).exec();
+			const lastRecord_kathgorias_symbashs = await KathgoriesSymbaseonModel.find({ afora_thn_symbash: kodikos_symbashs })
+				.lean()
+				.sort({ _id: -1 })
+				.limit(1);
 
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+			const aa_kodikos = (lastRecord_kathgorias_symbashs[0]?.kodikos !== undefined && lastRecord_kathgorias_symbashs[0]?.kodikos !== null
+				? parseInt(String(lastRecord_kathgorias_symbashs[0].kodikos), 10)
+				: NaN) + 1 || 1;
 
-      // Aggregation query για την ανάκτηση δεδομένων
-      const queryPipeline = [
-        {
-          $match: {
-            afora_thn_symbash: symbash_kodikos,
-          },
-        },
-        {
-          $sort: {
-            kodikos: 1,
-          },
-        },
-        {
-          $skip: skipRecords,
-        },
-        {
-          $limit: limitPerPage,
-        },
-      ];
+			res.render("symbaseis/kathgories/add", {
+				locals,
+				aa_value,
+				aa_kodikos,
+				symbash,
+			});
+		} catch (error) {
+			console.log("Σφάλμα :", error);
+		}
+	};
 
-      const kathgoriesSymbaseon = await KathgoriesSymbaseonModel.aggregate(
-        queryPipeline
-      ).exec();
+	static postKathgoriesSymbaseonForm = async (req, res) => {
+		const formData = req.body;
 
-      const responseData = {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: page, 
-        pages: totalPages,
-        kathgoriesSymbaseon 
-      };
-  
-      res.json(responseData);
-    } catch (error) {
-      console.log(error);
-    }
-  };
+		const newKathgoria = KathgoriesSymbaseonModel({
+			aa: formData.aa,
+			kodikos: formData.kodikos,
+			perigrafh: formData.perigrafh,
+			afora_thn_symbash: formData.afora_thn_symbash,
+		});
 
-  static addKathgoriesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Προσθήκη Νέας Κατηγορίας",
-      description: "Web Payroll System",
-    };
-    
-    let aa_kodikos = null;
-    let aa_value = null;
+		try {
+			await KathgoriesSymbaseonModel.create(newKathgoria);
+			res.json({ success: true, redirectUrl: "/symbaseis/kathgories" });
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
-    try {
-      const countPipeline = [
-        {
-          $count: "total",
-        },
-      ];
+    static searchPostKathgoriesSymbaseon = async (req, res, next) => {
+        const locals = {
+            title: 'Αναζήτηση Κατηγοριών Συμβάσεων',
+            description: 'Web Payroll System',
+        };
 
-      const countResults = await KathgoriesSymbaseonModel.aggregate(
-        countPipeline
-      ).exec();
-
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      if (totalRecords !== null) {
-        totalRecords++;
-      } else {
-        totalRecords = 1;
-      }
-      aa_value = totalRecords;
-
-      const kodikos_symbashs = req.params.kodikosSymbashs;
-      const symbash = await SymbaseisModel.find({ kodikos: kodikos_symbashs})
-
-      const lastRecord_kathgorias_symbashs = await KathgoriesSymbaseonModel.find({ afora_thn_symbash: kodikos_symbashs })
-        .sort({ _id: -1 })
-        .limit(1);
-
-      let kodValue = lastRecord_kathgorias_symbashs[0] && lastRecord_kathgorias_symbashs[0].kodikos ? parseInt(lastRecord_kathgorias_symbashs[0].kodikos, 10) : null;
-      if (kodValue !== null) {
-        kodValue++;
-      } else {
-        kodValue = 1;
-      }
-      aa_kodikos = kodValue;
-      res.render("symbaseis/kathgories/add", {
-        locals,
-        aa_value,
-        aa_kodikos,
-        symbash,
-      });
-    } catch (error) {
-      console.log("Σφάλμα :", error);
-    }
-  };
-
-  static postKathgoriesSymbaseonForm = async (req, res) => {
-    const formData = req.body;
-
-    const newKathgoria = KathgoriesSymbaseonModel({
-      aa: formData.aa,
-      kodikos: formData.kodikos,
-      perigrafh: formData.perigrafh,
-      afora_thn_symbash: formData.afora_thn_symbash,
-    });
-
-    try {
-      await KathgoriesSymbaseonModel.create(newKathgoria);
-      res.json({ success: true, redirectUrl: "/symbaseis/kathgories" });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  static searchPostKathgoriesSymbaseon = async (req, res) => {
-    const locals = {
-      title: "Αναζήτηση Κατηγοριών Συμβάσεων",
-      description: "Web Payroll System",
-    };
-
-    try {
-      let searchTerm = req.body.searchTerm;
-      let selectedSymbash = req.body.selected_Symbash;
-
-      const sessionUserId = req.session.userId;
-      const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
-      const perPage = Number(process.env.EGGRAFES);
-      let page = req.query.page || 1;
-
-      let sTerm = searchNoSpecialChar;
-      nextPageSearchTerm = searchNoSpecialChar;
-      nextPageSelectedSymbash = selectedSymbash;
-
-      // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "KathgoriesSymbaseon",
-      }).exec();
-
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            afora_thn_symbash: selectedSymbash,
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(sTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-            ]
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
-
-      const countResults = await KathgoriesSymbaseonModel.aggregate(countPipeline).exec();
-
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-      
-
-      // Αναζήτηση και επισήμανση
-      const kathgoriesSymbaseonFilteredRecs = await KathgoriesSymbaseonModel.aggregate([
-        {
-          $match: {
-            afora_thn_symbash: selectedSymbash,
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(sTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-            ]
-          }
-        }
-      ])
-      .skip(skipRecords)
-      .limit(limitPerPage);
-  
-      // Εφαρμογή της επισήμανσης
-      const highlightedRecords = kathgoriesSymbaseonFilteredRecs.map((record) => ({
-        ...record,
-        kodikos: this.highlightText(record.kodikos, sTerm),
-        perigrafh: this.highlightText(record.perigrafh, sTerm),
-      }));
-
-      res.render("symbaseis/Kathgories/search", {
-        userPrivileges,
-        locals,
-        current: page,
-        pages: totalPages,
-        sTerm: sTerm,
-        entries: perPage,
-        totalRecs: totalRecords,
-        selectedSymbash,
-        kathgoriesSymbaseonFilteredRecs: highlightedRecords,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  static searchGetKathgoriesSymbaseon = async (req, res) => {
-    const locals = {
-      title: "Αναζήτηση Κατηγοριών Συμβάσεων",
-      description: "Web Payroll System",
-    };
-
-    try {
-      let searchTerm = nextPageSearchTerm;
-      let selectedSymbash = nextPageSelectedSymbash;
-
-      const sessionUserId = req.session.userId;
-      const perPage = Number(process.env.EGGRAFES);
-      let page = req.query.page || 1;
-
-      // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "KathgoriesSymbaseon",
-      }).exec();
-
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            afora_thn_symbash: selectedSymbash,
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
-            ]
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
-
-      const countResults = await KathgoriesSymbaseonModel.aggregate(countPipeline).exec();
-
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-
-      // Αναζήτηση και επισήμανση
-      const kathgoriesSymbaseonFilteredRecs = await KathgoriesSymbaseonModel.aggregate([
-        {
-          $match: {
-            afora_thn_symbash: selectedSymbash,
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-              { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
-            ]
-          }
-        }
-      ]).skip(skipRecords).limit(limitPerPage);
-  
-      // Εφαρμογή της επισήμανσης
-      const highlightedRecords = kathgoriesSymbaseonFilteredRecs.map((record) => ({
-        ...record,
-        kodikos: this.highlightText(record.kodikos, searchTerm),
-        perigrafh: this.highlightText(record.perigrafh, searchTerm),
-      }));
-  
-      res.render("symbaseis/kathgories/search", {
-        kathgoriesSymbaseonFilteredRecs: highlightedRecords,
-        locals,
-        current: page,
-        pages: totalPages,
-        userPrivileges,
-        sTerm: searchTerm,
-        entries: perPage,
-        totalRecs: totalRecords,
-        selectedSymbash,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  static editKathgoriesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Συντήρηση Κατηγοριών Συμβάσεων",
-      description: "Web Payroll System",
-    };
-
-    try {
-      const kathgoriesId = req.params.id;
-      const kathgories = await KathgoriesSymbaseonModel.findById(kathgoriesId);
-
-      const symbaseis = await SymbaseisModel.findOne({ kodikos: kathgories.afora_thn_symbash })
-      res.render("symbaseis/kathgories/edit", {
-        locals,
-        symbaseis,
-        kathgories,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  static postKathgoriesSymbaseonUpdate = async (req, res) => {
-    const kathgoriesId = req.params.kathgoriesId;
-    const formData = req.body;
-
-    const filteredDataKathgoriesSymbaseon = {
-      perigrafh: formData.perigrafh,
-    };
-
-    // Τώρα μπορώ να χρησιμοποιήσω το filteredDataKathgoriesSymbaseon στη $set: για ενημέρωση
-    await KathgoriesSymbaseonModel.findOneAndUpdate(
-      { _id: kathgoriesId },
-      { $set: filteredDataKathgoriesSymbaseon },
-      { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
-    );
-
-    try {
-      res.json({ success: true, redirectUrl: "/symbaseis/kathgories" });
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  static deleteKathgoriesSymbaseon = async (req, res) => {
-    try {
-      const kathgoriesId = req.params.id;
-      const kathgories = await KathgoriesSymbaseonModel.findById(kathgoriesId);
-      if (!kathgories) {
-        return res.status(404).json({ message: 'Συμβάση δεν βρέθηκε.' });
-      }
-  
-      const tmpKodikos = kathgories.afora_thn_symbash.toString() + kathgories.kodikos.toString();
-      // Δημιουργία ενός regex pattern που αντιστοιχεί στον κωδικό συμβάσεως στην αρχή του string
-      const pattern = new RegExp(`^${tmpKodikos}`);
-  
-      await KathgoriesSymbaseonModel.deleteOne({ _id: kathgoriesId });
-  
-      const deletionResults = [];
-
-      // Πίνακας με τα μοντέλα και τα αντίστοιχα πεδία για διαγραφή
-      const modelsToDeleteFrom = [
-        { model: EidikothtesAnaKathgoriaSymbaseonModel, field: 'afora_thn_symbash_kathgoria', pattern, modelNameInGreek: "Ειδικότητες Κατηγορίας Συμβάσεων" },
-        { model: StoixeiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta', pattern, modelNameInGreek: "Στοιχεία Συμβάσεων" },
-        { model: KlimakiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta_stoixeio', pattern, modelNameInGreek: "Κλιμάκια Συμβάσεων" },
-      ];
-  
-      for (const { model, field, pattern } of modelsToDeleteFrom) {
         try {
-          const result = await model.deleteMany({ [field]: pattern });
-          if (result.deletedCount > 0) {
-            deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
-          }
+            const selectedSymbash = req.params?.symbash_stathera?.trim();
+            const searchTermRaw = (req.body?.searchTerm ?? '').trim();
+
+            if (!selectedSymbash) {
+                return res.status(400).render('symbaseis/kathgories/index', {
+                    ...locals,
+                    error: 'Πρέπει να επιλέξετε σύμβαση.',
+                });
+            }
+
+            const sessionUserId = req.session.userId;
+            const userPrivileges = await UserPrivilegesModel
+            .findOne({ userId: sessionUserId, form: 'KathgoriesSymbaseon' })
+            .lean();
+
+            const perPage = Number(process.env.EGGRAFES) || 10;
+            const page = Math.max(1, parseInt(req.query.page ?? '1', 10));
+
+            // Ασφαλές regex από input
+            const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const sTerm = searchTermRaw;
+            const termRegex = sTerm ? new RegExp(escapeRegex(sTerm), 'i') : null;
+
+            // Βάση φίλτρων
+            const baseMatch = {
+                afora_thn_symbash: selectedSymbash,
+                ...(termRegex && { $or: [{ kodikos: termRegex }, { perigrafh: termRegex }] }),
+            };
+
+            // Σύνολο εγγραφών
+            const countResults = await KathgoriesSymbaseonModel.aggregate([
+                { $match: baseMatch },
+                { $count: 'total' },
+            ]).exec();
+
+            const totalRecords = countResults[0]?.total ?? 0;
+            const totalPages = Math.max(1, Math.ceil(totalRecords / perPage));
+            const skip = (page - 1) * perPage;
+
+            // Δεδομένα σελίδας (με σταθερό sort)
+            const rows = await KathgoriesSymbaseonModel.aggregate([
+                { $match: baseMatch },
+                { $sort: { kodikos: 1, _id: 1 } },
+                { $skip: skip },
+                { $limit: perPage },
+            ]).exec();
+
+            // Highlight (ασφαλές)
+            const highlight = (txt) => {
+                const str = String(txt ?? '');
+                return !termRegex ? str : str.replace(new RegExp(`(${escapeRegex(sTerm)})`, 'gi'), '<mark>$1</mark>');
+            };
+            const highlightedRecords = rows.map(r => ({
+                ...r,
+                kodikos: highlight(r.kodikos),
+                perigrafh: highlight(r.perigrafh),
+            }));
+
+            // Φέρε τη σύμβαση για να δείξεις κωδ/περιγραφή στην κεφαλίδα
+            const symbash = await SymbaseisModel
+            .findOne({ kodikos: selectedSymbash }, { kodikos: 1, perigrafh: 1 })
+            .lean();
+
+            return res.render('symbaseis/kathgories/search', {
+                userPrivileges,
+                locals,
+                current: page,
+                pages: totalPages,
+                sTerm,
+                entries: perPage,
+                totalRecs: totalRecords,
+                selectedSymbash,
+                symbash_stathera: selectedSymbash, // για να ταιριάζει με το EJS σου
+                symbash,
+                kathgoriesSymbaseonFilteredRecs: highlightedRecords,
+            });
         } catch (error) {
-          console.error(`Error deleting records in ${model.modelName}: `, error);
+            return next(error);
         }
-      }
-  
-      res.json({
-        success: true,
-        message: 'Η κατηγορία συμβάσης και όλες οι σχετικές εγγραφές διαγράφηκαν επιτυχώς.',
-        redirectUrl: "/symbaseis/kathgories",
-        results: deletionResults, // Επιστρέφουμε τα αποτελέσματα της διαγραφής
-      });
-    } catch (error) {
-      console.error('Σφάλμα κατά την επεξεργασία της αίτησης: ', error);
-      res.status(500).json({ message: 'Σφάλμα κατά την επεξεργασία της αίτησης.' });
-    }
-  };
-  
+    };
+
+    static searchGetKathgoriesSymbaseon = async (req, res) => {
+        const locals = {
+            title: "Αναζήτηση Κατηγοριών Συμβάσεων",
+            description: "Web Payroll System",
+        };
+
+        try {
+            const sessionUserId = req.session.userId;
+            const perPage = Number(process.env.EGGRAFES);
+            const selectedSymbash = (req.query.symbash_stathera || '').trim();
+            const searchTerm = (req.query.sTerm || '').trim();
+            const page = Math.max(1, parseInt(req.query.page || '1', 10));
+
+            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: "KathgoriesSymbaseon",
+            }).exec();
+
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [
+                {
+                    $match: {
+                    afora_thn_symbash: selectedSymbash,
+                    },
+                },
+                {
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
+                            { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
+                        ]
+                    },
+                },
+                {
+                    $count: "total",
+                },
+            ];
+
+            const countResults = await KathgoriesSymbaseonModel.aggregate(countPipeline).exec();
+
+            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+
+            // Αναζήτηση και επισήμανση
+            const kathgoriesSymbaseonFilteredRecs = await KathgoriesSymbaseonModel.aggregate([
+                {
+                    $match: {
+                        afora_thn_symbash: selectedSymbash,
+                    },
+                },
+                {
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
+                            { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
+                        ]
+                    }
+                }
+            ]).skip(skipRecords).limit(limitPerPage);
+    
+            // Εφαρμογή της επισήμανσης
+            const highlightedRecords = kathgoriesSymbaseonFilteredRecs.map((record) => ({
+                ...record,
+                kodikos: this.highlightText(record.kodikos, searchTerm),
+                perigrafh: this.highlightText(record.perigrafh, searchTerm),
+            }));
+    
+            // Φέρε τη σύμβαση για να δείξεις κωδ/περιγραφή στην κεφαλίδα
+            const symbash = await SymbaseisModel
+                .findOne({ kodikos: selectedSymbash }, { kodikos: 1, perigrafh: 1 })
+                .lean();
+
+            res.render("symbaseis/kathgories/search", {
+                kathgoriesSymbaseonFilteredRecs: highlightedRecords,
+                locals,
+                current: page,
+                pages: totalPages,
+                userPrivileges,
+                sTerm: searchTerm,
+                entries: perPage,
+                totalRecs: totalRecords,
+                selectedSymbash,
+                symbash_stathera: selectedSymbash, // για να ταιριάζει με το EJS σου
+                symbash,
+                kathgoriesSymbaseonFilteredRecs: highlightedRecords,
+            });
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
+	static editKathgoriesSymbaseonForm = async (req, res) => {
+		const locals = {
+			title: "Συντήρηση Κατηγοριών Συμβάσεων",
+			description: "Web Payroll System",
+		};
+
+		try {
+			const kathgoriesId = req.params.id;
+			const kathgories = await KathgoriesSymbaseonModel.findById(kathgoriesId).lean();
+
+			const symbaseis = await SymbaseisModel.findOne({ kodikos: kathgories.afora_thn_symbash }).lean();
+			res.render("symbaseis/kathgories/edit", {
+				locals,
+				symbaseis,
+				kathgories,
+			});
+		} catch (error) {
+			console.log(error);
+		}
+	};
+
+	static postKathgoriesSymbaseonUpdate = async (req, res) => {
+			const kathgoriesId = req.params.kathgoriesId;
+			const formData = req.body;
+			const filteredDataKathgoriesSymbaseon = {
+			perigrafh: formData.perigrafh,
+		};
+
+		await KathgoriesSymbaseonModel.findOneAndUpdate(
+			{ _id: kathgoriesId },
+			{ $set: filteredDataKathgoriesSymbaseon },
+			{ new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
+		);
+
+		try {
+			res.json({ success: true, redirectUrl: "/symbaseis/kathgories" });
+		} catch (error) {
+			throw error;
+		}
+	};
+
+	static deleteKathgoriesSymbaseon = async (req, res) => {
+		try {
+			const kathgoriesId = req.params.id;
+			const kathgories = await KathgoriesSymbaseonModel.findById(kathgoriesId);
+			if (!kathgories) {
+				return res.status(404).json({ message: 'Συμβάση δεν βρέθηκε.' });
+			}
+	
+			const tmpKodikos = kathgories.afora_thn_symbash.toString() + kathgories.kodikos.toString();
+			// Δημιουργία ενός regex pattern που αντιστοιχεί στον κωδικό συμβάσεως στην αρχή του string
+			const pattern = new RegExp(`^${tmpKodikos}`);
+		
+			await KathgoriesSymbaseonModel.deleteOne({ _id: kathgoriesId });
+		
+			const deletionResults = [];
+
+			// Πίνακας με τα μοντέλα και τα αντίστοιχα πεδία για διαγραφή
+			const modelsToDeleteFrom = [
+				{ model: EidikothtesAnaKathgoriaSymbaseonModel, field: 'afora_thn_symbash_kathgoria', pattern, modelNameInGreek: "Ειδικότητες Κατηγορίας Συμβάσεων" },
+				{ model: StoixeiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta', pattern, modelNameInGreek: "Στοιχεία Συμβάσεων" },
+				{ model: KlimakiaSymbaseonModel, field: 'afora_thn_symbash_kathgoria_eidikothta_stoixeio', pattern, modelNameInGreek: "Κλιμάκια Συμβάσεων" },
+			];
+		
+			for (const { model, field, pattern } of modelsToDeleteFrom) {
+				try {
+					const result = await model.deleteMany({ [field]: pattern });
+					if (result.deletedCount > 0) {
+						deletionResults.push(`${model.modelName} Εγγραφές: ${result.deletedCount} <i class="bi bi-check cgreen"></i>`);
+					}
+				} catch (error) {
+					console.error(`Error deleting records in ${model.modelName}: `, error);
+				}
+			}
+		
+			res.json({
+				success: true,
+				message: 'Η κατηγορία συμβάσης και όλες οι σχετικές εγγραφές διαγράφηκαν επιτυχώς.',
+				redirectUrl: "/symbaseis/kathgories",
+				results: deletionResults, // Επιστρέφουμε τα αποτελέσματα της διαγραφής
+			});
+		} catch (error) {
+			console.error('Σφάλμα κατά την επεξεργασία της αίτησης: ', error);
+			res.status(500).json({ message: 'Σφάλμα κατά την επεξεργασία της αίτησης.' });
+		}
+	};
+
+    static listKathgoriesSymbaseon = async (req, res) => {
+		try {
+			const sym = String(req.query.symbash_stathera || "").trim();
+			const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+			const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+			// Αν δεν έχει σταθερά σύμβασης, γύρνα άδεια λίστα (είναι πιο ασφαλές και «ελαφρύ»)
+			if (!sym) {
+				return res.json({ items: [], page: 1, pages: 1, total: 0 });
+			}
+
+			// Φίλτρο βάσει layout: afora_thn_symbash = "0002" κ.λπ.
+			const query = { afora_thn_symbash: sym };
+
+			// Εφόσον το kodikos είναι ήδη zero-padded (π.χ. "0001"), η string ταξινόμηση είναι οκ.
+			const sort = { kodikos: 1 };
+
+			const [docs, total] = await Promise.all([
+				KathgoriesSymbaseonModel
+				.find(query)
+				.select({ kodikos: 1, perigrafh: 1 }) // μικρή βελτίωση: μόνο ό,τι χρειάζεται
+				.sort(sort)
+				.skip((page - 1) * limit)
+				.limit(limit)
+				.lean(),
+				KathgoriesSymbaseonModel.countDocuments(query),
+			]);
+
+			const items = (docs || []).map(d => ({
+				id: String(d._id),
+				kodikos: to4(d.kodikos),       // μορφή "0001"
+				perigrafh: d.perigrafh || "",
+			}));
+
+			const pages = Math.max(1, Math.ceil(total / limit));
+			res.json({ items, page, pages, total });
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({ error: "Server error" });
+		}
+	};
+
   // ================================== Ειδικότητες Συμβάσεων ====================================
 
-  static mainEidikothtesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Ειδικοτήτων Συμβάσεων",
-      description: "Web Payroll System",
-    };
-    const sessionUserId = req.session.userId;
+	static mainEidikothtesSymbaseonForm = async (req, res) => {
+		const locals = {
+			title: "Διαχείριση Ειδικοτήτων Συμβάσεων",
+			description: "Web Payroll System",
+		};
+		const sessionUserId = req.session.userId;
+    const basePer = Number(process.env.EGGRAFES) || 10;
+    const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+    const perPage = basePer * perx;
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "KathgoriesSymbaseon",
-      }).exec();
+		try {
+			// Έλεγχος CRUD των δικαιωμάτων του χρήστη
+			const userPrivileges = await UserPrivilegesModel.findOne({
+				userId: sessionUserId,
+				form: "EidikothtesSymbaseon",
+			}).exec();
 
-      res.render("symbaseis/eidikothtes/eidikothtes", {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: 1,
-        pages: 1,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  };
+			res.render("symbaseis/eidikothtes/eidikothtes", {
+				userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+				locals,
+				current: 1,
+				pages: 1,
+				context: "kathgoria_symbashs",
+				rec: {},
+			});
+		} catch (error) {
+			console.log(error);
+		}
+	};
 
-  static loadEidikothtesSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Ειδικοτήτων Συμβάσεων",
-      description: "Web Payroll System",
-    };
-    const symbash_kathgoria = req.params.symbash_kathgoria;
+	// static addKathgoriesSymbaseonForm = async (req, res) => {
+	// 	const locals = {
+	// 		title: "Προσθήκη Νέας Κατηγορίας",
+	// 		description: "Web Payroll System",
+	// 	};
 
-    const sessionUserId = req.session.userId;
-    const perPage = Number(process.env.EGGRAFES);
-    let page = req.query.page || 1;
+	// 	try {
+	// 		const lastRecord = await KathgoriesSymbaseonModel.find()
+	// 			.lean()
+	// 			.sort({ _id: -1 })
+	// 			.limit(1);
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "EidikothtesSymbaseon",
-      }).exec();
+	// 			let aa_value = lastRecord?.[0]?.aa ? parseInt(lastRecord[0].aa, 10) + 1 : 1;
 
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            afora_thn_symbash_kathgoria: symbash_kathgoria,
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
+	// 		const kodikos_symbashs = req.params.kodikosSymbashs;
+	// 		const symbash = await SymbaseisModel.find({ kodikos: kodikos_symbashs}).lean()
 
-      const countResults = await EidikothtesAnaKathgoriaSymbaseonModel.aggregate(
-        countPipeline
-      ).exec();
+	// 		const lastRecord_kathgorias_symbashs = await KathgoriesSymbaseonModel.find({ afora_thn_symbash: kodikos_symbashs })
+	// 			.lean()
+	// 			.sort({ _id: -1 })
+	// 			.limit(1);
 
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+	// 		const aa_kodikos = (lastRecord_kathgorias_symbashs[0]?.kodikos !== undefined && lastRecord_kathgorias_symbashs[0]?.kodikos !== null
+	// 			? parseInt(String(lastRecord_kathgorias_symbashs[0].kodikos), 10)
+	// 			: NaN) + 1 || 1;
 
-      // Aggregation query για την ανάκτηση δεδομένων
-      const queryPipeline = [
-        {
-          $match: {
-            afora_thn_symbash_kathgoria: symbash_kathgoria,
-          },
-        },
-        {
-          $sort: {
-            kodikos: 1,
-          },
-        },
-        {
-          $skip: skipRecords,
-        },
-        {
-          $limit: limitPerPage,
-        },
-      ];
+	// 		res.render("symbaseis/kathgories/add", {
+	// 			locals,
+	// 			aa_value,
+	// 			aa_kodikos,
+	// 			symbash,
+	// 		});
+	// 	} catch (error) {
+	// 		console.log("Σφάλμα :", error);
+	// 	}
+	// };
 
-      const eidikothtesSymbaseon = await EidikothtesAnaKathgoriaSymbaseonModel.aggregate(
-        queryPipeline
-      ).exec();
 
-      const responseData = {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: page, 
-        pages: totalPages,
-        eidikothtesSymbaseon 
-      };
+
+//   static loadEidikothtesSymbaseonForm = async (req, res) => {
+//     const locals = {
+//       title: "Διαχείριση Ειδικοτήτων Συμβάσεων",
+//       description: "Web Payroll System",
+//     };
+//     const symbash_kathgoria = req.params.symbash_kathgoria;
+
+//     const sessionUserId = req.session.userId;
+//     const perPage = Number(process.env.EGGRAFES);
+//     let page = req.query.page || 1;
+
+//     try {
+//       // Έλεγχος CRUD των δικαιωμάτων του χρήστη
+//       const userPrivileges = await UserPrivilegesModel.findOne({
+//         userId: sessionUserId,
+//         form: "EidikothtesSymbaseon",
+//       }).exec();
+
+//       // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+//       const countPipeline = [
+//         {
+//           $match: {
+//             afora_thn_symbash_kathgoria: symbash_kathgoria,
+//           },
+//         },
+//         {
+//           $count: "total",
+//         },
+//       ];
+
+//       const countResults = await EidikothtesAnaKathgoriaSymbaseonModel.aggregate(
+//         countPipeline
+//       ).exec();
+
+//       let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+//       let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+//       let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+//       let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+
+//       // Aggregation query για την ανάκτηση δεδομένων
+//       const queryPipeline = [
+//         {
+//           $match: {
+//             afora_thn_symbash_kathgoria: symbash_kathgoria,
+//           },
+//         },
+//         {
+//           $sort: {
+//             kodikos: 1,
+//           },
+//         },
+//         {
+//           $skip: skipRecords,
+//         },
+//         {
+//           $limit: limitPerPage,
+//         },
+//       ];
+
+//       const eidikothtesSymbaseon = await EidikothtesAnaKathgoriaSymbaseonModel.aggregate(
+//         queryPipeline
+//       ).exec();
+
+//       const responseData = {
+//         userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+//         locals,
+//         current: page, 
+//         pages: totalPages,
+//         eidikothtesSymbaseon 
+//       };
   
-      res.json(responseData);
-    } catch (error) {
-      console.log(error);
-    }
-  };
+//       res.json(responseData);
+//     } catch (error) {
+//       console.log(error);
+//     }
+//   };
 
   static searchPostEidikothtesSymbaseon = async (req, res) => {
     const locals = {
@@ -1289,6 +1357,57 @@ class symbaseisController {
     }
   };
   
+	static listEidikothtesSymbaseon = async (req, res) => {
+		try {
+			// 1) Πάρε έτοιμο composite key αν δίνεται, αλλιώς φτιάξ’ το από τα 2 hidden
+			const comboFromQuery = String(req.query.afora_thn_symbash_kathgoria || '').trim();
+			const symHidden  = String(req.query.symbash_stathera || '').trim();
+			const kathHidden = String(req.query.kathgoria_symbashs_stathera || '').trim();
+
+			const compositeKey = comboFromQuery
+			|| (symHidden && kathHidden ? `${to4(symHidden)}${to4(kathHidden)}` : '');
+
+			const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+			const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+			// 2) Αν δεν έχουμε κλειδί, γύρνα άδειο αποτέλεσμα
+			if (!compositeKey) {
+				return res.json({ items: [], page: 1, pages: 1, total: 0 });
+			}
+
+			// 3) Φίλτρο: afora_thn_symbash_kathgoria = "0002xxxx"
+				const query = { afora_thn_symbash_kathgoria: compositeKey };
+
+			// 4) Ταξινόμηση: με kodikos (είναι ήδη zero-padded)
+				const sort = { kodikos: 1 };
+
+			// 5) Ανάκτηση + total
+			const [docs, total] = await Promise.all([
+				EidikothtesAnaKathgoriaSymbaseonModel
+					.find(query)
+					.select({ kodikos: 1, perigrafh: 1 })     // μόνο ό,τι χρειάζεται
+					.sort(sort)
+					.skip((page - 1) * limit)
+					.limit(limit)
+					.lean(),
+				EidikothtesAnaKathgoriaSymbaseonModel.countDocuments(query),
+			]);
+
+			// 6) Μορφοποίηση για τον πίνακα
+			const items = (docs || []).map(d => ({
+				id: String(d._id),
+				kodikos: to4(d.kodikos),            // "0001"
+				perigrafh: d.perigrafh || '',
+			}));
+
+			const pages = Math.max(1, Math.ceil(total / limit));
+			res.json({ items, page, pages, total });
+		} catch (err) {
+			console.error(err);
+			res.status(500).json({ error: 'Server error' });
+		}
+	};
+
   // ================================== Στοιχεία Συμβάσεων =======================================
 
   static mainStoixeiaSymbaseonForm = async (req, res) => {
@@ -1310,88 +1429,90 @@ class symbaseisController {
         locals,
         current: 1,
         pages: 1,
+				context: "eidikothta_symbashs",
+				rec: {},
       });
     } catch (error) {
       console.log(error);
     }
   };
 
-  static loadStoixeiaSymbaseonForm = async (req, res) => {
-    const locals = {
-      title: "Διαχείριση Στοιχείων Συμβάσεων",
-      description: "Web Payroll System",
-    };
-    const symbash_kathgoria_eidikothta = req.params.symbash_kathgoria_eidikothta;
-    const page = req.query.page || 1;  // Προεπιλογή της σελίδας σε 1 αν δεν έχει δοθεί
+  // static loadStoixeiaSymbaseonForm = async (req, res) => {
+  //   const locals = {
+  //     title: "Διαχείριση Στοιχείων Συμβάσεων",
+  //     description: "Web Payroll System",
+  //   };
+  //   const symbash_kathgoria_eidikothta = req.params.symbash_kathgoria_eidikothta;
+  //   const page = req.query.page || 1;  // Προεπιλογή της σελίδας σε 1 αν δεν έχει δοθεί
     
-    const sessionUserId = req.session.userId;
-    const perPage = Number(process.env.EGGRAFES);
+  //   const sessionUserId = req.session.userId;
+  //   const perPage = Number(process.env.EGGRAFES);
 
-    try {
-      // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-      const userPrivileges = await UserPrivilegesModel.findOne({
-        userId: sessionUserId,
-        form: "StoixeiaSymbaseon",
-      }).exec();
+  //   try {
+  //     // Έλεγχος CRUD των δικαιωμάτων του χρήστη
+  //     const userPrivileges = await UserPrivilegesModel.findOne({
+  //       userId: sessionUserId,
+  //       form: "StoixeiaSymbaseon",
+  //     }).exec();
 
-      // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-      const countPipeline = [
-        {
-          $match: {
-            afora_thn_symbash_kathgoria_eidikothta: symbash_kathgoria_eidikothta,
-          },
-        },
-        {
-          $count: "total",
-        },
-      ];
+  //     // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+  //     const countPipeline = [
+  //       {
+  //         $match: {
+  //           afora_thn_symbash_kathgoria_eidikothta: symbash_kathgoria_eidikothta,
+  //         },
+  //       },
+  //       {
+  //         $count: "total",
+  //       },
+  //     ];
 
-      const countResults = await StoixeiaSymbaseonModel.aggregate(
-        countPipeline
-      ).exec();
+  //     const countResults = await StoixeiaSymbaseonModel.aggregate(
+  //       countPipeline
+  //     ).exec();
 
-      let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-      let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-      let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-      let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+  //     let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+  //     let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+  //     let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+  //     let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
-      // Aggregation query για την ανάκτηση δεδομένων
-      const queryPipeline = [
-        {
-          $match: {
-            afora_thn_symbash_kathgoria_eidikothta: symbash_kathgoria_eidikothta,
-          },
-        },
-        {
-          $sort: {
-            kodikos: 1,
-          },
-        },
-        {
-          $skip: skipRecords,
-        },
-        {
-          $limit: limitPerPage,
-        },
-      ];
+  //     // Aggregation query για την ανάκτηση δεδομένων
+  //     const queryPipeline = [
+  //       {
+  //         $match: {
+  //           afora_thn_symbash_kathgoria_eidikothta: symbash_kathgoria_eidikothta,
+  //         },
+  //       },
+  //       {
+  //         $sort: {
+  //           kodikos: 1,
+  //         },
+  //       },
+  //       {
+  //         $skip: skipRecords,
+  //       },
+  //       {
+  //         $limit: limitPerPage,
+  //       },
+  //     ];
 
-      const stoixeia = await StoixeiaSymbaseonModel.aggregate(
-        queryPipeline
-      ).exec();
+  //     const stoixeia = await StoixeiaSymbaseonModel.aggregate(
+  //       queryPipeline
+  //     ).exec();
 
-      const responseData = {
-        userPrivileges: userPrivileges ? userPrivileges.privileges : {},
-        locals,
-        current: page, 
-        pages: totalPages,
-        stoixeia 
-      };
+  //     const responseData = {
+  //       userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+  //       locals,
+  //       current: page, 
+  //       pages: totalPages,
+  //       stoixeia 
+  //     };
   
-      res.json(responseData);
-    } catch (error) {
-      console.log(error);
-    }
-  };
+  //     res.json(responseData);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
 
   static searchPostStoixeiaSymbaseon = async (req, res) => {
     const locals = {
@@ -1724,7 +1845,84 @@ class symbaseisController {
       console.error('Σφάλμα κατά την επεξεργασία της αίτησης: ', error);
       res.status(500).json({ message: 'Σφάλμα κατά την επεξεργασία της αίτησης.' });
     }
-  };
+  }
+
+  static listStoixeiaSymbaseon = async (req, res) => {
+  try {
+    // 1) Πάρε έτοιμο 12-ψηφιο κλειδί αν δίνεται, αλλιώς φτιάξ’ το από τα 3 hidden
+    const comboFromQuery =
+      String(req.query.afora_thn_symbash_kathgoria_eidikothta || req.query.kodikosSymbashs_Kathgorias_Eidikothtas || '')
+        .trim();
+
+    const symHidden   = String(req.query.symbash_stathera || '').trim();
+    const kathHidden  = String(req.query.kathgoria_symbashs_stathera || '').trim();
+    const eidikHidden = String(req.query.eidikothta_symbashs_stathera || '').trim();
+
+    const compositeKey =
+      comboFromQuery
+      || (symHidden && kathHidden && eidikHidden
+          ? `${to4(symHidden)}${to4(kathHidden)}${to4(eidikHidden)}`
+          : '');
+
+    const page  = Math.max(1, parseInt(req.query.page, 10)  || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
+    // 2) Αν δεν έχουμε κλειδί, γύρνα άδειο αποτέλεσμα
+    if (!compositeKey) {
+      return res.json({ items: [], page: 1, pages: 1, total: 0 });
+    }
+
+    // 3) Φίλτρο: afora_thn_symbash_kathgoria_eidikothta = "0002xxxx0001"
+    const query = { afora_thn_symbash_kathgoria_eidikothta: compositeKey };
+
+    // 4) Ταξινόμηση: με kodikos (zero-padded)
+    const sort = { kodikos: 1 };
+
+    // 5) Ανάκτηση + total
+    const [docs, total] = await Promise.all([
+      StoixeiaSymbaseonModel
+        .find(query)
+        .select({
+          kodikos: 1,
+          perigrafh: 1,
+          afora_thn_symbash_kathgoria_eidikothta: 1,
+          poso_pososto: 1,
+          arithmos_klimakion: 1,
+          ypologismos_apo_klimakio: 1,
+          bhma_ypologismoy: 1,
+          poso: 1,
+          pososto: 1,
+          typos_ypologismoy: 1,
+        })
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      StoixeiaSymbaseonModel.countDocuments(query),
+    ]);
+
+    // 6) Μορφοποίηση για τον πίνακα
+    const items = (docs || []).map(d => ({
+      id: String(d._id),
+      kodikos: to4(d.kodikos),                       // "0001"
+      perigrafh: d.perigrafh || '',
+      // Τα παρακάτω είναι διαθέσιμα αν θέλεις να τα εμφανίσεις/χρησιμοποιήσεις σε modal:
+      poso_pososto: !!d.poso_pososto,
+      arithmos_klimakion: d.arithmos_klimakion ?? null,
+      ypologismos_apo_klimakio: d.ypologismos_apo_klimakio ?? null,
+      bhma_ypologismoy: d.bhma_ypologismoy ?? null,
+      poso: d.poso ?? null,
+      pososto: d.pososto ?? null,
+      typos_ypologismoy: d.typos_ypologismoy || '',
+    }));
+
+    const pages = Math.max(1, Math.ceil(total / limit));
+    res.json({ items, page, pages, total });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
 
   // ================================== Κλιμάκια Συμβάσεων =======================================
 

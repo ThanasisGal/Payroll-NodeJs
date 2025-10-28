@@ -20,8 +20,10 @@ class nomimoiekprosopoiController {
 
         const sessionCompanyInUse = req.session.companyInUse;
         const sessionUserId       = req.session.userId;
-        const perPage             = Number(process.env.EGGRAFES);
-        const page                = Math.max(parseInt(req.query.page || '1', 10), 1);
+        const basePer = Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
+        const page = Math.max(Number(req.query.page) || 1, 1);
 
         try {
             const company = await CompaniesModel.findOne({ _id: sessionCompanyInUse }).lean();
@@ -140,6 +142,10 @@ class nomimoiekprosopoiController {
                 pages: totalPages,
                 company,
                 nomimoiekprosopoi,
+                perx,                       // <-- για το UI πολλαπλασιαστή
+                basePer,                    // (προαιρετικό, αν το δείχνεις)
+                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.error(error);

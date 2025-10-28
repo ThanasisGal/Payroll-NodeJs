@@ -168,12 +168,11 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/passwords/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-<!-- <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getXrhsh.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script> -->

@@ -7,6 +7,6 @@ module.exports = {
     model: DoyModel,
     options: {
         searchFields: ['kodikos', 'perigrafh'],
-        sort: { perigrafh: 1 },
+        sort: { kodikos: 1 },
     }
 };

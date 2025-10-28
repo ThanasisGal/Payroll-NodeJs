@@ -1,161 +1,232 @@
 <div class="accordion-item">
-  <h2 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFive" aria-expanded="false" aria-controls="panelsStayOpen-collapseFive" style="background-color: #3d4e001e !important; font-size: 1vw; font-weight: 700; color: #525114">
-      Δ.ΥΠ.Α.
-    </button>
-  </h2>
-  <div id="panelsStayOpen-collapseFive" class="accordion-collapse collapse show">
-    <div class="accordion-body">
-      <input type="hidden" name="kodikos_programmatos_dypa" id="kodikos_programmatos_dypa" />
+    <h2 class="accordion-header">
+        <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="true" aria-controls="panelsStayOpen-collapseFour" 
+        tabindex="-1">
+        Δ.ΥΠ.Α.
+        </button>
+    </h2>
+    <div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
+        <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="epidoma_anergias" class="col-form-label label-font-size">
-            Λήψη Επιδόματος Ανεργίας
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidoma_anergias" name="epidoma_anergias" value="" />
-          <label for="epidoma_anergias" id="label-epidoma_anergias" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+        <div class="accordion-body bg-white margin-bottom--0_5rem">
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="col-2 left-align">
+                    <label for="epidoma_anergias" class="col-form-label label-font-size">
+                    Λήψη Επιδόματος Ανεργίας
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidoma_anergias" name="epidoma_anergias" value="" />
+                    <label for="epidoma_anergias" id="label-epidoma_anergias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="dypa" class="col-form-label label-font-size">
-            Υπηρεσία Δ.ΥΠ.Α.
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="dypa" id="dypa">
-          </select>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="dypa" class="col-form-label label-font-size">
+                    Υπηρεσία Δ.ΥΠ.Α.
+                    </label>
+                </div>
 
-      <hr class="hr-style" />
+                <div class="col-3-74">
+                    <input
+                        type="hidden"
+                        name="dypa_stathera"
+                        id="dypa_stathera"
+                        class="form-control input-contents"
+                        value="<%= safe("dypa_stathera") %>"
+                    />
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="arithmos_deltioy_anergias" class="col-form-label label-font-size">
-            Αριθμός Δελτίου Ανεργίας
-          </label>
-        </div>
-        <div class="col-2">
-          <input type="text" name="arithmos_deltioy_anergias" id="arithmos_deltioy_anergias" class="form-control input-contents" value="" />
-        </div>
+                    <select
+                        id="dypa"
+                        name="dypa"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Υπηρεσία Δ.ΥΠ.Α."
+                        data-api="/api/dropdown/ergazomenoi/dypa"
+                        single
+                        data-target-input=<%= `dypa_stathera` %>
+                        data-preselect=<%= `dypa_stathera` %>
+                        data-preload-all="true"
+                        data-skip-autoload="false"
+                        data-pad-length="6"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Υπηρεσίας Δ.ΥΠ.Α.">
+                    </select>
+                </div>
+            </div>
 
-        <div class="col-2"></div>
+            <hr class="hr-style" />
 
-        <div class="col-2 left-align">
-          <label for="systatiko_shmeioma" class="col-form-label label-font-size">
-            Τοποθέτηση με Συστατικό Σημείωμα
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="systatiko_shmeioma" name="systatiko_shmeioma" value="" />
-          <label for="systatiko_shmeioma" id="label-systatiko_shmeioma" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-      </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="arithmos_deltioy_anergias" class="col-form-label label-font-size">
+                    Αριθμός Δελτίου Ανεργίας
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="arithmos_deltioy_anergias" id="arithmos_deltioy_anergias" class="form-control input-contents" value="" />
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="programma_dypa" class="col-form-label label-font-size">
-            Πρόγραμμα Δ.ΥΠ.Α.
-          </label>
-        </div>
-        <div class="col-9-5">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="programma_dypa" id="programma_dypa">
-          </select>
-        </div>
-        <a 
-          id="gotoProgrammaDypa"
-          href="" 
-          target="_blank"
-          role="button" 
-          data-bs-toggle="tooltip" title="Μετάβαση στη σελίδα του προγράμματος" data-bs-placement="bottom" style="font-size: 0.8vw;"
-          class="btn rounded-4 mt-2 col-0-3" style="border: 0;">
-          <i class="bi bi-send" style="color: #004600; margin-left: -0.4rem;"></i> 
-        </a>
-      </div>
+                <div class="col-2"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="egkritikh_apofash_dypa" class="col-form-label label-font-size">
-            Εγκριτική Απόφαση Δ.ΥΠ.Α.
-          </label>
-        </div>
-        <div class="col-4">
-          <input type="text" name="egkritikh_apofash_dypa" id="egkritikh_apofash_dypa" class="form-control input-contents" value="" />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="systatiko_shmeioma" class="col-form-label label-font-size">
+                    Τοποθέτηση με Συστατικό Σημείωμα
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="systatiko_shmeioma" name="systatiko_shmeioma" value="" />
+                    <label for="systatiko_shmeioma" id="label-systatiko_shmeioma" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="hmeromhnia_enarxhs_programmatos" class="col-form-label label-font-size">
-            Ημ/νία Έναρξης Προγ/ματος
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="date" name="hmeromhnia_enarxhs_programmatos" id="hmeromhnia_enarxhs_programmatos" class="date-control" value="" />
-        </div>
+            <div class="height-vh-0_2"></div>
 
-        <div class="col-2-5"></div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="programma_dypa" class="col-form-label label-font-size">
+                    Πρόγραμμα Δ.ΥΠ.Α.
+                    </label>
+                </div>
 
-        <div class="col-2 left-align">
-          <label for="hmeromhnia_lhxhs_programmatos" class="col-form-label label-font-size">
-            Ημ/νία Λήξης Προγράμματος
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="date" name="hmeromhnia_lhxhs_programmatos" id="hmeromhnia_lhxhs_programmatos" class="date-control" value="" />
-        </div>
-      </div>
+                <div class="col-9-4">
+                    <input
+                        type="hidden"
+                        name="programma_dypa_stathera"
+                        id="programma_dypa_stathera"
+                        class="form-control input-contents"
+                        value="<%= safe("programma_dypa_stathera") %>"
+                    />
 
-      <hr class="hr-style" />
+                    <input
+                        type="hidden"
+                        name="link_programma_dypa_stathera"
+                        id="link_programma_dypa_stathera"
+                        class="form-control input-contents"
+                        value=""
+                    />
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="antikatastash_ergazomenoy" class="col-form-label label-font-size field-required mt-1">
-            Η Τοποθέτηση Αφορά ΑΝΤΙΚΑΤΑΣΤΑΣΗ Ωφελούμενου του Ιδίου Προγράμματος
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="antikatastash_ergazomenoy" name="antikatastash_ergazomenoy" value="" />
-          <label for="antikatastash_ergazomenoy" id="label-antikatastash_ergazomenoy" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+                    <select
+                        id="programma_dypa"
+                        name="programma_dypa"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Προγράμματα Δ.ΥΠ.Α."
+                        data-api="/api/dropdown/ergazomenoi/programma_dypa"
+                        single
+                        data-target-input=<%= `programma_dypa_stathera` %>
+                        data-preselect=<%= `programma_dypa_stathera` %>
+                        data-preload-all="true"
+                        data-skip-autoload="false"
+                        data-pad-length="11"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Προγραμμάτων Δ.ΥΠ.Α.">
+                    </select>
+                </div>
 
-        <div class="col-3"></div>
+                <a 
+                    id="gotoProgrammaDypa"
+                    href=""
+                    target="_blank"
+                    role="button"
+                    data-bs-toggle="tooltip"
+                    title="Άνοιγμα νέας καρτέλας στον browser και Μετάβαση στη σελίδα του προγράμματος της Δ.ΥΠ.Α."
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="14vw"
+                    class="btn rounded-4 mt-1 col-0-56 border-0 font-size-vw-0_875 right-align">
+                    <i class="bi bi-link-45deg font-size-vw-1_1 c006900"></i>
+                </a>
+            </div>
 
-        <div class="col-2 left-align">
-          <label for="afm_antikatastath" class="col-form-label label-font-size" style="color: #000000; margin-top: -1.8rem;">
-            ΑΦΜ Εργαζόμενου που Αντικαταστάθηκε
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="text" name="afm_antikatastath" id="afm_antikatastath" class="form-control input-contents" style="margin-top: -1.8rem;" value="" maxlength="9" pattern="[0-9]{1,}" />
-        </div>
-      </div>
+            <div class="height-vh-0_2"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-6"></div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="egkritikh_apofash_dypa" class="col-form-label label-font-size">
+                    Εγκριτική Απόφαση Δ.ΥΠ.Α.
+                    </label>
+                </div>
 
-        <div class="col-2 left-align" style="margin-top: -1rem;">
-          <label for="amka_antikatastath" class="col-form-label label-font-size" style="color: #000000;">
-            ΑΜΚΑ Εργαζόμενου που Αντικαταστάθηκε
-          </label>
-        </div>
-        <div class="col-1-5">
-          <input type="text" name="amka_antikatastath" id="amka_antikatastath" class="form-control input-contents amka-input" value="" maxlength="11" pattern="[0-9]{1,}" style="margin-top: -2rem;" />
-        </div>
-      </div>
+                <div class="col-4">
+                    <input type="text" name="egkritikh_apofash_dypa" id="egkritikh_apofash_dypa" class="form-control input-contents" value="" />
+                </div>
+            </div>
 
-      <hr class="hr-style" />
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_enarxhs_programmatos" class="col-form-label label-font-size">
+                    Ημ/νία Έναρξης Προγ/ματος
+                    </label>
+                </div>
+                
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_enarxhs_programmatos" id="hmeromhnia_enarxhs_programmatos" class="date-control" value="" />
+                </div>
+
+                <div class="col-2-5"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_lhxhs_programmatos" class="col-form-label label-font-size">
+                    Ημ/νία Λήξης Προγράμματος
+                    </label>
+                </div>
+    
+                <div class="col-1-5-5">
+                    <input type="date" name="hmeromhnia_lhxhs_programmatos" id="hmeromhnia_lhxhs_programmatos" class="date-control" value="" />
+                </div>
+            </div>
+
+            <hr class="hr-style" />
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="antikatastash_ergazomenoy" class="col-form-label label-font-size field-required mt-1">
+                    Η Τοποθέτηση Αφορά ΑΝΤΙΚΑΤΑΣΤΑΣΗ Ωφελούμενου του Ιδίου Προγράμματος
+                    </label>
+                </div>
+                
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="antikatastash_ergazomenoy" name="antikatastash_ergazomenoy" value="" />
+                    <label for="antikatastash_ergazomenoy" id="label-antikatastash_ergazomenoy" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="afm_antikatastath" class="col-form-label label-font-size" style="color: #000000; margin-top: -1.8rem;">
+                    ΑΦΜ Εργαζόμενου που Αντικαταστάθηκε
+                    </label>
+                </div>
+                
+                <div class="col-1-5-5">
+                    <input type="text" name="afm_antikatastath" id="afm_antikatastath" class="form-control input-contents" style="margin-top: -1.8rem;" value="" maxlength="9" pattern="[0-9]{1,}" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-6"></div>
+
+                <div class="col-2 left-align" style="margin-top: -1rem;">
+                    <label for="amka_antikatastath" class="col-form-label label-font-size cblack">
+                    ΑΜΚΑ Εργαζόμενου που Αντικαταστάθηκε
+                    </label>
+                </div>
+          
+                <div class="col-1-5-5">
+                    <input type="text" name="amka_antikatastath" id="amka_antikatastath" class="form-control input-contents amka-input" value="" maxlength="11" pattern="[0-9]{1,}" style="margin-top: -2rem;" />
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 </div>

@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Βάσεις URLs
     const baseSelect = "/companies/genikastoixeia/select";
     const baseEdit   = "/companies/genikastoixeia/edit";
-    const baseDelete = "/companies/genikastoixeia/delete"; // <-- DELETE route που έχεις
+    const baseDelete = "/companies/genikastoixeia/delete";
 
     // Αν λείπει data-allowed θεωρούμε επιτρεπτό
     const isAllowed = (el) =>

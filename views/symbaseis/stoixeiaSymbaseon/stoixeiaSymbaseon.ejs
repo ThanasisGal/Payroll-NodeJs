@@ -1,4 +1,228 @@
-<div
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom bg-hero-cdn">
+    <form
+        name="StoixeiaSymbaseon"
+        class="nav col-12 col-md-auto flex-end mb-2 ms-auto mb-md-0"
+        role="search"
+        method="POST"
+        action="/symbaseis/stoixeiaSymbaseon/search">
+
+        <%- include('../../partials/_csrfField') %>
+
+        <div class="input-group">
+            <span><i class="bi bi-search bi-search-swing fsvw-1_3 fw600 cgreen"></i>&nbsp;</span>
+            <input
+                type="search"
+                name="searchTerm"
+                id="searchInput"
+                class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
+                placeholder="Αναζήτηση... ( πατείστε Enter )"
+                aria-label="Search" />
+        </div>
+    </form>
+</div>
+
+<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-4 overflow-hidden">
+
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+    <input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
+
+    <div class="card-header p-0 height-rem-3_5">
+        <label class="text-center w-100 headers-content mt-2">Διαχείριση Στοιχείων Συμβάσεων</label>
+    </div>
+
+    <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_5rem">
+        <div class="col-2 left-align">
+            <label for="symbash" class="col-form-label label-font-size field-required">
+            Επιλέξτε Σύμβαση
+            </label>
+        </div>
+
+        <input
+            type="hidden"
+            name="symbash_stathera"
+            id="symbash_stathera"
+            class="form-control input-contents"
+            value="<%= safe("symbash_stathera") %>"
+        />
+
+        <div class="col-9-5">
+            <select
+                id="symbash"
+                name="symbash"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                aria-label="Συμβάσεις"
+                data-api="/api/dropdown/symbaseis/symbash"
+                single
+                data-target-input=<%= `symbash_stathera` %>
+                data-preselect-value=<%= `symbash_stathera` %>
+                data-preload-all="true"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Σύμβασης">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem">
+        <div class="col-2 left-align">
+            <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
+            Επιλέξτε Κατηγορία
+            </label>
+        </div>
+
+        <input
+            type="hidden"
+            name="kathgoria_symbashs_stathera"
+            id="kathgoria_symbashs_stathera"
+            class="form-control input-contents"
+            value="<%= safe("kathgoria_symbashs_stathera") %>"
+        />
+
+        <div class="col-9-5">
+            <select
+                id="kathgoria_symbashs"
+                name="kathgoria_symbashs"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                aria-label="Κατηγορίες Συμβάσεων"
+                data-api="/api/dropdown/symbaseis/kathgoria_symbashs"
+                single
+                data-target-input=<%= `kathgoria_symbashs_stathera` %>
+                data-preselect-value=<%= `kathgoria_symbashs_stathera` %>
+                data-preload-all="true"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Κατηγορίας Σύμβασης">
+            </select>
+        </div>
+
+    <div class="row form-group g-1 align-items-center margin-top-0_1rem">
+        <div class="col-2 left-align">
+            <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
+            Επιλέξτε Ειδικότητα
+            </label>
+        </div>
+
+        <input
+            type="hidden"
+            name="eidikothta_symbashs_stathera"
+            id="eidikothta_symbashs_stathera"
+            class="form-control input-contents"
+            value="<%= safe("eidikothta_symbashs_stathera") %>"
+        />
+
+        <div class="col-9-54">
+            <select
+                id="eidikothta_symbashs"
+                name="eidikothta_symbashs"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                aria-label="Ειδικότητα Συμβάσεων"
+                data-api="/api/dropdown/symbaseis/eidikothta_symbashs"
+                single
+                data-target-input=<%= `eidikothta_symbashs_stathera` %>
+                data-preselect-value=<%= `eidikothta_symbashs_stathera` %>
+                data-preload-all="true"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Ειδικότητας Σύμβασης">
+            </select>
+        </div>
+
+        <div>
+            <table class="table table-striped table-bordered table-sm table-hover mb-0 w-100 margin-left--0_5rem" id="myTableHeader">
+                <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
+                    <tr class="color-brown">
+                        <th scope="col" class="col-1">Κωδ.<i class="sort-icon bi"></i></th>
+                        <th scope="col" class="col-11">Περιγραφή Στοιχείων Σύμβασης<i class="sort-icon bi"></i></th>
+                    </tr>
+                </thead>
+            </table>
+        <div>
+    </div>
+
+    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-48 bg-white margin-left--0_5rem margin-right-0_5rem">
+		<table class="table table-striped table-bordered table-sm table-hover w-100" id="myTable">
+			<tbody>
+			</tbody>
+		</table>
+	</div>
+
+	
+    <div class="card-footer cardFooter margin-left--1_5rem">
+        <div class="d-inline-block d-flex cardFooter01">
+            <div class="d-flex cardFooter02">
+                <a 
+                    id="add-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" 
+                    title="Προσθήκη νέου Στοιχείου"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-plus-circle"></i> Προσθήκη
+                </a>
+			
+                <a 
+                    id="edit-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" 
+                    title="Εμφάνιση - Διόρθωση του επιλεγμένου Στοιχείου"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+                </a>			
+
+                <a 
+                    id="delete-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" title="Διαγραφή του επιλεγμένου Στοιχείου"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-trash"></i> Διαγραφή
+                </a>
+	
+                <a 
+                    id="back-btn"
+                    href="/mainapp"
+                    role="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="10vw"
+                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
+                    <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+    		</div>
+
+            <div class="d-flex width-percent-15"></div>
+
+            <nav class="col-2 margin-top--0_3rem" aria-label="Dashboard Pagination">
+              <ul id="stoixeiaSymbaseon-pagination" class="pagination pagination-xsm justify-content-end mt-2"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- <div
   class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;">
 
   <form
@@ -17,9 +241,7 @@
         type="search"
         name="searchTerm"
         id="searchInput"
-        class="form-control rounded-end-2 ms-auto"
-        style="font-size: 1.1vw !important;"
-        style="font-size: 1.1vw !important;"
+        class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
         placeholder="Αναζήτηση... ( πατείστε Enter )"
         aria-label="Search"
       />
@@ -123,16 +345,130 @@
       </div>
     </div>
   </div>
-</div>
+</div> -->
 
-<script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getXrhsh.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/searchFormSubmit.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/common/clearSelectsSymbaseon.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/symbaseis/stoixeiaSymbaseon/loadDropdowns_StoixeiaSymbaseon.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/symbaseis/stoixeiaSymbaseon/selectRowInTable.js"></script>
-<!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+  window.RUNTIME_ENV = "<%= NODE_ENV %>";
+  window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
+</script>
+
+<!-- Common helpers (ίδια όπως στις Ειδικότητες) -->
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+
+<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
+<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/stoixeiaSymbaseon/stoixeia-list<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/stoixeiaSymbaseon/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<!-- Έλεγχος submit και σύνθεση 12-ψηφιου στον path -->
+<script nonce="<%= nonce %>">
+  document.addEventListener('DOMContentLoaded', function () {
+    const form       = document.querySelector('form[name="StoixeiaSymbaseon"]');
+
+    const symSelect  = document.getElementById('symbash');
+    const symHidden  = document.getElementById('symbash_stathera');
+
+    const katSelect  = document.getElementById('kathgoria_symbashs');
+    const katHidden  = document.getElementById('kathgoria_symbashs_stathera');
+
+    const eidSelect  = document.getElementById('eidikothta_symbashs');
+    const eidHidden  = document.getElementById('eidikothta_symbashs_stathera');
+
+    const combo3Hidden = document.getElementById('kodikosSymbashs_Kathgorias_Eidikothtas');
+
+    const to4 = (v) => {
+      const d = String(v ?? '').replace(/\D/g, '');
+      if (!d) return '';
+      const n = parseInt(d, 10);
+      return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+    };
+
+    form.addEventListener('submit', function (e) {
+      const sym = (symHidden?.value || symSelect?.value || '').trim();
+      if (!sym) {
+        e.preventDefault();
+        Swal.fire({
+          backdrop: false,
+          allowOutsideClick: false,
+          icon: 'info',
+          title: 'Δεν έχει επιλεγεί σύμβαση',
+          text: 'Παρακαλώ επιλέξτε σύμβαση πριν την αναζήτηση.',
+          showConfirmButton: true,
+          confirmButtonText: 'Κλείσιμο',
+          customClass: {
+            confirmButton: 'class-info custom-confirm-button custom-swal-button',
+            title: 'custom-title',
+            popup: 'custom-swal-popup',
+          },
+        }).then(() => { try { symSelect?.focus(); } catch (_) {} });
+        return false;
+      }
+
+      const kat = (katHidden?.value || katSelect?.value || '').trim();
+      if (!kat) {
+        e.preventDefault();
+        Swal.fire({
+          backdrop: false,
+          allowOutsideClick: false,
+          icon: 'info',
+          title: 'Δεν έχει επιλεγεί κατηγορία',
+          text: 'Παρακαλώ επιλέξτε κατηγορία σύμβασης πριν την αναζήτηση.',
+          showConfirmButton: true,
+          confirmButtonText: 'Κλείσιμο',
+          customClass: {
+            confirmButton: 'class-info custom-confirm-button custom-swal-button',
+            title: 'custom-title',
+            popup: 'custom-swal-popup',
+          },
+        }).then(() => { try { katSelect?.focus(); } catch (_) {} });
+        return false;
+      }
+
+      const eid = (eidHidden?.value || eidSelect?.value || '').trim();
+      if (!eid) {
+        e.preventDefault();
+        Swal.fire({
+          backdrop: false,
+          allowOutsideClick: false,
+          icon: 'info',
+          title: 'Δεν έχει επιλεγεί ειδικότητα',
+          text: 'Παρακαλώ επιλέξτε ειδικότητα σύμβασης πριν την αναζήτηση.',
+          showConfirmButton: true,
+          confirmButtonText: 'Κλείσιμο',
+          customClass: {
+            confirmButton: 'class-info custom-confirm-button custom-swal-button',
+            title: 'custom-title',
+            popup: 'custom-swal-popup',
+          },
+        }).then(() => { try { eidSelect?.focus(); } catch (_) {} });
+        return false;
+      }
+
+      // populate hidden & compose composite key
+      if (symHidden) symHidden.value = sym;
+      if (katHidden) katHidden.value = kat;
+      if (eidHidden) eidHidden.value = eid;
+
+      const combo = `${to4(sym)}${to4(kat)}${to4(eid)}`;
+      if (combo3Hidden) combo3Hidden.value = combo;
+
+      // path με το 12-ψηφιο
+      this.action = `/symbaseis/stoixeiaSymbaseon/search/${encodeURIComponent(combo)}`;
+    });
+  });
+</script>
+
+
+
+

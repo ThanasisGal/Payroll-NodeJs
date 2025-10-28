@@ -21,8 +21,10 @@ class passwordsController {
 
         const sessionCompanyInUse = req.session.companyInUse;
         const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const basePer = Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
+        const page = Math.max(Number(req.query.page) || 1, 1);
 
         try {
             // Άντληση στοιχείων εταιρείας
@@ -90,6 +92,10 @@ class passwordsController {
                 pages: totalPages,
                 company,
                 passwords,
+                perx,                       // <-- για το UI πολλαπλασιαστή
+                basePer,                    // (προαιρετικό, αν το δείχνεις)
+                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.log(error);

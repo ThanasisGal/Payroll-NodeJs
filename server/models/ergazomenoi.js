@@ -116,6 +116,7 @@ const { Schema: _Schema, model } = require("mongoose");
         pososto_apasxolhshs_kk3: { type: Number, default: 0 },
         kentro_kostoys_4: { type: String, trim: true },
         pososto_apasxolhshs_kk4: { type: Number, default: 0 },
+        kodikos_forologikhs_klimakas: { type: String, trim: true },
         symbash: { type: String, trim: true },
         kathgoria_symbashs: { type: String, trim: true },
         eidikothta_symbashs: { type: String, trim: true },

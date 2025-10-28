@@ -198,8 +198,8 @@ router.delete("/symbaseis/symbaseis/delete/:id", checkAuth, symbaseisController.
 router.get("/symbaseis/kathgories", checkAuth, symbaseisController.mainKathgoriesSymbaseonForm);
 router.get("/symbaseis/kathgories/add/:kodikosSymbashs", checkAuth, symbaseisController.addKathgoriesSymbaseonForm);
 router.post("/symbaseis/kathgories/add", symbaseisController.postKathgoriesSymbaseonForm);
-router.get("/symbaseis/kathgories/search", checkAuth, symbaseisController.searchGetKathgoriesSymbaseon);
-router.post("/symbaseis/kathgories/search", checkAuth, symbaseisController.searchPostKathgoriesSymbaseon);
+router.get("/symbaseis/kathgories/search/", checkAuth, symbaseisController.searchGetKathgoriesSymbaseon);
+router.post("/symbaseis/kathgories/search/:symbash_stathera", checkAuth, symbaseisController.searchPostKathgoriesSymbaseon);
 router.get("/symbaseis/kathgories/edit/:id", checkAuth, symbaseisController.editKathgoriesSymbaseonForm);
 router.delete("/symbaseis/kathgories/delete/:id", checkAuth, symbaseisController.deleteKathgoriesSymbaseon);
 
@@ -333,7 +333,7 @@ router.get("/api/kpkEfkaOtanYparxeiEpa", genikaAPIsController.getKpk);
 router.get("/api/antistoixishKadEidikothtesEfka", genikaAPIsController.getEidikothtesEfka);
 router.get("/api/antistoixishKadKpkEfka", genikaAPIsController.getKpkEfka);
 router.get("/api/epaEfka", genikaAPIsController.getEidikesPeriptoseisEfka);
-router.get("/api/antistoixishEpaKpkEfka", genikaAPIsController.getKpkBaseiEpaEfka);
+// router.get("/api/antistoixishEpaKpkEfka", genikaAPIsController.getKpkBaseiEpaEfka);
 router.get("/api/getKpkEfkaReset", genikaAPIsController.getKpkEfka);
 router.get("/api/programmataDypa", genikaAPIsController.getProgrammataDypa);
 router.get("/api/populateKentraKostoys", genikaAPIsController.getKentraKostoys);
@@ -342,15 +342,15 @@ router.get("/api/symbaseis", genikaAPIsController.getSymbaseis);
 router.post("/api/symbaseis/update/:symbaseisId", symbaseisController.postSymbaseisUpdate);
 
 router.get("/api/kathgoriesSymbaseon/:symbash", genikaAPIsController.getKathgoriesSymbaseon);
-router.get("/api/symbaseis/kathgories/:symbashId", symbaseisController.loadKathgoriesSymbaseonForm);
+// router.get("/api/symbaseis/kathgories/:symbashId", symbaseisController.loadKathgoriesSymbaseonForm);
 router.post("/api/kathgoriesSymbaseon/update/:kathgoriesId", symbaseisController.postKathgoriesSymbaseonUpdate);
 
 router.get("/api/eidikothtesSymbaseon/:symbash_kathgoria", genikaAPIsController.getEidikothtesSymbaseon);
-router.get("/api/symbaseis/eidikothtes/:symbash_kathgoria", symbaseisController.loadEidikothtesSymbaseonForm);
+// router.get("/api/symbaseis/eidikothtes/:symbash_kathgoria", symbaseisController.loadEidikothtesSymbaseonForm);
 router.post("/api/eidikothtesSymbaseon/update/:eidikothtesId", symbaseisController.postEidikothtesSymbaseonUpdate);
 
 router.get("/api/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", genikaAPIsController.getStoixeiaSymbaseon);
-router.get("/api/symbaseis/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", symbaseisController.loadStoixeiaSymbaseonForm);
+// router.get("/api/symbaseis/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", symbaseisController.loadStoixeiaSymbaseonForm);
 router.post("/api/stoixeiaSymbaseon/update/:stoixeiaSymbaseonId", symbaseisController.postStoixeiaSymbaseonUpdate);
 
 router.post("/api/apodoxesErgazomenon", symbaseisController.calcApodoxesErgazomenon);

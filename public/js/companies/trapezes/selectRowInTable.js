@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     };
-
+ 
     // Επιλογή/αποεπιλογή γραμμών (μία ενεργή)
     rows.forEach((row) => {
         row.addEventListener("click", function () {

@@ -11,17 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const nomosDropdown = document.getElementById("nomos");
   const dhmosDropdown = document.getElementById("dhmos");
   const polhDropdown = document.getElementById("polh");
-  const typoiTaytothtonDropdown = document.getElementById("typos_taytothtas");
-  const yphkoothtesDropdown = document.getElementById("yphkoothta");
   const eidikesKathgoriesDropdown = document.getElementById("eidikh_kathgoria_ergazomenoy");
-  const oikogeneiakhKatastashDropdown = document.getElementById("oikogeneiakh_katastash");
-  const trapezesDropdown = document.getElementById("trapeza");
-  const kathestosApasxolhshsDropdown = document.getElementById("kathestos_apasxolhshs");
-  const sxeseisErgasiasDropdown = document.getElementById("sxesh_ergasias");
-  const syggenikesSxeseisDropdown = document.getElementById("syggenikh_sxesh");
-  const theseisEythynhsDropdown = document.getElementById("thesh_eythynhs");
-  const eidikesPeriptoseisDropdown = document.getElementById("eidikh_periptosh");
-  const apasxolhseisBaseiSymbashsDropdown = document.getElementById("apasxolhsh_basei_symbashs");
   const tmhmataDropdown = document.getElementById("tmhma");
   const ekpaideytikaEpipedaDropdown = document.getElementById("ekpaideytiko_epipedo");
   const eidikothtesDropdown = document.getElementById("eidikothta");
@@ -134,83 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
     dropdown.appendChild(emptyOption);
   };
 
-  // Λειτουργία για φόρτωση δεδομένων σε dropdown
-  const loadDoyDataToDropdown = async (dropdown, data) => {
-    dropdown.innerHTML = ""; // Καθαρισμός του dropdown
-    addEmptyDoyOption(dropdown); // Προσθήκη κενής επιλογής
-    data.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.value;
-      option.textContent = item.value.padEnd(8, '\u00A0') + item.text;
-      dropdown.appendChild(option);
-    });
-  };
-
   // Αίτημα προς τον server για να πάρει τα δεδομένα
-  const fetchDoyDropdownData = async () => {
-    try {
-      const response = await fetch("/api/populatedoy");
-      const dropdownData = await response.json();
-      // Φόρτωση δεδομένων στα dropdowns
-      loadDoyDataToDropdown(doyDropdown, dropdownData.doy);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // Κλήση της συνάρτησης για να ανακτήσει τα δεδομένα
-  fetchDoyDropdownData();
-
-  const loadtypoiTaytothton = async () => {
-    typoiTaytothtonDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/typoiTaytothton");
-      const data = await response.json();
-      data.forEach((typosTaytothtas) => {
-        const option = new Option(
-          typosTaytothtas.perigrafh,
-          typosTaytothtas.kodikos
-        );
-        typoiTaytothtonDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadYphkoothtes = async () => {
-    yphkoothtesDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/yphkoothtes");
-      const data = await response.json();
-      data.forEach((yphkoothta) => {
-        const option = new Option(
-          yphkoothta.perigrafh,
-          yphkoothta.kodikos
-        );
-        yphkoothtesDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadEidikesKathgories = async () => {
-    eidikesKathgoriesDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/eidikesKathgories");
-      const data = await response.json();
-      data.forEach((eidikhKathgoria) => {
-        const option = new Option(
-          eidikhKathgoria.perigrafh,
-          eidikhKathgoria.kodikos
-        );
-        eidikesKathgoriesDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   eidikesKathgoriesDropdown.addEventListener('change', async (event) => {
     const selectedOption = event.target.value;
@@ -245,142 +159,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
   
-  const loadOikogeneiakhKatastash = async () => {
-    oikogeneiakhKatastashDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/oikogeneiakhKatastash");
-      const data = await response.json();
-      data.forEach((oikogeneiakhKatastash) => {
-        const option = new Option(
-          oikogeneiakhKatastash.perigrafh,
-          oikogeneiakhKatastash.kodikos
-        );
-        oikogeneiakhKatastashDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadTrapezes = async () => {
-    trapezesDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/trapezes");
-      const data = await response.json();
-      data.forEach((trapeza) => {
-        const option = new Option(
-          trapeza.perigrafh,
-          trapeza.kodikos_dias
-        );
-        trapezesDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadKathestosApasxolhshs = async () => {
-    kathestosApasxolhshsDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/kathestosApasxolhshs");
-      const data = await response.json();
-      data.forEach((kathestos) => {
-        const option = new Option(
-          kathestos.perigrafh,
-          kathestos.kodikos
-        );
-        kathestosApasxolhshsDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadSxeseisErgasias = async () => {
-    sxeseisErgasiasDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/sxeseisErgasias");
-      const data = await response.json();
-      data.forEach((sxesh) => {
-        const option = new Option(
-          sxesh.perigrafh,
-          sxesh.kodikos
-        );
-        sxeseisErgasiasDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadSyggenikesSxeseis = async () => {
-    syggenikesSxeseisDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/syggenikesSxeseis");
-      const data = await response.json();
-      data.forEach((syggenikhSxesh) => {
-        const option = new Option(
-          syggenikhSxesh.perigrafh,
-          syggenikhSxesh.kodikos
-        );
-        syggenikesSxeseisDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadTheseisEythynhs = async () => {
-    try {
-      const response = await fetch("/api/theshEythynhs");
-      const data = await response.json();
-      data.forEach((theshEythynhs) => {
-        const option = new Option(
-          theshEythynhs.perigrafh,
-          theshEythynhs.kodikos
-        );
-        theseisEythynhsDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadEidikesPeriptoseis = async () => {
-    eidikesPeriptoseisDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/eidikhPeriptosh");
-      const data = await response.json();
-      data.forEach((eidikhPeriptosh) => {
-        const option = new Option(
-          eidikhPeriptosh.perigrafh,
-          eidikhPeriptosh.kodikos
-        );
-        eidikesPeriptoseisDropdown.appendChild(option);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const loadApasxolhseisBaseiSymbashs = async () => {
-    apasxolhseisBaseiSymbashsDropdown.innerHTML = '<option value="" selected></option>';
-    try {
-      const response = await fetch("/api/apasxolhseisBaseiSymbashs");
-      const data = await response.json();
-      data.forEach((apasxolhshBaseiSymbashs) => {
-        const option = new Option(
-          apasxolhshBaseiSymbashs.perigrafh,
-          apasxolhshBaseiSymbashs.kodikos
-        );
-        apasxolhseisBaseiSymbashsDropdown.appendChild(option);
-      });
-
-      } catch (error) {
-      console.error(error);
-    }
-  };
-
   // Προσθήκη κενής επιλογής στο dropdown
   const addEmptyOption = (dropdown) => {
     const emptyOption = document.createElement("option");
@@ -389,30 +167,30 @@ document.addEventListener("DOMContentLoaded", function () {
     dropdown.appendChild(emptyOption);
   };
 
-  const loadAsfalistikesKlaseisToDropdown = (dropdown, data) => {
-    dropdown.innerHTML = ""; // Καθαρισμός του dropdown
-    addEmptyOption(dropdown); // Προσθήκη κενής επιλογής
+  // const loadAsfalistikesKlaseisToDropdown = (dropdown, data) => {
+  //   dropdown.innerHTML = ""; // Καθαρισμός του dropdown
+  //   addEmptyOption(dropdown); // Προσθήκη κενής επιλογής
 
-    data.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.value; // Συνδυασμός του etos και kodikos για το value του option
-      // Εξασφάλισε ότι η perigrafh είναι συμβολοσειρά και όχι undefined
-      option.textContent = item.text;
-      dropdown.appendChild(option);
-    });
-  };
+  //   data.forEach((item) => {
+  //     const option = document.createElement("option");
+  //     option.value = item.value; // Συνδυασμός του etos και kodikos για το value του option
+  //     // Εξασφάλισε ότι η perigrafh είναι συμβολοσειρά και όχι undefined
+  //     option.textContent = item.text;
+  //     dropdown.appendChild(option);
+  //   });
+  // };
 
-  const fetchDropdownDataAsfalistikesKlaseis = async () => {
-    try {
-      const response = await fetch("/api/asfalistikesKlaseis");
-      const dropdownData = await response.json();
-      // Φόρτωση δεδομένων στο dropdown
-      const asfalistikhKlashDropdown = document.getElementById("asfalistikh_klash");
-      loadAsfalistikesKlaseisToDropdown(asfalistikhKlashDropdown, dropdownData.asfalistikh_klash);
-    } catch (error) {
-      console.error('Σφάλμα κατά τη φόρτωση δεδομένων: ', error);
-    }
-  };
+  // const fetchDropdownDataAsfalistikesKlaseis = async () => {
+  //   try {
+  //     const response = await fetch("/api/asfalistikesKlaseis");
+  //     const dropdownData = await response.json();
+  //     // Φόρτωση δεδομένων στο dropdown
+  //     const asfalistikhKlashDropdown = document.getElementById("asfalistikh_klash");
+  //     loadAsfalistikesKlaseisToDropdown(asfalistikhKlashDropdown, dropdownData.asfalistikh_klash);
+  //   } catch (error) {
+  //     console.error('Σφάλμα κατά τη φόρτωση δεδομένων: ', error);
+  //   }
+  // };
 
   const loadTmhmata = async () => {
     tmhmataDropdown.innerHTML = '<option value="" selected></option>';
@@ -591,14 +369,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   epaEfkaDropdown.addEventListener("change", async () => {
     const selectedEpaEfka = epaEfkaDropdown.value;
-    const selectedKpkEfka = document.getElementById("kpk_efka_basei_symbashs").value;
-    // document.getElementById("tmp_kpk_efka_basei_symbashs").value = document.getElementById("kpk_efka_basei_symbashs").value
-    document.getElementById("tmp_kpk_efka_basei_symbashs").value = selectedKpkEfka;
+    const selectedKpkEfka = document.getElementById("kpk_efka_stathera").value;
+    document.getElementById("tmp_kpk_efka_stathera").value = selectedKpkEfka;
     kpkEfkaDropdown.innerHTML = '<option value="" selected></option>';
 
     if (selectedEpaEfka) {
       try {
-        const response = await fetch( `/api/antistoixishEpaKpkEfka?kodikos_eidikhs_periptoshs=${selectedEpaEfka}&kodikos_kpk_apo=${selectedKpkEfka}` );
+        const response = await fetch( `/api/antistoixishEpaKpk?kodikos_eidikhs_periptoshs=${selectedEpaEfka}&kodikos_kpk_apo=${selectedKpkEfka}` );
         const data = await response.json();
         
         let textToConvert
@@ -610,7 +387,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (data.length === 1) {
           kpkEfkaDropdown.value = data[0].kodikos;
-          document.getElementById("tmp_kpk_efka_basei_symbashs").value = data[0].kodikos;
+          document.getElementById("tmp_kpk_efka_stathera").value = data[0].kodikos;
         }
 
         kpkEfkaDropdown.disabled = false;
@@ -950,35 +727,23 @@ document.addEventListener("DOMContentLoaded", function () {
   //   }
   // };
     
-  loadPerifereies();
-  loadtypoiTaytothton();
-  loadYphkoothtes();
-  loadEidikesKathgories();
-  loadOikogeneiakhKatastash();
-  loadTrapezes();
-  loadKathestosApasxolhshs();
-  loadSxeseisErgasias();
-  loadSyggenikesSxeseis();
-  loadTheseisEythynhs();
-  loadEidikesPeriptoseis();
-  loadApasxolhseisBaseiSymbashs();
-  fetchDropdownDataAsfalistikesKlaseis();
-  loadTmhmata();
-  loadEkpaideytikaEpipeda();
-  loadEidikothtes();
-  loadTypoiErgazomenon();
-  loadYpokatasthmata();
+  // loadPerifereies();
+  // loadTmhmata();
+  // loadEkpaideytikaEpipeda();
+  // loadEidikothtes();
+  // loadTypoiErgazomenon();
+  // loadYpokatasthmata();
   loadKadEfka();
-  loadEpaEfka();
-  loadDypa();
-  loadProgrammataDypa();
-  fetchDropdownDataKentraKostoys();
-  loadSymbaseis();
-  loadAdeiesDiamonhsMeProsbash();
-  loadAdeiesDiamonhsXwrisProsbash();
-  loadThematikaPedia();
-  loadForeisEkpaideyshs();
-  loadLanguages();
+  // loadEpaEfka();
+  // loadDypa();
+  // loadProgrammataDypa();
+  // fetchDropdownDataKentraKostoys();
+  // loadSymbaseis();
+  // loadAdeiesDiamonhsMeProsbash();
+  // loadAdeiesDiamonhsXwrisProsbash();
+  // loadThematikaPedia();
+  // loadForeisEkpaideyshs();
+  // loadLanguages();
 });
 
 function removeGreekAccentsAndToUpper(text) {
