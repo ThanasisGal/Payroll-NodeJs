@@ -96,7 +96,7 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
-                    title="Επιστροφή στην Αρχική Σελίδα των Συμβάσεων"
+                    title="Επιστροφή στην Αρχική Σελίδα των Κατηγοριών των Συμβάσεων"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3">
                     <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                 </a>
@@ -116,7 +116,6 @@
                     const qsTail = qsParts.length ? '&' + qsParts.join('&') : '';
                 %>
 
-                <!-- Pagination -->
                 <nav class="col-2" aria-label="Dashboard Pagination">
                     <ul class="pagination pagination-sm justify-content-end mt-2">
                         <% if (Number(current) === 1) { %>
@@ -128,11 +127,9 @@
                             </li>
                         <% } else { %>
                             <li class="page-item">
-                                <!-- Πρώτη σελίδα -->
                                 <a href="/symbaseis/kathgories/search?page=1<%= qsTail %>" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
                             </li>
                             <li class="page-item">
-                                <!-- Προηγούμενη/νες -->
                                 <a href="/symbaseis/kathgories/search?page=<%= Number(current) - 1 %><%= qsTail %>" class="page-link"><i class="bi bi-chevron-left font-size-vw-0_5"></i></a>
                             </li>
                         <% } %>
@@ -152,7 +149,6 @@
                                 </li>
                             <% } else { %>
                                 <li class="page-item fsvw-0_7">
-                                    <!-- Αριθμημένες -->
                                     <a href="/symbaseis/kathgories/search?page=<%= i %><%= qsTail %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"> <%= i %></a>
                                 </li>
                             <% } %>
@@ -164,7 +160,6 @@
                                     </li>
                                 <% } %>
                                 <li class="page-item">
-                                    <!-- Τελευταία -->
                                     <a href="/symbaseis/kathgories/search?page=<%= pages %><%= qsTail %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= pages %></a>
                                 </li>
                             <% } %>
@@ -179,11 +174,9 @@
                             </li>
                         <% } else { %>
                             <li class="page-item">
-                                <!-- Επόμενη/νες -->
                                 <a href="/symbaseis/kathgories/search?page=<%= Number(current) + 1 %><%= qsTail %>" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
                             </li>
                             <li class="page-item fsvw-0_7">
-                                <!-- Τελευταία -->
                                 <a href="/symbaseis/kathgories/search?page=<%= pages %><%= qsTail %>" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i></a>
                             </li>
                         <% } %>
@@ -208,4 +201,5 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/kathgories/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

@@ -45,6 +45,7 @@
             class="form-control input-contents"
             value="<%= safe("symbash_stathera") %>"
         />
+                <!-- data-preselect-value=<%= `symbash_stathera` %> -->
 
         <div class="col-9-5">
             <select
@@ -55,7 +56,7 @@
                 data-api="/api/dropdown/symbaseis/symbash"
                 single
                 data-target-input=<%= `symbash_stathera` %>
-                data-preselect-value=<%= `symbash_stathera` %>
+                data-preselect="symbash_stathera"
                 data-preload-all="true"
                 data-pad-length="4"
                 data-xrhsh-related="false"
@@ -129,6 +130,7 @@
                 <a 
                     href="/mainapp"
                     role="button"
+                    data-clear-symbash
                     data-bs-toggle="tooltip"
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
@@ -200,7 +202,6 @@
             // Βεβαιώσου ότι θα σταλεί η τιμή
             hiddenEl.value = value;
 
-            // Αν θες να στείλεις ως path param αντί για body, ξεκλείδωσε την επόμενη γραμμή:
             this.action = `/symbaseis/kathgories/search/${encodeURIComponent(value)}`;
         });
     });

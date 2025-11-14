@@ -8,7 +8,95 @@ const selectedCache = {};
 window.setTomDropdownRender = (id, r) => (globalRenderMap[id] = r);
 window.setTomDropdownHooks  = (id, h) => (globalHookMap[id]  = h);
 
-const debounce = (fn, d = 100) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),d);} };
+const debounce = (fn, d = 100) => {
+	let t;
+	return (...args) => {
+		clearTimeout(t);
+		t = setTimeout(() => fn(...args), d);
+	};
+};
+
+// dropdown-item.js
+
+export function attachInlineSummary(tom, el) {
+	if (!tom || !el) return;
+	if (tom.settings.maxItems === 1) return;           // μόνο για multiple
+
+	const host = tom.wrapper || tom.control;
+	if (!host) return;
+
+	// να έχει βάση για absolute και να μην κόβει
+	const cs = getComputedStyle(host);
+	if (cs.position === 'static') host.style.position = 'relative';
+	host.style.overflow = 'visible';
+
+	// φτιάξε/πάρε το inline box
+	let box = el.__inlineSummary;
+	if (!box) {
+		box = document.createElement('div');
+		box.className = 'ts-inline-summary';
+		Object.assign(box.style, {
+			position: 'absolute',
+			left: '8px',
+			right: '56px',                 // reserve για βελάκι/clear
+			top: '50%',
+			transform: 'translateY(-50%)',
+			whiteSpace: 'nowrap',
+			overflow: 'hidden',
+			textOverflow: 'ellipsis',
+			pointerEvents: 'none',
+			zIndex: 10,
+			display: 'none'
+		});
+		el.__inlineSummary = box;
+		host.appendChild(box);
+	}
+
+	const peek = parseInt(el.dataset.summaryPeek || el.dataset.inlinePeek || '1', 10) || 1;
+	const pad4 = s => String(s ?? '').replace(/\D/g,'').padStart(4,'0');
+
+	const calcRight = () => {
+		let reserve = 56;
+		try {
+			const rectHost = host.getBoundingClientRect();
+			let rightMost = 0;
+			for (const c of Array.from(host.children)) {
+				if (c === box) continue;
+				const r = c.getBoundingClientRect();
+				if (r.width > 0 && r.right > rightMost) rightMost = r.right;
+			}
+			const free = Math.max(0, rectHost.right - rightMost) + 16; // +1rem
+			if (free > 36) reserve = free;
+		} catch {}
+		box.style.right = reserve + 'px';
+	};
+
+	const render = () => {
+		const vals = tom.items || [];
+		if (!vals.length) { box.style.display = 'none'; return; }
+
+		const labels = vals.map(v => {
+			const o = tom.options[v] || {};
+			return (o.label || o.text || (o.kodikos != null ? pad4(o.kodikos) : v)).toString();
+		}).filter(Boolean);
+
+		const head = labels.slice(0, peek).join(', ');
+		const rest = labels.length - peek;
+		box.textContent = rest > 0 ? `${head} +${rest}` : head;
+		box.style.display = 'block';
+		calcRight();
+	};
+
+	const rerender = () => { try { render(); } catch {} };
+	tom.on('item_add', rerender);
+	tom.on('item_remove', rerender);
+	tom.on('clear', rerender);
+	tom.on('change', rerender);
+	tom.on('load', rerender);
+	new MutationObserver(rerender).observe(host, { childList:true, subtree:true });
+	window.addEventListener('resize', rerender, { passive:true });
+	setTimeout(rerender, 0);
+}
 
 export const initTomDropdown = ({
     selector,
@@ -23,11 +111,6 @@ export const initTomDropdown = ({
     const el = document.querySelector(selector);
     if (!el) return;
     
-    // if (el.dataset.skipAutoload === 'true') {
-        // μην κάνεις pre-load • περιμένουμε ο χρήστης να πληκτρολογήσει
-    //     tom.settings.preload = false;
-    // }
-
     // ✅ Ασφαλής καθαρισμός υπάρχοντος instance
     if (el.tomselect) {
         el.tomselect.destroy();
@@ -115,17 +198,70 @@ export const initTomDropdown = ({
             currentAbort = new AbortController();
 
             /* 2. χτίζω το URL  – το δικό σου κομμάτι μένει όπως ήταν */
-            const urlToFetch = (typeof searchText === 'string' && searchText.startsWith('http'))
-                ? searchText
-                : (() => {
-                    const urlObj = new URL(url, location.origin);
-                    Object.entries(extraParams).forEach(([k,v]) => v && urlObj.searchParams.set(k,v));
-                    urlObj.searchParams.set('search', searchText || '');
-                    urlObj.searchParams.set('page',   1);
-                    urlObj.searchParams.set('limit',  50);
-                    return urlObj.toString();
-                    })
-                ();
+            let urlToFetch;
+            if (typeof searchText === 'string' && searchText.startsWith('http')) {
+                urlToFetch = searchText;
+            } else {
+                const urlObj = new URL(url, location.origin);
+                Object.entries(extraParams).forEach(([k, v]) => v && urlObj.searchParams.set(k, v));
+
+                // 🟢 extra filter από άλλο input (π.χ. σύμβαση σε εξαρτημένο dropdown)
+                const extraFilterId = el.dataset.extraFilter;
+                if (extraFilterId) {
+                    const extraFilterVal = document.getElementById(extraFilterId)?.value?.trim();
+                    if (extraFilterVal) {
+                        urlObj.searchParams.set(extraFilterId, extraFilterVal);
+                    }
+                }
+
+                // 🟢 2ο extra filter (π.χ. κατηγορίες ⇒ ειδικότητες) με ΠΗΓΗ λίστας
+                const extraFilterParam = el.dataset.extraFilter2; // π.χ. "kathgoria_symbashs_stathera"
+                if (extraFilterParam) {
+                    // από πού θα διαβάσω την ΤΙΜΗ; (αν δεν οριστεί, διαβάζει από το ίδιο id όπως πριν)
+                    const srcId = el.dataset.extraFilter2Src || extraFilterParam;
+                    const raw   = document.getElementById(srcId)?.value?.trim();
+                    if (raw) {
+                        const to4 = (x) => {
+                            const d = String(x ?? '').replace(/\D/g, '');
+                            if (!d) return '';
+                            const n = parseInt(d, 10);
+                            return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+                        };
+
+                        let used = false;
+
+                        // 1) JSON array τύπου [{aa:"....", kodikos:"0001"}, ...]
+                        try {
+                            const arr = JSON.parse(raw);
+                            if (Array.isArray(arr)) {
+                                arr.forEach(obj => {
+                                const k = to4(obj?.kodikos);
+                                if (k) urlObj.searchParams.append(extraFilterParam, k);
+                                });
+                                used = true;
+                            }
+                        } catch {}
+
+                        // 2) CSV: "0001,0003"
+                        if (!used && raw.includes(',')) {
+                            raw.split(',').map(s => to4(s)).filter(Boolean)
+                                .forEach(k => urlObj.searchParams.append(extraFilterParam, k));
+                            used = true;
+                        }
+
+                        // 3) Μία τιμή (παλιό behavior)
+                        if (!used) {
+                            const k = to4(raw);
+                            if (k) urlObj.searchParams.set(extraFilterParam, k);
+                        }
+                    }
+                }
+
+                urlObj.searchParams.set('search', searchText || '');
+                urlObj.searchParams.set('page', 1);
+                urlObj.searchParams.set('limit', 50);
+                urlToFetch = urlObj.toString();
+            }
 
             try {
                 /* 3. fetch */
@@ -137,17 +273,17 @@ export const initTomDropdown = ({
                 const vKey = this.settings.valueField || 'value';
                 const lKey = this.settings.labelField || 'label';
                 items = items
-                  .filter(it => it && (it[vKey] != null || it.value != null || it.id != null || it.kodikos != null))
-                  .map(it => {
-                    const rawVal = (it[vKey] ?? it.value ?? it.id ?? (it.kodikos != null ? String(it.kodikos).padStart(4,'0') : ''));
-                    const val = String(rawVal).trim();
-                    const label = String(
-                      it[lKey] ?? it.label ?? it.text ??
-                      (it.kodikos != null ? `${String(it.kodikos).padStart(4,'0')} - ${it.perigrafh ?? ''}` : val)
-                    );
-                    return { ...it, [vKey]: val, [lKey]: label, value: val, label, text: label };
-                  })
-                  .filter(it => it[vKey] !== '');
+					.filter(it => it && (it[vKey] != null || it.value != null || it.id != null || it.kodikos != null))
+					.map(it => {
+						const rawVal = (it[vKey] ?? it.value ?? it.id ?? (it.kodikos != null ? String(it.kodikos).padStart(4,'0') : ''));
+						const val = String(rawVal).trim();
+						const label = String(
+							it[lKey] ?? it.label ?? it.text ??
+							(it.kodikos != null ? `${String(it.kodikos).padStart(4,'0')} - ${it.perigrafh ?? ''}` : val)
+						);
+						return { ...it, [vKey]: val, [lKey]: label, value: val, label, text: label };
+					})
+					.filter(it => it[vKey] !== '');
 
                 /* 4. πρόσθεσε ΟΠΟΙΟ επιλεγμένο λείπει */
                 this.items.forEach(v => {
@@ -155,11 +291,64 @@ export const initTomDropdown = ({
                     const alreadyInOptions = this.options[v];
 
                     if (!alreadyInOptions && cached) {
+                        // 👉 δώσε group και στα cached (αν υπάρχει optgroupBy)
+                        if (el.dataset.optgroupBy) {
+                            const ogField   = el.dataset.optgroupField || '__group';
+                            const ogExtract = (el.dataset.optgroupExtract || '').toLowerCase();
+                            const raw = String(cached[el.dataset.optgroupBy] ?? '');
+                            cached[ogField] = ogExtract === 'last4' ? raw.slice(-4) : raw;
+                        }
                         this.addOption(cached);
                     } else if (!cached) {
                         console.warn('⚠️ Cannot re-add – missing from cache:', v);
                     }
                 });
+
+                /* ========= PATCH B: optgroups + group sorting ========= */
+                {
+                    const ogBy      = el.dataset.optgroupBy || '';
+                    const ogField   = el.dataset.optgroupField || '__group';
+                    const ogExtract = (el.dataset.optgroupExtract || '').toLowerCase();
+                    const ogSrcId   = el.dataset.optgroupLabelSource || '';
+
+                    if (ogBy) {
+                        // 1) βγάλε group id
+                        items = (items || []).map(it => {
+                            const raw = String(it[ogBy] ?? '');
+                            const gid = ogExtract === 'last4' ? raw.slice(-4) : raw;
+                            return { ...it, [ogField]: gid };
+                        });
+
+                        // 2) δήλωσε τα optgroups
+                        const groups = new Map();
+                        const katTS  = ogSrcId ? document.getElementById(ogSrcId)?.tomselect || null : null;
+
+                        for (const it of items) {
+                            const gid = it[ogField];
+                            if (!gid || groups.has(gid)) continue;
+                            let label = gid;
+                            const katOpt = katTS?.options?.[gid];
+                            if (katOpt) {
+								const base = String(katOpt.text || katOpt.label || '').trim();
+								// αν το base ξεκινά ήδη με "0001 -", βγάλε το πρώτο "0001 -"
+								const withoutDup = base.replace(new RegExp(`^${gid}\\s*-\\s*`, 'i'), '');
+								label = `${gid} - ${withoutDup || base}`;
+                            }
+                            groups.set(gid, { value: gid, label });
+                        }
+                        
+                        try { groups.forEach((data, gid) => this.addOptionGroup(gid, data)); } catch {}
+
+                        // 3) ταξινόμηση: Κατηγορία → kodikos
+                        items.sort((a, b) => {
+                            const ga = String(a[ogField] || ''), gb = String(b[ogField] || '');
+                            const cmpG = ga.localeCompare(gb, undefined, { numeric: true });
+                            if (cmpG !== 0) return cmpG;
+                            const kA = String(a.kodikos || ''), kB = String(b.kodikos || '');
+                            return kA.localeCompare(kB, undefined, { numeric: true });
+                        });
+                    }
+                }
 
                 /* 5. πέρασέ τα στον Tom-Select */
                 items.length ? callback(items) : callback();   // κλείνει και το spinner
@@ -205,45 +394,6 @@ export const initTomDropdown = ({
             ...render,
         },
 
-// /* ------ render ----------------------------------------- */
-// render : {
-//   option(optionData, e) {
-//     // ✅ ΜΟΝΟ για το <select id="asfalistikh_klash">
-//     const isAK = el && el.id === 'asfalistikh_klash';
-//     if (isAK && optionData?.label) {
-//       const SEP = ' - ';
-//       const i = optionData.label.indexOf(SEP);
-//       if (i > -1) {
-//         const c1   = optionData.label.slice(0, i);               // 1η στήλη (π.χ. "01")
-//         const rest = optionData.label.slice(i + SEP.length);
-//         const DESC_W = 19;                                       // ίδιο με server-side
-//         const c2   = rest.slice(0, DESC_W);                      // 2η στήλη (περιγραφή)
-//         let remain = rest.slice(DESC_W).replace(/^[ \u00A0]+/, '');
-//         const m    = remain.match(/^([^\u00A0 ]+)/);             // 3η στήλη (π.χ. "12.28")
-//         const c3   = m ? m[1] : '';
-//         const afterC3 = remain.slice(c3.length);
-
-//         return `<div class="ts-option ts-ak">
-// <span class="c1">${e(c1)}</span>${e(SEP)}${e(c2)} <span class="c3">${e(c3)}</span>${e(afterC3)}
-// </div>`;
-//       }
-//     }
-//     // default για όλα τα άλλα dropdowns (ή αν δεν "έσπασε" σωστά)
-//     return `<div class="ts-option">${e(optionData.label || '')}</div>`;
-//   },
-
-//   // ΚΡΑΤΑ το δικό σου item() όπως είναι
-//   item(optionData, e) {
-//     if (!optionData || typeof optionData !== 'object' || !('value' in optionData)) {
-//       const phText = el.getAttribute('placeholder') || '…';
-//       return `<div class="item placeholder-item" aria-placeholder="true">${e(phText)}</div>`;
-//     }
-//     const vKey = this.settings.valueField || 'value';
-//     return `<div class="item" data-value="${e(optionData[vKey])}">${e(optionData.label)}</div>`;
-//   },
-
-//   ...render, // (ό,τι περάσεις από έξω συνεχίζει να υπερισχύει)
-// },
 
         /* flag ώστε να είναι διαθέσιμο στο onInitialize */
         _preloadAll : preloadAll,
@@ -439,46 +589,60 @@ export const initTomDropdown = ({
             });
 
             const doPreselect = async () => {
-            const preSelId = el.dataset.preselect;
-            if (!preSelId) return;
+				const preSelId = el.dataset.preselect;
+				if (!preSelId) return;
 
-            const preSelVal = document.getElementById(preSelId)?.value?.trim();
-            if (!preSelVal) return;
+				const preSelVal = document.getElementById(preSelId)?.value?.trim();
+				if (!preSelVal) return;
 
-            if (el.hasAttribute('data-has-value')) return;
+				// 🟢  1ο φίλτρο
+				const extraFilterId  = el.dataset.extraFilter;
+				const extraFilterVal = extraFilterId ? document.getElementById(extraFilterId)?.value?.trim() : '';
 
-            // Φτιάξε URL + extra params
-            const u = new URL(url, location.origin);
-            Object.entries(extraParams || {}).forEach(([k, v]) => v && u.searchParams.set(k, v));
-            u.searchParams.set('value', preSelVal);
+				// 🟢  2ο φίλτρο
+				const extraFilterId2  = el.dataset.extraFilter2;
+				const extraFilterVal2 = extraFilterId2 ? document.getElementById(extraFilterId2)?.value?.trim() : '';
 
-            // Abort τυχόν προηγούμενο preselect
-            try { ts._preselectAbort?.abort(); } catch {}
-            const controller = new AbortController();
-            ts._preselectAbort = controller;
+				if (el.hasAttribute('data-has-value')) return;
 
-            try {
-                const res   = await fetch(u, { credentials: 'include', signal: controller.signal });
-                const json  = await res.json();
-                const item  = json?.items?.[0];
-                if (!item) return;
+				// Φτιάξε URL + extra params
+				const u = new URL(url, location.origin);
+				Object.entries(extraParams || {}).forEach(([k, v]) => v && u.searchParams.set(k, v));
+				u.searchParams.set('value', preSelVal);
+				
+				if (extraFilterVal) {
+					u.searchParams.set(extraFilterId, extraFilterVal);
+				}
+				if (extraFilterVal2) {
+					u.searchParams.set(extraFilterId2, extraFilterVal2);
+				}
+				// Abort τυχόν προηγούμενο preselect
+				try { ts._preselectAbort?.abort(); } catch {}
+				const controller = new AbortController();
+				ts._preselectAbort = controller;
 
-                // Αν στο μεταξύ έγινε άλλο preselect → μην συνεχίσεις (stale)
-                if (ts._preselectAbort !== controller) return;
+				try {
+					const res   = await fetch(u, { credentials: 'include', signal: controller.signal });
+					const json  = await res.json();
+					const item  = json?.items?.[0];
+					if (!item) return;
 
-                const key = ts.settings.valueField || 'value';
-                const id  = item[key] ?? preSelVal;
+					// Αν στο μεταξύ έγινε άλλο preselect → μην συνεχίσεις (stale)
+					if (ts._preselectAbort !== controller) return;
 
-                ts.addOption(item);
-                ts.setValue(id, true);
-                selectedCache[id] = item;
-                requestAnimationFrame(() => updateOverflow(ts));
-                el.setAttribute('data-has-value', 'true');
-            } catch (err) {
-                if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
-            } finally {
-                if (ts._preselectAbort === controller) ts._preselectAbort = null;
-            }
+					const key = ts.settings.valueField || 'value';
+					const id  = item[key] ?? preSelVal;
+
+					ts.addOption(item);
+					ts.setValue(id, true);
+					selectedCache[id] = item;
+					requestAnimationFrame(() => updateOverflow(ts));
+					el.setAttribute('data-has-value', 'true');
+				} catch (err) {
+					if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
+				} finally {
+					if (ts._preselectAbort === controller) ts._preselectAbort = null;
+				}
             };
 
             doPreselect();
@@ -492,6 +656,52 @@ export const initTomDropdown = ({
                     const input   = document.getElementById(inputId);
                     if (input) input.value = val;
                 });
+            } else {
+                const targetTableId = el.dataset.targetTable;   // π.χ. "kathgoria_symbashs_table"
+                if (targetTableId) {
+                    const to4 = (x) => {
+                        const d = String(x ?? '').replace(/\D/g, '');
+                        if (!d) return '';
+                        const n = parseInt(d, 10);
+                        return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+                    };
+
+                    const writeTable = () => {
+                        const vals = this.getValue(); // array από selected values (aa)
+                        const arr = (Array.isArray(vals) ? vals : (vals ? [vals] : []))
+                            .map(v => {
+                                const o = this.options?.[v] || {};
+                                const to4 = (x) => {
+                                    const d = String(x ?? '').replace(/\D/g, '');
+                                    if (!d) return '';
+                                    const n = parseInt(d, 10);
+                                    return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+                                };
+                                return {
+                                    aa: String(o.aa ?? v),                      // <-- ΠΑΝΤΑ γεμάτο
+                                    kodikos: to4(o.kodikos ?? (v.split?.('|')[0]) ?? '')
+                                };
+                            })
+                            .filter(x => x.kodikos)
+                            .sort((a,b) => a.kodikos.localeCompare(b.kodikos, undefined, { numeric:true }));
+
+                        const input = document.getElementById(targetTableId);
+                        if (input) {
+                            input.value = JSON.stringify(arr);
+                            // 🔔 ενημέρωσε όλο το σύστημα ότι άλλαξε ο table-hidden (πιάνει x, +/- κλπ)
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    };
+
+                    // ενημέρωση σε όλες τις σχετικές αλλαγές
+                    this.on('change',      writeTable);
+                    this.on('item_add',    writeTable);
+                    this.on('item_remove', writeTable);
+                    this.on('clear',       writeTable);
+
+                    // αρχικοποίηση
+                    writeTable();
+                }
             }
         },
 
@@ -501,8 +711,8 @@ export const initTomDropdown = ({
             if (ddInput) {
                 // αποθήκευση αρχικού placeholder για restore στο close
                 if (!this._origDdPlaceholderSaved) {
-                this._origDdPlaceholder = ddInput.getAttribute('placeholder') || '';
-                this._origDdPlaceholderSaved = true;
+					this._origDdPlaceholder = ddInput.getAttribute('placeholder') || '';
+					this._origDdPlaceholderSaved = true;
                 }
                 ddInput.setAttribute('placeholder', el.getAttribute('placeholder') || 'Αναζήτηση…');
             }
@@ -527,40 +737,34 @@ export const initTomDropdown = ({
             if (!this._infiniteBound) {
                 const content = this.dropdown?.querySelector('.ts-dropdown-content');
                 if (content) {
-                // κρατάμε ref για να μπορούμε να το αφαιρέσουμε αν ποτέ χρειαστεί
-                this._infiniteScrollHandler = () => handleScroll(this, content);
-                content.addEventListener('scroll', this._infiniteScrollHandler, { passive: true });
-                this._infiniteBound = true;
+					// κρατάμε ref για να μπορούμε να το αφαιρέσουμε αν ποτέ χρειαστεί
+					this._infiniteScrollHandler = () => handleScroll(this, content);
+					content.addEventListener('scroll', this._infiniteScrollHandler, { passive: true });
+					this._infiniteBound = true;
                 }
             }
 
             // flag στο wrapper (αν χρειάζεσαι CSS εφέ κατά το άνοιγμα)
-            tom.wrapper.classList.add('open');
+            this.wrapper.classList.add('open');
 
             hooks.onOpen?.(this);
         },
 
         onDropdownClose () {
             // αφαίρεση open flag
-            tom.wrapper.classList.remove('open');
+            this.wrapper.classList.remove('open');
 
             // επαναφορά placeholder όπως ήταν πριν το open
             const ddInput = this.dropdown?.querySelector('.dropdown-input');
             if (ddInput && this._origDdPlaceholderSaved) {
                 if (this._origDdPlaceholder) {
-                ddInput.setAttribute('placeholder', this._origDdPlaceholder);
+					ddInput.setAttribute('placeholder', this._origDdPlaceholder);
                 } else {
-                ddInput.removeAttribute('placeholder');
+					ddInput.removeAttribute('placeholder');
                 }
             }
         },
 
-        // onFocus () {
-        //     // ➜ αν φαίνεται σκουπιδάκι, «πάτα» το
-        //     clickClearIfVisible(this);
-
-        //     if (!this.ignoreFocusOpen) this.open();
-        // },
         onFocus () {
             // ΜΗΝ καθαρίζεις τίποτα στο focus εκτός κι αν ζητηθεί ρητά
             if (this.input?.dataset?.autoclearOnFocus === 'true' ||
@@ -573,55 +777,40 @@ export const initTomDropdown = ({
         onChange (vals) {
             if (!this.settings.mode.includes('multi') || !Array.isArray(vals)) return;
             const recs = vals.map(v=>this.options[v]);
-            recs.sort((a,b)=>parseInt(a.label)-parseInt(b.label));
+            // recs.sort((a,b)=>parseInt(a.label)-parseInt(b.label));
         }
     });
 
-//     const preselectId = el.dataset.preselect;
-//     const preselectValue = document.getElementById(preselectId)?.value;
+    /* ========= PATCH A: client-side sort & optgroups from data-attributes ========= */
+    (() => {
+        // data-sort-by="afora_thn_symbash_kathgoria,kodikos"  ➜ ταξινόμηση από meta πεδία
+        const sortBy = (el.dataset.sortBy || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
 
-// // --- Προεπιλογή από ΒΔ (respect valueField & credentials, με abort) ---
-//     if (preselectValue && url) {
-//     const urlObj = new URL(url, location.origin);
-//     urlObj.searchParams.set('value', preselectValue);
+        if (sortBy.length) {
+            tom.settings.sortField = sortBy.map(f => ({ field: f, direction: 'asc' }));
+            tom.settings.sort = true;   // ενεργοποίησε client sort μόνο αν ζητήθηκε
+        } else {
+            tom.settings.sort = false;  // αλλιώς σεβάσου τη σειρά του server
+        }
 
-//     // ➕ Πέρνα όλα τα extraParams στο URL (π.χ. padLength)
-//     Object.entries(extraParams || {}).forEach(([k, v]) => {
-//         if (v !== undefined && v !== null && v !== '') {
-//         urlObj.searchParams.set(k, v);
-//         }
-//     });
-
-//     try {
-//         // ακύρωσε τυχόν προηγούμενο preselect request
-//         try { this._preselectAbort?.abort(); } catch {}
-//         this._preselectAbort = new AbortController();
-
-//         fetch(urlObj.toString(), { credentials: 'include', signal: this._preselectAbort.signal })
-//         .then(res => res.json())
-//         .then(data => {
-//             const item = data?.items?.[0]; // ή αναλόγως το format του API
-//             if (!item) {
-//             console.warn('⚠️ No matching item found in fetch for', preselectValue);
-//             return;
-//             }
-
-//             const key = tom.settings.valueField || 'value';
-//             const id  = item[key] ?? preselectValue;
-
-//             tom.addOption(item);
-//             tom.setValue(id, true);
-//             selectedCache[id] = item;
-//             requestAnimationFrame(() => updateOverflow(tom));
-//             el.setAttribute('data-has-value', 'true');
-//         })
-//         .catch(err => {
-//             if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
-//         });
-//     } catch (err) {
-//         if (err?.name !== 'AbortError') console.error('❌ Preselect fetch failed:', err);
-//     }
-//     }
+        // optgroups: data-optgroup-by="afora_thn_symbash_kathgoria"
+        const ogBy = el.dataset.optgroupBy || '';
+        if (ogBy) {
+            tom.settings.optgroupField      = el.dataset.optgroupField || '__group';
+            tom.settings.lockOptgroupOrder  = true; // σταθερή σειρά ομάδων
+            // optional: custom header (κρατάμε το default αν υπάρχει ήδη renderer)
+            tom.settings.render = tom.settings.render || {};
+            const prevHeader = tom.settings.render.optgroup_header;
+            tom.settings.render.optgroup_header = function (data, escape) {
+                const inner = prevHeader ? prevHeader.call(this, data, escape)
+                                         : `<div class="optgroup-header ts-og">${escape(data.label || data.value || '')}</div>`;
+                return inner;
+            };
+        }
+    })();
 
     // --- Cache του επιλεγμένου option ώστε να μπορεί να «ξαναμπεί» αν λείπει ---
     tom.on('item_add', (value /* , $itemEl */) => {
@@ -634,7 +823,7 @@ export const initTomDropdown = ({
 
         // ✅ Αν δεν υπάρχει στο options (π.χ. από προ-επιλογή), ξαναπέρασέ το
         if (!tom.options[cacheId]) {
-        tom.addOption(rec);
+			tom.addOption(rec);
         }
     } else {
         console.error('❌ item_add: cannot cache or re-add', value);
@@ -645,61 +834,61 @@ export const initTomDropdown = ({
     *  Χειροποίητο infinite scroll
     * ----------------------------------------------------------------*/
     async function handleScroll (instance, content) {
-    // Φρένο αν δεν υπάρχει επόμενη σελίδα ή ήδη φορτώνουμε
-    if (!instance.nextPage || instance._loadingNext) return;
+		// Φρένο αν δεν υπάρχει επόμενη σελίδα ή ήδη φορτώνουμε
+		if (!instance.nextPage || instance._loadingNext) return;
 
-    // Trigger όταν πλησιάσουμε ~50px από το τέλος
-    if (content.scrollTop + content.clientHeight < content.scrollHeight - 50) return;
+		// Trigger όταν πλησιάσουμε ~50px από το τέλος
+		if (content.scrollTop + content.clientHeight < content.scrollHeight - 50) return;
 
-    instance._loadingNext = true;
+		instance._loadingNext = true;
 
-    const urlToFetch = instance.nextPage;
-    const limit      = getLimitFromUrl(urlToFetch);
+		const urlToFetch = instance.nextPage;
+		const limit      = getLimitFromUrl(urlToFetch);
 
-    try {
-        const json  = await fetch(urlToFetch, { credentials: 'include' }).then(r => r.json());
-        const items = Array.isArray(json.items) ? json.items : [];
+		try {
+			const json  = await fetch(urlToFetch, { credentials: 'include' }).then(r => r.json());
+			const items = Array.isArray(json.items) ? json.items : [];
 
-        // hasMore: αν δίνεται ρητά, αλλιώς με βάση το limit
-        const hasMore = ('hasMore' in json) ? Boolean(json.hasMore) : items.length === limit;
-        instance.nextPage = hasMore ? buildNextPageUrl(urlToFetch) : null;
+			// hasMore: αν δίνεται ρητά, αλλιώς με βάση το limit
+			const hasMore = ('hasMore' in json) ? Boolean(json.hasMore) : items.length === limit;
+			instance.nextPage = hasMore ? buildNextPageUrl(urlToFetch) : null;
 
-        // 1) θυμόμαστε scroll & ύψος ΠΡΙΝ την προσθήκη
-        const prevScroll = content.scrollTop;
-        const prevHeight = content.scrollHeight;
+			// 1) θυμόμαστε scroll & ύψος ΠΡΙΝ την προσθήκη
+			const prevScroll = content.scrollTop;
+			const prevHeight = content.scrollHeight;
 
-        // 2) προσθέτουμε options (dedupe με βάση valueField)
-        const key = instance.settings.valueField || 'value';
-        let newCount = 0;
-        for (const it of items) {
-        const id = it?.[key];
-        if (id == null) continue;
-        if (!instance.options[id]) {
-            instance.addOption(it);
-            newCount++;
-        }
-        }
-        instance.refreshOptions(false);
+			// 2) προσθέτουμε options (dedupe με βάση valueField)
+			const key = instance.settings.valueField || 'value';
+			let newCount = 0;
+			for (const it of items) {
+				const id = it?.[key];
+				if (id == null) continue;
+				if (!instance.options[id]) {
+					instance.addOption(it);
+					newCount++;
+				}
+			}
+			instance.refreshOptions(false);
 
-        // Αν δεν προσθέσαμε τίποτα καινούργιο → τέλος infinite
-        if (newCount === 0) {
-        instance.nextPage = null;
-        return;
-        }
+			// Αν δεν προσθέσαμε τίποτα καινούργιο → τέλος infinite
+			if (newCount === 0) {
+				instance.nextPage = null;
+				return;
+			}
 
-        // 3) επαναφέρουμε τη θέση 1-του-πριν (με ένα «μαξιλαράκι» ασφαλείας)
-        requestAnimationFrame(() => {
-        const newHeight = content.scrollHeight;
-        const delta     = newHeight - prevHeight;
-        const SAFE      = 500; // pixel από το τέλος
-        content.scrollTop = prevScroll + delta - SAFE;
-        });
+			// 3) επαναφέρουμε τη θέση 1-του-πριν (με ένα «μαξιλαράκι» ασφαλείας)
+			requestAnimationFrame(() => {
+				const newHeight = content.scrollHeight;
+				const delta     = newHeight - prevHeight;
+				const SAFE      = 500; // pixel από το τέλος
+				content.scrollTop = prevScroll + delta - SAFE;
+			});
 
-    } catch (err) {
-        console.error('❌ Dropdown next-page load failed', err);
-    } finally {
-        instance._loadingNext = false;
-    }
+		} catch (err) {
+			console.error('❌ Dropdown next-page load failed', err);
+		} finally {
+			instance._loadingNext = false;
+		}
     }
 
     /* --------------------------------------------------------------- */
@@ -734,216 +923,485 @@ function clickClearIfVisible(ts) {
  *   ▸ single-select:  trash-clear  (🗑)  +  ellipsis σε μακρύ label
  * ------------------------------------------------------------------ */
 function updateOverflow(tom) {
-  // 1. Safety checks -------------------------------------------------
-  if (!tom?.wrapper) return;
+	// 1. Safety checks -------------------------------------------------
+	if (!tom?.wrapper) return;
 
-  const wrapper = tom.wrapper;               // .ts-wrapper
-  const ctrl    = wrapper.querySelector('.ts-control');
-  if (!ctrl) return;
+	const wrapper = tom.wrapper;               // .ts-wrapper
+	const ctrl    = wrapper.querySelector('.ts-control');
+	if (!ctrl) return;
+	// --- reserve right space for external actions (optional) ---
+	try {
+		const reserve = parseInt(tom.input?.dataset.reserveRight || tom.wrapper?.dataset.reserveRight || '0', 10) || 0;
+		if (reserve > 0) {
+		tom.wrapper.style.display = 'inline-block';
+		tom.wrapper.style.width   = `calc(100% - ${reserve}px)`;
+		}
+	} catch {}
 
-  const isMulti = tom.settings.mode?.includes?.('multi');
+  	const isMulti = tom.settings.mode?.includes?.('multi');
 
-  /* ==================================================================
-  *  SINGLE-SELECT MODE                                               */
-  /* ==================================================================*/
-  if (!isMulti) {
-    /* ----------------------------------------------------------------
-    * A. Δημιουργία / update του trash-clear κουμπιού
-    * ----------------------------------------------------------------*/
-    let trash = wrapper.querySelector('.ts-single-reset-btn');
-    if (!trash) {
-        trash           = document.createElement('button');
-        trash.type      = 'button';
-        trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
-        trash.title     = 'Καθαρισμός επιλογής';
-        // trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
-        trash.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
-        <path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
-        </svg>`;
-        wrapper.appendChild(trash);
-        makeUnfocusable(trash); // ⬅️ ΝΕΟ: ποτέ focus στο σκουπιδάκι
-        
-      // Click handler – clear & refresh
-      trash.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!(tom.items || []).length) return;
+	/* ==================================================================
+	*  SINGLE-SELECT MODE                                               */
+	/* ==================================================================*/
+	if (!isMulti) {
+		/* ----------------------------------------------------------------
+		* A. Δημιουργία / update του trash-clear κουμπιού
+		* ----------------------------------------------------------------*/
+		let trash = wrapper.querySelector('.ts-single-reset-btn');
+		if (!trash) {
+			trash           = document.createElement('button');
+			trash.type      = 'button';
+			trash.className = 'ts-single-reset-btn ts-fill-reset-btn';
+			trash.title     = 'Καθαρισμός επιλογής';
+			// trash.innerHTML = '<i class="bi bi-trash3"></i>'; // bootstrap-icons
+			trash.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash3" viewBox="0 0 16 16">
+				<path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/>
+			</svg>`;
+			wrapper.appendChild(trash);
+			makeUnfocusable(trash); // ⬅️ ΝΕΟ: ποτέ focus στο σκουπιδάκι
+			
+			// Click handler – clear & refresh
+			trash.addEventListener('click', (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				if (!(tom.items || []).length) return;
 
-        tom.ignoreFocusOpen = true;
-        tom.clear();
-        tom.close();
-        tom.control_input.blur();
-        tom.ignoreFocusOpen = false;
+				tom.ignoreFocusOpen = true;
+				tom.clear();
+				tom.close();
+				tom.control_input.blur();
+				tom.ignoreFocusOpen = false;
 
-        setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
-      });
-    }
+				setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
+			});
+		}
 
-    // Εμφάνιση / απόκρυψη ανάλογα με επιλογή (χωρίς inline styles)
-    trash.hidden = !(tom.items || []).length;
+		// Εμφάνιση / απόκρυψη ανάλογα με επιλογή (χωρίς inline styles)
+		trash.hidden = !(tom.items || []).length;
 
-    // ✔ Μόλις γίνει ορατό, πάρε focus
-    // if (!trash.hidden) {
-    //   trash.focus();
-    // }
+		/* ----------------------------------------------------------------
+		* B. Ellipsis στο label όταν είναι μακρύ (χωρίς inline styles)
+		* ----------------------------------------------------------------*/
+		const itemEl = ctrl.querySelector('.item');
+		if (itemEl) itemEl.classList.add('ts-item-ellipsis');
 
-    /* ----------------------------------------------------------------
-    * B. Ellipsis στο label όταν είναι μακρύ (χωρίς inline styles)
-    * ----------------------------------------------------------------*/
-    const itemEl = ctrl.querySelector('.item');
-    if (itemEl) itemEl.classList.add('ts-item-ellipsis');
+		return; // single-select τελείωσε εδώ
+	}
 
-    return; // single-select τελείωσε εδώ
-  }
+    /* ==================================================================
+    *  MULTI-SELECT MODE
+    * =================================================================*/
+    if (isMulti) {
+        // καθάρισε τυχόν παλιό inline trash από μέσα στο ts-control
+        ctrl.querySelectorAll('.ts-inline-trash').forEach(n => n.remove());
 
-  /* ==================================================================
-  *  MULTI-SELECT MODE                                                */
-  /* =================================================================*/
-
-  /* 2. resetBtn (+/−) — δημιουργείται ΠΑΝΤΑ μία φορά -----------------*/
-  if (!ctrl.querySelector('.ts-fill-reset-btn')) {
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'ts-fill-reset-btn';
-    resetBtn.type      = 'button';
-    resetBtn.title     = 'Επιλογή όλων ή Καθαρισμός';
-    resetBtn.innerHTML = '<i class="bi bi-plus-slash-minus"></i>';
-    ctrl.appendChild(resetBtn);
-
-    /* ⇄ toggle: αν υπάρχουν tags → clear, αλλιώς → επίλεξε ΟΛΑ χωρίς dropdown */
-    resetBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      tom.ignoreFocusOpen = true; // stop auto-open
-
-      try {
-        const hasTags = (tom.items || []).length > 0;
-
-        if (hasTags) {
-          tom.clear();       // clear all
-        } else {
-          /* ▸▸ Επιλογή ΟΛΩΝ ------------------------------------------------*/
-          let allValues = Object.values(tom.options).map(o => o.value);
-
-          // αν είναι κενό (π.χ. remote) → fetch
-          if (!allValues.length && typeof url !== 'undefined') {
-            const finalUrl = new URL(url, window.location.origin);
-            if (typeof extraParams === 'object') {
-              Object.entries(extraParams).forEach(([k, v]) => v && finalUrl.searchParams.set(k, v));
-            }
-            try {
-              const json = await fetch(finalUrl, { credentials: 'include' }).then(r => r.json());
-              const allItems = json.items || [];
-              tom.addOptions(allItems);
-              allValues = allItems.map(i => i.value);
-            } catch (err) {
-              console.error('❌ resetBtn remote load failed', err);
-            }
-          }
-
-          if (allValues.length) {
-            tom.setValue([], true);          // redraw trick
-            tom.setValue(allValues, true);
-          }
+        // ── 0) Μικρό group για το +/- ΜΟΝΟ μέσα στο TS
+        let tools = ctrl.querySelector('.ts-tools');
+        if (!tools) {
+            tools = document.createElement('span');
+            tools.className = 'ts-tools';
+            Object.assign(tools.style, {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '.25rem',
+                marginRight: '.25rem',
+                flex: '0 0 auto'
+            });
+            ctrl.insertBefore(tools, ctrl.firstChild);
         }
-      } finally {
-        tom.close();
-        tom.control_input.blur();
-        tom.ignoreFocusOpen = false;
-        setTimeout(() => tom?.wrapper && updateOverflow(tom), 0);
-      }
-    });
-  }
 
-  /* 3. Υπολογισμός overflow -----------------------------------------*/
-  const ARROW = 36, GAP = 28;
-  const wrapW = wrapper.getBoundingClientRect().width;
-  let avail   = wrapW - ARROW;
-  let total   = 0;
+        // ── 1) +/- (μία φορά, μέσα στο TS)
+        let resetBtn = tools.querySelector('.ts-fill-reset-btn');
+        if (!resetBtn) {
+            resetBtn = document.createElement('button');
+            resetBtn.className = 'ts-fill-reset-btn';
+            resetBtn.type      = 'button';
+            resetBtn.title     = 'Επιλογή όλων ή Καθαρισμός';
+            resetBtn.innerHTML = '<i class="bi bi-plus-slash-minus"></i>';
+            Object.assign(resetBtn.style, {
+                background: 'transparent',
+                border: 0,
+                lineHeight: '1',
+                cursor: 'pointer',
+                padding: 0,
+                flex: '0 0 auto'
+            });
+            tools.appendChild(resetBtn);
+        }
 
-  const items = [...ctrl.querySelectorAll('.item')].filter(i => !i.closest('.ts-overflow-popup'));
-
-  // καθάρισμα προηγούμενων δεικτών
-  ctrl.querySelector('.ts-overflow-indicator')?.remove();
-  ctrl.querySelector('.ts-overflow-popup')?.remove();
-
-  const hidden = [];
-  for (let i = 0; i < items.length; i++) {
-    const el = items[i];
-    el.hidden = false; // δείξε το αρχικά
-    const w = el.offsetWidth + (parseInt(getComputedStyle(el).marginRight) || 0) + GAP;
-    if (total + w <= avail) {
-      total += w;
-    } else {
-      hidden.push(el);
-    }
-  }
-  hidden.forEach(el => (el.hidden = true));
-
-  if (!hidden.length) return;   // early exit (resetBtn κρατήθηκε)
-
-  /* 4. +N indicator & ταξινομημένο popup -----------------------------*/
-  const dot = document.createElement('div');
-  dot.className = 'ts-overflow-indicator';
-  dot.tabIndex  = -1;
-  dot.textContent = `+${hidden.length}`;
-  dot.title       = `Πατήστε για εμφάνιση (${hidden.length} ακόμη)`;
-  ctrl.appendChild(dot);
-
-  dot.addEventListener('click', (e) => {  
-    e.preventDefault();
-    e.stopPropagation();
-
-    tom.ignoreFocusOpen = true;
-    tom.control_input.blur();
-
-    setTimeout(() => {
-      tom.ignoreFocusOpen = false;
-      if (ctrl.querySelector('.ts-overflow-popup')) return;
-
-      const popup = document.createElement('div');
-      popup.className = 'ts-overflow-popup';
-
-      const sorted = hidden.slice().sort((a, b) => {
-        const extract = (el) => {
-          const lbl = (tom.options[el.dataset.value]?.label || el.dataset.value).split('-')[0].trim();
-          return lbl;
+        // ── helpers για καθαρίσματα
+        const clearTable = () => {
+            const tb = document.querySelector('#myTable tbody');
+            if (tb) tb.innerHTML = '';
         };
-        return extract(a).localeCompare(extract(b), undefined, { numeric: true, sensitivity: 'base' });
-      });
+  
+        const clearSelectAll = (selId, hiddenId, tableId) => {
+			const inst = document.getElementById(selId)?.tomselect;
+			if (inst) { inst.clear(true); inst.clearOptions(); }
+			else {
+				const el = document.getElementById(selId);
+				if (el) { el.value = ''; while (el.options?.length) el.remove(0); }
+			}
+			const hid = document.getElementById(hiddenId);
+			if (hid) hid.value = '';
+			if (tableId) {
+				const t = document.getElementById(tableId);
+				if (t) t.value = '[]';
+			}
+		};
 
-      popup.innerHTML = sorted.map(el => {
-        const v = el.dataset.value;
-        const l = tom.options[v]?.label || v;
-        return `<div class="ts-popup-row"><span>${l}</span><button data-val="${v}" title="Αφαίρεση"><i class="bi bi-trash3"></i></button></div>`;
-      }).join('');
+		// ── 3) Συμπεριφορά του +/−
+		/* ---------- μικρό helper: εξαναγκασμένο change (TS + native) ---------- */
+		function forceChange(ts) {
+			try { ts.trigger && ts.trigger('change', ts.getValue()); } catch {}
+			try { ts.input && ts.input.dispatchEvent(new Event('change', { bubbles: true })); } catch {}
+			setTimeout(() => {
+				try { ts.trigger && ts.trigger('change', ts.getValue()); } catch {}
+				try { ts.input && ts.input.dispatchEvent(new Event('change', { bubbles: true })); } catch {}
+			}, 0);
+		}
 
-      // ➜ Προσαρτούμε ΣΤΟΝ WRAPPER (όχι στο body), ώστε το CSS absolute να δουλεύει χωρίς inline τοποθέτηση
-      wrapper.appendChild(popup);
+		/* ---------- listener για το +/- (resetBtn) ---------- */
+		/* Προϋπόθεση: υπάρχει μεταβλητή `resetBtn` και το αρχικό `tom` του πεδίου. */
+		if (!resetBtn.__wired) {
+			resetBtn.__wired = true;
 
-      // κουμπάκια αφαίρεσης μέσα στο popup
-      popup.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          ctrl.querySelector(`.item[data-value="${btn.dataset.val}"] .remove`)?.click();
-          popup.remove();
-          updateOverflow(tom);
-        });
-      });
+			// Κρατάμε το id του select για να βρίσκουμε ΠΑΝΤΑ το ΠΙΟ ΦΡΕΣΚΟ instance
+			const selectId = (tom?.input?.id) || (el && el.id) || null;
 
-      // κλείσιμο popup όταν κλικάρει έξω ή ξαναπατήσει το +N
-      document.addEventListener('click', function close(ev) {
-        if (!popup.contains(ev.target) && ev.target !== dot) {
-          popup.remove();
-          document.removeEventListener('click', close);
-        }
-      });
-    }, 0);
-  });
+			resetBtn.addEventListener('click', async (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				// Βρες το τρέχον instance (σε περίπτωση που έγινε reinit)
+				const tsInst = (selectId && document.getElementById(selectId)?.tomselect) || tom;
+				if (!tsInst) return;
+
+				tsInst.ignoreFocusOpen = true; // μην ανοίγει το dropdown ενώ κάνουμε μαζικές αλλαγές
+
+				try {
+				const hasTags = Array.isArray(tsInst.items) && tsInst.items.length > 0;
+
+				if (hasTags) {
+					// ========== ΚΑΘΑΡΙΣΜΑ ΟΛΩΝ (ΟΧΙ silent) ========== //
+					if (typeof tsInst.clear === 'function') tsInst.clear(false);
+					else tsInst.setValue([], false);
+
+					// εξαναγκασμένο change
+					forceChange(tsInst);
+
+				} else {
+					// ========== ΕΠΙΛΟΓΗ ΟΛΩΝ ========== //
+					let allValues = Object.values(tsInst.options || [])
+					.map(o => o && o.value)
+					.filter(v => v && v !== '__optgroup');
+
+					// Αν δεν υπάρχουν ακόμη options (remote), δοκίμασε να τα φορτώσεις
+					if (!allValues.length && typeof url === 'string') {
+						try {
+							const finalUrl = new URL(url, window.location.origin);
+							if (extraParams && typeof extraParams === 'object') {
+								Object.entries(extraParams).forEach(([k, v]) => {
+									if (v !== undefined && v !== null && v !== '') {
+										finalUrl.searchParams.set(k, v);
+									}
+								});
+							}
+							const resp = await fetch(finalUrl.toString(), { credentials: 'include' });
+							const json = await resp.json();
+							const items = Array.isArray(json?.items) ? json.items : (Array.isArray(json) ? json : []);
+							if (items.length) {
+								tsInst.addOptions(items);
+								allValues = items.map(i => i.value).filter(Boolean);
+							}
+						} catch (err) {
+							console.error('resetBtn remote load failed', err);
+						}
+					}
+
+					allValues = Array.from(new Set(allValues));
+					if (allValues.length) {
+					// ΟΧΙ silent για να εκπέμψει change
+					tsInst.setValue(allValues, false);
+
+					// εξαναγκασμένο change
+					forceChange(tsInst);
+					}
+				}
+				} finally {
+				tsInst.close();
+				tsInst.control_input?.blur?.();
+				tsInst.ignoreFocusOpen = false;
+				setTimeout(() => tsInst?.wrapper && updateOverflow(tsInst), 0);
+				}
+			});
+		}
+	}
+
+
+	// 🔹 ΕΙΔΙΚΗ ΜΕΤΑΧΕΙΡΙΣΗ για #kathgoria_symbashs:
+	//    - Πάντα κρατάμε ΟΡΑΤΗ την 1η επιλογή
+	//    - Την εμφανίζουμε με δυναμική περικοπή κειμένου (80–135 chars)
+	(function applyKathgoriaFirstItemTruncation(){
+		try {
+			if (!tom || !tom.input || tom.input.id !== 'kathgoria_symbashs') return;
+			const itemsList = Array.from(ctrl.querySelectorAll('.item')).filter(i => !i.closest('.ts-overflow-popup'));
+			if (!itemsList.length) return;
+			const firstEl = itemsList[0];
+			const v = firstEl.getAttribute('data-value') || '';
+			const opt = (tom.options && tom.options[v]) || {};
+			let lbl = String(opt.label || v || firstEl.textContent || '').trim();
+			if (!lbl) return;
+
+			// Δυναμικό όριο χαρακτήρων βάσει πλάτους TS ή οθόνης
+			var tsWidth = 0;
+			try { tsWidth = tom.wrapper && tom.wrapper.clientWidth ? tom.wrapper.clientWidth : 0; } catch(_){}
+			var width = tsWidth;
+			if (!width) {
+				width = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth
+					: (typeof screen !== 'undefined' ? screen.width : 1912);
+			}
+			var baselineW = tsWidth ? 1028 : 1912;
+			var baselineL = 130;
+			var dynLimit;
+			if (tsWidth) {
+				if (width <= 640) dynLimit = Math.round(baselineL * 640 / 1028);         // ~81
+				else if (width >= 1028) dynLimit = baselineL;                            // 130
+				else dynLimit = Math.round(baselineL * width / 1028);
+			} else {
+				dynLimit = Math.round(baselineL * width / baselineW);
+			}
+			if (!(typeof dynLimit === 'number' && isFinite(dynLimit))) dynLimit = baselineL;
+			// clamp περίπου 80–135
+			if (dynLimit < 80) dynLimit = 80;
+			if (dynLimit > 135) dynLimit = 135;
+
+			var shown = lbl.length > dynLimit ? (lbl.slice(0, dynLimit) + '…') : lbl;
+
+			// Χτίσε label span χωρίς να χαλάσεις το remove button
+			var removeEl = firstEl.querySelector('.remove');
+			// αφαίρεσε όλα τα παιδιά
+			var kids = Array.from(firstEl.childNodes);
+			for (var i=0;i<kids.length;i++){ firstEl.removeChild(kids[i]); }
+			var span = document.createElement('span');
+			span.className = 'ts-kathgoria-first';
+			span.textContent = shown;
+			span.title = lbl;
+			firstEl.appendChild(span);
+			if (removeEl) firstEl.appendChild(removeEl);
+			// κράτα σημείο ότι έγινε truncation (σε επόμενα rerender θα ξαναπαρθεί από tom.options[v].label)
+			firstEl.setAttribute('data-trunc', '1');
+		} catch (e) {
+		// ignore
+		}
+	})();
+
+	// 3. Υπολογισμός overflow */)
+	const ARROW = 36, GAP = 28;
+	const wrapW = wrapper.getBoundingClientRect().width;
+	let avail   = wrapW - ARROW;
+	let total   = 0;
+
+	const items = Array.from(ctrl.querySelectorAll('.item'))
+		.filter(i => !i.closest('.ts-overflow-popup'));
+
+	// καθάρισμα προηγούμενων δεικτών
+	ctrl.querySelector('.ts-overflow-indicator')?.remove();
+	ctrl.querySelector('.ts-overflow-popup')?.remove();
+
+	const hidden = [];
+	const pinFirst = (tom && tom.input && tom.input.id === 'kathgoria_symbashs' && items.length > 0);
+	for (let i = 0; i < items.length; i++) {
+		const el = items[i];
+		el.hidden = false; // δείξε το αρχικά
+		const w = el.offsetWidth + (parseInt(getComputedStyle(el).marginRight) || 0) + GAP;
+		if (total + w <= avail || (pinFirst && i === 0)) {
+			total += w;
+		} else {
+			hidden.push(el);
+		}
+	}
+	hidden.forEach(el => (el.hidden = true));
+
+	if (!hidden.length) return;   // early exit (resetBtn κρατήθηκε)
+
+	/* 4. +N indicator & ταξινομημένο popup -----------------------------*/
+	const dot = document.createElement('div');
+	dot.className = 'ts-overflow-indicator';
+	dot.tabIndex  = -1;
+	dot.textContent = `+${hidden.length}`;
+	dot.title       = `Πατήστε για εμφάνιση (${hidden.length} ακόμη)`;
+	ctrl.appendChild(dot);
+
+	// ---- αναγνώριση πεδίου -------------------------------------------------
+	const idOrName = String(tom.input?.id || tom.input?.name || '').toLowerCase();
+	const IS_EID = idOrName === 'eidikothta_symbashs' || /(^|[_-])eidikothta[_-]?symbashs($|[_-])/.test(idOrName);
+
+	// λίγο UX
+	try { dot.style.cursor = 'pointer'; dot.setAttribute('role','button'); } catch{}
+
+	// ---- (ΜΟΝΟ για Ειδικότητες) αφοπλίζουμε προσωρινά clear/reload --------
+	(function setupNoReloadOnPlusN() {
+		if (!IS_EID) return;
+		if (tom.__noReloadPatched) return;
+		tom.__noReloadPatched = true;
+
+		const armed = () => !!tom.__noReloadArmed;
+		const wrap = (obj, key) => {
+			const orig = obj[key] && obj[key].bind(obj);
+			if (!orig) return;
+			obj[key] = (...a) => (armed() ? undefined : orig(...a));
+		};
+
+		wrap(tom, 'clear');
+		wrap(tom, 'clearOptions');
+		wrap(tom, 'load');
+		wrap(tom, 'addOption');
+		wrap(tom, 'addOptions');
+
+		// οπλίζουμε το "no reload" για λίγο όταν πατηθεί το +N των ειδικοτήτων
+		const arm = () => {
+			tom.__noReloadArmed = true;
+			clearTimeout(tom.__noReloadTimer);
+			tom.__noReloadTimer = setTimeout(() => (tom.__noReloadArmed = false), 600);
+		};
+		// θα το καλέσουμε μέσα στα mousedown/touchstart για IS_EID
+		dot.__armNoReload = arm;
+	})();
+
+	// ---- helper: άνοιγμα του overflow popup -------------------------------
+	const openOverflowPopup = () => {
+		// κλείσε αν υπάρχει ήδη
+		if (ctrl.querySelector('.ts-overflow-popup')) return;
+
+		// μην ανοίγει/κλείνει το TS από focus
+		tom.ignoreFocusOpen = true;
+		try { tom.control_input.blur(); } catch {}
+		setTimeout(() => {
+			tom.ignoreFocusOpen = false;
+			if (ctrl.querySelector('.ts-overflow-popup')) return;
+
+			const popup = document.createElement('div');
+			popup.className = 'ts-overflow-popup';
+			try { Object.assign(popup.style, { maxHeight: '408px', overflowY: 'auto' }); } catch {}
+
+			const to4 = (s) => String(s ?? '').replace(/\D/g,'').padStart(4,'0');
+
+			const getEidIndex = () => {
+				if (!window.__eidikothta_index) {
+					let arr = window.eidikothta_symbashs_table || window.eidikothta_symbashs || [];
+					try { if (typeof arr === 'string') arr = JSON.parse(arr); } catch {}
+					if (!Array.isArray(arr)) {
+						if (arr && Array.isArray(arr.data)) arr = arr.data;
+						else if (arr && typeof arr === 'object') arr = Object.values(arr);
+						else arr = [];
+					}
+					const m = new Map();
+					for (const r of arr) if (r && r.kodikos != null) m.set(to4(r.kodikos), String(r.afora_thn_symbash_kathgoria || ''));
+					window.__eidikothta_index = m;
+				}
+				return window.__eidikothta_index;
+			};
+
+			const codeOf = (v) => {
+				const o = (tom.options && tom.options[v]) || (selectedCache && selectedCache[v]) || {};
+				return (o.kodikos != null) ? to4(o.kodikos) : to4((v.split?.('|')[0] || v));
+			};
+			const catOf = (v) => {
+				const o = (tom.options && tom.options[v]) || (selectedCache && selectedCache[v]) || {};
+				if (o.afora_thn_symbash_kathgoria) return String(o.afora_thn_symbash_kathgoria);
+				const idx = getEidIndex();
+				return idx.get(codeOf(v)) || '';
+			};
+			const makeLabel = (v) => {
+				const o = (tom.options && tom.options[v]) || (selectedCache && selectedCache[v]) || {};
+				const code = (o.kodikos != null) ? to4(o.kodikos) : to4((v.split?.('|')[0] || v));
+				const desc = String(o.perigrafh || o.description || '').trim();
+				const base = String(o.label || o.text || '').trim();
+				if (desc) return `${code} - ${desc}`;
+				if (base) return base.includes(' - ') ? base : `${code} - ${base}`;
+				return code;
+			};
+
+			const sorted = hidden.slice().sort((a, b) => {
+				const av = a.dataset.value, bv = b.dataset.value;
+				const byCat = catOf(av).localeCompare(catOf(bv), undefined, { numeric: true, sensitivity: 'base' });
+				return byCat !== 0 ? byCat : codeOf(av).localeCompare(codeOf(bv), undefined, { numeric: true, sensitivity: 'base' });
+			});
+
+			let html = '';
+			let prevCat = null;
+			for (const el of sorted) {
+				const v   = el.dataset.value;
+				const cat = catOf(v);
+				const l   = makeLabel(v);
+
+				// Ομαδοποιημένος header ΜΟΝΟ για Ειδικότητες
+				if (IS_EID && (prevCat === null || cat !== prevCat)) {
+					if (prevCat !== null) html += `<div style="height:8px"></div>`; // μικρό κενό πριν από νέα ομάδα
+					html += `<div class="ts-popup-sep" role="separator" style="height:1px;background:#e5e7eb;margin:4px -6px 6px;"></div>`;
+					html += `<div class="ts-popup-sep-labeled" style="font-weight:700;font-size:15px;line-height:1.25;color:#111827;margin:2px 0 6px 6px;">Κατηγορία ${String(cat || '').padStart(4,'0')}</div>`;
+				} else if (!IS_EID && prevCat !== null && cat !== prevCat) {
+					// στα υπόλοιπα πεδία: απλός separator μόνο όταν αλλάζει κατηγορία
+					html += `<div class="ts-popup-sep" role="separator"></div>`;
+				}
+
+				html += `<div class="ts-popup-row"><span>${l}</span><button data-val="${v}" title="Αφαίρεση"><i class="bi bi-trash3"></i></button></div>`;
+				prevCat = cat;
+			}
+			popup.innerHTML = html;
+
+    		wrapper.appendChild(popup);
+
+			// κουμπί "Αφαίρεση" σε κάθε γραμμή του popup
+			popup.querySelectorAll('button').forEach((btn) => {
+				btn.addEventListener('click', (ev) => {
+					ev.preventDefault();
+					ev.stopPropagation();
+
+					const val = btn.dataset.val;
+					const removeBtn = ctrl.querySelector(`.item[data-value="${val}"] .remove`);
+					if (removeBtn) {
+						removeBtn.click();
+					}
+
+					popup.remove();
+					updateOverflow(tom);
+				});
+			});
+
+			// κλείσιμο popup όταν κλικάρει έξω ή ξαναπατήσει το +N
+			document.addEventListener('click', function close(ev) {
+				const clickOutside = !popup.contains(ev.target);
+				const clickedDot   = (ev.target === dot);
+				if (clickOutside && !clickedDot) {
+					popup.remove();
+					document.removeEventListener('click', close);
+				}
+			});
+		}, 0);
+	};
+
+	// ---- ενεργοποίηση στο mousedown/touchstart (για να ΜΗ χάνεται το click) --
+	const onPress = (ev) => {
+	ev.preventDefault();               // σταματά την προεπιλογή του TS (focus toggle)
+	ev.stopPropagation();
+	if (IS_EID && typeof dot.__armNoReload === 'function') dot.__armNoReload();
+	openOverflowPopup();
+	};
+	dot.addEventListener('mousedown',   onPress, { capture: true });
+	dot.addEventListener('pointerdown', onPress, { capture: true });
+	dot.addEventListener('touchstart',  onPress, { capture: true, passive: false });
+
+	// Προαιρετικά: fallback για πληκτρολόγιο
+	dot.addEventListener('click', (e) => {
+	if (IS_EID) { e.preventDefault(); e.stopPropagation(); }
+	openOverflowPopup();
+	});
 }
 
 window.tomDropdownConfig = {
-  setRender  : (id, r) => (globalRenderMap[id] = r),
-  setHooks   : (id, h) => (globalHookMap[id]  = h),
-  setTemplate: (id, t) => (templateCache[id]  = t)
+	setRender  : (id, r) => (globalRenderMap[id] = r),
+	setHooks   : (id, h) => (globalHookMap[id]  = h),
+	setTemplate: (id, t) => (templateCache[id]  = t)
 };

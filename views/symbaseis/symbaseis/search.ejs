@@ -27,7 +27,7 @@
         </table>
     </div>
 
-    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-35 bg-white">
+    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-58 bg-white">
         <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
             <tbody>
                 <% if (symbaseisFilteredRecs && symbaseisFilteredRecs.length> 0) { %>
@@ -171,4 +171,5 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/symbaseis/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

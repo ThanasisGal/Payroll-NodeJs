@@ -1,118 +1,138 @@
 <div class="margin-top-1rem">
-    <div class="container-fluid height-vh-100 padding-0">
-        
-        <% const safe = (k) => (rec && rec[k]) || ''; %>
+	<div class="container-fluid height-vh-100 padding-0">
 
-        <div class="sections margin-top-1rem">
-            <section class="sel_1_section visible" data-section="">
-                <div>
-                    <form class="formRadius">
+		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
-                        <%- include('../../partials/_csrfField') %>
-                        </br> </br> </br>
-                        
-                        <div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
+		<div class="sections margin-top-1rem">
+			<section class="sel_1_section visible" data-section="">
+				<div>
+					<form class="formRadius">
 
-                            <div class="card-header p-2 height-rem-3_5">
-                                <label class="text-center w-100 headers-content">
-                                Εισαγωγή Νέας Ειδικότητας Σύμβασης
-                                </label>
+						<%- include('../../partials/_csrfField') %>
+						</br> </br> </br>
+
+						<div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
+
+							<div class="card-header p-2 height-rem-3_5">
+								<label class="text-center w-100 headers-content">
+									Εισαγωγή Νέας Ειδικότητας Σύμβασης
+								</label>
+							</div>
+
+                            <%
+                            const kodikosStr = String(kathgoria?.[0]?.kodikos ?? '').padEnd(10, '\u00A0');
+                            const perigrafhStr = String(kathgoria?.[0]?.perigrafh ?? '');
+                            const labelDescr = kodikosStr + perigrafhStr;
+
+                            const len = labelDescr.length;
+                            const heightClass = len <= 90 
+                                    ? 'height-vh-25'
+                                    : len <= 200 ? 'height-vh-28'
+                                    : 'height-vh-30';
+                            %>
+    
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white <%= heightClass %>" id="cardBody">
+								<input type="hidden" id="aa" name="aa" value="<%= aa_value.toString().padStart(4, '0') %>" />
+								
+                                <input type="hidden" id="aa_kodikos" name="aa_kodikos" value="<%= aa_kodikos.toString().padStart(4, '0') %>" />
+
+								<input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %>" />
+
+                                <div class="row form-group g-3 align-items-center margin-top--2rem font-size-rem-1_1 mb-3">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            class="col-form-label label-font-size">
+                                            Σύμβαση &nbsp;
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5 left-align font-size-rem-1_1 font-weight-600 cdarkgreen">
+                                        <label>
+                                            <%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="row form-group g-3 align-items-center margin-top--1_5rem">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            class="col-form-label label-font-size">
+                                            Κατηγορία &nbsp;
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cgreen">
+                                        <label>
+                                            <%= kathgoria[0].kodikos.padEnd(10, '\u00A0') + kathgoria[0].perigrafh %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <hr class="hr-style mb-4" />
+
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                        for="kodikos"
+                                        class="col-form-label label-font-size">
+                                        Κωδικός
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="col-1-2">
+                                        <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= aa_kodikos.toString().padStart(4, '0') %>" readonly />
+                                    </div>
+                                </div>
+                
+                                </br>
+                
+                                <div class="row form-group g-3 align-items-center mb-1">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                        for="perigrafh"
+                                        class="col-form-label label-font-size field-required">
+                                        Περιγραφή
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5">
+                                        <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="" />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-25 bg-white" id="cardBody">
-								<input type="hidden" name="aa" id="aa" value="<%= aa_value.toString().padStart(4, '0') %>" />
-								<input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %>" />
-          
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      class="col-form-label label-font-size">
-                      Σύμβαση
-                    </label>
-                  </div>
-                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
-                    <label><%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %></label>
-                  </div>
+                            <div class="card-footer mt-auto cardFooter">
+                                <div class="d-inline-block d-flex cardFooter01">
+                                    <button
+                                        type="button"
+                                        class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
+                                        <i class="bi bi-floppy"></i> Αποθήκευση
+                                    </button>
+                                    <a
+                                        class="btn btn-brown buttons-content rounded-4 mt-2 w-20 backButton"
+                                        href="/symbaseis/eidikothtes">
+                                        <i class="bi bi-chevron-double-left"></i> 
+                                        Επιστροφή
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                
-                </br>
-
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      class="col-form-label label-font-size">
-                      Κατηγορία
-                    </label>
-                  </div>
-                  <div class="col-10-5 left-align" style="font-size: 1vw; font-weight: 600;">
-                    <label><%= kathgoria[0].kodikos.padEnd(10, '\u00A0') + kathgoria[0].perigrafh %></label>
-                  </div>
-                </div>
-                
-                </br>
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="kodikos"
-                      class="col-form-label label-font-size">
-                      Κωδικός
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= aa_kodikos.toString().padStart(4, '0') %>" readonly />
-                  </div>
-                </div>
-                
-                </br>
-                
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 right-align">
-                    <label
-                      for="perigrafh"
-                      class="col-form-label label-font-size field-required">
-                        Περιγραφή
-                    </label>
-                  </div>
-                  <div class="col-10-5">
-                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="" />
-                  </div>
-                </div>
-              </div>
-              <div
-                class="card-footer mt-auto"
-              >
-                <div
-                  class="d-inline-block d-flex"
-                  style="
-                    margin-top: -0.5rem !important;
-                    margin-bottom: -1rem !important;
-                    margin-left: 10px !important;
-                    margin-right: 10px !important;
-                    justify-content: space-around;
-                  "
-                >
-                  <button
-                    type="button"
-                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton" 
-                  >
-                    <i class="bi bi-floppy"></i> Αποθήκευση
-                  </button>
-                  <a
-                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
-                    href="/symbaseis/eidikothtes"
-                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                  </a>
-                </div>
-              </div>
-            </div>
-          </form>
+            </section>
         </div>
-      </section>
     </div>
-
-    <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/symbaseis/eidikothtes/getFieldValues.js"></script>
-    <!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
-  </div>
 </div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/eidikothtes/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

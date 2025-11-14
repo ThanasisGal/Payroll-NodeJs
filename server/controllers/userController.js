@@ -1197,6 +1197,62 @@ static sendUserVerifyEmail = async (req, res) => {
         }
     };
 
+//     static logout = (req, res) => {
+//         const sid = req.sessionID;
+
+//         req.session.destroy(err => {
+//             if (err) {
+//                 console.error('logout destroy error:', err);
+//                 return res.redirect('/');
+//             }
+
+//             // προαιρετικό – καθαρίζει και από το store
+//             try { req.sessionStore?.destroy?.(sid); } catch {}
+
+//             // καθάρισε το session cookie
+//             res.clearCookie(sessionOpts.name || 'sid', {
+//                 path    : sessionOpts.cookie.path ?? '/',
+//                 sameSite: sessionOpts.cookie.sameSite ?? 'lax',
+//                 httpOnly: sessionOpts.cookie.httpOnly !== false,
+//                 secure  : sessionOpts.cookie.secure ?? false,
+//             });
+//             // ΣΤΟ ΣΗΜΕΙΟ ΑΥΤΟ στέλνουμε ένα μικρό HTML που καθαρίζει το sessionStorage
+//             // και μετά κάνει redirect με status 200 ή 204 που λέει στον server πρώτα να
+//             // τρέξει το html στον browser και μετά να κανει redirect αλλιώς αν στείλουμε
+//             // status 303 ή 301 ή 300 τότε ο server θα αγνοήσει το html και θα κάνει 
+//             // άμεσα redirect με αποτέλεσμα να μην καθαρίζει το sessionStorage.
+
+//             const redirectUrl = 'https://www.google.com';   // ή '/login' ή ό,τι θες
+
+//             return res.status(200).send(`
+//                 <!doctype html>
+//                 <html lang="el">
+//                     <head>
+//                         <meta charset="utf-8" />
+//                         <title>Αποσύνδεση...</title>
+//                     </head>
+//                     <body>
+//                         <script>
+//                             try {
+//                                 // σβήσε ΜΟΝΟ όσα αρχίζουν από "wps:"
+//                                 for (const k of Object.keys(sessionStorage)) {
+//                                     if (k.startsWith('wps:')) {
+//                                         sessionStorage.removeItem(k);
+//                                     }
+//                                 }
+//                             } catch (e) {
+//                                 // αν ο browser δεν το επιτρέπει, απλώς προχώρα
+//                             }
+//                             // και μετά redirect
+//                             window.location.href = ${JSON.stringify(redirectUrl)};
+//                         </script>
+//                     </body>
+//                 </html>
+//             `);
+//         });
+//     };
+// }
+
     static logout = (req, res) => {
         const sid = req.sessionID;
 
@@ -1206,21 +1262,45 @@ static sendUserVerifyEmail = async (req, res) => {
                 return res.redirect('/');
             }
 
-            // προαιρετικό – καθαρίζει και από το store
             try { req.sessionStore?.destroy?.(sid); } catch {}
 
-            // καθάρισε το session cookie
             res.clearCookie(sessionOpts.name || 'sid', {
                 path    : sessionOpts.cookie.path ?? '/',
                 sameSite: sessionOpts.cookie.sameSite ?? 'lax',
                 httpOnly: sessionOpts.cookie.httpOnly !== false,
                 secure  : sessionOpts.cookie.secure ?? false,
             });
-            // console.log('Set-Cookie on logout:', res.getHeader('Set-Cookie'));
-            // για POST->GET redirect είναι σωστό το 303, δουλεύει τέλεια και για GET
-            return res.redirect(303, 'https://www.google.com');
+
+            const nonce = res.locals.nonce;
+            const redirectUrl = 'https://www.google.com'; // ή '/login'
+
+            return res.status(200).send(`
+                <!doctype html>
+                <html lang="el">
+                    <head>
+                        <meta charset="utf-8" />
+                        <title>Αποσύνδεση...</title>
+                    </head>
+                    <body>
+                        <script nonce="${nonce}">
+                            try {
+                                // σβήσε ΜΟΝΟ όσα αρχίζουν από "wps:"
+                                for (const key of Object.keys(window.sessionStorage)) {
+                                    if (key && key.indexOf('wps:') === 0) {
+                                        window.sessionStorage.removeItem(key);
+                                    }
+                                }
+                            } catch (e) {
+                                // αγνόησέ το
+                            }
+                            // μετά redirect
+                            window.location.href = ${JSON.stringify(redirectUrl)};
+                        </script>
+                    </body>
+                </html>
+            `);
         });
-    }
+    };
 }
 
 module.exports = userController;

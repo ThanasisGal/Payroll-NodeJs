@@ -62,6 +62,7 @@ const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/ka
 const symbaseisController                   = require('../controllers/symbaseisController');
 const kathgoriesApoSymbaseis                = require('../dropdowns/symbaseis/kathgoriesApoSymbaseis');
 const eidikothtesApoKathgories              = require('../dropdowns/symbaseis/eidikothtesApoKathgories');
+const eidikothtesApoKathgoriesMulti         = require('../dropdowns/symbaseis/eidikothtesApoKathgories-multi');
 
 const   {
             YpokatasthmataModel,
@@ -294,9 +295,11 @@ router.get('/ergazomenoi/kentro_kostoys',               buildDropdownRoute(Kentr
 router.get('/symbaseis/symbash',                        buildDropdownRoute(SymbaseisModel , symbaseis.options));
 router.get('/symbaseis/kathgories',                     buildDropdownRoute(KathgoriesSymbaseonModel, kathgoriesSymbaseon.options));
 // 2) ΠΙΝΑΚΑΣ με pagination (το νέο endpoint)
-router.get('/api/symbaseis/kathgories',                 symbaseisController.listKathgoriesSymbaseon);
+// router.get('/api/symbaseis/kathgories',                 symbaseisController.listKathgoriesSymbaseon);
+router.get('/symbaseis/kathgories',                 symbaseisController.listKathgoriesSymbaseon);
 router.get('/symbaseis/kathgoria_symbashs',             buildDropdownRoute(KathgoriesSymbaseonModel, kathgoriesApoSymbaseis.options));
 router.get('/symbaseis/eidikothta_symbashs',            buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgories.options));
+router.get('/symbaseis/eidikothta_symbashs_multi',      buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgoriesMulti.options));
 
 
 

@@ -3,7 +3,9 @@
         "pososto_apasxolhshs_kk1",
         "pososto_apasxolhshs_kk2",
         "pososto_apasxolhshs_kk3",
-        "pososto_apasxolhshs_kk4"
+        "pososto_apasxolhshs_kk4",
+        "poso",
+        "pososto",
     ];
 
     function parseToNumber(str) {
@@ -24,7 +26,7 @@
     function onBlur(e) {
         const el = e.target;
         const num = parseToNumber(el.value);
-        if (num == null) { el.value = ""; return; }
+        if (num == null) { el.value = 0.00; return; }
 
         // σεβασμός min/max αν υπάρχουν
         let v = num;

@@ -1,5 +1,5 @@
 // /static/js/common/initTomDropdowns.js
-import { initTomDropdown } from '/static/js/dropdown-item.js'; // προσαρμόσ’ το path αν χρειάζεται
+import { initTomDropdown, attachInlineSummary } from '/static/js/dropdown-item.js';
 
 // Global registry για instances (ώστε να μη διπλο-αρχικοποιούνται)
 window.__tomInstances = window.__tomInstances || {};
@@ -62,6 +62,8 @@ export function initOneTomSelect(sel) {
     const instance = ts || window.__tomInstances[key];
     if (!instance) return;
 
+    attachInlineSummary(instance, sel);
+    
     // Μόνο για την Ασφαλιστική Κλάση: φαρδύ dropdown & δεξιά ευθυγράμμιση (expand left)
     // ⬇️ ΠΡΟΣΟΧΗ: εδώ ΔΕΝ συμπεριλαμβάνεται πλέον το eidikothta_erganh
     if (sel.dataset.ddWide === 'true' || sel.id === 'asfalistikh_klash') {

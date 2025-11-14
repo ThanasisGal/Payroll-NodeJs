@@ -1,139 +1,280 @@
-<div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mt-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;"></br>
-</div>
-<!-- </br> -->
-<div class="container">
-  <form class="formRadius">
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom bg-hero-cdn height-rem-3_5"></div>
 
-    <div class="card d-flex flex-column z-depth-5">
-      <div class="card-header p-0" style="height: 3.5rem !important;">
-        <label class="text-center w-100 headers-content mt-2">
-          Υπολογισμός Κλιμακίων Συμβάσεων
-        </label>
-      </div>
-      
-      <div class="card-body overflow-auto flex-grow w-95" style="height: 64vh; background-color: #ffffff; margin-left: 5%" >
+<div class="card d-flex flex-column z-depth-5 w-92 margin-left-percent-4 overflow-hidden">
 
-        <input type="hidden" id="kodikosSymbashs" name="kodikosSymbashs" />
-        <input type="hidden" id="kodikosKathgorias" name="kodikosKathgorias" />
-        <input type="hidden" id="kodikosEidikothtas" name="kodikosEidikothtas" />
+    <% const safe = (k) => (rec && rec[k]) || ''; %>
 
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label class="col-form-label field-required" style="font-size: 12px;">
-              Περίοδος Ισχύος της Σύμβασης
-            </label>
-          </div>
+	<input type="hidden" id="kodikosSymbashs" name="kodikosSymbashs" />
+	<input type="hidden" id="kodikosKathgorias" name="kodikosKathgorias" />
+	<input type="hidden" id="kodikosEidikothtas" name="kodikosEidikothtas" />
+    <input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
 
-          <div class="col-2 left-align">
-            <label for="isxyei_apo" class="col-form-label label-font-size">
-              Από Ημ/νία Έναρξης
-            </label>
-          </div>
-          <div class="col-2-5">
-            <input type="date" name="isxyei_apo" id="isxyei_apo" class="date-control" value="" />
-          </div>
-          <div class="col-2 left-align">
-            <label for="isxyei_eos" class="col-form-label label-font-size">
-              Έως Ημ/νία Λήξης
-            </label>
-          </div>
-          <div class="col-2-5">
-            <input type="date" name="isxyei_eos" id="isxyei_eos" class="date-control" value="" />
-          </div>
-        </div>
-
-        </br>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="symbash" class="col-form-label label-font-size field-required" >
-              Σύμβαση
-            </label>
-          </div>
-      
-          <div class="col-9">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="symbash" id="symbash">
-            </select>
-          </div>
-          <button
-            type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-001" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Σύμβαση, Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-            <i class="bi bi-trash" style="color: red"></i> 
-          </button>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
-              Κατηγορία Σύμβασης
-            </label>
-          </div>
-          <div class="col-9">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kathgoria_symbashs" id="kathgoria_symbashs" disabled>
-            </select>
-          </div>
-          <button
-            type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-002" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-            <i class="bi bi-trash" style="color: red"></i> 
-          </button>
-        </div>
-
-        <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-          <div class="col-2 left-align">
-            <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
-              Ειδικότητα Σύμβασης
-            </label>
-          </div>
-          <div class="col-9">
-            <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_symbashs" id="eidikothta_symbashs" disabled>
-            </select>
-          </div>
-          <button
-          type="button" class="btn rounded-4 mt-2 col-1" id="clearSelectSymbaseon-003" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός των πεδίων Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-          <i class="bi bi-trash" style="color: red"></i> 
-          </button>
-        </div>
-
-        </br>
-
-        <div id="stoixeiaSymbaseonContainer">
-          <!-- Εδώ θα προστεθούν δυναμικά τα label στοιχεία -->
-        </div>
-
-      </div>
-
-      <div class="card-footer">
-        <div
-          class="d-inline-block d-flex"
-          style="
-            margin-top: -0.5rem !important;
-            margin-bottom: -1rem !important;
-            margin-left: 10px !important;
-            margin-right: 10px !important;
-            justify-content: space-around;">
-          
-          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" id="calculateButton"><i class="bi bi-calculator"></i> 
-            Υπολογισμός
-          </a>
-          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" id="updateButton"><i class="bi bi-floppy"></i> 
-            Ενημέρωση
-          </a>
-          <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp"><i class="bi bi-chevron-double-left"></i> 
-            Επιστροφή
-          </a>
-        </div>
-      </div>
+    <div class="card-header height-rem-4">
+        <label class="text-center w-100 headers-content margin-bottom-1rem">Υπολογισμός Κλιμακίων Συμβάσεων</label>
     </div>
-  </form>
+
+	<div class="row form-group g-1 align-items-center bg-white">
+		<div class="col-2 left-align margin-left-1rem">
+			<label class="col-form-label label-font-size field-required ">
+			Περίοδος Ισχύος της Σύμβασης
+			</label>
+		</div>
+
+		<div class="col-0-75"></div>
+
+		<div class="col-2 right-align">
+		<label for="isxyei_apo" class="col-form-label label-font-size">
+			Από Ημ/νία Έναρξης
+		</label>
+		</div>
+		<div class="col-1-5">
+		<input type="date" name="isxyei_apo" id="isxyei_apo" class="date-control" value="" />
+		</div>
+		<div class="col-2 right-align">
+		<label for="isxyei_eos" class="col-form-label label-font-size">
+			Έως Ημ/νία Λήξης
+		</label>
+		</div>
+		<div class="col-1-5">
+		<input type="date" name="isxyei_eos" id="isxyei_eos" class="date-control" value="" />
+		</div>
+	</div>
+
+    <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_5rem">
+        <div class="col-2 left-align">
+            <label for="symbash" class="col-form-label label-font-size field-required">
+            Επιλέξτε Σύμβαση
+            </label>
+        </div>
+
+        <input
+            type="hidden"
+            name="symbash_stathera"
+            id="symbash_stathera"
+            class="form-control input-contents"
+            value="<%= safe("symbash_stathera") %>"
+        />
+
+        <div class="col-9-5">
+            <select
+                id="symbash"
+                name="symbash"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                aria-label="Συμβάσεις"
+                data-api="/api/dropdown/symbaseis/symbash"
+                single
+                data-target-input=<%= `symbash_stathera` %>
+                data-preselect="symbash_stathera"
+                data-preload-all="true"
+                data-pad-length="4"
+                data-xrhsh-related="false"
+                data-team-related="false"
+                data-company-related="false"
+                data-mhnas-related="false"
+                placeholder="Αναζήτηση Σύμβασης">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem margin-bottom-0_3rem margin-left-1rem">
+        <div class="col-2-00 left-align">
+            <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
+            Επιλέξτε Κατηγορία
+            </label>
+        </div>
+        
+        <!-- Κατηγορία: MULTIPLE -->
+        <input 
+			type="hidden" 
+			id="kathgoria_symbashs_stathera" 
+			name="kathgoria_symbashs_stathera"
+			class="form-control input-contents" 
+			value="<%= safe('kathgoria_symbashs_stathera') %>" 
+		/>
+
+		<!-- ΠΡΟΣΘΗΚΗ: θα αποθηκεύουμε εδώ όλο τον πίνακα [{aa,kodikos},...] σε JSON -->
+		<input 
+			type="hidden" 
+			id="kathgoria_symbashs_table" 
+			name="kathgoria_symbashs_table" 
+			value="[]"
+		/>
+        
+        <div class="col-9-24">
+            <select
+                id="kathgoria_symbashs"
+                name="kathgoria_symbashs[]"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                aria-label="Κατηγορίες Συμβάσεων"
+                data-api="/api/dropdown/symbaseis/kathgoria_symbashs"
+                multiple
+                data-target-input="kathgoria_symbashs_stathera"
+                data-target-table="kathgoria_symbashs_table"
+                data-preselect="kathgoria_symbashs_stathera"
+                data-extra-filter="symbash_stathera"
+                data-preload-all="true"
+                data-pad-length="4"
+                data-reserve-right="28"
+                placeholder="Αναζήτηση Κατηγορίας Σύμβασης">
+            </select>
+        </div>
+    </div>
+
+    <div class="row form-group g-1 align-items-center margin-left-1rem ">
+        <div class="col-2-00 left-align">
+            <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required margin-top--0_2rem">
+            Επιλέξτε Ειδικότητα
+            </label>
+        </div>
+
+        <input 
+			type="hidden" 
+			id="eidikothta_symbashs_stathera" 
+			name="eidikothta_symbashs_stathera" 
+			class="form-control input-contents" value="<%= safe('eidikothta_symbashs_stathera') %>" 
+		/>
+
+		<input 
+			type="hidden" 
+			id="eidikothta_symbashs_table" 
+			name="eidikothta_symbashs_table" 
+			value="[]"
+		/>
+
+        <div class="col-9-24">
+            <select
+                id="eidikothta_symbashs"
+                name="eidikothta_symbashs[]"
+                class="tom-dropdown selectpicker-dropdown-normal left-align w-100 mb-3"
+                aria-label="Ειδικότητα Συμβάσεων"
+                data-api="/api/dropdown/symbaseis/eidikothta_symbashs_multi"
+                multiple
+
+                data-preselect="eidikothta_symbashs_stathera"
+                data-target-input="eidikothta_symbashs_stathera"
+                data-target-table="eidikothta_symbashs_table"
+                
+                data-extra-filter="symbash_stathera"
+                data-extra-filter2="kathgoria_symbashs_table"
+                data-extra-filter2-src="kathgoria_symbashs_table"
+
+                data-optgroup-by="afora_thn_symbash_kathgoria"
+                data-optgroup-extract="last4"
+                data-optgroup-field="__group"
+                data-optgroup-label-source="kathgoria_symbashs"
+
+                data-inline-peek="2"
+                data-inline-mode="kodikos"
+
+                data-preload-all="true"
+                data-pad-length="4"
+                data-reserve-right="28"
+                placeholder="Αναζήτηση Ειδικότητας Σύμβασης">
+            </select>
+        </div>
+    </div>
+    <div>
+        <table class="table table-striped table-bordered table-sm table-hover mb-0 w-100" id="myTableHeader">
+            <thead class="backgroundColor-brown center-align">
+                <tr class="color-brown">
+                    <th scope="col" class="col-1 font-size-vw-1">Κατηγορίες</th>
+                    <th scope="col" class="col-1 font-size-vw-1">Ειδικότητες</th>
+                    <th scope="col" class="col-1 font-size-vw-1">Κωδικός Στοιχείων</th>
+                    <th scope="col" class="col-6 font-size-vw-1">Περιγραφή Στοιχείων Σύμβασης</th>
+                    <th scope="col" class="col-1 font-size-vw-1">α/α Κλιμακίων</th>
+                    <th scope="col" class="col-1 font-size-vw-1">Ποσό</th>
+                    <th scope="col" class="col-1 font-size-vw-1">Κατάσταση</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+
+	<div class="card-body p-0 overflow-auto flex-grow-1 height-vh-42 bg-white">
+		<table class="table table-striped table-bordered table-sm table-hover w-100" id="myTable">
+			<tbody class="font-size-vw-0_875">
+			</tbody>
+		</table>
+	</div>
+
+    <div class="card-footer cardFooter margin-left--1_5rem">
+        <div class="d-inline-block d-flex cardFooter01">
+            <div class="d-flex cardFooter02">
+                <a 
+                    id="add-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" 
+                    title="Υπολογισμός των κλιμακίων των συμβάσεων"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content margin-left-1rem mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-calculator"></i> Υπολογισμός
+                </a>
+			
+                <a 
+                    id="edit-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" 
+                    title="Ενημέρωση της Βάσης Δεδομένων των Κλιμακίων Συμβάσεων"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-pencil-square"></i> Ενημέρωση
+                </a>
+
+                <a 
+                    id="back-btn"
+                    href="/mainapp"
+                    role="button"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="bottom"
+                    data-tooltip-max-width="10vw"
+                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
+                    <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+	   		</div>
+
+			<div class="d-flex width-percent-35"></div>
+		</div>
+    </div>
 </div>
 
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+    window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
+</script>
+
+<!-- Common helpers (ίδια όπως στις Ειδικότητες) -->
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
+<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3-multi.js"></script>
+
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/externalRowTrash<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ts-inline-summary<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/ypologismos<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
 
 
 
-<script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/addStoixeiaSymbaseon.js"></script>
+
+<!-- <script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/addStoixeiaSymbaseon.js"></script>
 <script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/loadDropdowns_ypologismoi.js"></script>
 <script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/clearSelects.js"></script>
 <script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/ypologismos.js"></script>
 <script nonce="<%= nonce %>" src="/static/js/symbaseis/ypologismoiKlimakion/enhmerosh.js"></script>
-<!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
+<script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->

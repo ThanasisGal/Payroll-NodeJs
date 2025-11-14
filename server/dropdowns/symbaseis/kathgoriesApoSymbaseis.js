@@ -34,6 +34,7 @@ module.exports = {
         kodikos: kod,
         perigrafh: per,
         afora_thn_symbash: String(doc.afora_thn_symbash || '').trim(),
+        aa: String(doc.aa),
         id: String(doc._id || ''),
       };
     },

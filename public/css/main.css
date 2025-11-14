@@ -601,7 +601,10 @@ small,
 .mt-5-5 { margin-top: 4rem !important; }
 .mt-10 { margin-top: 10rem !important; }
 
-.mt-n-0-5 { margin-top: -0.5rem; }
+.mt-n-0-0_75 { margin-top: -0.075rem !important; }
+.mt-n-0-15 { margin-top: -0.15rem !important; }
+.mt-n-0-2 { margin-top: -0.2rem !important; }
+.mt-n-0-5 { margin-top: -0.5rem !important; }
 .mt-n-1 { margin-top: -1rem; }
 .mt-n-1-3 { margin-top: -1.3rem; }
 .mt-n-1-3-0 { margin-top: -1.3rem; }
@@ -708,7 +711,10 @@ small,
 .col-1-7 { flex: 0 0 auto; width: 14.17%; }
 .col-1-75 { flex: 0 0 auto; width: 14.58%; }
 .col-1-9 { flex: 0 0 auto; width: 15.83%; }
+.col-1-95 { flex: 0 0 auto; width: 16.25%; }
+.col-2-00 { flex: 0 0 auto; width: 17.5%; }
 .col-2-0 { flex: 0 0 auto; width: 18%; }
+.col-2-1 { flex: 0 0 auto; width: 17.50%; }
 .col-2-25 { flex: 0 0 auto; width: 18.75%; }
 .col-2-26 { flex: 0 0 auto; width: 18.83%; }
 .col-2-27 { flex: 0 0 auto; width: 18.91%; }
@@ -3824,6 +3830,7 @@ select.tom-dropdown {
 
 .cred { color: #ff0000 !important; }
 .cgreen { color: #008000; }
+.cdarkergreen { color: #006500; }
 .cdarkgreen { color: #005000; }
 .cwhite { color: #ffffff; }
 .cblack { color: #000000; }
@@ -3947,6 +3954,7 @@ select.tom-dropdown {
 .margin-top-0_1rem      { margin-top: 0.1rem; }
 .margin-top-0_2rem      { margin-top: 0.2rem; }
 .margin-top-0_5rem      { margin-top: 0.5rem; }
+.margin-top-0_75rem     { margin-top: 0.75rem !important; }
 .margin-top-1rem        { margin-top: 1rem; }
 .margin-top-1_5rem      { margin-top: 1.5rem; }
 .margin-top-2rem        { margin-top: 2rem; }
@@ -3983,6 +3991,7 @@ select.tom-dropdown {
 .margin-bottom--0_5rem  { margin-bottom: -0.5rem !important; }
 .margin-bottom--1rem    { margin-bottom: -1rem !important; }
 
+.margin-bottom-0_3rem  { margin-bottom: 0.3rem !important; }
 .margin-bottom-1rem     { margin-bottom: 1rem !important; }
 
 .padding-0              { padding: 0; }
@@ -3996,6 +4005,7 @@ select.tom-dropdown {
 .width-percent-15       { width: 15%; }
 .width-percent-20       { width: 20%; }
 .width-percent-30       { width: 30%; }
+.width-percent-35       { width: 35%; }
 .width-percent-60       { width: 60%  ; }
 .width-percent-96       { width: 96%; }
 .width-percent-97       { width: 97%; }
@@ -4007,6 +4017,7 @@ select.tom-dropdown {
 
 .button-height-rem-2    {height: 2rem !important;}
 .height-rem-3_5         { height: 3.5rem !important; }
+.height-rem-4           { height: 4rem !important; }
 .height-rem-5           { height: 5rem !important; }
 
 .height-vh--0_5         { height: -0.5vh !important; }
@@ -4018,12 +4029,22 @@ select.tom-dropdown {
 .height-vh-0_8          { height: 0.8vh !important; }
 .height-vh-12           { height: 12vh !important; }
 .height-vh-25           { height: 25vh !important; }
+.height-vh-26           { height: 26vh !important; }
+.height-vh-28           { height: 28vh !important; }
+.height-vh-30           { height: 30vh !important; }
+.height-vh-31           { height: 31vh !important; }
 .height-vh-35           { height: 35vh !important; }
-.height-vh-38           { height: 39vh !important; }
+.height-vh-38           { height: 38vh !important; }
+.height-vh-39           { height: 39vh !important; }
 .height-vh-40           { height: 40vh !important; }
+.height-vh-41           { height: 41vh !important; }
 .height-vh-42           { height: 42vh !important; }
 .height-vh-45           { height: 45vh !important; }
 .height-vh-48           { height: 48vh !important; }
+.height-vh-49           { height: 49vh !important; }
+.height-vh-50           { height: 50vh !important; }
+.height-vh-51           { height: 51vh !important; }
+.height-vh-52           { height: 52vh !important; }
 .height-vh-53           { height: 53vh !important; }
 .height-vh-58           { height: 58vh !important; }
 .height-vh-62           { height: 62vh !important; }
@@ -5281,4 +5302,102 @@ main{ margin-left: var(--leftW); }
   background-color: #c7ced6;
   border-color: #c7ced6;
   color: #000;
+}
+
+#eidikothtes tbody tr { cursor: pointer; }
+
+/* επιλεγμένη γραμμή: βάψε τα ΚΕΛΙΑ */
+#eidikothtes tbody tr.selected-row > * {
+  background-color: #00501167 !important; /* ή κράτα το ημιδιαφανές αν το θες */
+  color: #fff !important;
+  font-weight: 700;
+}
+
+/* hover: επίσης στα κελιά, για να υπερισχύει του .table-hover */
+#eidikothtes.table-hover tbody tr:hover > * {
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+
+/* το striping να μην “φαίνεται” στην επιλεγμένη γραμμή */
+#eidikothtes.table-striped > tbody > tr.selected-row:nth-of-type(odd) > * {
+  background-color: #00501196 !important;
+}
+
+#eidikothtes tr.selected-row mark {
+  background-color: #ffbb00c9 !important;
+  color: #fff;
+}
+
+#eidikothtes.table-sm > :not(caption) > * > * {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+table td mark {
+  padding: 0;
+}
+
+.indent-1_5 { margin-left: 1.5rem; }
+.indent-3 { margin-left: 3rem; }
+.indent-4_5 { margin-left: 4.5rem; }
+
+#stoixeia tbody tr { cursor: pointer; }
+
+/* επιλεγμένη γραμμή: βάψε τα ΚΕΛΙΑ */
+#stoixeia tbody tr.selected-row > * {
+  background-color: #00501167 !important; /* ή κράτα το ημιδιαφανές αν το θες */
+  color: #fff !important;
+  font-weight: 700;
+}
+
+/* hover: επίσης στα κελιά, για να υπερισχύει του .table-hover */
+#stoixeia.table-hover tbody tr:hover > * {
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+
+/* το striping να μην “φαίνεται” στην επιλεγμένη γραμμή */
+#stoixeia.table-striped > tbody > tr.selected-row:nth-of-type(odd) > * {
+  background-color: #00501196 !important;
+}
+
+#stoixeia tr.selected-row mark {
+  background-color: #ffbb00c9 !important;
+  color: #fff;
+}
+
+#stoixeia.table-sm > :not(caption) > * > * {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Δείξε ΜΟΝΟ το πρώτο tag και κόψε το με ellipsis ώστε να μη φαίνεται κενό */
+.ts-wrapper .ts-control.multi .item {
+  max-width: calc(100% - 64px); /* 64px = χώρο για βελάκι/clear */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ts-wrapper .ts-control.multi .item:not(:first-of-type) {
+  display: none;
+}
+
+ /* styling για τα optgroup headers */
+.ts-dropdown .optgroup > .optgroup-header,
+.ts-dropdown .optgroup > .ts-og {
+  background: #012b0fb2;      /* πιο σκούρο */
+  color: #fff;               /* άσπρα γράμματα */
+  font-weight: 700;
+  padding: 6px 10px;
+  position: sticky;          /* “κολλάει” στην κορυφή όταν κάνεις scroll */
+  top: 0;
+  z-index: 1;
+  border-top: 1px solid rgba(255,255,255,.15);
+}
+
+/* λίγο αέρα ανάμεσα στις ομάδες */
+.ts-dropdown .optgroup + .optgroup > .optgroup-header,
+.ts-dropdown .optgroup + .optgroup > .ts-og {
+  margin-top: 4px;
 }

@@ -206,7 +206,7 @@ router.delete("/symbaseis/kathgories/delete/:id", checkAuth, symbaseisController
 // EidikothtesSymbaseon Router
 router.get("/symbaseis/eidikothtes", checkAuth, symbaseisController.mainEidikothtesSymbaseonForm);
 router.get("/symbaseis/eidikothtes/search", checkAuth, symbaseisController.searchGetEidikothtesSymbaseon);
-router.post("/symbaseis/eidikothtes/search", checkAuth, symbaseisController.searchPostEidikothtesSymbaseon);
+router.post("/symbaseis/eidikothtes/search/:kodikos_symbashs_kathgorias", checkAuth, symbaseisController.searchPostEidikothtesSymbaseon);
 router.get("/symbaseis/eidikothtes/add/:kodikosSymbashs_Kathgorias", checkAuth, symbaseisController.addEidikothtesSymbaseonForm);
 router.post("/symbaseis/eidikothtes/add", symbaseisController.postEidikothtesSymbaseonForm);
 router.get("/symbaseis/eidikothtes/edit/:id", checkAuth, symbaseisController.editEidikothtesSymbaseonForm);
@@ -214,7 +214,7 @@ router.delete("/symbaseis/eidikothtes/delete/:id", checkAuth, symbaseisControlle
 
 // StoixeiaSymbaseon Router
 router.get("/symbaseis/stoixeiaSymbaseon", checkAuth, symbaseisController.mainStoixeiaSymbaseonForm);
-router.post("/symbaseis/stoixeiaSymbaseon/search", checkAuth, symbaseisController.searchPostStoixeiaSymbaseon);
+router.post("/symbaseis/stoixeiaSymbaseon/search/:kodikos_symbashs_kathgorias_eidikothtas", checkAuth, symbaseisController.searchPostStoixeiaSymbaseon);
 router.get("/symbaseis/stoixeiaSymbaseon/search", checkAuth, symbaseisController.searchGetStoixeiaSymbaseon);
 router.get("/symbaseis/stoixeiaSymbaseon/add/:kodikosSymbashs_Kathgorias_Eidikothtas", checkAuth, symbaseisController.addStoixeiaSymbaseonForm);
 router.post("/symbaseis/stoixeiaSymbaseon/add", symbaseisController.postStoixeiaSymbaseonForm);

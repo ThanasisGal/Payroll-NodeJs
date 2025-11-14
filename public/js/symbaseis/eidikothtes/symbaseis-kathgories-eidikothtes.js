@@ -1,13 +1,14 @@
 // /static/js/symbaseis/eidikothtes/symbaseis-kathgories-eidikothtes.js
-// ΜΟΝΟ λογική πίνακα/φόρτωσης. ΔΕΝ κλειδώνει/ξεκλειδώνει dropdowns.
-// Disable/enable τα χειρίζεται ΜΟΝΟ το symbaseisDropdownChain.js
+// Φορτώνει τον πίνακα Ειδικοτήτων για (Σύμβαση + Κατηγορία)
+// και ΚΡΑΤΑΕΙ την επιλογή ανάμεσα σε redirect, όπως κάναμε στις Κατηγορίες.
 
 (() => {
   if (window.__eidikothtesInit) return;
   window.__eidikothtesInit = true;
 
-  const ENDPOINT    = '/api/symbaseis/eidikothtes';
+  const ENDPOINT  = '/api/symbaseis/eidikothtes';
 
+  // ids
   const SYM_SELECT  = 'symbash';
   const SYM_HIDDEN  = 'symbash_stathera';
 
@@ -17,39 +18,58 @@
   const TBODY_SEL   = '#myTable tbody';
   const PAG_UL_ID   = 'eidikothtes-pagination';
 
+  // session keys (ξεχωριστά για ΕΙΔΙΚΟΤΗΤΕΣ)
+  const SS_SYM = 'wps:eidikothtes:symbasi';
+  const SS_KAT = 'wps:eidikothtes:kathgoria';
+
   const LIMIT = (() => {
-    const n = parseInt(window.__CONFIG__?.EGRAFES ?? '15', 10);
+    const n = parseInt(window.__CONFIG__?.EGGRAFES ?? '15', 10);
     return Number.isFinite(n) && n > 0 ? n : 15;
   })();
 
-  const $id           = (id) => document.getElementById(id);
-  const tbody         = () => document.querySelector(TBODY_SEL);
-  const pagUl         = () => document.getElementById(PAG_UL_ID);
-  const csrf          = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
-  const kod_sym_kat   = () => document.getElementById('kodikosSymbashs_Kathgorias');
-
-  const to4 = (v) => {
+  // ---------- μικρά helpers ----------
+  const $id     = (id) => document.getElementById(id);
+  const tbody   = () => document.querySelector(TBODY_SEL);
+  const pagUl   = () => document.getElementById(PAG_UL_ID);
+  const csrf    = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const to4     = (v) => {
     const d = String(v ?? '').replace(/\D/g, '');
     if (!d) return '';
     const n = parseInt(d, 10);
     return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
   };
 
+  // πάρε τιμή από TS αν υπάρχει
   const getTSVal = (id) => {
     const el = $id(id);
     if (!el) return '';
-    const v = el.tomselect?.getValue?.();
-    return (typeof v === 'string' ? v : (Array.isArray(v) ? v[0] : v)) ?? el.value ?? '';
+    if (el.tomselect && typeof el.tomselect.getValue === 'function') {
+      const v = el.tomselect.getValue();
+      if (Array.isArray(v)) return v[0] || '';
+      return v || '';
+    }
+    return el.value || '';
   };
 
+  // session helpers
+  const saveSym = (v) => { try { v ? sessionStorage.setItem(SS_SYM, v) : sessionStorage.removeItem(SS_SYM); } catch {} };
+  const saveKat = (v) => { try { v ? sessionStorage.setItem(SS_KAT, v) : sessionStorage.removeItem(SS_KAT); } catch {} };
+  const getSym  = () => { try { return sessionStorage.getItem(SS_SYM) || ''; } catch { return ''; } };
+  const getKat  = () => { try { return sessionStorage.getItem(SS_KAT) || ''; } catch { return ''; } };
+  const clearSS = () => { try { sessionStorage.removeItem(SS_SYM); sessionStorage.removeItem(SS_KAT); } catch {} };
+
+  // ---------- πίνακας ----------
   const clearTable = () => { const tb = tbody(); if (tb) tb.innerHTML = ''; };
 
   const rowMsg = (text, cls = 'text-center text-muted') => {
     const tb = tbody(); if (!tb) return;
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 2; td.className = cls; td.textContent = text;
-    tr.appendChild(td); tb.appendChild(tr);
+    td.colSpan = 2;
+    td.className = cls;
+    td.textContent = text;
+    tr.appendChild(td);
+    tb.appendChild(tr);
   };
 
   function renderRows(items) {
@@ -72,7 +92,7 @@
     }
   }
 
-  const state = { pg: 1, pages: 1, total: 0 };
+  const state = { pg: 1, pages: 1 };
 
   function renderPagination(current, pages) {
     const ul = pagUl(); if (!ul) return;
@@ -97,9 +117,17 @@
 
     for (; i <= (current + 1) && i <= state.pages; i++) {
       if (i === current) {
-        li.push(`<li class="page-item is-current" aria-current="page"><span class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</span></li>`);
+        li.push(`
+          <li class="page-item is-current" aria-current="page">
+            <span class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</span>
+          </li>
+        `);
       } else {
-        li.push(`<li class="page-item fsvw-0_7"><a href="#" data-page="${i}" class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</a></li>`);
+        li.push(`
+          <li class="page-item fsvw-0_7">
+            <a href="#" data-page="${i}" class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</a>
+          </li>
+        `);
       }
 
       if (i === current + 1 && i < state.pages) {
@@ -122,6 +150,7 @@
     ul.innerHTML = li.join('');
   }
 
+  // pagination click
   document.addEventListener('click', (e) => {
     const a = e.target.closest(`#${PAG_UL_ID} a.page-link`);
     if (!a) return;
@@ -131,12 +160,16 @@
 
     const sym = to4($id(SYM_HIDDEN)?.value || getTSVal(SYM_SELECT) || '');
     const kat = to4($id(KAT_HIDDEN)?.value || getTSVal(KAT_SELECT) || '');
-    const combo = sym && kat ? `${sym}${kat}` : '';
-    if (!combo) return;
-    kod_sym_kat.value = combo;
+    if (!sym || !kat) return;
+
+    const combo = `${sym}${kat}`;
+    const comboHidden = $id('kodikosSymbashs_Kathgorias');
+    if (comboHidden) comboHidden.value = combo;
+
     loadFor(combo, page);
   });
 
+  // ---------- fetch ----------
   async function loadFor(compositeKey, page = 1) {
     if (!compositeKey) { clearTable(); renderPagination(1, 1); return; }
     clearTable(); rowMsg('Φόρτωση...', 'text-center');
@@ -153,48 +186,99 @@
       renderRows(json.items || []);
       renderPagination(Number(json.page || page), Number(json.pages || 1));
     } catch (e) {
-      clearTable(); renderPagination(1, 1);
-      rowMsg('Προέκυψε σφάλμα κατά τη φόρτωση.', 'text-center text-danger');
       console.error(e);
+      clearTable();
+      renderPagination(1, 1);
+      rowMsg('Προέκυψε σφάλμα κατά τη φόρτωση.', 'text-center text-danger');
     }
   }
 
-  // Handlers: ΜΟΝΟ ενημέρωση πίνακα
-  function onChangeSym(val) {
-    // άλλαξε σύμβαση → καθάρισε πίνακα
-    clearTable(); renderPagination(1,1);
-  }
-
-  function onChangeKat(val) {
-    const sym = to4($id(SYM_HIDDEN)?.value || getTSVal(SYM_SELECT) || '');
-    const kat = to4(val || $id(KAT_HIDDEN)?.value || getTSVal(KAT_SELECT) || '');
-    const combo = sym && kat ? `${sym}${kat}` : '';
-    if (!combo) {
+  // ---------- change handlers ----------
+  function tryLoad() {
+    const sym = to4($id(SYM_HIDDEN)?.value || getTSVal(SYM_SELECT) || getSym() || '');
+    const kat = to4($id(KAT_HIDDEN)?.value || getTSVal(KAT_SELECT) || getKat() || '');
+    if (!sym || !kat) {
       clearTable(); renderPagination(1,1);
       return;
     }
+    const combo = `${sym}${kat}`;
+    const comboHidden = $id('kodikosSymbashs_Kathgorias');
+    if (comboHidden) comboHidden.value = combo;
     loadFor(combo, 1);
   }
 
+  // αλλαγή σύμβασης
   document.addEventListener('change', (e) => {
-    const t = e.target; if (!t) return;
-    if (t.id === SYM_SELECT || (t.closest && t.closest('#' + SYM_SELECT))) {
-      queueMicrotask(() => onChangeSym($id(SYM_SELECT)?.value || $id(SYM_HIDDEN)?.value || ''));
+    const t = e.target;
+    if (!t) return;
+
+    if (t.id === SYM_SELECT || t.closest?.(`#${SYM_SELECT}`)) {
+      const v = to4(getTSVal(SYM_SELECT) || t.value || '');
+      if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = v;
+      saveSym(v);
+
+      // όταν αλλάζει η σύμβαση → καθάρισε τον πίνακα, περίμενε την κατηγορία
+      clearTable(); renderPagination(1,1);
       return;
     }
-    if (t.id === KAT_SELECT || (t.closest && t.closest('#' + KAT_SELECT))) {
-      queueMicrotask(() => onChangeKat($id(KAT_SELECT)?.value || $id(KAT_HIDDEN)?.value || ''));
+
+    if (t.id === KAT_SELECT || t.closest?.(`#${KAT_SELECT}`)) {
+      const v = to4(getTSVal(KAT_SELECT) || t.value || '');
+      if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = v;
+      saveKat(v);
+
+      // τώρα που έχουμε κατηγορία → δοκίμασε να φορτώσεις
+      tryLoad();
       return;
     }
   }, true);
 
-  // Hydration
-  const sym0 = ($id(SYM_HIDDEN)?.value || $id(SYM_SELECT)?.value || '').trim();
-  const kat0 = ($id(KAT_HIDDEN)?.value || $id(KAT_SELECT)?.value || '').trim();
-  if (sym0 && kat0) {
-    const combo = `${to4(sym0)}${to4(kat0)}`;
-    loadFor(combo, 1);
+  // ---------- κουμπί "Επιστροφή" -> καθάρισε session ----------
+  document.addEventListener('click', (e) => {
+    const back = e.target.closest('#back-btn,[data-clear-symbash]');
+    if (!back) return;
+    clearSS();
+  }, true);
+
+  // ---------- init ----------
+  function init() {
+    // 1) Πάρε από URL (αν γύρισες με redirect και θες να το υποστηρίξεις)
+    let symFromUrl = '', katFromUrl = '';
+    try {
+      const u = new URL(location.href);
+      symFromUrl = u.searchParams.get('symbash') || '';
+      katFromUrl = u.searchParams.get('kathgoria') || '';
+    } catch {}
+
+    // 2) Πάρε από session
+    const symFromSS = getSym();
+    const katFromSS = getKat();
+
+    // 3) Πάρε από hidden
+    const symFromHidden = $id(SYM_HIDDEN)?.value || '';
+    const katFromHidden = $id(KAT_HIDDEN)?.value || '';
+
+    const finalSym = to4(symFromUrl || symFromSS || symFromHidden || '');
+    const finalKat = to4(katFromUrl || katFromSS || katFromHidden || '');
+
+    // γράψ’ τα στα hidden (για να τα δει TomSelect που κάνει preselect)
+    if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = finalSym;
+    if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = finalKat;
+
+    // και τώρα δοκίμασε να φορτώσεις
+    if (finalSym && finalKat) {
+      const combo = `${finalSym}${finalKat}`;
+      const comboHidden = $id('kodikosSymbashs_Kathgorias');
+      if (comboHidden) comboHidden.value = combo;
+      loadFor(combo, 1);
+    } else {
+      clearTable(); renderPagination(1,1);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
-    clearTable(); renderPagination(1,1);
+    init();
   }
 })();

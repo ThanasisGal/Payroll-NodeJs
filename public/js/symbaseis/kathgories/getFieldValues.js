@@ -1,193 +1,395 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const isEmpty = v => !String(v ?? "").trim();
+// document.addEventListener("DOMContentLoaded", () => {
+//     const isEmpty = v => !String(v ?? "").trim();
   
-    async function handleFormSubmit(event) {
-        event.preventDefault();
-        event.stopPropagation();
+//     async function handleFormSubmit(event) {
+//         event.preventDefault();
+//         event.stopPropagation();
 
-        const formData = {};
-        const filePromises = [];
-        const sections = document.querySelectorAll(".card-body");
+//         const formData = {};
+//         const filePromises = [];
+//         const sections = document.querySelectorAll(".card-body");
 
-        sections.forEach((section) => {
-            const inputs = section.querySelectorAll("input, select, textarea");
-            inputs.forEach((input) => {
-                if (input.tagName === "INPUT") {
-                    if (input.type === "checkbox") {
-                        formData[input.name] = input.checked;
-                    } else if (input.type === "date" && input.value === "") {
-                        formData[input.name] = null;
-                    } else if (input.type === "file" && input.files.length > 0) {
-                        filePromises.push(new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = (e) => { formData[input.name] = e.target.result; resolve(); };
-                            reader.onerror = reject;
-                            reader.readAsDataURL(input.files[0]);
-                        }));
-                    } else {
-                        formData[input.name] = input.value;
-                    }
-                } else if (input.tagName === "TEXTAREA") {
-                    formData[input.name] = input.value;
-                } else if (input.tagName === "SELECT") {
-                    if (input.multiple) {
-                        const selected = Array.from(input.selectedOptions).map(o => o.value);
-                        formData[input.name] = selected.length ? selected : [];
-                    } else {
-                        formData[input.name] = (input.selectedIndex === -1) ? null : input.options[input.selectedIndex].value;
-                    }
-                }
-            });
-        });
+//         sections.forEach((section) => {
+//             const inputs = section.querySelectorAll("input, select, textarea");
+//             inputs.forEach((input) => {
+//                 if (input.tagName === "INPUT") {
+//                     if (input.type === "checkbox") {
+//                         formData[input.name] = input.checked;
+//                     } else if (input.type === "date" && input.value === "") {
+//                         formData[input.name] = null;
+//                     } else if (input.type === "file" && input.files.length > 0) {
+//                         filePromises.push(new Promise((resolve, reject) => {
+//                             const reader = new FileReader();
+//                             reader.onload = (e) => { formData[input.name] = e.target.result; resolve(); };
+//                             reader.onerror = reject;
+//                             reader.readAsDataURL(input.files[0]);
+//                         }));
+//                     } else {
+//                         formData[input.name] = input.value;
+//                     }
+//                 } else if (input.tagName === "TEXTAREA") {
+//                     formData[input.name] = input.value;
+//                 } else if (input.tagName === "SELECT") {
+//                     if (input.multiple) {
+//                         const selected = Array.from(input.selectedOptions).map(o => o.value);
+//                         formData[input.name] = selected.length ? selected : [];
+//                     } else {
+//                         formData[input.name] = (input.selectedIndex === -1) ? null : input.options[input.selectedIndex].value;
+//                     }
+//                 }
+//             });
+//         });
 
-        try {
-            await Promise.all(filePromises);
+//         try {
+//             await Promise.all(filePromises);
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+//             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
 
-            const errors = [];
-            if (isEmpty(formData.kodikos))      errors.push("Κωδικός");
-            if (isEmpty(formData.perigrafh))    errors.push("Περιγραφή");
+//             const errors = [];
+//             if (isEmpty(formData.kodikos))      errors.push("Κωδικός");
+//             if (isEmpty(formData.perigrafh))    errors.push("Περιγραφή");
 
-            if (errors.length) {
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "warning",
-                    title: "Προσοχή!",
-                    html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
-                    confirmButtonText: "Κλείσιμο",
-                    showConfirmButton: true,
-                    confirmButtonText: "Κλείσιμο",
-                    customClass: {
-                        confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                });
-                return;
-            }
-            const response = await fetch("/symbaseis/kathgories/add", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "CSRF-Token": csrfToken,   // ✅ για csurf
-                },
-                credentials: "include",      // ✅ στείλε session cookies
-                body: JSON.stringify(formData),
-            });
+//             if (errors.length) {
+//                 await Swal.fire({
+//                     backdrop: false,            // overlay
+//                     allowOutsideClick: false,
+//                     icon: "warning",
+//                     title: "Προσοχή!",
+//                     html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
+//                     confirmButtonText: "Κλείσιμο",
+//                     showConfirmButton: true,
+//                     confirmButtonText: "Κλείσιμο",
+//                     customClass: {
+//                         confirmButton: "class-warning custom-confirm-button custom-swal-button",
+//                         title: "custom-title",
+//                         popup: "custom-swal-popup",
+//                     },
+//                 });
+//                 return;
+//             }
+//             const response = await fetch("/symbaseis/kathgories/add", {
+//                 method: "POST",
+//                 headers: {
+//                     "Content-Type": "application/json",
+//                     "CSRF-Token": csrfToken,   // ✅ για csurf
+//                 },
+//                 credentials: "include",      // ✅ στείλε session cookies
+//                 body: JSON.stringify(formData),
+//             });
 
-            // 1) αν ο browser ακολούθησε redirect
-            if (response.redirected && response.url) {
-                window.location.href = response.url;
-                return;
-            }
+//             // 1) αν ο browser ακολούθησε redirect
+//             if (response.redirected && response.url) {
+//                 window.location.href = response.url;
+//                 return;
+//             }
 
-            // 2) 3xx χωρίς auto-follow (σπάνιο)
-            if (response.status >= 300 && response.status < 400) {
-                const loc = response.headers.get("Location") || response.headers.get("location");
-                if (loc) {
-                const abs = loc.startsWith("http") ? loc : new URL(loc, window.location.origin).toString();
-                window.location.href = abs;
-                return;
-                }
-                throw new Error(`Redirect ${response.status} χωρίς Location header`);
-            }
+//             // 2) 3xx χωρίς auto-follow (σπάνιο)
+//             if (response.status >= 300 && response.status < 400) {
+//                 const loc = response.headers.get("Location") || response.headers.get("location");
+//                 if (loc) {
+//                 const abs = loc.startsWith("http") ? loc : new URL(loc, window.location.origin).toString();
+//                 window.location.href = abs;
+//                 return;
+//                 }
+//                 throw new Error(`Redirect ${response.status} χωρίς Location header`);
+//             }
 
-            // 3) CSRF/Forbidden
-            if (response.status === 403) {
-                throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
-            }
+//             // 3) CSRF/Forbidden
+//             if (response.status === 403) {
+//                 throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
+//             }
 
-            // 4) 204 No Content → δικό μας redirect
-            if (response.status === 204) {
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
-                    timer: 1200,
-                    showConfirmButton: true,
-                    confirmButtonText: "Κλείσιμο",
-                    customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => window.location.href = "/symbaseis/kathgories");
-                return;
-            }
+//             // 4) 204 No Content → δικό μας redirect
+//             if (response.status === 204) {
+//                 await Swal.fire({
+//                     backdrop: false,            // overlay
+//                     allowOutsideClick: false,
+//                     icon: "success",
+//                     title: "Επιτυχής καταχώριση!",
+//                     timer: 1200,
+//                     showConfirmButton: true,
+//                     confirmButtonText: "Κλείσιμο",
+//                     customClass: {
+//                         confirmButton: "class-success custom-confirm-button custom-swal-button",
+//                         title: "custom-title",
+//                         popup: "custom-swal-popup",
+//                     },
+//                 }).then(() => window.location.href = "/symbaseis/kathgories");
+//                 return;
+//             }
 
-            // 5) JSON απάντηση
-            const ct = response.headers.get("content-type") || "";
-            if (ct.includes("application/json")) {
-                const data = await response.json();
-                if (!response.ok || !data?.success) {
-                    throw new Error(`HTTP ${response.status} / success=${data?.success}`);
-                }
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
-                    timer: 1200,
-                    showConfirmButton: true,
-                    confirmButtonText: "Κλείσιμο",
-                    customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => {
-                    window.location.href = data.redirectUrl || "/symbaseis/kathgories";
-                });
-                return;
-            }
+//             // 5) JSON απάντηση
+//             const ct = response.headers.get("content-type") || "";
+//             if (ct.includes("application/json")) {
+//                 const data = await response.json();
+//                 if (!response.ok || !data?.success) {
+//                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
+//                 }
+//                 await Swal.fire({
+//                     backdrop: false,            // overlay
+//                     allowOutsideClick: false,
+//                     icon: "success",
+//                     title: "Επιτυχής καταχώριση!",
+//                     timer: 1200,
+//                     showConfirmButton: true,
+//                     confirmButtonText: "Κλείσιμο",
+//                     customClass: {
+//                         confirmButton: "class-success custom-confirm-button custom-swal-button",
+//                         title: "custom-title",
+//                         popup: "custom-swal-popup",
+//                     },
+//                 }).then(() => {
+//                     window.location.href = data.redirectUrl || "/symbaseis/kathgories";
+//                 });
+//                 return;
+//             }
 
-            // 6) Άλλος content-type αλλά OK (π.χ. HTML)
-            if (response.ok) {
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
-                    timer: 1200,
-                    showConfirmButton: true,
-                    confirmButtonText: "Κλείσιμο",
-                    customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => window.location.href = "/symbaseis/kathgories");
-                return;
-            }
+//             // 6) Άλλος content-type αλλά OK (π.χ. HTML)
+//             if (response.ok) {
+//                 await Swal.fire({
+//                     backdrop: false,            // overlay
+//                     allowOutsideClick: false,
+//                     icon: "success",
+//                     title: "Επιτυχής καταχώριση!",
+//                     timer: 1200,
+//                     showConfirmButton: true,
+//                     confirmButtonText: "Κλείσιμο",
+//                     customClass: {
+//                         confirmButton: "class-success custom-confirm-button custom-swal-button",
+//                         title: "custom-title",
+//                         popup: "custom-swal-popup",
+//                     },
+//                 }).then(() => window.location.href = "/symbaseis/kathgories");
+//                 return;
+//             }
 
-            // 7) Σφάλμα HTTP
-            throw new Error(`HTTP error ${response.status}`);
+//             // 7) Σφάλμα HTTP
+//             throw new Error(`HTTP error ${response.status}`);
 
-        } catch (err) {
-            await Swal.fire({
-                backdrop: false,            // overlay
-                allowOutsideClick: false,
-                icon: "error",
-                title: "Αποτυχία αποθήκευσης",
-                timer: 1200,
-                text: String(err?.message || err),
-                showConfirmButton: true,
-                confirmButtonText: "Κλείσιμο",
-                customClass: {
-                    confirmButton: "class-error custom-confirm-button custom-swal-button",
-                    title: "custom-title",
-                    popup: "custom-swal-popup",
-                },
-            });
-        }
-    }
+//         } catch (err) {
+//             await Swal.fire({
+//                 backdrop: false,            // overlay
+//                 allowOutsideClick: false,
+//                 icon: "error",
+//                 title: "Αποτυχία αποθήκευσης",
+//                 timer: 1200,
+//                 text: String(err?.message || err),
+//                 showConfirmButton: true,
+//                 confirmButtonText: "Κλείσιμο",
+//                 customClass: {
+//                     confirmButton: "class-error custom-confirm-button custom-swal-button",
+//                     title: "custom-title",
+//                     popup: "custom-swal-popup",
+//                 },
+//             });
+//         }
+//     }
 
-    const buttons = document.querySelectorAll(".submitButton");
+//     const buttons = document.querySelectorAll(".submitButton");
 
-    buttons.forEach((button) => {
-        button.addEventListener("click", handleFormSubmit);
-    });
+//     buttons.forEach((button) => {
+//         button.addEventListener("click", handleFormSubmit);
+//     });
+// });
+
+
+
+
+
+
+
+document.addEventListener("DOMContentLoaded", () => {
+	const isEmpty = v => !String(v ?? "").trim();
+
+	// ▼ Helpers & "Επιστροφή"
+	const $ = (s) => document.querySelector(s);
+	const pad4 = n => String(n).padStart(4, "0");
+	const nextKodikosFrom = v => pad4((parseInt(String(v).replace(/\D/g, ""), 10) || 0) + 1);
+
+	// Κουμπί "Επιστροφή" (δεν κάνει submit)
+	document.querySelectorAll(".backButton").forEach(btn => {
+		btn.addEventListener("click", (e) => {
+		e.preventDefault();
+		window.location.href = "/symbaseis/kathgories";
+		});
+	});
+	// ▲ Helpers & "Επιστροφή"
+
+	async function handleFormSubmit(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		// Προστασία από διπλό κλικ
+		const btn = event.currentTarget;
+		if (btn && btn.disabled) return;
+		if (btn) btn.disabled = true;
+
+		const formData = {};
+		const filePromises = [];
+		const sections = document.querySelectorAll(".card-body");
+
+		sections.forEach((section) => {
+			const inputs = section.querySelectorAll("input, select, textarea");
+			inputs.forEach((input) => {
+				if (input.tagName === "INPUT") {
+					if (input.type === "checkbox") {
+						formData[input.name] = input.checked;
+					} else if (input.type === "date" && input.value === "") {
+						formData[input.name] = null;
+					} else if (input.type === "file" && input.files.length > 0) {
+						filePromises.push(new Promise((resolve, reject) => {
+						const reader = new FileReader();
+						reader.onload = (e) => { formData[input.name] = e.target.result; resolve(); };
+						reader.onerror = reject;
+						reader.readAsDataURL(input.files[0]);
+						}));
+					} else {
+						formData[input.name] = input.value;
+					}
+				} else if (input.tagName === "TEXTAREA") {
+					formData[input.name] = input.value;
+				} else if (input.tagName === "SELECT") {
+					if (input.multiple) {
+						const selected = Array.from(input.selectedOptions).map(o => o.value);
+						formData[input.name] = selected.length ? selected : [];
+					} else {
+						formData[input.name] = (input.selectedIndex === -1)
+						? null
+						: input.options[input.selectedIndex].value;
+					}
+				}
+			});
+		});
+
+		try {
+			await Promise.all(filePromises);
+
+			const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+
+			// Client validation
+			const errors = [];
+			if (isEmpty(formData.kodikos))   errors.push("Κωδικός");
+			if (isEmpty(formData.perigrafh)) errors.push("Περιγραφή");
+
+			if (errors.length) {
+				await Swal.fire({
+					backdrop: false,
+					allowOutsideClick: false,
+					icon: "warning",
+					title: "Προσοχή!",
+					html: `Τα πεδία:<br><strong>${errors.join(", ")}</strong> είναι υποχρεωτικά`,
+					showConfirmButton: true,
+					confirmButtonText: "Κλείσιμο",
+					customClass: {
+						confirmButton: "class-warning custom-confirm-button custom-swal-button",
+						title: "custom-title",
+						popup: "custom-swal-popup",
+					},
+				});
+				return;
+			}
+
+			const response = await fetch("/symbaseis/kathgories/add", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"X-CSRF-Token": csrfToken,           // ✅ για csurf
+					"X-Requested-With": "XMLHttpRequest" // δηλώνουμε AJAX
+				},
+				credentials: "same-origin",            // same-origin cookies μόνο
+				redirect: "error",
+				referrerPolicy: "same-origin",
+				body: JSON.stringify(formData),
+			});
+
+			// Σαφής χειρισμός CSRF/Forbidden
+			if (response.status === 403) {
+				throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
+			}
+
+			const ct = response.headers.get("content-type") || "";
+			if (!ct.includes("application/json")) {
+				throw new Error(`Μη αναμενόμενη απάντηση (${ct || "no content-type"})`);
+			}
+
+			const data = await response.json();
+			if (!response.ok || !data?.success) {
+				throw new Error(data?.message || `HTTP ${response.status}`);
+			}
+
+			// Προαιρετική ανανέωση CSRF token αν ο server στείλει νέο
+			const newToken = response.headers.get("x-csrf-token");
+			if (newToken) {
+				const meta = document.querySelector('meta[name="csrf-token"]');
+				if (meta) meta.content = newToken;
+			}
+
+			// Success toast (χωρίς να επιστρέψει focus στο κουμπί)
+			await Swal.fire({
+				backdrop: false,
+				allowOutsideClick: false,
+				icon: "success",
+				title: "Επιτυχής καταχώριση!",
+				timer: 900,
+				showConfirmButton: false,
+				returnFocus: false,
+				customClass: {
+					confirmButton: "class-success custom-confirm-button custom-swal-button",
+					title: "custom-title",
+					popup: "custom-swal-popup",
+				},
+			});
+
+			// --- Ready για επόμενη εγγραφή ---
+			const aaEl        = $('[name="aa"]');
+			const kodikosEl   = $('[name="kodikos"]');
+			const perigrafhEl = $('[name="perigrafh"]');
+
+			// Βάλε τα NEXT από server (fallbacks αν λείπουν)
+			if (aaEl) {
+				const pad4num = v => String(parseInt(v, 10) || 0).padStart(4, "0");
+				const fallbackAa = (parseInt(aaEl.value, 10) || 0) + 1;
+
+				// ΠΑΝΤΑ γράφουμε string "xxxx"
+				aaEl.value = (data.nextAa ?? null) !== null
+  					? pad4num(data.nextAa)     // δέχεται number ή string ("12" ή "0012")
+  					: pad4num(fallbackAa);
+			}
+			if (kodikosEl) {
+				const fallbackKod = nextKodikosFrom(kodikosEl.value);
+				kodikosEl.value = data.nextKodikos || fallbackKod;
+			}
+
+			if (perigrafhEl) {
+				perigrafhEl.value = "";
+				perigrafhEl.focus();
+				perigrafhEl.select?.();
+			}
+
+			return; // Μένεις στην ίδια σελίδα
+
+		} catch (err) {
+			await Swal.fire({
+				backdrop: false,
+				allowOutsideClick: false,
+				icon: "error",
+				title: "Αποτυχία αποθήκευσης",
+				text: String(err?.message || err),
+				showConfirmButton: true,
+				confirmButtonText: "Κλείσιμο",
+				customClass: {
+					confirmButton: "class-error custom-confirm-button custom-swal-button",
+					title: "custom-title",
+					popup: "custom-swal-popup",
+				},
+			});
+		} finally {
+			if (btn) btn.disabled = false; // επανενεργοποίηση κουμπιού
+		}
+	}
+
+	// Attach handler στα κουμπιά "Αποθήκευση"
+	document.querySelectorAll(".submitButton").forEach((button) => {
+		button.addEventListener("click", handleFormSubmit);
+	});
 });

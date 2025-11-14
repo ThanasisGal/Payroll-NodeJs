@@ -55,7 +55,7 @@
                 data-api="/api/dropdown/symbaseis/symbash"
                 single
                 data-target-input=<%= `symbash_stathera` %>
-                data-preselect-value=<%= `symbash_stathera` %>
+                data-preselect="symbash_stathera"
                 data-preload-all="true"
                 data-pad-length="4"
                 data-xrhsh-related="false"
@@ -91,7 +91,8 @@
                 data-api="/api/dropdown/symbaseis/kathgoria_symbashs"
                 single
                 data-target-input=<%= `kathgoria_symbashs_stathera` %>
-                data-preselect-value=<%= `kathgoria_symbashs_stathera` %>
+                data-preselect="kathgoria_symbashs_stathera"
+                data-extra-filter="symbash_stathera"
                 data-preload-all="true"
                 data-pad-length="4"
                 data-xrhsh-related="false"
@@ -179,7 +180,7 @@
             <div class="d-flex width-percent-15"></div>
 
             <nav class="col-2 margin-top--0_3rem" aria-label="Dashboard Pagination">
-              <ul id="eidikothtes-pagination" class="pagination pagination-xsm justify-content-end mt-2"></ul>
+                <ul id="eidikothtes-pagination" class="pagination pagination-xsm justify-content-end mt-2"></ul>
             </nav>
         </div>
     </div>
@@ -208,79 +209,75 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
 <script nonce="<%= nonce %>">
-  document.addEventListener('DOMContentLoaded', function () {
-    const form        = document.querySelector('form[name="EidikothtesSymbaseon"]');
+    document.addEventListener('DOMContentLoaded', function () {
+        const form        = document.querySelector('form[name="EidikothtesSymbaseon"]');
 
-    // Σύμβαση
-    const symSelect   = document.getElementById('symbash');
-    const symHidden   = document.getElementById('symbash_stathera');
+        // Σύμβαση
+        const symSelect   = document.getElementById('symbash');
+        const symHidden   = document.getElementById('symbash_stathera');
 
-    // Κατηγορία Σύμβασης
-    const katSelect   = document.getElementById('kathgoria_symbashs');
-    const katHidden   = document.getElementById('kathgoria_symbashs_stathera');
+        // Κατηγορία Σύμβασης
+        const katSelect   = document.getElementById('kathgoria_symbashs');
+        const katHidden   = document.getElementById('kathgoria_symbashs_stathera');
 
-    // Προαιρετικό hidden για τον συνδυασμό (sym+kat)
-    const comboHidden = document.getElementById('kodikosSymbashs_Kathgorias');
+        // hidden για τον συνδυασμό (sym+kat)
+        const comboHidden = document.getElementById('kodikosSymbashs_Kathgorias');
 
-    const to4 = (v) => {
-      const d = String(v ?? '').replace(/\D/g, '');
-      if (!d) return '';
-      const n = parseInt(d, 10);
-      return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
-    };
+        const to4 = (v) => {
+            const d = String(v ?? '').replace(/\D/g, '');
+            if (!d) return '';
+            const n = parseInt(d, 10);
+            return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+        };
 
-    form.addEventListener('submit', function (e) {
-      const sym = (symHidden?.value || symSelect?.value || '').trim();
-      if (!sym) {
-        e.preventDefault();
-        Swal.fire({
-          backdrop: false,
-          allowOutsideClick: false,
-          icon: 'info',
-          title: 'Δεν έχει επιλεγεί σύμβαση',
-          text: 'Παρακαλώ επιλέξτε σύμβαση πριν την αναζήτηση.',
-          showConfirmButton: true,
-          confirmButtonText: 'Κλείσιμο',
-          customClass: {
-            confirmButton: 'class-info custom-confirm-button custom-swal-button',
-            title: 'custom-title',
-            popup: 'custom-swal-popup',
-          },
-        }).then(() => { try { symSelect?.focus(); } catch (_) {} });
-        return false;
-      }
+        form.addEventListener('submit', function (e) {
+            const sym = (symHidden?.value || symSelect?.value || '').trim();
+            if (!sym) {
+                e.preventDefault();
+                Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'info',
+                    title: 'Δεν έχει επιλεγεί σύμβαση',
+                    text: 'Παρακαλώ επιλέξτε σύμβαση πριν την αναζήτηση.',
+                    showConfirmButton: true,
+                    confirmButtonText: 'Κλείσιμο',
+                    customClass: {
+                        confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup',
+                    },
+                }).then(() => { try { symSelect?.focus(); } catch (_) {} });
+                return false;
+            }
 
-      const kat = (katHidden?.value || katSelect?.value || '').trim();
-      if (!kat) {
-        e.preventDefault();
-        Swal.fire({
-          backdrop: false,
-          allowOutsideClick: false,
-          icon: 'info',
-          title: 'Δεν έχει επιλεγεί κατηγορία',
-          text: 'Παρακαλώ επιλέξτε κατηγορία σύμβασης πριν την αναζήτηση.',
-          showConfirmButton: true,
-          confirmButtonText: 'Κλείσιμο',
-          customClass: {
-            confirmButton: 'class-info custom-confirm-button custom-swal-button',
-            title: 'custom-title',
-            popup: 'custom-swal-popup',
-          },
-        }).then(() => { try { katSelect?.focus(); } catch (_) {} });
-        return false;
-      }
+            const kat = (katHidden?.value || katSelect?.value || '').trim();
+            if (!kat) {
+                e.preventDefault();
+                Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'info',
+                    title: 'Δεν έχει επιλεγεί κατηγορία',
+                    text: 'Παρακαλώ επιλέξτε κατηγορία σύμβασης πριν την αναζήτηση.',
+                    showConfirmButton: true,
+                    confirmButtonText: 'Κλείσιμο',
+                    customClass: {
+                        confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup',
+                    },
+                }).then(() => { try { katSelect?.focus(); } catch (_) {} });
+                return false;
+            }
 
-      // Βεβαιώσου ότι θα σταλούν οι τιμές στα hidden
-      if (symHidden) symHidden.value = sym;
-      if (katHidden) katHidden.value = kat;
+            if (symHidden) symHidden.value = sym;
+            if (katHidden) katHidden.value = kat;
 
-      const combo = `${to4(sym)}${to4(kat)}`;
-      if (comboHidden) comboHidden.value = combo;
+            const combo = `${to4(sym)}${to4(kat)}`;
+            if (comboHidden) comboHidden.value = combo;
 
-      // Προαιρετικά: στείλ’ το ως path param (sym+kat μαζί)
-      this.action = `/symbaseis/eidikothtes/search/${encodeURIComponent(combo)}`;
-      // Εναλλακτικά (αν θες ξεχωριστά params), χρησιμοποίησε:
-      // this.action = `/symbaseis/eidikothtes/search/${encodeURIComponent(to4(sym))}/${encodeURIComponent(to4(kat))}`;
+            this.action = `/symbaseis/eidikothtes/search/${encodeURIComponent(combo)}`;
+        });
     });
-  });
 </script>

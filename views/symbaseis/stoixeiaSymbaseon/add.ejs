@@ -1,219 +1,238 @@
-<div class="tadded-container">
-  <div class="container-fluid">
-    <div class="menu_Links">
-      <ul>
-        <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
-      </ul>
-    </div>
-    <!-- <hr style="margin-top: -2rem" /> -->
+<div class="margin-top-1rem">
+	<div class="container-fluid height-vh-100 padding-0">
 
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div class="container">
-          <form class="formRadius">
+		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
-            </br></br></br></br>
+		<div class="sections margin-top-1rem">
+			<section class="sel_1_section visible" data-section="">
+				<div>
+					<form class="formRadius">
 
-            <div class="card d-flex flex-column z-depth-5 w-97" style="margin-left: 1.5%;">
+						<%- include('../../partials/_csrfField') %>
+						</br> </br> </br>
 
-              <div class="card-header">
-                <label class="text-center headers-content">
-                  Εισαγωγή Νέου Στοιχείου Σύμβασης
-                </label>
-              </div>
+						<div class="card d-flex flex-column z-depth-5 w-80 margin-left-percent-10 overflow-hidden">
 
-              <div class="card-body overflow-auto flex-grow-1" style="height: 43vh; background-color: #ffffff;" >
-                <input type="hidden" name="afora_thn_symbash_kathgoria_eidikothta" id="afora_thn_symbash_kathgoria_eidikothta" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %><%= eidikothta[0].kodikos.toString().padStart(4, '0') %>" />
-          
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label
-                      class="col-form-label label-font-size">
-                      Σύμβαση
-                    </label>
-                  </div>
-                  <div class="col-10-5 left-align" style="font-size: 0.85vw; font-weight: 600;">
-                    <label><%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %></label>
-                  </div>
-                </div>
+							<div class="card-header p-2 height-rem-3_5">
+								<label class="text-center w-100 headers-content">
+									Εισαγωγή Νέου Στοιχείου Σύμβασης
+								</label>
+							</div>
+
+                            <%
+								const kodikosStr = String(kathgoria?.[0]?.kodikos ?? '').padEnd(10, '\u00A0');
+								const perigrafhStr = String(kathgoria?.[0]?.perigrafh ?? '');
+								const kodikosStrEid = String(eidikothta?.[0]?.kodikos ?? '').padEnd(10, '\u00A0');
+								const perigrafhStrEid = String(eidikothta?.[0]?.perigrafh ?? '');
+								const labelDescr = kodikosStr + perigrafhStr + kodikosStrEid + perigrafhStrEid;
+
+								const len = labelDescr.length;
+								const heightClass = len <= 90 
+                                    ? 'height-vh-42'
+                                    : len <= 200 ? 'height-vh-45'
+                                    : 'height-vh-48';
+                            %>
+    
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white <%= heightClass %>" id="cardBody">
+								<input type="hidden" id="aa_kodikos" name="aa_kodikos" value="<%= aa_kodikos.toString().padStart(4, '0') %>" />
+
+                            	<input type="hidden" name="afora_thn_symbash_kathgoria_eidikothta" id="afora_thn_symbash_kathgoria_eidikothta" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %><%= eidikothta[0].kodikos.toString().padStart(4, '0') %>" />
+
+                                <div class="row form-group g-3 align-items-center margin-top--2rem font-size-rem-1_1 mb-3">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            class="col-form-label label-font-size">
+                                            Σύμβαση &nbsp;
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5 left-align font-size-rem-1_1 font-weight-600 cdarkgreen">
+                                        <label>
+                                            <%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center margin-top--1_5rem mb-3">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            class="col-form-label label-font-size">
+                                            Κατηγορία &nbsp;
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cdarkergreen">
+                                        <label>
+                                            <%= kathgoria[0].kodikos.padEnd(10, '\u00A0') + kathgoria[0].perigrafh %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center margin-top--1_5rem">
+                                    <div class="col-1-5 right-align">
+                                        <label
+                                            class="col-form-label label-font-size">
+                                            Ειδικότητα &nbsp;
+                                        </label>
+                                    </div>
+                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cgreen">
+                                        <label>
+                                            <%= eidikothta[0].kodikos.padEnd(10, '\u00A0') + eidikothta[0].perigrafh %>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <hr class="hr-style mb-4" />
                 
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label
-                      class="col-form-label label-font-size">
-                      Κατηγορία
-                    </label>
-                  </div>
-                  <div class="col-10-5 left-align" style="font-size: 0.85vw; font-weight: 600;">
-                    <label><%= kathgoria[0].kodikos.padEnd(10, '\u00A0') + kathgoria[0].perigrafh %></label>
-                  </div>
-                </div>
+								<div class="row form-group g-3 align-items-center mb-1">
+									<div class="col-1-5 left-align">
+										<label
+										for="kodikos"
+										class="col-form-label label-font-size">
+										Κωδικός
+										</label>
+									</div>
+									<div class="col-1-5">
+										<input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= aa_kodikos.toString().padStart(4, '0') %>" readonly />
+									</div>
+								</div>
                 
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label
-                      class="col-form-label label-font-size">
-                      Ειδικότητα
-                    </label>
-                  </div>
-                  <div class="col-10-5 left-align" style="font-size: 0.85vw; font-weight: 600;">
-                    <label><%= eidikothta[0].kodikos.padEnd(10, '\u00A0') + eidikothta[0].perigrafh %></label>
-                  </div>
-                </div>
+								<div class="row form-group g-3 align-items-center mb-1">
+									<div class="col-1-5 left-align">
+										<label
+										for="perigrafh"
+										class="col-form-label label-font-size field-required">
+											Περιγραφή
+										</label>
+									</div>
+									<div class="col-10-5">
+										<input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="" />
+									</div>
+								</div>
 
-                <hr style="margin-bottom: 1rem;" />
-                
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label
-                      for="kodikos"
-                      class="col-form-label label-font-size">
-                      Κωδικός
-                    </label>
-                  </div>
-                  <div class="col-1">
-                    <input type="text" name="kodikos" id="kodikos" class="form-control input-contents" value="<%= aa_kodikos.toString().padStart(4, '0') %>" readonly />
-                  </div>
-                </div>
-                
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label
-                      for="perigrafh"
-                      class="col-form-label label-font-size field-required">
-                        Περιγραφή
-                    </label>
-                  </div>
-                  <div class="col-10-5">
-                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="" />
-                  </div>
-                </div>
-
-                <div class="row form-group g-3 align-items-center" style="background-color: #ffffff;">
-                  <div class="col-1-5 left-align">
-                    <label for="poso_pososto" class="col-form-label label-font-size left-align field-required">
-                      Ποσό ή Ποσοστό
-                    </label>
-                  </div>
-                  <div class="col-1-5 left-align checkbox-flex-center">
-                    <input type="checkbox" id="poso_pososto" name="poso_pososto" class="form-check-input custom-checkbox checkbox-class" value="" />
-                    <label for="poso_pososto" id="label-poso_pososto" style="margin-left: 0.75rem; font-size: 0.875vw;">
-                      ΠΟΣΟΣΤΟ
-                    </label>
-                  </div>
+								<div class="row form-group g-3 align-items-center mb-2 bg-white">
+									<div class="col-1-5 left-align">
+										<label for="poso_pososto" class="col-form-label label-font-size left-align field-required">
+										Ποσό ή Ποσοστό
+										</label>
+									</div>
+									<div class="col-1-5 left-align checkbox-flex-center">
+										<input type="checkbox" id="poso_pososto" name="poso_pososto" class="form-check-input custom-checkbox checkbox-class margin-top--0_02rem" value="" />
+										<label for="poso_pososto" id="label-poso_pososto" class="margin-left-0_75rem font-size-vw-0_875">
+										ΠΟΣΟΣΤΟ
+										</label>
+									</div>
                   
-                  <div class="col-3"></div>
+									<div class="col-2-5"></div>
 
-                  <div class="col-1-5 left-align">
-                    <label for="poso" class="col-form-label label-font-size">
-                      Ποσό
-                    </label>
-                  </div>
+									<div class="col-1-5 left-align">
+										<label for="poso" class="col-form-label label-font-size">
+										Ποσό
+										</label>
+									</div>
 
-                  <div class="col-1">
-                    <input type="number" name="poso" id="poso" class="form-control input-contents text-right" value="0" disabled />
-                  </div>
+									<div class="col-1-5">
+										<input type="number" name="poso" id="poso" class="form-control input-contents text-right" value="0" step="0.10" disabled />
+									</div>
+									
+									<div class="col-1"></div>
+
+									<div class="col-1 left-align">
+										<label for="pososto" class="col-form-label label-font-size">
+										Ποσοστό
+										</label>
+									</div>
+
+									<div class="col-1-5">
+										<input type="number" name="pososto" id="pososto" class="form-control input-contents text-right" value="0" min="-100" max="100" step="0.05" />
+									</div>
+				                </div>
+
+								<div class="row form-group g-3 align-items-center mb-2 bg-white">
+									<div class="col-1-5 left-align">
+										<label for="arithmos_klimakion" class="col-form-label label-font-size left-align field-required">
+										Αριθμός Κλιμακίων
+										</label>
+									</div>
+
+									<div class="col-1">
+										<input type="number" name="arithmos_klimakion" id="arithmos_klimakion" class="form-control input-contents text-right" min="1" max="50" value="35" />
+									</div>
+									
+									<div class="col-3"></div>
+
+									<div class="col-2 left-align">
+										<label for="ypologismos_apo_klimakio" class="col-form-label label-font-size-smaller">
+										Ξεκινά απ'το Κλιμάκιο
+										</label>
+									</div>
+
+									<div class="col-1">
+										<input type="number" name="ypologismos_apo_klimakio" id="ypologismos_apo_klimakio" class="form-control input-contents text-right" min="1" max="35" value="1" />
+									</div>
+
+									<div class="col-1"></div>
+
+									<div class="col-1-5 left-align">
+										<label for="bhma_ypologismoy" class="col-form-label label-font-size">
+										Βήμα Υπολογισμού
+										</label>
+									</div>
+
+									<div class="col-1">
+										<input type="number" name="bhma_ypologismoy" id="bhma_ypologismoy" class="form-control input-contents text-right" min="1" max="35" value="1" />
+									</div>
+				                </div>
                 
-                  <div class="col-1"></div>
+								<div class="row form-group g-3 align-items-center mb-1">
+									<div class="col-1-5 left-align">
+										<label 
+										for="typos_ypologismoy"
+										class="col-form-label label-font-size field-required">
+											Τύπος Υπολογισμού
+										</label>
+									</div>
+									<div class="col-10-5">
+										<input type="text" name="typos_ypologismoy" id="typos_ypologismoy" class="form-control input-contents" value="" />
+									</div>
+								</div>
+			              	</div>
 
-                  <div class="col-1-5 left-align">
-                    <label for="pososto" class="col-form-label label-font-size">
-                      Ποσοστό
-                    </label>
-                  </div>
-
-                  <div class="col-1">
-                    <input type="number" name="pososto" id="pososto" class="form-control input-contents text-right" value="0" min="0" max="100" step="0.05" />
-                  </div>
+                            <div class="card-footer mt-auto cardFooter">
+                                <div class="d-inline-block d-flex cardFooter01">
+                                    <button
+                                        type="button"
+                                        class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton">
+                                        <i class="bi bi-floppy"></i> Αποθήκευση
+                                    </button>
+                                    <a
+                                        class="btn btn-brown buttons-content rounded-4 mt-2 w-20 backButton"
+                                        href="/symbaseis/stoixeiaSymbaseon">
+                                        <i class="bi bi-chevron-double-left"></i> 
+                                        Επιστροφή
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-
-                <div class="row form-group g-3 align-items-center mb-4" style="background-color: #ffffff;">
-                  <div class="col-1-5 left-align">
-                    <label for="arithmos_klimakion" class="col-form-label label-font-size left-align field-required">
-                      Αριθμός Κλιμακίων
-                    </label>
-                  </div>
-
-                  <div class="col-1">
-                    <input type="number" name="arithmos_klimakion" id="arithmos_klimakion" class="form-control input-contents text-right" min="1" max="50" value="35" />
-                  </div>
-                
-                  <div class="col-3-5"></div>
-
-                  <div class="col-1-5 left-align">
-                    <label for="ypologismos_apo_klimakio" class="col-form-label label-font-size-smaller">
-                      Ξεκινά απ'το Κλιμάκιο
-                    </label>
-                  </div>
-
-                  <div class="col-1">
-                    <input type="number" name="ypologismos_apo_klimakio" id="ypologismos_apo_klimakio" class="form-control input-contents text-right" min="1" max="35" value="1" />
-                  </div>
-
-                  <div class="col-1"></div>
-
-                  <div class="col-1-5 left-align">
-                    <label for="bhma_ypologismoy" class="col-form-label label-font-size">
-                      Βήμα Υπολογισμού
-                    </label>
-                  </div>
-
-                  <div class="col-1">
-                    <input type="number" name="bhma_ypologismoy" id="bhma_ypologismoy" class="form-control input-contents text-right" min="1" max="35" value="1" />
-                  </div>
-                </div>
-                
-                <div class="row form-group g-3 align-items-center mb-1">
-                  <div class="col-1-5 left-align">
-                    <label 
-                      for="typos_ypologismoy"
-                      class="col-form-label label-font-size field-required">
-                        Τύπος Υπολογισμού
-                    </label>
-                  </div>
-                  <div class="col-10-5">
-                    <input type="text" name="typos_ypologismoy" id="typos_ypologismoy" class="form-control input-contents" value="" />
-                  </div>
-                </div>
-              </div>
-
-              <div
-                class="card-footer mt-auto"
-              >
-                <div
-                  class="d-inline-block d-flex"
-                  style="
-                    margin-top: -0.5rem !important;
-                    margin-bottom: -1rem !important;
-                    margin-left: 10px !important;
-                    margin-right: 10px !important;
-                    justify-content: space-around;
-                  "
-                >
-                  <button
-                    type="button"
-                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content submitButton"  data-url="/symbaseis/stoixeiaSymbaseon/add" data-message="Επιτυχής ενημέρωση του αρχείου των Στοιχείων Συμβάσεων"
-                  >
-                    <i class="bi bi-floppy"></i> Αποθήκευση
-                  </button>
-                  <a
-                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
-                    href="/symbaseis/stoixeiaSymbaseon"
-                    ><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                  </a>
-                </div>
-              </div>
-            </div>
-          </form>
+            </section>
         </div>
-      </section>
     </div>
-
-    <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/toggleLabelSymbaseis.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/getFieldValues.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/putFieldValues.js"></script>
-    <!-- <script nonce="<%= nonce %>" src="/static/js/common/changeUrl.js"></script> -->
-  </div>
 </div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+              
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/stoixeiaSymbaseon/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatNumbers_2dec<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabelSymbaseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>

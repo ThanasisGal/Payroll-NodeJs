@@ -2,42 +2,59 @@ const { Schema: _Schema, model } = require("mongoose");
 
 const Schema = _Schema;
 
-const SymbaseisSchema = new Schema({
-  kodikos: { type: String, unique: true, index: true },
-  perigrafh: { type: String, trim: true },
-});
+const SymbaseisSchema = new Schema(
+	{
+		kodikos: { type: String, unique: true, index: true },
+		perigrafh: { type: String, trim: true },
+	}
+);
 const SymbaseisModel = model("Symbaseis", SymbaseisSchema);
   
-const KathgoriesSymbaseonSchema = new Schema({
-  aa: { type: String, unique: true, index: true },
-  kodikos: { type: String, trim: true },
-  perigrafh: { type: String, trim: true },
-  afora_thn_symbash: { type: String, trim: true },
-});
+const KathgoriesSymbaseonSchema = new Schema(
+	{
+		aa: { type: String, unique: true, index: true },
+		kodikos: { type: String, trim: true },
+		perigrafh: { type: String, trim: true },
+		afora_thn_symbash: { type: String, trim: true },
+	},
+	{
+	  	collection: "kathgories_symbaseon"
+	}
+);
 const KathgoriesSymbaseonModel = model("KathgoriesSymbaseon", KathgoriesSymbaseonSchema);
-  
-const EidikothtesAnaKathgoriaSymbaseonSchema = new Schema({
-  aa: { type: String, unique: true, index: true },
-  kodikos: { type: String, trim: true },
-  perigrafh: { type: String, trim: true },
-  afora_thn_symbash_kathgoria: { type: String, trim: true },
-});
+
+const EidikothtesAnaKathgoriaSymbaseonSchema = new Schema(
+	{
+		aa: { type: String, unique: true, index: true },
+		kodikos: { type: String, trim: true },
+		perigrafh: { type: String, trim: true },
+		afora_thn_symbash_kathgoria: { type: String, trim: true },
+	},
+	{
+	  	collection: "eidikothtes_symbaseon"
+	}
+);
 const EidikothtesAnaKathgoriaSymbaseonModel = model("EidikothtesAnaKathgoriaSymbaseon", EidikothtesAnaKathgoriaSymbaseonSchema);
 
-const StoixeiaSymbaseonSchema = new Schema({
-  kodikos: { type: String, trim: true },
-  perigrafh: { type: String, trim: true },
-  afora_thn_symbash_kathgoria_eidikothta: { type: String, trim: true },
-  poso_pososto: { type: Boolean, default: false },
-  arithmos_klimakion: { type: Number },
-  ypologismos_apo_klimakio: { type: Number },
-  bhma_ypologismoy: { type: Number },
-  poso: { type: Number },
-  pososto: { type: Number },
-  typos_ypologismoy: { type: String, trim: true },
-});
+const StoixeiaSymbaseonSchema = new Schema(
+    {
+        kodikos: { type: String, trim: true },
+        perigrafh: { type: String, trim: true },
+        afora_thn_symbash_kathgoria_eidikothta: { type: String, trim: true },
+        poso_pososto: { type: Boolean, default: false },
+        arithmos_klimakion: { type: Number },
+        ypologismos_apo_klimakio: { type: Number },
+        bhma_ypologismoy: { type: Number },
+        poso: { type: Number },
+        pososto: { type: Number },
+        typos_ypologismoy: { type: String, trim: true },
+    },
+    {
+        collection: "stoixeia_symbaseon"
+    }
+);
 const StoixeiaSymbaseonModel = model("StoixeiaSymbaseon", StoixeiaSymbaseonSchema);
-  
+
 const KlimakiaSymbaseonSchema = new Schema({
   kodikos_symbashs: { type: String, trim: true },
   kodikos_kathgorias_symbashs: { type: String, trim: true },

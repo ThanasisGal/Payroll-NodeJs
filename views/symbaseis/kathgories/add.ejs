@@ -19,6 +19,19 @@
                                 </label>
                             </div>
 
+                            <%
+                            const kodikosStr = String(symbash?.[0]?.kodikos ?? '').padEnd(10, '\u00A0');
+                            const perigrafhStr = String(symbash?.[0]?.perigrafh ?? '');
+                            const labelDescr = kodikosStr + perigrafhStr;
+
+                            const len = labelDescr.length;
+                            const heightClass = len <= 90 
+                                    ? 'height-vh-25'
+                                    : len <= 200 ? 'height-vh-28'
+                                    : 'height-vh-30';
+                            %>
+    
+
                             <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-25 bg-white" id="cardBody">
                                 <input type="hidden" name="aa" id="aa" value="<%= aa_value.toString().padStart(4, '0') %>" />
                                 <input type="hidden" name="afora_thn_symbash" id="afora_thn_symbash" value="<%= symbash[0].kodikos.toString().padStart(4, '0') %>" />
@@ -31,7 +44,7 @@
                                             Σύμβαση &nbsp;
                                         </label>
                                     </div>
-                                    <div class="col-8 left-align font-size-rem-1_1 cgreen">
+                                    <div class="col-8 left-align font-size-rem-1_1 font-weight-600 cgreen">
                                         <label>
                                             <%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %>
                                         </label>
@@ -79,7 +92,7 @@
                                         <i class="bi bi-floppy"></i> Αποθήκευση
                                     </button>
                                     <a
-                                        class="btn btn-brown buttons-content rounded-4 mt-2 w-20"
+                                        class="btn btn-brown buttons-content rounded-4 mt-2 w-20 backButton"
                                         href="/symbaseis/kathgories">
                                         <i class="bi bi-chevron-double-left"></i> 
                                         Επιστροφή
