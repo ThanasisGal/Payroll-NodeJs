@@ -1027,6 +1027,9 @@ function updateOverflow(tom) {
                 flex: '0 0 auto'
             });
             tools.appendChild(resetBtn);
+
+            // ⬅️ ΜΗΝ παίρνει ποτέ focus
+            makeUnfocusable(resetBtn);
         }
 
         // ── helpers για καθαρίσματα
@@ -1354,21 +1357,24 @@ function updateOverflow(tom) {
     		wrapper.appendChild(popup);
 
 			// κουμπί "Αφαίρεση" σε κάθε γραμμή του popup
-			popup.querySelectorAll('button').forEach((btn) => {
-				btn.addEventListener('click', (ev) => {
-					ev.preventDefault();
-					ev.stopPropagation();
+            popup.querySelectorAll('button').forEach((btn) => {
+                // 🔒 ΜΗΝ παίρνουν ΠΟΤΕ focus τα trash του popup
+                makeUnfocusable(btn);
 
-					const val = btn.dataset.val;
-					const removeBtn = ctrl.querySelector(`.item[data-value="${val}"] .remove`);
-					if (removeBtn) {
-						removeBtn.click();
-					}
+                btn.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
 
-					popup.remove();
-					updateOverflow(tom);
-				});
-			});
+                    const val = btn.dataset.val;
+                    const removeBtn = ctrl.querySelector(`.item[data-value="${val}"] .remove`);
+                    if (removeBtn) {
+                        removeBtn.click();
+                    }
+
+                    popup.remove();
+                    updateOverflow(tom);
+                });
+            });
 
 			// κλείσιμο popup όταν κλικάρει έξω ή ξαναπατήσει το +N
 			document.addEventListener('click', function close(ev) {
@@ -1395,10 +1401,21 @@ function updateOverflow(tom) {
 
 	// Προαιρετικά: fallback για πληκτρολόγιο
 	dot.addEventListener('click', (e) => {
-	if (IS_EID) { e.preventDefault(); e.stopPropagation(); }
-	openOverflowPopup();
+        if (IS_EID) { e.preventDefault(); e.stopPropagation(); }
+        openOverflowPopup();
 	});
+
+    // 🔚 ΤΕΛΙΚΟ ΒΗΜΑ:
+    // Σε multiple TS βγάζουμε από το tab-order ΟΛΑ τα κουμπιά
+    // που έχουν μέσα icon με bi-plus-slash-minus ή bi-trash3
+    wrapper
+        .querySelectorAll('button i.bi.bi-plus-slash-minus, button i.bi.bi-trash3')
+        .forEach((icon) => {
+            const btn = icon.closest('button');
+            if (btn) makeUnfocusable(btn);
+        });
 }
+
 
 window.tomDropdownConfig = {
 	setRender  : (id, r) => (globalRenderMap[id] = r),

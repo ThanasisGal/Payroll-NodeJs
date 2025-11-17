@@ -1,38 +1,31 @@
 // /static/js/symbaseis/stoixeiaSymbaseon/stoixeia-list.js
-// Φόρτωμα πίνακα Στοιχείων Σύμβασης για 3 επίπεδα:
-// 1) Σύμβαση  2) Κατηγορία  3) Ειδικότητα
-// Υποστηρίζει single & multiple (για Κατηγορία/Ειδικότητα):
-// - Single: όπως πριν (server-side pagination με 12-ψηφιο).
-// - Multiple: φέρνει ΟΛΟΥΣ τους συνδυασμούς (client-side merge + pagination).
-//
-// ΚΡΑΤΑΕΙ την επιλογή με sessionStorage. Σβήνεται όταν πατήσεις
-// "Επιστροφή" ή κάποιο από τα σκουπιδάκια.
+// ΜΟΝΟ single TomSelect για: Σύμβαση, Κατηγορία, Ειδικότητα.
+// Λογική ίδια με symbaseis-kathgories-eidikothtes.js, απλώς με 3 επίπεδα.
 
 (() => {
-  // για να μην φορτώσει 2 φορές
   if (window.__stoixeiaListInit) return;
   window.__stoixeiaListInit = true;
 
   const ENDPOINT = '/api/symbaseis/stoixeiaSymbaseon';
 
-  // ids των dropdown/hidden
-  const SYM_SELECT = 'symbash';
-  const SYM_HIDDEN = 'symbash_stathera';
+  // ids dropdown / hidden
+  const SYM_SELECT  = 'symbash';
+  const SYM_HIDDEN  = 'symbash_stathera';
 
-  const KAT_SELECT = 'kathgoria_symbashs';
-  const KAT_HIDDEN = 'kathgoria_symbashs_stathera';
+  const KAT_SELECT  = 'kathgoria_symbashs';
+  const KAT_HIDDEN  = 'kathgoria_symbashs_stathera';
 
-  const EID_SELECT = 'eidikothta_symbashs';
-  const EID_HIDDEN = 'eidikothta_symbashs_stathera';
+  const EID_SELECT  = 'eidikothta_symbashs';
+  const EID_HIDDEN  = 'eidikothta_symbashs_stathera';
 
-  // το hidden με το 12-ψηφιο (single)
-  const COMBO12_ID = 'kodikosSymbashs_Kathgorias_Eidikothtas';
+  // 12-ψήφιο (συμβασης+κατηγορίας+ειδικότητας)
+  const COMBO12_ID  = 'kodikosSymbashs_Kathgorias_Eidikothtas';
 
   // πίνακας + pagination
-  const TBODY_SEL = '#myTable tbody';
-  const PAG_UL_ID = 'stoixeiaSymbaseon-pagination';
+  const TBODY_SEL   = '#myTable tbody';
+  const PAG_UL_ID   = 'stoixeiaSymbaseon-pagination';
 
-  // sessionStorage keys (arrays σε JSON)
+  // sessionStorage keys (single string, όχι arrays)
   const SS_SYM = 'wps:stoixeia:symbasi';
   const SS_KAT = 'wps:stoixeia:kathgoria';
   const SS_EID = 'wps:stoixeia:eidikothta';
@@ -43,77 +36,76 @@
     return Number.isFinite(n) && n > 0 ? n : 15;
   })();
 
-  // ---- μικρά helpers -------------------------------------------------
+  // ---- helpers γενικά -------------------------------------------------
+
   const $id   = (id) => document.getElementById(id);
   const tbody = () => document.querySelector(TBODY_SEL);
   const pagUl = () => document.getElementById(PAG_UL_ID);
-  const csrf  = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  const csrfToken = () =>
+    document.querySelector('meta[name="csrf-token"]')?.content || '';
 
   const to4 = (v) => {
-    const d = String(v ?? '').replace(/\D/g, '');
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    const d = s.replace(/\D/g, '');
     if (!d) return '';
     const n = parseInt(d, 10);
-    return Number.isFinite(n) ? String(n).padStart(4, '0') : d.slice(-4).padStart(4, '0');
+    return Number.isFinite(n) ? String(n).padStart(4, '0').slice(-4) : d.slice(-4).padStart(4, '0');
   };
 
-  // είναι multiple το συγκεκριμένο <select> / TomSelect;
-  const isMulti = (id) => {
+  // TomSelect single value από <select id=...>
+  const getTSVal = (id) => {
     const el = $id(id);
-    if (!el) return false;
-    if (el.tomselect) return el.tomselect.settings.mode === 'multi';
-    return !!el.multiple;
-  };
-
-  // πάρε ΤΙΜΕΣ από TomSelect (ή native): πάντα array
-  const getTSVals = (id) => {
-    const el = $id(id);
-    if (!el) return [];
+    if (!el) return '';
     if (el.tomselect && typeof el.tomselect.getValue === 'function') {
       const v = el.tomselect.getValue();
-      return Array.isArray(v) ? v : (v ? [v] : []);
+      if (Array.isArray(v)) return v[0] || '';
+      return v || '';
     }
-    const v = el.value || '';
-    return v ? [v] : [];
+    return el.value || '';
   };
 
-  const to4arr = (vals) => (vals || []).map(to4).filter(Boolean);
+  // Θέσε single value σε TomSelect / native <select>
+  const setTSVal = (id, value) => {
+    const el = $id(id);
+    if (!el) return;
+    const v = to4(value || '');
 
-  // session helpers (αποθήκευση array σε JSON)
-  const saveArr = (key, arr) => { try { arr?.length ? sessionStorage.setItem(key, JSON.stringify(arr)) : sessionStorage.removeItem(key); } catch {} };
-  const getArr  = (key) => { try { const v = sessionStorage.getItem(key); return v ? JSON.parse(v) : []; } catch { return []; } };
-  const clearSS = () => { try { sessionStorage.removeItem(SS_SYM); sessionStorage.removeItem(SS_KAT); sessionStorage.removeItem(SS_EID); } catch {} };
-
-  // Συμβατικές προσβάσεις (παίρνουν πρώτα από TS, μετά από session, μετά από hidden)
-  const getSymArr = () => {
-    const ts = to4arr(getTSVals(SYM_SELECT));
-    if (ts.length) return ts;
-    const ss = to4arr(getArr(SS_SYM));
-    if (ss.length) return ss;
-    const hv = to4($id(SYM_HIDDEN)?.value || '');
-    return hv ? [hv] : [];
-  };
-  const getKatArr = () => {
-    const ts = to4arr(getTSVals(KAT_SELECT));
-    if (ts.length) return ts;
-    const ss = to4arr(getArr(SS_KAT));
-    if (ss.length) return ss;
-    const hv = to4($id(KAT_HIDDEN)?.value || '');
-    return hv ? [hv] : [];
-  };
-  const getEidArr = () => {
-    const ts = to4arr(getTSVals(EID_SELECT));
-    if (ts.length) return ts;
-    const ss = to4arr(getArr(SS_EID));
-    if (ss.length) return ss;
-    const hv = to4($id(EID_HIDDEN)?.value || '');
-    return hv ? [hv] : [];
+    if (el.tomselect && typeof el.tomselect.setValue === 'function') {
+      // Αν είναι άδειο → καθάρισε
+      if (!v) {
+        if (typeof el.tomselect.clear === 'function') {
+          el.tomselect.clear(true);
+        } else {
+          el.tomselect.setValue('', true);
+        }
+      } else {
+        el.tomselect.setValue(v, true);
+      }
+    } else {
+      el.value = v;
+    }
   };
 
-  // ---- table helpers -------------------------------------------------
-  const clearTable = () => {
-    const tb = tbody();
-    if (tb) tb.innerHTML = '';
-  };
+  // session helpers (απλό string)
+  const saveSym = (v) => { try { v ? sessionStorage.setItem(SS_SYM, v) : sessionStorage.removeItem(SS_SYM); } catch {} };
+  const saveKat = (v) => { try { v ? sessionStorage.setItem(SS_KAT, v) : sessionStorage.removeItem(SS_KAT); } catch {} };
+  const saveEid = (v) => { try { v ? sessionStorage.setItem(SS_EID, v) : sessionStorage.removeItem(SS_EID); } catch {} };
+
+  const getSym  = () => { try { return sessionStorage.getItem(SS_SYM) || ''; } catch { return ''; } };
+  const getKat  = () => { try { return sessionStorage.getItem(SS_KAT) || ''; } catch { return ''; } };
+  const getEid  = () => { try { return sessionStorage.getItem(SS_EID) || ''; } catch { return ''; } };
+
+  const clearSS = () => { try {
+    sessionStorage.removeItem(SS_SYM);
+    sessionStorage.removeItem(SS_KAT);
+    sessionStorage.removeItem(SS_EID);
+  } catch {} };
+
+  // ---- table helpers --------------------------------------------------
+
+  const clearTable = () => { const tb = tbody(); if (tb) tb.innerHTML = ''; };
 
   const rowMsg = (text, cls = 'text-center text-muted') => {
     const tb = tbody(); if (!tb) return;
@@ -128,10 +120,13 @@
 
   function renderRows(items) {
     clearTable();
-    if (!items?.length) return rowMsg('Δεν βρέθηκαν στοιχεία σύμβασης.');
+    if (!items || !items.length) {
+      rowMsg('Δεν βρέθηκαν στοιχεία σύμβασης.');
+      return;
+    }
     const tb = tbody(); if (!tb) return;
 
-    for (const r of items) {
+    items.forEach((r) => {
       const tr = document.createElement('tr');
       tr.dataset.id = r.id ?? r._id ?? '';
 
@@ -149,381 +144,371 @@
       tr.appendChild(td2);
 
       tb.appendChild(tr);
-    }
+    });
   }
 
-  // ---- pagination state ----------------------------------------------
-  const state = {
-    pg: 1,
-    pages: 1,
-    multiActive: false,     // όταν είναι true → client-side pagination
-    multiItems: [],         // merged + deduped items
-  };
+  // ---- pagination -----------------------------------------------------
+
+  const state = { page: 1, pages: 1 };
 
   function renderPagination(current, pages) {
     const ul = pagUl(); if (!ul) return;
-    state.pg = current;
+
+    state.page  = current || 1;
     state.pages = Math.max(1, pages || 1);
 
-    if (state.pages <= 1) {
-      ul.innerHTML = '';
-      return;
-    }
+    ul.innerHTML = '';
+    if (state.pages <= 1) return;
 
-    const li = [];
-    const disabledLeft  = current === 1;
-    const disabledRight = current === state.pages;
+    const makeLi = (p, label, disabled, active) => {
+      const li = document.createElement('li');
+      li.className = `page-item${disabled ? ' disabled' : ''}${active ? ' active' : ''}`;
+      const a = document.createElement('a');
+      a.className = 'page-link font-size-vw-0_5';
+      a.href = '#';
+      a.dataset.page = String(p);
+      a.textContent = label;
+      li.appendChild(a);
+      return li;
+    };
 
-    // first / prev
-    li.push(`
-      <li class="page-item ${disabledLeft ? 'disabled' : ''}">
-        <a href="#" data-page="1" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
-      </li>
-      <li class="page-item ${disabledLeft ? 'disabled' : ''}">
-        <a href="#" data-page="${Math.max(1, current - 1)}" class="page-link"><i class="bi bi-chevron-left font-size-vw-0_5"></i></a>
-      </li>
-    `);
+    const disabledLeft  = state.page === 1;
+    const disabledRight = state.page === state.pages;
 
-    // γύρω από την τρέχουσα
-    let i = current > 2 ? current - 1 : 1;
-    if (i !== 1) {
-      li.push(`<li class="page-item disabled"><a href="#" class="page-link font-size-vw-0_5">...</a></li>`);
-    }
+    // first + prev
+    ul.appendChild(makeLi(1, '««', disabledLeft, false));
+    ul.appendChild(makeLi(Math.max(1, state.page - 1), '«', disabledLeft, false));
 
-    for (; i <= (current + 1) && i <= state.pages; i++) {
-      if (i === current) {
-        li.push(`
-          <li class="page-item is-current" aria-current="page">
-            <span class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</span>
-          </li>
-        `);
-      } else {
-        li.push(`
-          <li class="page-item fsvw-0_7">
-            <a href="#" data-page="${i}" class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${i}</a>
-          </li>
-        `);
-      }
+    // λίγες γύρω από την τρέχουσα
+    let start = Math.max(1, state.page - 1);
+    let end   = Math.min(state.pages, state.page + 1);
 
-      if (i === current + 1 && i < state.pages) {
-        li.push(`
-          <li class="page-item disabled"><a href="#" class="page-link font-size-vw-0_5">...</a></li>
-          <li class="page-item"><a href="#" data-page="${state.pages}" class="page-link font-size-vw-0_5 padding-top-px-8 fw500">${state.pages}</a></li>
-        `);
+    if (start > 1) {
+      ul.appendChild(makeLi(1, '1', false, state.page === 1));
+      if (start > 2) {
+        const liDots = document.createElement('li');
+        liDots.className = 'page-item disabled';
+        const aDots = document.createElement('a');
+        aDots.className = 'page-link font-size-vw-0_5';
+        aDots.textContent = '...';
+        liDots.appendChild(aDots);
+        ul.appendChild(liDots);
       }
     }
 
-    // next / last
-    li.push(`
-      <li class="page-item ${disabledRight ? 'disabled' : ''}">
-        <a href="#" data-page="${Math.min(state.pages, current + 1)}" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
-      </li>
-      <li class="page-item ${disabledRight ? 'disabled' : ''}">
-        <a href="#" data-page="${state.pages}" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i></a>
-      </li>
-    `);
+    for (let p = start; p <= end; p++) {
+      ul.appendChild(makeLi(p, String(p), false, p === state.page));
+    }
 
-    ul.innerHTML = li.join('');
+    if (end < state.pages) {
+      if (end < state.pages - 1) {
+        const liDots = document.createElement('li');
+        liDots.className = 'page-item disabled';
+        const aDots = document.createElement('a');
+        aDots.className = 'page-link font-size-vw-0_5';
+        aDots.textContent = '...';
+        liDots.appendChild(aDots);
+        ul.appendChild(liDots);
+      }
+      ul.appendChild(makeLi(state.pages, String(state.pages), false, state.page === state.pages));
+    }
+
+    // next + last
+    ul.appendChild(makeLi(Math.min(state.pages, state.page + 1), '»', disabledRight, false));
+    ul.appendChild(makeLi(state.pages, '»»', disabledRight, false));
   }
 
-  // click στο pagination
   document.addEventListener('click', (e) => {
-    const a = e.target.closest(`#${PAG_UL_ID} a.page-link`);
+    const a = e.target.closest?.(`#${PAG_UL_ID} a[data-page]`);
     if (!a) return;
-
-    const page = Number(a.dataset.page);
-    if (!page || page === state.pg || a.parentElement.classList.contains('disabled')) return;
     e.preventDefault();
 
-    // Αν είμαστε σε multi → client-side slice
-    if (state.multiActive) {
-      renderMultiPage(page);
-      return;
-    }
+    const p = parseInt(a.dataset.page || '1', 10);
+    if (!p || p === state.page) return;
 
-    // Single → fetch με το 12-ψηφιο
-    const comboVal = $id(COMBO12_ID)?.value?.trim() || '';
-    if (!comboVal) return;
-    loadForSingle(comboVal, page);
-  });
+    const combo = ($id(COMBO12_ID)?.value || '').trim();
+    if (!combo) return;
 
-  // ---- fetch ---------------------------------------------------------
+    loadFor(combo, p);
+  }, true);
+
+  // ---------- κουμπί "Επιστροφή" -> καθάρισε session ----------
+  document.addEventListener('click', (e) => {
+    const back = e.target.closest('#back-btn,[data-clear-symbash]');
+    if (!back) return;
+    clearSS();
+  }, true);
+
+  // ---- fetch ----------------------------------------------------------
+
   async function fetchPageForCombo(combo12, page = 1) {
-    const url = `${ENDPOINT}?afora_thn_symbash_kathgoria_eidikothta=${encodeURIComponent(combo12)}&page=${page}&limit=${LIMIT}`;
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json', 'X-CSRF-Token': csrf() },
+    const params = new URLSearchParams();
+    params.set('afora_thn_symbash_kathgoria_eidikothta', combo12);
+    params.set('page', String(page));
+    params.set('limit', String(LIMIT));
+
+    const res = await fetch(`${ENDPOINT}?${params.toString()}`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrfToken() ? { 'X-CSRF-Token': csrfToken() } : {})
+      },
       credentials: 'same-origin'
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json(); // { items, page, pages }
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   }
 
-  async function loadForSingle(combo12, page = 1) {
-    if (!combo12) {
-      clearTable();
-      renderPagination(1, 1);
-      return;
-    }
-
-    state.multiActive = false;
-    clearTable();
-    rowMsg('Φόρτωση...', 'text-center');
-
+  async function loadFor(combo12, page = 1) {
+    if (!combo12) return;
     try {
-      const json = await fetchPageForCombo(combo12, page);
-      renderRows(json.items || []);
-      renderPagination(Number(json.page || page), Number(json.pages || 1));
-    } catch (err) {
-      console.error(err);
       clearTable();
-      renderPagination(1, 1);
-      rowMsg('Προέκυψε σφάλμα κατά τη φόρτωση.', 'text-center text-danger');
-    }
-  }
+      rowMsg('Φόρτωση στοιχείων σύμβασης...');
 
-  // ---- multiple: merge όλων των combos, client-side pagination --------
-  const cartesian = (a, b, c) => {
-    const out = [];
-    for (const x of a) for (const y of b) for (const z of c) out.push([x,y,z]);
-    return out;
-  };
+      const data = await fetchPageForCombo(combo12, page);
+      const items = data?.items || [];
+      const curPage = Number(data?.page || 1);
+      const totalPages = Number(data?.pages || 1) || 1;
 
-  const uniqItems = (items) => {
-    const seen = new Set();
-    const out = [];
-    for (const r of items || []) {
-      const key = (r.id ?? r._id ?? '') || `${r.kodikos}|${r.perigrafh}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        out.push(r);
-      }
-    }
-    return out;
-  };
-
-  async function loadForMultiple(symArr, katArr, eidArr) {
-    // combos 12-ψηφια
-    const combos = cartesian(symArr, katArr, eidArr).map(([s,k,e]) => `${s}${k}${e}`);
-    if (!combos.length) {
-      clearTable(); renderPagination(1,1); return;
-    }
-
-    state.multiActive = true;
-    state.multiItems = [];
-    clearTable();
-    renderPagination(1, 1);
-    rowMsg('Φόρτωση πολλαπλών συνδυασμών...', 'text-center');
-
-    try {
-      const all = [];
-      // Φέρε ΟΛΕΣ τις σελίδες για κάθε combo (sequential για απλότητα/συμβατότητα)
-      for (const combo of combos) {
-        let page = 1, pages = 1;
-        do {
-          const json = await fetchPageForCombo(combo, page);
-          if (Array.isArray(json.items)) all.push(...json.items);
-          pages = Number(json.pages || pages || 1);
-          page++;
-        } while (page <= pages);
+      if (!items.length) {
+        clearTable();
+        rowMsg('Δεν βρέθηκαν στοιχεία σύμβασης.');
+        renderPagination(1, 1);
+        return;
       }
 
-      // dedupe & αποθήκευση
-      state.multiItems = uniqItems(all);
-      const pages = Math.max(1, Math.ceil(state.multiItems.length / LIMIT));
-
-      // 1η σελίδα
-      renderMultiPage(1, pages);
-
+      renderRows(items);
+      renderPagination(curPage, totalPages);
     } catch (err) {
-      console.error(err);
-      state.multiItems = [];
+      console.error('stoixeia-list loadFor error', err);
       clearTable();
-      renderPagination(1, 1);
       rowMsg('Προέκυψε σφάλμα κατά τη φόρτωση.', 'text-center text-danger');
+      renderPagination(1, 1);
     }
   }
 
-  function renderMultiPage(page = 1, pagesOpt) {
-    const totalPages = pagesOpt || Math.max(1, Math.ceil(state.multiItems.length / LIMIT));
-    const p = Math.min(Math.max(1, page), totalPages);
-    const start = (p - 1) * LIMIT;
-    const slice = state.multiItems.slice(start, start + LIMIT);
+  // ---- κοινό διάβασμα / φόρτωμα --------------------------------------
 
-    renderRows(slice);
-    renderPagination(p, totalPages);
+  function currentCodes() {
+    // Διαβάζουμε ΠΡΩΤΑ από TS (έχει πάντα το τελευταίο), μετά από session, μετά από hidden.
+    const sym = to4(getTSVal(SYM_SELECT) || getSym() || ($id(SYM_HIDDEN)?.value || ''));
+    const kat = to4(getTSVal(KAT_SELECT) || getKat() || ($id(KAT_HIDDEN)?.value || ''));
+    const eid = to4(getTSVal(EID_SELECT) || getEid() || ($id(EID_HIDDEN)?.value || ''));
+
+    return { sym, kat, eid };
   }
 
-  // ---- build & load ---------------------------------------------------
   function tryLoad() {
-    // σειρά προτεραιότητας: hidden (ό,τι έγραψε dropdown-item.js) -> TS -> session
-    const symArr = (() => {
-      const v = to4($id(SYM_HIDDEN)?.value || '');
-      if (v) return [v];
-      return getSymArr();
-    })();
+    const { sym, kat, eid } = currentCodes();
 
-    const katArr = (() => {
-      const v = to4($id(KAT_HIDDEN)?.value || '');
-      if (v) return [v];
-      return getKatArr();
-    })();
+    // γράψε τα στα hidden
+    if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = sym;
+    if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = kat;
+    if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = eid;
 
-    const eidArr = (() => {
-      const v = to4($id(EID_HIDDEN)?.value || '');
-      if (v) return [v];
-      return getEidArr();
-    })();
+    // γράψε τα στο session
+    saveSym(sym);
+    saveKat(kat);
+    saveEid(eid);
 
-    // Αποθήκευση arrays στο session
-    saveArr(SS_SYM, symArr);
-    saveArr(SS_KAT, katArr);
-    saveArr(SS_EID, eidArr);
-
-    // Αν λείπει κάτι → καθάρισμα
-    if (!symArr.length || !katArr.length || !eidArr.length) {
-      state.multiActive = false;
-      state.multiItems = [];
+    // Αν λείπει κάτι → καθάρισε πίνακα & combo
+    if (!sym || !kat || !eid) {
+      const comboEl = $id(COMBO12_ID);
+      if (comboEl) comboEl.value = '';
       clearTable();
       renderPagination(1, 1);
       return;
     }
 
-    // Single (1-1-1) → server-side
-    if (symArr.length === 1 && katArr.length === 1 && eidArr.length === 1) {
-      const combo = `${symArr[0]}${katArr[0]}${eidArr[0]}`;
-      const comboEl = $id(COMBO12_ID);
-      if (comboEl) comboEl.value = combo;
-      loadForSingle(combo, 1);
-      return;
-    }
-
-    // Multiple → client-side merge
+    const combo = `${sym}${kat}${eid}`;
     const comboEl = $id(COMBO12_ID);
-    if (comboEl) comboEl.value = ''; // δεν έχει νόημα 12-ψηφιο εδώ
-    loadForMultiple(symArr, katArr, eidArr);
+    if (comboEl) comboEl.value = combo;
+
+    loadFor(combo, 1);
   }
 
-  // ---- change listeners ----------------------------------------------
+  // ---- change handlers για τα 3 TS -----------------------------------
+
   document.addEventListener('change', (e) => {
     const t = e.target;
     if (!t) return;
 
-    // 1) Σύμβαση → σώσε (ως array), γράψε hidden (πρώτη), καθάρισε πίνακα
+    // 1) Σύμβαση
     if (t.id === SYM_SELECT || t.closest?.(`#${SYM_SELECT}`)) {
-      const vals = to4arr(getTSVals(SYM_SELECT));
-      if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = vals[0] || '';
-      saveArr(SS_SYM, vals);
+      const v = to4(getTSVal(SYM_SELECT));
 
-      // αλλάζοντας σύμβαση, μηδένισε αποτελέσματα (οι άλλες επιλογές ίσως δεν ισχύουν πια)
-      state.multiActive = false;
-      state.multiItems = [];
+      // Αν αδειάσει η σύμβαση → άδειασμα ΟΛΩΝ
+      if (!v) {
+        saveSym('');
+        saveKat('');
+        saveEid('');
+
+        if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = '';
+        if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = '';
+        if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = '';
+
+        setTSVal(KAT_SELECT, '');
+        setTSVal(EID_SELECT, '');
+
+        const comboEl = $id(COMBO12_ID);
+        if (comboEl) comboEl.value = '';
+
+        clearTable();
+        renderPagination(1, 1);
+        return;
+      }
+
+      // αλλιώς, αλλάξαμε σύμβαση → κρατάμε μόνο αυτή, μηδενίζουμε κατηγορία/ειδικότητα
+      saveSym(v);
+      if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = v;
+
+      saveKat('');
+      saveEid('');
+      if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = '';
+      if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = '';
+
+      setTSVal(KAT_SELECT, '');
+      setTSVal(EID_SELECT, '');
+
+      const comboEl = $id(COMBO12_ID);
+      if (comboEl) comboEl.value = '';
+
       clearTable();
       renderPagination(1, 1);
       return;
     }
 
-    // 2) Κατηγορία → σώσε array, γράψε hidden (πρώτη), προσπάθησε να φορτώσεις
+    // 2) Κατηγορία
     if (t.id === KAT_SELECT || t.closest?.(`#${KAT_SELECT}`)) {
-      const vals = to4arr(getTSVals(KAT_SELECT));
-      if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = vals[0] || '';
-      saveArr(SS_KAT, vals);
+      const v = to4(getTSVal(KAT_SELECT));
+
+      if (!v) {
+        // Αν αδειάσει η κατηγορία → σβήσε κατηγορία & ειδικότητα
+        saveKat('');
+        saveEid('');
+
+        if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = '';
+        if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = '';
+
+        setTSVal(EID_SELECT, '');
+
+        const comboEl = $id(COMBO12_ID);
+        if (comboEl) comboEl.value = '';
+
+        clearTable();
+        renderPagination(1, 1);
+        return;
+      }
+
+      saveKat(v);
+      if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = v;
+
+      // αλλαγή κατηγορίας → σβήνουμε ειδικότητα
+      saveEid('');
+      if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = '';
+      setTSVal(EID_SELECT, '');
+
       tryLoad();
       return;
     }
 
-    // 3) Ειδικότητα → σώσε array, γράψε hidden (πρώτη), φόρτωσε
+    // 3) Ειδικότητα
     if (t.id === EID_SELECT || t.closest?.(`#${EID_SELECT}`)) {
-      const vals = to4arr(getTSVals(EID_SELECT));
-      if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = vals[0] || '';
-      saveArr(SS_EID, vals);
+      const v = to4(getTSVal(EID_SELECT));
+
+      if (!v) {
+        // άδεια ειδικότητα → μόνο σβήσιμο ειδικότητας
+        saveEid('');
+        if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = '';
+
+        const comboEl = $id(COMBO12_ID);
+        if (comboEl) comboEl.value = '';
+
+        clearTable();
+        renderPagination(1, 1);
+        return;
+      }
+
+      saveEid(v);
+      if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = v;
+
       tryLoad();
       return;
     }
   }, true);
 
-  // ---- καθάρισμα όταν πατήσεις επιστροφή / σκουπιδάκι ----------------
-  document.addEventListener('click', (e) => {
-    // έχεις 3 σκουπιδάκια στο ejs, όλα με data-clear-symbash / data-clear-kathgoria / data-clear-eidikothta
-    const clearBtn = e.target.closest('[data-clear-symbash],[data-clear-kathgoria],[data-clear-eidikothta],#back-btn');
-    if (!clearBtn) return;
-
-    clearSS(); // σβήσε τα δικά μας
-    state.multiActive = false;
-    state.multiItems = [];
-
-    // καθάρισε τον πίνακα
-    clearTable();
-    renderPagination(1, 1);
-  }, true);
-
-  // ---- init ----------------------------------------------------------
-  function parseUrlParamArr(name) {
-    try {
-      const u = new URL(location.href);
-      const raw = u.searchParams.get(name) || '';
-      if (!raw) return [];
-      // υποστήριξη "0001,0002  ;  1  2"
-      return to4arr(raw.split(/[,\s]+/).filter(Boolean));
-    } catch { return []; }
-  }
+  // ---- init (URL -> session -> hidden) --------------------------------
 
   function init() {
-    // 1) από URL (πιθανή λίστα με κόμματα)
-    const symUrl = parseUrlParamArr('symbash');
-    const katUrl = parseUrlParamArr('kathgoria');
-    const eidUrl = parseUrlParamArr('eidikothta');
+    // 1) URL
+    let symUrl = '', katUrl = '', eidUrl = '';
+    try {
+      const u = new URL(window.location.href);
+      symUrl = to4(u.searchParams.get('symbash')     || '');
+      katUrl = to4(u.searchParams.get('kathgoria')   || '');
+      eidUrl = to4(u.searchParams.get('eidikothta') || '');
+    } catch {}
 
-    // 2) από session
-    const symSS = to4arr(getArr(SS_SYM));
-    const katSS = to4arr(getArr(SS_KAT));
-    const eidSS = to4arr(getArr(SS_EID));
+    // 2) session
+    const symSS = to4(getSym());
+    const katSS = to4(getKat());
+    const eidSS = to4(getEid());
 
-    // 3) από hidden
+    // 3) hidden
     const symH = to4($id(SYM_HIDDEN)?.value || '');
     const katH = to4($id(KAT_HIDDEN)?.value || '');
     const eidH = to4($id(EID_HIDDEN)?.value || '');
 
-    // 4) από TS
-    const symTS = to4arr(getTSVals(SYM_SELECT));
-    const katTS = to4arr(getTSVals(KAT_SELECT));
-    const eidTS = to4arr(getTSVals(EID_SELECT));
+    const sym = symUrl || symSS || symH || '';
+    const kat = katUrl || katSS || katH || '';
+    const eid = eidUrl || eidSS || eidH || '';
 
-    // Τελικές τιμές (προτεραιότητα: URL > TS > Session > Hidden)
-    const finalSym = (symUrl.length ? symUrl : (symTS.length ? symTS : (symSS.length ? symSS : (symH ? [symH] : []))));
-    const finalKat = (katUrl.length ? katUrl : (katTS.length ? katTS : (katSS.length ? katSS : (katH ? [katH] : []))));
-    const finalEid = (eidUrl.length ? eidUrl : (eidTS.length ? eidTS : (eidSS.length ? eidSS : (eidH ? [eidH] : []))));
+    // γράψε στα hidden
+    if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = sym;
+    if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = kat;
+    if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = eid;
 
-    // Γράψ’ τα στα hidden (ώστε το dropdown-item.js να τα δει) — μόνο την 1η τιμή για συμβατότητα
-    if ($id(SYM_HIDDEN)) $id(SYM_HIDDEN).value = finalSym[0] || '';
-    if ($id(KAT_HIDDEN)) $id(KAT_HIDDEN).value = finalKat[0] || '';
-    if ($id(EID_HIDDEN)) $id(EID_HIDDEN).value = finalEid[0] || '';
+    // γράψε στο session
+    saveSym(sym);
+    saveKat(kat);
+    saveEid(eid);
 
-    // Αποθήκευσέ τα και στο session (arrays)
-    saveArr(SS_SYM, finalSym);
-    saveArr(SS_KAT, finalKat);
-    saveArr(SS_EID, finalEid);
-
-    // Single vs Multiple
-    if (finalSym.length && finalKat.length && finalEid.length) {
-      if (finalSym.length === 1 && finalKat.length === 1 && finalEid.length === 1) {
-        const combo = `${finalSym[0]}${finalKat[0]}${finalEid[0]}`;
-        const comboEl = $id(COMBO12_ID);
-        if (comboEl) comboEl.value = combo;
-        loadForSingle(combo, 1);
-      } else {
-        const comboEl = $id(COMBO12_ID);
-        if (comboEl) comboEl.value = '';
-        loadForMultiple(finalSym, finalKat, finalEid);
-      }
+    // φόρτωσε αν έχουμε πλήρες combo, αλλιώς καθάρισε πίνακα
+    if (sym && kat && eid) {
+      const combo = `${sym}${kat}${eid}`;
+      const comboEl = $id(COMBO12_ID);
+      if (comboEl) comboEl.value = combo;
+      loadFor(combo, 1);
     } else {
+      const comboEl = $id(COMBO12_ID);
+      if (comboEl) comboEl.value = '';
       clearTable();
       renderPagination(1, 1);
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
+  // Ενημέρωσε τα TomSelect από session/hidden (μόνο labels, όχι πίνακα)
+  function refreshTSLabels() {
+    const sym = to4(getSym() || ($id(SYM_HIDDEN)?.value || ''));
+    const kat = to4(getKat() || ($id(KAT_HIDDEN)?.value || ''));
+    const eid = to4(getEid() || ($id(EID_HIDDEN)?.value || ''));
+
+    setTSVal(SYM_SELECT, sym);
+    setTSVal(KAT_SELECT, kat);
+    setTSVal(EID_SELECT, eid);
   }
+
+  const runInit = () => { init(); refreshTSLabels(); };
+
+  if (document.readyState === 'complete') {
+    runInit();
+  } else {
+    window.addEventListener('load', runInit, { once: true });
+  }
+
+  // υποστήριξη back/forward cache (Chrome κλπ)
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) refreshTSLabels();
+  });
 })();

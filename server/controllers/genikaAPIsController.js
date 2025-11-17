@@ -1017,8 +1017,8 @@ class genikaAPIsController {
   static getEidikothtesSymbaseon = async (req, res) => {
     try {
       const { symbash_kathgoria } = req.params;
-      const kathgoriesSymbashs = await EidikothtesAnaKathgoriaSymbaseonModel.find({ afora_thn_symbash_kathgoria: symbash_kathgoria }).sort("kodikos");
-      res.json(kathgoriesSymbashs);
+      const eidikothtesSymbashs = await EidikothtesAnaKathgoriaSymbaseonModel.find({ afora_thn_symbash_kathgoria: symbash_kathgoria }).sort("kodikos");
+      res.json(eidikothtesSymbashs);
     } catch (error) {
       res.status(500).send(error);
     }

@@ -235,3 +235,25 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatNumbers_2dec<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabelSymbaseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<!-- <script nonce="<%= nonce %>">
+	document.addEventListener('DOMContentLoaded', function () {
+		var hidden = document.getElementById('afora_thn_symbash_kathgoria_eidikothta');
+		var back   = document.querySelector('.backButton');
+		if (!hidden || !back) return;
+
+		var v = (hidden.value || '').trim();
+		if (v.length !== 12) return;
+
+		var sym = v.slice(0, 4);
+		var kat = v.slice(4, 8);
+		var eid = v.slice(8, 12);
+
+		var url = new URL(back.getAttribute('href'), window.location.origin);
+		url.searchParams.set('symbash', sym);
+		url.searchParams.set('kathgoria', kat);
+		url.searchParams.set('eidikothta', eid);
+
+		back.setAttribute('href', url.pathname + url.search);
+	});
+</script> -->
