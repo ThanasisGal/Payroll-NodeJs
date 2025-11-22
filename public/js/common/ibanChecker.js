@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 3ψήφιος κωδικός τράπεζας από διαθέσιμη πηγή
   const getSelectedBankCode = () => {
-    if (bankSelect) return (bankSelect.value || '').trim();
+    if (bankSelect) return (bankSelect.value.substring(0, 3) || '').trim();
     if (bankHidden) return (bankHidden.value || '').trim();
     const fb = document.getElementById(FALLBACK_HIDDEN_ID);
     return fb ? (fb.value || '').trim() : '';

@@ -124,7 +124,10 @@ class ergazomenoiController {
             genikesParametroi,
             istorikoData,
             orariaData,
-            ergazomenoiData
+            ergazomenoiData,
+            mode: "edit", 
+            context: "ergazomenoi", 
+            rec: {}
         });
         } catch (error) {
         console.log("Σφάλμα :", error);

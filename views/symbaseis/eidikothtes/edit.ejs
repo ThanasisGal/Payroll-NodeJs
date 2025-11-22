@@ -36,31 +36,25 @@
                                 <input type="hidden" name="aa" id="aa" class="form-control" value="<%= kathgories.aa %>" />
                                 <input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" class="form-control" value="<%= symbaseis.kodikos %><%= kathgories.afora_thn_symbash %>" />
 
-                                <div class="row form-group g-3 align-items-center margin-top--2rem font-size-rem-1_1 mb-3">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Σύμβαση &nbsp;
-                                        </label>
-                                    </div>
-                                    <div class="col-10-5 left-align font-size-rem-1_1 font-weight-600 cdarkgreen">
-                                        <label>
-                                            <%= symbaseis.kodikos.padEnd(10, '\u00A0') + symbaseis.perigrafh %>
-                                        </label>
+                                <div class="row form-group g-3 align-items-center">
+                                    <div>
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Σύμβαση</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= symbaseis.kodikos.padEnd(10, '\u00A0') %></span>
+                                            <span class="text-muted font-size-vw-0_875"> <%= symbaseis.perigrafh %></span>
+                                        </div>
                                     </div>
                                 </div>
-                                
-                                <div class="row form-group g-3 align-items-center margin-top--1_5rem">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Κατηγορία &nbsp;
-                                        </label>
-                                    </div>
-                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cgreen">
-                                        <label>
-                                            <%= kathgories.kodikos.padEnd(10, '\u00A0') + kathgories.perigrafh %>
-                                        </label>
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="indent-1_5">
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Κατηγορία</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= kathgories.kodikos.padEnd(10, '\u00A0') %></span>
+                                            <span class="text-muted font-size-vw-0_875 left-align"> <%= kathgories.perigrafh %></span>
+                                        </div>
                                     </div>
                                 </div>
 

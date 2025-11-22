@@ -1034,6 +1034,26 @@ class genikaAPIsController {
     }
   };
 
+  static getKlimakiaSymbaseon = async (req, res) => {
+    try {
+      const { symbash_kathgoria_eidikothta_stoixeio } = req.params;
+      
+      const klimakiaSymbashs = await KlimakiaSymbaseonModel.find({ 
+        afora_thn_symbash_kathgoria_eidikothta_stoixeio: symbash_kathgoria_eidikothta_stoixeio 
+      })
+      .sort({
+        "isxyei_apo": 1,      // Ταξινόμηση πρώτα κατά ημερομηνία έναρξης (ανοδική)
+        "isxyei_eos": 1,      // Μετά κατά ημερομηνία λήξης (ανοδική)
+        "klimakio": 1         // Τέλος κατά κλιμάκιο (ανοδική)
+      })
+      .lean();
+      
+      res.json(klimakiaSymbashs);
+    } catch (error) {
+      res.status(500).send(error);
+    }
+  };
+
   static getAdeiesDiamonhs = async (req, res) => {
     try {
       const { typosAdeias } = req.params;

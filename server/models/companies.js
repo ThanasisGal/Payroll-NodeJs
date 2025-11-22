@@ -216,7 +216,11 @@ const BanksPerCompanySchema = new Schema({
     logariasmos_3: { type: String, trim: true }, 
     createdAt: { type: Date, default: Date.now() },
     updatedAt: { type: Date, default: Date.now() },
-});
+    },
+    {
+        collection: "trapezes_ana_etaireia"
+    }
+);
 const BanksPerCompanyModel = model("BanksPerCompany", BanksPerCompanySchema);
 
 module.exports = {  CompaniesModel, 

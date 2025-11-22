@@ -38,31 +38,25 @@
 
 								<input type="hidden" name="afora_thn_symbash_kathgoria" id="afora_thn_symbash_kathgoria" value="<%= kathgoria[0].afora_thn_symbash.toString().padStart(4, '0') %><%= kathgoria[0].kodikos.toString().padStart(4, '0') %>" />
 
-                                <div class="row form-group g-3 align-items-center margin-top--2rem font-size-rem-1_1 mb-3">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Σύμβαση &nbsp;
-                                        </label>
-                                    </div>
-                                    <div class="col-10-5 left-align font-size-rem-1_1 font-weight-600 cdarkgreen">
-                                        <label>
-                                            <%= symbash[0].kodikos.padEnd(10, '\u00A0') + symbash[0].perigrafh %>
-                                        </label>
+                                <div class="row form-group g-3 align-items-center">
+                                    <div>
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Σύμβαση</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= symbash[0].kodikos.padEnd(10, '\u00A0') %> </span>
+                                            <span class="text-muted font-size-vw-0_875"> <%= symbash[0].perigrafh %></span>
+                                        </div>
                                     </div>
                                 </div>
-                                
-                                <div class="row form-group g-3 align-items-center margin-top--1_5rem">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Κατηγορία &nbsp;
-                                        </label>
-                                    </div>
-                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cgreen">
-                                        <label>
-                                            <%= kathgoria[0].kodikos.padEnd(10, '\u00A0') + kathgoria[0].perigrafh %>
-                                        </label>
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="indent-1_5">
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Κατηγορία</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= kathgoria[0].kodikos.padEnd(10, '\u00A0') %></span>
+                                            <span class="text-muted font-size-vw-0_875 left-align"> <%= kathgoria[0].perigrafh %></span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -71,9 +65,9 @@
                                 <div class="row form-group g-3 align-items-center mb-1">
                                     <div class="col-1-5 right-align">
                                         <label
-                                        for="kodikos"
-                                        class="col-form-label label-font-size">
-                                        Κωδικός
+                                            for="kodikos"
+                                            class="col-form-label label-font-size">
+                                            Κωδικός
                                         </label>
                                     </div>
                                     
@@ -87,9 +81,9 @@
                                 <div class="row form-group g-3 align-items-center mb-1">
                                     <div class="col-1-5 right-align">
                                         <label
-                                        for="perigrafh"
-                                        class="col-form-label label-font-size field-required">
-                                        Περιγραφή
+                                            for="perigrafh"
+                                            class="col-form-label label-font-size field-required">
+                                            Περιγραφή
                                         </label>
                                     </div>
                                     <div class="col-10-5">

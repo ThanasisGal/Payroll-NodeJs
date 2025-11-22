@@ -12,49 +12,7 @@
         <input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
 
         <div class="card-header height-rem-4">
-            <label class="text-center w-100 headers-content margin-bottom-1rem">Υπολογισμός Κλιμακίων Συμβάσεων</label>
-        </div>
-
-        <div class="row form-group g-1 align-items-center bg-white">
-            <div class="col-2 left-align margin-left-1rem">
-                <label class="col-form-label label-font-size">
-                    Περίοδος Ισχύος της Σύμβασης
-                </label>
-            </div>
-
-            <div class="col-1-2 left-align">
-                <label for="isxyei_apo" class="col-form-label label-font-size field-required">
-                    Από Ημ/νία Έναρξης
-                </label>
-            </div>
-
-            <div class="col-1-3">
-                <input type="date" name="isxyei_apo" id="isxyei_apo" class="date-control" value="" />
-            </div>
-
-            <div class="col-0-5"></div>
-
-            <div class="col-1-2 left-align">
-                <label for="isxyei_eos" class="col-form-label label-font-size field-required">
-                    Έως Ημ/νία Λήξης
-                </label>
-            </div>
-
-            <div class="col-1-3">
-                <input type="date" name="isxyei_eos" id="isxyei_eos" class="date-control" value="" />
-            </div>
-
-            <div class="col-0-5"></div>
-
-            <div class="col-0-32 left-align">
-                <label for="pk" class="col-form-label label-font-size field-required">
-                    Π.Κ.
-                </label>
-            </div>
-
-            <div class="col-3-01">
-                <input type="text" name="pk" id="pk" class="form-control input-contents" value="" />
-            </div>
+            <label class="text-center w-100 headers-content margin-bottom-1rem">Κλιμάκια Συμβάσεων</label>
         </div>
 
         <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_5rem">
@@ -218,11 +176,11 @@
                         data-tooltip-max-width="15vw"
                         class="btn btn-brown rounded-4 buttons-content margin-left-1rem mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
                         data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
-                        <i class="buttons-content bi bi-calculator"></i> Υπολογισμός
+                        <i class="buttons-content bi bi-display"></i> Εμφάνιση
                     </a>
                 
                     <a 
-                        id="edit-btn"
+                        id="update-klimakia-btn"
                         href="#"
                         role="button"
                         data-bs-toggle="tooltip" 
@@ -275,55 +233,9 @@
 
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/externalRowTrash<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ts-inline-summary<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/ypologismos<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/enhmerosh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/emfanish<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/enhmeroshKlimakion<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-<script nonce="<%= nonce %>">
-    document.addEventListener("DOMContentLoaded", () => {
-        const isxyeiApo = document.getElementById("isxyei_apo");
-        const isxyeiEos = document.getElementById("isxyei_eos");
-
-        // 1. Focus στο "Από" όταν ανοίγει η φόρμα
-        if (isxyeiApo) {
-            isxyeiApo.focus();
-        }
-
-        // 2. Έλεγχος ημερομηνιών στο blur του "Έως"
-        if (isxyeiApo.value && isxyeiEos.value) {
-            isxyeiEos.addEventListener("blur", () => {
-                const apoVal = isxyeiApo.value;
-                const eosVal = isxyeiEos.value;
-
-                // Αν ένα από τα δύο είναι κενό, δεν ελέγχουμε
-                if (!apoVal || !eosVal) return;
-
-                // Τα input type="date" επιστρέφουν μορφή YYYY-MM-DD,
-                // οπότε η σύγκριση string δουλεύει σωστά
-                if (eosVal < apoVal) {
-                    Swal.fire({
-                        backdrop: false,
-                        allowOutsideClick: false,
-                        icon: 'warning',
-                        title: 'Λάθος Ημερομηνίες',
-                        html: 'Η ημερομηνία <strong>Έως Ημ/νία Λήξης</strong> δεν επιτρέπεται να είναι μικρότερη της <strong>Από Ημ/νία Έναρξης</strong>',
-                        showConfirmButton: true,
-                        confirmButtonText: 'Κλείσιμο',
-                        customClass: {
-                            confirmButton: 'class-warning custom-confirm-button custom-swal-button',
-                            title: 'custom-title',
-                            popup: 'custom-swal-popup',
-                        },
-                    }).then(() => {
-                        isxyeiApo.focus();
-                    });
-                }
-            });
-        }
-    });
-</script>
-
-<script nonce="<%= nonce %>" src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>

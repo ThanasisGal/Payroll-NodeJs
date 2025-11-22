@@ -223,7 +223,7 @@ router.delete("/symbaseis/stoixeiaSymbaseon/delete/:id", checkAuth, symbaseisCon
 
 // YpologismoiKlimakion Router
 router.get("/symbaseis/ypologismoiKlimakion", checkAuth, symbaseisController.mainYpologismoiForm);
-router.get("/symbaseis/klimakia", checkAuth, symbaseisController.mainYpologismoiForm);
+router.get("/symbaseis/klimakia", checkAuth, symbaseisController.mainKlimakiaForm);
 
 // Kinhseis Router
 router.get("/kinhseis/apasxolhseis", checkAuth, kinhseisController.mainApasxolhseisForm);
@@ -352,9 +352,12 @@ router.post("/api/eidikothtesSymbaseon/update/:eidikothtesId", symbaseisControll
 router.get("/api/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", genikaAPIsController.getStoixeiaSymbaseon);
 // router.get("/api/symbaseis/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", symbaseisController.loadStoixeiaSymbaseonForm);
 router.post("/api/stoixeiaSymbaseon/update/:stoixeiaSymbaseonId", symbaseisController.postStoixeiaSymbaseonUpdate);
+router.get("/api/klimakiaSymbaseon/:symbash_kathgoria_eidikothta_stoixeio", genikaAPIsController.getKlimakiaSymbaseon);
 
 router.post("/api/apodoxesErgazomenon", symbaseisController.calcApodoxesErgazomenon);
 router.post("/api/enhmeroshKlimakion", symbaseisController.postKlimakiaSymbaseon);
+router.post('/api/enhmeroshKlimakia', symbaseisController.postKlimakiaSymbaseonUpdates);
+
 router.get("/api/krathseisErgazomenon", symbaseisController.getKrathseisErgazomenon);
 router.get("/api/genikesParametroi", genikaAPIsController.getGenikesParametroi);
 router.post("/api/getOraria", ergazomenoiController.getOrariaAnaErgazomeno);

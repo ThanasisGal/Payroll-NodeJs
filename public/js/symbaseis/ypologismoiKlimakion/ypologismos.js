@@ -1,4 +1,16 @@
 // ypologismos.js
+// Πλήρης έκδοση με τις διορθώσεις:
+// - Decimal.js (αν είναι διαθέσιμο) για ακριβή στρογγυλοποίηση ROUND_HALF_UP
+// - Δυο-φάσεων ροή υπολογισμών: prefetch όλων των στοιχείων, προσδιορισμός max κλιμακίου του '0001',
+//   και μετά οι τελικοί υπολογισμοί + συμπλήρωση με το τελευταίο ποσό του ίδιου στοιχείου.
+
+// Ρύθμιση Decimal.js για λογιστικές πράξεις
+if (typeof Decimal !== 'undefined') {
+	Decimal.set({
+		precision: 28,
+		rounding: Decimal.ROUND_HALF_UP
+	});
+}
 
 // Flat buffer για αποθήκευση των γραμμών (χρησιμοποιείται και από dynamicCalculation)
 window.dataForUpdate = [];
@@ -12,10 +24,13 @@ window.categoryDescriptions = {};
 // Περιγραφές ειδικοτήτων (γεμίζει από τα APIs)
 window.eidikotitaDescriptions = {};
 
+// Αποθήκευση του μέγιστου αριθμού κλιμακίων από το στοιχείο "0001"
+window.maxKlimaKiaFrom0001 = 0;
+
 // ------------------------------
 // ΒΟΗΘΗΤΙΚΑ ΓΙΑ ΔΟΜΕΣ ΔΕΔΟΜΕΝΩΝ
 // ------------------------------
-function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos }) {
+function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, pk }) {
 	// -------- flat buffer --------
 	window.dataForUpdate.push({
 		kodikos_symbashs: uniqueCode.substring(0, 4),
@@ -26,6 +41,7 @@ function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos }) {
 		poso: result,
 		isxyei_apo: isxyeiApo,
 		isxyei_eos: isxyeiEos,
+		pk: pk,
 		afora_thn_symbash: uniqueCode.substring(0, 4),
 		afora_thn_symbash_kathgoria: uniqueCode.substring(0, 8),
 		afora_thn_symbash_kathgoria_eidikothta: uniqueCode.substring(0, 12),
@@ -159,7 +175,6 @@ function createChildContainerRow(tbody, id) {
 }
 
 // Χτίζει όλο το nested table: Κατηγορία -> Ειδικότητα -> Στοιχείο -> Κλιμάκια
-// (χωρίς πλέον το επίπεδο "Ισχύει από ... έως ...")
 function renderNestedTables(tbody) {
 	tbody.innerHTML = '';
 
@@ -238,27 +253,25 @@ function renderNestedTables(tbody) {
 
 						for (const k of klimakia) {
 							const tr = document.createElement('tr');
-							tr.classList.add('klimakio-row');   // για το hover στο CSS
+							tr.classList.add('klimakio-row-ypologismon');
 
 							const posoDisp = (typeof k.poso === 'number' && Number.isFinite(k.poso))
 								? k.poso.toLocaleString('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 								: '';
 
+							// ✅ ΑΚΡΙΒΩΣ ΙΔΙΟ LAYOUT ΜΕ ΤΗΝ ΚΕΦΑΛΙΔΑ
 							tr.innerHTML = `
 								<td colspan="7" class="p-0">
-									<div class="row g-0 align-items-stretch klimakio-row-wrapper">
+									<div class="row g-0 align-items-stretch">
 										<div class="col-3"></div>
 
-										<!-- ΟΜΑΔΑ που περιέχει και τα 3 “λογικά” κελιά -->
-										<div class="col-6">
-											<div class="row g-0 align-items-stretch klimakio-hover">
-												<div class="col-4 text-center">${k.klimakio}</div>
-												<div class="col-4 text-end">${posoDisp}</div>
-												<div class="col-4 text-center">${k.katastash || ''}</div>
-											</div>
+										<div class="klimakio-content-ypologismon">
+											<div class="col-2 klimakio-cell-ypologismon text-center padding-top-rem-0_4">${k.klimakio}</div>
+											<div class="col-2 klimakio-cell-ypologismon text-end padding-top-rem-0_4">${posoDisp}</div>
+											<div class="col-2 klimakio-cell-ypologismon text-center padding-top-rem-0_4">${k.katastash || ''}</div>
 										</div>
 
-										<div class="col-1"></div>
+										<div class="col-3"></div>
 									</div>
 								</td>
 							`;
@@ -318,9 +331,11 @@ document.addEventListener("DOMContentLoaded", function () {
 		window.treeData = {};
 		window.categoryDescriptions = {};
 		window.eidikotitaDescriptions = {};
+		window.maxKlimaKiaFrom0001 = 0;
 
 		const isxyeiApo = document.getElementById('isxyei_apo').value;
 		const isxyeiEos = document.getElementById('isxyei_eos').value;
+		const pk 		= document.getElementById('pk').value;
 
 		if (!isxyeiApo || !isxyeiEos) {
 			Swal.fire({
@@ -350,7 +365,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		try {
 			const el  = document.getElementById('eidikothta_symbashs_table');
 			const raw = (el.value ?? el.textContent ?? '').trim();
-			const eidArr = JSON.parse(raw);
+			const eidArr = JSON.parse(raw || '[]');
 
 			// 1) Μοναδικές συμβάσεις (0001, 0002 κ.λπ.)
 			const symbashSet = new Set(
@@ -437,20 +452,26 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			}
 
-			// 3) StoixeiaSymbaseon & υπολογισμοί
-			let rowIndex = 0;
+			// ================================
+			// PREFETCH & ΔΥΟ-ΦΑΣΕΙΣ ΥΠΟΛΟΓΙΣΜΟΥ
+			// ================================
+
+			// 1) Φτιάχνουμε λίστα για fetch όλων των stoixeiaSymbaseon (με βάση το eidArr)
+			const fetchList = [];
 			for (const row of eidArr) {
-				if (rowIndex++ % 5 === 0) {
-					await new Promise(r => setTimeout(r, 0));
-				}
-
-				const kodikosSymbashs    = row.afora_thn_symbash_kathgoria.slice(0, 4);
-				const kodikosKathgorias  = row.afora_thn_symbash_kathgoria.slice(4, 8);
+				const kodikosSymbashs    = (row.afora_thn_symbash_kathgoria ?? '').slice(0, 4);
+				const kodikosKathgorias  = (row.afora_thn_symbash_kathgoria ?? '').slice(4, 8);
 				const kodikosEidikothtas = row.kodikos;
-				const key = `${kodikosSymbashs}${kodikosKathgorias}${kodikosEidikothtas}`;
-
 				if (!kodikosEidikothtas) continue;
+				const key = `${kodikosSymbashs}${kodikosKathgorias}${kodikosEidikothtas}`;
+				fetchList.push({ row, key });
+			}
 
+			// 2) Εκτελούμε τα fetch (με μικρά pauses για responsiveness)
+			const allFetched = [];
+			for (let i = 0; i < fetchList.length; i++) {
+				if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+				const { row, key } = fetchList[i];
 				try {
 					const response = await fetch(`/api/stoixeiaSymbaseon/${encodeURIComponent(key)}`, {
 						method: 'GET',
@@ -459,15 +480,109 @@ document.addEventListener("DOMContentLoaded", function () {
 					});
 					if (!response.ok) throw new Error('HTTP ' + response.status);
 					const data = await response.json();
+					allFetched.push({ row, data });
+				} catch (err) {
+					console.error('Error fetching stoixeiaSymbaseon for', key, err);
+				}
+			}
 
-					for (const item of data) {
-						if (!item) continue;
+			// 3) Βρίσκουμε το global max κλιμάκιο από το στοιχείο '0001' (σε όλα τα fetched πακέτα)
+			window.maxKlimaKiaFrom0001 = 0;
+			for (const pack of allFetched) {
+				const data = pack.data || [];
+				for (const it of data) {
+					if (!it) continue;
+					if (String(it.kodikos) === '0001') {
+						const ak = Number(it.arithmos_klimakion) || 0;
+						if (ak > window.maxKlimaKiaFrom0001) window.maxKlimaKiaFrom0001 = ak;
+					}
+				}
+			}
 
-						const arithmosKlimakion   = Number(item.arithmos_klimakion) || 0;
-						const vhmaYpologismou     = Number(item.vhma_ypologismou) || 1;
-						const startKlimakio       = Number(item.ypologismos_apo_klimakio) || 1;
+			// 4) Τώρα κάνουμε τους τελικούς υπολογισμούς για κάθε fetched πακέτο
+			for (let idx = 0; idx < allFetched.length; idx++) {
+				if (idx % 5 === 0) await new Promise(r => setTimeout(r, 0));
 
-						for (let i = 1; i <= arithmosKlimakion; i += vhmaYpologismou) {
+				const { row, data } = allFetched[idx];
+				if (!data || data.length === 0) continue;
+
+				for (const item of data) {
+					if (!item) continue;
+
+					const arithmosKlimakion   = Number(item.arithmos_klimakion) || 0;
+					const vhmaYpologismou     = Number(item.vhma_ypologismou) || 1;
+					const startKlimakio       = Number(item.ypologismos_apo_klimakio) || 1;
+					const kodikosItem        = item.kodikos;
+
+					let lastResultThisItem = 0;
+
+					// Υπολογισμός για τα κλιμάκια που ορίστηκαν
+					for (let i = 1; i <= arithmosKlimakion; i += vhmaYpologismou) {
+
+						// κάθε 20 κλιμάκια, ένα μικρό διάλειμμα
+						if (i % 20 === 0) {
+							await new Promise(r => setTimeout(r, 0));
+						}
+
+						const klimakioDisp = String(i).padStart(2, '0');
+						const uniqueCode = `${item.afora_thn_symbash_kathgoria_eidikothta}${item.kodikos}${klimakioDisp}`;
+
+						let multiplier = 0;
+						let klimakioValue = i;
+
+						// Για κλιμάκια πριν από το "Ξεκινά από το Κλιμάκιο" => μηδενικό
+						if (item.ypologismos_apo_klimakio > 1 && i < startKlimakio) {
+							multiplier    = 0;
+							klimakioValue = 0;
+
+							const resultPre = dynamicCalculation(
+								data,
+								item,
+								item.typos_ypologismoy ?? '',
+								multiplier,
+								klimakioValue
+							);
+
+							lastResultThisItem = resultPre;
+							collectRow({ uniqueCode, item, result: resultPre, isxyeiApo, isxyeiEos, pk });
+							continue;
+						}
+
+						// Κανονικός multiplier
+						if (item.ypologismos_apo_klimakio > 1) {
+							if (i > arithmosKlimakion) {
+								multiplier = Math.floor(
+									(arithmosKlimakion - 1) / item.ypologismos_apo_klimakio
+								);
+							} else {
+								multiplier = Math.floor(
+									(i - 1) / item.ypologismos_apo_klimakio
+								);
+							}
+						} else {
+							multiplier = 1;
+						}
+
+						const result = dynamicCalculation(
+							data,
+							item,
+							item.typos_ypologismoy ?? '',
+							multiplier,
+							klimakioValue
+						);
+
+						lastResultThisItem = result;
+
+						collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, pk });
+					}
+
+					// ===== ΣΥΜΠΛΗΡΩΣΗ με το ΤΕΛΕΥΤΑΙΟ ΠΟΣΟ ΤΟΥ ΙΔΙΟΥ ΣΤΟΙΧΕΙΟΥ =====
+					// Αν το στοιχείο έχει λιγότερα κλιμάκια από το "0001"
+					if (window.maxKlimaKiaFrom0001 > 0 && arithmosKlimakion < window.maxKlimaKiaFrom0001) {
+						// Ξεκινάμε από το επόμενο κλιμάκιο
+						const startFromKlimakio = Math.max(arithmosKlimakion + vhmaYpologismou, 1);
+
+						for (let i = startFromKlimakio; i <= window.maxKlimaKiaFrom0001; i += vhmaYpologismou) {
 
 							// κάθε 20 κλιμάκια, ένα μικρό διάλειμμα
 							if (i % 20 === 0) {
@@ -477,59 +592,17 @@ document.addEventListener("DOMContentLoaded", function () {
 							const klimakioDisp = String(i).padStart(2, '0');
 							const uniqueCode = `${item.afora_thn_symbash_kathgoria_eidikothta}${item.kodikos}${klimakioDisp}`;
 
-							let multiplier = 0;
-							let klimakioValue = i;
-
-							// Για κλιμάκια πριν από το "Ξεκινά από το Κλιμάκιο" => μηδενικό
-							if (item.ypologismos_apo_klimakio > 1 && i < startKlimakio) {
-								multiplier    = 0;
-								klimakioValue = 0;
-
-								const resultPre = dynamicCalculation(
-									data,
-									item,
-									item.typos_ypologismoy ?? '',
-									multiplier,
-									klimakioValue
-								);
-
-								collectRow({ uniqueCode, item, result: resultPre, isxyeiApo, isxyeiEos });
-								continue;
-							}
-
-							// Κανονικός multiplier
-							if (item.ypologismos_apo_klimakio > 1) {
-								if (i > arithmosKlimakion) {
-									multiplier = Math.floor(
-										(arithmosKlimakion - 1) / item.ypologismos_apo_klimakio
-									);
-								} else {
-									multiplier = Math.floor(
-										(i - 1) / item.ypologismos_apo_klimakio
-									);
-								}
-							} else {
-								multiplier = 1;
-							}
-
-							const result = dynamicCalculation(
-								data,
-								item,
-								item.typos_ypologismoy ?? '',
-								multiplier,
-								klimakioValue
-							);
-
-							collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos });
+							// Χρησιμοποιούμε το ΤΕΛΕΥΤΑΙΟ ΠΟΣΟ ΤΟΥ ΙΔΙΟΥ ΣΤΟΙΧΕΙΟΥ
+							collectRow({ uniqueCode, item, result: lastResultThisItem, isxyeiApo, isxyeiEos, pk });
 						}
 					}
-				} catch (error) {
-					console.error(error);
 				}
 			}
 
 			// Όταν τελειώσουν όλα, χτίζουμε το nested UI
 			renderNestedTables(tbody);
+		} catch (error) {
+			console.error(error);
 		} finally {
 			// ---------- ΚΡΥΨΕ LOADER ----------
 			if (loader) {
@@ -540,11 +613,11 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // ------------------------------
-// dynamicCalculation
+// dynamicCalculation - ΜΕ DECIMAL.JS
 // ------------------------------
 
 /**
- * Υπολογίζει τον τύπο `expression` αντικαθιστώντας…
+ * Υπολογίζει τον τύπο `expression` με ΑΚΡΙΒΕΙΑ χρησιμοποιώντας Decimal.js
  */
 function dynamicCalculation(data, item, expression, multiplier, klimakio) {
 	const startKlimakio   = Number(item?.ypologismos_apo_klimakio) || 0;
@@ -602,12 +675,25 @@ function dynamicCalculation(data, item, expression, multiplier, klimakio) {
 		.replace(/bhma_ypologismou|bhma_ypologismoy/gi, String(bhmaYpologismou));
 
 	try {
+		// ✅ Αξιολόγησε με math.js
 		let result = math.evaluate(processedExpression);
 
-		if (!Number.isFinite(result)) return 0;
-		if (result < 0) result = 0; 
+		// ✅ ΑΝ Decimal.js είναι διαθέσιμο, χρησιμοποίησέ το για ακρίβεια
+		if (typeof Decimal !== 'undefined') {
+			let decimalResult = new Decimal(result.toString());
 
-		return Number(result.toFixed(2));
+			if (!decimalResult.isFinite()) return 0;
+			if (decimalResult.isNegative()) return 0;
+
+			// ✅ Στρογγυλοποίησε με ROUND_HALF_UP (σωστό για λογιστική)
+			let rounded = decimalResult.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+			return Number(rounded);
+		} else {
+			// Fallback αν δεν υπάρχει Decimal.js
+			if (!Number.isFinite(result)) return 0;
+			if (result < 0) result = 0;
+			return Number(result.toFixed(2));
+		}
 	} catch (error) {
 		console.error('Error evaluating expression:', error, processedExpression);
 		return 0;

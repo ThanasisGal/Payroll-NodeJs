@@ -41,42 +41,38 @@
 	
 								<input type="hidden" name="stoixeiaSymbaseonId" id="stoixeiaSymbaseonId" value="<%= stoixeiaSymbaseonId %>" />
           
+                                <div class="row form-group g-3 align-items-center">
+                                    <div>
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Σύμβαση</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= symbaseis.kodikos.padEnd(10, '\u00A0') %> </span>
+                                            <span class="text-muted font-size-vw-0_875"> <%= symbaseis.perigrafh %></span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                <div class="row form-group g-3 align-items-center margin-top--2rem font-size-rem-1_1 mb-3">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Σύμβαση &nbsp;
-                                        </label>
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="indent-1_5">
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Κατηγορία</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= kathgories.kodikos.padEnd(10, '\u00A0') %></span>
+                                            <span class="text-muted font-size-vw-0_875 left-align"> <%= kathgories.perigrafh %></span>
+                                        </div>
                                     </div>
-									<div class="col-10-5 left-align font-size-rem-1_1 font-weight-600 cdarkgreen">
-										<label><%= symbaseis.kodikos.padEnd(10, '\u00A0') + symbaseis.perigrafh %></label>
-									</div>
-								</div>
-		
-								<div class="row form-group g-3 align-items-center margin-top--1_5rem mb-3">
-									<div class="col-1-5 right-align">
-										<label
-											class="col-form-label label-font-size">
-											Κατηγορία &nbsp;
-										</label>
-									</div>
-									<div class="col-10-5 left-align font-size-rem-1 font-weight-600 cdarkergreen">
-										<label><%= kathgories.kodikos.padEnd(10, '\u00A0') + kathgories.perigrafh %></label>
-									</div>
-								</div>
-                
-                                <div class="row form-group g-3 align-items-center margin-top--1_5rem">
-                                    <div class="col-1-5 right-align">
-                                        <label
-                                            class="col-form-label label-font-size">
-                                            Ειδικότητα &nbsp;
-                                        </label>
+                                </div>
+
+                                <div class="row form-group g-3 align-items-center">
+                                    <div class="indent-3">
+                                        <div class="px-3 pb-2 pt-1 d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary">Ειδικότητα</span>
+                                            <span>— </span>
+                                            <span class="fw-semibold font-size-vw-0_875"><%= eidikothtes.kodikos.padEnd(10, '\u00A0') %></span>
+                                            <span class="text-muted font-size-vw-0_875 left-align"> <%= eidikothtes.perigrafh %></span>
+                                        </div>
                                     </div>
-                                    <div class="col-10-5 left-align font-size-rem-1 font-weight-600 cgreen">
-										<label><%= eidikothtes.kodikos.padEnd(10, '\u00A0') + eidikothtes.perigrafh %></label>
-									</div>
-								</div>
+                                </div>
 
                                 <hr class="hr-style mb-4" />
                 
@@ -102,7 +98,7 @@
 										</label>
 									</div>
 									<div class="col-10-5">
-					                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" value="<%= stoixeiaSymbaseon.perigrafh %>" />
+					                    <input type="text" name="perigrafh" id="perigrafh" class="form-control input-contents" autocomplete="off" value="<%= stoixeiaSymbaseon.perigrafh %>" />
 				                  	</div>
                 				</div>
 
@@ -127,12 +123,12 @@
 										</label>
 									</div>
 
-									<div class="col-1-5">
-										<input type="number" name="poso" id="poso" class="form-control input-contents text-right" value="<%= stoixeiaSymbaseon.poso %>" step="0.10"
- disabled />
+									<div class="col-2">
+										<input type="number" name="poso" id="poso" class="form-control input-contents text-right" autocomplete="off" value="<%= stoixeiaSymbaseon.poso %>" step="0.10"
+ 										disabled />
 									</div>
 									
-									<div class="col-1"></div>
+									<div class="col-0-5"></div>
 
 									<div class="col-1 left-align">
 										<label for="pososto" class="col-form-label label-font-size">
@@ -141,7 +137,7 @@
 									</div>
 
 									<div class="col-1-5">
-										<input type="number" name="pososto" id="pososto" class="form-control input-contents text-right" value="<%= stoixeiaSymbaseon.pososto %>" min="-100" max="100" step="0.05" />
+										<input type="number" name="pososto" id="pososto" class="form-control input-contents text-right" autocomplete="off" value="<%= stoixeiaSymbaseon.pososto %>" min="-100" max="100" step="0.05" />
 									</div>
 				                </div>
 
@@ -153,22 +149,22 @@
 									</div>
 
 									<div class="col-1">
-										<input type="number" name="arithmos_klimakion" id="arithmos_klimakion" class="form-control input-contents text-right" min="1" max="50" value="<%= stoixeiaSymbaseon.arithmos_klimakion %>" />
+										<input type="number" name="arithmos_klimakion" id="arithmos_klimakion" class="form-control input-contents text-right" min="1" max="50" autocomplete="off" value="<%= stoixeiaSymbaseon.arithmos_klimakion %>" />
 									</div>
 									
 									<div class="col-3"></div>
 
-									<div class="col-2 left-align">
+									<div class="col-1-5 left-align">
 										<label for="ypologismos_apo_klimakio" class="col-form-label label-font-size-smaller">
 										Ξεκινά απ'το Κλιμάκιο
 										</label>
 									</div>
 
 									<div class="col-1">
-										<input type="number" name="ypologismos_apo_klimakio" id="ypologismos_apo_klimakio" class="form-control input-contents text-right" min="1" max="35" value="<%= stoixeiaSymbaseon.ypologismos_apo_klimakio %>" />
+										<input type="number" name="ypologismos_apo_klimakio" id="ypologismos_apo_klimakio" class="form-control input-contents text-right" min="1" max="35" autocomplete="off" value="<%= stoixeiaSymbaseon.ypologismos_apo_klimakio %>" />
 									</div>
 
-									<div class="col-1"></div>
+									<div class="col-1-5"></div>
 
 									<div class="col-1-5 left-align">
 										<label for="bhma_ypologismoy" class="col-form-label label-font-size">
@@ -177,7 +173,7 @@
 									</div>
 
 									<div class="col-1">
-										<input type="number" name="bhma_ypologismoy" id="bhma_ypologismoy" class="form-control input-contents text-right" min="1" max="35" value="<%= stoixeiaSymbaseon.bhma_ypologismoy %>" />
+										<input type="number" name="bhma_ypologismoy" id="bhma_ypologismoy" class="form-control input-contents text-right" min="1" max="35" autocomplete="off" value="<%= stoixeiaSymbaseon.bhma_ypologismoy %>" />
 									</div>
 				                </div>
 
@@ -190,7 +186,7 @@
 										</label>
 									</div>
 									<div class="col-10-5">
-										<input type="text" name="typos_ypologismoy" id="typos_ypologismoy" class="form-control input-contents" value="<%= stoixeiaSymbaseon.typos_ypologismoy %>" />
+										<input type="text" name="typos_ypologismoy" id="typos_ypologismoy" class="form-control input-contents" autocomplete="off" value="<%= stoixeiaSymbaseon.typos_ypologismoy %>" />
 									</div>
 								</div>
 			              	</div>
@@ -235,25 +231,3 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatNumbers_2dec<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabelSymbaseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-<!-- <script nonce="<%= nonce %>">
-	document.addEventListener('DOMContentLoaded', function () {
-		var hidden = document.getElementById('afora_thn_symbash_kathgoria_eidikothta');
-		var back   = document.querySelector('.backButton');
-		if (!hidden || !back) return;
-
-		var v = (hidden.value || '').trim();
-		if (v.length !== 12) return;
-
-		var sym = v.slice(0, 4);
-		var kat = v.slice(4, 8);
-		var eid = v.slice(8, 12);
-
-		var url = new URL(back.getAttribute('href'), window.location.origin);
-		url.searchParams.set('symbash', sym);
-		url.searchParams.set('kathgoria', kat);
-		url.searchParams.set('eidikothta', eid);
-
-		back.setAttribute('href', url.pathname + url.search);
-	});
-</script> -->

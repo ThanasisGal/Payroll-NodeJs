@@ -63,6 +63,7 @@ const symbaseisController                   = require('../controllers/symbaseisC
 const kathgoriesApoSymbaseis                = require('../dropdowns/symbaseis/kathgoriesApoSymbaseis');
 const eidikothtesApoKathgories              = require('../dropdowns/symbaseis/eidikothtesApoKathgories');
 const eidikothtesApoKathgoriesMulti         = require('../dropdowns/symbaseis/eidikothtesApoKathgories-multi');
+const stoixeiaApoEidikothtes                = require('../dropdowns/symbaseis/stoixeiaApoEidikothtes');
 
 const   {
             YpokatasthmataModel,
@@ -108,7 +109,8 @@ const   {
 const   {
             SymbaseisModel,
             KathgoriesSymbaseonModel,
-            EidikothtesAnaKathgoriaSymbaseonModel
+            EidikothtesAnaKathgoriaSymbaseonModel,
+            StoixeiaSymbaseonModel
         } = symbaseisModels;
 
 
@@ -193,7 +195,7 @@ router.get('/nomimoiEkprosopoi/taytothta',              buildDropdownRoute(Typoi
 
 // ================================ ΕΤΑΙΡΕΙΕΣ -> ΤΡΑΠΕΖΕΣ =========================================
 // Επειδή στο crateDropdownApi.js διαχειρίζομαι τα πεδία kodikos και perigrafh ενώ εδώ σαν pripary key
-// έχω το kodikos_dias με το mapItem: item, pad = 3) => ({... αν    τιστοιχίζω το kodikos με το item.kodikos_dias
+// έχω το kodikos_dias με το mapItem: item, pad = 3) => ({... αντιστοιχίζω το kodikos με το item.kodikos_dias
 // και το περνάω σαν options.
 
 router.get(
@@ -300,9 +302,8 @@ router.get('/symbaseis/kathgories',                 symbaseisController.listKath
 router.get('/symbaseis/kathgoria_symbashs',             buildDropdownRoute(KathgoriesSymbaseonModel, kathgoriesApoSymbaseis.options));
 router.get('/symbaseis/eidikothta_symbashs',            buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgories.options));
 router.get('/symbaseis/eidikothta_symbashs_multi',      buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgoriesMulti.options));
+router.get('/symbaseis/stoixeio_symbashs',              buildDropdownRoute(StoixeiaSymbaseonModel, stoixeiaApoEidikothtes.options));
 
 
-
-// router.get('/api/symbaseis/eidikothtes',                symbaseisController.listEidikothtesSymbaseon);
 
 module.exports = router;

@@ -138,7 +138,7 @@ class trapezesController {
 
             let kodValue =
                 lastRecord[0] && lastRecord[0].kodikos
-                ? parseInt(lastRecord[0].kodikos, 10)
+                ? parseInt(lastRecord[0].kodikos.substring(3, 5), 10)
                 : null;
             if (kodValue !== null) {
                 kodValue++;
@@ -154,7 +154,7 @@ class trapezesController {
             team: formData.companyTeam,
             companykod_object: formData.companyId,
             companykod: formatNumber(formData.companyKodikos, 4),
-            kodikos: formatNumber(aa_kod, 4),
+            kodikos: formData.kodikos_dias_stathera + formatNumber(aa_kod, 2),
             kodikos_dias: formData.kodikos_dias_stathera,
             perigrafh: formData.perigrafh_stathera,
             logariasmos_1: formData.logariasmos_1,

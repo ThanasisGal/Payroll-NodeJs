@@ -6,7 +6,7 @@ module.exports = {
     path: '/api/dropdown/ergazomenoi/trapeza',
     model: BanksPerCompanyModel,
     options: {
-        searchFields: ['kodikos', 'perigrafh'],
+        searchFields: ['kodikos_dias', 'perigrafh'],
         sort: { perigrafh: 1 },
     }
 };

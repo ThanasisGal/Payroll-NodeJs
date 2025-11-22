@@ -54,23 +54,6 @@ module.exports = {
       const symKathEid = `${sym}${kat}${eid}`; // 12 ψηφία
 
       return { afora_thn_symbash_kathgoria_eidikothta: symKathEid };
-
-      // ------------- ΠΕΡΙΠΤΩΣΗ Β: έχεις 8ψήφιο + ξεχωριστή ειδικότητα -----
-      // return {
-      //   afora_thn_symbash_kathgoria: symKath,
-      //   afora_thn_eidikothta: eid,
-      // };
-
-      // ------------- Αν πραγματικά έχεις ΚΑΙ τα δύο στη βάση -------------
-      // return {
-      //   $or: [
-      //     { afora_thn_symbash_kathgoria_eidikothta: symKathEid },
-      //     {
-      //       afora_thn_symbash_kathgoria: symKath,
-      //       afora_thn_eidikothta: eid,
-      //     },
-      //   ],
-      // };
     },
 
     mapItem: (doc) => {

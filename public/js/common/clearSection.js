@@ -9,7 +9,7 @@ document.addEventListener('click', function (e) {
     // ---- helper: αναγνώριση id fields ----
     const ID_PATTERNS = [
         /^_?id$/i,                                 // id, _id
-        /(^|[_-])(company|site|branch|employee|team|user|record|entry|row|parent|child|owner)(_)?id$/i, // companyId, company_id, etc.
+        /(^|[_-])(company|site|branch|ergazomenoi|team|user|record|entry|row|parent|child|owner)(_)?id$/i, // companyId, company_id, etc.
         /(^|[_-])(id)$/i                            // κάτι-Id/κάτι_id
     ];
 

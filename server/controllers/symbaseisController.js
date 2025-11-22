@@ -2022,6 +2022,35 @@ class symbaseisController {
 
     // ================================== Κλιμάκια Συμβάσεων =======================================
 
+    static mainKlimakiaForm = async (req, res) => {
+        const locals = {
+        title: "Κλιμάκια Συμβάσεων",
+        description: "Web Payroll System",
+        };
+
+        const companyId = req.session.companyInUse;
+        const sessionUserId = req.session.userId;
+        const perPage = Number(process.env.EGGRAFES);
+        let page = req.query.page || 1;
+
+        try {
+        // Έλεγχος CRUD των δικαιωμάτων του χρήστη
+        const userPrivileges = await UserPrivilegesModel.findOne({
+            userId: sessionUserId,
+            form: "KlimakiaSymbaseon",
+        }).exec();
+
+        res.render("symbaseis/klimakia/klimakiaSymbaseon", {
+            userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+            locals,
+            context: "klimakia_symbaseon",
+            rec: {},
+        });
+        } catch (error) {
+        console.log(error);
+        }
+    };
+
     // ================================== Υπολογισμοί Κλιμακίων ====================================
 
     static mainYpologismoiForm = async (req, res) => {
@@ -2083,6 +2112,115 @@ class symbaseisController {
         } catch (error) {
         console.error('Error during bulk update:', error);
         res.status(500).json({ message: 'Σφάλμα κατά την ενημέρωση' });
+        }
+    };
+
+    /**
+     * postKlimakiaSymbaseonUpdates
+     * Ενημέρωση κλιμακίων με updated (αλλαγές ποσού) και deleted (διαγραφές)
+     * 
+     * Δέχεται payload από enhmeroshKlimakion.js:
+     * {
+     *   klimakiaChanges: {
+     *     updated: [{ klimakio, oldPoso, newPoso, ... }],
+     *     deleted: [{ klimakio, poso, ... }]
+     *   }
+     * }
+    */
+    static postKlimakiaSymbaseonUpdates = async (req, res) => {
+        try {
+            const { klimakiaChanges } = req.body;
+
+            if (!klimakiaChanges) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Δεν βρέθηκαν αλλαγές κλιμακίων' 
+                });
+            }
+
+            const { updated = [], deleted = [] } = klimakiaChanges;
+
+            // // ===== ΣΎΝΔΕΣΗ ΜΕ DATABASE =====
+            // const db = mongoose.connection.db;
+            // const collection = db.collection('klimakiasymbaseon'); // Το όνομα της collection σας
+
+            const bulkOps = [];
+
+            // ===== 1) ΕΝΗΜΕΡΩΣΗ ΠΟΣΩΝ (Updated) =====
+            for (const update of updated) {
+                // update = { klimakio: "01", oldPoso: 830, newPoso: 850, ... }
+                
+                // Φτιάχνουμε το filter με όλες τις πληροφορίες που ήδη έχουμε
+                const filter = {
+                    // Χρησιμοποιούμε το klimakio και το παλιό ποσό για να βρούμε τη σωστή γραμμή
+                    klimakio: update.klimakio,
+                    poso: update.oldPoso,
+                    // Προσθέτουμε και άλλες πληροφορίες αν χρειάζονται (από τα session data ή globals)
+                };
+
+                bulkOps.push({
+                    updateOne: {
+                        filter: filter,
+                        update: { 
+                            $set: { 
+                                poso: update.newPoso,  // Νέο ποσό
+                                // updated_at: new Date(),
+                                // updated_by: req.user?.id || 'system' // Ποιος έκανε την αλλαγή
+                            } 
+                        },
+                        upsert: false
+                    }
+                });
+            }
+
+            // ===== 2) ΔΙΑΓΡΑΦΗ (Deleted) =====
+            for (const deleteItem of deleted) {
+                const filter = {
+                    klimakio: deleteItem.klimakio,
+                    poso: parseFloat(deleteItem.poso.replace(',', '.')), // Μετατροπή string σε number
+                };
+
+                bulkOps.push({
+                    deleteOne: {
+                        filter: filter
+                    }
+                });
+            }
+
+            // ===== 3) ΕΚΤΕΛΕΣΗ BULK OPERATIONS =====
+            if (bulkOps.length > 0) {
+                const result = await KlimakiaSymbaseonModel.bulkWrite(bulkOps);
+
+                console.log(`📊 Bulk Write Results:`, {
+                    modified: result.modifiedCount,
+                    deleted: result.deletedCount,
+                    upserted: result.upsertedCount
+                });
+
+                return res.json({ 
+                    success: true, 
+                    message: `✅ Ενημερώθησαν ${result.modifiedCount} γραμμές και διαγράφηκαν ${result.deletedCount}`,
+                    redirectUrl: "/symbaseis/klimakia",
+                    result: {
+                        modifiedCount: result.modifiedCount,
+                        deletedCount: result.deletedCount,
+                        upsertedCount: result.upsertedCount
+                    }
+                });
+            } else {
+                return res.json({ 
+                    success: false, 
+                    message: 'Δεν υπάρχουν αλλαγές προς αποθήκευση' 
+                });
+            }
+
+        } catch (error) {
+            console.error('❌ Error during klimakia updates:', error);
+            res.status(500).json({ 
+                success: false,
+                message: 'Σφάλμα κατά την ενημέρωση κλιμακίων',
+                error: error.message 
+            });
         }
     };
 

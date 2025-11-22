@@ -109,5 +109,23 @@
         <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
         <script nonce="<%= nonce %>" src="/static/js/common/checkScreenAnalysis.js" defer></script> 
         <script nonce="<%= nonce %>" src="/static/js/common/deviceSwitcher.js" defer></script> 
+        <!-- <script nonce="<%= nonce %>" src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script> -->
+
+<!-- ΠΡΙΝ το closing </body> tag -->
+<script nonce="<%= nonce %>">
+  // 🔑 Global CSRF helper
+  window.getCSRFToken = function() {
+    // 1. Από meta tag
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) return meta.getAttribute('content');
+    
+    // 2. Από hidden input (fallback)
+    const input = document.querySelector('input[name="_csrf"]');
+    if (input) return input.value;
+    
+    console.warn('⚠️ CSRF token not found!');
+    return null;
+  };
+</script>
     </body>
 </html>

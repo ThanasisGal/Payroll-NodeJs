@@ -979,7 +979,23 @@ function updateOverflow(tom) {
 		// Εμφάνιση / απόκρυψη ανάλογα με επιλογή (χωρίς inline styles)
 		trash.hidden = !(tom.items || []).length;
 
-		/* ----------------------------------------------------------------
+        /* ================================================================
+        * ✅ ΣΥΓΧΡΟΝΙΣΜΟΣ ΜΕ ΤΟ GLOBAL DISABLED STATE
+        * ================================================================ */
+
+        // Αν υπάρχει global __trashButtonsDisabledState, χρησιμοποίησέ το
+        if (typeof window.__trashButtonsDisabledState !== 'undefined') {
+            const disabledState = window.__trashButtonsDisabledState;
+            const selectId = tom?.input?.id || el?.id;
+            
+            if (selectId && typeof disabledState[selectId] !== 'undefined') {
+                const shouldBeHidden = disabledState[selectId];
+                // Κρύψε το trash button αν το dropdown είναι disabled
+                trash.hidden = shouldBeHidden || !(tom.items || []).length;
+            }
+        }
+
+        /* ----------------------------------------------------------------
 		* B. Ellipsis στο label όταν είναι μακρύ (χωρίς inline styles)
 		* ----------------------------------------------------------------*/
 		const itemEl = ctrl.querySelector('.item');
@@ -1416,9 +1432,10 @@ function updateOverflow(tom) {
         });
 }
 
-
 window.tomDropdownConfig = {
 	setRender  : (id, r) => (globalRenderMap[id] = r),
 	setHooks   : (id, h) => (globalHookMap[id]  = h),
 	setTemplate: (id, t) => (templateCache[id]  = t)
 };
+
+// window.initTomDropdown = initTomDropdown;

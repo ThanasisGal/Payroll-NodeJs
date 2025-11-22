@@ -26,187 +26,196 @@
 
                             <%- include('./partials/add/cardHeaders/cardHeader_Add_Section1') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
-                <input type="hidden" name="eidikhKathgoriaErgazomenoy" id="eidikhKathgoriaErgazomenoy" value="40" />
-                <input type="hidden" name="eponymoHidden" id="eponymoHidden" value="" />
-                <input type="hidden" name="onomaHidden" id="onomaHidden" value="" />
-                <input type="hidden" name="afmHidden" id="afmHidden" value="" />
-                <input type="hidden" name="amkaHidden" id="amkaHidden" value="" />
+			              	<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+                				<input type="hidden" name="eidikhKathgoriaErgazomenoy" id="eidikhKathgoriaErgazomenoy" value="40" />
+                				<input type="hidden" name="eponymoHidden" id="eponymoHidden" value="" />
+                				<input type="hidden" name="onomaHidden" id="onomaHidden" value="" />
+                				<input type="hidden" name="afmHidden" id="afmHidden" value="" />
+								<input type="hidden" name="amkaHidden" id="amkaHidden" value="" />
                 
-                <div class="accordion" id="accordion">
+                				<div class="accordion" id="accordion">
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/prosopikaStoixeia') %>
+									<%- include('./partials/add/cardBodies/section1/accordion/prosopikaStoixeia') %>
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
+                  					<%- include('./partials/add/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
+                  					<%- include('./partials/add/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/efka') %>
+									<%- include('./partials/add/cardBodies/section1/accordion/efka') %>
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/dypa') %>
+                  					<%- include('./partials/add/cardBodies/section1/accordion/dypa') %>
 
-                  <%- include('./partials/add/cardBodies/section1/accordion/kentraKostoys') %>
+                  					<%- include('./partials/add/cardBodies/section1/accordion/kentraKostoys') %>
 
-                </div>
-              </div>
+                				</div>
+              				</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+              				<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_2_section visible" data-section="Αποδοχές">
-        <div>
-          <form class="formRadius">
+			<section class="sel_2_section visible" data-section="Αποδοχές">
+				<div>
+					<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2') %>
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
 
-                <input type="hidden" name="selectedSymbash" id="selectedSymbash" />
-                <input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
-                <input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
+								<input type="hidden" name="selectedSymbash" id="selectedSymbash" />
+								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
+								<input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
 
-                <%- include('./partials/add/cardBodies/section2/apodoxes') %>
+								<%- include('./partials/add/cardBodies/section2/apodoxes') %>
 
-              </div>
+							</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+							<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+			            </div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_3_section visible" data-section="Κρατήσεις">
-        <div>
-          <form class="formRadius">
+			<section class="sel_3_section visible" data-section="Κρατήσεις">
+				<div>
+					<form class="formRadius">
+						<%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section3') %>
-              
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+							<%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-                <%- include('./partials/add/cardBodies/section3/krathseis') %>
-              </div>
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+								<%- include('./partials/add/cardBodies/section3/krathseis') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+							</div>
 
-      <section class="sel_4_section visible" data-section="Αλλοδαποί">
-        <div>
-          <form class="formRadius">
+							<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+						</div>
+					</form>
+				</div>
+			</section>
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section4') %>
+			<section class="sel_4_section visible" data-section="Αλλοδαποί">
+        		<div>
+          			<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
+
+              				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
                 
-                <%- include('./partials/add/cardBodies/section4/allodapoi') %>
+                				<%- include('./partials/add/cardBodies/section4/allodapoi') %>
 
-              </div>
+              				</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+              				<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
-        <div>
-          <form class="formRadius">
+      		<section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
+				<div>
+          			<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section5') %>
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
 
-                <%- include('./partials/add/cardBodies/section5/epaggelmatikhKatartish') %>
+								<%- include('./partials/add/cardBodies/section5/epaggelmatikhKatartish') %>
 
-              </div>
+							</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+							<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_6_section visible" data-section="Διάφορα">
-        <div>
-          <form class="formRadius">
+      		<section class="sel_6_section visible" data-section="Διάφορα">
+        		<div>
+          			<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section6') %>
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
 
-                <%- include('./partials/add/cardBodies/section6/diafora') %>
+								<%- include('./partials/add/cardBodies/section6/diafora') %>
 
-              </div>
+							</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+							<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
-        <div>
-          <form class="formRadius">
+      		<section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
+        		<div>
+          			<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section8') %>
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
-                <input type="hidden" id="dateDifference" name="dateDifference" value="">
+              				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+                				<input type="hidden" id="dateDifference" name="dateDifference" value="">
 
-                <%- include('./partials/add/cardBodies/section8/orarioErgasias') %>
+				                <%- include('./partials/add/cardBodies/section8/orarioErgasias') %>
 
-              </div>
+              				</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+              				<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+			            </div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
-        <div>
-          <form class="formRadius">
+      		<section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
+				<div>
+          			<form class="formRadius">
+                        <%- include('../../partials/_csrfField') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/add/cardHeaders/cardHeader_Add_Section7') %>
+                            <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
-              </div>
+              				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+              				</div>
 
-              <%- include('./partials/add/cardFooters/cardFooter_Add') %>
+              				<%- include('./partials/add/cardFooters/cardFooter_Add') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-  </div>
-
+  		</div>
+	</div>
+</div>
 
 <% const isProduction = NODE_ENV === 'production'; %>
 
@@ -218,9 +227,13 @@
 
 <script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
 <script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
+
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/kathestos-apasxolhshs-fulltime-sync<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
 <script nonce="<%= nonce %>" type="module" src="/static/js/geoDropdownChain.js"></script>  
 <script nonce="<%= nonce %>" type="module" src="/static/js/efkaDropdownChain.js"></script>  
+<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3.js"></script>
+
 <!-- Βήματα διαχείρισης του epa_efka-->
 <script nonce="<%= nonce %>" type="module" src="/static/js/epa_step1.js"></script>  
 <script nonce="<%= nonce %>" type="module" src="/static/js/epa_step2.js"></script>  
@@ -243,6 +256,8 @@
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/fillLabelFromInput<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" type="module" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/addStoixeiaSymbaseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
 <script nonce="<%= nonce %>" type="module">
     import { bindCheckboxControlsSelect } from '/static/js/common/dependentSelectToggle.js';
@@ -283,7 +298,7 @@
     });
 </script>
 
-    <!-- <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/addStoixeiaSymbaseon.js"></script>
+    <!-- 
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/loadDropdowns_add.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRepo.js"></script>
@@ -300,33 +315,33 @@
 
 
 <script nonce="<%= nonce %>" type="module">
-// --- ΣΤΟΧΕΥΜΕΝΟ hook για το antikatastash_ergazomenoy ---
-(function () {
-  const cb  = document.getElementById('antikatastash_ergazomenoy');
-  const ids = ['afm_antikatastath', 'amka_antikatastath']; // αν δεν υπάρχει το δεύτερο, απλώς αγνοείται
-  if (!cb) return;
+	// --- ΣΤΟΧΕΥΜΕΝΟ hook για το antikatastash_ergazomenoy ---
+	(function () {
+		const cb  = document.getElementById('antikatastash_ergazomenoy');
+		const ids = ['afm_antikatastath', 'amka_antikatastath']; // αν δεν υπάρχει το δεύτερο, απλώς αγνοείται
+		if (!cb) return;
 
-  function apply() {
-    const enabled = cb.checked;
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      // property + attribute (για να ακυρώσουμε το disabled από το markup)
-      el.disabled = !enabled;
-      if (enabled) el.removeAttribute('disabled');
-      else el.setAttribute('disabled', 'disabled');
-      // αν το κλείνουμε, καθάρισε τιμή
-      if (!enabled) {
-        if (el._flatpickr) el._flatpickr.clear();
-        else el.value = '';
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
-  }
+		function apply() {
+			const enabled = cb.checked;
+			ids.forEach(id => {
+			const el = document.getElementById(id);
+			if (!el) return;
+			// property + attribute (για να ακυρώσουμε το disabled από το markup)
+			el.disabled = !enabled;
+			if (enabled) el.removeAttribute('disabled');
+			else el.setAttribute('disabled', 'disabled');
+			// αν το κλείνουμε, καθάρισε τιμή
+			if (!enabled) {
+				if (el._flatpickr) el._flatpickr.clear();
+				else el.value = '';
+				el.dispatchEvent(new Event('change', { bubbles: true }));
+			}
+			});
+		}
 
-  cb.addEventListener('change', apply);
-  cb.addEventListener('input', apply); // για custom-styled checkboxes
-  // αρχική κατάσταση
-  apply();
-})();
+		cb.addEventListener('change', apply);
+		cb.addEventListener('input', apply); // για custom-styled checkboxes
+		// αρχική κατάσταση
+		apply();
+	})();
 </script>

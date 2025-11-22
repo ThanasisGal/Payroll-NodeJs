@@ -19,14 +19,20 @@
         return n.toLocaleString("el-GR", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-            useGrouping: false // "##0,00"
+            useGrouping: false
         });
     }
 
     function onBlur(e) {
         const el = e.target;
         const num = parseToNumber(el.value);
-        if (num == null) { el.value = 0.00; return; }
+        
+        if (num == null) { 
+            el.dataset.raw = "0";
+            el.type = "text"; // Αλλαγή σε text πρώτα
+            el.value = "0,00"; 
+            return; 
+        }
 
         // σεβασμός min/max αν υπάρχουν
         let v = num;
@@ -36,24 +42,23 @@
         // αποθηκεύουμε την "ωμή" τιμή για επεξεργασία στο focus
         el.dataset.raw = String(v);
 
-        // επιχειρούμε να γράψουμε με κόμμα
-        const formatted = formatEL(v);
-        el.value = formatted;
-
-        // Αν ο browser δεν δέχεται κόμμα σε type=number, γυρνάμε προσωρινά σε text
-        if (!el.value.includes(",") && formatted.includes(",")) {
-            el.type = "text";
-            el.value = formatted;
-        }
+        // Αλλαγή σε text ΠΡΙΝ την μορφοποίηση
+        el.type = "text";
+        
+        // μορφοποίηση με κόμμα
+        el.value = formatEL(v);
     }
 
     function onFocus(e) {
         const el = e.target;
-        if (el.type !== "number") el.type = "number";           // επαναφορά για κανονικό editing
-        // επαναφορά της ωμής αριθμητικής τιμής
+        // επαναφορά σε number για κανονικό editing
+        el.type = "number";
+        
+        // επαναφορά της ωμής αριθμητικής τιμής (με τελεία)
         const raw = el.dataset.raw;
-        if (raw != null) el.value = raw;
-        else if (el.value) {
+        if (raw != null) {
+            el.value = raw;
+        } else if (el.value) {
             const parsed = parseToNumber(el.value);
             if (parsed != null) el.value = String(parsed);
         }
@@ -68,4 +73,3 @@
         if (el.value) el.dispatchEvent(new Event("blur"));
     });
 })();
-

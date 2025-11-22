@@ -1,39 +1,49 @@
+// fillLabelFromInput.js
+
 // Ορίζουμε τις μεταβλητές για τα inputs και τις labels
 document.addEventListener('DOMContentLoaded', function() {
-  const inputs = {
-      eponymo: document.getElementById('eponymo'),
-      onoma: document.getElementById('onoma'),
-      afm: document.getElementById('afm'),
-      amka: document.getElementById('amka')
-  };
- 
-  const labels = {
-      eponymo: [
-          'Apodoxes', 'Krathseis', 'Allodapoi', 'Katartish', 'Diafora', 'Istoriko', 'Oraria' ].map(suffix => document.getElementById(`eponymoLabel_${suffix}`)),
-      onoma: [
-          'Apodoxes', 'Krathseis', 'Allodapoi', 'Katartish', 'Diafora', 'Istoriko', 'Oraria'
-      ].map(suffix => document.getElementById(`onomaLabel_${suffix}`)),
-      afm: [
-          'Apodoxes', 'Krathseis', 'Allodapoi', 'Katartish', 'Diafora', 'Istoriko', 'Oraria'
-      ].map(suffix => document.getElementById(`afmLabel_${suffix}`)),
-      amka: [
-          'Apodoxes', 'Krathseis', 'Allodapoi', 'Katartish', 'Diafora', 'Istoriko', 'Oraria'
-      ].map(suffix => document.getElementById(`amkaLabel_${suffix}`))
-  };
+    // Συγχρονισμός με classes και max lengths
+    const syncMap = {
+        'eponymo': { selector: '.sync-eponymo', maxLength: 25 },
+        'onoma': { selector: '.sync-onoma', maxLength: 15 },
+        'afm_ergazomenoy': { selector: '.sync-afm', maxLength: null },
+        'amka_ergazomenoy': { selector: '.sync-amka', maxLength: null }
+    };
 
-  function updateLabels(inputType, value) {
-      labels[inputType].forEach(label => {
-          if (label) {
-              label.textContent = value;
-          }
-      });
-  }
+    // Συνάρτηση για truncate με "..."
+    function truncateText(text, maxLength) {
+        if (!maxLength || text.length <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength) + '...';
+    }
 
-  Object.keys(inputs).forEach(type => {
-      if (inputs[type]) {
-          inputs[type].addEventListener('input', function() {
-              updateLabels(type, this.value);
-          });
-      }
-  });
+    Object.keys(syncMap).forEach(inputId => {
+        const inputEl = document.getElementById(inputId);
+        if (!inputEl) return;
+
+        const config = syncMap[inputId];
+
+        inputEl.addEventListener('input', function() {
+            const displayText = truncateText(this.value, config.maxLength);
+            document.querySelectorAll(config.selector).forEach(label => {
+                label.textContent = displayText;
+                // Προσθέτουμε title για να φαίνεται ολόκληρο το κείμενο στο hover
+                if (config.maxLength && this.value.length > config.maxLength) {
+                    label.setAttribute('title', this.value);
+                } else {
+                    label.removeAttribute('title');
+                }
+            });
+        });
+
+        // Αρχική τιμή
+        const initialText = truncateText(inputEl.value, config.maxLength);
+        document.querySelectorAll(config.selector).forEach(label => {
+            label.textContent = initialText;
+            if (config.maxLength && inputEl.value.length > config.maxLength) {
+                label.setAttribute('title', inputEl.value);
+            }
+        });
+    });
 });

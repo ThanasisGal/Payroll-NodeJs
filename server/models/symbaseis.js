@@ -56,19 +56,24 @@ const StoixeiaSymbaseonSchema = new Schema(
 const StoixeiaSymbaseonModel = model("StoixeiaSymbaseon", StoixeiaSymbaseonSchema);
 
 const KlimakiaSymbaseonSchema = new Schema({
-  kodikos_symbashs: { type: String, trim: true },
-  kodikos_kathgorias_symbashs: { type: String, trim: true },
-  kodikos_eidikothtas_symbashs: { type: String, trim: true },
-  kodikos_stoixeioy: { type: String, trim: true },
-  klimakio: { type: String, trim: true },
-  poso: { type: Number },
-  isxyei_apo: { type: Date },
-  isxyei_eos: { type: Date },
-  afora_thn_symbash: { type: String, trim: true },
-  afora_thn_symbash_kathgoria: { type: String, trim: true },
-  afora_thn_symbash_kathgoria_eidikothta: { type: String, trim: true },
-  afora_thn_symbash_kathgoria_eidikothta_stoixeio: { type: String, trim: true },
-});
+    kodikos_symbashs: { type: String, trim: true },
+    kodikos_kathgorias_symbashs: { type: String, trim: true },
+    kodikos_eidikothtas_symbashs: { type: String, trim: true },
+    kodikos_stoixeioy: { type: String, trim: true },
+    klimakio: { type: String, trim: true },
+    poso: { type: Number },
+    isxyei_apo: { type: Date },
+    isxyei_eos: { type: Date },
+    pk: { type: String, trim: true },
+    afora_thn_symbash: { type: String, trim: true },
+    afora_thn_symbash_kathgoria: { type: String, trim: true },
+    afora_thn_symbash_kathgoria_eidikothta: { type: String, trim: true },
+    afora_thn_symbash_kathgoria_eidikothta_stoixeio: { type: String, trim: true },
+    },
+    {
+        collection: "klimakia_symbaseon"
+    }
+);
 const KlimakiaSymbaseonModel = model("KlimakiaSymbaseon", KlimakiaSymbaseonSchema);
 
 module.exports = {  SymbaseisModel,

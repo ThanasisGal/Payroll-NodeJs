@@ -69,8 +69,8 @@ connectDB();
 /* -------------------------------------------------------------------------- */
 
 // Body parsers ΠΡΙΝ από CSRF
-app.use(urlencoded({ extended: true }));
-app.use(json());
+app.use(urlencoded({ extended: true, limit: '50mb' }));
+app.use(json({ limit: '50mb' }));
 
 // Method override για φόρμες που θέλουν PUT/DELETE
 app.use(methodOverride("_method"));

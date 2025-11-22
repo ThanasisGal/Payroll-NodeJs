@@ -1,5 +1,5 @@
 :root {
-  --aaaa: #c1cfc588;
+  --aaa: #0074e9;
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -23,7 +23,7 @@
   --disabled-text: #6c757d; /* muted */
   --disabled-border: #bdbdbd;
   --app-w: 100%;
-  --ts-accent-active:  #4e6335a2;  /* darker olive for hover/active */
+  --ts-accent-active: #4e6335a2;  /* darker olive for hover/active */
   --ts-accent:        #6B7F4E;  /* ελαιοπράσινο */
   --ts-selected-bg:   #F3F7ED;  /* πολύ απαλό για το "επιλεγμένο" */
   --ts-hover-bg:      #ECF3E4;  /* ανοιχτό hover για καθαρό ✓ */
@@ -732,6 +732,8 @@ small,
 .col-2-84 { flex: 0 0 auto; width: 23.67%; }
 .col-2-85 { flex: 0 0 auto; width: 23.75%; }
 .col-3-01 { flex: 0 0 auto; width: 25.5%; }
+.col-3-08 { flex: 0 0 auto; width: 25.67%; }
+.col-3-10 { flex: 0 0 auto; width: 25.84%; }
 .col-3-15 { flex: 0 0 auto; width: 26.25%; }
 .col-3-2 { flex: 0 0 auto; width: 26.67%; }
 .col-3-25 { flex: 0 0 auto; width: 27.08%; }
@@ -751,7 +753,7 @@ small,
 .col-3-85 { flex: 0 0 auto; width: 32.08%; }
 .col-3-95 { flex: 0 0 auto; width: 32.92%; }
 .col-3-99 { flex: 0 0 auto; width: 33.25%; }
-/* .col-4-00 { flex: 0 0 auto; width: 35.4265%; } */
+/* .ψολ-0--00 { flex: 0 0 auto; width: 35.4265%; } */
 .col-4-00 { flex: 0 0 auto; width: 35.65%; }
 .col-4-01 { flex: 0 0 auto; width: 33.75%; }
 .col-4-1 { flex: 0 0 auto; width: 34.9%; }
@@ -782,6 +784,7 @@ small,
 .col-9-65 { flex: 0 0 auto; width: 80.42%; }
 .col-9-7 { flex: 0 0 auto; width: 80.84%; }
 .col-9-74 { flex: 0 0 auto; width: 81.25%; }
+.col-9-8 { flex: 0 0 auto; width: 81.67%; }
 .col-10-25 { flex: 0 0 auto; width: 85.4166%; }
 .col-10-5 { flex: 0 0 auto; width: 87.5%; }
 
@@ -2028,6 +2031,7 @@ th {
 .text-left { text-align: left !important; }
 .text-center { text-align: center !important; }
 .text-right { text-align: right !important; }
+.text-end { text-align: right !important; }
 
 .rotate {
   transform: rotate(90deg) !important;
@@ -3920,9 +3924,6 @@ select.tom-dropdown {
 
 .chevron-icon { font-size: 1rem; }
 
-
-
-
 .margin-right--1px      { margin-right: -1px; }
 .margin-right--4px      { margin-right: -4px; }
 
@@ -3948,14 +3949,16 @@ select.tom-dropdown {
 .margin-top--0_75rem    { margin-top: -0.75rem !important; }
 .margin-top--1rem       { margin-top: -1rem !important; }
 .margin-top--1_5rem     { margin-top: -1.5rem !important; }
-.margin-top--2rem       { margin-top: -2rem; }
+.margin-top--2rem       { margin-top: -2rem !important; }
+.margin-top--2_5rem     { margin-top: -2.5rem !important; }
+.margin-top--3rem       { margin-top: -3rem !important; }
 .margin-top--4rem       { margin-top: -4rem !important; }
 
 .margin-top-5px         { margin-top: 5px !important; }
 
 .margin-top-0_1rem      { margin-top: 0.1rem; }
 .margin-top-0_2rem      { margin-top: 0.2rem; }
-.margin-top-0_5rem      { margin-top: 0.5rem; }
+.margin-top-0_5rem      { margin-top: 0.5rem !important; }
 .margin-top-0_75rem     { margin-top: 0.75rem !important; }
 .margin-top-1rem        { margin-top: 1rem; }
 .margin-top-1_5rem      { margin-top: 1.5rem; }
@@ -3993,7 +3996,10 @@ select.tom-dropdown {
 .margin-bottom--0_5rem  { margin-bottom: -0.5rem !important; }
 .margin-bottom--1rem    { margin-bottom: -1rem !important; }
 
-.margin-bottom-0_3rem  { margin-bottom: 0.3rem !important; }
+.margin-bottom-0_005rem { margin-bottom: 0.005rem !important; }
+.margin-bottom-0_01rem  { margin-bottom: 0.01rem !important; }
+.margin-bottom-0_1rem   { margin-bottom: 0.1rem !important; }
+.margin-bottom-0_3rem   { margin-bottom: 0.3rem !important; }
 .margin-bottom-1rem     { margin-bottom: 1rem !important; }
 
 .padding-0              { padding: 0; }
@@ -4001,6 +4007,9 @@ select.tom-dropdown {
 .padding-top-px-10      { padding-top: 10px; }
 .padding-left-rem-0_5   { padding-left: .5rem !important; }
 .padding-left-rem-1     { padding-left: 1rem !important; }
+
+.padding-top-rem-0_4    { padding-top: .4rem !important; }
+.padding-top-rem-0_5    { padding-top: .5rem !important; }
 
 .white-space-nowrap     { white-space: nowrap; }
 
@@ -4062,13 +4071,6 @@ select.tom-dropdown {
 
 .text-align-left        { text-align: left !important; }
 
-/* .logout-btn { 
-  font-weight: 600 !important; 
-  font-size: 1rem !important; 
-  background-color: #0097589c !important;
-  color: #000000c7;
- } */
-
 /* === Home background  */
 .home-bg-cdn {
   background-image: url("https://cdn.webpayrollsolutions.com/assets/img/wps.png");
@@ -4077,15 +4079,6 @@ select.tom-dropdown {
   background-size: auto;
   background-position: 60% 50% !important;
 }
-
-/* .custom-background {
-  background-image:
-    url("https://cdn.webpayrollsolutions.com/assets/img/pageNotFound.png");
-  background-repeat: no-repeat;
-  background-position: 63% 45%;
-  background-attachment: fixed;
-  background-size: auto;
-} */
 
 /* === Buttons που είχαν inline style === */
 .returnAppBtn {
@@ -4143,8 +4136,9 @@ select.tom-dropdown {
 
 .font-size-vw-0_5  { font-size: 0.5vw; }
 .font-size-vw-0_65  { font-size: 0.65vw; }
-.font-size-vw-0_72  { font-size: 0.72vw; }
-.font-size-vw-0_875  { font-size: 0.875vw; }
+.font-size-vw-0_72  { font-size: 0.72vw !important; }
+.font-size-vw-0_85  { font-size: 0.85vw !important; }
+.font-size-vw-0_875  { font-size: 0.875vw !important; }
 .font-size-vw-1  { font-size: 1vw; }
 .font-size-vw-1_1 { font-size: 1.1vw; }
 .font-size-vw-2  { font-size: 2vw; }
@@ -5502,7 +5496,68 @@ tbody .group-row--category:first-of-type > td {
   color: #ffffff !important;
 }
 
-/* ---------------- ΚΛΙΜΑΚΙΑ ---------------- */
+/* ---------------- ΠΕΡΙΟΔΟΙ ---------------- */
+
+.group-row--period > td {
+  padding: 0;           /* row/col μέσα */
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.period-row-wrapper {
+  height: 100%;
+}
+
+/* col-3 κενή με λευκό background */
+.period-row-wrapper > .col-3 {
+  background-color: #ffffff;
+}
+
+/* col-9 με το κείμενο της Περιόδου */
+.period-cell {
+  background-color: #706e0834;
+  line-height: 1.3;
+  height: 2em;
+  overflow: hidden;
+  padding: 4px 10px;
+  color: #000000;
+}
+
+/* Hover ΜΟΝΟ πάνω στην col-9 της περιόδου */
+.group-row--period:hover .period-cell {
+  background-color: #5a5806d9 !important;
+  color: #ffffff !important;
+}
+
+/* ============================
+   KLIMAKIO ROW - YPOLOGISMON (FIXED ALIGNMENT)
+   ============================ */
+
+.klimakio-row-ypologismon {
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* ✅ Wrapper ΜΟΝΟ για τα 3 κελιά με σωστό padding */
+.klimakio-content-ypologismon {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: stretch;
+  line-height: 1.3;
+	height: 2em;
+	margin-left: calc(100% * 3/12);
+}
+
+.klimakio-cell-ypologismon {
+	align-items: center !important;
+	justify-content: center !important;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* ✅ Hover ΜΟΝΟ στα 3 κελιά */
+.klimakio-content-ypologismon:hover .klimakio-cell-ypologismon {
+	background-color: #00501bb2 !important;
+	color: #ffffff !important;
+}
 
 /* ---------------- ΚΛΙΜΑΚΙΑ ---------------- */
 
@@ -5517,7 +5572,7 @@ tbody .group-row--category:first-of-type > td {
   background-color: transparent; /* δεν βάφουμε όλη τη σειρά */
 }
 
-/* ομάδα των 3 “λογικών” κελιών */
+/* ομάδα των 3 "λογικών" κελιών */
 .klimakio-hover {
   background-color: #ffffff;
   line-height: 1.3;
@@ -5527,8 +5582,221 @@ tbody .group-row--category:first-of-type > td {
 }
 
 /* hover: αν περάσεις πάνω από ΟΠΟΙΟΔΗΠΟΤΕ από τα 3,
-   βάφεται ολόκληρη η ομάδα μαζί */
-.klimakio-hover:hover {
+   βάφεται ολόκληρη η ομάδα μαζί - ΑΛΛ' όχι αν έχει αλλαγές */
+.klimakio-row:not([data-is-saved="true"]) .klimakio-hover:hover {
   background-color: #00501bb2 !important;
   color: #ffffff !important;
+}
+
+/* ============================
+   KLIMAKIO ROW - STYLING
+   ============================ */
+
+.klimakio-row > td {
+    padding: 0;
+    border: none;
+}
+
+.klimakio-row-wrapper {
+    background-color: transparent;
+}
+
+/* SPACER - ΠΑΝ ΤΑ ΠΑΡΑΜΕΝΕΙ ΛΕΥΚΟ */
+.klimakio-spacer {
+    background-color: #ffffff !important;
+}
+
+.klimakio-row[data-is-saved="true"] .klimakio-spacer,
+.klimakio-row[data-is-deleted="true"] .klimakio-spacer {
+    background-color: #ffffff !important;
+}
+
+/* COLORED CELLS - Τα κελιά που θα αλλάζουν χρώμα */
+.klimakio-colored {
+    background-color: #ffffff;
+    transition: background-color 0.15s ease;
+}
+
+/* NORMAL HOVER */
+.klimakio-row:not([data-is-saved="true"]):not([data-is-deleted="true"]):hover .klimakio-colored {
+    background-color: #00501bb2 !important;
+    color: #ffffff !important;
+}
+
+/* SAVED (YELLOW) */
+.klimakio-row[data-is-saved="true"] .klimakio-colored {
+    background-color: #ffffcc !important;
+}
+
+.klimakio-row[data-is-saved="true"]:hover .klimakio-colored {
+    background-color: #ffffcc !important;
+}
+
+/* DELETED (RED) */
+.klimakio-row[data-is-deleted="true"] .klimakio-colored {
+    background-color: #ffcccc !important;
+}
+
+.klimakio-row[data-is-deleted="true"]:hover .klimakio-colored {
+    background-color: #ffcccc !important;
+}
+
+/* ============================
+   KLIMAKIO HOVER
+   ============================ */
+
+.klimakio-hover {
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 100%;
+}
+
+/* ============================
+   ΚΟΥΜΠΙΑ - STYLING & HOVER
+   ============================ */
+
+.klimakio-row:not([data-is-saved="true"]):not([data-is-deleted="true"]):hover .amendment-button,
+.klimakio-row:not([data-is-saved="true"]):not([data-is-deleted="true"]):hover .delete-button,
+.klimakio-row:not([data-is-saved="true"]):not([data-is-deleted="true"]):hover .save-button,
+.klimakio-row:not([data-is-saved="true"]):not([data-is-deleted="true"]):hover .undo-button {
+    color: #ffffff !important;
+}
+
+.klimakio-row[data-is-saved="true"]:hover .amendment-button,
+.klimakio-row[data-is-saved="true"]:hover .delete-button,
+.klimakio-row[data-is-saved="true"]:hover .save-button,
+.klimakio-row[data-is-saved="true"]:hover .undo-button,
+.klimakio-row[data-is-deleted="true"]:hover .amendment-button,
+.klimakio-row[data-is-deleted="true"]:hover .delete-button,
+.klimakio-row[data-is-deleted="true"]:hover .save-button,
+.klimakio-row[data-is-deleted="true"]:hover .undo-button {
+    color: #000000 !important;
+}
+
+.amendment-button:hover {
+    color: #2980B9 !important;
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(52, 152, 219, 0.4));
+}
+
+.delete-button:hover {
+    color: #C0392B !important;
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(192, 57, 43, 0.4));
+}
+
+.save-button:hover {
+    color: #229954 !important;
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(34, 153, 84, 0.4));
+}
+
+.undo-button:hover {
+    color: #E67E22 !important;
+    transform: scale(1.2);
+    filter: drop-shadow(0 2px 4px rgba(230, 126, 34, 0.4));
+}
+
+.amendment-button:active,
+.delete-button:active,
+.save-button:active,
+.undo-button:active {
+    transform: scale(1.05);
+}
+
+/* ===== BOOTSTRAP GRID FIX ===== */
+.col-915 {
+    flex: 0 0 calc(150/1200 * 100%) !important;
+    max-width: calc(150/1200 * 100%) !important;
+}
+
+.col-920 {
+    flex: 0 0 calc(200/1200 * 100%) !important;
+    max-width: calc(200/1200 * 100%) !important;
+}
+
+.col-925 {
+    flex: 0 0 calc(250/1200 * 100%) !important;
+    max-width: calc(250/1200 * 100%) !important;
+}
+
+.style_01 { border-bottom: 1px solid #E8E8E8; height: 40px; }
+.sttle_02 { height: 100%; padding: 0 8px; }
+.style_03 { display: flex; justify-content: center; align-items: center; gap: 12px; height: 100%; }
+.style_04 { padding: 10px 8px; background-color: #F5F5F5; border-bottom: 2px solid #BDC3C7; }
+
+.line-height-40px { line-height: 40px }
+.padding-right-12px { padding-right: 12px }
+.color2C3E50 { color: #2C3E50 }
+.color3498DB { color: #3498DB }
+.colorE74C3C { color: #E74C3C }
+.color27AE60 { color: #27AE60 }
+.colorF39C12 { color: #F39C12 }
+
+.button-style-1 { 
+  background: none; 
+  border: none; 
+  padding: 4px; 
+  cursor: pointer; 
+  font-size: 18px; 
+  transition: all 0.2s ease; 
+  display: inline-flex; 
+  align-items: 
+  center; justify-content: 
+  center; width: 28px; height: 28px; 
+}
+
+/* ============================
+   SAVE BUTTON - DEFAULT HIDDEN
+   ============================ */
+
+.save-button {
+    display: none !important; /* ✅ DEFAULT: Κρυμμένο */
+}
+
+.save-button.visible {
+    display: inline-flex !important; /* ✅ VISIBLE: Όταν χρειάζεται */
+}
+
+.display-value {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 0.375rem 0.75rem;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    font-size:1.3rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help; /* δείχνει ότι υπάρχει tooltip */
+}
+
+.bg-3d4e001e { background-color: #3d4e001e;}
+
+.ts-locked .ts-control {
+  background-color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 0.8 !important;
+  pointer-events: none; /* ← Αυτό εμποδίζει ΟΛΑ τα clicks */
+}
+
+.ts-locked .ts-control::after {
+  content: "🔒";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* Επιτρέπουμε το trash button ακόμα και όταν είναι locked */
+.ts-locked .ts-single-reset-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
 }

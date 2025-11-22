@@ -20,6 +20,7 @@ const { Schema: _Schema, model } = require("mongoose");
         typos_taytothtas: { type: String, trim: true },
         adt: { type: String, trim: true },
         hmeromhnia_ekdoshs: { type: Date },
+        hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: { type: Date },
         arxh_ekdoshs: { type: String, trim: true },
         amka: { type: String, trim: true, length: 11 },
         hmeromhnia_gennhshs: { type: Date },
@@ -187,7 +188,6 @@ const { Schema: _Schema, model } = require("mongoose");
         ama_krathshs_06: { type: String, trim: true },
         krathsh_07: { type: String, trim: true },
         ama_krathshs_07: { type: String, trim: true },
-        hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: { type: Date },
         adeia_diamonhs_me_amesh_prosbash_gia_ergasia: { type: Boolean, default: false },
         eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: { type: String, trim: true },
         arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: { type: String, trim: true },
@@ -233,6 +233,9 @@ const { Schema: _Schema, model } = require("mongoose");
         createdAt: { type: Date, default: Date.now() },
         updatedAt: { type: Date, default: Date.now() },
         ypologismos_foroy: { type: Boolean, default: false },
+    },
+    {
+        collection: "ergazomenoi"
     });
 
     ErgazomenoiSchema.index(

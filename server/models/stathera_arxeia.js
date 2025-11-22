@@ -318,7 +318,11 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const BanksSchema = new Schema({
     kodikos_dias: { type: String, unique: true },
     perigrafh: { type: String, trim: true },
-  });
+    },
+    {
+        collection: "trapezes"
+    }
+);
   const BanksModel = model("Banks", BanksSchema);
 
   const YphkoothtesSchema = new Schema({
