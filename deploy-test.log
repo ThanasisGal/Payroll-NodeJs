@@ -1,7 +1,7 @@
 [0;34mℹ️  Checking prerequisites...[0m
 [0;32m✅ All prerequisites met.[0m
 [0;34mℹ️  Checking disk space...[0m
-[0;32m✅ Disk space OK (266691 MB available)[0m
+[0;32m✅ Disk space OK (266668 MB available)[0m
 [0;34mℹ️  Current Git status:[0m
  D build/common/adjustFontSizeToFit.min.js
  D build/common/adjustFontSizeToFit.min.js.map
@@ -164,6 +164,8 @@
  D build/utils/tree.min.js
  D build/utils/tree.min.js.map
  M deploy.sh
+ D public/js/common/amka-validation.js
+ D public/js/common/kathestos-apasxolhshs-fulltime-sync.js
  D public/min.js/common/adjustFontSizeToFit.min.js
  D public/min.js/common/amka-validation.min.js
  D public/min.js/common/blockInvalidClick.min.js
@@ -244,7 +246,11 @@
  D public/min.js/utils/formatNumber.min.js
  D public/min.js/utils/scripts.min.js
  D public/min.js/utils/tree.min.js
-?? test-obfuscation.log
+ D test-obfuscation.log
+ M views/ergazomenoi/ergazomenoi/add.ejs
+?? deploy-test.log
+?? public/js/common/amka_validation.js
+?? public/js/common/kathestos_apasxolhshs_fulltime_sync.js
 [0;34mℹ️  Cleaning build directories...[0m
 [0;32m✅ Cleanup complete.[0m
 
@@ -254,12 +260,12 @@
 Environment:    dev
 Obfuscation:    ENABLED
 CDN Upload:     DISABLED
-Version:        20251125123815
+Version:        20251125135551
 Phase:          Phase 1 (Core files only)
 Files:          ~78 files
 ==========================================
 
-[0;36m🚀 PHASE 1.1: Building ES6 Modules (21 files)...[0m
+[0;36m🚀 PHASE 1.1: Building ES6 Modules (20 files)...[0m
 
 [1/80]
 [0;35m👉 Minifying: public/js/modules/apodoxesCalculations.js[0m
@@ -364,79 +370,3 @@ Files:          ~78 files
 [0;34mℹ️    → Module preserved (no obfuscation)[0m
 
 [18/80]
-[0;35m👉 Minifying: public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js[0m
-[0;34mℹ️    → ES6 Module mode[0m
-[0;32m✅   → addStoixeiaSymbaseon.min.js (79% smaller: 69219 → 14595 bytes)[0m
-[0;34mℹ️    → Module preserved (no obfuscation)[0m
-
-[19/80]
-[0;35m👉 Minifying: public/js/ergazomenoi/genika/reCalcApodoxes.js[0m
-[0;34mℹ️    → ES6 Module mode[0m
-[0;32m✅   → reCalcApodoxes.min.js (91% smaller: 25430 → 2415 bytes)[0m
-[0;34mℹ️    → Module preserved (no obfuscation)[0m
-
-[20/80]
-[0;35m👉 Minifying: public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js[0m
-[0;34mℹ️    → ES6 Module mode[0m
-[0;32m✅   → initYpokatasthmataDropdowns.min.js (61% smaller: 1680 → 661 bytes)[0m
-[0;34mℹ️    → Module preserved (no obfuscation)[0m
-
-[21/80]
-[0;35m👉 Minifying: public/js/common/kathestos-apasxolhshs-fulltime-sync.js[0m
-[0;34mℹ️    → ES6 Module mode[0m
-[0;32m✅   → kathestos-apasxolhshs-fulltime-sync.min.js (55% smaller: 6591 → 2987 bytes)[0m
-[0;34mℹ️    → Module preserved (no obfuscation)[0m
-
-[0;36m🚀 PHASE 1.2: Building utility files (2 files)...[0m
-
-[22/80]
-[0;35m👉 Minifying: public/js/utils/scripts.js[0m
-[0;32m✅   → scripts.min.js (63% smaller: 1286 → 476 bytes)[0m
-[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/scripts.min.js[0m
-
-[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\scripts.min.js... 
-[0;32m✅   → Obfuscated[0m
-
-[23/80]
-[0;35m👉 Minifying: public/js/utils/tree.js[0m
-[0;32m✅   → tree.min.js (54% smaller: 10130 → 4696 bytes)[0m
-[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/tree.min.js[0m
-
-[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\tree.min.js... 
-[0;32m✅   → Obfuscated[0m
-
-[0;36m🚀 PHASE 1.3: Building common files (57 files)...[0m
-
-[24/80]
-[0;35m👉 Minifying: public/js/common/adjustFontSizeToFit.js[0m
-[0;32m✅   → adjustFontSizeToFit.min.js (65% smaller: 1111 → 391 bytes)[0m
-[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/adjustFontSizeToFit.min.js[0m
-
-[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\adjustFontSizeToFit.min.js... 
-[0;32m✅   → Obfuscated[0m
-
-[25/80]
-[0;35m👉 Minifying: public/js/common/amka-validation.js[0m
-[0;32m✅   → amka-validation.min.js (30% smaller: 4214 → 2969 bytes)[0m
-[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/amka-validation.min.js[0m
-
-[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\amka-validation.min.js... 
-
-[javascript-obfuscator-cli] Error in file: C:\Payroll-NodeJs\build\common\amka-validation.min.js... 
-
-C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:77
-        throw new Error(`ERROR at line ${position.line}: ${errorMessage}\n${formattedPointer} ${formattedCodeSlice}`);
-              ^
-Error: ERROR at line 2: Unexpected token (2:23)
-> ...function __amka-validation__0a...
-    at Function.processParsingError (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:77:15)
-    at Function.parse (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:43:49)
-    at Function.convertCodeToStructure (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\node\NodeUtils.ts:45:61)
-    at v.apply (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\StringArrayCodeHelper.ts:39:38)
-    at v.getNodeStructure (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\decorators\Initializable.ts:65:39)
-    at v.getNode (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\AbstractCustomCodeHelper.ts:42:83)
-    at callback (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\group\StringArrayCodeHelperGroup.ts:42:92)
-    at o.appendCustomNodeIfExist (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\AbstractCustomCodeHelperGroup.ts:36:9)
-    at o.apply (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\group\StringArrayCodeHelperGroup.ts:41:14)
-    at o.value (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\decorators\Initializable.ts:65:39)
-[0;31m❌ Obfuscation failed: C:/Payroll-NodeJs/build/common/amka-validation.min.js[0m

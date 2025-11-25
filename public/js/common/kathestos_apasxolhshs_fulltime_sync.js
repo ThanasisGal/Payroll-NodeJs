@@ -1,4 +1,4 @@
-// /js/common/kathestos-apasxolhshs-fulltime-sync.js
+// /js/common/kathestos_apasxolhshs_fulltime_sync.js
 (function () {
     const IDS = {
         select:  'kathestos_apasxolhshs',
