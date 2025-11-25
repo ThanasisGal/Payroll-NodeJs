@@ -89,14 +89,25 @@ async function checkForHolidays() {
     return date.toISOString().replace('.000Z', '.000+00:00');
   });
 
-  try {
-    const response = await fetch('/api/checkArgies', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ dates })
-    });
+  // try {
+		const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+		
+		if (!csrfToken) {
+			console.error('❌ CSRF token not found!');
+			throw new Error('CSRF token missing. Please refresh the page.');
+		}
+
+
+    	const response = await fetch('/api/checkArgies', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CSRF-Token': csrfToken,
+				'X-CSRF-Token': csrfToken
+			},
+			credentials: 'include',
+      		body: JSON.stringify({ dates })
+		});
 
     const holidays = await response.json();
 
@@ -136,7 +147,7 @@ async function checkForHolidays() {
         document.getElementById(`label-argia_${inputId.match(/\d+/)[0].padStart(2, '0')}`).textContent = 'ΟΧΙ';
       }
     });
-  } catch (error) {
-    console.error('Error checking holidays:', error);
-  }
+  // } catch (error) {
+  //   console.error('Error checking holidays:', error);
+  // }
 }

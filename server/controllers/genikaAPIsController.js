@@ -1066,8 +1066,8 @@ class genikaAPIsController {
 
   static getGenikesParametroi = async (req, res) => {
     try {
-      const genikesParametroi = await GenikesParametroiModel.find();
-      res.json(genikesParametroi);
+      const genikesParametroi = await GenikesParametroiModel.find().sort({ kodikos: 1 }).lean();
+      res.json({ success: true, data: genikesParametroi });
     } catch (error) {
       res.status(500).send(error);
     }

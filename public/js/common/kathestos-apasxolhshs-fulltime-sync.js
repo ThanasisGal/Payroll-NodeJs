@@ -5,7 +5,7 @@
         hidden:  'kathestos_apasxolhshs_stathera',
         cb:      'plhrhs_apasxolhsh',
         label:   'label-plhrhs_apasxolhsh',
-        hours:   'ores_ergasias_ebdomadas',   // <-- ΝΕΟ
+        hours:   'ores_ergasias_ebdomadas',
     };
 
     const $ = (id) => document.getElementById(id);

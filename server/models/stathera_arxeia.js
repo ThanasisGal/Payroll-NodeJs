@@ -316,13 +316,13 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const PosostaKrathseonModel = model("PosostaKrathseon", PosostaKrathseonSchema);
 
   const BanksSchema = new Schema({
-    kodikos_dias: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
+      kodikos_dias: { type: String, unique: true },
+      perigrafh: { type: String, trim: true },
     },
     {
-        collection: "trapezes"
+      collection: "trapezes"
     }
-);
+  );
   const BanksModel = model("Banks", BanksSchema);
 
   const YphkoothtesSchema = new Schema({
@@ -546,9 +546,13 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const ArgiesModel = model("Argies", ArgiesSchema);
 
   const KathgoriesErgasiasSchema = new Schema({
-    kodikos: { type: String, unique: true, index: true},
-    perigrafh: { type: String, trim: true },
-  });
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "kathgories_ergasias"
+    }
+  );
   const KathgoriesErgasiasModel = model("KathgoriesErgasias", KathgoriesErgasiasSchema);
   
   const KathgoriesAdeiasSchema = new Schema({

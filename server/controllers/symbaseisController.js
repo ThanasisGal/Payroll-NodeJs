@@ -2271,6 +2271,7 @@ class symbaseisController {
         }
 
         res.json({ success: true, poso: parseFloat(klimakia[0].poso).toFixed(2), genikesParametroi });
+        // res.json({ success: true, poso: parseFloat(klimakia[0].poso).toFixed(2) });
         } catch (error) {
         console.error('Error querying database:', error);
         res.status(500).send('Server error');

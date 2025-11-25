@@ -19,6 +19,7 @@ const pararthmataEfka                       = require('../dropdowns/pararthmataE
 const doy                                   = require('../dropdowns/doy');
 const tameia                                = require('../dropdowns/tameia');
 const kad                                   = require('../dropdowns/kad');
+const kathgoriesErgasias                    = require('../dropdowns/statheraArxeia/kathgoriesErgasias');
 
 const sepe                                  = require('../dropdowns/ypokatasthmata/sepe');
 const dypa                                  = require('../dropdowns/ypokatasthmata/dypa');
@@ -104,6 +105,7 @@ const   {
             EidikothtesErganhModel,
             KadEfkaModel,
             KentraKostoysModel,
+            KathgoriesErgasiasModel,
         } = statheraArxeiaModels;
 
 const   {
@@ -291,6 +293,7 @@ router.get('/ergazomenoi/kpk_efka_by_code',             kpkEfkaByCode.handler);
 router.get('/ergazomenoi/dypa',                         buildDropdownRoute(DypaModel , d_yp_apasxolhshs.options));
 router.get('/ergazomenoi/programma_dypa',               programmaDypa.handler);
 router.get('/ergazomenoi/kentro_kostoys',               buildDropdownRoute(KentraKostoysModel , kentraKostoys.options));
+router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(KathgoriesErgasiasModel , kathgoriesErgasias.options));
 
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 
