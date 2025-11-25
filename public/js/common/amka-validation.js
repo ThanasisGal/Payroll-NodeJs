@@ -1,4 +1,3 @@
-/* ========== utilities ========== */
 const reasonText = r => {
   const reasons = {
     'Μη string': 'Άκυρη τιμή.',
@@ -74,10 +73,10 @@ function attachFormSubmit(form, fields){
       enforceDigits(el);
       const { ok, reason, empty } = validateAndStyle(el, opts);
       if (empty){
-        errors.push(`${label}: Το πεδίο είναι κενό.`);
+        errors.push(label + ': Το πεδίο είναι κενό.');
         firstInvalid.push(el);
       } else if (!ok){
-        errors.push(`${label}: ${reasonText(reason)}`);
+        errors.push(label + ': ' + reasonText(reason));
         firstInvalid.push(el);
       }
     }
@@ -86,7 +85,7 @@ function attachFormSubmit(form, fields){
       await Swal.fire({
         icon: "error",
         title: "Διορθώστε τα ακόλουθα",
-        html: `<ul style="text-align:left;margin:0;padding-left:18px">${errors.map(x => `<li>${x}</li>`).join('')}</ul>`,
+        html: '<ul style="text-align:left;margin:0;padding-left:18px">' + errors.map(x => '<li>' + x + '</li>').join('') + '</ul>',
         confirmButtonText: "Εντάξει",
         allowOutsideClick: false
       });

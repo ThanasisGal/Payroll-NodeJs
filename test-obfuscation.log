@@ -1,0 +1,442 @@
+[0;34mℹ️  Checking prerequisites...[0m
+[0;32m✅ All prerequisites met.[0m
+[0;34mℹ️  Checking disk space...[0m
+[0;32m✅ Disk space OK (266691 MB available)[0m
+[0;34mℹ️  Current Git status:[0m
+ D build/common/adjustFontSizeToFit.min.js
+ D build/common/adjustFontSizeToFit.min.js.map
+ D build/common/amka-validation.min.js
+ D build/common/amka-validation.min.js.map
+ D build/common/blockInvalidClick.min.js
+ D build/common/blockInvalidClick.min.js.map
+ D build/common/changeFontSizeSelectDropdownMenu.min.js
+ D build/common/changeFontSizeSelectDropdownMenu.min.js.map
+ D build/common/changeInputTypeFile.min.js
+ D build/common/changeInputTypeFile.min.js.map
+ D build/common/changeUrl.min.js
+ D build/common/changeUrl.min.js.map
+ D build/common/checkAfm.min.js
+ D build/common/checkAfm.min.js.map
+ D build/common/checkAmka.min.js
+ D build/common/checkAmka.min.js.map
+ D build/common/checkHlikia.min.js
+ D build/common/checkHlikia.min.js.map
+ D build/common/checkScreenAnalysis.min.js
+ D build/common/checkScreenAnalysis.min.js.map
+ D build/common/clearImage.min.js
+ D build/common/clearImage.min.js.map
+ D build/common/clearSection.min.js
+ D build/common/clearSection.min.js.map
+ D build/common/clearSelectsSymbaseon.min.js
+ D build/common/clearSelectsSymbaseon.min.js.map
+ D build/common/clearableInputs.min.js
+ D build/common/clearableInputs.min.js.map
+ D build/common/convertNumbers.min.js
+ D build/common/convertNumbers.min.js.map
+ D build/common/countdown.min.js
+ D build/common/countdown.min.js.map
+ D build/common/createNavTree.min.js
+ D build/common/createNavTree.min.js.map
+ D build/common/dependentSelectToggle.min.js
+ D build/common/dependentSelectToggle.min.js.map
+ D build/common/deviceSwitcher.min.js
+ D build/common/deviceSwitcher.min.js.map
+ D build/common/expandIcons.min.js
+ D build/common/expandIcons.min.js.map
+ D build/common/formatDates.min.js
+ D build/common/formatDates.min.js.map
+ D build/common/formatNumbers_2dec.min.js
+ D build/common/formatNumbers_2dec.min.js.map
+ D build/common/formatTimes.min.js
+ D build/common/formatTimes.min.js.map
+ D build/common/getAppDate.min.js
+ D build/common/getAppDate.min.js.map
+ D build/common/getCompanyDescription.min.js
+ D build/common/getCompanyDescription.min.js.map
+ D build/common/getFieldValues.min.js
+ D build/common/getFieldValues.min.js.map
+ D build/common/getFocusNumberFields.min.js
+ D build/common/getFocusNumberFields.min.js.map
+ D build/common/getPeriod.min.js
+ D build/common/getPeriod.min.js.map
+ D build/common/getUser.min.js
+ D build/common/getUser.min.js.map
+ D build/common/getUserRole.min.js
+ D build/common/getUserRole.min.js.map
+ D build/common/getXrhsh.min.js
+ D build/common/getXrhsh.min.js.map
+ D build/common/hideTooltips.min.js
+ D build/common/hideTooltips.min.js.map
+ D build/common/ibanChecker.min.js
+ D build/common/ibanChecker.min.js.map
+ D build/common/initTomDropdown.min.js
+ D build/common/initTomDropdown.min.js.map
+ D build/common/kathestos-apasxolhshs-fulltime-sync.min.js
+ D build/common/kathestos-apasxolhshs-fulltime-sync.min.js.map
+ D build/common/logger.min.js
+ D build/common/logger.min.js.map
+ D build/common/makeMoreSpaceInMenuElements.min.js
+ D build/common/makeMoreSpaceInMenuElements.min.js.map
+ D build/common/modal.min.js
+ D build/common/modal.min.js.map
+ D build/common/moveByEnter.min.js
+ D build/common/moveByEnter.min.js.map
+ D build/common/multipleChoicesDropdowns.min.js
+ D build/common/multipleChoicesDropdowns.min.js.map
+ D build/common/navTabs.min.js
+ D build/common/navTabs.min.js.map
+ D build/common/num2words.min.js
+ D build/common/num2words.min.js.map
+ D build/common/putFieldValues.min.js
+ D build/common/putFieldValues.min.js.map
+ D build/common/readAndPreviewImage.min.js
+ D build/common/readAndPreviewImage.min.js.map
+ D build/common/removeGreekAccentsAndToUpper.min.js
+ D build/common/removeGreekAccentsAndToUpper.min.js.map
+ D build/common/scrollToTop.min.js
+ D build/common/scrollToTop.min.js.map
+ D build/common/searchFormSubmit.min.js
+ D build/common/searchFormSubmit.min.js.map
+ D build/common/sectionsVisible.min.js
+ D build/common/sectionsVisible.min.js.map
+ D build/common/selectUnselectAndChangeButtonTextContent.min.js
+ D build/common/selectUnselectAndChangeButtonTextContent.min.js.map
+ D build/common/setupTabKeyNavigation.min.js
+ D build/common/setupTabKeyNavigation.min.js.map
+ D build/common/showModal.min.js
+ D build/common/showModal.min.js.map
+ D build/common/sidebar.min.js
+ D build/common/sidebar.min.js.map
+ D build/common/sortTable.min.js
+ D build/common/sortTable.min.js.map
+ D build/common/toggleLabel.min.js
+ D build/common/toggleLabel.min.js.map
+ D build/common/toggleLabelErgazomenon.min.js
+ D build/common/toggleLabelErgazomenon.min.js.map
+ D build/common/toggleLabelKrathseon.min.js
+ D build/common/toggleLabelKrathseon.min.js.map
+ D build/common/toggleLabelSymbaseis.min.js
+ D build/common/toggleLabelSymbaseis.min.js.map
+ D build/common/tooltips.min.js
+ D build/common/tooltips.min.js.map
+ D build/common/tooltipsForButtons.min.js
+ D build/common/tooltipsForButtons.min.js.map
+ D build/common/totalPercentChecker.min.js
+ D build/common/totalPercentChecker.min.js.map
+ D build/companies/genikastoixeia/initDoyDropdowns.min.js
+ D build/companies/genikastoixeia/initDoyDropdowns.min.js.map
+ D build/companies/genikastoixeia/initKadDropdowns.min.js
+ D build/companies/genikastoixeia/initKadDropdowns.min.js.map
+ D build/companies/genikastoixeia/initNomikesMorfesDropdowns.min.js
+ D build/companies/genikastoixeia/initNomikesMorfesDropdowns.min.js.map
+ D build/companies/genikastoixeia/initPararthmataEfkaDropdowns.min.js
+ D build/companies/genikastoixeia/initPararthmataEfkaDropdowns.min.js.map
+ D build/companies/genikastoixeia/initTameiaDropdowns.min.js
+ D build/companies/genikastoixeia/initTameiaDropdowns.min.js.map
+ D build/dropdown-item.min.js
+ D build/dropdown-item.min.js.map
+ D build/dropdownManager.min.js
+ D build/dropdownManager.min.js.map
+ D build/efkaDropdownChain.min.js
+ D build/efkaDropdownChain.min.js.map
+ D build/ergazomenoi/genika/addStoixeiaSymbaseon.min.js
+ D build/ergazomenoi/genika/addStoixeiaSymbaseon.min.js.map
+ D build/ergazomenoi/genika/reCalcApodoxes.min.js
+ D build/ergazomenoi/genika/reCalcApodoxes.min.js.map
+ D build/ergazomenoi/programmata/initYpokatasthmataDropdowns.min.js
+ D build/ergazomenoi/programmata/initYpokatasthmataDropdowns.min.js.map
+ D build/geoDropdownChain.min.js
+ D build/geoDropdownChain.min.js.map
+ D build/modules/apodoxesCalculations.min.js
+ D build/modules/apodoxesCalculations.min.js.map
+ D build/searchableSelect.min.js
+ D build/searchableSelect.min.js.map
+ D build/symbaseisDropdownChain.min.js
+ D build/symbaseisDropdownChain.min.js.map
+ D build/symbaseisDropdownChain3-multi.min.js
+ D build/symbaseisDropdownChain3-multi.min.js.map
+ D build/symbaseisDropdownChain3.min.js
+ D build/symbaseisDropdownChain3.min.js.map
+ D build/utils/formatNumber.min.js
+ D build/utils/formatNumber.min.js.map
+ D build/utils/scripts.min.js
+ D build/utils/scripts.min.js.map
+ D build/utils/tree.min.js
+ D build/utils/tree.min.js.map
+ M deploy.sh
+ D public/min.js/common/adjustFontSizeToFit.min.js
+ D public/min.js/common/amka-validation.min.js
+ D public/min.js/common/blockInvalidClick.min.js
+ D public/min.js/common/changeFontSizeSelectDropdownMenu.min.js
+ D public/min.js/common/changeInputTypeFile.min.js
+ D public/min.js/common/changeUrl.min.js
+ D public/min.js/common/checkAfm.min.js
+ D public/min.js/common/checkAmka.min.js
+ D public/min.js/common/checkHlikia.min.js
+ D public/min.js/common/checkScreenAnalysis.min.js
+ D public/min.js/common/clearImage.min.js
+ D public/min.js/common/clearSection.min.js
+ D public/min.js/common/clearSelectsSymbaseon.min.js
+ D public/min.js/common/clearableInputs.min.js
+ D public/min.js/common/convertNumbers.min.js
+ D public/min.js/common/countdown.min.js
+ D public/min.js/common/createNavTree.min.js
+ D public/min.js/common/dependentSelectToggle.min.js
+ D public/min.js/common/deviceSwitcher.min.js
+ D public/min.js/common/expandIcons.min.js
+ D public/min.js/common/formatDates.min.js
+ D public/min.js/common/formatNumbers_2dec.min.js
+ D public/min.js/common/formatTimes.min.js
+ D public/min.js/common/getAppDate.min.js
+ D public/min.js/common/getCompanyDescription.min.js
+ D public/min.js/common/getFieldValues.min.js
+ D public/min.js/common/getFocusNumberFields.min.js
+ D public/min.js/common/getPeriod.min.js
+ D public/min.js/common/getUser.min.js
+ D public/min.js/common/getUserRole.min.js
+ D public/min.js/common/getXrhsh.min.js
+ D public/min.js/common/hideTooltips.min.js
+ D public/min.js/common/ibanChecker.min.js
+ D public/min.js/common/initTomDropdown.min.js
+ D public/min.js/common/kathestos-apasxolhshs-fulltime-sync.min.js
+ D public/min.js/common/logger.min.js
+ D public/min.js/common/makeMoreSpaceInMenuElements.min.js
+ D public/min.js/common/modal.min.js
+ D public/min.js/common/moveByEnter.min.js
+ D public/min.js/common/multipleChoicesDropdowns.min.js
+ D public/min.js/common/navTabs.min.js
+ D public/min.js/common/num2words.min.js
+ D public/min.js/common/putFieldValues.min.js
+ D public/min.js/common/readAndPreviewImage.min.js
+ D public/min.js/common/removeGreekAccentsAndToUpper.min.js
+ D public/min.js/common/scrollToTop.min.js
+ D public/min.js/common/searchFormSubmit.min.js
+ D public/min.js/common/sectionsVisible.min.js
+ D public/min.js/common/selectUnselectAndChangeButtonTextContent.min.js
+ D public/min.js/common/setupTabKeyNavigation.min.js
+ D public/min.js/common/showModal.min.js
+ D public/min.js/common/sidebar.min.js
+ D public/min.js/common/sortTable.min.js
+ D public/min.js/common/toggleLabel.min.js
+ D public/min.js/common/toggleLabelErgazomenon.min.js
+ D public/min.js/common/toggleLabelKrathseon.min.js
+ D public/min.js/common/toggleLabelSymbaseis.min.js
+ D public/min.js/common/tooltips.min.js
+ D public/min.js/common/tooltipsForButtons.min.js
+ D public/min.js/common/totalPercentChecker.min.js
+ D public/min.js/companies/genikastoixeia/initDoyDropdowns.min.js
+ D public/min.js/companies/genikastoixeia/initKadDropdowns.min.js
+ D public/min.js/companies/genikastoixeia/initNomikesMorfesDropdowns.min.js
+ D public/min.js/companies/genikastoixeia/initPararthmataEfkaDropdowns.min.js
+ D public/min.js/companies/genikastoixeia/initTameiaDropdowns.min.js
+ D public/min.js/dropdown-item.min.js
+ D public/min.js/dropdownManager.min.js
+ D public/min.js/efkaDropdownChain.min.js
+ D public/min.js/ergazomenoi/genika/addStoixeiaSymbaseon.min.js
+ D public/min.js/ergazomenoi/genika/reCalcApodoxes.min.js
+ D public/min.js/ergazomenoi/programmata/initYpokatasthmataDropdowns.min.js
+ D public/min.js/geoDropdownChain.min.js
+ D public/min.js/modules/apodoxesCalculations.min.js
+ D public/min.js/searchableSelect.min.js
+ D public/min.js/symbaseisDropdownChain.min.js
+ D public/min.js/symbaseisDropdownChain3-multi.min.js
+ D public/min.js/symbaseisDropdownChain3.min.js
+ D public/min.js/utils/formatNumber.min.js
+ D public/min.js/utils/scripts.min.js
+ D public/min.js/utils/tree.min.js
+?? test-obfuscation.log
+[0;34mℹ️  Cleaning build directories...[0m
+[0;32m✅ Cleanup complete.[0m
+
+==========================================
+🚀 BUILD PROCESS STARTING - Phase 1
+==========================================
+Environment:    dev
+Obfuscation:    ENABLED
+CDN Upload:     DISABLED
+Version:        20251125123815
+Phase:          Phase 1 (Core files only)
+Files:          ~78 files
+==========================================
+
+[0;36m🚀 PHASE 1.1: Building ES6 Modules (21 files)...[0m
+
+[1/80]
+[0;35m👉 Minifying: public/js/modules/apodoxesCalculations.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → apodoxesCalculations.min.js (54% smaller: 9612 → 4452 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[2/80]
+[0;35m👉 Minifying: public/js/utils/formatNumber.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → formatNumber.min.js (29% smaller: 157 → 112 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[3/80]
+[0;35m👉 Minifying: public/js/common/dependentSelectToggle.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → dependentSelectToggle.min.js (64% smaller: 2855 → 1045 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[4/80]
+[0;35m👉 Minifying: public/js/common/initTomDropdown.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initTomDropdown.min.js (62% smaller: 7817 → 3004 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[5/80]
+[0;35m👉 Minifying: public/js/dropdown-item.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → dropdown-item.min.js (65% smaller: 65290 → 23142 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[6/80]
+[0;35m👉 Minifying: public/js/dropdownManager.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → dropdownManager.min.js (59% smaller: 3172 → 1317 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[7/80]
+[0;35m👉 Minifying: public/js/searchableSelect.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → searchableSelect.min.js (98% smaller: 2023 → 49 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[8/80]
+[0;35m👉 Minifying: public/js/companies/genikastoixeia/initDoyDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initDoyDropdowns.min.js (62% smaller: 1822 → 699 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[9/80]
+[0;35m👉 Minifying: public/js/companies/genikastoixeia/initKadDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initKadDropdowns.min.js (61% smaller: 1753 → 694 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[10/80]
+[0;35m👉 Minifying: public/js/companies/genikastoixeia/initNomikesMorfesDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initNomikesMorfesDropdowns.min.js (61% smaller: 1677 → 657 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[11/80]
+[0;35m👉 Minifying: public/js/companies/genikastoixeia/initPararthmataEfkaDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initPararthmataEfkaDropdowns.min.js (61% smaller: 1679 → 661 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[12/80]
+[0;35m👉 Minifying: public/js/companies/genikastoixeia/initTameiaDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initTameiaDropdowns.min.js (61% smaller: 1756 → 700 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[13/80]
+[0;35m👉 Minifying: public/js/efkaDropdownChain.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → efkaDropdownChain.min.js (64% smaller: 9325 → 3386 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[14/80]
+[0;35m👉 Minifying: public/js/geoDropdownChain.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → geoDropdownChain.min.js (61% smaller: 6715 → 2623 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[15/80]
+[0;35m👉 Minifying: public/js/symbaseisDropdownChain.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → symbaseisDropdownChain.min.js (64% smaller: 9461 → 3423 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[16/80]
+[0;35m👉 Minifying: public/js/symbaseisDropdownChain3-multi.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → symbaseisDropdownChain3-multi.min.js (53% smaller: 11750 → 5626 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[17/80]
+[0;35m👉 Minifying: public/js/symbaseisDropdownChain3.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → symbaseisDropdownChain3.min.js (53% smaller: 21347 → 10060 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[18/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → addStoixeiaSymbaseon.min.js (79% smaller: 69219 → 14595 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[19/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/genika/reCalcApodoxes.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → reCalcApodoxes.min.js (91% smaller: 25430 → 2415 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[20/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initYpokatasthmataDropdowns.min.js (61% smaller: 1680 → 661 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[21/80]
+[0;35m👉 Minifying: public/js/common/kathestos-apasxolhshs-fulltime-sync.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → kathestos-apasxolhshs-fulltime-sync.min.js (55% smaller: 6591 → 2987 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[0;36m🚀 PHASE 1.2: Building utility files (2 files)...[0m
+
+[22/80]
+[0;35m👉 Minifying: public/js/utils/scripts.js[0m
+[0;32m✅   → scripts.min.js (63% smaller: 1286 → 476 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/scripts.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\scripts.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[23/80]
+[0;35m👉 Minifying: public/js/utils/tree.js[0m
+[0;32m✅   → tree.min.js (54% smaller: 10130 → 4696 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/tree.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\tree.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[0;36m🚀 PHASE 1.3: Building common files (57 files)...[0m
+
+[24/80]
+[0;35m👉 Minifying: public/js/common/adjustFontSizeToFit.js[0m
+[0;32m✅   → adjustFontSizeToFit.min.js (65% smaller: 1111 → 391 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/adjustFontSizeToFit.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\adjustFontSizeToFit.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[25/80]
+[0;35m👉 Minifying: public/js/common/amka-validation.js[0m
+[0;32m✅   → amka-validation.min.js (30% smaller: 4214 → 2969 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/amka-validation.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\amka-validation.min.js... 
+
+[javascript-obfuscator-cli] Error in file: C:\Payroll-NodeJs\build\common\amka-validation.min.js... 
+
+C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:77
+        throw new Error(`ERROR at line ${position.line}: ${errorMessage}\n${formattedPointer} ${formattedCodeSlice}`);
+              ^
+Error: ERROR at line 2: Unexpected token (2:23)
+> ...function __amka-validation__0a...
+    at Function.processParsingError (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:77:15)
+    at Function.parse (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\ASTParserFacade.ts:43:49)
+    at Function.convertCodeToStructure (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\node\NodeUtils.ts:45:61)
+    at v.apply (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\StringArrayCodeHelper.ts:39:38)
+    at v.getNodeStructure (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\decorators\Initializable.ts:65:39)
+    at v.getNode (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\AbstractCustomCodeHelper.ts:42:83)
+    at callback (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\group\StringArrayCodeHelperGroup.ts:42:92)
+    at o.appendCustomNodeIfExist (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\AbstractCustomCodeHelperGroup.ts:36:9)
+    at o.apply (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\custom-code-helpers\string-array\group\StringArrayCodeHelperGroup.ts:41:14)
+    at o.value (C:\Users\User\AppData\Roaming\npm\node_modules\javascript-obfuscator\dist\webpack:\javascript-obfuscator\src\decorators\Initializable.ts:65:39)
+[0;31m❌ Obfuscation failed: C:/Payroll-NodeJs/build/common/amka-validation.min.js[0m

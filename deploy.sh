@@ -331,7 +331,10 @@ declare -a modules=(
     "public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js"
     "public/js/ergazomenoi/genika/reCalcApodoxes.js"
     "public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js"
-	"public/js/common/amka-validation.js"
+	
+	# Problematic Files   (obfuscation fails)
+	# "public/js/common/amka-validation.js"
+	"public/js/common/kathestos-apasxolhshs-fulltime-sync.js"
 )
 
 # UTILITIES (can obfuscate) - 2 files
@@ -343,7 +346,7 @@ declare -a utils=(
 # COMMON FILES (can obfuscate) - 56 files
 declare -a common_files=(
     "public/js/common/adjustFontSizeToFit.js"
-    # "public/js/common/amka-validation.js"
+    "public/js/common/amka-validation.js"
     "public/js/common/blockInvalidClick.js"
     "public/js/common/changeFontSizeSelectDropdownMenu.js"
     "public/js/common/changeInputTypeFile.js"
@@ -374,7 +377,7 @@ declare -a common_files=(
     "public/js/common/getXrhsh.js"
     "public/js/common/hideTooltips.js"
     "public/js/common/ibanChecker.js"
-    "public/js/common/kathestos-apasxolhshs-fulltime-sync.js"
+    #  "public/js/common/kathestos-apasxolhshs-fulltime-sync.js"
     "public/js/common/logger.js"
     "public/js/common/makeMoreSpaceInMenuElements.js"
     "public/js/common/modal.js"
