@@ -4,16 +4,16 @@ dotenv.config();
 
 const node_env = process.env.NODE_ENV || "development";
 
-// Configure static assets
+// Ρύθμιση static assets
 const STATIC_BASE_DEV = process.env.STATIC_BASE_DEV || "/static/js";
-const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min. js";
+const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min.js";
 const STATIC_BASE = node_env === 'production' ? STATIC_BASE_PROD : STATIC_BASE_DEV;
 
 // AWS S3/CloudFront domains
 const S3_BUCKET = process.env.S3_BUCKET || "employee-certificates-webpayrollsolutions-central";
 const S3_REGION = process.env.AWS_REGION || "eu-central-1";
-const CDN_DOMAIN = process.env.CDN_DOMAIN || "cdn. webpayrollsolutions.com";
-const CLOUDFRONT_DOMAIN = process.env.CLOUDFRONT_DOMAIN; // Optional: d1t9waojrhy16d.cloudfront.net
+const CDN_DOMAIN = process.env.CDN_DOMAIN || "cdn.webpayrollsolutions.com";
+const CLOUDFRONT_DOMAIN = process.env. CLOUDFRONT_DOMAIN; // Προαιρετικό: d1t9waojrhy16d.cloudfront.net
 
 const express = require("express");
 const { urlencoded, json } = require("express");
@@ -48,7 +48,7 @@ const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secr
 const mongoUrl = process.env.MONGODB_URL;
 const EGGRAFES = Number. parseInt(process.env.EGGRAFES ??  '15', 10) || 15;
 
-// ✅ Startup logging
+// Εκκίνηση - καταγραφή ρυθμίσεων
 logger.info("========================================");
 logger.info("🔧 ENVIRONMENT CONFIG");
 logger.info("========================================");
@@ -62,28 +62,85 @@ if (CLOUDFRONT_DOMAIN) {
 }
 logger.info("========================================");
 
-if (isProd) app.set("trust proxy", 1); // απαιτείται πίσω από reverse proxy για secure cookies & σωστό req.ip
+// Απαιτείται πίσω από reverse proxy για secure cookies & σωστό req.ip
+if (isProd) app.set("trust proxy", 1);
 
 /* -------------------------------------------------------------------------- */
-/*                            Rate limiters & guards                           */
+/*                         Rate limiters & guards                             */
 /* -------------------------------------------------------------------------- */
 
-// Προστασία από brute force σε login (και προαιρετικά reset_password)
+// Βελτιωμένος περιορισμός login με φιλικές ρυθμίσεις προς τον χρήστη
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15'
-    max: 10,                  // έως 10 αιτήσεις / IP / 15'
+    windowMs: 15 * 60 * 1000,      // Παράθυρο 15 λεπτών
+    max: 5,                         // 5 προσπάθειες
+    
+    // ΚΡΙΣΙΜΟ: Επαναφορά μετρητή σε επιτυχημένο login
+    skipSuccessfulRequests: true,
+    
+    // Μην περιορίζεις ήδη συνδεδεμένους χρήστες
+    skip: (req) => req.session?.userId != null,
+    
     standardHeaders: true,
     legacyHeaders: false,
-    message: "Πάρα πολλές προσπάθειες.  Δοκιμάστε ξανά αργότερα."
+    
+    // Προσαρμοσμένο handler με ακριβή χρόνο επανάληψης
+    handler: async (req, res) => {
+        const retryAfter = req.rateLimit.resetTime 
+            ?  Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000 / 60)
+            : 15;
+            
+        logger.warn('⚠️ Επιτεύχθηκε όριο login:', {
+            ip: req. ip,
+            email: req. body.email || 'άγνωστο',
+            προσπάθειες: req.rateLimit. current,
+            επανάληψηΣε: `${retryAfter}λεπτά`
+        });
+        
+        // Flash μήνυμα
+        if (req.flash) {
+            await res.flash('error', `Πάρα πολλές αποτυχημένες προσπάθειες σύνδεσης. Δοκιμάστε ξανά σε ${retryAfter} λεπτά.`);
+        }
+        
+        // Εμφάνιση σελίδας login με σφάλμα
+        res.status(429).render('login/login', {
+            bodyClass: 'home-bg-cdn',
+            csrfToken: req.csrfToken ?  req.csrfToken() : '',
+            title: 'Σύνδεση',
+            description: 'Σελίδα σύνδεσης'
+        });
+    }
+});
+
+// Αυστηρότερος περιορισμός για επαναφορά κωδικού (3 προσπάθειες/ώρα)
+const resetPasswordLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,      // 1 ώρα
+    max: 3,                         // 3 αιτήσεις επαναφοράς ανά ώρα
+    skipSuccessfulRequests: true,
+    
+    standardHeaders: true,
+    legacyHeaders: false,
+    
+    handler: async (req, res) => {
+        logger.warn('⚠️ Επιτεύχθηκε όριο επαναφοράς κωδικού:', {
+            ip: req.ip,
+            email: req.body.email || 'Άγνωστο email'
+        });
+        
+        if (req.flash) {
+            await res.flash('error', 'Πάρα πολλές αιτήσεις επαναφοράς κωδικού. Δοκιμάστε ξανά σε 1 ώρα.');
+        }
+        
+        res.status(429).redirect('/login');
+    }
 });
 
 /* -------------------------------------------------------------------------- */
-/*                                Database init                                */
+/*                            Αρχικοποίηση Database                           */
 /* -------------------------------------------------------------------------- */
 connectDB();
 
 /* -------------------------------------------------------------------------- */
-/*                            Core middlewares order                           */
+/*                         Σειρά βασικών middlewares                          */
 /* -------------------------------------------------------------------------- */
 
 // Body parsers ΠΡΙΝ από CSRF
@@ -97,34 +154,34 @@ app.use(methodOverride("_method"));
 app.use(cookieParser());
 
 // Static assets
-app.use("/static", express.static(path.join(__dirname, "public")));
+app.use("/static", express.static(path. join(__dirname, "public")));
 
 // Global locals
-// Helper: Get script path
+// Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
-    // Remove . js if present
-    const cleanPath = path.replace(/\.js$/, '');
+    // Αφαίρεση .js αν υπάρχει
+    const cleanPath = path.replace(/\. js$/, '');
     
     if (node_env === 'production') {
-        return `${STATIC_BASE}/${cleanPath}. min.js`;
+        return `${STATIC_BASE}/${cleanPath}.min.js`;
     } else {
         return `${STATIC_BASE}/${cleanPath}.js`;
     }
 };
 
-// Also expose for direct use
+// Επίσης διαθέσιμο για άμεση χρήση
 app.locals. STATIC_BASE = STATIC_BASE;
 app.locals.NODE_ENV = node_env;
 
 /* -------------------------------------------------------------------------- */
-/*                                Session setup                               */
+/*                              Ρύθμιση Session                               */
 /* -------------------------------------------------------------------------- */
 if (! mongoUrl) {
-    logger.error("MONGODB_URL is not set.  Using MemoryStore (dev only).");
+    logger. error("MONGODB_URL δεν έχει οριστεί.  Χρήση MemoryStore (μόνο dev).");
 }
 
 app.use(session(sessionOpts));
-logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} enabled (ttl=${diarkeia_session}m, secure=${isProd})`);
+logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 // Flash messages (βασίζεται στο session)
 app.use(flash({ sessionKeyName: "flashMessage" }));
@@ -137,7 +194,7 @@ app.use((req, res, next) => {
     if (req.session) {
         const now = Date.now();
         const isAsset = req.path.startsWith("/static/");
-        const isCountdown = req.path === '/remaining-time';
+        const isCountdown = req. path === '/remaining-time';
         const isLogout = req.path. startsWith('/logout');
 
         if (! isAsset && !isCountdown && !isLogout) {
@@ -156,13 +213,13 @@ app.use((req, res, next) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/*                              Security headers                               */
+/*                           Security headers                                 */
 /* -------------------------------------------------------------------------- */
 
 // Helmet "βασικά" headers
 app.use(helmet());
 
-// Extra policies (safe defaults)
+// Επιπλέον πολιτικές (ασφαλείς προεπιλογές)
 app.use(helmet.referrerPolicy({ policy: "no-referrer" }));
 app.use(helmet.permittedCrossDomainPolicies({ permittedPolicies: "none" }));
 app.use(helmet.crossOriginResourcePolicy({ policy: "same-origin" })); // τα δικά μου assets δεν σερβίρονται σε άλλους origins
@@ -180,15 +237,15 @@ if (isProd) {
 
 // CSP nonce ανά request
 app.use((req, res, next) => {
-    res.locals.nonce = crypto.randomBytes(18).toString("base64");
+    res.locals.nonce = crypto. randomBytes(18).toString("base64");
     next();
 });
 
 /* -------------------------------------------------------------------------- */
-/*          ✅ FIXED CSP SOLUTION - Works in ALL environments                 */
+/*            ΔΙΟΡΘΩΜΕΝΗ CSP ΛΥΣΗ - Λειτουργεί σε ΟΛΑ τα environments         */
 /* -------------------------------------------------------------------------- */
 
-// Build CSP directives dynamically
+// Δημιουργία CSP directives δυναμικά
 const buildCSPDirectives = () => {
     const directives = {
         "default-src": ["'self'"],
@@ -204,7 +261,7 @@ const buildCSPDirectives = () => {
         "style-src-attr": ["'unsafe-inline'"],
         "style-src": [
             "'self'",
-            "https://fonts. googleapis. com"
+            "https://fonts.googleapis. com"
         ],
         "font-src": [
             "'self'",
@@ -218,8 +275,8 @@ const buildCSPDirectives = () => {
         ],
         "connect-src": [
             "'self'",
-            "https://fonts. googleapis.com",
-            "https://fonts.gstatic.com"
+            "https://fonts.googleapis.com",
+            "https://fonts.gstatic. com"
         ],
         "worker-src": ["'self'", "blob:"],
         "object-src": ["'none'"],
@@ -229,27 +286,27 @@ const buildCSPDirectives = () => {
         "frame-ancestors": ["'none'"]
     };
 
-    // ✅ ALWAYS add CDN/S3 domains (both dev and prod)
-    // This allows testing with CDN resources in development
+    // ΠΑΝΤΑ προσθήκη CDN/S3 domains (και dev και prod)
+    // Αυτό επιτρέπει testing με CDN resources στο development
     const cdnDomains = [
         `https://${CDN_DOMAIN}`,
-        `https://${S3_BUCKET}.s3.amazonaws. com`,
-        `https://${S3_BUCKET}.s3.${S3_REGION}. amazonaws.com`
+        `https://${S3_BUCKET}.s3.amazonaws.com`,
+        `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com`
     ];
     
     if (CLOUDFRONT_DOMAIN) {
         cdnDomains.push(`https://${CLOUDFRONT_DOMAIN}`);
     }
 
-    // Add CDN domains to all relevant directives
-    directives["script-src"].push(... cdnDomains);
+    // Προσθήκη CDN domains σε όλα τα σχετικά directives
+    directives["script-src"].push(...cdnDomains);
     directives["style-src-elem"].push(...cdnDomains);
-    directives["style-src"].push(`https://${CDN_DOMAIN}`);
-    directives["font-src"].push(...cdnDomains);
-    directives["img-src"]. push(...cdnDomains);
-    directives["connect-src"].push(...cdnDomains);
+    directives["style-src"]. push(`https://${CDN_DOMAIN}`);
+    directives["font-src"].push(... cdnDomains);
+    directives["img-src"].push(...cdnDomains);
+    directives["connect-src"]. push(...cdnDomains);
     
-    // Enable HTTPS upgrade ONLY in production
+    // Ενεργοποίηση HTTPS upgrade ΜΟΝΟ σε production
     if (isProd) {
         directives["upgrade-insecure-requests"] = [];
     }
@@ -260,14 +317,14 @@ const buildCSPDirectives = () => {
 const cspDirectives = buildCSPDirectives();
 
 app.use(
-    helmet. contentSecurityPolicy({
+    helmet.contentSecurityPolicy({
         useDefaults: false,
         directives: cspDirectives,
     })
 );
 
 /* -------------------------------------------------------------------------- */
-/*                              CSRF (csurf@1.x)                               */
+/*                              CSRF (csurf@1.x)                              */
 /* -------------------------------------------------------------------------- */
 /**
  * Χρησιμοποιούμε cookie-based CSRF:
@@ -284,11 +341,11 @@ const csrfProtection = csurf({
     },
 });
 
-// ✅ CSRF με exceptions για S3 uploads & AWS webhooks
+// CSRF με εξαιρέσεις για S3 uploads & AWS webhooks
 app.use((req, res, next) => {
-    // Skip CSRF για:
+    // Παράκαμψη CSRF για:
     // 1. S3 pre-signed URL callbacks
-    // 2.  Webhooks από AWS
+    // 2. Webhooks από AWS
     // 3. Health checks
     const skipPaths = [
         '/health',
@@ -315,7 +372,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// (Προαιρετικό) Endpoint για AJAX clients να παίρνουν token
+// Προαιρετικό endpoint για AJAX clients να παίρνουν token
 app.get("/csrf-token", (req, res) => {
     try {
         return res.json({ csrfToken: req.csrfToken() });
@@ -327,7 +384,7 @@ app.get("/csrf-token", (req, res) => {
 // CSRF error handler (για ληγμένα/λάθος tokens)
 app.use(async (err, req, res, next) => {
     if (err && err.code === "EBADCSRFTOKEN") {
-        logger.warn("CSRF token rejected", {
+        logger.warn("CSRF token απορρίφθηκε", {
             method: req.method,
             path: req.path,
             ip: req.ip,
@@ -335,19 +392,19 @@ app.use(async (err, req, res, next) => {
         });
         
         if (req.flash) {
-            await res.flash("error", "Η συνεδρία έληξε ή η φόρμα δεν είναι έγκυρη.  Δοκιμάστε ξανά.");
+            await res.flash("error", "Η συνεδρία έληξε ή η φόρμα δεν είναι έγκυρη. Δοκιμάστε ξανά.");
         }
         
         const referrer = req.get("Referrer") || req.get("Referer") || "/";
-        // Validation για να αποφύγουμε open redirects
-        const safeRedirect = referrer.startsWith('/') ?  referrer : '/';
+        // Επικύρωση για να αποφύγουμε open redirects
+        const safeRedirect = referrer.startsWith('/') ? referrer : '/';
         return res.redirect(safeRedirect);
     }
     next(err);
 });
 
 /* -------------------------------------------------------------------------- */
-/*                             Views / layouts (EJS)                           */
+/*                             Views / layouts (EJS)                          */
 /* -------------------------------------------------------------------------- */
 app.set("view engine", "ejs");
 app.use(expressLayout);
@@ -363,7 +420,7 @@ app.use((req, res, next) => {
 /* -------------------------------------------------------------------------- */
 app.get("/api/session-data", (req, res) => {
     res.json({
-        sessionEtos: req.session?. yearInUse || null,
+        sessionEtos: req.session?.yearInUse || null,
         sessionMhnas: req.session?.periodInUse || null,
         sessionTeam: req.session?.userTeam || null,
         sessionCompanyInUse: req.session?.companyInUse || null,
@@ -373,14 +430,19 @@ app.get("/api/session-data", (req, res) => {
 /* -------------------------------------------------------------------------- */
 /*                                   Routes                                   */
 /* -------------------------------------------------------------------------- */
-// Guards στο /login — ενεργά μόνο σε prod (σε dev no-op)
+// Εφαρμογή login limiter στα login routes
 app.use(
     "/login",
     isProd ? loginLimiter : (req, res, next) => next(),
     isProd ? geoGuard : (req, res, next) => next()
 );
 
-app.use("/reset_password", isProd ? loginLimiter : (req, res, next) => next(), isProd ? geoGuard : (req, res, next) => next());
+// Εφαρμογή αυστηρότερου limiter στην επαναφορά κωδικού
+app.use(
+    "/reset_password",
+    isProd ? resetPasswordLimiter : (req, res, next) => next(),
+    isProd ? geoGuard : (req, res, next) => next()
+);
 
 app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
@@ -395,7 +457,7 @@ app.get("/remaining-time", (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/*                                 Error paths                                */
+/*                              Διαχείριση σφαλμάτων                          */
 /* -------------------------------------------------------------------------- */
 
 // 404 — τελευταίο middleware
@@ -411,7 +473,7 @@ app.use((req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/*                                  Startup                                   */
+/*                                 Εκκίνηση                                   */
 /* -------------------------------------------------------------------------- */
 app.listen(port, "0.0.0.0", () => {
     logger.info(`🚀 App listening at http://${host}:${port}`);
