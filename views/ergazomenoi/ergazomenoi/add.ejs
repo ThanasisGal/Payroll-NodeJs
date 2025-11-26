@@ -222,6 +222,8 @@
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
+	
+<script nonce="<%= nonce %>" src="<%= NODE_ENV === 'production' ? 'https://cdn.webpayrollsolutions.com/static/min.js' : '/static/js' %>/common/amka_validation<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
 <!-- ✅ Import Map Definition -->
 <script type="importmap" nonce="<%= nonce %>">
@@ -231,6 +233,7 @@
 		}
 	}
 </script>
+
 
 <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 

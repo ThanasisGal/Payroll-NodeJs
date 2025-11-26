@@ -698,7 +698,10 @@
   window.WPS_USER_ID = "<%= (userId || '') %>";
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sidebar<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="<%= script('common/sidebar') %>"></script>
+<script nonce="<%= nonce %>" src="<%= script('common/tooltipsForButtons') %>"></script>
+
+<!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sidebar<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
 
 

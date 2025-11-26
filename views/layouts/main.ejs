@@ -63,8 +63,6 @@
 
             <%- include('../partials/footer.ejs') %>
         </div>
-            <!-- </div>
-        </div> -->
 
         <% const isProduction = NODE_ENV === 'production'; %>
         <script nonce="<%= nonce %>">
@@ -72,21 +70,20 @@
         </script>
 
         <!-- Προσθέτω nonce σε ΟΛΑ τα <script> tags (εξωτερικά & εσωτερικά) -->
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/logger<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/utils/tree<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/utils/scripts<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUserRole<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeFontSizeSelectDropdownMenu<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/countdown<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/logger') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('utils/tree') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('utils/scripts') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/getUserRole') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/getCompanyDescription') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/getXrhsh') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/getPeriod') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/getUser') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/navTabs') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/tooltipsForButtons') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/moveByEnter') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
+        <script nonce="<%= nonce %>" src="<%= script('common/countdown') %>"></script>            
+        <script nonce="<%= nonce %>" src="<%= script('dates/convertDateToISO') %>"></script>            
 
         <script nonce="<%= nonce %>">
             window.addEventListener("load", function () {
@@ -111,21 +108,21 @@
         <script nonce="<%= nonce %>" src="/static/js/common/deviceSwitcher.js" defer></script> 
         <script nonce="<%= nonce %>" src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
 
-<!-- ΠΡΙΝ το closing </body> tag -->
-<script nonce="<%= nonce %>">
-  // 🔑 Global CSRF helper
-  window.getCSRFToken = function() {
-    // 1. Από meta tag
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    if (meta) return meta.getAttribute('content');
-    
-    // 2. Από hidden input (fallback)
-    const input = document.querySelector('input[name="_csrf"]');
-    if (input) return input.value;
-    
-    console.warn('⚠️ CSRF token not found!');
-    return null;
-  };
-</script>
+        <!-- ΠΡΙΝ το closing </body> tag -->
+        <script nonce="<%= nonce %>">
+        // 🔑 Global CSRF helper
+        window.getCSRFToken = function() {
+            // 1. Από meta tag
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
+            
+            // 2. Από hidden input (fallback)
+            const input = document.querySelector('input[name="_csrf"]');
+            if (input) return input.value;
+            
+            console.warn('⚠️ CSRF token not found!');
+            return null;
+        };
+        </script>
     </body>
 </html>

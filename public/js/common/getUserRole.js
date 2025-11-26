@@ -1,83 +1,92 @@
 document.addEventListener("DOMContentLoaded", function () {
+  
+  // ✅ Only run on authenticated/protected pages
+  // Skip on public pages and login flow
+  const publicPages = ['/login', '/reset_password', '/register', '/logout', '/'];
+  const currentPath = window. location.pathname;
+  
+  // If on home page or login pages, skip permission check
+  if (publicPages. some(page => currentPath === page)) {
+    console.log("Public page - skipping permission check");
+    return;
+  }
+
+  // ✅ Only run if user appears to be logged in
+  const userId = window.WPS_USER_ID;
+  if (!userId || userId === '""' || userId === 'null') {
+    console.log("No user ID - skipping permission check");
+    return;
+  }
+
   async function fetchUserDataAndPermissions() {
     try {
-      const response = await fetch("/api/login/getRoles");
+      const response = await fetch("/api/login/getRoles", {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // If not authenticated, just log and exit (don't redirect)
+      if (response.status === 401) {
+        console. warn("Not authenticated - permissions unavailable");
+        hideProtectedElements();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      
+      if (!data || !data.permissions) {
+        console.warn("No permissions data received");
+        return;
+      }
+
       const { permissions } = data;
       updateDOM(permissions);
+      
     } catch (error) {
       console.error("Error fetching user data:", error);
+      hideProtectedElements();
     }
   }
 
   function updateDOM(permissions) {
-    // enableAllLinks()
-
     for (const key in permissions) {
       const listItem = document.querySelector(`#${key}`);
-      const links = listItem ? listItem.querySelectorAll('a') : [];
+      if (! listItem) continue;
+      
+      const links = listItem.querySelectorAll('a');
   
       links.forEach(link => {
         if (permissions[key]) {
-          link.classList.remove("disabled");
-          link.classList.add("enabled");
+          link.classList. remove("disabled");
+          link. classList.add("enabled");
+          link.removeAttribute('disabled');
         } else {
-          link.classList.remove("enabled");
+          link. classList.remove("enabled");
           link.classList.add("disabled");
+          link.setAttribute('disabled', 'true');
         }
       });
     }
   }
 
+  function hideProtectedElements() {
+    // Silently disable protected features
+    const protectedElements = document.querySelectorAll('[id^="perm_"], [data-permission]');
+    protectedElements.forEach(el => {
+      const links = el.querySelectorAll('a');
+      links. forEach(link => {
+        link.classList.add("disabled");
+        link.classList.remove("enabled");
+      });
+    });
+  }
+
   fetchUserDataAndPermissions();
 
 });
-
-
-
-
-
-
-// document.addEventListener('DOMContentLoaded', () => {
-//   async function fetchUserDataAndPermissions() {
-//     try {
-//       const res = await fetch('/api/login/getRoles', { cache: 'no-store' });
-//       if (!res.ok) return;
-//       const { permissions = {} } = await res.json();
-//       applyPermissions(permissions);
-//     } catch (e) { console.error(e); }
-//   }
-
-//   function applyPermissions(permissions) {
-//     // προαιρετικά: κλείδωσε όλα by default
-//     document.querySelectorAll('#nav-tree a').forEach(a => {
-//       a.classList.add('disabled');
-//       a.classList.remove('enabled');
-//       a.setAttribute('aria-disabled', 'true');
-//       a.tabIndex = -1;
-//     });
-
-//     // άνοιξε όσα επιτρέπονται
-//     for (const key in permissions) {
-//       const allowed = !!permissions[key];
-//       const root = document.getElementById(key);
-//       if (!root) continue;
-//       root.querySelectorAll('a').forEach(a => {
-//         if (allowed) {
-//           a.classList.remove('disabled');
-//           a.classList.add('enabled');
-//           a.removeAttribute('aria-disabled');
-//           a.tabIndex = 0;
-//         }
-//       });
-//     }
-//   }
-
-//   // μπλοκάρεις clicks σε disabled links κεντρικά
-//   document.getElementById('nav-tree')?.addEventListener('click', (ev) => {
-//     const a = ev.target.closest('a.disabled');
-//     if (a) ev.preventDefault();
-//   });
-
-//   fetchUserDataAndPermissions();
-// });

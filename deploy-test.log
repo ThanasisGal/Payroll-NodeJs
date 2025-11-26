@@ -370,3 +370,811 @@ Files:          ~78 files
 [0;34mℹ️    → Module preserved (no obfuscation)[0m
 
 [18/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → addStoixeiaSymbaseon.min.js (79% smaller: 69219 → 14595 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[19/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/genika/reCalcApodoxes.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → reCalcApodoxes.min.js (91% smaller: 25430 → 2415 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[20/80]
+[0;35m👉 Minifying: public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js[0m
+[0;34mℹ️    → ES6 Module mode[0m
+[0;32m✅   → initYpokatasthmataDropdowns.min.js (61% smaller: 1680 → 661 bytes)[0m
+[0;34mℹ️    → Module preserved (no obfuscation)[0m
+
+[0;36m🚀 PHASE 1.2: Building utility files (2 files)...[0m
+
+[21/80]
+[0;35m👉 Minifying: public/js/utils/scripts.js[0m
+[0;32m✅   → scripts.min.js (63% smaller: 1286 → 476 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/scripts.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\scripts.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[22/80]
+[0;35m👉 Minifying: public/js/utils/tree.js[0m
+[0;32m✅   → tree.min.js (54% smaller: 10130 → 4696 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/utils/tree.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\utils\tree.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[0;36m🚀 PHASE 1.3: Building common files (58 files)...[0m
+
+[23/80]
+[0;35m👉 Minifying: public/js/common/adjustFontSizeToFit.js[0m
+[0;32m✅   → adjustFontSizeToFit.min.js (65% smaller: 1111 → 391 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/adjustFontSizeToFit.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\adjustFontSizeToFit.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[24/80]
+[0;35m👉 Minifying: public/js/common/amka_validation.js[0m
+[0;32m✅   → amka_validation.min.js (41% smaller: 5026 → 3005 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/amka_validation.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\amka_validation.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[25/80]
+[0;35m👉 Minifying: public/js/common/blockInvalidClick.js[0m
+[0;32m✅   → blockInvalidClick.min.js (50% smaller: 842 → 425 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/blockInvalidClick.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\blockInvalidClick.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[26/80]
+[0;35m👉 Minifying: public/js/common/changeFontSizeSelectDropdownMenu.js[0m
+[0;32m✅   → changeFontSizeSelectDropdownMenu.min.js (58% smaller: 2610 → 1097 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/changeFontSizeSelectDropdownMenu.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\changeFontSizeSelectDropdownMenu.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[27/80]
+[0;35m👉 Minifying: public/js/common/changeInputTypeFile.js[0m
+[0;32m✅   → changeInputTypeFile.min.js (33% smaller: 654 → 444 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/changeInputTypeFile.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\changeInputTypeFile.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[28/80]
+[0;35m👉 Minifying: public/js/common/changeUrl.js[0m
+[0;32m✅   → changeUrl.min.js (43% smaller: 188 → 108 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/changeUrl.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\changeUrl.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[29/80]
+[0;35m👉 Minifying: public/js/common/checkAfm.js[0m
+[0;32m✅   → checkAfm.min.js (59% smaller: 30928 → 12843 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/checkAfm.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\checkAfm.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[30/80]
+[0;35m👉 Minifying: public/js/common/checkAmka.js[0m
+[0;32m✅   → checkAmka.min.js (51% smaller: 6991 → 3478 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/checkAmka.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\checkAmka.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[31/80]
+[0;35m👉 Minifying: public/js/common/checkHlikia.js[0m
+[0;32m✅   → checkHlikia.min.js (55% smaller: 2288 → 1044 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/checkHlikia.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\checkHlikia.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[32/80]
+[0;35m👉 Minifying: public/js/common/checkScreenAnalysis.js[0m
+[0;32m✅   → checkScreenAnalysis.min.js (38% smaller: 8485 → 5332 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/checkScreenAnalysis.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\checkScreenAnalysis.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[33/80]
+[0;35m👉 Minifying: public/js/common/clearImage.js[0m
+[0;32m✅   → clearImage.min.js (45% smaller: 761 → 426 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/clearImage.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\clearImage.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[34/80]
+[0;35m👉 Minifying: public/js/common/clearSection.js[0m
+[0;32m✅   → clearSection.min.js (57% smaller: 4276 → 1843 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/clearSection.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\clearSection.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[35/80]
+[0;35m👉 Minifying: public/js/common/clearSelectsSymbaseon.js[0m
+[0;32m✅   → clearSelectsSymbaseon.min.js (31% smaller: 2397 → 1673 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/clearSelectsSymbaseon.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\clearSelectsSymbaseon.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[36/80]
+[0;35m👉 Minifying: public/js/common/clearableInputs.js[0m
+[0;32m✅   → clearableInputs.min.js (51% smaller: 2809 → 1391 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/clearableInputs.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\clearableInputs.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[37/80]
+[0;35m👉 Minifying: public/js/common/convertNumbers.js[0m
+[0;32m✅   → convertNumbers.min.js (1% smaller: 138 → 137 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/convertNumbers.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\convertNumbers.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[38/80]
+[0;35m👉 Minifying: public/js/common/countdown.js[0m
+[0;32m✅   → countdown.min.js (54% smaller: 2905 → 1338 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/countdown.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\countdown.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[39/80]
+[0;35m👉 Minifying: public/js/common/createNavTree.js[0m
+[0;32m✅   → createNavTree.min.js (13% smaller: 441 → 387 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/createNavTree.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\createNavTree.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[40/80]
+[0;35m👉 Minifying: public/js/common/deviceSwitcher.js[0m
+[0;32m✅   → deviceSwitcher.min.js (52% smaller: 3034 → 1471 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/deviceSwitcher.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\deviceSwitcher.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[41/80]
+[0;35m👉 Minifying: public/js/common/expandIcons.js[0m
+[0;32m✅   → expandIcons.min.js (26% smaller: 468 → 347 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/expandIcons.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\expandIcons.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[42/80]
+[0;35m👉 Minifying: public/js/common/formatDates.js[0m
+[0;32m✅   → formatDates.min.js (70% smaller: 4620 → 1386 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/formatDates.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\formatDates.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[43/80]
+[0;35m👉 Minifying: public/js/common/formatNumbers_2dec.js[0m
+[0;32m✅   → formatNumbers_2dec.min.js (60% smaller: 2495 → 1022 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/formatNumbers_2dec.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\formatNumbers_2dec.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[44/80]
+[0;35m👉 Minifying: public/js/common/formatTimes.js[0m
+[0;32m✅   → formatTimes.min.js (79% smaller: 3748 → 811 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/formatTimes.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\formatTimes.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[45/80]
+[0;35m👉 Minifying: public/js/common/getAppDate.js[0m
+[0;32m✅   → getAppDate.min.js (55% smaller: 943 → 430 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getAppDate.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getAppDate.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[46/80]
+[0;35m👉 Minifying: public/js/common/getCompanyDescription.js[0m
+[0;32m✅   → getCompanyDescription.min.js (60% smaller: 1081 → 433 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getCompanyDescription.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getCompanyDescription.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[47/80]
+[0;35m👉 Minifying: public/js/common/getFieldValues.js[0m
+[0;32m✅   → getFieldValues.min.js (49% smaller: 3060 → 1571 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getFieldValues.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getFieldValues.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[48/80]
+[0;35m👉 Minifying: public/js/common/getFocusNumberFields.js[0m
+[0;32m✅   → getFocusNumberFields.min.js (20% smaller: 383 → 310 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getFocusNumberFields.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getFocusNumberFields.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[49/80]
+[0;35m👉 Minifying: public/js/common/getPeriod.js[0m
+[0;32m✅   → getPeriod.min.js (48% smaller: 775 → 408 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getPeriod.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getPeriod.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[50/80]
+[0;35m👉 Minifying: public/js/common/getUser.js[0m
+[0;32m✅   → getUser.min.js (59% smaller: 1097 → 455 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getUser.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getUser.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[51/80]
+[0;35m👉 Minifying: public/js/common/getUserRole.js[0m
+[0;32m✅   → getUserRole.min.js (82% smaller: 2528 → 466 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getUserRole.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getUserRole.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[52/80]
+[0;35m👉 Minifying: public/js/common/getXrhsh.js[0m
+[0;32m✅   → getXrhsh.min.js (56% smaller: 857 → 381 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/getXrhsh.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\getXrhsh.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[53/80]
+[0;35m👉 Minifying: public/js/common/hideTooltips.js[0m
+[0;32m✅   → hideTooltips.min.js (49% smaller: 1035 → 538 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/hideTooltips.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\hideTooltips.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[54/80]
+[0;35m👉 Minifying: public/js/common/ibanChecker.js[0m
+[0;32m✅   → ibanChecker.min.js (59% smaller: 7312 → 3068 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/ibanChecker.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\ibanChecker.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[55/80]
+[0;35m👉 Minifying: public/js/common/kathestos_apasxolhshs_fulltime_sync.js[0m
+[0;32m✅   → kathestos_apasxolhshs_fulltime_sync.min.js (55% smaller: 6591 → 2987 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/kathestos_apasxolhshs_fulltime_sync.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\kathestos_apasxolhshs_fulltime_sync.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[56/80]
+[0;35m👉 Minifying: public/js/common/logger.js[0m
+[0;32m✅   → logger.min.js (87% smaller: 1168 → 157 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/logger.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\logger.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[57/80]
+[0;35m👉 Minifying: public/js/common/makeMoreSpaceInMenuElements.js[0m
+[0;32m✅   → makeMoreSpaceInMenuElements.min.js (56% smaller: 896 → 402 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/makeMoreSpaceInMenuElements.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\makeMoreSpaceInMenuElements.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[58/80]
+[0;35m👉 Minifying: public/js/common/modal.js[0m
+[0;32m✅   → modal.min.js (56% smaller: 1242 → 547 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/modal.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\modal.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[59/80]
+[0;35m👉 Minifying: public/js/common/moveByEnter.js[0m
+[0;32m✅   → moveByEnter.min.js (47% smaller: 4968 → 2680 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/moveByEnter.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\moveByEnter.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[60/80]
+[0;35m👉 Minifying: public/js/common/multipleChoicesDropdowns.js[0m
+[0;32m✅   → multipleChoicesDropdowns.min.js (55% smaller: 3798 → 1731 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/multipleChoicesDropdowns.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\multipleChoicesDropdowns.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[61/80]
+[0;35m👉 Minifying: public/js/common/navTabs.js[0m
+[0;32m✅   → navTabs.min.js (37% smaller: 866 → 554 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/navTabs.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\navTabs.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[62/80]
+[0;35m👉 Minifying: public/js/common/num2words.js[0m
+[0;32m✅   → num2words.min.js (50% smaller: 2861 → 1441 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/num2words.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\num2words.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[63/80]
+[0;35m👉 Minifying: public/js/common/putFieldValues.js[0m
+[0;32m✅   → putFieldValues.min.js (53% smaller: 3318 → 1590 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/putFieldValues.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\putFieldValues.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[64/80]
+[0;35m👉 Minifying: public/js/common/readAndPreviewImage.js[0m
+[0;32m✅   → readAndPreviewImage.min.js (37% smaller: 589 → 373 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/readAndPreviewImage.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\readAndPreviewImage.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[65/80]
+[0;35m👉 Minifying: public/js/common/removeGreekAccentsAndToUpper.js[0m
+[0;32m✅   → removeGreekAccentsAndToUpper.min.js (17% smaller: 464 → 389 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/removeGreekAccentsAndToUpper.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\removeGreekAccentsAndToUpper.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[66/80]
+[0;35m👉 Minifying: public/js/common/scrollToTop.js[0m
+[0;32m✅   → scrollToTop.min.js (51% smaller: 868 → 431 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/scrollToTop.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\scrollToTop.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[67/80]
+[0;35m👉 Minifying: public/js/common/searchFormSubmit.js[0m
+[0;32m✅   → searchFormSubmit.min.js (66% smaller: 840 → 288 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/searchFormSubmit.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\searchFormSubmit.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[68/80]
+[0;35m👉 Minifying: public/js/common/sectionsVisible.js[0m
+[0;32m✅   → sectionsVisible.min.js (44% smaller: 2677 → 1502 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/sectionsVisible.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\sectionsVisible.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[69/80]
+[0;35m👉 Minifying: public/js/common/selectUnselectAndChangeButtonTextContent.js[0m
+[0;32m✅   → selectUnselectAndChangeButtonTextContent.min.js (59% smaller: 1238 → 519 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/selectUnselectAndChangeButtonTextContent.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\selectUnselectAndChangeButtonTextContent.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[70/80]
+[0;35m👉 Minifying: public/js/common/setupTabKeyNavigation.js[0m
+[0;32m✅   → setupTabKeyNavigation.min.js (64% smaller: 950 → 345 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/setupTabKeyNavigation.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\setupTabKeyNavigation.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[71/80]
+[0;35m👉 Minifying: public/js/common/showModal.js[0m
+[0;32m✅   → showModal.min.js (30% smaller: 635 → 448 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/showModal.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\showModal.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[72/80]
+[0;35m👉 Minifying: public/js/common/sidebar.js[0m
+[0;32m✅   → sidebar.min.js (55% smaller: 7078 → 3192 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/sidebar.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\sidebar.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[73/80]
+[0;35m👉 Minifying: public/js/common/sortTable.js[0m
+[0;32m✅   → sortTable.min.js (53% smaller: 2680 → 1275 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/sortTable.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\sortTable.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[74/80]
+[0;35m👉 Minifying: public/js/common/toggleLabel.js[0m
+[0;32m✅   → toggleLabel.min.js (43% smaller: 3070 → 1767 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/toggleLabel.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\toggleLabel.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[75/80]
+[0;35m👉 Minifying: public/js/common/toggleLabelErgazomenon.js[0m
+[0;32m✅   → toggleLabelErgazomenon.min.js (54% smaller: 6859 → 3215 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/toggleLabelErgazomenon.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\toggleLabelErgazomenon.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[76/80]
+[0;35m👉 Minifying: public/js/common/toggleLabelKrathseon.js[0m
+[0;32m✅   → toggleLabelKrathseon.min.js (28% smaller: 3582 → 2589 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/toggleLabelKrathseon.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\toggleLabelKrathseon.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[77/80]
+[0;35m👉 Minifying: public/js/common/toggleLabelSymbaseis.js[0m
+[0;32m✅   → toggleLabelSymbaseis.min.js (60% smaller: 1514 → 616 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/toggleLabelSymbaseis.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\toggleLabelSymbaseis.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[78/80]
+[0;35m👉 Minifying: public/js/common/tooltips.js[0m
+[0;32m✅   → tooltips.min.js (47% smaller: 1659 → 889 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/tooltips.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\tooltips.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[79/80]
+[0;35m👉 Minifying: public/js/common/tooltipsForButtons.js[0m
+[0;32m✅   → tooltipsForButtons.min.js (49% smaller: 1964 → 1021 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/tooltipsForButtons.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\tooltipsForButtons.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+[80/80]
+[0;35m👉 Minifying: public/js/common/totalPercentChecker.js[0m
+[0;32m✅   → totalPercentChecker.min.js (60% smaller: 4028 → 1641 bytes)[0m
+[0;35m👉 Obfuscating: C:/Payroll-NodeJs/build/common/totalPercentChecker.min.js[0m
+
+[javascript-obfuscator-cli] Obfuscating file: C:\Payroll-NodeJs\build\common\totalPercentChecker.min.js... 
+[0;32m✅   → Obfuscated[0m
+
+
+[0;32m✅ Build complete! Processed 80/80 files[0m
+[0;34mℹ️  Output directory: /cygdrive/c/Payroll-NodeJs/public/min.js[0m
+
+[0;34mℹ️  Build summary:[0m
+817K	/cygdrive/c/Payroll-NodeJs/public/min.js
+  Files created: 80
+[1;33m⚠️  Skipping CDN upload (OBF_ENV=dev, UPLOAD_TO_CDN=false)[0m
+
+[0;34mℹ️  Checking swap on EC2...[0m
+Swap already exists.
+
+==========================================
+📦 GIT COMMIT & PUSH
+==========================================
+[0;34mℹ️  Committing to Git...[0m
+[main f8d01c7] 🚀 Deploy dev build - 20251125135551 (Phase 1)
+ 132 files changed, 236 insertions(+), 225 deletions(-)
+ delete mode 100644 build/common/amka-validation.min.js.map
+ rename build/common/{amka-validation.min.js => amka_validation.min.js} (63%)
+ create mode 100644 build/common/amka_validation.min.js.map
+ delete mode 100644 build/common/kathestos-apasxolhshs-fulltime-sync.min.js
+ rename public/min.js/common/kathestos-apasxolhshs-fulltime-sync.min.js => build/common/kathestos_apasxolhshs_fulltime_sync.min.js (97%)
+ rename build/common/{kathestos-apasxolhshs-fulltime-sync.min.js.map => kathestos_apasxolhshs_fulltime_sync.min.js.map} (97%)
+ rename test-obfuscation.log => deploy-test.log (75%)
+ rename public/js/common/{amka-validation.js => amka_validation.js} (67%)
+ rename public/js/common/{kathestos-apasxolhshs-fulltime-sync.js => kathestos_apasxolhshs_fulltime_sync.js} (96%)
+ create mode 100644 public/min.js/common/adjustFontSizeToFit.min.js.map
+ delete mode 100644 public/min.js/common/amka-validation.min.js
+ create mode 100644 public/min.js/common/amka_validation.min.js
+ create mode 100644 public/min.js/common/amka_validation.min.js.map
+ create mode 100644 public/min.js/common/blockInvalidClick.min.js.map
+ create mode 100644 public/min.js/common/changeFontSizeSelectDropdownMenu.min.js.map
+ create mode 100644 public/min.js/common/changeInputTypeFile.min.js.map
+ create mode 100644 public/min.js/common/changeUrl.min.js.map
+ create mode 100644 public/min.js/common/checkAfm.min.js.map
+ create mode 100644 public/min.js/common/checkAmka.min.js.map
+ create mode 100644 public/min.js/common/checkHlikia.min.js.map
+ create mode 100644 public/min.js/common/checkScreenAnalysis.min.js.map
+ create mode 100644 public/min.js/common/clearImage.min.js.map
+ create mode 100644 public/min.js/common/clearSection.min.js.map
+ create mode 100644 public/min.js/common/clearSelectsSymbaseon.min.js.map
+ create mode 100644 public/min.js/common/clearableInputs.min.js.map
+ create mode 100644 public/min.js/common/convertNumbers.min.js.map
+ create mode 100644 public/min.js/common/countdown.min.js.map
+ create mode 100644 public/min.js/common/createNavTree.min.js.map
+ create mode 100644 public/min.js/common/deviceSwitcher.min.js.map
+ create mode 100644 public/min.js/common/expandIcons.min.js.map
+ create mode 100644 public/min.js/common/formatDates.min.js.map
+ create mode 100644 public/min.js/common/formatNumbers_2dec.min.js.map
+ create mode 100644 public/min.js/common/formatTimes.min.js.map
+ create mode 100644 public/min.js/common/getAppDate.min.js.map
+ create mode 100644 public/min.js/common/getCompanyDescription.min.js.map
+ create mode 100644 public/min.js/common/getFieldValues.min.js.map
+ create mode 100644 public/min.js/common/getFocusNumberFields.min.js.map
+ create mode 100644 public/min.js/common/getPeriod.min.js.map
+ create mode 100644 public/min.js/common/getUser.min.js.map
+ create mode 100644 public/min.js/common/getUserRole.min.js.map
+ create mode 100644 public/min.js/common/getXrhsh.min.js.map
+ create mode 100644 public/min.js/common/hideTooltips.min.js.map
+ create mode 100644 public/min.js/common/ibanChecker.min.js.map
+ create mode 100644 public/min.js/common/kathestos_apasxolhshs_fulltime_sync.min.js
+ create mode 100644 public/min.js/common/kathestos_apasxolhshs_fulltime_sync.min.js.map
+ create mode 100644 public/min.js/common/logger.min.js.map
+ create mode 100644 public/min.js/common/makeMoreSpaceInMenuElements.min.js.map
+ create mode 100644 public/min.js/common/modal.min.js.map
+ create mode 100644 public/min.js/common/moveByEnter.min.js.map
+ create mode 100644 public/min.js/common/multipleChoicesDropdowns.min.js.map
+ create mode 100644 public/min.js/common/navTabs.min.js.map
+ create mode 100644 public/min.js/common/num2words.min.js.map
+ create mode 100644 public/min.js/common/putFieldValues.min.js.map
+ create mode 100644 public/min.js/common/readAndPreviewImage.min.js.map
+ create mode 100644 public/min.js/common/removeGreekAccentsAndToUpper.min.js.map
+ create mode 100644 public/min.js/common/scrollToTop.min.js.map
+ create mode 100644 public/min.js/common/searchFormSubmit.min.js.map
+ create mode 100644 public/min.js/common/sectionsVisible.min.js.map
+ create mode 100644 public/min.js/common/selectUnselectAndChangeButtonTextContent.min.js.map
+ create mode 100644 public/min.js/common/setupTabKeyNavigation.min.js.map
+ create mode 100644 public/min.js/common/showModal.min.js.map
+ create mode 100644 public/min.js/common/sidebar.min.js.map
+ create mode 100644 public/min.js/common/sortTable.min.js.map
+ create mode 100644 public/min.js/common/toggleLabel.min.js.map
+ create mode 100644 public/min.js/common/toggleLabelErgazomenon.min.js.map
+ create mode 100644 public/min.js/common/toggleLabelKrathseon.min.js.map
+ create mode 100644 public/min.js/common/toggleLabelSymbaseis.min.js.map
+ create mode 100644 public/min.js/common/tooltips.min.js.map
+ create mode 100644 public/min.js/common/tooltipsForButtons.min.js.map
+ create mode 100644 public/min.js/common/totalPercentChecker.min.js.map
+ create mode 100644 public/min.js/utils/scripts.min.js.map
+ create mode 100644 public/min.js/utils/tree.min.js.map
+To github.com:ThanasisGal/Payroll-NodeJs.git
+   c91d509..f8d01c7  main -> main
+[0;32m✅ Pushed to GitHub[0m
+
+==========================================
+📤 SYNCING TO EC2
+==========================================
+[0;34mℹ️  Starting rsync...[0m
+         32,768   0%    0.00kB/s    0:00:00           45,194   0%   11.85MB/s    0:00:00 (xfr#1, ir-chk=1025/1030)         67,055   1%   10.90MB/s    0:00:00 (xfr#2, ir-chk=1024/1030)         67,104   1%  206.98kB/s    0:00:00 (xfr#3, ir-chk=1009/1030)        170,510   2%  768.65kB/s    0:00:00 (xfr#4, ir-chk=1005/1030)        183,517   2%  743.51kB/s    0:00:00 (xfr#5, ir-chk=1018/1064)        196,524   2%  754.33kB/s    0:00:00 (xfr#6, ir-chk=1014/1064)        207,468   3%  754.89kB/s    0:00:00 (xfr#7, ir-chk=1012/1064)        208,005   2%  557.43kB/s    0:00:00 (xfr#8, ir-chk=1016/1363)        208,457   2%  532.83kB/s    0:00:00 (xfr#9, ir-chk=1023/1382)        208,614   2%  503.59kB/s    0:00:00 (xfr#10, ir-chk=1036/1416)        209,028   2%  484.87kB/s    0:00:00 (xfr#11, ir-chk=1021/1416)        209,704   2%  469.54kB/s    0:00:00 (xfr#12, ir-chk=1008/1416)        211,026   2%  458.11kB/s    0:00:00 (xfr#13, ir-chk=1007/1416)        211,486   2%  439.62kB/s    0:00:00 (xfr#14, ir-chk=1023/1438)        211,877   2%  424.54kB/s    0:00:00 (xfr#15, ir-chk=1024/1458)        213,402   1%  392.87kB/s    0:00:00 (xfr#16, ir-chk=1023/1546)        215,928   1%  374.20kB/s    0:00:00 (xfr#17, ir-chk=1029/1591)        216,588   1%  360.47kB/s    0:00:00 (xfr#18, ir-chk=1018/1612)        217,246   1%  351.86kB/s    0:00:00 (xfr#19, ir-chk=1014/1612)        220,470   1%  347.16kB/s    0:00:00 (xfr#20, ir-chk=1009/1612)        220,730   1%  337.42kB/s    0:00:00 (xfr#21, ir-chk=1008/1612)        221,081   1%  317.07kB/s    0:00:00 (xfr#22, ir-chk=1017/1674)        224,285   1%  305.10kB/s    0:00:00 (xfr#23, ir-chk=1020/1725)        225,168   1%  294.04kB/s    0:00:00 (xfr#24, ir-chk=1033/1762)        225,300   1%  287.93kB/s    0:00:00 (xfr#25, ir-chk=1011/1762)        226,206   1%  281.95kB/s    0:00:00 (xfr#26, ir-chk=1004/1784)        226,510   1%  275.00kB/s    0:00:00 (xfr#27, ir-chk=1022/1815)        227,016   1%  264.57kB/s    0:00:00 (xfr#28, ir-chk=1045/1860)        227,475   1%  254.88kB/s    0:00:00 (xfr#29, ir-chk=1036/1906)        228,064   1%  249.96kB/s    0:00:00 (xfr#30, ir-chk=1032/1906)        228,377   1%  243.34kB/s    0:00:00 (xfr#31, ir-chk=1041/1933)        229,173   1%  240.65kB/s    0:00:00 (xfr#32, ir-chk=1037/1933)        232,692   1%  240.74kB/s    0:00:00 (xfr#33, ir-chk=1031/1933)        232,804   1%  234.23kB/s    0:00:00 (xfr#34, ir-chk=1009/1960)        232,882   1%  228.57kB/s    0:00:00 (xfr#35, ir-chk=1020/1987)        234,950   1%  225.39kB/s    0:00:00 (xfr#36, ir-chk=1018/1987)        235,588   1%  219.83kB/s    0:00:00 (xfr#37, ir-chk=1036/2014)        236,391   1%  216.38kB/s    0:00:00 (xfr#38, ir-chk=1031/2014)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1020/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  213.13kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  212.90kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        238,787   1%  212.90kB/s    0:00:00 (xfr#39, ir-chk=1016/2046)        239,164   1%  208.65kB/s    0:00:00 (xfr#40, ir-chk=1014/2067)        239,252   1%  206.18kB/s    0:00:00 (xfr#41, ir-chk=1005/2067)        240,690   1%  202.85kB/s    0:01:19          240,690   1%  202.85kB/s    0:00:01 (xfr#42, ir-chk=1016/2108)        241,204   1%  199.95kB/s    0:00:01 (xfr#43, ir-chk=1009/2125)        242,969   1%  198.91kB/s    0:00:01 (xfr#44, ir-chk=1006/2125)        243,106   1%  192.33kB/s    0:00:01 (xfr#45, ir-chk=1032/2245)        244,594   1%  191.01kB/s    0:00:01 (xfr#46, ir-chk=1022/2245)        245,360   1%  187.88kB/s    0:00:01 (xfr#47, ir-chk=1035/2292)        246,615   1%  185.96kB/s    0:00:01 (xfr#48, ir-chk=1038/2314)        246,925   1%  184.26kB/s    0:00:01 (xfr#49, ir-chk=1033/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1029/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.94kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.78kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.78kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.78kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.78kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        247,635   1%  182.78kB/s    0:00:01 (xfr#50, ir-chk=1021/2314)        248,656   1%  181.28kB/s    0:00:01 (xfr#51, ir-chk=1032/2336)        249,406   1%  178.68kB/s    0:00:01 (xfr#52, ir-chk=1045/2384)        249,678   1%  177.26kB/s    0:00:01 (xfr#53, ir-chk=1024/2384)        250,698   1%  176.18kB/s    0:00:01 (xfr#54, ir-chk=1022/2384)        251,977   1%  174.33kB/s    0:00:01 (xfr#55, ir-chk=1014/2424)        253,574   1%  171.68kB/s    0:00:01 (xfr#56, ir-chk=1043/2490)        254,147   1%  169.16kB/s    0:00:01 (xfr#57, ir-chk=1013/2516)        254,352   1%  166.45kB/s    0:00:01 (xfr#58, ir-chk=1019/2563)        254,599   1%  163.62kB/s    0:00:01 (xfr#59, ir-chk=1033/2618)        256,656   1%  163.16kB/s    0:00:01 (xfr#60, ir-chk=1009/2618)        257,622   1%  161.34kB/s    0:00:01 (xfr#61, ir-chk=1029/2643)        260,629   1%  160.09kB/s    0:00:01 (xfr#62, ir-chk=1049/2689)        260,947   1%  158.60kB/s    0:00:01 (xfr#63, ir-chk=1030/2689)        260,947   1%  158.60kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.60kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        260,947   1%  158.49kB/s    0:00:01 (xfr#63, ir-chk=1015/2689)        261,262   1%  156.26kB/s    0:00:01 (xfr#64, ir-chk=1020/2718)        262,268   1%  154.46kB/s    0:00:01 (xfr#65, ir-chk=1024/2751)        265,270   1%  154.98kB/s    0:00:01 (xfr#66, ir-chk=1011/2751)        265,342   1%  153.77kB/s    0:00:01 (xfr#67, ir-chk=1010/2751)        265,808   1%  152.33kB/s    0:00:01 (xfr#68, ir-chk=1028/2772)        265,873   1%  151.16kB/s    0:00:01 (xfr#69, ir-chk=1020/2772)        266,540   1%  150.29kB/s    0:00:01 (xfr#70, ir-chk=1010/2772)        273,244   1%  151.80kB/s    0:00:01 (xfr#71, ir-chk=1027/2832)        273,947   1%  150.88kB/s    0:00:01 (xfr#72, ir-chk=1009/2832)        274,006   1%  149.67kB/s    0:00:01 (xfr#73, ir-chk=1006/2832)        274,173   1%  147.34kB/s    0:00:01 (xfr#74, ir-chk=1041/2880)        274,456   1%  145.60kB/s    0:00:01 (xfr#75, ir-chk=1024/2910)        276,902   1%  144.40kB/s    0:00:01 (xfr#76, ir-chk=1050/2958)        277,543   1%  143.65kB/s    0:00:01 (xfr#77, ir-chk=1034/2958)        277,885   1%  141.98kB/s    0:00:01 (xfr#78, ir-chk=1050/2986)        278,445   1%  140.96kB/s    0:00:01 (xfr#79, ir-chk=1046/2986)        280,384   1%  140.18kB/s    0:00:01 (xfr#80, ir-chk=1048/3012)        281,790   1%  139.52kB/s    0:00:01 (xfr#81, ir-chk=1039/3037)        283,067   1%  138.80kB/s    0:00:01 (xfr#82, ir-chk=1029/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1028/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,226   1%  138.97kB/s    0:00:01 (xfr#83, ir-chk=1004/3050)        285,630   1%  136.96kB/s    0:00:01 (xfr#84, ir-chk=1016/3072)        286,252   1%  135.94kB/s    0:00:01 (xfr#85, ir-chk=1014/3072)        287,078   1%  133.59kB/s    0:00:01 (xfr#86, ir-chk=1031/3129)        289,250   1%  133.02kB/s    0:00:01 (xfr#87, ir-chk=1038/3177)        289,793   1%  132.38kB/s    0:00:01 (xfr#88, ir-chk=1024/3177)        290,183   1%  131.20kB/s    0:00:01 (xfr#89, ir-chk=1039/3207)        290,366   1%  130.55kB/s    0:00:01 (xfr#90, ir-chk=1027/3207)        291,772   1%  129.91kB/s    0:00:01 (xfr#91, ir-chk=1026/3225)        292,380   1%  129.48kB/s    0:00:01 (xfr#92, ir-chk=1021/3225)        293,589   1%  128.45kB/s    0:00:01 (xfr#93, ir-chk=1037/3263)        293,696   1%  127.41kB/s    0:00:02 (xfr#94, ir-chk=1031/3263)        294,396   1%  126.80kB/s    0:03:27          302,820   1%  130.88kB/s    0:00:02 (xfr#95, ir-chk=1028/3263)        303,593   1%  130.22kB/s    0:00:02 (xfr#96, ir-chk=1027/3263)        304,294   1%  128.91kB/s    0:00:02 (xfr#97, ir-chk=1029/3296)        304,351   1%  127.88kB/s    0:00:02 (xfr#98, ir-chk=1005/3296)        307,987   1%  127.68kB/s    0:00:02 (xfr#99, ir-chk=1028/3338)        308,445   1%  126.87kB/s    0:00:02 (xfr#100, ir-chk=1004/3338)        309,730   1%  126.15kB/s    0:00:02 (xfr#101, ir-chk=1010/3357)        309,982   1%  124.81kB/s    0:00:02 (xfr#102, ir-chk=1051/3411)        310,231   1%  124.12kB/s    0:00:02 (xfr#103, ir-chk=1043/3411)        312,068   1%  124.04kB/s    0:00:02 (xfr#104, ir-chk=1032/3411)        313,506   1%  123.89kB/s    0:00:02 (xfr#105, ir-chk=1022/3411)        314,304   1%  123.18kB/s    0:00:02 (xfr#106, ir-chk=1026/3439)        314,884   1%  122.39kB/s    0:00:02 (xfr#107, ir-chk=1026/3459)        315,193   1%  121.71kB/s    0:00:02 (xfr#108, ir-chk=1015/3459)        315,820   1%  117.42kB/s    0:00:02 (xfr#109, ir-chk=1012/3459)        317,045   1%  116.94kB/s    0:00:02 (xfr#110, ir-chk=1016/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1009/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        319,179   1%  117.22kB/s    0:00:02 (xfr#111, ir-chk=1008/3498)        320,099   1%  116.72kB/s    0:00:02 (xfr#112, ir-chk=1017/3525)        320,812   1%  116.14kB/s    0:00:02 (xfr#113, ir-chk=1042/3565)        321,112   1%  115.36kB/s    0:00:02 (xfr#114, ir-chk=1005/3565)        321,338   1%  113.86kB/s    0:00:02 (xfr#115, ir-chk=1031/3663)        323,640   1%  113.85kB/s    0:00:02 (xfr#116, ir-chk=1007/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1004/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        324,316   1%  113.61kB/s    0:00:02 (xfr#117, ir-chk=1003/3692)        325,012   1%  112.89kB/s    0:00:02 (xfr#118, ir-chk=1035/3738)        325,445   1%  112.35kB/s    0:00:02 (xfr#119, ir-chk=1034/3759)        326,747   1%  112.23kB/s    0:00:02 (xfr#120, ir-chk=1028/3759)        326,854   1%  111.57kB/s    0:00:02 (xfr#121, ir-chk=1019/3759)        331,397   1%  112.64kB/s    0:00:02 (xfr#122, ir-chk=1016/3759)        332,550   1%  112.38kB/s    0:00:02 (xfr#123, ir-chk=1008/3759)        333,540   1%  111.60kB/s    0:00:02 (xfr#124, ir-chk=1026/3805)        334,953   1%  111.15kB/s    0:00:02 (xfr#125, ir-chk=1022/3842)        335,465   1%  110.55kB/s    0:00:02 (xfr#126, ir-chk=1030/3864)        337,224   1%  110.61kB/s    0:00:02 (xfr#127, ir-chk=1020/3864)        339,702   1%  110.28kB/s    0:00:02 (xfr#128, ir-chk=1043/3930)        340,349   1%  109.39kB/s    0:00:02 (xfr#129, ir-chk=1042/4001)        340,890   1%  108.63kB/s    0:00:02 (xfr#130, ir-chk=1036/4050)        341,403   1%  108.34kB/s    0:00:02 (xfr#131, ir-chk=1031/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        341,403   1%  108.30kB/s    0:00:02 (xfr#131, ir-chk=1013/4050)        342,173   0%  107.95kB/s    0:00:02 (xfr#132, ir-chk=1013/4076)        342,838   0%  107.72kB/s    0:00:02 (xfr#133, ir-chk=1010/4076)        345,049   0%  108.03kB/s    0:00:02 (xfr#134, ir-chk=1005/4076)        346,405   0%  107.73kB/s    0:00:02 (xfr#135, ir-chk=1032/4105)        346,896   0%  107.45kB/s    0:00:02 (xfr#136, ir-chk=1006/4105)        348,171   0%  106.99kB/s    0:00:02 (xfr#137, ir-chk=1046/4157)        348,418   0%  106.66kB/s    0:00:02 (xfr#138, ir-chk=1041/4157)        348,663   0%  106.30kB/s    0:00:02 (xfr#139, ir-chk=1037/4157)        352,994   0%  107.32kB/s    0:00:02 (xfr#140, ir-chk=1034/4157)        353,407   0%  107.05kB/s    0:00:02 (xfr#141, ir-chk=1028/4157)        354,880   0%  107.07kB/s    0:00:02 (xfr#142, ir-chk=1019/4157)        355,314   0%  106.63kB/s    0:00:02 (xfr#143, ir-chk=1012/4182)        356,024   0%  106.22kB/s    0:00:02 (xfr#144, ir-chk=1025/4210)        356,339   0%  105.86kB/s    0:00:02 (xfr#145, ir-chk=1005/4210)        356,960   0%  105.29kB/s    0:00:03 (xfr#146, ir-chk=1031/4239)        357,678   0%  105.00kB/s    0:05:45          357,678   0%  105.00kB/s    0:00:03 (xfr#147, ir-chk=1017/4239)        359,531   0%  104.76kB/s    0:00:03 (xfr#148, ir-chk=1022/4265)        360,242   0%  104.54kB/s    0:00:03 (xfr#149, ir-chk=1015/4265)        363,413   0%  104.60kB/s    0:00:03 (xfr#150, ir-chk=1025/4314)        365,102   0%  104.29kB/s    0:00:03 (xfr#151, ir-chk=1041/4356)        365,334   0%  103.69kB/s    0:00:03 (xfr#152, ir-chk=1027/4374)        366,052   0%  103.32kB/s    0:00:03 (xfr#153, ir-chk=1037/4400)        366,347   0%  103.02kB/s    0:00:03 (xfr#154, ir-chk=1020/4400)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1028/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.53kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        366,627   0%  102.49kB/s    0:00:03 (xfr#155, ir-chk=1020/4431)        368,595   0%  102.42kB/s    0:00:03 (xfr#156, ir-chk=1031/4475)        368,998   0%  102.13kB/s    0:00:03 (xfr#157, ir-chk=1022/4475)        369,791   0%  101.83kB/s    0:00:03 (xfr#158, ir-chk=1036/4496)        373,116   0%  102.43kB/s    0:00:03 (xfr#159, ir-chk=1035/4496)        373,805   0%  102.29kB/s    0:00:03 (xfr#160, ir-chk=1034/4496)        374,140   0%  102.01kB/s    0:00:03 (xfr#161, ir-chk=1030/4496)        376,335   0%  102.29kB/s    0:00:03 (xfr#162, ir-chk=1014/4496)        376,625   0%  101.85kB/s    0:00:03 (xfr#163, ir-chk=1037/4521)        376,681   0%  101.34kB/s    0:00:03 (xfr#164, ir-chk=1032/4544)        376,945   0%  101.09kB/s    0:00:03 (xfr#165, ir-chk=1027/4544)        377,276   0%  100.85kB/s    0:00:03 (xfr#166, ir-chk=1025/4544)        377,806   0%  100.61kB/s    0:00:03 (xfr#167, ir-chk=1013/4544)        381,389   0%  100.96kB/s    0:00:03 (xfr#168, ir-chk=1028/4587)        381,717   0%  100.55kB/s    0:00:03 (xfr#169, ir-chk=1036/4613)        382,619   0%   99.81kB/s    0:00:03 (xfr#170, ir-chk=1028/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1017/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.49kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        382,822   0%   99.46kB/s    0:00:03 (xfr#171, ir-chk=1010/4702)        384,190   0%   99.24kB/s    0:00:03 (xfr#172, ir-chk=1018/4722)        385,115   0%   99.08kB/s    0:00:03 (xfr#173, ir-chk=1016/4722)        385,735   0%   98.68kB/s    0:00:03 (xfr#174, ir-chk=1023/4750)        387,731   0%   98.79kB/s    0:00:03 (xfr#175, ir-chk=1013/4750)        389,336   0%   98.53kB/s    0:00:03 (xfr#176, ir-chk=1039/4783)        389,956   0%   98.09kB/s    0:00:03 (xfr#177, ir-chk=1024/4783)        391,083   0%   96.85kB/s    0:00:03 (xfr#178, ir-chk=1006/4980)        391,332   0%   96.41kB/s    0:00:03 (xfr#179, ir-chk=1026/5012)        392,249   0%   96.26kB/s    0:00:03 (xfr#180, ir-chk=1017/5035)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1029/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        393,294   0%   96.06kB/s    0:00:03 (xfr#181, ir-chk=1017/5067)        394,592   0%   95.84kB/s    0:00:03 (xfr#182, ir-chk=1019/5116)        395,252   0%   95.57kB/s    0:00:03 (xfr#183, ir-chk=1030/5148)        395,610   0%   95.38kB/s    0:00:03 (xfr#184, ir-chk=1029/5148)        395,871   0%   95.04kB/s    0:00:03 (xfr#185, ir-chk=1035/5178)        397,834   0%   95.09kB/s    0:00:03 (xfr#186, ir-chk=1039/5197)        399,133   0%   95.03kB/s    0:00:03 (xfr#187, ir-chk=1034/5197)        399,593   0%   94.69kB/s    0:00:03 (xfr#188, ir-chk=1032/5197)        400,062   0%   94.47kB/s    0:00:03 (xfr#189, ir-chk=1017/5197)        401,713   0%   94.34kB/s    0:00:03 (xfr#190, ir-chk=1029/5221)        403,188   0%   93.76kB/s    0:00:03 (xfr#191, ir-chk=1025/5322)        403,538   0%   93.49kB/s    0:00:03 (xfr#192, ir-chk=1018/5322)        404,390   0%   93.37kB/s    0:00:03 (xfr#193, ir-chk=1013/5322)        404,916   0%   93.14kB/s    0:00:03 (xfr#194, ir-chk=1008/5322)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1031/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        405,398   0%   92.83kB/s    0:00:03 (xfr#195, ir-chk=1018/5353)        406,071   0%   92.46kB/s    0:00:03 (xfr#196, ir-chk=1022/5406)        410,005   0%   92.89kB/s    0:00:03 (xfr#197, ir-chk=1027/5434)        411,114   0%   92.79kB/s    0:00:03 (xfr#198, ir-chk=1013/5434)        413,622   0%   92.82kB/s    0:00:04 (xfr#199, ir-chk=1033/5468)        414,052   0%   92.58kB/s    0:08:20          414,052   0%   92.58kB/s    0:00:04 (xfr#200, ir-chk=1017/5468)        414,525   0%   92.39kB/s    0:00:04 (xfr#201, ir-chk=1016/5468)        415,469   0%   91.96kB/s    0:00:04 (xfr#202, ir-chk=1035/5520)        421,769   0%   92.86kB/s    0:00:04 (xfr#203, ir-chk=1012/5548)        422,775   0%   92.13kB/s    0:00:04 (xfr#204, ir-chk=1031/5627)        423,461   0%   91.78kB/s    0:00:04 (xfr#205, ir-chk=1004/5648)        424,693   0%   91.65kB/s    0:00:04 (xfr#206, ir-chk=1013/5670)        426,261   0%   91.36kB/s    0:00:04 (xfr#207, ir-chk=1046/5721)        426,985   0%   89.93kB/s    0:00:04 (xfr#208, ir-chk=1044/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1040/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.74kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        427,709   0%   89.71kB/s    0:00:04 (xfr#209, ir-chk=1019/5721)        434,527   0%   90.78kB/s    0:00:04 (xfr#210, ir-chk=1035/5741)        434,962   0%   90.13kB/s    0:00:04 (xfr#211, ir-chk=1037/5777)        435,725   0%   89.80kB/s    0:00:04 (xfr#212, ir-chk=1014/5797)        436,906   0%   89.47kB/s    0:00:04 (xfr#213, ir-chk=1032/5829)        437,676   0%   89.24kB/s    0:00:04 (xfr#214, ir-chk=1028/5829)        438,738   0%   89.03kB/s    0:00:04 (xfr#215, ir-chk=1016/5829)        439,034   0%   87.79kB/s    0:00:04 (xfr#216, ir-chk=1035/5962)        439,722   0%   87.61kB/s    0:00:04 (xfr#217, ir-chk=1020/5962)        440,093   0%   87.33kB/s    0:00:04 (xfr#218, ir-chk=1009/5962)        442,126   0%   87.15kB/s    0:00:04 (xfr#219, ir-chk=1017/6014)        442,826   0%   86.94kB/s    0:00:04 (xfr#220, ir-chk=1013/6014)        443,474   0%   86.59kB/s    0:00:04 (xfr#221, ir-chk=1020/6038)        443,653   0%   86.33kB/s    0:00:04 (xfr#222, ir-chk=1005/6038)        444,999   0%   86.07kB/s    0:00:04 (xfr#223, ir-chk=1046/6095)        445,874   0%   85.98kB/s    0:00:04 (xfr#224, ir-chk=1036/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        445,874   0%   85.96kB/s    0:00:04 (xfr#224, ir-chk=1028/6095)        446,119   0%   85.74kB/s    0:00:04 (xfr#225, ir-chk=1025/6095)        446,390   0%   85.18kB/s    0:00:04 (xfr#226, ir-chk=1042/6193)        446,929   0%   85.06kB/s    0:00:04 (xfr#227, ir-chk=1035/6193)        447,233   0%   84.80kB/s    0:00:04 (xfr#228, ir-chk=1026/6221)        449,901   0%   85.08kB/s    0:00:04 (xfr#229, ir-chk=1024/6221)        450,580   0%   84.97kB/s    0:00:04 (xfr#230, ir-chk=1020/6221)        451,213   0%   84.73kB/s    0:00:04 (xfr#231, ir-chk=1009/6260)        451,994   0%   84.53kB/s    0:00:04 (xfr#232, ir-chk=1033/6287)        453,908   0%   84.62kB/s    0:00:04 (xfr#233, ir-chk=1023/6287)        455,585   0%   84.49kB/s    0:00:04 (xfr#234, ir-chk=1044/6354)        456,660   0%   84.45kB/s    0:00:04 (xfr#235, ir-chk=1034/6354)        457,689   0%   84.34kB/s    0:00:04 (xfr#236, ir-chk=1021/6354)        458,721   0%   84.26kB/s    0:00:04 (xfr#237, ir-chk=1012/6354)        458,944   0%   84.03kB/s    0:00:04 (xfr#238, ir-chk=1005/6354)        459,264   0%   83.58kB/s    0:00:04 (xfr#239, ir-chk=1031/6397)        459,572   0%   83.26kB/s    0:00:05 (xfr#240, ir-chk=1037/6426)        460,272   0%   53.25kB/s    0:17:05          460,476   0%   83.05kB/s    0:00:05 (xfr#241, ir-chk=1045/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1032/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        461,953   0%   83.03kB/s    0:00:05 (xfr#242, ir-chk=1019/6453)        462,487   0%   82.72kB/s    0:00:05 (xfr#243, ir-chk=1032/6518)        464,810   0%   82.89kB/s    0:00:05 (xfr#244, ir-chk=1024/6543)        466,042   0%   82.79kB/s    0:00:05 (xfr#245, ir-chk=1055/6576)        466,737   0%   82.74kB/s    0:00:05 (xfr#246, ir-chk=1052/6576)        467,051   0%   82.61kB/s    0:00:05 (xfr#247, ir-chk=1050/6576)        469,253   0%   82.83kB/s    0:00:05 (xfr#248, ir-chk=1047/6576)        471,085   0%   82.94kB/s    0:00:05 (xfr#249, ir-chk=1037/6576)        472,683   0%   83.05kB/s    0:00:05 (xfr#250, ir-chk=1035/6576)        473,394   0%   83.01kB/s    0:00:05 (xfr#251, ir-chk=1029/6576)        473,748   0%   82.86kB/s    0:00:05 (xfr#252, ir-chk=1017/6576)        476,076   0%   82.93kB/s    0:00:05 (xfr#253, ir-chk=1043/6626)        477,367   0%   82.87kB/s    0:00:05 (xfr#254, ir-chk=1042/6626)        477,920   0%   82.72kB/s    0:00:05 (xfr#255, ir-chk=1041/6626)        478,537   0%   82.54kB/s    0:00:05 (xfr#256, ir-chk=1036/6643)        480,002   0%   82.48kB/s    0:00:05 (xfr#257, ir-chk=1030/6672)        480,123   0%   82.30kB/s    0:00:05 (xfr#258, ir-chk=1019/6672)        480,760   0%   82.17kB/s    0:00:05 (xfr#259, ir-chk=1003/6672)        481,199   0%   81.87kB/s    0:00:05 (xfr#260, ir-chk=1018/6694)        481,715   0%   81.70kB/s    0:00:05 (xfr#261, ir-chk=1010/6694)        481,920   0%   81.06kB/s    0:00:05 (xfr#262, ir-chk=1141/6839)        482,521   0%   80.96kB/s    0:00:05 (xfr#263, ir-chk=1138/6839)        483,207   0%   80.88kB/s    0:00:05 (xfr#264, ir-chk=1126/6839)        483,529   0%   80.65kB/s    0:00:05 (xfr#265, ir-chk=1119/6839)        483,529   0%   80.65kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,529   0%   80.64kB/s    0:00:05 (xfr#265, ir-chk=1118/6839)        483,795   0%   80.42kB/s    0:00:05 (xfr#266, ir-chk=1113/6839)        484,346   0%   80.24kB/s    0:00:05 (xfr#267, ir-chk=1109/6839)        484,640   0%   80.03kB/s    0:00:05 (xfr#268, ir-chk=1054/6839)        485,345   0%   79.91kB/s    0:00:05 (xfr#269, ir-chk=1046/6839)        486,243   0%   79.82kB/s    0:00:05 (xfr#270, ir-chk=1029/6839)        491,011   0%   80.38kB/s    0:00:05 (xfr#271, ir-chk=1019/6839)        492,353   0%   80.13kB/s    0:00:05 (xfr#272, ir-chk=1030/6882)        492,838   0%   79.97kB/s    0:00:05 (xfr#273, ir-chk=1009/6882)        493,579   0%   79.51kB/s    0:00:05 (xfr#274, ir-chk=1024/6914)        499,414   0%   80.06kB/s    0:00:05 (xfr#275, ir-chk=1006/6948)        499,728   0%   79.85kB/s    0:00:05 (xfr#276, ir-chk=1030/6977)        501,234   0%   79.91kB/s    0:00:05 (xfr#277, ir-chk=1020/6977)        501,884   0%   79.78kB/s    0:00:05 (xfr#278, ir-chk=1009/6989)        502,834   0%   79.63kB/s    0:00:05 (xfr#279, ir-chk=1052/7049)        503,289   0%   79.24kB/s    0:00:05 (xfr#280, ir-chk=1033/7049)        503,390   0%   79.01kB/s    0:00:05 (xfr#281, ir-chk=1030/7049)        505,054   0%   79.00kB/s    0:00:05 (xfr#282, ir-chk=1023/7049)        505,576   0%   78.81kB/s    0:00:05 (xfr#283, ir-chk=1019/7066)        506,917   0%   78.79kB/s    0:00:05 (xfr#284, ir-chk=1016/7066)        507,140   0%   78.61kB/s    0:00:05 (xfr#285, ir-chk=1012/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1007/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.61kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        508,635   0%   78.59kB/s    0:00:05 (xfr#286, ir-chk=1001/7066)        509,309   0%   77.86kB/s    0:00:05 (xfr#287, ir-chk=1026/7143)        509,392   0%   77.58kB/s    0:00:06 (xfr#288, ir-chk=1036/7175)        512,888   0%   77.91kB/s    0:00:06 (xfr#289, ir-chk=1026/7195)        513,553   0%   53.31kB/s    0:23:08          513,553   0%   77.85kB/s    0:00:06 (xfr#290, ir-chk=1021/7195)        515,612   0%   77.99kB/s    0:00:06 (xfr#291, ir-chk=1020/7195)        515,929   0%   77.90kB/s    0:00:06 (xfr#292, ir-chk=1003/7195)        516,012   0%   77.62kB/s    0:00:06 (xfr#293, ir-chk=1020/7228)        517,963   0%   77.73kB/s    0:00:06 (xfr#294, ir-chk=1014/7228)        522,637   0%   77.96kB/s    0:00:06 (xfr#295, ir-chk=1121/7346)        523,428   0%   77.87kB/s    0:00:06 (xfr#296, ir-chk=1108/7346)        524,676   0%   77.88kB/s    0:00:06 (xfr#297, ir-chk=1086/7346)        525,392   0%   77.78kB/s    0:00:06 (xfr#298, ir-chk=1077/7346)        525,898   0%   77.67kB/s    0:00:06 (xfr#299, ir-chk=1042/7346)        526,729   0%   77.65kB/s    0:00:06 (xfr#300, ir-chk=1038/7346)        526,947   0%   77.50kB/s    0:00:06 (xfr#301, ir-chk=1000/7354)        527,386   0%   77.20kB/s    0:00:06 (xfr#302, ir-chk=1018/7377)        527,559   0%   76.97kB/s    0:00:06 (xfr#303, ir-chk=1016/7397)        527,905   0%   76.68kB/s    0:00:06 (xfr#304, ir-chk=1019/7431)        541,739   0%   78.58kB/s    0:00:06 (xfr#305, ir-chk=1007/7431)        542,146   0%   78.30kB/s    0:00:06 (xfr#306, ir-chk=1030/7487)        542,432   0%   78.11kB/s    0:00:06 (xfr#307, ir-chk=1020/7487)        544,567   0%   78.22kB/s    0:00:06 (xfr#308, ir-chk=1016/7487)        544,914   0%   77.95kB/s    0:00:06 (xfr#309, ir-chk=1029/7521)        545,381   0%   77.85kB/s    0:00:06 (xfr#310, ir-chk=1018/7521)        557,079   0%   79.44kB/s    0:00:06 (xfr#311, ir-chk=1010/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1008/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,283   0%   79.32kB/s    0:00:06 (xfr#312, ir-chk=1003/7521)        557,540   0%   78.83kB/s    0:00:06 (xfr#313, ir-chk=1000/7543)        558,056   0%   78.31kB/s    0:00:06 (xfr#314, ir-chk=1002/7602)        558,534   0%   78.08kB/s    0:00:06 (xfr#315, ir-chk=1022/7629)        559,684   0%   77.99kB/s    0:00:06 (xfr#316, ir-chk=1014/7645)        563,421   0%   78.36kB/s    0:00:06 (xfr#317, ir-chk=1011/7645)        564,516   0%   78.24kB/s    0:00:06 (xfr#318, ir-chk=1013/7672)        564,557   0%   77.97kB/s    0:00:06 (xfr#319, ir-chk=1000/7695)        564,598   0%   77.92kB/s    0:00:06 (xfr#320, ir-chk=1005/7702)        587,740   0%   81.24kB/s    0:00:06 (xfr#321, ir-chk=1020/7719)        617,646   0%   85.33kB/s    0:00:06 (xfr#322, ir-chk=1019/7719)        618,963   0%   85.51kB/s    0:00:06 (xfr#323, ir-chk=1018/7719)        621,046   0%   85.78kB/s    0:00:06 (xfr#324, ir-chk=1017/7719)        624,432   0%   86.26kB/s    0:00:06 (xfr#325, ir-chk=1016/7719)        628,933   0%   86.75kB/s    0:00:06 (xfr#326, ir-chk=1015/7719)        631,556   0%   87.12kB/s    0:00:06 (xfr#327, ir-chk=1014/7719)        635,228   0%   87.62kB/s    0:00:06 (xfr#328, ir-chk=1013/7719)        635,277   0%   87.62kB/s    0:00:06 (xfr#329, ir-chk=1012/7719)        635,328   0%   87.60kB/s    0:00:06 (xfr#330, ir-chk=1011/7719)        638,751   0%   88.09kB/s    0:00:06 (xfr#331, ir-chk=1010/7719)        643,432   0%   88.76kB/s    0:00:06 (xfr#332, ir-chk=1009/7719)        649,058   0%   89.56kB/s    0:00:06 (xfr#333, ir-chk=1008/7719)        656,681   0%   90.64kB/s    0:00:06 (xfr#334, ir-chk=1007/7719)        666,741   0%   92.10kB/s    0:00:06 (xfr#335, ir-chk=1006/7719)        679,322   0%   93.71kB/s    0:00:06 (xfr#336, ir-chk=1005/7719)        679,713   0%   93.71kB/s    0:00:06 (xfr#337, to-chk=1012/7732)        680,470   0%   93.79kB/s    0:00:06 (xfr#338, to-chk=1011/7732)        683,475   0%   94.21kB/s    0:00:06 (xfr#339, to-chk=1010/7732)        686,754   0%   94.48kB/s    0:00:06 (xfr#340, to-chk=1009/7732)        687,179   0%   94.54kB/s    0:00:06 (xfr#341, to-chk=1008/7732)        687,714   0%   94.45kB/s    0:00:06 (xfr#342, to-chk=1007/7732)        688,811   0%   94.59kB/s    0:00:06 (xfr#343, to-chk=1006/7732)        689,687   0%   94.55kB/s    0:00:06 (xfr#344, to-chk=1005/7732)        690,131   0%   94.60kB/s    0:00:06 (xfr#345, to-chk=1004/7732)        690,558   0%   94.51kB/s    0:00:06 (xfr#346, to-chk=1003/7732)        690,666   0%   94.52kB/s    0:00:06 (xfr#347, to-chk=1002/7732)        690,830   0%   94.37kB/s    0:00:06 (xfr#348, to-chk=1001/7732)        703,673   0%   96.19kB/s    0:00:06 (xfr#349, to-chk=1000/7732)        719,937   0%   98.30kB/s    0:00:06 (xfr#350, to-chk=999/7732)         723,415   0%   98.78kB/s    0:00:06 (xfr#351, to-chk=998/7732)        727,758   0%   99.20kB/s    0:00:06 (xfr#352, to-chk=997/7732)        728,802   0%   99.33kB/s    0:00:06 (xfr#353, to-chk=996/7732)        730,107   0%   99.28kB/s    0:00:06 (xfr#354, to-chk=995/7732)        735,439   0%  100.04kB/s    0:00:06 (xfr#355, to-chk=994/7732)        740,536   0%  100.52kB/s    0:00:06 (xfr#356, to-chk=993/7732)        740,962   0%  100.57kB/s    0:00:06 (xfr#357, to-chk=992/7732)        741,410   0%  100.41kB/s    0:00:06 (xfr#358, to-chk=991/7732)        743,253   0%  100.67kB/s    0:00:06 (xfr#359, to-chk=990/7732)        745,690   0%  100.78kB/s    0:00:06 (xfr#360, to-chk=989/7732)        747,363   0%  101.01kB/s    0:00:06 (xfr#361, to-chk=988/7732)        748,582   0%  100.93kB/s    0:00:06 (xfr#362, to-chk=987/7732)        749,973   0%  101.13kB/s    0:00:06 (xfr#363, to-chk=986/7732)        751,635   0%  101.14kB/s    0:00:06 (xfr#364, to-chk=985/7732)        751,772   0%  101.16kB/s    0:00:06 (xfr#365, to-chk=984/7732)        752,022   0%  100.99kB/s    0:00:06 (xfr#366, to-chk=983/7732)        753,360   0%  101.16kB/s    0:00:06 (xfr#367, to-chk=982/7732)        754,914   0%  101.15kB/s    0:00:06 (xfr#368, to-chk=981/7732)        755,301   0%  101.19kB/s    0:00:06 (xfr#369, to-chk=980/7732)        755,797   0%  101.03kB/s    0:00:06 (xfr#370, to-chk=979/7732)        756,842   0%  101.16kB/s    0:00:06 (xfr#371, to-chk=978/7732)        758,507   0%  101.36kB/s    0:00:06 (xfr#372, to-chk=977/7732)        759,978   0%  101.55kB/s    0:00:06 (xfr#373, to-chk=976/7732)        761,900   0%  101.62kB/s    0:00:07 (xfr#374, to-chk=975/7732)        762,247   0%  101.65kB/s    0:00:07 (xfr#375, to-chk=974/7732)        762,720   0%  101.54kB/s    0:00:07 (xfr#376, to-chk=973/7732)        764,106   0%  101.74kB/s    0:00:07 (xfr#377, to-chk=972/7732)        764,806   0%   99.12kB/s    0:13:02          765,872   0%  101.78kB/s    0:00:07 (xfr#378, to-chk=971/7732)        766,894   0%  101.92kB/s    0:00:07 (xfr#379, to-chk=970/7732)        768,405   0%  101.94kB/s    0:00:07 (xfr#380, to-chk=969/7732)        769,216   0%  102.04kB/s    0:00:07 (xfr#381, to-chk=968/7732)        770,531   0%  102.02kB/s    0:00:07 (xfr#382, to-chk=967/7732)        770,961   0%  102.08kB/s    0:00:07 (xfr#383, to-chk=966/7732)        771,440   0%  101.97kB/s    0:00:07 (xfr#384, to-chk=965/7732)        771,873   0%  102.02kB/s    0:00:07 (xfr#385, to-chk=964/7732)        772,357   0%  101.91kB/s    0:00:07 (xfr#386, to-chk=963/7732)        773,928   0%  102.13kB/s    0:00:07 (xfr#387, to-chk=962/7732)        776,184   0%  102.24kB/s    0:00:07 (xfr#388, to-chk=961/7732)        776,494   0%  102.28kB/s    0:00:07 (xfr#389, to-chk=960/7732)        776,852   0%  102.14kB/s    0:00:07 (xfr#390, to-chk=959/7732)        777,260   0%  102.18kB/s    0:00:07 (xfr#391, to-chk=958/7732)        777,710   0%  102.09kB/s    0:00:07 (xfr#392, to-chk=957/7732)        778,165   0%  102.15kB/s    0:00:07 (xfr#393, to-chk=956/7732)        778,812   0%  102.07kB/s    0:00:07 (xfr#394, to-chk=955/7732)        779,278   0%  102.12kB/s    0:00:07 (xfr#395, to-chk=954/7732)        779,987   0%  102.04kB/s    0:00:07 (xfr#396, to-chk=953/7732)        780,368   0%  102.08kB/s    0:00:07 (xfr#397, to-chk=952/7732)        780,818   0%  101.98kB/s    0:00:07 (xfr#398, to-chk=951/7732)        781,356   0%  102.04kB/s    0:00:07 (xfr#399, to-chk=950/7732)        782,020   0%  101.98kB/s    0:00:07 (xfr#400, to-chk=949/7732)        785,088   1%  102.38kB/s    0:00:07 (xfr#401, to-chk=948/7732)        788,663   1%  102.70kB/s    0:00:07 (xfr#402, to-chk=947/7732)        791,667   1%  103.09kB/s    0:00:07 (xfr#403, to-chk=946/7732)        795,734   1%  103.61kB/s    0:00:07 (xfr#404, to-chk=945/7732)        798,721   1%  104.00kB/s    0:00:07 (xfr#405, to-chk=944/7732)        802,327   1%  104.29kB/s    0:00:07 (xfr#406, to-chk=943/7732)        802,484   1%  104.30kB/s    0:00:07 (xfr#407, to-chk=942/7732)        802,795   1%  104.17kB/s    0:00:07 (xfr#408, to-chk=941/7732)        803,197   1%  104.22kB/s    0:00:07 (xfr#409, to-chk=940/7732)        803,703   1%  104.10kB/s    0:00:07 (xfr#410, to-chk=939/7732)        804,250   1%  104.18kB/s    0:00:07 (xfr#411, to-chk=938/7732)        804,933   1%  104.10kB/s    0:00:07 (xfr#412, to-chk=937/7732)        807,613   1%  104.44kB/s    0:00:07 (xfr#413, to-chk=936/7732)        810,638   1%  104.68kB/s    0:00:07 (xfr#414, to-chk=935/7732)        812,369   1%  104.90kB/s    0:00:07 (xfr#415, to-chk=934/7732)        814,963   1%  105.04kB/s    0:00:07 (xfr#416, to-chk=933/7732)        815,517   1%  105.10kB/s    0:00:07 (xfr#417, to-chk=932/7732)        816,109   1%  105.02kB/s    0:00:07 (xfr#418, to-chk=931/7732)        817,550   1%  105.20kB/s    0:00:07 (xfr#419, to-chk=930/7732)        818,846   1%  105.19kB/s    0:00:07 (xfr#420, to-chk=929/7732)        820,436   1%  105.40kB/s    0:00:07 (xfr#421, to-chk=928/7732)        822,803   1%  105.51kB/s    0:00:07 (xfr#422, to-chk=927/7732)        823,176   1%  105.56kB/s    0:00:07 (xfr#423, to-chk=926/7732)        823,717   1%  105.46kB/s    0:00:07 (xfr#424, to-chk=925/7732)        824,106   1%  105.50kB/s    0:00:07 (xfr#425, to-chk=924/7732)        824,625   1%  105.41kB/s    0:00:07 (xfr#426, to-chk=923/7732)        825,056   1%  105.45kB/s    0:00:07 (xfr#427, to-chk=922/7732)        825,679   1%  105.35kB/s    0:00:07 (xfr#428, to-chk=921/7732)        825,967   1%  105.39kB/s    0:00:07 (xfr#429, to-chk=920/7732)        826,292   1%  105.12kB/s    0:00:07 (xfr#430, to-chk=919/7732)        827,794   1%  105.32kB/s    0:00:07 (xfr#431, to-chk=918/7732)        829,270   1%  105.20kB/s    0:00:07 (xfr#432, to-chk=917/7732)        829,789   1%  105.25kB/s    0:00:07 (xfr#433, to-chk=916/7732)        830,358   1%  105.07kB/s    0:00:07 (xfr#434, to-chk=915/7732)        830,703   1%  105.10kB/s    0:00:07 (xfr#435, to-chk=914/7732)        831,260   1%  104.92kB/s    0:00:07 (xfr#436, to-chk=913/7732)        831,708   1%  104.97kB/s    0:00:07 (xfr#437, to-chk=912/7732)        832,107   1%  104.78kB/s    0:00:07 (xfr#438, to-chk=911/7732)        835,299   1%  105.18kB/s    0:00:07 (xfr#439, to-chk=910/7732)        839,315   1%  105.46kB/s    0:00:07 (xfr#440, to-chk=909/7732)        840,590   1%  105.59kB/s    0:00:07 (xfr#441, to-chk=908/7732)        842,581   1%  105.57kB/s    0:00:07 (xfr#442, to-chk=907/7732)        844,348   1%  105.79kB/s    0:00:07 (xfr#443, to-chk=906/7732)        845,783   1%  105.75kB/s    0:00:07 (xfr#444, to-chk=905/7732)        848,998   1%  106.15kB/s    0:00:07 (xfr#445, to-chk=904/7732)        851,511   1%  106.27kB/s    0:00:07 (xfr#446, to-chk=903/7732)        854,100   1%  106.59kB/s    0:00:07 (xfr#447, to-chk=902/7732)        855,566   1%  106.57kB/s    0:00:07 (xfr#448, to-chk=901/7732)        856,182   1%  106.65kB/s    0:00:07 (xfr#449, to-chk=900/7732)        857,122   1%  106.57kB/s    0:00:07 (xfr#450, to-chk=899/7732)        858,011   1%  106.67kB/s    0:00:07 (xfr#451, to-chk=898/7732)        859,164   1%  106.61kB/s    0:00:07 (xfr#452, to-chk=897/7732)        860,185   1%  106.73kB/s    0:00:07 (xfr#453, to-chk=896/7732)        861,252   1%  106.65kB/s    0:00:07 (xfr#454, to-chk=895/7732)        862,893   1%  106.85kB/s    0:00:07 (xfr#455, to-chk=894/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.88kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.87kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.87kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.87kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.87kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,119   1%  106.87kB/s    0:00:07 (xfr#456, to-chk=893/7732)        865,818   1%  106.96kB/s    0:00:07 (xfr#457, to-chk=891/7732)        866,895   1%  107.05kB/s    0:00:07 (xfr#458, to-chk=890/7732)        867,589   1%  107.14kB/s    0:00:07 (xfr#459, to-chk=889/7732)        868,717   1%  107.25kB/s    0:00:07 (xfr#460, to-chk=888/7732)        869,374   1%  107.32kB/s    0:00:07 (xfr#461, to-chk=887/7732)        870,436   1%  107.42kB/s    0:00:07 (xfr#462, to-chk=886/7732)        871,097   1%  107.49kB/s    0:00:07 (xfr#463, to-chk=885/7732)        872,162   1%  107.60kB/s    0:00:07 (xfr#464, to-chk=884/7732)        872,862   1%  107.68kB/s    0:00:07 (xfr#465, to-chk=883/7732)        873,995   1%  107.80kB/s    0:00:07 (xfr#466, to-chk=882/7732)        888,590   1%  109.65kB/s    0:00:07 (xfr#467, to-chk=879/7732)        904,052   1%  111.35kB/s    0:00:07 (xfr#468, to-chk=878/7732)        906,467   1%  111.66kB/s    0:00:07 (xfr#469, to-chk=877/7732)        909,033   1%  111.95kB/s    0:00:07 (xfr#470, to-chk=876/7732)        909,694   1%  112.03kB/s    0:00:07 (xfr#471, to-chk=875/7732)        910,757   1%  112.12kB/s    0:00:07 (xfr#472, to-chk=874/7732)        915,209   1%  112.68kB/s    0:00:07 (xfr#473, to-chk=873/7732)        920,230   1%  113.29kB/s    0:00:07 (xfr#474, to-chk=872/7732)        920,342   1%  113.29kB/s    0:00:07 (xfr#475, to-chk=871/7732)        920,548   1%  113.29kB/s    0:00:07 (xfr#476, to-chk=870/7732)        921,024   1%  113.33kB/s    0:00:07 (xfr#477, to-chk=869/7732)        921,811   1%  113.40kB/s    0:00:07 (xfr#478, to-chk=868/7732)        926,507   1%  113.99kB/s    0:00:07 (xfr#479, to-chk=867/7732)        932,101   1%  114.67kB/s    0:00:07 (xfr#480, to-chk=866/7732)        937,127   1%  115.30kB/s    0:00:07 (xfr#481, to-chk=741/7732)        943,718   1%  116.12kB/s    0:00:07 (xfr#482, to-chk=708/7732)        943,718   1%  115.91kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        943,718   1%  115.89kB/s    0:00:07 (xfr#482, to-chk=683/7732)        966,860   1%  118.82kB/s    0:00:07 (xfr#483, to-chk=516/7732)        968,177   1%  118.97kB/s    0:00:07 (xfr#484, to-chk=515/7732)        971,563   1%  119.39kB/s    0:00:07 (xfr#485, to-chk=514/7732)        974,186   1%  119.72kB/s    0:00:07 (xfr#486, to-chk=513/7732)        974,235   1%  119.71kB/s    0:00:07 (xfr#487, to-chk=512/7732)        977,658   1%  120.13kB/s    0:00:07 (xfr#488, to-chk=511/7732)        983,284   1%  120.85kB/s    0:00:07 (xfr#489, to-chk=510/7732)        993,344   1%  122.11kB/s    0:00:07 (xfr#490, to-chk=509/7732)        994,737   1%  121.15kB/s    0:00:07 (xfr#491, to-chk=503/7732)        996,062   1%  121.09kB/s    0:00:07 (xfr#492, to-chk=502/7732)      1,000,797   1%  120.38kB/s    0:00:07 (xfr#493, to-chk=501/7732)      1,008,029   1%  120.79kB/s    0:00:07 (xfr#494, to-chk=500/7732)      1,009,399   1%  120.42kB/s    0:00:07 (xfr#495, to-chk=499/7732)      1,010,417   1%  120.33kB/s    0:00:07 (xfr#496, to-chk=498/7732)      1,012,819   1%  119.98kB/s    0:00:07 (xfr#497, to-chk=497/7732)      1,014,918   1%  119.97kB/s    0:00:07 (xfr#498, to-chk=496/7732)      1,016,427   1%  146.51kB/s    0:08:47        1,016,427   1%  119.51kB/s    0:00:08 (xfr#499, to-chk=495/7732)      1,017,295   1%  119.38kB/s    0:00:08 (xfr#500, to-chk=494/7732)      1,018,191   1%  118.72kB/s    0:00:08 (xfr#501, to-chk=493/7732)      1,018,491   1%  118.58kB/s    0:00:08 (xfr#502, to-chk=492/7732)      1,034,850   1%  119.38kB/s    0:00:08 (xfr#503, to-chk=491/7732)      1,069,461   1%  123.06kB/s    0:00:08 (xfr#504, to-chk=490/7732)      1,074,523   1%  123.09kB/s    0:00:08 (xfr#505, to-chk=489/7732)      1,084,305   1%  123.80kB/s    0:00:08 (xfr#506, to-chk=488/7732)      1,086,408   1%  123.54kB/s    0:00:08 (xfr#507, to-chk=487/7732)      1,089,158   1%  123.50kB/s    0:00:08 (xfr#508, to-chk=486/7732)      1,096,729   1%  123.40kB/s    0:00:08 (xfr#509, to-chk=485/7732)      1,108,229   1%  124.25kB/s    0:00:08 (xfr#510, to-chk=484/7732)      1,109,545   1%  123.94kB/s    0:00:08 (xfr#511, to-chk=483/7732)      1,110,416   1%  123.81kB/s    0:00:08 (xfr#512, to-chk=482/7732)      1,113,733   1%  123.58kB/s    0:00:08 (xfr#513, to-chk=481/7732)      1,118,600   1%  123.72kB/s    0:00:08 (xfr#514, to-chk=480/7732)      1,121,571   1%  123.42kB/s    0:00:08 (xfr#515, to-chk=479/7732)      1,124,867   1%  123.37kB/s    0:00:08 (xfr#516, to-chk=478/7732)      1,127,484   1%  123.08kB/s    0:00:08 (xfr#517, to-chk=477/7732)      1,130,971   1%  123.24kB/s    0:00:08 (xfr#518, to-chk=476/7732)      1,131,924   1%  122.90kB/s    0:00:08 (xfr#519, to-chk=475/7732)      1,132,315   1%  122.75kB/s    0:00:08 (xfr#520, to-chk=474/7732)      1,134,850   1%  122.12kB/s    0:00:08 (xfr#521, to-chk=473/7732)      1,137,882   1%  121.88kB/s    0:00:08 (xfr#522, to-chk=472/7732)      1,139,185   1%  121.38kB/s    0:00:08 (xfr#523, to-chk=471/7732)      1,139,955   1%  121.28kB/s    0:00:08 (xfr#524, to-chk=470/7732)      1,141,000   1%  121.38kB/s    0:00:08 (xfr#525, to-chk=469/7732)      1,143,720   1%  121.07kB/s    0:00:08 (xfr#526, to-chk=468/7732)      1,147,528   1%  121.12kB/s    0:00:08 (xfr#527, to-chk=467/7732)      1,148,838   1%  120.81kB/s    0:00:09 (xfr#528, to-chk=466/7732)      1,149,635   1%  120.71kB/s    0:00:09 (xfr#529, to-chk=465/7732)      1,152,031   1%  167.05kB/s    0:07:41        1,152,031   1%  120.47kB/s    0:00:09 (xfr#530, to-chk=464/7732)      1,155,654   1%  120.52kB/s    0:00:09 (xfr#531, to-chk=463/7732)      1,157,895   1%  120.31kB/s    0:00:09 (xfr#532, to-chk=462/7732)      1,160,808   1%  120.30kB/s    0:00:09 (xfr#533, to-chk=461/7732)      1,162,786   1%  120.07kB/s    0:00:09 (xfr#534, to-chk=460/7732)      1,165,391   1%  120.16kB/s    0:00:09 (xfr#535, to-chk=459/7732)      1,166,736   1%  119.68kB/s    0:00:09 (xfr#536, to-chk=458/7732)      1,167,652   1%  119.61kB/s    0:00:09 (xfr#537, to-chk=457/7732)      1,169,164   1%  119.12kB/s    0:00:09 (xfr#538, to-chk=456/7732)      1,170,042   1%  119.05kB/s    0:00:09 (xfr#539, to-chk=455/7732)      1,173,005   1%  118.58kB/s    0:00:09 (xfr#540, to-chk=454/7732)      1,176,974   1%  118.78kB/s    0:00:09 (xfr#541, to-chk=453/7732)      1,178,298   1%  118.54kB/s    0:00:09 (xfr#542, to-chk=452/7732)      1,178,962   1%  118.38kB/s    0:00:09 (xfr#543, to-chk=451/7732)      1,180,284   1%  117.72kB/s    0:00:09 (xfr#544, to-chk=450/7732)      1,181,137   1%  117.63kB/s    0:00:09 (xfr#545, to-chk=449/7732)      1,182,637   1%  117.03kB/s    0:00:09 (xfr#546, to-chk=448/7732)      1,183,764   1%  116.96kB/s    0:00:09 (xfr#547, to-chk=447/7732)      1,185,148   1%  116.70kB/s    0:00:09 (xfr#548, to-chk=446/7732)      1,186,398   1%  116.60kB/s    0:00:09 (xfr#549, to-chk=445/7732)      1,187,735   1%  116.05kB/s    0:00:09 (xfr#550, to-chk=444/7732)      1,188,558   1%  115.92kB/s    0:00:09 (xfr#551, to-chk=443/7732)      1,189,932   1%  115.51kB/s    0:00:09 (xfr#552, to-chk=442/7732)      1,191,224   1%  115.38kB/s    0:00:09 (xfr#553, to-chk=441/7732)      1,195,888   1%  114.85kB/s    0:00:09 (xfr#554, to-chk=440/7732)      1,203,337   1%  115.25kB/s    0:00:09 (xfr#555, to-chk=439/7732)      1,206,341   1%  115.53kB/s    0:00:09 (xfr#556, to-chk=438/7732)      1,210,979   1%  115.15kB/s    0:00:09 (xfr#557, to-chk=437/7732)      1,218,465   1%  115.55kB/s    0:00:10 (xfr#558, to-chk=436/7732)      1,219,406   1%  115.21kB/s    0:00:10 (xfr#559, to-chk=435/7732)      1,219,873   1%  170.57kB/s    0:07:32        1,219,873   1%  115.07kB/s    0:00:10 (xfr#560, to-chk=434/7732)      1,221,391   1%  114.67kB/s    0:00:10 (xfr#561, to-chk=433/7732)      1,222,301   1%  114.52kB/s    0:00:10 (xfr#562, to-chk=432/7732)      1,223,876   1%  113.84kB/s    0:00:10 (xfr#563, to-chk=431/7732)      1,225,192   1%  113.60kB/s    0:00:10 (xfr#564, to-chk=430/7732)      1,229,373   1%  112.98kB/s    0:00:10 (xfr#565, to-chk=429/7732)      1,235,718   1%  113.20kB/s    0:00:10 (xfr#566, to-chk=428/7732)      1,238,924   1%  112.75kB/s    0:00:10 (xfr#567, to-chk=427/7732)      1,243,516   1%  112.94kB/s    0:00:10 (xfr#568, to-chk=426/7732)      1,245,040   1%  112.65kB/s    0:00:10 (xfr#569, to-chk=425/7732)      1,246,253   1%  112.58kB/s    0:00:10 (xfr#570, to-chk=424/7732)      1,248,699   1%  112.12kB/s    0:00:10 (xfr#571, to-chk=423/7732)      1,252,055   1%  112.19kB/s    0:00:10 (xfr#572, to-chk=422/7732)      1,255,018   1%  112.06kB/s    0:00:10 (xfr#573, to-chk=421/7732)      1,259,099   1%  112.25kB/s    0:00:10 (xfr#574, to-chk=420/7732)      1,260,508   1%  112.06kB/s    0:00:10 (xfr#575, to-chk=419/7732)      1,261,409   1%  112.01kB/s    0:00:10 (xfr#576, to-chk=418/7732)      1,262,857   1%  111.82kB/s    0:00:10 (xfr#577, to-chk=417/7732)      1,263,947   1%  111.78kB/s    0:00:10 (xfr#578, to-chk=416/7732)      1,265,313   1%  111.59kB/s    0:00:10 (xfr#579, to-chk=415/7732)      1,266,360   1%  111.53kB/s    0:00:10 (xfr#580, to-chk=414/7732)      1,267,535   1%  111.28kB/s    0:00:10 (xfr#581, to-chk=413/7732)      1,268,140   1%  111.20kB/s    0:00:10 (xfr#582, to-chk=412/7732)      1,270,865   1%  110.87kB/s    0:00:10 (xfr#583, to-chk=411/7732)      1,274,085   1%  111.01kB/s    0:00:10 (xfr#584, to-chk=410/7732)      1,275,882   1%  110.59kB/s    0:00:10 (xfr#585, to-chk=409/7732)      1,277,028   1%  110.50kB/s    0:00:10 (xfr#586, to-chk=408/7732)      1,278,392   1%  110.26kB/s    0:00:11 (xfr#587, to-chk=407/7732)      1,279,286   1%  110.20kB/s    0:00:11 (xfr#588, to-chk=406/7732)      1,280,654   1%  124.57kB/s    0:10:18        1,280,654   1%  110.01kB/s    0:00:11 (xfr#589, to-chk=405/7732)      1,281,538   1%  109.95kB/s    0:00:11 (xfr#590, to-chk=404/7732)      1,286,182   1%  110.02kB/s    0:00:11 (xfr#591, to-chk=403/7732)      1,294,432   1%  110.50kB/s    0:00:11 (xfr#592, to-chk=402/7732)      1,296,946   1%  110.39kB/s    0:00:11 (xfr#593, to-chk=401/7732)      1,300,668   1%  110.48kB/s    0:00:11 (xfr#594, to-chk=400/7732)      1,303,553   1%  110.29kB/s    0:00:11 (xfr#595, to-chk=399/7732)      1,307,292   1%  110.47kB/s    0:00:11 (xfr#596, to-chk=398/7732)      1,311,839   1%  110.43kB/s    0:00:11 (xfr#597, to-chk=397/7732)      1,318,459   1%  110.73kB/s    0:00:11 (xfr#598, to-chk=396/7732)      1,322,340   1%  110.46kB/s    0:00:11 (xfr#599, to-chk=395/7732)      1,326,899   1%  110.69kB/s    0:00:11 (xfr#600, to-chk=394/7732)      1,328,636   1%  110.39kB/s    0:00:11 (xfr#601, to-chk=393/7732)      1,330,289   1%  110.31kB/s    0:00:11 (xfr#602, to-chk=392/7732)      1,332,206   1%  110.17kB/s    0:00:11 (xfr#603, to-chk=391/7732)      1,334,350   1%  110.21kB/s    0:00:11 (xfr#604, to-chk=390/7732)      1,336,595   1%  110.12kB/s    0:00:11 (xfr#605, to-chk=389/7732)      1,338,905   1%  110.18kB/s    0:00:11 (xfr#606, to-chk=388/7732)      1,341,913   1%  109.88kB/s    0:00:11 (xfr#607, to-chk=387/7732)      1,346,105   1%  110.01kB/s    0:00:11 (xfr#608, to-chk=386/7732)      1,346,804   1%  110.05kB/s    0:00:11 (xfr#609, to-chk=384/7732)      1,347,498   1%  110.11kB/s    0:00:11 (xfr#610, to-chk=383/7732)      1,348,155   1%  110.16kB/s    0:00:11 (xfr#611, to-chk=382/7732)      1,348,816   1%  110.21kB/s    0:00:11 (xfr#612, to-chk=381/7732)      1,349,516   1%  110.26kB/s    0:00:11 (xfr#613, to-chk=380/7732)      1,364,111   1%  111.49kB/s    0:00:11 (xfr#614, to-chk=377/7732)      1,366,526   1%  111.68kB/s    0:00:11 (xfr#615, to-chk=376/7732)      1,367,187   1%  111.73kB/s    0:00:11 (xfr#616, to-chk=375/7732)      1,371,639   1%  112.10kB/s    0:00:11 (xfr#617, to-chk=374/7732)      1,371,751   1%  112.11kB/s    0:00:11 (xfr#618, to-chk=373/7732)      1,373,255   1%  111.87kB/s    0:00:11 (xfr#619, to-chk=372/7732)      1,374,566   1%  111.83kB/s    0:00:11 (xfr#620, to-chk=371/7732)      1,381,164   1%  112.04kB/s    0:00:11 (xfr#621, to-chk=370/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.72kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,392,683   1%  112.71kB/s    0:00:11 (xfr#622, to-chk=369/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=153/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.22kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  114.21kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.90kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=149/7732)      1,410,881   1%  112.89kB/s    0:00:11 (xfr#623, to-chk=147/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=144/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=137/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=136/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=130/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=129/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=128/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=127/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=126/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=125/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=124/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=123/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=121/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=118/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=110/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=109/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=103/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=102/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=101/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=100/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=99/7732)       1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=98/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=97/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=96/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=95/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=87/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=81/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=72/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=69/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=66/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=63/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=60/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=57/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=54/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=50/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=48/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=46/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=45/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=37/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=30/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=28/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=22/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=18/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=14/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=13/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=9/7732)       1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=5/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=4/7732)      1,410,881   1%  112.88kB/s    0:00:11 (xfr#623, to-chk=0/7732)[0;32m✅ Files synced to EC2[0m
+
+==========================================
+🚀 EC2 DEPLOYMENT
+==========================================
+[0;34mℹ️  Deploying on EC2...[0m
+[EC2] Installing production dependencies...
+npm warn using --force Recommended protections disabled.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated npmlog@5.0.1: This package is no longer supported.
+npm warn deprecated multer@1.4.5-lts.2: Multer 1.x is impacted by a number of vulnerabilities, which have been patched in 2.x. You should upgrade to the latest 2.x version.
+npm warn deprecated querystring@0.2.0: The querystring API is considered Legacy. new code should use the URLSearchParams API instead.
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated gauge@3.0.2: This package is no longer supported.
+npm warn deprecated csurf@1.11.0: This package is archived and no longer maintained. For support, visit https://github.com/expressjs/express/discussions
+npm warn deprecated are-we-there-yet@2.0.0: This package is no longer supported.
+npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+
+> payroll_nodejs@1.0.0 postinstall
+> npx playwright install --with-deps
+
+Installing dependencies...
+Switching to root user to install dependencies...
+Hit:1 http://eu-central-1.ec2.archive.ubuntu.com/ubuntu jammy InRelease
+Hit:2 http://eu-central-1.ec2.archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:3 http://eu-central-1.ec2.archive.ubuntu.com/ubuntu jammy-backports InRelease
+Get:4 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Hit:5 https://deb.nodesource.com/node_22.x nodistro InRelease
+Hit:6 https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 InRelease
+Fetched 129 kB in 1s (101 kB/s)
+Reading package lists...
+W: https://repo.mongodb.org/apt/ubuntu/dists/jammy/mongodb-org/6.0/InRelease: Key is stored in legacy trusted.gpg keyring (/etc/apt/trusted.gpg), see the DEPRECATION section in apt-key(8) for details.
+Reading package lists...
+Building dependency tree...
+Reading state information...
+fonts-freefont-ttf is already the newest version (20120503-10build1).
+fonts-liberation is already the newest version (1:1.07.4-11).
+libasound2 is already the newest version (1.2.6.1-1ubuntu1).
+libatk-bridge2.0-0 is already the newest version (2.38.0-3).
+libatk1.0-0 is already the newest version (2.36.0-3build1).
+libatspi2.0-0 is already the newest version (2.44.0-3).
+libcairo-gobject2 is already the newest version (1.16.0-5ubuntu2).
+libcairo2 is already the newest version (1.16.0-5ubuntu2).
+libdbus-glib-1-2 is already the newest version (0.112-2build1).
+libegl1 is already the newest version (1.4.0-1).
+libenchant-2-2 is already the newest version (2.3.2-1ubuntu2).
+libepoxy0 is already the newest version (1.5.10-1).
+libevdev2 is already the newest version (1.12.1+dfsg-1).
+libevent-2.1-7 is already the newest version (2.1.12-stable-1build3).
+libfontconfig1 is already the newest version (2.13.1-4.2ubuntu5).
+libgles2 is already the newest version (1.4.0-1).
+libglx0 is already the newest version (1.4.0-1).
+libgudev-1.0-0 is already the newest version (1:237-2build1).
+libhyphen0 is already the newest version (2.8.8-7build2).
+libicu70 is already the newest version (70.1-2).
+libjpeg-turbo8 is already the newest version (2.1.2-0ubuntu1).
+liblcms2-2 is already the newest version (2.12~rc1-2build2).
+libmanette-0.2-0 is already the newest version (0.2.6-3build1).
+libopengl0 is already the newest version (1.4.0-1).
+libopus0 is already the newest version (1.3.1-0.1build2).
+libpng16-16 is already the newest version (1.6.37-3build5).
+libproxy1v5 is already the newest version (0.4.17-2).
+libsecret-1-0 is already the newest version (0.20.5-2).
+libwoff1 is already the newest version (1.0.2-1build4).
+libxcb-shm0 is already the newest version (1.14-3ubuntu3).
+libxcb1 is already the newest version (1.14-3ubuntu3).
+libxcomposite1 is already the newest version (1:0.4.5-1build2).
+libxcursor1 is already the newest version (1:1.2.0-2build4).
+libxdamage1 is already the newest version (1:1.1.5-2build2).
+libxext6 is already the newest version (2:1.3.4-1build1).
+libxfixes3 is already the newest version (1:6.0.0-1).
+libxi6 is already the newest version (2:1.8-1build1).
+libxkbcommon0 is already the newest version (1.4.0-1).
+libxrandr2 is already the newest version (2:1.5.2-1build1).
+libxrender1 is already the newest version (1:0.9.10-1build4).
+libxtst6 is already the newest version (2:1.2.3-1build4).
+xfonts-scalable is already the newest version (1:1.0.3-1.2ubuntu1).
+fonts-ipafont-gothic is already the newest version (00303-21ubuntu1).
+fonts-tlwg-loma-otf is already the newest version (1:0.7.3-1).
+fonts-unifont is already the newest version (1:14.0.01-1).
+fonts-wqy-zenhei is already the newest version (0.9.45-8).
+libavif13 is already the newest version (0.9.3-3).
+libffi7 is already the newest version (3.3-5ubuntu1).
+libx264-163 is already the newest version (2:0.163.3060+git5db6aa6-2build1).
+xfonts-cyrillic is already the newest version (1:1.0.5).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.22.04.1).
+gstreamer1.0-plugins-base is already the newest version (1.20.1-1ubuntu0.5).
+gstreamer1.0-plugins-good is already the newest version (1.20.3-0ubuntu1.4).
+libatomic1 is already the newest version (12.3.0-1ubuntu1~22.04.2).
+libcups2 is already the newest version (2.4.1op1-1ubuntu4.12).
+libdbus-1-3 is already the newest version (1.12.20-2ubuntu4.1).
+libdrm2 is already the newest version (2.4.113-2~ubuntu0.22.04.1).
+libfreetype6 is already the newest version (2.11.1+dfsg-1ubuntu0.3).
+libgbm1 is already the newest version (23.2.1-1ubuntu3.1~22.04.3).
+libgdk-pixbuf-2.0-0 is already the newest version (2.42.8+dfsg-1ubuntu0.4).
+libglib2.0-0 is already the newest version (2.72.4-0ubuntu2.6).
+libgstreamer-gl1.0-0 is already the newest version (1.20.1-1ubuntu0.5).
+libgstreamer-plugins-base1.0-0 is already the newest version (1.20.1-1ubuntu0.5).
+libgstreamer1.0-0 is already the newest version (1.20.3-0ubuntu1.1).
+libgtk-3-0 is already the newest version (3.24.33-1ubuntu2.2).
+libgtk-4-1 is already the newest version (4.6.9+ds-0ubuntu0.22.04.2).
+libharfbuzz-icu0 is already the newest version (2.7.4-1ubuntu3.2).
+libharfbuzz0b is already the newest version (2.7.4-1ubuntu3.2).
+libnotify4 is already the newest version (0.7.9-3ubuntu5.22.04.1).
+libnspr4 is already the newest version (2:4.35-0ubuntu0.22.04.1).
+libnss3 is already the newest version (2:3.98-0ubuntu0.22.04.2).
+libopenjp2-7 is already the newest version (2.4.0-6ubuntu0.4).
+libpango-1.0-0 is already the newest version (1.50.6+ds-2ubuntu1).
+libpangocairo-1.0-0 is already the newest version (1.50.6+ds-2ubuntu1).
+libwayland-client0 is already the newest version (1.20.0-1ubuntu0.1).
+libwayland-egl1 is already the newest version (1.20.0-1ubuntu0.1).
+libwayland-server0 is already the newest version (1.20.0-1ubuntu0.1).
+libwebpdemux2 is already the newest version (1.2.2-2ubuntu0.22.04.2).
+libx11-6 is already the newest version (2:1.7.5-1ubuntu0.3).
+libx11-xcb1 is already the newest version (2:1.7.5-1ubuntu0.3).
+libxml2 is already the newest version (2.9.13+dfsg-1ubuntu0.10).
+libxslt1.1 is already the newest version (1.1.34-4ubuntu0.22.04.4).
+ffmpeg is already the newest version (7:4.4.2-0ubuntu0.22.04.1).
+gstreamer1.0-libav is already the newest version (1.20.3-0ubuntu1).
+gstreamer1.0-plugins-bad is already the newest version (1.20.3-0ubuntu1.1).
+libsoup-3.0-0 is already the newest version (3.0.7-0ubuntu1).
+xvfb is already the newest version (2:21.1.4-2ubuntu1.7~22.04.16).
+0 upgraded, 0 newly installed, 0 to remove and 47 not upgraded.
+
+added 506 packages, and audited 507 packages in 44s
+
+50 packages are looking for funding
+  run `npm fund` for details
+
+2 low severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+[EC2] Reloading PM2...
+[PM2] Applying action reloadProcessId on app [payroll](ids: [ 0 ])
+[PM2] [payroll](0) ✓
+[EC2] PM2 status:
+┌────┬────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name       │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ payroll    │ default     │ 1.0.0   │ fork    │ 395081   │ 0s     │ 48   │ online    │ 100%     │ 56.9mb   │ ubuntu   │ disabled │
+└────┴────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[0;32m✅ EC2 deployment complete[0m
+
+==========================================
+🌐 DNS AUTO-UPDATE
+==========================================
+[0;34mℹ️  Executing DNS Auto-Update...[0m
+Debugging PowerShell Script - 11/25/2025 14:02:53
+Using AWS CLI with Access Key ID: AKIAUJ3VUCBADJR2ELIV
+Fetching Hosted Zone ID...
+Using Hosted Zone ID: /hostedzone/Z087811015TB31NL3OPU2
+Fetching Current Public IP...
+Current Public IP: 62.38.129.67
+Fetching Current DNS IP...
+Current DNS IP: 62.38.129.67	10 mx.zoho.eu	ns-486.awsdns-60.com.	ns-486.awsdns-60.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400	"zoho-verification=zb24887167.zmverify.zoho.eu"
+New IP detected: 62.38.129.67 (Old IP: 62.38.129.67	10 mx.zoho.eu	ns-486.awsdns-60.com.	ns-486.awsdns-60.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400	"zoho-verification=zb24887167.zmverify.zoho.eu"). Updating Route 53...
+JSON saved to C:\Users\User\AppData\Local\Temp\temp-change-batch.json
+JSON Content:
+{
+    "Changes": [
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "webpayrollsolutions.com",
+                "Type": "A",
+                "TTL": 300,
+                "ResourceRecords": [
+                    {
+                        "Value": "62.38.129.67"
+                    }
+                ]
+            }
+        }
+    ]
+}
+DNS successfully updated to 62.38.129.67.
+Debug Complete - 11/25/2025 14:03:10
+
+
+==========================================
+🎉 DEPLOYMENT COMPLETE!
+==========================================
+Environment:    dev
+Version:        20251125135551
+Phase:          Phase 1
+Files:          80 processed
+Build output:   /cygdrive/c/Payroll-NodeJs/public/min.js
+EC2 Status:     ✅ Running
+==========================================
+
+✅ Next steps:
+  1. Test CDN URL: https://cdn.webpayrollsolutions.com/static/min.js/modules/apodoxesCalculations.min.js
+  2. Check browser console for errors
+  3. Test critical pages
+  4. If all OK → Deploy Phase 2 (remaining ~162 files)
+
+🚧 Phase 2 files waiting (uncomment in script):
+  - Krathseis/* (12 files)
+  - companies/* (36 files)
+  - ergazomenoi/* (43 files)
+  - kinhseis/* (27 files)
+  - symbaseis/* (40 files)
+  - dates/* (4 files)
+
