@@ -6,7 +6,7 @@ const node_env = process.env.NODE_ENV || "development";
 
 // Ρύθμιση static assets
 const STATIC_BASE_DEV = process.env.STATIC_BASE_DEV || "/static/js";
-const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min.js";
+const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min. js";
 const STATIC_BASE = node_env === 'production' ? STATIC_BASE_PROD : STATIC_BASE_DEV;
 
 // AWS S3/CloudFront domains
@@ -78,31 +78,31 @@ const loginLimiter = rateLimit({
     skipSuccessfulRequests: true,
     
     // Μην περιορίζεις ήδη συνδεδεμένους χρήστες
-    skip: (req) => req.session?.userId != null,
+    skip: (req) => req.session?. userId != null,
     
     standardHeaders: true,
     legacyHeaders: false,
     
     // Προσαρμοσμένο handler με ακριβή χρόνο επανάληψης
     handler: async (req, res) => {
-        const retryAfter = req.rateLimit.resetTime 
-            ?  Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000 / 60)
+        const retryAfter = req.rateLimit. resetTime 
+            ? Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000 / 60)
             : 15;
             
         logger.warn('⚠️ Επιτεύχθηκε όριο login:', {
-            ip: req. ip,
-            email: req. body.email || 'άγνωστο',
+            ip: req.ip,
+            email: req.body.email || 'άγνωστο',
             προσπάθειες: req.rateLimit. current,
             επανάληψηΣε: `${retryAfter}λεπτά`
         });
         
         // Flash μήνυμα
         if (req.flash) {
-            await res.flash('error', `Πάρα πολλές αποτυχημένες προσπάθειες σύνδεσης. Δοκιμάστε ξανά σε ${retryAfter} λεπτά.`);
+            await res.flash('error', `Πάρα πολλές αποτυχημένες προσπάθειες σύνδεσης.  Δοκιμάστε ξανά σε ${retryAfter} λεπτά.`);
         }
         
         // Εμφάνιση σελίδας login με σφάλμα
-        res.status(429).render('login/login', {
+        res. status(429).render('login/login', {
             bodyClass: 'home-bg-cdn',
             csrfToken: req.csrfToken ?  req.csrfToken() : '',
             title: 'Σύνδεση',
@@ -123,7 +123,7 @@ const resetPasswordLimiter = rateLimit({
     handler: async (req, res) => {
         logger.warn('⚠️ Επιτεύχθηκε όριο επαναφοράς κωδικού:', {
             ip: req.ip,
-            email: req.body.email || 'Άγνωστο email'
+            email: req.body.email || 'άγνωστο'
         });
         
         if (req.flash) {
@@ -145,7 +145,7 @@ connectDB();
 
 // Body parsers ΠΡΙΝ από CSRF
 app.use(urlencoded({ extended: true, limit: '50mb' }));
-app. use(json({ limit: '50mb' }));
+app.use(json({ limit: '50mb' }));
 
 // Method override για φόρμες που θέλουν PUT/DELETE
 app.use(methodOverride("_method"));
@@ -159,11 +159,11 @@ app.use("/static", express.static(path. join(__dirname, "public")));
 // Global locals
 // Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
-    // Αφαίρεση .js αν υπάρχει
-    const cleanPath = path.replace(/\. js$/, '');
+    // Αφαίρεση . js αν υπάρχει
+    const cleanPath = path.replace(/\.js$/, '');
     
     if (node_env === 'production') {
-        return `${STATIC_BASE}/${cleanPath}.min.js`;
+        return `${STATIC_BASE}/${cleanPath}. min.js`;
     } else {
         return `${STATIC_BASE}/${cleanPath}.js`;
     }
@@ -184,7 +184,7 @@ app.use(session(sessionOpts));
 logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 // Flash messages (βασίζεται στο session)
-app.use(flash({ sessionKeyName: "flashMessage" }));
+app. use(flash({ sessionKeyName: "flashMessage" }));
 
 // Custom session vars → res.locals
 app.use(getSessionVars);
@@ -194,12 +194,12 @@ app.use((req, res, next) => {
     if (req.session) {
         const now = Date.now();
         const isAsset = req.path.startsWith("/static/");
-        const isCountdown = req. path === '/remaining-time';
+        const isCountdown = req.path === '/remaining-time';
         const isLogout = req.path. startsWith('/logout');
 
         if (! isAsset && !isCountdown && !isLogout) {
             if (! req.session.lastActivity) req.session.lastActivity = now;
-            const elapsed = now - req.session.lastActivity;
+            const elapsed = now - req.session. lastActivity;
             const remaining = 1000 * 60 * diarkeia_session - elapsed;
 
             if (remaining <= 0) return res.redirect(303, "/logout/end_Session");
@@ -226,7 +226,7 @@ app.use(helmet.crossOriginResourcePolicy({ policy: "same-origin" })); // τα δ
 
 // HSTS μόνο σε production
 if (isProd) {
-    app.use(
+    app. use(
         helmet.hsts({
             maxAge: 31536000, // 1 έτος
             includeSubDomains: true,
@@ -236,48 +236,76 @@ if (isProd) {
 }
 
 // CSP nonce ανά request
-app.use((req, res, next) => {
-    res.locals.nonce = crypto. randomBytes(18).toString("base64");
+app. use((req, res, next) => {
+    res.locals.nonce = crypto.randomBytes(18). toString("base64");
     next();
 });
 
 /* -------------------------------------------------------------------------- */
-/*            ΔΙΟΡΘΩΜΕΝΗ CSP ΛΥΣΗ - Λειτουργεί σε ΟΛΑ τα environments         */
+/*          ✅ ΔΙΟΡΘΩΜΕΝΗ CSP ΛΥΣΗ - CDN domains επιτρέπονται πλήρως          */
 /* -------------------------------------------------------------------------- */
 
 // Δημιουργία CSP directives δυναμικά
 const buildCSPDirectives = () => {
+    // CDN domains που πρέπει να επιτρέπονται
+    const cdnDomains = [
+        `https://${CDN_DOMAIN}`,
+        `https://${S3_BUCKET}.s3.amazonaws.com`,
+        `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws. com`
+    ];
+    
+    if (CLOUDFRONT_DOMAIN) {
+        cdnDomains.push(`https://${CLOUDFRONT_DOMAIN}`);
+    }
+    
+    logger.info(`CSP: Επιτρέπονται scripts από: ${cdnDomains.join(', ')}`);
+    
     const directives = {
         "default-src": ["'self'"],
+        
+        // ✅ Scripts: self + nonce + ΟΛΟΙ οι CDN domains
         "script-src": [
             "'self'",
-            (req, res) => `'nonce-${res.locals.nonce}'`
+            (req, res) => `'nonce-${res.locals.nonce}'`,
+            ... cdnDomains  // ← Προσθήκη όλων των CDN domains
         ],
+        
         "style-src-elem": [
             "'self'",
             "https://fonts.googleapis.com",
-            "'unsafe-inline'"
+            "'unsafe-inline'",
+            ... cdnDomains
         ],
+        
         "style-src-attr": ["'unsafe-inline'"],
+        
         "style-src": [
             "'self'",
-            "https://fonts.googleapis. com"
+            "https://fonts.googleapis. com",
+            ... cdnDomains
         ],
+        
         "font-src": [
             "'self'",
             "https://fonts.gstatic.com",
-            "data:"
+            "data:",
+            ... cdnDomains
         ],
+        
         "img-src": [
             "'self'",
             "data:",
-            "blob:"
+            "blob:",
+            ...cdnDomains
         ],
+        
         "connect-src": [
             "'self'",
             "https://fonts.googleapis.com",
-            "https://fonts.gstatic. com"
+            "https://fonts.gstatic. com",
+            ... cdnDomains
         ],
+        
         "worker-src": ["'self'", "blob:"],
         "object-src": ["'none'"],
         "base-uri": ["'self'"],
@@ -285,26 +313,6 @@ const buildCSPDirectives = () => {
         "frame-src": ["'self'"],
         "frame-ancestors": ["'none'"]
     };
-
-    // ΠΑΝΤΑ προσθήκη CDN/S3 domains (και dev και prod)
-    // Αυτό επιτρέπει testing με CDN resources στο development
-    const cdnDomains = [
-        `https://${CDN_DOMAIN}`,
-        `https://${S3_BUCKET}.s3.amazonaws.com`,
-        `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws.com`
-    ];
-    
-    if (CLOUDFRONT_DOMAIN) {
-        cdnDomains.push(`https://${CLOUDFRONT_DOMAIN}`);
-    }
-
-    // Προσθήκη CDN domains σε όλα τα σχετικά directives
-    directives["script-src"].push(...cdnDomains);
-    directives["style-src-elem"].push(...cdnDomains);
-    directives["style-src"]. push(`https://${CDN_DOMAIN}`);
-    directives["font-src"].push(... cdnDomains);
-    directives["img-src"].push(...cdnDomains);
-    directives["connect-src"]. push(...cdnDomains);
     
     // Ενεργοποίηση HTTPS upgrade ΜΟΝΟ σε production
     if (isProd) {
@@ -317,7 +325,7 @@ const buildCSPDirectives = () => {
 const cspDirectives = buildCSPDirectives();
 
 app.use(
-    helmet.contentSecurityPolicy({
+    helmet. contentSecurityPolicy({
         useDefaults: false,
         directives: cspDirectives,
     })
@@ -345,7 +353,7 @@ const csrfProtection = csurf({
 app.use((req, res, next) => {
     // Παράκαμψη CSRF για:
     // 1. S3 pre-signed URL callbacks
-    // 2. Webhooks από AWS
+    // 2.  Webhooks από AWS
     // 3. Health checks
     const skipPaths = [
         '/health',
@@ -392,12 +400,12 @@ app.use(async (err, req, res, next) => {
         });
         
         if (req.flash) {
-            await res.flash("error", "Η συνεδρία έληξε ή η φόρμα δεν είναι έγκυρη. Δοκιμάστε ξανά.");
+            await res.flash("error", "Η συνεδρία έληξε ή η φόρμα δεν είναι έγκυρη.  Δοκιμάστε ξανά.");
         }
         
         const referrer = req.get("Referrer") || req.get("Referer") || "/";
         // Επικύρωση για να αποφύγουμε open redirects
-        const safeRedirect = referrer.startsWith('/') ? referrer : '/';
+        const safeRedirect = referrer.startsWith('/') ?  referrer : '/';
         return res.redirect(safeRedirect);
     }
     next(err);
@@ -420,7 +428,7 @@ app.use((req, res, next) => {
 /* -------------------------------------------------------------------------- */
 app.get("/api/session-data", (req, res) => {
     res.json({
-        sessionEtos: req.session?.yearInUse || null,
+        sessionEtos: req.session?. yearInUse || null,
         sessionMhnas: req.session?.periodInUse || null,
         sessionTeam: req.session?.userTeam || null,
         sessionCompanyInUse: req.session?.companyInUse || null,
@@ -451,7 +459,7 @@ app.use("/", usersRoute);
 // Countdown endpoint (για client-side εμφάνιση)
 app.get("/remaining-time", (req, res) => {
     const now = Date.now();
-    const last = req.session?. lastActivity ??  now;
+    const last = req.session?.lastActivity ??  now;
     const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
     res.json({ remainingTime: remaining });
 });
