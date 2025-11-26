@@ -56,7 +56,7 @@ router.post("/login/send-reset-password-email", userController.sendUserResetPass
 router.get("/reset_password", userController.resetPasswordForm);
 router.get("/login/reset_old_password/:uid/:token", userController.showResetPasswordForm);
 router.post("/login/reset_old_password/:uid/:token", userController.handleResetPassword);
-
+  
 router.get("/login/logout", userController.logoutForm);
 router.post("/logout/userLogout", userController.logout);
 router.get("/logout/end_Session", userController.logout);
