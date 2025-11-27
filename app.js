@@ -6,7 +6,7 @@ const node_env = process.env.NODE_ENV || "development";
 
 // Ρύθμιση static assets
 const STATIC_BASE_DEV = process.env.STATIC_BASE_DEV || "/static/js";
-const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min. js";
+const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min.js";
 const STATIC_BASE = node_env === 'production' ? STATIC_BASE_PROD : STATIC_BASE_DEV;
 
 // AWS S3/CloudFront domains
