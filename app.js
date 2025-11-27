@@ -163,7 +163,7 @@ app.locals.script = (path) => {
     const cleanPath = path.replace(/\.js$/, '');
     
     if (node_env === 'production') {
-        return `${STATIC_BASE}/${cleanPath}. min.js`;
+        return `${STATIC_BASE}/${cleanPath}.min.js`;
     } else {
         return `${STATIC_BASE}/${cleanPath}.js`;
     }
