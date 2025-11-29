@@ -1,6 +1,6 @@
 <div
-  class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom bg-hero-cdn">
-  </br>
+    class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom bg-hero-cdn">
+    </br>
 </div>
 
 <div class="container w-35">
@@ -28,6 +28,7 @@
                             id="appHmeromhnia"
                             class="date-control"
                             value=""
+                            required
                         />
                     </div>
                 </div>
@@ -49,10 +50,9 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/logger<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getAppDate<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<!-- <script src="<%= script('common/logger') %>"></script>
+<script src="<%= script('common/getCompanyDescription') %>"></script>
+<script src="<%= script('common/getXrhsh') %>"></script>
+<script src="<%= script('common/getPeriod') %>"></script> -->
+<!-- <script src="<%= script('common/getAppDate') %>"></script> -->
+<!-- <script src="<%= script('common/getUser') %>"></script> -->

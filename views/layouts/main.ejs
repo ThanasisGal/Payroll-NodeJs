@@ -76,6 +76,7 @@
         <script src="<%= script('common/getCompanyDescription') %>"></script>
         <script src="<%= script('common/getXrhsh') %>"></script>
         <script src="<%= script('common/getPeriod') %>"></script>
+        <script src="<%= script('common/getAppDate') %>"></script>
         <script src="<%= script('common/getUser') %>"></script>
         <script src="<%= script('common/navTabs') %>"></script>
         <script src="<%= script('common/moveByEnter') %>"></script>
@@ -96,17 +97,6 @@
         </script>
 
         <!-- Εξωτερικά vendor scripts με nonce -->
-        <!-- <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
-        <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
-        <script nonce="<%= nonce %>" type="module" src="/static/js/app.js"></script>
-        <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
-        <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
-        <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
-        <script nonce="<%= nonce %>" src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
-        <script nonce="<%= nonce %>" src="/static/js/common/checkScreenAnalysis.js" defer></script> 
-        <script nonce="<%= nonce %>" src="/static/js/common/deviceSwitcher.js" defer></script> 
-        <script nonce="<%= nonce %>" src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script> -->
-
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
         <script type="module" src="/static/js/app.js"></script>
@@ -120,19 +110,19 @@
 
         <!-- ΠΡΙΝ το closing </body> tag -->
         <script nonce="<%= nonce %>">
-        // 🔑 Global CSRF helper
-        window.getCSRFToken = function() {
-            // 1. Από meta tag
-            const meta = document.querySelector('meta[name="csrf-token"]');
-            if (meta) return meta.getAttribute('content');
-            
-            // 2. Από hidden input (fallback)
-            const input = document.querySelector('input[name="_csrf"]');
-            if (input) return input.value;
-            
-            console.warn('⚠️ CSRF token not found!');
-            return null;
-        };
+            // 🔑 Global CSRF helper
+            window.getCSRFToken = function() {
+                // 1. Από meta tag
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta) return meta.getAttribute('content');
+                
+                // 2. Από hidden input (fallback)
+                const input = document.querySelector('input[name="_csrf"]');
+                if (input) return input.value;
+                
+                console.warn('⚠️ CSRF token not found!');
+                return null;
+            };
         </script>
     </body>
 </html>

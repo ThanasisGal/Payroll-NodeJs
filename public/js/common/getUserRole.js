@@ -2,19 +2,19 @@ document.addEventListener("DOMContentLoaded", function () {
   
   // ✅ Only run on authenticated/protected pages
   // Skip on public pages and login flow
-  const publicPages = ['/login', '/reset_password', '/register', '/logout', '/'];
+  const publicPages = ['/login', '/reset_password', '/register', '/logout', '/', '/dates/appDate', '/dates/yearInUse', '/dates/periods'];
   const currentPath = window. location.pathname;
   
   // If on home page or login pages, skip permission check
   if (publicPages. some(page => currentPath === page)) {
-    console.log("Public page - skipping permission check");
+    // console.log("Public page - skipping permission check");
     return;
   }
 
   // ✅ Only run if user appears to be logged in
   const userId = window.WPS_USER_ID;
   if (!userId || userId === '""' || userId === 'null') {
-    console.log("No user ID - skipping permission check");
+    // console.log("No user ID - skipping permission check");
     return;
   }
 
