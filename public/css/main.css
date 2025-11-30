@@ -817,9 +817,9 @@ small,
   position: absolute; /* Απόλυτη θέση */
   right: 10px; /* Ακριβώς στο δεξί άκρο */
   font-weight: 600;
-  font-size: 0.75vw;
+  font-size: 0.95vw;
   text-align: right;
-  color:#fb9200
+  color:#ffffff
 }
 
 .padding-right-10 {
@@ -3902,7 +3902,7 @@ select.tom-dropdown {
 /* Ασφαλείς, ειδικές κλάσεις για να μην συγκρούονται */
 #remaining-time.rt-white  { color: #fff; }
 #remaining-time.rt-orange { color: #ffa500; }
-#remaining-time.rt-red    { color: red; }
+#remaining-time.rt-red    { color: #ff5252; }
 
 .loader-container.visible { display: grid; }
 .loader-container.is-hidden { display: none !important; }

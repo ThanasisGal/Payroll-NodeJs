@@ -584,17 +584,164 @@ static sendUserVerifyEmail = async (req, res) => {
         }
     };
 
+    // static userLogin = async (req, res) => {
+    //     let redir = "login/login";
+
+    //     try {
+    //         const { email, password } = req.body || {};
+            
+    //         if (!email || !password) {
+    //             await res.flash("info", "Όλα τα πεδία είναι υποχρεωτικά...");
+    //             return res.render("login/login", { bodyClass: "home-bg-cdn" });
+    //         }
+
+    //         const user = await UserModel.findOne({ email: String(email).trim().toLowerCase() });
+            
+    //         if (!user) {
+    //             await res.flash("warning", "Δεν είστε εγγεγραμμένος χρήστης. Εγγραφείτε για να συνεχίσετε...");
+    //             return res.render("login/login", { bodyClass: "home-bg-cdn" });
+    //         }
+
+    //         if (!user.isVerified) {
+    //             await res.flash("error", "Δεν έχετε κάνει επαλήθευση του Email σας. Επαληθεύστε το email και συνεχίστε...");
+    //             return res.render("login/login", { bodyClass: "home-bg-cdn" });
+    //         }
+
+    //         if (user.situation === "I") {
+    //             await res.flash("error", "Είστε απενεργοποιημένος χρήστης. Επικοινωνήστε με τον διαχειριστή...");
+    //             return res.render("login/login", { bodyClass: "home-bg-cdn" });
+    //         }
+
+    //         const isMatch = await bcrypt.compare(password, user.password);
+    //         if (!(user.email === String(email).trim().toLowerCase() && isMatch)) {
+    //             await res. flash("error", "Το email ή ο κωδικός πρόσβασης δεν είναι έγκυρα...");
+    //             return res.render("login/login", { bodyClass: "home-bg-cdn" });
+    //         }
+
+    //         // JWT
+    //         const token = jwt.sign({ userID: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: "10m" });
+
+    //         // ✅ Set session data
+    //         req.session.userId = user._id;
+    //         req.session.userName = user.firstName;
+    //         req.session.userTeam = user.team;
+    //         req.session.userRole = user. privileges;
+    //         req.session. userStatus = user.situation;
+    //         req.session.companyInUse = "";
+    //         req. session.companyDescription = "";
+    //         req.session.yearInUse = String(year);
+    //         req.session.periodInUse = month;
+    //         req.session.periodInUseDescr = monthNames[now.getMonth()];
+    //         req.session.appDate = `${day}/${month}/${year}`;
+    //         req.session.currentTyposApodoxon = "001";
+    //         req.session.energoi = true;
+    //         req.session. ypokatasthma = "";
+
+    //         // Sync from template
+    //         const templateUserId = process.env.PROTYPO_ID;
+    //         const userIdStr = String(user._id);
+
+    //         await syncFromTemplate({
+    //             Model: UserPrivilegesModel,
+    //             userIdStr,
+    //             templateId: templateUserId,
+    //             uniqueKey: "form",
+    //             projection: { _id: 0, userId: 0, createdAt: 0, updatedAt: 0 },
+    //         });
+
+    //         await syncFromTemplate({
+    //             Model: SidebarStatusModel,
+    //             userIdStr,
+    //             templateId: templateUserId,
+    //             uniqueKey: "li_Id",
+    //             projection: { _id: 0, userId: 0 },
+    //         });
+
+    //         // Load user parameters
+    //         const parameter = await ParamModel.findOne({ usrId: req.session.userId });
+    //         if (parameter) {
+    //             if (parameter.usedYear) req.session.yearInUse = parameter.usedYear;
+    //             if (parameter.usedPeriod) req.session.periodInUse = parameter.usedPeriod;
+    //             if (parameter.usedPeriodDescr) req.session.periodInUseDescr = parameter.usedPeriodDescr;
+    //             if (parameter.appDate) req.session.appDate = parameter.appDate;
+
+    //             if (parameter.companyId && parameter. companyId.length > 0) {
+    //                 const companies = await CompaniesModel.findById(parameter.companyId);
+    //                 if (companies) {
+    //                     req.session.companyInUse = parameter.companyId;
+    //                     req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`.trim();
+    //                 }
+    //                 redir = "/mainapp";
+    //             } else {
+    //                 redir = "/companies/genikastoixeia";
+    //             }
+
+    //             if (parameter.usedPeriod && parameter.usedYear) {
+    //                 const periodoi = await PeriodsModel.findOne({
+    //                     xrhsh: parameter.usedYear,
+    //                     kodikos: parameter.usedPeriod,
+    //                 });
+    //                 if (periodoi) req. session.periodInUseDescr = periodoi.perigrafh;
+    //             }
+    //         } else {
+    //             redir = "/companies/genikastoixeia";
+    //         }
+
+    //     } catch (error) {
+    //         console.error('Login error:', error);
+    //         await res.flash("error", "Αδυναμία Σύνδεσης.  Επικοινωνήστε με τον Διαχειριστή");
+    //         redir = "login/login";
+    //     }
+
+    //     // ✅ CRITICAL FIX: Save session before redirect! 
+    //     if (redir === "/mainapp" || redir === "/companies/genikastoixeia") {
+    //         req.session. save((err) => {
+    //             if (err) {
+    //                 console.error('❌ Session save error:', err);
+    //                 return res.render("login/login", { 
+    //                     bodyClass: "home-bg-cdn" 
+    //                 });
+    //             }
+                
+    //             console.log('✅ Session saved - redirecting to:', redir);
+    //             console.log('   Session ID:', req.sessionID);
+    //             console.log('   User ID:', req.session.userId);
+                
+    //             res.redirect(redir);
+    //         });
+    //     } else {
+    //         // Login failed - render login page
+    //         return res.render(redir, { bodyClass: "home-bg-cdn" });
+    //     }
+    // };
+
     static userLogin = async (req, res) => {
         let redir = "login/login";
 
         try {
             const { email, password } = req.body || {};
             
-            // ...  (existing validation code) ...
+            if (!email || !password) {
+                await res.flash("info", "Όλα τα πεδία είναι υποχρεωτικά...");
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
+            }
 
             const user = await UserModel.findOne({ email: String(email).trim().toLowerCase() });
             
-            // ... (existing user checks) ...
+            if (!user) {
+                await res.flash("warning", "Δεν είστε εγγεγραμμένος χρήστης. Εγγραφείτε για να συνεχίσετε...");
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
+            }
+
+            if (!user.isVerified) {
+                await res. flash("error", "Δεν έχετε κάνει επαλήθευση του Email σας. Επαληθεύστε το email και συνεχίστε.. .");
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
+            }
+
+            if (user.situation === "I") {
+                await res.flash("error", "Είστε απενεργοποιημένος χρήστης. Επικοινωνήστε με τον διαχειριστή...");
+                return res. render("login/login", { bodyClass: "home-bg-cdn" });
+            }
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!(user.email === String(email).trim().toLowerCase() && isMatch)) {
@@ -605,21 +752,29 @@ static sendUserVerifyEmail = async (req, res) => {
             // JWT
             const token = jwt.sign({ userID: user._id }, process.env.JWT_SECRET_KEY, { expiresIn: "10m" });
 
+            // ═══════════════════════════════════════════════════════════
             // ✅ Set session data
+            // ═══════════════════════════════════════════════════════════
             req.session.userId = user._id;
-            req.session.userName = user.firstName;
+            req. session.userName = user.firstName;
             req.session.userTeam = user.team;
-            req.session.userRole = user. privileges;
-            req.session. userStatus = user.situation;
+            req.session.userRole = user.privileges;
+            req.session.userStatus = user.situation;
             req.session.companyInUse = "";
-            req. session.companyDescription = "";
+            req.session.companyDescription = "";
             req.session.yearInUse = String(year);
             req.session.periodInUse = month;
-            req.session.periodInUseDescr = monthNames[now.getMonth()];
-            req.session.appDate = `${day}/${month}/${year}`;
+            req. session.periodInUseDescr = monthNames[now.getMonth()];
+            req.session. appDate = `${day}/${month}/${year}`;
             req.session.currentTyposApodoxon = "001";
             req.session.energoi = true;
             req.session. ypokatasthma = "";
+            
+            // ✅ ΚΡΙΣΙΜΟ: Set lastActivity για countdown
+            req.session.lastActivity = Date.now();
+            
+            // ✅ ΚΡΙΣΙΜΟ: Διέγραψε anonymousStartTime (αν υπάρχει)
+            delete req.session.anonymousStartTime;
 
             // Sync from template
             const templateUserId = process.env.PROTYPO_ID;
@@ -645,15 +800,15 @@ static sendUserVerifyEmail = async (req, res) => {
             const parameter = await ParamModel.findOne({ usrId: req.session.userId });
             if (parameter) {
                 if (parameter.usedYear) req.session.yearInUse = parameter.usedYear;
-                if (parameter.usedPeriod) req.session.periodInUse = parameter.usedPeriod;
-                if (parameter.usedPeriodDescr) req.session.periodInUseDescr = parameter.usedPeriodDescr;
+                if (parameter.usedPeriod) req.session.periodInUse = parameter. usedPeriod;
+                if (parameter.usedPeriodDescr) req.session. periodInUseDescr = parameter.usedPeriodDescr;
                 if (parameter.appDate) req.session.appDate = parameter.appDate;
 
-                if (parameter.companyId && parameter. companyId.length > 0) {
+                if (parameter.companyId && parameter.companyId.length > 0) {
                     const companies = await CompaniesModel.findById(parameter.companyId);
                     if (companies) {
                         req.session.companyInUse = parameter.companyId;
-                        req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`.trim();
+                        req.session.companyDescription = `${companies.eponymia} ${companies. firstname}`.trim();
                     }
                     redir = "/mainapp";
                 } else {
@@ -672,29 +827,29 @@ static sendUserVerifyEmail = async (req, res) => {
             }
 
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('❌ Login error:', error);
             await res.flash("error", "Αδυναμία Σύνδεσης.  Επικοινωνήστε με τον Διαχειριστή");
             redir = "login/login";
         }
 
-        // ✅ CRITICAL FIX: Save session before redirect! 
+        // ✅ Save session before redirect
         if (redir === "/mainapp" || redir === "/companies/genikastoixeia") {
-            req.session. save((err) => {
+            req.session.save((err) => {
                 if (err) {
-                    console.error('❌ Session save error:', err);
-                    return res.render("login/login", { 
+                    console. error('❌ Session save error:', err);
+                    return res. render("login/login", { 
                         bodyClass: "home-bg-cdn" 
                     });
                 }
                 
-                console.log('✅ Session saved - redirecting to:', redir);
+                console.log('✅ Session saved successfully');
                 console.log('   Session ID:', req.sessionID);
                 console.log('   User ID:', req.session.userId);
+                console.log('   Last Activity:', new Date(req.session.lastActivity).toISOString());
                 
                 res.redirect(redir);
             });
         } else {
-            // Login failed - render login page
             return res.render(redir, { bodyClass: "home-bg-cdn" });
         }
     };

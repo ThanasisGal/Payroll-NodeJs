@@ -43,7 +43,10 @@ app.disable("x-powered-by"); // μικρό hardening
 
 const host = process.env.HOST || "localhost";
 const port = Number(process.env.PORT || 5000);
+
 const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 30); // λεπτά
+const grace_period = Number(process.env. GRACE_PERIOD || 2);         // λεπτά
+
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
 const EGGRAFES = Number. parseInt(process.env.EGGRAFES ??  '15', 10) || 15;
@@ -144,8 +147,8 @@ connectDB();
 /* -------------------------------------------------------------------------- */
 
 // Body parsers ΠΡΙΝ από CSRF
-app.use(urlencoded({ extended: true, limit: '50mb' }));
 app.use(json({ limit: '50mb' }));
+app.use(urlencoded({ extended: true, limit: '50mb' }));
 
 // Method override για φόρμες που θέλουν PUT/DELETE
 app.use(methodOverride("_method"));
@@ -190,26 +193,64 @@ app. use(flash({ sessionKeyName: "flashMessage" }));
 app.use(getSessionVars);
 
 // Activity-based session timeout (κρατά lastActivity ώστε να ανανεώνεται το cookie)
-app.use((req, res, next) => {
-    if (req.session) {
-        const now = Date.now();
-        const isAsset = req.path.startsWith("/static/");
-        const isCountdown = req.path === '/remaining-time';
-        const isLogout = req.path. startsWith('/logout');
+    app.get("/remaining-time", (req, res) => {
+    const now = Date.now();
+    
+    // ═══════════════════════════════════════════════════════════
+    // CASE 1: Authenticated User (έχει userId)
+    // ═══════════════════════════════════════════════════════════
+    if (req.session && req.session.userId) {
+        const last = req.session.lastActivity || now;
+        const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
 
-        if (! isAsset && !isCountdown && !isLogout) {
-            if (! req.session.lastActivity) req.session.lastActivity = now;
-            const elapsed = now - req.session. lastActivity;
-            const remaining = 1000 * 60 * diarkeia_session - elapsed;
-
-            if (remaining <= 0) return res.redirect(303, "/logout/end_Session");
-            res.locals.remainingTime = remaining;
-            req.session.lastActivity = now; // τροποποίηση => σώζει session
-        }
-    } else {
-        res.locals. remainingTime = 0;
+        return res.json({ 
+            remainingTime: remaining,
+            sessionID: req. sessionID,
+            userType: 'authenticated'
+        });
     }
-    next();
+
+    // ═══════════════════════════════════════════════════════════
+    // CASE 2: Anonymous User (δεν έχει userId)
+    // ═══════════════════════════════════════════════════════════
+    
+    // ✅ Αν δεν υπάρχει session καθόλου, δημιούργησε
+    if (!req.session) {
+        return res.status(500).json({ 
+            error: 'Session middleware error',
+            remainingTime: 0 
+        });
+    }
+
+    // ✅ Αν δεν έχει `anonymousStartTime`, όρισέ το ΤΩΡΑ
+    if (!req.session.anonymousStartTime) {
+        req.session.anonymousStartTime = now;
+    }
+
+    // ✅ Υπολόγισε το remaining time για anonymous
+    const anonymousStart = req.session.anonymousStartTime;
+    const anonymousElapsed = now - anonymousStart;
+    const anonymousRemaining = Math.max(0, 1000 * 60 * grace_period - anonymousElapsed);
+
+    // Debug logging
+
+    // ✅ Αν το grace period έληξε
+    if (anonymousRemaining <= 0) {
+        return res.status(401).json({ 
+            error: 'Grace period expired',
+            remainingTime: 0,
+            userType: 'anonymous',
+            message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
+        });
+    }
+
+    // ✅ Επιστροφή remaining time για anonymous
+    return res.json({ 
+        remainingTime: anonymousRemaining,
+        sessionID: req.sessionID,
+        userType: 'anonymous',
+        gracePeriod: true
+    });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -410,7 +451,7 @@ app.use(async (err, req, res, next) => {
     }
     next(err);
 });
-
+ 
 /* -------------------------------------------------------------------------- */
 /*                             Views / layouts (EJS)                          */
 /* -------------------------------------------------------------------------- */
@@ -458,10 +499,21 @@ app.use("/", usersRoute);
 
 // Countdown endpoint (για client-side εμφάνιση)
 app.get("/remaining-time", (req, res) => {
+    if (!req.session || !req.session.userId) {
+        return res.status(401).json({ 
+            error: 'Not authenticated',
+            remainingTime: 0 
+        });
+    }
+
     const now = Date.now();
     const last = req.session?.lastActivity ??  now;
     const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
-    res.json({ remainingTime: remaining });
+
+    res.json({ 
+        remainingTime: remaining,
+        sessionID: req.sessionID // για debugging
+    });
 });
 
 /* -------------------------------------------------------------------------- */

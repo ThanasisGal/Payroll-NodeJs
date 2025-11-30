@@ -6,24 +6,29 @@ const secret            = process.env.SESSION_SECRET || process.env.SECRET || "d
 const mongoUrl          = process.env.MONGODB_URL;
 
 const sessionOpts = {
-  name: 'sid',
-  secret,
-  resave: false,
-  saveUninitialized: false,
-  store: mongoUrl
-    ? MongoStore.create({
-        mongoUrl,
-        ttl: 60 * diarkeia_session,   // λεπτά
-        autoRemove: 'native',
-      })
-    : undefined,                      // MemoryStore σε dev
-  cookie: {
-    maxAge  : 1000 * 60 * diarkeia_session,
-    httpOnly: true,
-    secure  : isProd,                 // dev:false, prod:true (με trust proxy)
-    sameSite: 'lax',
-    path    : '/',                    // ⚠️ ίδιο στο clearCookie
-  },
+    name: 'sid',
+    secret,
+    resave: false,
+    saveUninitialized: true,
+    store: mongoUrl
+		? MongoStore.create({
+				mongoUrl,
+				ttl: 60 * diarkeia_session,   // λεπτά
+				autoRemove: 'native',
+			})
+		: undefined,                      // MemoryStore σε dev
+    cookie: {
+		maxAge  : 1000 * 60 * diarkeia_session,
+		httpOnly: true,
+		secure  : isProd,                 // dev:false, prod:true (με trust proxy)
+		sameSite: 'lax',
+		path    : '/',                    // ⚠️ ίδιο στο clearCookie
+		...(isProd && process.env.COOKIE_DOMAIN && { 
+    	    domain: process.env.COOKIE_DOMAIN 
+    	})
+  	},
+	rolling: false,
+  	proxy: isProd,
 };
 
 module.exports = { sessionOpts, isProd };

@@ -1,6 +1,8 @@
 # Κλειδιά και διαπιστευτήρια
 *.pem
 .env
+.env.production
+.aws/
 
 # Παραγόμενα αρχεία και φακέλοι
 public/json/*.json
