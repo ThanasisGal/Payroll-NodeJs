@@ -9,12 +9,13 @@ const sessionOpts = {
     name: 'sid',
     secret,
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     store: mongoUrl
 		? MongoStore.create({
 				mongoUrl,
 				ttl: 60 * diarkeia_session,   // λεπτά
 				autoRemove: 'native',
+				touchAfter: 24 * 3600,
 			})
 		: undefined,                      // MemoryStore σε dev
     cookie: {
