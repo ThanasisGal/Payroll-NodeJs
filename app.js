@@ -510,23 +510,23 @@ app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
 
 // Countdown endpoint (για client-side εμφάνιση)
-app.get("/remaining-time", (req, res) => {
-    if (!req.session || !req.session.userId) {
-        return res.status(401).json({ 
-            error: 'Not authenticated',
-            remainingTime: 0 
-        });
-    }
+// app.get("/remaining-time", (req, res) => {
+//     if (!req.session || !req.session.userId) {
+//         return res.status(401).json({ 
+//             error: 'Not authenticated',
+//             remainingTime: 0 
+//         });
+//     }
 
-    const now = Date.now();
-    const last = req.session?.lastActivity ??  now;
-    const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
+//     const now = Date.now();
+//     const last = req.session?.lastActivity ??  now;
+//     const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
 
-    res.json({ 
-        remainingTime: remaining,
-        sessionID: req.sessionID // για debugging
-    });
-});
+//     res.json({ 
+//         remainingTime: remaining,
+//         sessionID: req.sessionID // για debugging
+//     });
+// });
 
 /* -------------------------------------------------------------------------- */
 /*                              Διαχείριση σφαλμάτων                          */
