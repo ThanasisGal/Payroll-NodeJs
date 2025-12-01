@@ -162,13 +162,25 @@ app.use("/static", express.static(path. join(__dirname, "public")));
 // Global locals
 // Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
-    // Αφαίρεση . js αν υπάρχει
-    const cleanPath = path.replace(/\.js$/, '');
+    // ✅ Καθαρισμός path
+    const cleanPath = path.replace(/\.js$/, '').trim();
+    
+    // ✅ Καθαρισμός STATIC_BASE (αφαίρεση spaces)
+    const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
     
     if (node_env === 'production') {
-        return `${STATIC_BASE}/${cleanPath}.min.js`;
+        const url = `${baseURL}/${cleanPath}.min.js`;
+        
+        // ✅ Debug: Έλεγχος για %20
+        if (url.includes('%20') || url.includes(' ')) {
+            console.error(`❌ Invalid script URL generated: ${url}`);
+            console.error(`   Path: ${path}`);
+            console.error(`   STATIC_BASE: ${STATIC_BASE}`);
+        }
+        
+        return url;
     } else {
-        return `${STATIC_BASE}/${cleanPath}.js`;
+        return `${baseURL}/${cleanPath}.js`;
     }
 };
 
