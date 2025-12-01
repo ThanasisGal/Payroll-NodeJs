@@ -705,21 +705,37 @@ static sendUserVerifyEmail = async (req, res) => {
         if (redir === "/mainapp" || redir === "/companies/genikastoixeia") {
             req.session.save((err) => {
                 if (err) {
-                    console. error('❌ Session save error:', err);
-                    return res. render("login/login", { 
-                        bodyClass: "home-bg-cdn" 
-                    });
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.error('❌ SESSION SAVE ERROR');
+                    console.error(err);
+                    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    return res.render("login/login", { bodyClass: "home-bg-cdn" });
                 }
                 
-                console.log('✅ Session saved successfully');
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('✅ SESSION SAVED SUCCESSFULLY');
                 console.log('   Session ID:', req.sessionID);
                 console.log('   User ID:', req.session.userId);
                 console.log('   Last Activity:', new Date(req.session.lastActivity).toISOString());
                 
-                const setCookieHeader = res. getHeader('Set-Cookie');
-                console.log('   Set-Cookie headers:', setCookieHeader);
-
-                res.redirect(redir);
+                // ✅ CRITICAL FIX: Manually set session cookie
+                // Express session middleware sometimes doesn't set it automatically
+                const cookieOptions = {
+                    httpOnly: true,
+                    secure: isProd,
+                    sameSite: 'lax',
+                    path: '/',
+                    maxAge: 1000 * 60 * (Number(process.env.DIARKEIA_SESSION) || 30)
+                };
+                
+                res.cookie('sid', req.sessionID, cookieOptions);
+                
+                console.log('   Cookie manually set: sid=' + req.sessionID. substring(0, 20) + '...');
+                console.log('   Cookie options:', cookieOptions);
+                console.log('   Redirecting to:', redir);
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                
+                return res.redirect(redir);
             });
         } else {
             return res.render(redir, { bodyClass: "home-bg-cdn" });
