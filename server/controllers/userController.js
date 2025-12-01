@@ -728,7 +728,7 @@ static sendUserVerifyEmail = async (req, res) => {
                     maxAge: 1000 * 60 * (Number(process.env.DIARKEIA_SESSION) || 30)
                 };
                 
-                res.cookie('sid', req.sessionID, cookieOptions);
+                // res.cookie('sid', req.sessionID, cookieOptions);
                 
                 console.log('   Cookie manually set: sid=' + req.sessionID. substring(0, 20) + '...');
                 console.log('   Cookie options:', cookieOptions);
