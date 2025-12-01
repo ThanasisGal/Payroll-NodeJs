@@ -993,8 +993,12 @@ static userLogin = async (req, res) => {
                 }
                 
                 console.log('✅ Login successful - Session ID:', req.sessionID);
+                console.log('   User ID:', req.session.userId);
+                console.log('   Redirecting to:', redir);
+                
+                // ✅ FIX: Explicit redirect με return
                 return res.redirect(redir);
-            });
+            });        
         });
 
     } catch (error) {
