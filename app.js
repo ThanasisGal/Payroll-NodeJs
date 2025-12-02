@@ -163,13 +163,13 @@ app.use("/static", express.static(path. join(__dirname, "public")));
 // Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
     // ✅ Καθαρισμός path
-    const cleanPath = path.replace(/\. js$/, ''). trim();
+    const cleanPath = path.replace(/\.js$/, ''). trim();
     
     // ✅ Καθαρισμός STATIC_BASE (αφαίρεση spaces)
     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
     
     if (node_env === 'production') {
-        const url = `${baseURL}/${cleanPath}. min.js`;
+        const url = `${baseURL}/${cleanPath}.min.js`;
         
         // ✅ Debug: Έλεγχος για %20
         if (url.includes('%20') || url.includes(' ')) {
