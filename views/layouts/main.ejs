@@ -81,7 +81,6 @@
         <script src="<%= script('common/navTabs') %>"></script>
         <script src="<%= script('common/moveByEnter') %>"></script>
         <script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
-        <!-- <script src="<%= script('common/countdown') %>"></script> -->
         <script src="<%= script('common/tooltipsForButtons') %>"></script>
         <script src="<%= script('dates/convertDateToISO') %>"></script>
 
@@ -99,13 +98,15 @@
         <!-- Εξωτερικά vendor scripts με nonce -->
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
-        <script type="module" src="/static/js/app.js"></script>
+        <script type="module" src="<%= script('app.js') %>"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
-        <script src="/static/js/common/checkScreenAnalysis.js" defer></script>
-        <script src="/static/js/common/deviceSwitcher.js" defer></script>
+        <script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
+        <script src="<%= script('common/deviceSwitcher') %>" defer></script>
+
+        <!-- <script src="/static/js/common/deviceSwitcher.js" defer></script> -->
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
 
         <!-- ΠΡΙΝ το closing </body> tag -->
