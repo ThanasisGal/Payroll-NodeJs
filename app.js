@@ -162,29 +162,26 @@ app.use("/static", express.static(path. join(__dirname, "public")));
 // Global locals
 // Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
-    // ✅ Καθαρισμός path
-    const cleanPath = path.replace(/\.js$/, ''). trim();
+    // ✅ Remove . js, trim, remove ALL spaces
+    const cleanPath = path
+        .replace(/\. js$/i, '')
+        .trim()
+        .replace(/\s+/g, '');
     
-    // ✅ Καθαρισμός STATIC_BASE (αφαίρεση spaces)
-    const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
+    // ✅ Clean STATIC_BASE
+    const baseURL = STATIC_BASE
+        .trim()
+        .replace(/\s+/g, '');
     
     if (node_env === 'production') {
-        const url = `${baseURL}/${cleanPath}.min.js`;
-        
-        // ✅ Debug: Έλεγχος για %20
-        if (url.includes('%20') || url.includes(' ')) {
-            console.error(`❌ Invalid script URL generated: ${url}`);
-            console.error(`   Path: ${path}`);
-            console.error(`   STATIC_BASE: ${STATIC_BASE}`);
-        }
-        
+        // ✅ Build URL without spaces
+        const url = `${baseURL}/${cleanPath}.min.js`. replace(/\s+/g, '');
         return url;
     } else {
-        return `${baseURL}/${cleanPath}.js`;
+        return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
     }
 };
 
-// Επίσης διαθέσιμο για άμεση χρήση
 app.locals. STATIC_BASE = STATIC_BASE;
 app.locals.NODE_ENV = node_env;
 
@@ -676,25 +673,6 @@ app.use(
 app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
-
-// Countdown endpoint (για client-side εμφάνιση)
-// app.get("/remaining-time", (req, res) => {
-//     if (!req.session || !req.session.userId) {
-//         return res.status(401).json({ 
-//             error: 'Not authenticated',
-//             remainingTime: 0 
-//         });
-//     }
-
-//     const now = Date.now();
-//     const last = req.session?. lastActivity ??  now;
-//     const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
-
-//     res.json({ 
-//         remainingTime: remaining,
-//         sessionID: req.sessionID // για debugging
-//     });
-// });
 
 /* -------------------------------------------------------------------------- */
 /*                              Διαχείριση σφαλμάτων                          */
