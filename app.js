@@ -628,7 +628,18 @@ app.use(async (err, req, res, next) => {
     }
     next(err);
 });
- 
+
+// CSS helper (add after app.locals.script)
+app.locals.css = (path) => {
+    const cleanPath = path. replace(/\.css$/i, '').trim(). replace(/\s+/g, '');
+    
+    if (node_env === 'production') {
+        return `https://cdn.webpayrollsolutions.com/assets/own/css/${cleanPath}.min.css`;
+    } else {
+        return `/static/css/${cleanPath}.css`;
+    }
+};
+
 /* -------------------------------------------------------------------------- */
 /*                             Views / layouts (EJS)                          */
 /* -------------------------------------------------------------------------- */
