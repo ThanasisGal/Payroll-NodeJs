@@ -6,14 +6,14 @@ const node_env = process.env.NODE_ENV || "development";
 
 // Ρύθμιση static assets
 const STATIC_BASE_DEV = process.env.STATIC_BASE_DEV || "/static/js";
-const STATIC_BASE_PROD = process.env. STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min.js";
+const STATIC_BASE_PROD = process.env.STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min. js";
 const STATIC_BASE = node_env === 'production' ? STATIC_BASE_PROD : STATIC_BASE_DEV;
 
 // AWS S3/CloudFront domains
 const S3_BUCKET = process.env.S3_BUCKET || "employee-certificates-webpayrollsolutions-central";
 const S3_REGION = process.env.AWS_REGION || "eu-central-1";
 const CDN_DOMAIN = process.env.CDN_DOMAIN || "cdn.webpayrollsolutions.com";
-const CLOUDFRONT_DOMAIN = process.env. CLOUDFRONT_DOMAIN; // Προαιρετικό: d1t9waojrhy16d.cloudfront.net
+const CLOUDFRONT_DOMAIN = process. env.CLOUDFRONT_DOMAIN; // Προαιρετικό: d1t9waojrhy16d.cloudfront.net
 
 const express = require("express");
 const { urlencoded, json } = require("express");
@@ -45,7 +45,7 @@ const host = process.env.HOST || "localhost";
 const port = Number(process.env.PORT || 5000);
 
 const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 30); // λεπτά
-const grace_period = Number(process.env. GRACE_PERIOD || 2);         // λεπτά
+const grace_period = Number(process.env.GRACE_PERIOD || 2);         // λεπτά
 
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
@@ -105,7 +105,7 @@ const loginLimiter = rateLimit({
         }
         
         // Εμφάνιση σελίδας login με σφάλμα
-        res. status(429).render('login/login', {
+        res.status(429).render('login/login', {
             bodyClass: 'home-bg-cdn',
             csrfToken: req.csrfToken ?  req.csrfToken() : '',
             title: 'Σύνδεση',
@@ -163,13 +163,13 @@ app.use("/static", express.static(path. join(__dirname, "public")));
 // Helper: Λήψη διαδρομής script
 app.locals.script = (path) => {
     // ✅ Καθαρισμός path
-    const cleanPath = path.replace(/\.js$/, '').trim();
+    const cleanPath = path.replace(/\. js$/, ''). trim();
     
     // ✅ Καθαρισμός STATIC_BASE (αφαίρεση spaces)
     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
     
     if (node_env === 'production') {
-        const url = `${baseURL}/${cleanPath}.min.js`;
+        const url = `${baseURL}/${cleanPath}. min.js`;
         
         // ✅ Debug: Έλεγχος για %20
         if (url.includes('%20') || url.includes(' ')) {
@@ -192,25 +192,118 @@ app.locals.NODE_ENV = node_env;
 /*                              Ρύθμιση Session                               */
 /* -------------------------------------------------------------------------- */
 if (! mongoUrl) {
-    logger. error("MONGODB_URL δεν έχει οριστεί.  Χρήση MemoryStore (μόνο dev).");
+    logger.error("MONGODB_URL δεν έχει οριστεί.  Χρήση MemoryStore (μόνο dev).");
 }
 
 app.use(session(sessionOpts));
 logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 // Flash messages (βασίζεται στο session)
-app. use(flash({ sessionKeyName: "flashMessage" }));
+app.use(flash({ sessionKeyName: "flashMessage" }));
 
 // Custom session vars → res.locals
 app.use(getSessionVars);
 
-// Activity-based session timeout (κρατά lastActivity ώστε να ανανεώνεται το cookie)
-    app.get("/remaining-time", (req, res) => {
+// // Activity-based session timeout (κρατά lastActivity ώστε να ανανεώνεται το cookie)
+// app.get("/remaining-time", (req, res) => {
+//     const now = Date.now();
+    
+//     // ═══════════════════════════════════════════════════════════
+//     // CASE 1: Authenticated User (έχει userId)
+//     // ═══════════════════════════════════════════════════════════
+//     if (req.session && req.session.userId) {
+//         const last = req.session.lastActivity || now;
+//         const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
+
+//         return res.json({ 
+//             remainingTime: remaining,
+//             sessionID: req.sessionID,
+//             userType: 'authenticated'
+//         });
+//     }
+
+//     // ═══════════════════════════════════════════════════════════
+//     // CASE 2: Anonymous User (δεν έχει userId)
+//     // ═══════════════════════════════════════════════════════════
+    
+//     // ✅ Αν δεν υπάρχει session καθόλου, δημιούργησε
+//     if (!req.session) {
+//         return res.status(500).json({ 
+//             error: 'Session middleware error',
+//             remainingTime: 0 
+//         });
+//     }
+
+//     // ✅ Αν δεν έχει `anonymousStartTime`, όρισέ το ΤΩΡΑ
+//     if (!req.session.anonymousStartTime) {
+//         req.session. anonymousStartTime = now;
+//     }
+
+//     // ✅ Υπολόγισε το remaining time για anonymous
+//     const anonymousStart = req.session.anonymousStartTime;
+//     const anonymousElapsed = now - anonymousStart;
+//     const anonymousRemaining = Math.max(0, 1000 * 60 * grace_period - anonymousElapsed);
+
+//     // Debug logging
+
+//     // ✅ Αν το grace period έληξε
+//     if (anonymousRemaining <= 0) {
+//         return res.status(401).json({ 
+//             error: 'Grace period expired',
+//             remainingTime: 0,
+//             userType: 'anonymous',
+//             message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
+//         });
+//     }
+
+//     // ✅ Επιστροφή remaining time για anonymous
+//     return res.json({ 
+//         remainingTime: anonymousRemaining,
+//         sessionID: req.sessionID,
+//         userType: 'anonymous',
+//         gracePeriod: true
+//     });
+// });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MIDDLEWARE: Reset lastActivity on authenticated page navigation
+// ═══════════════════════════════════════════════════════════════════════════
+app.use((req, res, next) => {
+    // Skip for static files, API calls, login/logout
+    const skipPaths = [
+        '/static',
+        '/api',
+        '/login',
+        '/logout',
+        '/remaining-time',
+        '/csrf-token'
+    ];
+    
+    const shouldSkip = skipPaths.some(path => req.path.startsWith(path));
+    
+    // ✅ Reset lastActivity for authenticated users on page navigation
+    if (! shouldSkip && req.session && req.session.userId) {
+        const now = Date.now();
+        const lastActivity = req.session.lastActivity || 0;
+        const timeSinceLastActivity = now - lastActivity;
+        
+        // Only reset if > 5 seconds since last activity (avoid rapid resets)
+        if (timeSinceLastActivity > 5000) {
+            req.session. lastActivity = now;
+            logger.info(`🔄 Session activity reset for user ${req.session.userId} on ${req.path}`);
+        }
+    }
+    
+    next();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXISTING: Activity-based session timeout
+// ═══════════════════════════════════════════════════════════════════════════
+app.get("/remaining-time", (req, res) => {
     const now = Date.now();
     
-    // ═══════════════════════════════════════════════════════════
-    // CASE 1: Authenticated User (έχει userId)
-    // ═══════════════════════════════════════════════════════════
+    // CASE 1: Authenticated User
     if (req.session && req.session.userId) {
         const last = req.session.lastActivity || now;
         const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
@@ -222,33 +315,24 @@ app.use(getSessionVars);
         });
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // CASE 2: Anonymous User (δεν έχει userId)
-    // ═══════════════════════════════════════════════════════════
-    
-    // ✅ Αν δεν υπάρχει session καθόλου, δημιούργησε
-    if (!req.session) {
+    // CASE 2: Anonymous User
+    if (! req.session) {
         return res.status(500).json({ 
             error: 'Session middleware error',
             remainingTime: 0 
         });
     }
 
-    // ✅ Αν δεν έχει `anonymousStartTime`, όρισέ το ΤΩΡΑ
-    if (!req.session.anonymousStartTime) {
+    if (!req. session.anonymousStartTime) {
         req.session.anonymousStartTime = now;
     }
 
-    // ✅ Υπολόγισε το remaining time για anonymous
     const anonymousStart = req.session.anonymousStartTime;
     const anonymousElapsed = now - anonymousStart;
-    const anonymousRemaining = Math.max(0, 1000 * 60 * grace_period - anonymousElapsed);
+    const anonymousRemaining = Math. max(0, 1000 * 60 * grace_period - anonymousElapsed);
 
-    // Debug logging
-
-    // ✅ Αν το grace period έληξε
     if (anonymousRemaining <= 0) {
-        return res.status(401).json({ 
+        return res. status(401).json({ 
             error: 'Grace period expired',
             remainingTime: 0,
             userType: 'anonymous',
@@ -256,7 +340,6 @@ app.use(getSessionVars);
         });
     }
 
-    // ✅ Επιστροφή remaining time για anonymous
     return res.json({ 
         remainingTime: anonymousRemaining,
         sessionID: req.sessionID,
@@ -264,6 +347,89 @@ app.use(getSessionVars);
         gracePeriod: true
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MIDDLEWARE: Check if user is authenticated
+// ═══════════════════════════════════════════════════════════════════════════
+function isAuthenticated(req, res, next) {
+    if (req.session && req.session.userId) {
+        return next(); // ✅ Authenticated → proceed
+    }
+    
+    // ❌ Not authenticated → return 401
+    return res.status(401).json({ 
+        success: false, 
+        error: 'Not authenticated',
+        message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NEW: Session refresh on navigation (ONLY for authenticated users)
+// ═══════════════════════════════════════════════════════════════════════════
+app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
+    try {
+        const now = Date.now();
+        
+        // ✅ Υπολογισμός remaining time
+        const lastActivity = req.session.lastActivity || now;
+        const remainingMs = Math.max(0, 1000 * 60 * diarkeia_session - (now - lastActivity));
+        const remainingMinutes = Math.floor(remainingMs / 60000);
+        
+        const GRACE_PERIOD_MINUTES = grace_period; // 2 minutes (από το config σου)
+        
+        // ✅ ΑΝ remaining time > grace period → RESET session
+        if (remainingMinutes > GRACE_PERIOD_MINUTES) {
+            // Reset lastActivity → effectively resets countdown
+            req.session.lastActivity = now;
+            
+            req.session.save((err) => {
+                if (err) {
+                    console.error('Session save error:', err);
+                    return res.status(500).json({ 
+                        success: false, 
+                        error: 'Session refresh failed' 
+                    });
+                }
+                
+                const newRemainingMs = 1000 * 60 * diarkeia_session;
+                
+                return res.json({
+                    success: true,
+                    refreshed: true,
+                    remainingTime: formatTime(newRemainingMs),
+                    remainingMs: newRemainingMs,
+                    message: 'Session refreshed to 30:00'
+                });
+            });
+        } else {
+            // ✅ ΑΝ remaining time ≤ grace period → ΜΗΝ κάνεις reset
+            return res.json({
+                success: true,
+                refreshed: false,
+                remainingTime: formatTime(remainingMs),
+                remainingMs: remainingMs,
+                gracePeriod: true,
+                message: 'Grace period active - session NOT refreshed'
+            });
+        }
+    } catch (error) {
+        console.error('Session refresh error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Server error' 
+        });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: Format milliseconds to MM:SS
+// ═══════════════════════════════════════════════════════════════════════════
+function formatTime(ms) {
+    const minutes = Math. floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                           Security headers                                 */
@@ -279,7 +445,7 @@ app.use(helmet.crossOriginResourcePolicy({ policy: "same-origin" })); // τα δ
 
 // HSTS μόνο σε production
 if (isProd) {
-    app. use(
+    app.use(
         helmet.hsts({
             maxAge: 31536000, // 1 έτος
             includeSubDomains: true,
@@ -289,8 +455,8 @@ if (isProd) {
 }
 
 // CSP nonce ανά request
-app. use((req, res, next) => {
-    res.locals.nonce = crypto.randomBytes(18). toString("base64");
+app.use((req, res, next) => {
+    res.locals.nonce = crypto.randomBytes(18).toString("base64");
     next();
 });
 
@@ -303,8 +469,8 @@ const buildCSPDirectives = () => {
     // CDN domains που πρέπει να επιτρέπονται
     const cdnDomains = [
         `https://${CDN_DOMAIN}`,
-        `https://${S3_BUCKET}.s3.amazonaws.com`,
-        `https://${S3_BUCKET}.s3.${S3_REGION}.amazonaws. com`
+        `https://${S3_BUCKET}.s3. amazonaws.com`,
+        `https://${S3_BUCKET}.s3. ${S3_REGION}.amazonaws.com`
     ];
     
     if (CLOUDFRONT_DOMAIN) {
@@ -408,9 +574,11 @@ app.use((req, res, next) => {
     // 1. S3 pre-signed URL callbacks
     // 2.  Webhooks από AWS
     // 3. Health checks
+    // 4. Session refresh API
     const skipPaths = [
         '/health',
         '/api/webhook',
+        '/api/session/refresh',
     ];
     
     const skipCSRF = skipPaths.some(path => req.path.startsWith(path)) ||
@@ -458,7 +626,7 @@ app.use(async (err, req, res, next) => {
         
         const referrer = req.get("Referrer") || req.get("Referer") || "/";
         // Επικύρωση για να αποφύγουμε open redirects
-        const safeRedirect = referrer.startsWith('/') ?  referrer : '/';
+        const safeRedirect = referrer.startsWith('/') ? referrer : '/';
         return res.redirect(safeRedirect);
     }
     next(err);
@@ -494,7 +662,7 @@ app.get("/api/session-data", (req, res) => {
 // Εφαρμογή login limiter στα login routes
 app.use(
     "/login",
-    isProd ? loginLimiter : (req, res, next) => next(),
+    isProd ?  loginLimiter : (req, res, next) => next(),
     isProd ? geoGuard : (req, res, next) => next()
 );
 
@@ -519,7 +687,7 @@ app.use("/", usersRoute);
 //     }
 
 //     const now = Date.now();
-//     const last = req.session?.lastActivity ??  now;
+//     const last = req.session?. lastActivity ??  now;
 //     const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
 
 //     res.json({ 
