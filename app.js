@@ -173,13 +173,14 @@ app.locals.script = (path) => {
         .trim()
         .replace(/\s+/g, '');
     
-    if (node_env === 'production') {
-        // ✅ Build URL without spaces
-        const url = `${baseURL}/${cleanPath}.min.js`. replace(/\s+/g, '');
-        return url;
-    } else {
         return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
-    }
+    // if (node_env === 'production') {
+    //     // ✅ Build URL without spaces
+    //     const url = `${baseURL}/${cleanPath}.min.js`. replace(/\s+/g, '');
+    //     return url;
+    // } else {
+    //     return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
+    // }
 };
 
 app.locals. STATIC_BASE = STATIC_BASE;
