@@ -1,1 +1,1 @@
-!function(z){window['RUNTIME_ENV'],z['logger']={'error':(...u)=>{},'warn':(...u)=>{},'info':(...u)=>{},'debug':(...u)=>{}};}(window);
+!function(E){window['RUNTIME_ENV'],E['logger']={'error':(...d)=>{},'warn':(...d)=>{},'info':(...d)=>{},'debug':(...d)=>{}};}(window);
