@@ -1,0 +1,1 @@
+!function(W){window['RUNTIME_ENV'],W['logger']={'error':(...v)=>{},'warn':(...v)=>{},'info':(...v)=>{},'debug':(...v)=>{}};}(window);

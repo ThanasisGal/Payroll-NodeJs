@@ -1,0 +1,1 @@
+document['addEventListener']('DOMContentLoaded',()=>{document['getElementById']('sfragida')['addEventListener']('change',function(Q){var T=document['getElementById']('preview-image'),E=Q['target']['files'][0x0];if(E){var u=new FileReader();u['onload']=function(f){T['src']=f['target']['result'],T['style']['display']='inline-block';},u['readAsDataURL'](E);}});});
