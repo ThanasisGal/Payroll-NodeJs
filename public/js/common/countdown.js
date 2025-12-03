@@ -1,238 +1,49 @@
-// document.addEventListener("DOMContentLoaded", () => {
-// 	const remainingTimeElement = document.getElementById("remaining-time");
-	
-// 	if (!remainingTimeElement) {
-// 		console.log('ℹ️ No countdown element in DOM');
-// 		return;
-// 	}
-
-// 	let intervalId = null;
-// 	let wasAuthenticated = false;
-// 	let currentUserType = null; // 'authenticated', 'anonymous', or null
-// 	let consecutiveErrors = 0;
-
-// 	function formatTime(ms) {
-// 		const totalSeconds = Math.floor(ms / 1000);
-// 		const minutes = Math.floor(totalSeconds / 60);
-// 		const seconds = totalSeconds % 60;
-// 		return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-// 	}
-
-// 	function updateTextColor(remainingTime, userType) {
-// 		const totalSeconds = Math.ceil(remainingTime / 1000);
-// 		remainingTimeElement.classList.remove("rt-white", "rt-orange", "rt-red", "rt-anonymous");
-
-// 		// ✅ Διαφορετικά colors για anonymous vs authenticated
-// 		if (userType === 'anonymous') {
-// 			// Anonymous: Πάντα πορτοκαλί/κόκκινο (grace period)
-// 			if (totalSeconds >= 60) {
-// 				remainingTimeElement.classList.add("rt-orange");
-// 			} else {
-// 				remainingTimeElement.classList.add("rt-red");
-// 			}
-// 		} else {
-// 			// Authenticated: Κανονικά colors
-// 			if (totalSeconds >= 900) {
-// 				remainingTimeElement.classList.add("rt-white");   // 30' - 15'
-// 			} else if (totalSeconds >= 300) {
-// 				remainingTimeElement.classList.add("rt-orange");  // 15' - 05'
-// 			} else {
-// 				remainingTimeElement.classList.add("rt-red");     // 05' - 00'
-// 			}
-// 		}
-// 	}
-
-// 	function showCountdown() {
-// 		remainingTimeElement.style.visibility = 'visible';
-// 		remainingTimeElement.style.opacity = '1';
-// 	}
-
-// 	function hideCountdown() {
-// 		remainingTimeElement. style.visibility = 'hidden';
-// 		remainingTimeElement.style.opacity = '0';
-// 	}
-
-// 	async function checkSession() {
-// 		try {
-// 			const response = await fetch("/remaining-time", {
-// 				method: 'GET',
-// 				credentials: 'include',
-// 				headers: {
-// 					'Cache-Control': 'no-cache',
-// 					'Accept': 'application/json'
-// 				}
-// 			});
-
-// 			consecutiveErrors = 0;
-
-// 			// ═══════════════════════════════════════════════════
-// 			// CASE 1: Grace Period Expired (401)
-// 			// ═══════════════════════════════════════════════════
-// 			if (response.status === 401) {
-// 				const data = await response.json();
-				
-// 				// ✅ Αν ήταν anonymous και έληξε το grace period
-// 				if (data. userType === 'anonymous' && currentUserType === 'anonymous') {
-// 					console.warn('⚠️ Anonymous grace period expired');
-// 					hideCountdown();
-// 					document.dispatchEvent(new CustomEvent("gracePeriodExpired", {
-// 						detail: { message: data.message }
-// 					}));
-// 					return;
-// 				}
-				
-// 				// ✅ Αν ήταν authenticated και έχασε το session
-// 				if (wasAuthenticated) {
-// 					console.warn('⚠️ Authenticated session expired');
-// 					hideCountdown();
-// 					currentUserType = null;
-// 					wasAuthenticated = false;
-// 					document.dispatchEvent(new Event("sessionExpired"));
-// 					return;
-// 				}
-				
-// 				// ✅ Αν ποτέ δεν είχε session, κρύψε το countdown
-// 				hideCountdown();
-// 				return;
-// 			}
-
-// 			if (! response.ok) {
-// 				throw new Error(`HTTP ${response.status}`);
-// 			}
-
-// 			// ═══════════════════════════════════════════════════
-// 			// CASE 2: Valid Response
-// 			// ═══════════════════════════════════════════════════
-// 			const data = await response.json();
-
-// 			if (data.remainingTime > 0) {
-// 				currentUserType = data.userType;
-				
-// 				// ✅ Authenticated user
-// 				if (data.userType === 'authenticated') {
-// 					wasAuthenticated = true;
-// 				}
-				
-// 				showCountdown();
-// 				remainingTimeElement.textContent = formatTime(data.remainingTime);
-// 				updateTextColor(data. remainingTime, data.userType);
-// 			} else {
-// 				// Time reached 0
-// 				remainingTimeElement.textContent = "Λήξη! ";
-// 				remainingTimeElement.classList.remove("rt-white", "rt-orange");
-// 				remainingTimeElement.classList.add("rt-red");
-				
-// 				if (currentUserType === 'authenticated' || wasAuthenticated) {
-// 					document.dispatchEvent(new Event("sessionExpired"));
-// 				} else if (currentUserType === 'anonymous') {
-// 					document.dispatchEvent(new Event("gracePeriodExpired"));
-// 				}
-// 			}
-
-// 		} catch (error) {
-// 			consecutiveErrors++;
-// 			console.error(`❌ Countdown error (${consecutiveErrors}):`, error. message);
-			
-// 			if (consecutiveErrors >= 3) {
-// 				console.warn('⚠️ Multiple errors, hiding countdown');
-// 				hideCountdown();
-// 			}
-// 		}
-// 	}
-
-// 	// ═══════════════════════════════════════════════════
-// 	// Event: Session Expired (Authenticated users)
-// 	// ═══════════════════════════════════════════════════
-// 	function onSessionExpired() {
-// 		if (! wasAuthenticated) {
-// 			return;
-// 		}
-
-// 		if (document.querySelector('. swal2-container')) {
-// 			return;
-// 		}
-
-// 		Swal.fire({
-// 			title: "Λήξη Συνεδρίας",
-// 			text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε.. .",
-// 			icon: "error",
-// 			timer: 4000,
-// 			timerProgressBar: true,
-// 			showConfirmButton: false,
-// 			allowOutsideClick: false,
-// 			customClass: {
-// 				title: 'custom-title',
-// 				popup: "custom-swal-popup",
-// 			},
-// 			willClose: () => {
-// 				window.location.href = "/logout/end_Session? method=idle";
-// 			},
-// 		});
-// 	}
-
-// 	// ═══════════════════════════════════════════════════
-// 	// Event: Grace Period Expired (Anonymous users)
-// 	// ═══════════════════════════════════════════════════
-// 	function onGracePeriodExpired(event) {
-// 		if (document.querySelector('.swal2-container')) {
-// 			return;
-// 		}
-		
-// 		Swal.fire({
-// 			title: "Λήξη Συνεδρίας",
-// 			text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε.. .",
-// 			icon: "error",
-// 			timer: 4000,
-// 			timerProgressBar: true,
-// 			showConfirmButton: false,
-// 			allowOutsideClick: false,
-// 			customClass: {
-// 				title: 'custom-title',
-// 				popup: "custom-swal-popup",
-// 			},
-// 			willClose: () => {
-// 				window.location.href = "/logout/end_Session? method=idle";
-// 			},
-// 		});
-// 	}
-
-// 	// ═══════════════════════════════════════════════════
-// 	// Event Listeners
-// 	// ═══════════════════════════════════════════════════
-// 	document.addEventListener("sessionExpired", onSessionExpired);
-// 	document.addEventListener("gracePeriodExpired", onGracePeriodExpired);
-
-// 	// ═══════════════════════════════════════════════════
-// 	// Initialization
-// 	// ═══════════════════════════════════════════════════
-// 	hideCountdown();
-// 	checkSession();
-// 	intervalId = setInterval(checkSession, 1000);
-
-// 	window.addEventListener('beforeunload', () => {
-// 		if (intervalId) clearInterval(intervalId);
-// 	});
-// });
-
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SESSION COUNTDOWN - CLIENT-SIDE (No polling!  Works with httpOnly cookies!)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SESSION COUNTDOWN - Global State Management
+// GLOBAL STATE
 // ═══════════════════════════════════════════════════════════════════════════
-
-// ✅ Global state
 window.CountdownManager = {
-    intervalId: null,
+    sessionEndTime: null,
+    countdownInterval: null,
     wasAuthenticated: false,
     currentUserType: null,
-    consecutiveErrors: 0,
-    isRunning: false
+    gracePeriodActive: false,
+    isRunning: false,
+    remainingTimeElement: null,
+    lastAuthState: null
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HELPER: Format time
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════════
+const CONFIG = {
+    SESSION_DURATION_MS: 30 * 60 * 1000,
+    GRACE_PERIOD_MS: 2 * 60 * 1000,
+    UPDATE_INTERVAL_MS: 1000,
+    WARNING_THRESHOLD_MS: 15 * 60 * 1000,
+    DANGER_THRESHOLD_MS: 5 * 60 * 1000,
+    DEBUG: false
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILITY: Debug logging
+// ═══════════════════════════════════════════════════════════════════════════
+function log(...args) {
+    if (CONFIG.DEBUG) {
+        console.log('[Countdown]', ...args);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: Format time as MM:SS
 // ═══════════════════════════════════════════════════════════════════════════
 function formatTime(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
@@ -241,21 +52,20 @@ function formatTime(ms) {
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER: Update text color
 // ═══════════════════════════════════════════════════════════════════════════
-function updateTextColor(remainingTime, userType, element) {
-    const totalSeconds = Math.ceil(remainingTime / 1000);
+function updateTextColor(remainingMs, userType, element) {
     element.classList.remove("rt-white", "rt-orange", "rt-red", "rt-anonymous");
 
     if (userType === 'anonymous') {
-        if (totalSeconds >= 60) {
-            element.classList. add("rt-orange");
+        if (remainingMs >= 60000) {
+            element.classList.add("rt-orange");
         } else {
             element.classList.add("rt-red");
         }
     } else {
-        if (totalSeconds >= 900) {
-            element.classList. add("rt-white");
-        } else if (totalSeconds >= 300) {
-            element.classList. add("rt-orange");
+        if (remainingMs >= CONFIG.WARNING_THRESHOLD_MS) {
+            element.classList.add("rt-white");
+        } else if (remainingMs >= CONFIG. DANGER_THRESHOLD_MS) {
+            element.classList.add("rt-orange");
         } else {
             element.classList.add("rt-red");
         }
@@ -266,21 +76,27 @@ function updateTextColor(remainingTime, userType, element) {
 // HELPER: Show/hide countdown
 // ═══════════════════════════════════════════════════════════════════════════
 function showCountdown(element) {
-    element.style.visibility = 'visible';
-    element.style.opacity = '1';
+    if (element) {
+        element.style.visibility = 'visible';
+        element.style.opacity = '1';
+    }
 }
 
 function hideCountdown(element) {
-    element.style.visibility = 'hidden';
-    element.style.opacity = '0';
+    if (element) {
+        element.style. visibility = 'hidden';
+        element.style.opacity = '0';
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CORE: Check session (polls /remaining-time)
+// FETCH: Get session data from server
 // ═══════════════════════════════════════════════════════════════════════════
-async function checkSession(element) {
+async function fetchInitialRemainingTime() {
     try {
-        const response = await fetch("/remaining-time", {
+        log('📡 Fetching session data from server...');
+        
+        const response = await fetch('/remaining-time', {
             method: 'GET',
             credentials: 'include',
             headers: {
@@ -289,122 +105,207 @@ async function checkSession(element) {
             }
         });
 
-        window.CountdownManager.consecutiveErrors = 0;
-
-        // Grace period expired (401)
         if (response.status === 401) {
             const data = await response.json();
+            log('❌ Server returned 401 (unauthenticated)');
             
-            if (data.userType === 'anonymous' && window.CountdownManager.currentUserType === 'anonymous') {
-                console.warn('⚠️ Anonymous grace period expired');
-                hideCountdown(element);
-                document.dispatchEvent(new CustomEvent("gracePeriodExpired", {
-                    detail: { message: data.message }
-                }));
-                return;
-            }
-            
-            if (window.CountdownManager.wasAuthenticated) {
-                console.warn('⚠️ Authenticated session expired');
-                hideCountdown(element);
-                window.CountdownManager.currentUserType = null;
-                window.CountdownManager.wasAuthenticated = false;
-                document.dispatchEvent(new Event("sessionExpired"));
-                return;
-            }
-            
-            hideCountdown(element);
-            return;
+            return {
+                remainingMs: 0,
+                userType: data.userType || 'anonymous',
+                gracePeriod: true,
+                expired: true,
+                authenticated: false
+            };
         }
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        if (! response.ok) {
+            log('❌ Server error:', response.status);
+            return null;
         }
 
         const data = await response.json();
+        
+        const isAuthenticated = data.userType === 'authenticated';
+        
+        log('✅ Server response:', {
+            remainingTime: formatTime(data.remainingTime || 0),
+            userType: data.userType,
+            authenticated: isAuthenticated
+        });
 
-        if (data.remainingTime > 0) {
-            window. CountdownManager.currentUserType = data.userType;
-            
-            if (data.userType === 'authenticated') {
-                window.CountdownManager.wasAuthenticated = true;
-            }
-            
-            showCountdown(element);
-            element.textContent = formatTime(data.remainingTime);
-            updateTextColor(data.remainingTime, data.userType, element);
-        } else {
-            element.textContent = "Λήξη! ";
-            element.classList.remove("rt-white", "rt-orange");
-            element.classList.add("rt-red");
-            
-            if (window.CountdownManager.currentUserType === 'authenticated' || window.CountdownManager.wasAuthenticated) {
-                document.dispatchEvent(new Event("sessionExpired"));
-            } else if (window.CountdownManager.currentUserType === 'anonymous') {
-                document.dispatchEvent(new Event("gracePeriodExpired"));
-            }
-        }
+        return {
+            remainingMs: data.remainingTime || 0,
+            userType: data.userType,
+            gracePeriod: data.gracePeriod || false,
+            expired: false,
+            authenticated: isAuthenticated
+        };
 
     } catch (error) {
-        window.CountdownManager.consecutiveErrors++;
-        console.error(`❌ Countdown error (${window.CountdownManager.consecutiveErrors}):`, error. message);
-        
-        if (window.CountdownManager.consecutiveErrors >= 3) {
-            console. warn('⚠️ Multiple errors, hiding countdown');
-            hideCountdown(element);
-        }
+        log('❌ Fetch error:', error);
+        return null;
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ✅ GLOBAL API: Force refresh countdown (called by sessionRefresh. js)
+// INIT: Initialize countdown
 // ═══════════════════════════════════════════════════════════════════════════
-window.forceRefreshCountdown = function(newRemainingMs) {
-    const element = document.getElementById("remaining-time");
+async function initCountdown(element) {
+    log('🚀 Initializing countdown...');
+
+    // Fetch session data from server
+    const sessionData = await fetchInitialRemainingTime();
+    
+    if (!sessionData) {
+        // Fetch failed - use grace period as fallback
+        log('⚠️ Server fetch failed → Using grace period (2:00)');
+        window.CountdownManager.gracePeriodActive = true;
+        window.CountdownManager.currentUserType = 'anonymous';
+        window.CountdownManager.sessionEndTime = Date.now() + CONFIG. GRACE_PERIOD_MS;
+        window.CountdownManager.wasAuthenticated = false;
+    } else if (sessionData.authenticated) {
+        // ✅ AUTHENTICATED USER
+        log('✅ User IS authenticated');
+        
+        window.CountdownManager.sessionEndTime = Date.now() + sessionData.remainingMs;
+        window.CountdownManager.currentUserType = 'authenticated';
+        window.CountdownManager.gracePeriodActive = false;
+        window.CountdownManager.wasAuthenticated = true;
+        
+        log('📊 Session time:', formatTime(sessionData.remainingMs));
+    } else {
+        // ❌ NOT AUTHENTICATED → Grace period
+        log('⚠️ User NOT authenticated → Using grace period (2:00)');
+        
+        window.CountdownManager.gracePeriodActive = true;
+        window.CountdownManager.currentUserType = 'anonymous';
+        window.CountdownManager.sessionEndTime = Date.now() + CONFIG.GRACE_PERIOD_MS;
+        window.CountdownManager.wasAuthenticated = false;
+    }
+
+    log('📊 Final state:', {
+        endTime: new Date(window.CountdownManager. sessionEndTime).toLocaleTimeString(),
+        userType: window.CountdownManager.currentUserType,
+        gracePeriod: window.CountdownManager.gracePeriodActive,
+        wasAuthenticated: window.CountdownManager.wasAuthenticated
+    });
+
+    startCountdown(element);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START: Begin countdown
+// ═══════════════════════════════════════════════════════════════════════════
+function startCountdown(element) {
+    if (window.CountdownManager.countdownInterval) {
+        clearInterval(window.CountdownManager.countdownInterval);
+    }
+
+    updateCountdownDisplay(element);
+
+    window.CountdownManager.countdownInterval = setInterval(() => {
+        updateCountdownDisplay(element);
+    }, CONFIG.UPDATE_INTERVAL_MS);
+
+    window.CountdownManager.isRunning = true;
+    log('▶️ Countdown started');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UPDATE: Display countdown
+// ═══════════════════════════════════════════════════════════════════════════
+function updateCountdownDisplay(element) {
+    if (! element) return;
+
+    const now = Date.now();
+    const remainingMs = Math.max(0, window.CountdownManager. sessionEndTime - now);
+
+    showCountdown(element);
+    element.textContent = formatTime(remainingMs);
+    updateTextColor(remainingMs, window.CountdownManager.currentUserType, element);
+
+    if (remainingMs <= 0) {
+        handleSessionExpiry(element);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HANDLE: Session expiry
+// ═══════════════════════════════════════════════════════════════════════════
+function handleSessionExpiry(element) {
+    log('⏰ Session expired! ');
+
+    if (window.CountdownManager.countdownInterval) {
+        clearInterval(window.CountdownManager.countdownInterval);
+        window.CountdownManager.countdownInterval = null;
+        window.CountdownManager.isRunning = false;
+    }
+
+    if (element) {
+        element.textContent = "Λήξη! ";
+        element.classList.remove("rt-white", "rt-orange");
+        element.classList.add("rt-red");
+    }
+
+    if (window.CountdownManager.currentUserType === 'authenticated' || window.CountdownManager.wasAuthenticated) {
+        document.dispatchEvent(new Event("sessionExpired"));
+    } else if (window.CountdownManager.currentUserType === 'anonymous') {
+        document.dispatchEvent(new Event("gracePeriodExpired"));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GLOBAL API: Force refresh
+// ═══════════════════════════════════════════════════════════════════════════
+window.forceRefreshCountdown = async function() {
+    log('🔄 Force refresh triggered');
+
+    const element = window.CountdownManager.remainingTimeElement;
+    
     if (! element) {
-        console.warn('⚠️ Countdown element not found');
+        log('⚠️ Countdown element not found');
         return;
     }
 
-    console.log(`🔄 Force refresh countdown → ${formatTime(newRemainingMs)}`);
-    
-    // ✅ ΚΛΕΙΔΙ: Clear existing interval to prevent override
-    if (window.CountdownManager. intervalId) {
-        clearInterval(window.CountdownManager.intervalId);
-        console.log('⏸️ Interval cleared');
+    if (! window.CountdownManager.wasAuthenticated) {
+        log('⚠️ Not authenticated, skipping refresh');
+        return;
     }
+
+    const freshData = await fetchInitialRemainingTime();
     
-    // ✅ Update display immediately
-    element.textContent = formatTime(newRemainingMs);
-    updateTextColor(newRemainingMs, window.CountdownManager.currentUserType || 'authenticated', element);
-    showCountdown(element);
-    
-    // ✅ Reset consecutive errors
-    window.CountdownManager. consecutiveErrors = 0;
-    
-    // ✅ ΚΛΕΙΔΙ: Restart interval with fresh state
-    window.CountdownManager. intervalId = setInterval(() => {
-        checkSession(element);
-    }, 1000);
-    
-    console.log('▶️ Interval restarted');
+    if (freshData && freshData.authenticated && ! freshData.expired) {
+        window.CountdownManager.sessionEndTime = Date.now() + freshData.remainingMs;
+        window.CountdownManager.currentUserType = 'authenticated';
+        window.CountdownManager.gracePeriodActive = false;
+        
+        log('✅ Countdown refreshed to:', formatTime(freshData.remainingMs));
+        
+        updateCountdownDisplay(element);
+        
+        if (! window.CountdownManager.isRunning) {
+            startCountdown(element);
+        }
+    } else {
+        log('⚠️ Failed to refresh countdown');
+    }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EVENT: Session expired (Authenticated users)
+// EVENT: Session expired
 // ═══════════════════════════════════════════════════════════════════════════
 function onSessionExpired() {
     if (! window.CountdownManager.wasAuthenticated) {
         return;
     }
 
-    if (document.querySelector('. swal2-container')) {
+    if (document.querySelector('.swal2-container')) {
         return;
     }
 
     Swal.fire({
         title: "Λήξη Συνεδρίας",
-        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε.. .",
+        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
@@ -421,7 +322,7 @@ function onSessionExpired() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EVENT: Grace period expired (Anonymous users)
+// EVENT: Grace period expired
 // ═══════════════════════════════════════════════════════════════════════════
 function onGracePeriodExpired(event) {
     if (document.querySelector('.swal2-container')) {
@@ -430,7 +331,7 @@ function onGracePeriodExpired(event) {
     
     Swal.fire({
         title: "Λήξη Συνεδρίας",
-        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε...",
+        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
@@ -441,7 +342,7 @@ function onGracePeriodExpired(event) {
             popup: "custom-swal-popup",
         },
         willClose: () => {
-            window.location.href = "/logout/end_Session? method=idle";
+            window.location.href = "/logout/end_Session?method=idle";
         },
     });
 }
@@ -453,30 +354,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const remainingTimeElement = document.getElementById("remaining-time");
     
     if (! remainingTimeElement) {
-        console.log('ℹ️ No countdown element in DOM');
+        log('ℹ️ No countdown element in DOM');
         return;
     }
 
-    // Event listeners
+    window.CountdownManager. remainingTimeElement = remainingTimeElement;
+
     document.addEventListener("sessionExpired", onSessionExpired);
-    document.addEventListener("gracePeriodExpired", onGracePeriodExpired);
+    document. addEventListener("gracePeriodExpired", onGracePeriodExpired);
 
-    // Start countdown
     hideCountdown(remainingTimeElement);
-    checkSession(remainingTimeElement);
-    
-    window.CountdownManager.intervalId = setInterval(() => {
-        checkSession(remainingTimeElement);
-    }, 1000);
-    
-    window.CountdownManager.isRunning = true;
+    initCountdown(remainingTimeElement);
 
-    console.log('✅ Countdown initialized');
+    // console.log('✅ Countdown initialized (client-side - 1 server call only!)');
 
-    // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
-        if (window.CountdownManager.intervalId) {
-            clearInterval(window.CountdownManager.intervalId);
+        if (window.CountdownManager.countdownInterval) {
+            clearInterval(window.CountdownManager.countdownInterval);
             window.CountdownManager.isRunning = false;
         }
     });
