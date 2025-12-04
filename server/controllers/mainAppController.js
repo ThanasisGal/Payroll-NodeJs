@@ -169,19 +169,58 @@ class mainAppController {
 
     static getXrhseis = async (req, res) => {
         try {
-            const parameter = await ParamModel.findOne({ usrId: req.session.userId });
-            if (parameter) {
-                if(parameter.usedYear.length > 0) {
-                    const xrhseis = await XrhseisModel.find({}, "etos").sort({etos: -1});
-                    res.json(xrhseis);
-                }
-            } else {
-                res.json();
+            // ✅ Έλεγχος authentication
+            if (!req.session || !req.session.userId) {
+                return res.status(401).json({ 
+                    error: 'Not authenticated',
+                    xrhseis: []
+                });
             }
+
+            // ✅ Fetch user parameters
+            const parameter = await ParamModel.findOne({ usrId: req.session.userId });
+
+            if (!parameter) {
+                return res.json({ 
+                    success: true,
+                    xrhseis: [],
+                    message: 'No user parameters found'
+                });
+            }
+
+            if (! parameter.usedYear || parameter. usedYear.length === 0) {
+                return res.json({ 
+                    success: true,
+                    xrhseis: [],
+                    message: 'No year selected'
+                });
+            }
+
+            // ✅ Fetch periods for the selected year
+            const xrhseis = await XrhseisModel
+                .find()
+                .select('etos')
+                .sort({etos: -1})
+                .lean();  // ✅ Faster query
+
+            // ✅ Return proper JSON response
+            return res.json({ 
+                success: true,
+                xrhseis: xrhseis || [],
+                count: xrhseis.length
+            });
+
         } catch (error) {
-            res.json();
+            console.error("Error fetching xrhseis:", error);
+            
+            // ✅ Return proper error JSON (not empty!)
+            return res.status(500).json({ 
+                error: 'Internal server error',
+                message: error.message,
+                xrhseis: []
+            });
         }
-    };
+    };    
     
     static changeYear = async (req, res) => {
         try {
