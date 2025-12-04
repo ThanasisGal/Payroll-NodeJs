@@ -1,0 +1,1 @@
+function adjustFontSizeToFit(D,A,v={}){const u=document['getElementById'](D);if(!u)return;const {startRem:g=0.8,minPx:b=0x8,stepPx:q=0x1}=v,F=Math['round'](0x10*A);let y=Math['round'](0x10*g);y<b&&(y=b);let f=null;const K=S=>{null!=f&&u['classList']['remove']('font-size-px-'+f),f=S,u['classList']['add']('font-size-px-'+S);};for(K(y);u['scrollWidth']>F&&y>b;)y-=q,K(y);}

@@ -1,1 +1,1 @@
-export default function t(t,r){return t.toString().padStart(r,"0")}
+export default function formatNumber(t,r){return t.toString().padStart(r,"0")}
