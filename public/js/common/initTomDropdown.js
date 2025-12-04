@@ -1,5 +1,6 @@
 // /static/js/common/initTomDropdowns.js
-import { initTomDropdown, attachInlineSummary } from '/static/js/dropdown-item.js';
+// import { initTomDropdown, attachInlineSummary } from '/static/js/dropdown-item.js';
+import { initTomDropdown, attachInlineSummary } from '%%CDN_URL%%/dropdown-item.js';
 
 // Global registry για instances (ώστε να μη διπλο-αρχικοποιούνται)
 window.__tomInstances = window.__tomInstances || {};

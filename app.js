@@ -6,7 +6,7 @@ const node_env = process.env.NODE_ENV || "development";
 
 // Ρύθμιση static assets
 const STATIC_BASE_DEV = process.env.STATIC_BASE_DEV || "/static/js";
-const STATIC_BASE_PROD = process.env.STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min. js";
+const STATIC_BASE_PROD = process.env.STATIC_BASE_PROD || "https://cdn.webpayrollsolutions.com/static/min.js";
 const STATIC_BASE = node_env === 'production' ? STATIC_BASE_PROD : STATIC_BASE_DEV;
 
 // AWS S3/CloudFront domains
@@ -173,14 +173,7 @@ app.locals.script = (path) => {
         .trim()
         .replace(/\s+/g, '');
     
-        return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
-    // if (node_env === 'production') {
-    //     // ✅ Build URL without spaces
-    //     const url = `${baseURL}/${cleanPath}.min.js`. replace(/\s+/g, '');
-    //     return url;
-    // } else {
-    //     return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
-    // }
+    return `${baseURL}/${cleanPath}.js`. replace(/\s+/g, '');
 };
 
 app.locals. STATIC_BASE = STATIC_BASE;
