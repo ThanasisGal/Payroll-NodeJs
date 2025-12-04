@@ -191,25 +191,44 @@
         window.RUNTIME_ENV = "<%= NODE_ENV %>";
     </script>
               
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script src="<%= script('companies/genikastoixeia/loadDropdowns_edit') %>"></script>
+    <script src="<%= script('common/checkAfm') %>"></script>
+    <script src="<%= script('companies/genikastoixeia/loadMultipleUsers') %>"></script>
+    <script src="<%= script('companies/genikastoixeia/loadLoipaPedia') %>"></script>
+    <script src="<%= script('common/sectionsVisible') %>"></script>
+    <script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
+    
+    <script type="module" src="<%= script('common/initTomDropdown') %>"></script>
+    
+    <script src="<%= script('common/toggleLabel') %>"></script>
+    <script src="<%= script('common/selectUnselectAndChangeButtonTextContent') %>"></script>
+    <script src="<%= script('common/readAndPreviewImage') %>"></script>
+    <script src="<%= script('common/changeInputTypeFile') %>"></script>
+    <script src="<%= script('common/clearImage') %>"></script>
+    <script src="<%= script('common/clearableInputs') %>"></script>
+    <script src="<%= script('common/tooltips') %>"></script>
+    <script src="<%= script('common/clearSection') %>"></script>
+    <script src="<%= script('companies/genikastoixeia/putFieldValues_Company') %>"></script>
+
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadDropdowns_edit<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
     <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadMultipleUsers<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
 
-    <script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+    <!-- <script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script> -->
 
-    <script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>  
+    <!-- <script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>   -->
 
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/selectUnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearSection<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script>
-    <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/selectUnselectAndChangeButtonTextContent<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/readAndPreviewImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/changeInputTypeFile<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearImage<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearSection<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/loadLoipaPedia<%= NODE_ENV === 'production' ? '.min' : '' %>.js" defer></script> -->
+    <!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/genikastoixeia/putFieldValues_Company<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
 </div>
