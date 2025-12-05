@@ -60,6 +60,7 @@
                                             required
                                             maxlength="4"
                                             pattern="[0-9]{1,}"
+                                            autocomplete="off"
                                             disabled
                                         />
                                     </div>
@@ -127,6 +128,7 @@
                                             class="form-control input-contents"
                                             value=""
                                             maxlength="33"
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -146,6 +148,7 @@
                                             id="logariasmos_2"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -165,6 +168,7 @@
                                             id="logariasmos_3"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -197,16 +201,15 @@
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
-              
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+<script src="<%= script('companies/trapezes/getFieldValues') %>"></script>
 
-<script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/trapezes/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/ibanChecker<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/trapezes/loadMultiFieldsToHiddenInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
+
+<script src="<%= script('common/ibanChecker') %>"></script>
+<script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/clearableInputs') %>"></script>
+<script src="<%= script('companies/trapezes/loadMultiFieldsToHiddenInputs') %>"></script>

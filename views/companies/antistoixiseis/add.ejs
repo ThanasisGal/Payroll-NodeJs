@@ -76,7 +76,7 @@
                                     </label>
                                 </div>
                                     <div class="col-2">
-                                        <input type="text" name="kpk" id="kpk" class="form-control input-contents right-align" value="" maxlength="4" pattern="[0-9]{1,}" />
+                                        <input type="text" name="kpk" id="kpk" class="form-control input-contents right-align" value="" maxlength="4" pattern="[0-9]{1,}" autocomplete="off" />
                                     </div>
                                 </div>
 
@@ -89,7 +89,7 @@
                                         </label>
                                     </div>
                                     <div class="col-2">
-                                        <input type="text" name="apo_typos_apodoxon" id="apo_typos_apodoxon" class="form-control input-contents right-align" value="" maxlength="3" />
+                                        <input type="text" name="apo_typos_apodoxon" id="apo_typos_apodoxon" class="form-control input-contents right-align" value="" maxlength="3" autocomplete="off" />
                                     </div>
 
                                     <div class="col-3"></div>
@@ -100,7 +100,7 @@
                                         </label>
                                     </div>
                                     <div class="col-2">
-                                        <input type="text" name="se_typos_apodoxon" id="se_typos_apodoxon" class="form-control input-contents right-align" value="" maxlength="3" />
+                                        <input type="text" name="se_typos_apodoxon" id="se_typos_apodoxon" class="form-control input-contents right-align" value="" maxlength="3" autocomplete="off" />
                                     </div>
                                 </div>
 
@@ -113,7 +113,7 @@
                                         </label>
                                     </div>
                                     <div class="col-2">
-                                        <input type="text" name="kad" id="kad" class="form-control input-contents right-align" value="" maxlength="4" />
+                                        <input type="text" name="kad" id="kad" class="form-control input-contents right-align" value="" maxlength="4" autocomplete="off" />
                                     </div>
 
                                     <div class="col-3"></div>
@@ -124,7 +124,7 @@
                                         </label>
                                     </div>
                                     <div class="col-2">
-                                        <input type="text" name="eidikothta" id="eidikothta" class="form-control input-contents right-align" value="" maxlength="6" />
+                                        <input type="text" name="eidikothta" id="eidikothta" class="form-control input-contents right-align" value="" maxlength="6" autocomplete="off" />
                                     </div>
                                 </div>
 
@@ -137,7 +137,7 @@
                                         </label>
                                     </div>
                                     <div class="col-2">
-                                        <input type="text" name="epa" id="epa" class="form-control input-contents right-align" value="" maxlength="2" />
+                                        <input type="text" name="epa" id="epa" class="form-control input-contents right-align" value="" maxlength="2" autocomplete="off" />
                                     </div>
                                 </div>
                             </div>
@@ -171,11 +171,9 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/fillValuesWithZeroes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
+<script src="<%= script('companies/antistoixiseis/getFieldValues') %>"></script>
+<script src="<%= script('companies/antistoixiseis/fillValuesWithZeroes') %>"></script>
+<script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/clearableInputs') %>"></script>

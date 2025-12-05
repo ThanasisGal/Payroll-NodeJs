@@ -60,6 +60,7 @@
                                             required
                                             maxlength="4"
                                             pattern="[0-9]{1,}"
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -80,6 +81,7 @@
                                             id="perigrafh"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                             required
                                         />
                                     </div>
@@ -100,6 +102,7 @@
                                         id="username"
                                         class="form-control input-contents"
                                         value=""
+                                        autocomplete="off"
                                         required
                                         />
                                     </div>
@@ -121,6 +124,7 @@
                                             id="password"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                             required
                                         />
                                     </div>
@@ -153,9 +157,8 @@
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
-              
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/passwords/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script src="<%= script('companies/passwords/getFieldValues') %>"></script>
+<script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/clearableInputs') %>"></script>

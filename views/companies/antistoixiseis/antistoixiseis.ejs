@@ -146,55 +146,54 @@
         <div class="flex-grow-1"></div>
 
         <!-- Δεξιά: Pagination -->
-            <nav aria-label="Πλοήγηση σελίδων">
-                <ul class="pagination pagination-sm mb-0 margin-top--0_5rem">
-                    <!-- First / Prev -->
-                    <li class="page-item <%= cur === 1 ? 'disabled' : '' %>">
-                        <a class="page-link" href="<%= cur === 1 ? '#' : href(1) %>" aria-label="First"
-                            <%= cur === 1 ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-bar-left"></i></a>
-                    </li>
-                    <li class="page-item <%= cur === 1 ? 'disabled' : '' %>">
-                        <a class="page-link" href="<%= cur === 1 ? '#' : href(cur - 1) %>" aria-label="Previous"
-                            <%= cur === 1 ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-left"></i></a>
-                    </li>
+        <nav aria-label="Πλοήγηση σελίδων">
+            <ul class="pagination pagination-sm mb-0 margin-top--0_5rem">
+                <!-- First / Prev -->
+                <li class="page-item <%= cur === 1 ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= cur === 1 ? '#' : href(1) %>" aria-label="First"
+                        <%= cur === 1 ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-bar-left"></i></a>
+                </li>
+                <li class="page-item <%= cur === 1 ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= cur === 1 ? '#' : href(cur - 1) %>" aria-label="Previous"
+                        <%= cur === 1 ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-left"></i></a>
+                </li>
 
-                    <!-- Ellipsis πριν -->
-                    <% if (start > 1) { %>
-                        <li class="page-item disabled"><span class="page-link">…</span></li>
-                    <% } %>
+                <!-- Ellipsis πριν -->
+                <% if (start > 1) { %>
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                <% } %>
 
-                    <!-- Αριθμημένες -->
-                    <% for (let i = start; i <= end; i++) { %>
-                        <li class="page-item <%= i === cur ? 'active' : '' %>" <%= i === cur ? 'aria-current="page"' : '' %>>
-                            <% if (i === cur) { %>
-                                <span class="page-link"><%= i %></span>
-                            <% } else { %>
-                                <a class="page-link" href="<%= href(i) %>"><%= i %></a>
-                            <% } %>
-                        </li>
-                    <% } %>
-
-                    <!-- Ellipsis μετά + τελευταία -->
-                    <% if (end < total) { %>
-                        <li class="page-item disabled"><span class="page-link">…</span></li>
-                        <li class="page-item"><a class="page-link" href="<%= href(total) %>"><%= total %></a></li>
-                    <% } %>
-
-                    <!-- Next / Last -->
-                    <li class="page-item <%= cur === total ? 'disabled' : '' %>">
-                        <a class="page-link" href="<%= cur === total ? '#' : href(cur + 1) %>" aria-label="Next"
-                            <%= cur === total ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-right"></i>
-                        </a>
+                <!-- Αριθμημένες -->
+                <% for (let i = start; i <= end; i++) { %>
+                    <li class="page-item <%= i === cur ? 'active' : '' %>" <%= i === cur ? 'aria-current="page"' : '' %>>
+                        <% if (i === cur) { %>
+                            <span class="page-link"><%= i %></span>
+                        <% } else { %>
+                            <a class="page-link" href="<%= href(i) %>"><%= i %></a>
+                        <% } %>
                     </li>
-                    <li class="page-item <%= cur === total ? 'disabled' : '' %>">
-                        <a class="page-link" href="<%= cur === total ? '#' : href(total) %>" aria-label="Last"
-                                <%= cur === total ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-bar-right"></i>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
+                <% } %>
+
+                <!-- Ellipsis μετά + τελευταία -->
+                <% if (end < total) { %>
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                    <li class="page-item"><a class="page-link" href="<%= href(total) %>"><%= total %></a></li>
+                <% } %>
+
+                <!-- Next / Last -->
+                <li class="page-item <%= cur === total ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= cur === total ? '#' : href(cur + 1) %>" aria-label="Next"
+                        <%= cur === total ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                <li class="page-item <%= cur === total ? 'disabled' : '' %>">
+                    <a class="page-link" href="<%= cur === total ? '#' : href(total) %>" aria-label="Last"
+                            <%= cur === total ? 'tabindex="-1" aria-disabled="true"' : '' %>><i class="bi bi-chevron-bar-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
     </div>
-
 </div>
 
 <% const isProduction = NODE_ENV === 'production'; %>
@@ -203,14 +202,8 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/nestingTables<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/antistoixiseis/selectRowsInNestedTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<!-- <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script> -->
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
+<script src="<%= script('companies/antistoixiseis/nestingTables') %>"></script>
+<script src="<%= script('companies/antistoixiseis/selectRowInTable') %>"></script>
+<script src="<%= script('companies/antistoixiseis/selectRowsInNestedTable') %>"></script>
+<script src="<%= script('common/hideTooltips') %>"></script>
