@@ -58,6 +58,7 @@
                                             value="" 
                                             maxlength="9" 
                                             pattern="[0-9]{1,}" 
+                                            autocomplete="off"
                                         />
                                     </div>
                                     
@@ -138,6 +139,7 @@
                                             id="eponymia"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                             required
                                         />
                                     </div>
@@ -155,6 +157,7 @@
                                             name="onoma"
                                             id="onoma"
                                             class="form-control input-contents"
+                                            autocomplete="off"
                                             value=""
                                         />
                                     </div>
@@ -175,6 +178,7 @@
                                             id="eponymo_patera"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -192,6 +196,7 @@
                                             id="onoma_patera"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -212,6 +217,7 @@
                                             id="onoma_mhteras"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -233,6 +239,7 @@
                                             id="eponymo_syzygoy"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -250,6 +257,7 @@
                                             id="onoma_syzygoy"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -269,6 +277,7 @@
                                             id="topos_gennhshs"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -288,6 +297,7 @@
                                             id="hmnia_gennhshs"
                                             class="date-control"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -305,6 +315,7 @@
                                             id="odos"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -320,6 +331,7 @@
                                             id="arithmos"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -337,6 +349,7 @@
                                             value=""
                                             maxlength="5"
                                             pattern="[0-9]{1,}"
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -436,6 +449,7 @@
                                             value=""
                                             maxlength="10"
                                             pattern="[0-9]{1,}"
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -453,7 +467,7 @@
                                             id="email"
                                             class="form-control input-contents"
                                             value=""
-                                        />
+                                            autocomplete="off"
                                     </div>
                                 </div>
 
@@ -510,6 +524,7 @@
                                             id="arithmos_taytothtas"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -529,6 +544,7 @@
                                             id="hmnia_ekdoshs"
                                             class="date-control"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
 
@@ -548,6 +564,7 @@
                                             id="arxh_ekdoshs"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -603,6 +620,7 @@
                                             id="ame"
                                             class="form-control input-contents"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -658,6 +676,7 @@
                                             id="hmnia_enarjhs_idiothtas"
                                             class="date-control"
                                             value=""
+                                            autocomplete="off"
                                         />
                                     </div>
                                 </div>
@@ -690,18 +709,19 @@
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
-              
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/nomimoiekprosopoi/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/nomimoiekprosopoi/loadDropdowns_add<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
 
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
+<script src="<%= script('companies/nomimoiekprosopoi/loadDropdowns_add') %>"></script>
+<script src="<%= script('companies/nomimoiekprosopoi/getFieldValues') %>"></script>
+<script src="<%= script('common/checkAfm') %>"></script>
 
-<script nonce="<%= nonce %>" type="module" src="/static/js/common/initTomDropdown.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
+
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
 
 <!-- Enabled/Disablet των ts ανάλογα με το checkbox -->
 <script nonce="<%= nonce %>" type="module">
-    import { bindCheckboxControlsSelect } from '/static/js/common/dependentSelectToggle.js';
+    import { bindCheckboxControlsSelect } from '<%= script('common/dependentSelectToggle') %>';
+    // import { bindCheckboxControlsSelect } from '/static/js/common/dependentSelectToggle.js';
 
     // Νομική μορφή
     bindCheckboxControlsSelect({
@@ -719,11 +739,10 @@
     //   });
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/navTabs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabel<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/dates/convertDateToISO<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/navTabs') %>"></script>
+<script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('common/toggleLabel') %>"></script>
+<script src="<%= script('dates/convertDateToISO') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/clearableInputs') %>"></script>
+

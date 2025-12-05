@@ -17,6 +17,7 @@
                 id="searchInput"
                 class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
                 placeholder="Αναζήτηση... ( πατείστε Enter )"
+                autocomplete="off"
                 aria-label="Search"/>
         </div>
     </form>
@@ -214,6 +215,6 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/companies/nomimoiekprosopoi/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
+<script src="<%= script('companies/nomimoiekprosopoi/selectRowInTable') %>"></script>
+<script src="<%= script('common/sortTable') %>"></script>
