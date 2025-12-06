@@ -1,4 +1,4 @@
-// /static/js/symbaseis/stoixeiaSymbaseon/stoixeia-list-multi.js
+// /static/js/symbaseis/ypologismoiKlimakion/stoixeia_list_multi.js
 // Χωρίς pagination & χωρίς sessionStorage. Υποστηρίζει single/multiple επιλογές.
 // ΕΜΦΑΝΙΖΕΙ 3 στήλες: [Κωδικός 4ψηφιο] [AFK πρώτα 8] [Περιγραφή].
 // Φέρνει ΟΛΑ τα στοιχεία (όλες τις σελίδες) όταν αλλάζει η Ειδικότητα.

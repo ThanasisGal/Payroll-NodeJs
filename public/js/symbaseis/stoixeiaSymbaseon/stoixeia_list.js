@@ -1,4 +1,4 @@
-// /static/js/symbaseis/stoixeiaSymbaseon/stoixeia-list.js
+// /static/js/symbaseis/stoixeiaSymbaseon/stoixeia_list.js
 
 (() => {
 	if (window.__stoixeiaListInit) return;
@@ -332,7 +332,7 @@
 			renderRows(items);
 			renderPagination(curPage, totalPages);
 		} catch (err) {
-			console.error('stoixeia-list loadFor error', err);
+			console.error('stoixeia_list loadFor error', err);
 			clearTable();
 			rowMsg('Προέκυψε σφάλμα κατά τη φόρτωση.', 'text-center text-danger');
 			renderPagination(1, 1);

@@ -1,4 +1,4 @@
-// /static/js/symbaseis/eidikothtes/symbaseis-kathgories-eidikothtes.js
+// /static/js/symbaseis/eidikothtes/symbaseis_kathgories_eidikothtes.js
 // Φορτώνει τον πίνακα Ειδικοτήτων για (Σύμβαση + Κατηγορία)
 // και ΚΡΑΤΑΕΙ την επιλογή ανάμεσα σε redirect, όπως κάναμε στις Κατηγορίες.
 

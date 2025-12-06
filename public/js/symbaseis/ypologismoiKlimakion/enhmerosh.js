@@ -1,38 +1,3 @@
-// document.addEventListener("DOMContentLoaded", async function () {
-// 	document.getElementById('edit-btn').addEventListener('click', async function() {
-// 		try {
-// 			const response = await fetch('/api/enhmeroshKlimakion', {
-// 				method: 'POST',
-// 				headers: {
-// 					'Content-Type': 'application/json',
-// 				},
-// 				body: JSON.stringify(window.dataForUpdate),
-// 			});
-		
-// 			const data = await response.json();
-// 			if (data.success) {
-//                 await Swal.fire({
-//                     backdrop: false,            // overlay
-//                     allowOutsideClick: false,
-//                     icon: "success",
-//                     title: "Επιτυχής ενημέρωση!",
-//                     timer: 1200,
-//                     showConfirmButton: true,
-//                     confirmButtonText: "Κλείσιμο",
-//                     customClass: {
-//                         confirmButton: "class-success custom-confirm-button custom-swal-button",
-//                         title: "custom-title",
-//                         popup: "custom-swal-popup",
-//                     },
-//                 }).then(() => window.location.href = data.redirectUrl);
-// 			}
-// 	    } catch (error) {
-// 			console.error('Error:', error);
-// 	    }
-//   	});
-// });
-
-
 document.addEventListener("DOMContentLoaded", () => {
     const editBtn = document.getElementById("edit-btn");
     if (!editBtn) return;

@@ -16,6 +16,7 @@
                 id="searchInput"
                 class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
                 placeholder="Αναζήτηση... ( πατείστε Enter )"
+                autocomplete="off"
                 aria-label="Search" />
         </div>
     </form>
@@ -193,20 +194,17 @@
     window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
 </script>
             
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/eidikothtes/symbaseis-kathgories-eidikothtes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/eidikothtes/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
+
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
+<script type="module" src="<%= script('symbaseisDropdownChain') %>"></script>
+
+<script src="<%= script('symbaseis/eidikothtes/symbaseis_kathgories_eidikothtes') %>"></script>
+<script src="<%= script('symbaseis/eidikothtes/selectRowInTable') %>"></script>
+<script src="<%= script('common/sortTable') %>"></script>
+<script src="<%= script('common/hideTooltips') %>"></script>
 
 <script nonce="<%= nonce %>">
     document.addEventListener('DOMContentLoaded', function () {

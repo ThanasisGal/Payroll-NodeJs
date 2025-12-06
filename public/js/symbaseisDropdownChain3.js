@@ -1,7 +1,7 @@
 // /static/js/symbaseisDropdownChain3.js (ESM) - FINAL VERSION
 // Smart Lock με έλεγχο hidden fields + Full Cascade Clear
 
-import { initTomDropdown } from '/static/js/dropdown-item.js';
+import { initTomDropdown } from './dropdown-item.js';
 
 (() => {
 	if (window.__symbaseisDropdownChain3MultiInit) return;

@@ -5,7 +5,7 @@
 // - auto-load όταν ανοίγει το dropdown αν υπάρχουν φίλτρα και δεν υπάρχουν options
 // - συνεργάζεται με *_stathera (data-target-input / data-preselect)
 
-import { initTomDropdown } from '/static/js/dropdown-item.js';
+import { initTomDropdown } from './dropdown-item.js';
 
 (function () {
   if (window.__geoDropdownChainInit) return;

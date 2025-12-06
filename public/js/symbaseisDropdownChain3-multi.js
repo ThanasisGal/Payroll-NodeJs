@@ -1,5 +1,5 @@
 // /static/js/symbaseisDropdownChain3-multi.js  (ESM)
-import { initTomDropdown } from '/static/js/dropdown-item.js';
+import { initTomDropdown } from './dropdown-item.js';
 
 (() => {
 	if (window.__symbaseisDropdownChain3MultiInit) return;

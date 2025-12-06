@@ -4,7 +4,7 @@
 // - Σκληρό reset παιδιών σε change/clear
 // - Auto-focus στο επόμενο βήμα
 
-import { initTomDropdown } from '/static/js/dropdown-item.js';
+import { initTomDropdown } from './dropdown-item.js';
 
 (function () {
   if (window.__efkaDropdownChainInit) return;

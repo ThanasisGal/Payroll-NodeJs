@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	function buildRecordFromRow(tr) {
 		const d = tr.dataset || {};
-		// dataset ονόματα όπως τα αποδίδει ο loader (stoixeia-list.js που γεμίζει τα rows)
+		// dataset ονόματα όπως τα αποδίδει ο loader (stoixeia_list.js που γεμίζει τα rows)
 		// Εάν κάποιο δεν υπάρχει, παίρνει default.
 		const rec = {
 			id: d.id || "",

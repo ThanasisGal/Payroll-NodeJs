@@ -3,7 +3,7 @@
 // + ενημέρωση hidden kodikosSymbashs_Kathgorias = sym(4) + kat(4)
 // + focus στο #back-btn μόλις συμπληρωθεί ο συνδυασμός
 
-import { initTomDropdown } from '/static/js/dropdown-item.js';
+import { initTomDropdown } from './dropdown-item.js';
 
 (() => {
   if (window.__symbaseisDropdownChainInit) return;

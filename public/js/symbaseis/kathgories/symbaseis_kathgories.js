@@ -1,4 +1,4 @@
-// public/js/symbaseis/kathgories/symbaseis-kathgories.js
+// public/js/symbaseis/kathgories/symbaseis_kathgories.js
 (() => {
   // ----------------------------------------------------
   // σταθερά endpoints

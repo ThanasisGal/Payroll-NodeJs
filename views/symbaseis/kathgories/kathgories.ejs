@@ -16,6 +16,7 @@
                 id="searchInput"
                 class="form-control rounded-end-2 ms-auto fsvw-1_1 border-radius-10 use-default-enter"
                 placeholder="Αναζήτηση... ( πατείστε Enter )"
+                autocomplete="off"
                 aria-label="Search" />
         </div>
     </form>
@@ -155,17 +156,12 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
     window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
 </script>
-            
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/kathgories/symbaseis-kathgories<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/kathgories/selectRowInTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sortTable<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script src="<%= script('common/blockInvalidClick') %>"></script>
+<script src="<%= script('symbaseis/kathgories/symbaseis_kathgories') %>"></script>
+<script src="<%= script('symbaseis/kathgories/selectRowInTable') %>"></script>
+<script src="<%= script('common/sortTable') %>"></script>
+<script src="<%= script('common/hideTooltips') %>"></script>
 
 <script nonce="<%= nonce %>">
     document.addEventListener('DOMContentLoaded', function () {
