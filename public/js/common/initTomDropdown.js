@@ -1,6 +1,5 @@
 // /static/js/common/initTomDropdowns.js
 import { initTomDropdown, attachInlineSummary } from '../dropdown-item.js';
-// import { initTomDropdown, attachInlineSummary } from '%%CDN_URL%%/dropdown-item.js';
 
 // Global registry για instances (ώστε να μη διπλο-αρχικοποιούνται)
 window.__tomInstances = window.__tomInstances || {};
@@ -47,7 +46,10 @@ function syncTargetOnChange(instance, sel, hidden, opts = {}) {
 export function initOneTomSelect(sel) {
     if (!sel || !sel.id) return;
     const key = `#${sel.id}`;
-    if (window.__tomInstances[key]) return; // guard: μην ξανακάνεις init
+
+    if (window.__tomInstances[key] || sel.tomselect) {
+        return;
+    }
 
     const api = sel.dataset.api;
     if (!api) return;

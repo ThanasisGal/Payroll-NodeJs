@@ -29,7 +29,7 @@ window.maxKlimaKiaFrom0001 = 0;
 // ------------------------------
 // ΒΟΗΘΗΤΙΚΑ ΓΙΑ ΔΟΜΕΣ ΔΕΔΟΜΕΝΩΝ
 // ------------------------------
-function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, pk }) {
+function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, praxhKatatheshs }) {
 	// -------- flat buffer --------
 	window.dataForUpdate.push({
 		kodikos_symbashs: uniqueCode.substring(0, 4),
@@ -40,7 +40,7 @@ function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, pk }) {
 		poso: result,
 		isxyei_apo: isxyeiApo,
 		isxyei_eos: isxyeiEos,
-		pk: pk,
+		praxh_katatheshs: praxhKatatheshs,
 		afora_thn_symbash: uniqueCode.substring(0, 4),
 		afora_thn_symbash_kathgoria: uniqueCode.substring(0, 8),
 		afora_thn_symbash_kathgoria_eidikothta: uniqueCode.substring(0, 12),
@@ -334,7 +334,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		const isxyeiApo = document.getElementById('isxyei_apo').value;
 		const isxyeiEos = document.getElementById('isxyei_eos').value;
-		const pk 		= document.getElementById('pk').value;
+		const praxhKatatheshs = document.getElementById('praxh_katatheshs').value;
 
 		if (!isxyeiApo || !isxyeiEos) {
 			Swal.fire({
@@ -543,7 +543,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							);
 
 							lastResultThisItem = resultPre;
-							collectRow({ uniqueCode, item, result: resultPre, isxyeiApo, isxyeiEos, pk });
+							collectRow({ uniqueCode, item, result: resultPre, isxyeiApo, isxyeiEos, praxhKatatheshs });
 							continue;
 						}
 
@@ -572,7 +572,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 						lastResultThisItem = result;
 
-						collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, pk });
+						collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, praxhKatatheshs });
 					}
 
 					// ===== ΣΥΜΠΛΗΡΩΣΗ με το ΤΕΛΕΥΤΑΙΟ ΠΟΣΟ ΤΟΥ ΙΔΙΟΥ ΣΤΟΙΧΕΙΟΥ =====
@@ -592,7 +592,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							const uniqueCode = `${item.afora_thn_symbash_kathgoria_eidikothta}${item.kodikos}${klimakioDisp}`;
 
 							// Χρησιμοποιούμε το ΤΕΛΕΥΤΑΙΟ ΠΟΣΟ ΤΟΥ ΙΔΙΟΥ ΣΤΟΙΧΕΙΟΥ
-							collectRow({ uniqueCode, item, result: lastResultThisItem, isxyeiApo, isxyeiEos, pk });
+							collectRow({ uniqueCode, item, result: lastResultThisItem, isxyeiApo, isxyeiEos, praxhKatatheshs });
 						}
 					}
 				}

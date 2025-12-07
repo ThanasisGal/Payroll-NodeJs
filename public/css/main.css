@@ -3872,6 +3872,7 @@ select.tom-dropdown {
 .mt0_4rem-mb0_3rem { margin-top: 0.4rem; margin-bottom: 0.3rem;}
 .dispno-mt-0_4rem { display: none; margin-top: -0.4rem;}
 
+.font-weight-400 { font-weight: 400; }
 .font-weight-500 { font-weight: 500; }
 .font-weight-600 { font-weight: 600; }
 .font-weight-700 { font-weight: 700; }
@@ -4140,6 +4141,7 @@ select.tom-dropdown {
 .font-size-vw-0_5  { font-size: 0.5vw; }
 .font-size-vw-0_65  { font-size: 0.65vw; }
 .font-size-vw-0_72  { font-size: 0.72vw !important; }
+.font-size-vw-0_75  { font-size: 0.75vw !important; }
 .font-size-vw-0_85  { font-size: 0.85vw !important; }
 .font-size-vw-0_875  { font-size: 0.875vw !important; }
 .font-size-vw-1  { font-size: 1vw; }

@@ -47,13 +47,13 @@
             <div class="col-0-5"></div>
 
             <div class="col-0-32 left-align">
-                <label for="pk" class="col-form-label label-font-size field-required">
+                <label for="praxh_katatheshs" class="col-form-label label-font-size field-required">
                     Π.Κ.
                 </label>
             </div>
 
             <div class="col-3-01">
-                <input type="text" name="pk" id="pk" class="form-control input-contents" value="" />
+                <input type="text" name="praxh_katatheshs" id="praxh_katatheshs" class="form-control input-contents" value="" />
             </div>
         </div>
 
@@ -262,25 +262,20 @@
     window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
 </script>
 
-<!-- Common helpers (ίδια όπως στις Ειδικότητες) -->
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3-multi.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/externalRowTrash<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ts-inline-summary<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/ypologismos<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/enhmerosh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
+<script type="module" src="<%= script('symbaseisDropdownChain3-multi') %>"></script>
+
+<script src="<%= script('symbaseis/ypologismoiKlimakion/externalRowTrash') %>"></script>
+<script src="<%= script('ts-inline-summary') %>"></script>
+<script src="<%= script('symbaseis/ypologismoiKlimakion/ypologismos') %>"></script>
+<script src="<%= script('symbaseis/ypologismoiKlimakion/enhmerosh') %>"></script>
+<script src="<%= script('common/hideTooltips') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/scrollToTop') %>"></script>
 
 <script nonce="<%= nonce %>">
     document.addEventListener("DOMContentLoaded", () => {
@@ -325,5 +320,3 @@
         }
     });
 </script>
-
-<!-- <script nonce="<%= nonce %>" src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script> -->

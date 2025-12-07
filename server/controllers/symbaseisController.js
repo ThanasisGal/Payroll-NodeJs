@@ -2095,6 +2095,7 @@ class symbaseisController {
                 klimakio: update.klimakio,
                 isxyei_apo: new Date(update.isxyei_apo),
                 isxyei_eos: new Date(update.isxyei_eos),
+                praxh_katatheshs: update.praxh_katatheshs,
                 afora_thn_symbash: update.afora_thn_symbash,
                 afora_thn_symbash_kathgoria: update.afora_thn_symbash_kathgoria,
                 afora_thn_symbash_kathgoria_eidikothta: update.afora_thn_symbash_kathgoria_eidikothta,
@@ -2115,18 +2116,6 @@ class symbaseisController {
         }
     };
 
-    /**
-     * postKlimakiaSymbaseonUpdates
-     * Ενημέρωση κλιμακίων με updated (αλλαγές ποσού) και deleted (διαγραφές)
-     * 
-     * Δέχεται payload από enhmeroshKlimakion.js:
-     * {
-     *   klimakiaChanges: {
-     *     updated: [{ klimakio, oldPoso, newPoso, ... }],
-     *     deleted: [{ klimakio, poso, ... }]
-     *   }
-     * }
-    */
     static postKlimakiaSymbaseonUpdates = async (req, res) => {
         try {
             const { klimakiaChanges } = req.body;

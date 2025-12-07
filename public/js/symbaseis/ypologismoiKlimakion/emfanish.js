@@ -53,6 +53,9 @@ function buildTreeFromData(klimakiaData, stoixeiaMap) {
 		const isxyeiEos = record.isxyei_eos || new Date().toISOString();
 		const periodKey = `${isxyeiApo}__${isxyeiEos}`;
 
+		// Πράξη κατάθεσης
+		const praxh_katatheshs = record.praxh_katatheshs || '';
+
 		// Περιγραφή στοιχείου από τα δεδομένα
 		let perigrafhStoixeioy = record.perigrafh_stoixeioy || record.perigrafh || '';
 
@@ -89,6 +92,7 @@ function buildTreeFromData(klimakiaData, stoixeiaMap) {
 			stoixeioNode.periods[periodKey] = {
 				isxyeiApo,
 				isxyeiEos,
+				praxh_katatheshs,
 				klimakia: [],
 			};
 		}
@@ -314,7 +318,9 @@ function renderNestedTablesEmfanish(tbody) {
 
 					const periodFromDate = formatDateGR(period.isxyeiApo);
 					const periodToDate = formatDateGR(period.isxyeiEos);
-					const periodLabel = `<span class="fw-bold">Περίοδος:</span> <span class="font-size-vw-0_72 font-weight-500 ms-2">${periodFromDate} → ${periodToDate}</span>`;
+					// const periodLabel = `<span class="fw-bold">Περίοδος:</span> <span class="font-size-vw-0_72 font-weight-500 ms-2">${periodFromDate} → ${periodToDate}</span>`;
+					const periodLabel = `<span class="fw-bold">Περίοδος:</span> <span class="font-size-vw-0_75 font-weight-600 ms-2">${periodFromDate} → ${periodToDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="font-size-vw-0_72 font-weight-400">ΠΚ :</span> <span class="font-size-vw-0_72 font-weight-400 ms-2">${period.praxh_katatheshs}</span>`;
+
 					createGroupRowEmfanish(stoixBody, periodLabel, periodId, 'period');
 					const periodBody = createChildContainerRowEmfanish(stoixBody, periodId);
 

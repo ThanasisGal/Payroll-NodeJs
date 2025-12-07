@@ -1,4 +1,6 @@
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-2 border-bottom bg-hero-cdn height-rem-3_5"></div>
+<div
+    class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-2 border-bottom bg-hero-cdn height-rem-3_5">
+</div>
 <form>
     <%- include('../../partials/_csrfField') %>
 
@@ -9,7 +11,8 @@
         <input type="hidden" id="kodikosSymbashs" name="kodikosSymbashs" />
         <input type="hidden" id="kodikosKathgorias" name="kodikosKathgorias" />
         <input type="hidden" id="kodikosEidikothtas" name="kodikosEidikothtas" />
-        <input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
+        <input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas"
+            id="kodikosSymbashs_Kathgorias_Eidikothtas" />
 
         <div class="card-header height-rem-4">
             <label class="text-center w-100 headers-content margin-bottom-1rem">Κλιμάκια Συμβάσεων</label>
@@ -18,78 +21,45 @@
         <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_5rem">
             <div class="col-2 left-align">
                 <label for="symbash" class="col-form-label label-font-size field-required">
-                Επιλέξτε Σύμβαση
+                    Επιλέξτε Σύμβαση
                 </label>
             </div>
 
-            <input
-                type="hidden"
-                name="symbash_stathera"
-                id="symbash_stathera"
-                class="form-control input-contents"
-                value="<%= safe("symbash_stathera") %>"
-            />
+            <input type="hidden" name="symbash_stathera" id="symbash_stathera" class="form-control input-contents"
+                value="<%= safe("symbash_stathera") %>" />
 
             <div class="col-9-5">
-                <select
-                    id="symbash"
-                    name="symbash"
-                    class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                    aria-label="Συμβάσεις"
-                    data-api="/api/dropdown/symbaseis/symbash"
-                    single
-                    data-target-input=<%= `symbash_stathera` %>
-                    data-preselect="symbash_stathera"
-                    data-preload-all="true"
-                    data-pad-length="4"
-                    data-xrhsh-related="false"
-                    data-team-related="false"
-                    data-company-related="false"
-                    data-mhnas-related="false"
-                    placeholder="Αναζήτηση Σύμβασης">
+                <select id="symbash" name="symbash" class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                    aria-label="Συμβάσεις" data-api="/api/dropdown/symbaseis/symbash" single
+                    data-target-input=<%= `symbash_stathera` %> data-preselect="symbash_stathera"
+                    data-preload-all="true" data-pad-length="4" data-xrhsh-related="false" data-team-related="false"
+                    data-company-related="false" data-mhnas-related="false" placeholder="Αναζήτηση Σύμβασης">
                 </select>
             </div>
         </div>
 
-        <div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem margin-bottom-0_3rem margin-left-1rem">
+        <div
+            class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem margin-bottom-0_3rem margin-left-1rem">
             <div class="col-2-00 left-align">
                 <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
-                Επιλέξτε Κατηγορία
+                    Επιλέξτε Κατηγορία
                 </label>
             </div>
-            
+
             <!-- Κατηγορία: MULTIPLE -->
-            <input 
-                type="hidden" 
-                id="kathgoria_symbashs_stathera" 
-                name="kathgoria_symbashs_stathera"
-                class="form-control input-contents" 
-                value="<%= safe('kathgoria_symbashs_stathera') %>" 
-            />
+            <input type="hidden" id="kathgoria_symbashs_stathera" name="kathgoria_symbashs_stathera"
+                class="form-control input-contents" value="<%= safe('kathgoria_symbashs_stathera') %>" />
 
             <!-- ΠΡΟΣΘΗΚΗ: θα αποθηκεύουμε εδώ όλο τον πίνακα [{aa,kodikos},...] σε JSON -->
-            <input 
-                type="hidden" 
-                id="kathgoria_symbashs_table" 
-                name="kathgoria_symbashs_table" 
-                value="[]"
-            />
-            
+            <input type="hidden" id="kathgoria_symbashs_table" name="kathgoria_symbashs_table" value="[]" />
+
             <div class="col-9-24">
-                <select
-                    id="kathgoria_symbashs"
-                    name="kathgoria_symbashs[]"
-                    class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                    aria-label="Κατηγορίες Συμβάσεων"
-                    data-api="/api/dropdown/symbaseis/kathgoria_symbashs"
-                    multiple
-                    data-target-input="kathgoria_symbashs_stathera"
-                    data-target-table="kathgoria_symbashs_table"
-                    data-preselect="kathgoria_symbashs_stathera"
-                    data-extra-filter="symbash_stathera"
-                    data-preload-all="true"
-                    data-pad-length="4"
-                    data-reserve-right="28"
+                <select id="kathgoria_symbashs" name="kathgoria_symbashs[]"
+                    class="tom-dropdown selectpicker-dropdown-normal left-align w-100" aria-label="Κατηγορίες Συμβάσεων"
+                    data-api="/api/dropdown/symbaseis/kathgoria_symbashs" multiple
+                    data-target-input="kathgoria_symbashs_stathera" data-target-table="kathgoria_symbashs_table"
+                    data-preselect="kathgoria_symbashs_stathera" data-extra-filter="symbash_stathera"
+                    data-preload-all="true" data-pad-length="4" data-reserve-right="28"
                     placeholder="Αναζήτηση Κατηγορίας Σύμβασης">
                 </select>
             </div>
@@ -97,53 +67,28 @@
 
         <div class="row form-group g-1 align-items-center margin-left-1rem ">
             <div class="col-2-00 left-align">
-                <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required margin-top--0_2rem">
-                Επιλέξτε Ειδικότητα
+                <label for="eidikothta_symbashs"
+                    class="col-form-label label-font-size field-required margin-top--0_2rem">
+                    Επιλέξτε Ειδικότητα
                 </label>
             </div>
 
-            <input 
-                type="hidden" 
-                id="eidikothta_symbashs_stathera" 
-                name="eidikothta_symbashs_stathera" 
-                class="form-control input-contents" value="<%= safe('eidikothta_symbashs_stathera') %>" 
-            />
+            <input type="hidden" id="eidikothta_symbashs_stathera" name="eidikothta_symbashs_stathera"
+                class="form-control input-contents" value="<%= safe('eidikothta_symbashs_stathera') %>" />
 
-            <input 
-                type="hidden" 
-                id="eidikothta_symbashs_table" 
-                name="eidikothta_symbashs_table" 
-                value="[]"
-            />
+            <input type="hidden" id="eidikothta_symbashs_table" name="eidikothta_symbashs_table" value="[]" />
 
             <div class="col-9-24">
-                <select
-                    id="eidikothta_symbashs"
-                    name="eidikothta_symbashs[]"
+                <select id="eidikothta_symbashs" name="eidikothta_symbashs[]"
                     class="tom-dropdown selectpicker-dropdown-normal left-align w-100 mb-3"
-                    aria-label="Ειδικότητα Συμβάσεων"
-                    data-api="/api/dropdown/symbaseis/eidikothta_symbashs_multi"
-                    multiple
-
-                    data-preselect="eidikothta_symbashs_stathera"
-                    data-target-input="eidikothta_symbashs_stathera"
-                    data-target-table="eidikothta_symbashs_table"
-                    
-                    data-extra-filter="symbash_stathera"
-                    data-extra-filter2="kathgoria_symbashs_table"
-                    data-extra-filter2-src="kathgoria_symbashs_table"
-
-                    data-optgroup-by="afora_thn_symbash_kathgoria"
-                    data-optgroup-extract="last4"
-                    data-optgroup-field="__group"
-                    data-optgroup-label-source="kathgoria_symbashs"
-
-                    data-inline-peek="2"
-                    data-inline-mode="kodikos"
-
-                    data-preload-all="true"
-                    data-pad-length="4"
-                    data-reserve-right="28"
+                    aria-label="Ειδικότητα Συμβάσεων" data-api="/api/dropdown/symbaseis/eidikothta_symbashs_multi"
+                    multiple data-preselect="eidikothta_symbashs_stathera"
+                    data-target-input="eidikothta_symbashs_stathera" data-target-table="eidikothta_symbashs_table"
+                    data-extra-filter="symbash_stathera" data-extra-filter2="kathgoria_symbashs_table"
+                    data-extra-filter2-src="kathgoria_symbashs_table" data-optgroup-by="afora_thn_symbash_kathgoria"
+                    data-optgroup-extract="last4" data-optgroup-field="__group"
+                    data-optgroup-label-source="kathgoria_symbashs" data-inline-peek="2" data-inline-mode="kodikos"
+                    data-preload-all="true" data-pad-length="4" data-reserve-right="28"
                     placeholder="Αναζήτηση Ειδικότητας Σύμβασης">
                 </select>
             </div>
@@ -166,47 +111,32 @@
         <div class="card-footer cardFooter margin-left--1_5rem">
             <div class="d-inline-block d-flex cardFooter01">
                 <div class="d-flex cardFooter02">
-                    <a 
-                        id="add-btn"
-                        href="#"
-                        role="button"
-                        data-bs-toggle="tooltip" 
-                        title="Υπολογισμός των κλιμακίων των συμβάσεων"
-                        data-bs-placement="bottom"
+                    <a id="add-btn" href="#" role="button" data-bs-toggle="tooltip"
+                        title="Υπολογισμός των κλιμακίων των συμβάσεων" data-bs-placement="bottom"
                         data-tooltip-max-width="15vw"
                         class="btn btn-brown rounded-4 buttons-content margin-left-1rem mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
                         data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
                         <i class="buttons-content bi bi-display"></i> Εμφάνιση
                     </a>
-                
-                    <a 
-                        id="update-klimakia-btn"
-                        href="#"
-                        role="button"
-                        data-bs-toggle="tooltip" 
-                        title="Ενημέρωση της Βάσης Δεδομένων των Κλιμακίων Συμβάσεων"
-                        data-bs-placement="bottom"
+
+                    <a id="update-klimakia-btn" href="#" role="button" data-bs-toggle="tooltip"
+                        title="Ενημέρωση της Βάσης Δεδομένων των Κλιμακίων Συμβάσεων" data-bs-placement="bottom"
                         data-tooltip-max-width="15vw"
                         class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
                         data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
                         <i class="buttons-content bi bi-pencil-square"></i> Ενημέρωση
                     </a>
 
-                    <a 
-                        id="back-btn"
-                        href="/mainapp"
-                        role="button"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="bottom"
-                        data-tooltip-max-width="10vw"
-                        title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    <a id="back-btn" href="/mainapp" role="button" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                        data-tooltip-max-width="10vw" title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
                         class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
                         <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                     </a>
                 </div>
 
                 <div class="d-flex width-percent-35">
-                    <button type="button" class="btn btn-toTop scroll-to-top"><i class="bi bi-chevron-double-up"></i></button>
+                    <button type="button" class="btn btn-toTop scroll-to-top"><i
+                            class="bi bi-chevron-double-up"></i></button>
                 </div>
             </div>
         </div>
@@ -220,22 +150,17 @@
     window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
 </script>
 
-<!-- Common helpers (ίδια όπως στις Ειδικότητες) -->
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getCompanyDescription<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getXrhsh<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getPeriod<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getUser<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/blockInvalidClick<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/blockInvalidClick') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3-multi.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/externalRowTrash<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ts-inline-summary<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/emfanish<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/symbaseis/ypologismoiKlimakion/enhmeroshKlimakion<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/hideTooltips<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/tooltipsForButtons<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
+<script type="module" src="<%= script('symbaseisDropdownChain3-multi') %>"></script>
+
+<script src="<%= script('symbaseis/ypologismoiKlimakion/externalRowTrash') %>"></script>
+<script src="<%= script('ts-inline-summary') %>"></script>
+<script src="<%= script('symbaseis/ypologismoiKlimakion/emfanish') %>"></script>
+<script src="<%= script('symbaseis/ypologismoiKlimakion/enhmeroshKlimakion') %>"></script>
+<script src="<%= script('common/hideTooltips') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/scrollToTop') %>"></script>

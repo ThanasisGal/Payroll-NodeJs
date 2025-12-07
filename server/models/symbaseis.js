@@ -64,7 +64,7 @@ const KlimakiaSymbaseonSchema = new Schema({
     poso: { type: Number },
     isxyei_apo: { type: Date },
     isxyei_eos: { type: Date },
-    pk: { type: String, trim: true },
+    praxh_katatheshs: { type: String, trim: true },
     afora_thn_symbash: { type: String, trim: true },
     afora_thn_symbash_kathgoria: { type: String, trim: true },
     afora_thn_symbash_kathgoria_eidikothta: { type: String, trim: true },

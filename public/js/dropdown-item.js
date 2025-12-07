@@ -157,7 +157,7 @@ export const initTomDropdown = ({
     delete hooks.initialize;
 
     /* ---------------------------------------------------------- */
-    let currentAbort = null;
+    // let currentAbort = null;
 
     const tom = new TomSelect(el, {
         /* ▼ βασικά πεδία ▼ */
@@ -192,11 +192,18 @@ export const initTomDropdown = ({
 
         /* ------ async LOAD (σελίδα 1) ------------------------- */
         async load(searchText, callback) {
-
+            // ✅ Debounce guard για διαδοχικά calls
+            const now = Date.now();
+            if (this._lastLoadTime && now - this._lastLoadTime < 50) {
+                callback();
+                return;
+            }
+            this._lastLoadTime = now;
+    
             /* 1. ακύρωσε τυχόν προηγούμενο fetch */
-            try { currentAbort?.abort(); } catch {}
-            currentAbort = new AbortController();
-
+            try { this._currentAbort?. abort(); } catch {}
+            this._currentAbort = new AbortController();
+    
             /* 2. χτίζω το URL  – το δικό σου κομμάτι μένει όπως ήταν */
             let urlToFetch;
             if (typeof searchText === 'string' && searchText.startsWith('http')) {
@@ -265,8 +272,8 @@ export const initTomDropdown = ({
 
             try {
                 /* 3. fetch */
-                const json = await fetch(urlToFetch, { signal: currentAbort.signal })
-                                        .then(r => r.json());
+            const json = await fetch(urlToFetch, { signal: this._currentAbort.signal })
+                            .then(r => r. json());
                 let items = Array.isArray(json.items) ? json.items : [];
 
                 // ✅ Normalize items: ensure every record has value + label/text (strings)
@@ -589,6 +596,9 @@ export const initTomDropdown = ({
             });
 
             const doPreselect = async () => {
+                if (ts._preselectDone) return;
+                ts._preselectDone = true;
+
 				const preSelId = el.dataset.preselect;
 				if (!preSelId) return;
 
@@ -893,6 +903,7 @@ export const initTomDropdown = ({
 
     /* --------------------------------------------------------------- */
     (window.__tomInstances ??= {})[selector] = tom;
+    return tom;
 }
 
 const CLEAR_BTN_SELECTOR = '.ts-single-reset-btn';

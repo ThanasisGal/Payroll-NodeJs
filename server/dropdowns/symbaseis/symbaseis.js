@@ -1,24 +1,9 @@
-// // routes/dropdowns/symbaseis/symbaseis.js
-// const symbaseisModel = require('../../models/symbaseis');
-
-// const {
-//   SymbaseisModel
-// } = symbaseisModel;
-
-// module.exports = {
-//   path: '/api/dropdown/symbaseis/symbash',
-//   model: SymbaseisModel,
-//   options: {
-//     searchFields: ['kodikos', 'perigrafh'],
-//     sort: { kodikos: 1 },
-//   }
-// };
 // routes/dropdowns/symbaseis/symbaseis.js
 const symbaseisModel = require('../../models/symbaseis');
 const { SymbaseisModel } = symbaseisModel;
 
 module.exports = {
-  // το καλείς ήδη έτσι στο EJS
+  // το καλώ ήδη έτσι στο EJS
   path: '/api/dropdown/symbaseis/symbash',
   model: SymbaseisModel,
   options: {
@@ -46,9 +31,9 @@ module.exports = {
 
       return {
         id: String(doc._id ?? kod),
-        value: kod,          // 👈 αυτό θα μπει στο input
-        label,               // 👈 αυτό θα ΔΕΙΣ επάνω
-        text: label,         // 👈 μερικά init διαβάζουν text
+        value: kod,
+        label,
+        text: label,
         kodikos: kod,
         perigrafh: doc.perigrafh ?? '',
       };
