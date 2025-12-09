@@ -222,67 +222,75 @@
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
-	
-<script nonce="<%= nonce %>" src="<%= NODE_ENV === 'production' ? 'https://cdn.webpayrollsolutions.com/static/min.js' : '/static/js' %>/common/amka_validation<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<%
+	// Helper function μόνο για αυτό το template
+	function moduleUrl(path) {
+		const isProd = NODE_ENV === 'production';
+		
+		if (isProd) {
+			return `https://cdn.webpayrollsolutions.com/static/min.js/${path}.js`;
+		} else {
+			return `/static/js/${path}.js`;
+		}
+	}
+%>
 
 <!-- ✅ Import Map Definition -->
 <script type="importmap" nonce="<%= nonce %>">
 	{
 		"imports": {
-			"apodoxes-calculations": "/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/modules/apodoxesCalculations<%= NODE_ENV === 'production' ? '.min' : '' %>.js"
+			"apodoxes-calculations": "<%= moduleUrl('modules/apodoxesCalculations') %>",
+	        "dependent-select-toggle": "<%= moduleUrl('common/dependentSelectToggle') %>"
 		}
 	}
 </script>
 
+<script src="<%= script('common/amka_validation') %>"></script>
+<script src="<%= script('ergazomenoi/genika/getFieldValues') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/getFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('companies/genikastoixeia/dropdownsValue') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/js/companies/genikastoixeia/dropdownsValue.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/js/dropdown-item.js"></script>
+<script type="module" src="<%= script('common/initTomDropdown') %>"></script>
 
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/kathestos_apasxolhshs_fulltime_sync<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/kathestos_apasxolhshs_fulltime_sync') %>"></script>
 
-<script nonce="<%= nonce %>" type="module" src="/static/js/geoDropdownChain.js"></script>  
-<script nonce="<%= nonce %>" type="module" src="/static/js/efkaDropdownChain.js"></script>  
-<script nonce="<%= nonce %>" type="module" src="/static/js/symbaseisDropdownChain3.js"></script>
+<script type="module" src="<%= script('geoDropdownChain') %>"></script>
+<script type="module" src="<%= script('efkaDropdownChain') %>"></script>
+<script type="module" src="<%= script('symbaseisDropdownChain3') %>"></script>
+<script type="module" src="<%= script('epa_step1') %>"></script>
+<script type="module" src="<%= script('epa_step2') %>"></script>
+<script type="module" src="<%= script('epa_step3') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/genika/updateLinkFromTomDropdown') %>"></script>
 
-<!-- Βήματα διαχείρισης του epa_efka-->
-<script nonce="<%= nonce %>" type="module" src="/static/js/epa_step1.js"></script>  
-<script nonce="<%= nonce %>" type="module" src="/static/js/epa_step2.js"></script>  
-<script nonce="<%= nonce %>" type="module" src="/static/js/epa_step3.js"></script>  
-
-<script nonce="<%= nonce %>" type="module" src="/static/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"></script>  
-
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/toggleLabelErgazomenon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkHlikia<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/totalPercentChecker<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAfm<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/checkAmka<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/ibanChecker<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/clearableInputs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/amka_validation<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatNumbers_2dec<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/sectionsVisible<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/putInputValuesToHiddenValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/calcProyphresia<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/toggleDisabledSelectViaCheckbox<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/fillLabelFromInput<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/date-sync-add<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/fillLabelFromInput<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/getDaysFromDate<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/selectRepo<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-
-<script nonce="<%= nonce %>" type="module" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/addStoixeiaSymbaseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-<script nonce="<%= nonce %>" type="module" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/ergazomenoi/genika/reCalcApodoxes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
+<script src="<%= script('common/checkHlikia') %>"></script>
+<script src="<%= script('common/totalPercentChecker') %>"></script>
+<script src="<%= script('common/checkAfm') %>"></script>
+<script src="<%= script('common/checkAmka') %>"></script>
+<script src="<%= script('common/ibanChecker') %>"></script>
+<script src="<%= script('common/clearableInputs') %>"></script>
+<script src="<%= script('common/formatNumbers_2dec') %>"></script>
+<script src="<%= script('common/moveByEnter') %>"></script>
+<script src="<%= script('common/scrollToTop') %>"></script>
+<script src="<%= script('common/sectionsVisible') %>"></script>
+<script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
+<script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>
+<script src="<%= script('ergazomenoi/genika/toggleDisabledSelectViaCheckbox') %>"></script>
+<script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
+<script src="<%= script('ergazomenoi/genika/date_sync_add') %>"></script>
+<script src="<%= script('ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs') %>"></script>
+<script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
+<script src="<%= script('ergazomenoi/genika/getDaysFromDate') %>"></script>
+<script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/genika/addStoixeiaSymbaseon') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/genika/reCalcApodoxes') %>"></script>
 
 
 <script nonce="<%= nonce %>" type="module">
-    import { bindCheckboxControlsSelect } from '../dependentSelectToggle.js';
+    import { bindCheckboxControlsSelect } from 'dependent-select-toggle';
 
-    // Νομική μορφή
+	// Νομική μορφή
     bindCheckboxControlsSelect({
         checkboxId: 'syggeneia',
         selectId  : 'syggenikh_sxesh',

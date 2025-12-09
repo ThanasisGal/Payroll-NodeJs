@@ -1,0 +1,1 @@
+document['addEventListener']('DOMContentLoaded',()=>{['eponymo','onoma','afm','amka']['forEach'](l=>{const M=document['getElementById'](l);if(!M)return;const p=l+'Hidden';M['addEventListener']('blur',()=>{const A=document['getElementById'](p);A&&(A['value']=M['value']);});});});

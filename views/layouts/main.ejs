@@ -11,21 +11,23 @@
         
         <!-- Επιτρέπεται από strict CSP μέσω nonce -->
         <script nonce="<%= nonce %>">
-        (function() {
-            let ua = navigator.userAgent;
-            let htmlTag = document.documentElement;
+            (function() {
+                let ua = navigator.userAgent;
+                let htmlTag = document.documentElement;
 
-            if (ua.indexOf("Firefox") > -1) {
-                htmlTag.classList.add("firefox");
-            } else if (ua.indexOf("Edg") > -1) {
-                htmlTag.classList.add("edge");
-            } else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) {
-                htmlTag.classList.add("chrome");
-            } else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) {
-                htmlTag.classList.add("safari");
-            }
-        })();
+                if (ua.indexOf("Firefox") > -1) {
+                    htmlTag.classList.add("firefox");
+                } else if (ua.indexOf("Edg") > -1) {
+                    htmlTag.classList.add("edge");
+                } else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) {
+                    htmlTag.classList.add("chrome");
+                } else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) {
+                    htmlTag.classList.add("safari");
+                }
+            })();
         </script>
+
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
 
         <!-- Προαιρετικά: preconnect για Google Fonts -->
         <!-- <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -107,7 +109,6 @@
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
         <script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
         <script src="<%= script('common/deviceSwitcher') %>" defer></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
 
         <script nonce="<%= nonce %>">
             // 🔑 Global CSRF helper

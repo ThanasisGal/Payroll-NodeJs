@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const { ObjectId } = require('mongodb');
+const fs = require("fs-extra");
+
 const Models_A = require("../../models/stathera_arxeia");
 const Models_B = require("../../models/privileges");
 const Models_D = require("../../models/ergazomenoi");
@@ -29,23 +32,21 @@ const arithmosKrathseon = 7;
 class ergazomenoiController {
 
     static mainErgazomenoiForm = async (req, res) => {
-        const locals = {
-            title: "Εργαζόμενοι",
-            description: "Web Payroll System",
-        };
+        const locals = { title: "Εργαζόμενοι", description: "Web Payroll System" };
 
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const basePer = Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
+        const page = Math.max(Number(req.query.page) || 1, 1);
 
-        // console.log(req.session);
+        if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+        const userId   = ObjectId.createFromHexString(sessionUserId);
+
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-            const userPrivileges = await UserPrivilegesModel.findOne({
-                userId: sessionUserId,
-                form: "Ergazomenoi",
-            }).exec();
+            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Ergazomenoi" }).lean();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
@@ -70,17 +71,9 @@ class ergazomenoiController {
 
             // Aggregation query για την ανάκτηση δεδομένων
             const queryPipeline = [
-                {
-                    $match: {
-                        company_kod: companyId,
-                    },
-                },
-                {
-                    $skip: skipRecords,
-                },
-                {
-                    $limit: limitPerPage,
-                },
+                { $match: { company_kod: companyId } },
+                { $skip: skipRecords },
+                { $limit: limitPerPage },
             ];
 
             const ergazomenoi = await ErgazomenoiModel.aggregate(
@@ -93,9 +86,14 @@ class ergazomenoiController {
                 current: page,
                 pages: totalPages,
                 ergazomenoi,
+                perx,                       // <-- για το UI πολλαπλασιαστή
+                basePer,                    // (προαιρετικό, αν το δείχνεις)
+                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
             });
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.error(error);
+            res.status(500).send("Σφάλμα");
         }
     };
 

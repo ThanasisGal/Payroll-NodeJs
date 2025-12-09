@@ -350,7 +350,6 @@ router.get("/api/eidikothtesSymbaseon/:symbash_kathgoria", genikaAPIsController.
 router.post("/api/eidikothtesSymbaseon/update/:eidikothtesId", symbaseisController.postEidikothtesSymbaseonUpdate);
 
 router.get("/api/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", genikaAPIsController.getStoixeiaSymbaseon);
-// router.get("/api/symbaseis/stoixeiaSymbaseon/:symbash_kathgoria_eidikothta", symbaseisController.loadStoixeiaSymbaseonForm);
 router.post("/api/stoixeiaSymbaseon/update/:stoixeiaSymbaseonId", symbaseisController.postStoixeiaSymbaseonUpdate);
 router.get("/api/klimakiaSymbaseon/:symbash_kathgoria_eidikothta_stoixeio", genikaAPIsController.getKlimakiaSymbaseon);
 
