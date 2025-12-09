@@ -428,6 +428,8 @@
 // reCalcApodoxes.js
 // Clean import με alias
 
+const Decimal = window.Decimal;
+
 import { 
     toDecimal, 
     formatDecimal, 
@@ -452,7 +454,7 @@ function waitForDecimal(callback) {
 }
 
 waitForDecimal(function() {
-    console.log('✅ Decimal.js loaded, initializing reCalcApodoxes...');
+    // console.log('✅ Decimal.js loaded, initializing reCalcApodoxes...');
     
     Decimal.set({ 
         precision: 28,

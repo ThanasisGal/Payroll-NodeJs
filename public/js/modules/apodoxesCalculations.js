@@ -223,7 +223,31 @@ export function calculateWageBasedOnWorkType(type, data, hours, days, extraApodo
 export function updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, extraApodoxes) {
     const typeEl = document.getElementById('typos_ergazomenon');
     if (!typeEl || !typeEl.value) {
-        console.warn('⚠️ Τύπος Εργαζομένου δεν έχει επιλεγεί');
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή !!!',
+            html: 'Δεν είναι εφικτός ο υπολογισμός των αποδοχών βάσει των ωρών εργασίας γιατί δεν έχετε επιλέξει <strong>ΤΥΠΟ ΕΡΓΑΖΟΜΕΝΟΥ</strong> στην καρτέλλα <strong>Σταθερά Στοιχεία</strong>.'
+        });
+        return;
+    }
+    
+    const typeEl1 = document.getElementById('hmeres_ergasias_ebdomadas');
+    if (!typeEl1 || !typeEl1.value) {
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή !!!',
+            html: 'Δεν είναι εφικτός ο υπολογισμός των αποδοχών βάσει των ωρών εργασίας γιατί δεν έχετε επιλέξει <strong>ΗΜΕΡΕΣ ΕΒΔΟΜΑΔΙΑΙΑΣ ΕΡΓΑΣΙΑΣ</strong> στην καρτέλλα <strong>Σταθερά Στοιχεία</strong>.'
+        });
+        return;
+    }
+    
+    const typeEl2 = document.getElementById('ores_ergasias_ebdomadas');
+    if (!typeEl2 || !typeEl2.value) {
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή !!!',
+            html: 'Δεν είναι εφικτός ο υπολογισμός των αποδοχών βάσει των ωρών εργασίας γιατί δεν έχετε επιλέξει <strong>ΩΡΕΣ ΕΒΔΟΜΑΔΙΑΙΑΣ ΕΡΓΑΣΙΑΣ</strong> στην καρτέλλα <strong>Σταθερά Στοιχεία</strong>.'
+        });
         return;
     }
     

@@ -4,13 +4,16 @@
 import { initTomDropdown } from './dropdown-item.js';
 
 (() => {
-	if (window.__symbaseisDropdownChain3MultiInit) return;
+
+	if (window.__symbaseisDropdownChain3MultiInit) {
+		return;
+	}
 	window.__symbaseisDropdownChain3MultiInit = true;
 
 	/* ═══════════════════════════════════════════════════════════════
 	* 🔧 HELPER FUNCTIONS
 	* ═══════════════════════════════════════════════════════════════ */
-	
+
 	function $(id){ return document.getElementById(id); }
 	function ts(id){ var el = $(id); return el && el.tomselect ? el.tomselect : null; }
 
@@ -39,17 +42,17 @@ import { initTomDropdown } from './dropdown-item.js';
 	function setHiddenJSON(hidId, obj){
 		var h = $(hidId); if (!h) return;
 		var next = JSON.stringify(obj || []);
+		// suppress observer when we intentionally update
+		try { h.__suppressObserver = true; } catch(_) {}
 		h.value = next;
 		try{ h.dispatchEvent(new Event('change',{bubbles:true})); }catch(_){}
+		try { h.__suppressObserver = false; } catch(_) {}
 	}
 
 	/* ═══════════════════════════════════════════════════════════════
 	* 🔐 SMART LOCK/UNLOCK BASED ON HIDDEN FIELDS
 	* ═══════════════════════════════════════════════════════════════ */
-	
-	/**
-	 * Έλεγχος: Αν το hidden field έχει τιμή → LOCK, αλλιώς → UNLOCK
-	 */
+
 	function updateLockState() {
 		var symVal = ($('symbash_stathera')?.value || '').trim();
 		var katVal = ($('kathgoria_symbashs_stathera')?.value || '').trim();
@@ -110,7 +113,7 @@ import { initTomDropdown } from './dropdown-item.js';
 			if (symTrash) {
 				symTrash.hidden = false;
 				symTrash.style.display = '';
-				
+
 				if (!symTrash.__cascadeWired) {
 					symTrash.__cascadeWired = true;
 					symTrash.addEventListener('click', function(e) {
@@ -128,7 +131,7 @@ import { initTomDropdown } from './dropdown-item.js';
 			if (katTrash) {
 				katTrash.hidden = false;
 				katTrash.style.display = '';
-				
+
 				if (!katTrash.__cascadeWired) {
 					katTrash.__cascadeWired = true;
 					katTrash.addEventListener('click', function(e) {
@@ -146,7 +149,7 @@ import { initTomDropdown } from './dropdown-item.js';
 			if (eidTrash) {
 				eidTrash.hidden = false;
 				eidTrash.style.display = '';
-				
+
 				if (!eidTrash.__cascadeWired) {
 					eidTrash.__cascadeWired = true;
 					eidTrash.addEventListener('click', function(e) {
@@ -162,10 +165,14 @@ import { initTomDropdown } from './dropdown-item.js';
 	/* ═══════════════════════════════════════════════════════════════
 	* 🔄 CHANGE HANDLERS
 	* ═══════════════════════════════════════════════════════════════ */
-	
+
 	function onSymChange(){
 		var symVals = getVals('symbash').map(to4);
+		// suppress observer while we write hidden fields
+		var hid = $('symbash_stathera');
+		if (hid) { try { hid.__suppressObserver = true; } catch(_){} }
 		setHiddenFirst('symbash_stathera', symVals);
+		if (hid) { try { hid.__suppressObserver = false; } catch(_){} }
 
 		var tsKat = ts('kathgoria_symbashs');
 		if (tsKat){
@@ -177,7 +184,7 @@ import { initTomDropdown } from './dropdown-item.js';
 		setHiddenFirst('kathgoria_symbashs_stathera', '');
 
 		clickEidTrashOrClear();
-		
+
 		setTimeout(updateLockState, 100);
 	}
 
@@ -192,11 +199,15 @@ import { initTomDropdown } from './dropdown-item.js';
 			return { aa: aa, kodikos: k };
 		}).filter(function(x){ return !!x.kodikos; });
 
+		// suppress while writing
+		var hidK = $('kathgoria_symbashs_stathera');
+		if (hidK) { try { hidK.__suppressObserver = true; } catch(_){} }
 		setHiddenFirst('kathgoria_symbashs_stathera', katVals);
 		setHiddenJSON('kathgoria_symbashs_table', katTable);
+		if (hidK) { try { hidK.__suppressObserver = false; } catch(_){} }
 
 		clickEidTrashOrClear();
-		
+
 		setTimeout(updateLockState, 100);
 	}
 
@@ -213,13 +224,16 @@ import { initTomDropdown } from './dropdown-item.js';
 			};
 		}).filter(function(x){ return !!x.kodikos; });
 
+		var hidE = $('eidikothta_symbashs_stathera');
+		if (hidE) { try { hidE.__suppressObserver = true; } catch(_){} }
 		setHiddenFirst('eidikothta_symbashs_stathera', eidVals);
 		setHiddenJSON('eidikothta_symbashs_table', eidTable);
-		
+		if (hidE) { try { hidE.__suppressObserver = false; } catch(_){} }
+
 		setTimeout(function(){
 			try { window.dispatchEvent(new Event('eidikothtaChanged')); } catch(e) {}
 		}, 50);
-			
+
 		setTimeout(updateLockState, 100);
 	}
 
@@ -227,168 +241,169 @@ import { initTomDropdown } from './dropdown-item.js';
 	* 🗑️ TRASH HANDLERS - Full Cascade Clear
 	* ═══════════════════════════════════════════════════════════════ */
 
-	/**
-	 * Trash Σύμβασης → Clear ΟΛΑ (Συμβάσεις, Κατηγορίες, Ειδικότητες, Container)
-	 */
 	function handleSymbashClear() {
-		
+
 		var symTS = ts('symbash');
-		
+
 		// 1️⃣ Καθαρισμός Σύμβασης
 		if (symTS) {
 			try { symTS.setValue('', true); } catch(_){}
 			try { symTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var symHidden = $('symbash_stathera');
 		if (symHidden) {
+			// suppress observer around programmatic changes
+			try { symHidden.__suppressObserver = true; } catch(_) {}
 			symHidden.value = '';
 			try { symHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { symHidden.__suppressObserver = false; } catch(_) {}
 		}
-		
+
 		// 2️⃣ Καθαρισμός Κατηγοριών
 		var katTS = ts('kathgoria_symbashs');
 		if (katTS) {
 			try { katTS.setValue('', true); } catch(_){}
 			try { katTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var katHidden = $('kathgoria_symbashs_stathera');
 		var katTable = $('kathgoria_symbashs_table');
 		if (katHidden) {
+			try { katHidden.__suppressObserver = true; } catch(_) {}
 			katHidden.value = '';
 			try { katHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { katHidden.__suppressObserver = false; } catch(_) {}
 		}
 		if (katTable) {
 			katTable.value = '[]';
 			try { katTable.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
 		}
-		
+
 		// 3️⃣ Καθαρισμός Ειδικοτήτων
 		var eidTS = ts('eidikothta_symbashs');
 		if (eidTS) {
 			try { eidTS.setValue('', true); } catch(_){}
 			try { eidTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var eidHidden = $('eidikothta_symbashs_stathera');
 		var eidTable = $('eidikothta_symbashs_table');
 		if (eidHidden) {
+			try { eidHidden.__suppressObserver = true; } catch(_) {}
 			eidHidden.value = '';
 			try { eidHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { eidHidden.__suppressObserver = false; } catch(_) {}
 		}
 		if (eidTable) {
 			eidTable.value = '[]';
 			try { eidTable.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
 		}
-			
+
 		// 4️⃣ Καθαρισμός Container
 		if (typeof window.clearStoixeiaSymbaseonContainer === 'function') {
 			window.clearStoixeiaSymbaseonContainer();
 		}
-			
+
 		// 5️⃣ Update lock state (όλα unlocked)
 		setTimeout(function() {
 			updateLockState();
 		}, 150);
 	}
 
-	/**
-	 * Trash Κατηγοριών → Clear Κατηγορίες, Ειδικότητες, Container
-	 */
 	function handleKathgoriaClear() {
-		
+
 		var katTS = ts('kathgoria_symbashs');
-		
+
 		// 1️⃣ Καθαρισμός Κατηγοριών
 		if (katTS) {
 			try { katTS.setValue('', true); } catch(_){}
 			try { katTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var katHidden = $('kathgoria_symbashs_stathera');
 		var katTable = $('kathgoria_symbashs_table');
 		if (katHidden) {
+			try { katHidden.__suppressObserver = true; } catch(_) {}
 			katHidden.value = '';
 			try { katHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { katHidden.__suppressObserver = false; } catch(_) {}
 		}
 		if (katTable) {
 			katTable.value = '[]';
 			try { katTable.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
 		}
-		
+
 		// 2️⃣ Καθαρισμός Ειδικοτήτων
 		var eidTS = ts('eidikothta_symbashs');
 		if (eidTS) {
 			try { eidTS.setValue('', true); } catch(_){}
 			try { eidTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var eidHidden = $('eidikothta_symbashs_stathera');
 		var eidTable = $('eidikothta_symbashs_table');
 		if (eidHidden) {
+			try { eidHidden.__suppressObserver = true; } catch(_) {}
 			eidHidden.value = '';
 			try { eidHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { eidHidden.__suppressObserver = false; } catch(_) {}
 		}
 		if (eidTable) {
 			eidTable.value = '[]';
 			try { eidTable.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
 		}
-		
+
 		// 3️⃣ Καθαρισμός Container
 		if (typeof window.clearStoixeiaSymbaseonContainer === 'function') {
 			window.clearStoixeiaSymbaseonContainer();
 		}
-		
+
 		// 4️⃣ Update lock state
 		setTimeout(function() {
 			updateLockState();
 		}, 150);
 	}
 
-	/**
-	 * Trash Ειδικοτήτων → Clear Ειδικότητες, Container
-	 */
 	function handleEidikothtaClear() {
 
 		var eidTS = ts('eidikothta_symbashs');
-		
+
 		// 1️⃣ Καθαρισμός Ειδικοτήτων
 		if (eidTS) {
 			try { eidTS.setValue('', true); } catch(_){}
 			try { eidTS.clearOptions(); } catch(_){}
 		}
-		
+
 		var eidHidden = $('eidikothta_symbashs_stathera');
 		var eidTable = $('eidikothta_symbashs_table');
 		if (eidHidden) {
+			try { eidHidden.__suppressObserver = true; } catch(_) {}
 			eidHidden.value = '';
 			try { eidHidden.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
+			try { eidHidden.__suppressObserver = false; } catch(_) {}
 		}
 		if (eidTable) {
 			eidTable.value = '[]';
 			try { eidTable.dispatchEvent(new Event('change', {bubbles:true})); } catch(_){}
 		}
-		
+
 		// 2️⃣ Καθαρισμός Container
 		if (typeof window.clearStoixeiaSymbaseonContainer === 'function') {
 			window.clearStoixeiaSymbaseonContainer();
 		}
-		
+
 		// 3️⃣ Trigger event για το watcher
 		setTimeout(function(){
 			try { window.dispatchEvent(new Event('eidikothtaChanged')); } catch(e) {}
 		}, 100);
-		
+
 		// 4️⃣ Update lock state
 		setTimeout(function() {
 			updateLockState();
 		}, 150);
 	}
 
-	/**
-	 * Helper: Trash των Ειδικοτήτων (fallback αν δεν υπάρχει το κουμπί)
-	 */
 	function clickEidTrashOrClear(){
 		var btn =
 			document.querySelector('.row-trash-btn-eidikothta_symbashs') ||
@@ -417,73 +432,266 @@ import { initTomDropdown } from './dropdown-item.js';
 	/* ═══════════════════════════════════════════════════════════════
 	* 🔧 INIT / REINIT
 	* ═══════════════════════════════════════════════════════════════ */
-	
+
 	function bindTS(inst, handler){
 		if (!inst || typeof inst.on !== 'function' || inst.__chain3Bound) return;
 		inst.__chain3Bound = true;
 		var fire = function(){ queueMicrotask(function(){ handler(inst); }); };
 		['change','item_add','item_remove','clear'].forEach(function(e){ inst.on(e, fire); });
-		
+
 		try{
 			if (inst.input) inst.input.addEventListener('change', fire, { passive:true });
 			if (inst.control) inst.control.addEventListener('click', function(e){
 				if (e.target && e.target.closest && e.target.closest('.remove')) fire();
 			}, { passive:true });
 		}catch(_){}
-		
+
 		setTimeout(fire, 0);
 	}
 
 	function reinitTS(selector, url, extraParams){
 		var node = document.querySelector(selector);
-		if (!node) return null;
-		if (node.tomselect) node.tomselect.destroy();
+		if (!node) {
+			return null;
+		}
+
+		if (node. tomselect) {
+			node.tomselect. destroy();
+		}
 
 		var inst = null;
-		
+
 		try{
 			inst = initTomDropdown && initTomDropdown({
 				selector: selector,
-				url: url,
+				url:  url,
 				extraParams: extraParams || {},
 				minChars: 0
 			});
 		}catch(e){
-			console.error('initTomDropdown failed for', selector, e);
+			console.error('❌ initTomDropdown FAILED:', e);
 		}
 
-		if (selector === '#symbash'){
-			var S = inst || ts('symbash'); 
-			if (S && S.on) {
-				S.on('change', onSymChange);
-				S.on('clear', handleSymbashClear);
+		// ═════════════════════════════════════════════════════════════
+		// ⏰ ΚΑΘΥΣΤΕΡΗΜΕΝΟ BINDING ΓΙΑ AUTO-FOCUS
+		// ═════════════════════════════════════════════════════════════
+		setTimeout(function() {
+			// ===== debug + auto-focus handlers for #symbash =====
+			if (selector === '#symbash') {
+			    var S = inst || ts('symbash');
+
+			    // helper που κάνει το auto-focus στις Κατηγορίες
+			    function autoFocusKat(){
+					try {
+						const katEl = document.getElementById('kathgoria_symbashs');
+						const katTS = katEl && katEl.tomselect;
+						if (!katTS) return;
+						try { katTS.enable(); } catch(_) {}
+						try { katTS.unlock && katTS.unlock(); } catch(_) {}
+						const controlInput = katTS.control_input || (katTS.wrapper && katTS.wrapper.querySelector('input'));
+						if (controlInput && typeof controlInput.focus === 'function') {
+							controlInput.focus();
+							setTimeout(()=>{ try { katTS.open(); } catch(_){}; }, 120);
+						}
+					}catch(_){}
+			    }
+
+			    if (S && typeof S.on === 'function') {
+			        // existing bindings
+			        S.on('change', function(value) {
+			            try { onSymChange(); } catch(e) { console.error(e); }
+			            if (value) autoFocusKat();
+			        });
+
+			        S.on('item_add', function(value) {
+			            try { onSymChange(); } catch(e) { console.error(e); }
+			            if (value) autoFocusKat();
+			            if (value) autoFocusKat();
+			        });
+
+			        // fallback handlers
+			        try {
+			            // 1) raw <select> change (native element)
+			            var rawSelect = document.querySelector('#symbash');
+			            if (rawSelect && !rawSelect.__fallbackBound) {
+			                rawSelect.__fallbackBound = true;
+			                rawSelect.addEventListener('change', function(ev){
+			                    try { onSymChange(); } catch(e){ console.error(e); }
+			                    setTimeout(autoFocusKat, 250);
+			                }, true);
+			            }
+
+			            // 2) hidden "stathera" input change (if used)
+			            var hid = document.getElementById('symbash_stathera');
+			            if (hid && !hid.__fallbackBound) {
+			                hid.__fallbackBound = true;
+			                // robust observer instead of simple attribute loop
+			                (function attachRobustObserver(){
+			                	try{
+			                		if (hid.__robustObserverAttached) return;
+			                		hid.__robustObserverAttached = true;
+			                		let lastProcessed = String(hid.value || '');
+			                		var mo = new MutationObserver(function(mutations){
+			                			try{
+			                				for (const m of mutations){
+			                					if (m.type !== 'attributes' || m.attributeName !== 'value') continue;
+			                					if (hid.__suppressObserver) { lastProcessed = String(hid.value||''); continue; }
+			                					const newVal = String(hid.value || '');
+			                					if (newVal === lastProcessed) continue;
+			                					lastProcessed = newVal;
+			                					// minimal debug
+			                					try { onSymChange(); } catch(e){ console.error(e); }
+			                					setTimeout(autoFocusKat, 250);
+			                				}
+			                			}catch(obsErr){ console.error('MutationObserver callback error', obsErr); }
+			                		});
+			                		mo.observe(hid, { attributes: true, attributeFilter: ['value'], attributeOldValue: true });
+			                		hid.__robustMutationObserver = mo;
+			                	}catch(err){ console.error('attachRobustObserver failed', err); }
+			                })();
+			                // also listen native change for safety
+			                hid.addEventListener('change', function(){ 
+			                	try { onSymChange(); } catch(e){ console.error(e); }
+			                	setTimeout(autoFocusKat, 250);
+			                }, true);
+			            }
+
+			            // 3) Listen on control_input (TomSelect visible input) for "input" events
+			            var ctrlInput = S && S.control_input;
+			            if (ctrlInput && !ctrlInput.__fallbackBound) {
+			                ctrlInput.__fallbackBound = true;
+			                ctrlInput.addEventListener('input', function(){
+			                }, { passive:true });
+			            }
+			        } catch (err) {
+			            console.error('fallback listeners attach failed', err);
+			        }
+
+			        S.on('clear', handleSymbashClear);
+			    } else {
+			        console.warn('⚠️ Cannot bind debug handlers for #symbash, S.on is not function', S);
+			    }
 			}
-		}
-		if (selector === '#kathgoria_symbashs'){
-			bindTS(inst || ts('kathgoria_symbashs'), function(){ onKatChange(); });
-			var K = inst || ts('kathgoria_symbashs');
-			if (K && K.on) K.on('clear', handleKathgoriaClear);
-		}
-		if (selector === '#eidikothta_symbashs'){
-			var E = inst || ts('eidikothta_symbashs');
-			bindTS(E, function(){ onEidChange(); });
-			if (E) {
-				E.settings.openOnFocus = false;
-				E.settings.openOnClick = true;
+
+			// 🟢 ΚΑΤΗΓΟΡΙΕΣ - debug + Auto-focus → Ειδικότητες
+			if (selector === '#kathgoria_symbashs') {
+				var K = inst || ts('kathgoria_symbashs');
+
+				// helper που κάνει το auto-focus στις Ειδικότητες
+				function autoFocusEid(){
+					try {
+						const eidEl = document.getElementById('eidikothta_symbashs');
+						const eidTS = eidEl && eidEl.tomselect;
+						if (!eidTS) return;
+						try { eidTS.enable(); } catch(_) {}
+						try { eidTS.unlock && eidTS.unlock(); } catch(_) {}
+						const controlInput = eidTS.control_input || (eidTS.wrapper && eidTS.wrapper.querySelector('input'));
+						if (controlInput && typeof controlInput.focus === 'function') {
+							controlInput.focus();
+							setTimeout(()=>{ try { eidTS.open(); } catch(_){}; }, 120);
+						}
+					}catch(_){}
+				}
+
+				if (K && typeof K.on === 'function') {
+					// bindings
+					K.on('change', function(value) {
+						try { onKatChange(); } catch(e) { console.error(e); }
+						if (value && (Array.isArray(value) ? value.length>0 : value)) autoFocusEid();
+					});
+
+					K.on('item_add', function(value) {
+						try { onKatChange(); } catch(e) { console.error(e); }
+						if (value) autoFocusEid();
+						if (value) autoFocusEid();
+					});
+
+					// fallback handlers for categories
+					try {
+						// raw <select> change
+						var rawSelectK = document.querySelector('#kathgoria_symbashs');
+						if (rawSelectK && !rawSelectK.__fallbackBound) {
+							rawSelectK.__fallbackBound = true;
+							rawSelectK.addEventListener('change', function(ev){
+								try { onKatChange(); } catch(e){ console.error(e); }
+								setTimeout(autoFocusEid, 250);
+							}, true);
+						}
+
+						// hidden "stathera" input change (kathgoria)
+						var hidK = document.getElementById('kathgoria_symbashs_stathera');
+						if (hidK && !hidK.__fallbackBound) {
+							hidK.__fallbackBound = true;
+							(function attachRobustObserverK(){
+								try{
+									if (hidK.__robustObserverAttached) return;
+									hidK.__robustObserverAttached = true;
+									let lastProcessedK = String(hidK.value || '');
+									var moK = new MutationObserver(function(muts){
+										try{
+											for (const m of muts){
+												if (m.type !== 'attributes' || m.attributeName !== 'value') continue;
+												if (hidK.__suppressObserver) { lastProcessedK = String(hidK.value||''); continue; }
+												const newValK = String(hidK.value || '');
+												if (newValK === lastProcessedK) continue;
+												lastProcessedK = newValK;
+												try { onKatChange(); } catch(e){ console.error(e); }
+												setTimeout(autoFocusEid, 250);
+											}
+										}catch(obsErr){ console.error('MutationObserver callback error (kathgoria)', obsErr); }
+									});
+									moK.observe(hidK, { attributes: true, attributeFilter: ['value'], attributeOldValue: true });
+									hidK.__robustMutationObserver = moK;
+								}catch(err){ console.error('attachRobustObserverK failed', err); }
+							})();
+							// native change for safety
+							hidK.addEventListener('change', function(){
+								try { onKatChange(); } catch(e){ console.error(e); }
+								setTimeout(autoFocusEid, 250);
+							}, true);
+						}
+
+						// control_input listener
+						var ctrlInputK = K && K.control_input;
+						if (ctrlInputK && !ctrlInputK.__fallbackBound) {
+							ctrlInputK.__fallbackBound = true;
+							ctrlInputK.addEventListener('input', function(){
+								// optional debug
+							}, { passive:true });
+						}
+					} catch (err) {
+						console.error('fallback listeners attach failed (kathgoria)', err);
+					}
+
+					K.on('clear', handleKathgoriaClear);
+				} else {
+					console.warn('⚠️ Cannot bind debug handlers for #kathgoria_symbashs, K.on is not function', K);
+				}
 			}
-			if (E && E.on) E.on('clear', handleEidikothtaClear);
-		}
+
+			// 🟣 ΕΙΔΙΚΟΤΗΤΕΣ
+			if (selector === '#eidikothta_symbashs'){
+				var E = inst || ts('eidikothta_symbashs');
+				bindTS(E, function(){ onEidChange(); });
+				if (E) {
+					E.settings.openOnFocus = false;
+					E.settings.openOnClick = true;
+				}
+				if (E && E.on) E.on('clear', handleEidikothtaClear);
+			}
+
+		}, 500);  // ⏰ Περίμενε 500ms για να είναι έτοιμο το TomSelect
 
 		// Wire trash buttons μετά το init
-		setTimeout(ensureTrashButtonsVisible, 200);
+		setTimeout(ensureTrashButtonsVisible, 700);
 
-		return inst || ts(selector.replace('#',''));
+		return inst || ts(selector. replace('#',''));
 	}
 
 	/* ═══════════════════════════════════════════════════════════════
 	* 🛡️ ΕΙΔΙΚΗ ΛΟΓΙΚΗ ΓΙΑ ΕΙΔΙΚΟΤΗΤΕΣ (Click-Only Open)
 	* ═══════════════════════════════════════════════════════════════ */
-	
+
 	function isEidTableEmpty(){
 		var h = $('eidikothta_symbashs_table');
 		var v = h && typeof h.value === 'string' ? h.value.trim() : '';
@@ -569,11 +777,9 @@ import { initTomDropdown } from './dropdown-item.js';
 	/* ═══════════════════════════════════════════════════════════════
 	* 🚀 BOOTSTRAP
 	* ═══════════════════════════════════════════════════════════════ */
-	
 	reinitTS('#symbash',             '/api/dropdown/symbaseis/symbash');
 	reinitTS('#kathgoria_symbashs',  '/api/dropdown/symbaseis/kathgoria_symbashs');
 	reinitTS('#eidikothta_symbashs', '/api/dropdown/symbaseis/eidikothta_symbashs_multi');
-
 	wireEidClickOpenOnly();
 
 	var mo = new MutationObserver(function(){
@@ -590,8 +796,8 @@ import { initTomDropdown } from './dropdown-item.js';
 
 	/* ═══════════════════════════════════════════════════════════════
 	* 📤 EXPORT (για εξωτερική χρήση)
-	* ═══════════════════════════════════════════════════════════════ */
-	
+	* ═════════─────────────────────────────────────────────────────── */
+
 	window.__symbaseisHelpers = {
 		$,
 		ts,
