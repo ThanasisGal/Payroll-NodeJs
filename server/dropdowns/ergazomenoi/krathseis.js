@@ -2,16 +2,6 @@ const statheraArxeiaModel = require('../../models/stathera_arxeia');
 
 const { KrathseisModel } = statheraArxeiaModel;
 
-// module.exports = {
-//     path: '/api/dropdown/ergazomenoi/krathseis',
-//     model: KrathseisModel,
-//     options: {
-//         searchFields: ['kodikos', 'perigrafh'],
-//         sort: { kodikos: 1 },
-//         fields: ['kodikos', 'perigrafh', 'kodikos_tameioy']  
-//     }
-// };
-
 module.exports = {
     path: '/api/dropdown/ergazomenoi/krathseis',
     model:  KrathseisModel,
