@@ -1,21 +1,55 @@
-<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem; margin-bottom: -0.5rem;">
-  <div class="col-1 text-center">
-    <label class="col-form-label field-required">
-      α/α
-    </label>
-  </div>
-  <div class="col-8 text-center">
-    <label class="col-form-label field-required">
-      Κράτηση
-    </label>
-  </div>
-  <div class="col-2 text-center">
-    <label class="col-form-label field-required">
-      Α.Μ.Α
-    </label>
-  </div>
+<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-3 margin-top--1rem">
+	<div class="col-1 text-center">
+		<label class="col-form-label field-required">
+			α/α
+		</label>
+	</div>
+
+	<div class="col-8 text-center">
+		<label class="col-form-label field-required">
+			Κράτηση
+		</label>
+	</div>
+
+	<div class="col-0-5"></div>
+
+	<div class="col-1-5 text-center">
+		<label class="col-form-label field-required">
+			Α.Μ.Α.
+		</label>
+	</div>
 </div>
 
-<div id="krathseisContainer">
-  <!-- Εδώ θα προστεθούν δυναμικά τα select κρατήσεις -->
-</div>
+<input type="hidden" id="krathseis_table" name="krathseis_table" value="[]" />
+
+<% const safe = (k) => (rec && rec[k]) || ''; %>
+
+<% for (let index = 1; index <= 7; index++) { %>
+	<% const idNum = index.toString().padStart(2, '0'); %>
+
+	<div class="row form-group g-3 align-items-center mb-3">
+		<div class="col-1 center-align">
+			<label for=<%= `select_krathsh_${index}` %> class="col-form-label label-font-size">#<%= index %>
+			</label>
+		</div>
+
+		<input type="hidden" name="krathsh_<%= idNum %>" id="krathsh_<%= idNum %>" class="form-control input-contents"
+			value="<%= safe(`krathsh_${idNum}`) %>" readonly />
+
+		<div class="col-8">
+			<select id=<%= `select_krathsh_${idNum}` %> name=<%= `select_krathsh_${idNum}` %>
+				class="tom-dropdown left-align krathsh-select" aria-label="Κρατήσεις"
+				data-api="/api/dropdown/ergazomenoi/krathseis" single data-target-input=<%= `krathsh_${idNum}` %>
+				data-preselect=<%= `krathsh_${idNum}` %> data-preload-all="false" data-pad-length="4"
+				data-row-index="<%= idNum %>" placeholder="Αναζήτηση Κρατήσεων">
+			</select>
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-1-5">
+			<input type="text" name="ama_<%= idNum %>" id="ama_<%= idNum %>" class="form-control input-contents"
+				value="<%= safe(`ama_${idNum}`) %>" />
+		</div>
+	</div>
+<% } %>

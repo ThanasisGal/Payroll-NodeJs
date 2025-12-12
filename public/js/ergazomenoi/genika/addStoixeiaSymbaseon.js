@@ -44,6 +44,16 @@ function formatForDisplay(decimalValue, decimals) {
     }
 }
 
+// ---------- 1) Safe setter helper (τοποθέτησε το κοντά στις helper functions, πάνω πάνω στο αρχείο) ----------
+function safeSetValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        try { el.value = value; } catch (_) { console.warn('safeSetValue: cannot set value for', id); }
+    } // else {
+    //     console.warn(`safeSetValue: element "${id}" not found — value was:`, value);
+    // }
+}
+
 // ========================================================================
 // GLOBAL VARIABLES
 // ========================================================================
@@ -257,12 +267,9 @@ async function calculateTotal() {
 		}
 	}
 
-	// ✅ Εμφάνιση συνόλων - Round ΚΑΙ format με . toFixed()
-	document.getElementById('synolo_symbashs'). value = 
-		totalSymbashs.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
-	document. getElementById('synolo_symbashs_basei_oron_ergasias').value = 
-		totalBaseiOronErgasias.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
-	
+	// ✅ Εμφάνιση συνόλων - Round ΚΑΙ format
+	safeSetValue('synolo_symbashs', formatForDisplay(totalSymbashs, 2));
+	safeSetValue('synolo_symbashs_basei_oron_ergasias', formatForDisplay(totalBaseiOronErgasias, 2));	
 	// Παίρνουμε τον τύπο εργαζομένου και ειδική κατηγορία
 	const typosErg = document.getElementById('typos_ergazomenon')?.value;
 	const eidKath = document.getElementById('eidikh_kathgoria_ergazomenoy')?.value;
@@ -400,12 +407,13 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
 
 	// ✅ Format για εμφάνιση
 	nomimosMisthos. value = formatForDisplay(nomimosMisthosValue, 2);
-	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 2);
-	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 3);
+	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
+	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
 	
 	pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
-	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 2);
-	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 3);}
+	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
+}
 
 function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
 	const nomimosMisthos = document. getElementById('nomimosMisthos');
@@ -522,12 +530,12 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
 
 	// ✅ Format για εμφάνιση
 	nomimosMisthos. value = formatForDisplay(nomimosMisthosValue, 2);
-	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 2);
-	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 2);
+	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
+	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
 	
 	pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
-	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 2);
-	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 2);
+	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
 }
 
 function setupAutomaticRecalculation() {

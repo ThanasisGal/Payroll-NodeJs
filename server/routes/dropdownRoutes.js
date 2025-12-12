@@ -57,6 +57,7 @@ const kpkEfkaByCode                         = require('../dropdowns/ergazomenoi/
 const d_yp_apasxolhshs                      = require('../dropdowns/ergazomenoi/dypa');
 const programmaDypa                         = require('../dropdowns/ergazomenoi/programmataDypa');
 const kentraKostoys                         = require('../dropdowns/ergazomenoi/kentraKostoys');
+const krathseis                             = require('../dropdowns/ergazomenoi/krathseis');
 
 const symbaseis                             = require('../dropdowns/symbaseis/symbaseis');
 const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/kathgoriesSymbaseon');
@@ -106,6 +107,7 @@ const   {
             KadEfkaModel,
             KentraKostoysModel,
             KathgoriesErgasiasModel,
+            KrathseisModel,
         } = statheraArxeiaModels;
 
 const   {
@@ -294,6 +296,10 @@ router.get('/ergazomenoi/dypa',                         buildDropdownRoute(DypaM
 router.get('/ergazomenoi/programma_dypa',               programmaDypa.handler);
 router.get('/ergazomenoi/kentro_kostoys',               buildDropdownRoute(KentraKostoysModel , kentraKostoys.options));
 router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(KathgoriesErgasiasModel , kathgoriesErgasias.options));
+
+// =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION3 -> ΚΡΑΤΗΣΕΙΣ ==============================
+
+router.get('/ergazomenoi/krathseis',                    buildDropdownRoute(KrathseisModel, krathseis.options));
 
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 

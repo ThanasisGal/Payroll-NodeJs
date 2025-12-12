@@ -5780,6 +5780,8 @@ tbody .group-row--category:first-of-type > td {
     cursor: help;
 }
 
+.bg-2b97001e { background-color: #2b97001e;}
+.bg-eeff0223 { background-color: #eeff0223;}
 .bg-3d4e001e { background-color: #3d4e001e;}
 
 .ts-locked .ts-control {

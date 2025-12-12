@@ -194,7 +194,7 @@ export const initTomDropdown = ({
         async load(searchText, callback) {
             // ✅ Debounce guard για διαδοχικά calls
             const now = Date.now();
-            if (this._lastLoadTime && now - this._lastLoadTime < 50) {
+            if (this._lastLoadTime && now - this._lastLoadTime < 150) { // increased from 50 -> 150 to reduce aborts
                 callback();
                 return;
             }
@@ -377,7 +377,11 @@ export const initTomDropdown = ({
                 this.nextPage = hasMore ? nextUrl(urlToFetch) : null;
 
             } catch (err) {
-                if (err.name !== 'AbortError') console.error('Dropdown load failed', err);
+                if (err && err.name === 'AbortError') {
+                    // silent — expected cancellation
+                } else {
+                    if (err.name !== 'AbortError') console.error('Dropdown load failed', err);
+                }
                 callback();                 // κλείσε spinner σε κάθε σφάλμα
             }
         },
@@ -655,7 +659,8 @@ export const initTomDropdown = ({
 				}
             };
 
-            doPreselect();
+            // small delay to avoid competing initial fetches which can cause aborts on first load
+            setTimeout(doPreselect, 150);
 
             /* -----------------------------------------------------------------
             *  Α. Ενημέρωση κρυφού input  ΜΟΝΟ στο single
@@ -822,7 +827,7 @@ export const initTomDropdown = ({
         }
     })();
 
-    // --- Cache του επιλεγμένου option ώστε να μπορεί να «ξαναμπεί» αν λείπει ---
+    // --- Cache του επιλεγμένου option ώστε να μπορεί να «ξαναμπεί» --- 
     tom.on('item_add', (value /* , $itemEl */) => {
     const key   = tom.settings.valueField || 'value';
     const rec   = tom.options?.[value];  // πιο αξιόπιστο από το 2ο arg του event
