@@ -157,7 +157,37 @@ app.use(methodOverride("_method"));
 app.use(cookieParser());
 
 // Static assets
-app.use("/static", express.static(path. join(__dirname, "public")));
+// app.use("/static", express.static(path. join(__dirname, "public")));
+
+
+// ═══════════════════════════════════════════════════════════════
+// Static assets + CORS headers για static files
+// ═══════════════════════════════════════════════════════════════
+
+app.use("/static", express.static(path.join(__dirname, "public"), {
+    maxAge: isProd ? '1d' : '0',
+    etag: false,
+    setHeaders: (res, filepath) => {
+        // ✅ Πρόσθεσε CORS headers για ΟΛΕΣ τις static files (JS, CSS, κλπ)
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+        
+        // ✅ Cache control logic
+        if (filepath.endsWith('.html')) {
+            // HTML files:  NO cache
+            res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.set('Pragma', 'no-cache');
+            res.set('Expires', '0');
+        } else if (filepath.endsWith('.js') || filepath.endsWith('.css')) {
+            // JS/CSS:  cache για 1 day
+            res. set('Cache-Control', 'public, max-age=86400, immutable');
+        } else {
+            // Images κλπ: cache για 7 days
+            res.set('Cache-Control', 'public, max-age=604800');
+        }
+    }
+}));
 
 // Global locals
 // Helper: Λήψη διαδρομής script

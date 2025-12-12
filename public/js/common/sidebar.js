@@ -1,9 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const TREE_SEL     = '#nav-tree';
-    const SCROLL_SEL   = '#sidebarMenu .sidebar-scroll'; // <-- ΤΟ scroll container
+    const SCROLL_SEL   = '#sidebarMenu.sidebar-scroll'; // <-- ΤΟ scroll container
     const BTN_COLL_SEL = '#btn-collapse-all';
     const BTN_EXPD_SEL = '#btn-expand-all';
-    const SEARCH_SEL   = '#sidebarMenu .sidebar-search';
+    const SEARCH_SEL   = '#sidebarMenu.sidebar-search';
 
     const USER_ID   = (window.WPS_USER_ID || '').trim();
     const STATE_KEY = (id) => `wps.sidebar.state.v1.${id || 'guest'}`;
