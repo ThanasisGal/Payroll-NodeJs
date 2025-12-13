@@ -58,6 +58,8 @@ const d_yp_apasxolhshs                      = require('../dropdowns/ergazomenoi/
 const programmaDypa                         = require('../dropdowns/ergazomenoi/programmataDypa');
 const kentraKostoys                         = require('../dropdowns/ergazomenoi/kentraKostoys');
 const krathseis                             = require('../dropdowns/ergazomenoi/krathseis');
+const adeies_diamonhs_typos_0               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_0');
+const adeies_diamonhs_typos_1               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_1');
 
 const symbaseis                             = require('../dropdowns/symbaseis/symbaseis');
 const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/kathgoriesSymbaseon');
@@ -108,6 +110,7 @@ const   {
             KentraKostoysModel,
             KathgoriesErgasiasModel,
             KrathseisModel,
+            AdeiesDiamonhsModel,
         } = statheraArxeiaModels;
 
 const   {
@@ -198,8 +201,8 @@ router.get('/nomimoiEkprosopoi/idiothta',               buildDropdownRoute(Idiot
 router.get('/nomimoiEkprosopoi/taytothta',              buildDropdownRoute(TypoiTaytothtonModel, taytothtes.options));
 
 // ================================ ΕΤΑΙΡΕΙΕΣ -> ΤΡΑΠΕΖΕΣ =========================================
-// Επειδή στο crateDropdownApi.js διαχειρίζομαι τα πεδία kodikos και perigrafh ενώ εδώ σαν pripary key
-// έχω το kodikos_dias με το mapItem: item, pad = 3) => ({... αντιστοιχίζω το kodikos με το item.kodikos_dias
+// Επειδή στο crateDropdownApi.js διαχειρίζομαι τα πεδία kodikos και perigrafh ενώ εδώ σαν pripary key έχω
+// το kodikos_dias με το mapItem: item, pad = 3) => ({... αντιστοιχίζω το kodikos με το item.kodikos_dias
 // και το περνάω σαν options.
 
 router.get(
@@ -301,18 +304,20 @@ router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(Kathg
 
 router.get('/ergazomenoi/krathseis',                    buildDropdownRoute(KrathseisModel, krathseis.options));
 
+// =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION4 -> ΑΛΛΟΔΑΠΟΙ ==============================
+
+// ✅ Άδειες Διαμονής με typos = "0"
+router.get('/ergazomenoi/adeies_diamonhs_typos_0',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_0.options));
+router.get('/ergazomenoi/adeies_diamonhs_typos_1',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_1.options));
+
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 
 router.get('/symbaseis/symbash',                        buildDropdownRoute(SymbaseisModel , symbaseis.options));
 router.get('/symbaseis/kathgories',                     buildDropdownRoute(KathgoriesSymbaseonModel, kathgoriesSymbaseon.options));
-// 2) ΠΙΝΑΚΑΣ με pagination (το νέο endpoint)
-// router.get('/api/symbaseis/kathgories',                 symbaseisController.listKathgoriesSymbaseon);
-router.get('/symbaseis/kathgories',                 symbaseisController.listKathgoriesSymbaseon);
+router.get('/symbaseis/kathgories',                     symbaseisController.listKathgoriesSymbaseon);
 router.get('/symbaseis/kathgoria_symbashs',             buildDropdownRoute(KathgoriesSymbaseonModel, kathgoriesApoSymbaseis.options));
 router.get('/symbaseis/eidikothta_symbashs',            buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgories.options));
 router.get('/symbaseis/eidikothta_symbashs_multi',      buildDropdownRoute(EidikothtesAnaKathgoriaSymbaseonModel, eidikothtesApoKathgoriesMulti.options));
 router.get('/symbaseis/stoixeio_symbashs',              buildDropdownRoute(StoixeiaSymbaseonModel, stoixeiaApoEidikothtes.options));
-
-
 
 module.exports = router;

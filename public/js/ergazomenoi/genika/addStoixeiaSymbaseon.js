@@ -50,9 +50,6 @@ function safeSetValue(id, value) {
     if (el) {
         try { el.value = value; } catch (_) { console.warn('safeSetValue: cannot set value for', id); }
     } 
-	// else {
-    // 	console.warn(`safeSetValue: element "${id}" not found — value was:`, value);
-	// }
 }
 
 // ========================================================================

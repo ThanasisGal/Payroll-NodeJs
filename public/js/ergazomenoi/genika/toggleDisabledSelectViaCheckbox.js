@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
   const checkboxes = document.querySelectorAll('.checkbox-class');
-
+ 
   checkboxes.forEach(checkbox => {
     // Παίρνουμε τα IDs από τα data attributes
     const selectId = checkbox.getAttribute('data-related-select');

@@ -398,16 +398,16 @@ class ergazomenoiController {
         };
 
         try {
-        const data = await PerifereiesModel.find().sort("kodikos");
-        res.render("ergazomenoi/ergazomenoi/add", { 
-            locals,
-            data, 
-            mode: "add", 
-            context: "ergazomenoi", 
-            rec: {}
-        });
+            const data = await PerifereiesModel.find().sort("kodikos");
+            res.render("ergazomenoi/ergazomenoi/add", { 
+                locals,
+                data, 
+                mode: "add", 
+                context: "ergazomenoi", 
+                rec: {}
+            });
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
     };
     

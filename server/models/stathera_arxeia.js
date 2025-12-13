@@ -501,10 +501,14 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const GenikesParametroiModel = model("GenikesParametroi", GenikesParametroiSchema);
   
   const AdeiesDiamonhsSchema = new Schema({
-    kodikos: { type: String, unique: true, index: true},
-    perigrafh: { type: String, trim: true },
-    typos: { type: String, trim: true },
-  });
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+      typos: { type: String, trim: true },
+    },
+    {
+      collection: "adeies_diamonhs"
+    }
+  );
   const AdeiesDiamonhsModel = model("AdeiesDiamonhs", AdeiesDiamonhsSchema);
   
   const ThematikaPediaSchema = new Schema({
