@@ -1,9 +1,25 @@
 <div class="footer fs0_75vw z-index">
     <div class="footer-content d-flex align-items-center text-white w-100">
         <div id="version" class="text-start">
-            Ver. 1.0.0
+            <% if (isProduction) { %>
+                <!-- Production:  Πράσινο badge -->
+                <small class="d-flex align-items-center gap-1">
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle"></i> PROD
+                    </span>
+                    <span class="opacity-75">v<%= appVersion %></span>
+                </small>
+            <% } else { %>
+                <!-- Development: Πορτοκαλί badge -->
+                <small class="d-flex align-items-center gap-1">
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-tools"></i> DEV
+                    </span>
+                    <span class="opacity-75">v<%= appVersion %></span>
+                </small>
+            <% } %>
         </div>
-
+    
         <div class="footer-center text-center mx-auto">
             © 2009 - <%= new Date().getFullYear(); %> Copyright:
             <a class="text-white fs0_75vw" href="/">

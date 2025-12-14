@@ -17,6 +17,7 @@ const CLOUDFRONT_DOMAIN = process. env.CLOUDFRONT_DOMAIN; // Προαιρετι�
 
 const express = require("express");
 const { urlencoded, json } = require("express");
+const fs = require('fs');
 const path = require("path");
 const expressLayout = require("express-ejs-layouts");
 const methodOverride = require("method-override");
@@ -653,19 +654,10 @@ app.use(async (err, req, res, next) => {
     next(err);
 });
 
-// CSS helper (add after app.locals.script)
-// app.locals.css = (path) => {
-//     const cleanPath = path. replace(/\.css$/i, '').trim(). replace(/\s+/g, '');
-    
-//     if (node_env === 'production') {
-//         return `https://cdn.webpayrollsolutions.com/assets/own/css/${cleanPath}.min.css`;
-//     } else {
-//         return `/static/css/${cleanPath}.css`;
-//     }
-// };
 // CSS helper με timestamp cache busting
 const cssVersion = Date.now(); // Timestamp που δημιουργείται κατά την εκκίνηση της εφαρμογής
-    
+app.locals.cssVersion = cssVersion;
+
 app.locals.css = (path) => {
     const cleanPath = path.replace(/\.css$/i, '').trim().replace(/\s+/g, '');
     
@@ -675,6 +667,23 @@ app.locals.css = (path) => {
         return `/static/css/${cleanPath}.css?v=${cssVersion}`;
     }
 };
+
+try {
+    const packageJsonPath = path.join(__dirname, 'package.json');
+    const packageJson = JSON.parse(fs. readFileSync(packageJsonPath, 'utf8'));
+    app.locals.appVersion = packageJson.version;
+    console.log(`✅ App Version: ${packageJson.version}`);
+} catch (error) {
+    console.error('⚠️  Failed to read version from package.json:', error. message);
+    app.locals.appVersion = '1.0.0'; // Fallback
+}
+
+// ✅ ΠΡΟΣΘΗΚΗ: Make NODE_ENV available in templates
+app.locals.nodeEnv = process.env.NODE_ENV || 'development';
+app.locals.isProduction = process.env.NODE_ENV === 'production';
+app.locals.isDevelopment = process.env.NODE_ENV !== 'production';
+
+console.log(`✅ Environment: ${app.locals.nodeEnv}`);
 
 /* -------------------------------------------------------------------------- */
 /*                             Views / layouts (EJS)                          */

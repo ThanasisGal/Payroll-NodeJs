@@ -5809,3 +5809,27 @@ tbody .group-row--category:first-of-type > td {
   cursor: pointer !important;
   opacity: 1 !important;
 }
+
+/* Version footer styling */
+#version {
+    font-size: 0.875rem;
+}
+
+#version .cursor-pointer {
+    cursor: pointer;
+}
+
+#version .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+#version .bi {
+    font-size: 0.875rem;
+}
+
+/* Collapsible info panel */
+#versionInfo .card {
+    max-width: 300px;
+    font-family: 'Courier New', monospace;
+}
