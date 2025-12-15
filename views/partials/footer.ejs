@@ -1,10 +1,10 @@
 <div class="footer fs0_75vw z-index">
     <div class="footer-content d-flex align-items-center text-white w-100">
-        <div id="version" class="text-start">
+        <div id="version" class="text-start margin-left--0_2rem">
             <% if (isProduction) { %>
                 <!-- Production:  Πράσινο badge -->
                 <small class="d-flex align-items-center gap-1">
-                    <span class="badge bg-success">
+                    <span class="badge-success">
                         <i class="bi bi-check-circle"></i> PROD
                     </span>
                     <span class="opacity-75">v<%= appVersion %></span>
@@ -12,7 +12,7 @@
             <% } else { %>
                 <!-- Development: Πορτοκαλί badge -->
                 <small class="d-flex align-items-center gap-1">
-                    <span class="badge bg-warning text-dark">
+                    <span class="badge-warning">
                         <i class="bi bi-tools"></i> DEV
                     </span>
                     <span class="opacity-75">v<%= appVersion %></span>
@@ -79,7 +79,7 @@
             </button>
         </div> -->
 
-        <div id="remaining-time" class="ms-auto text-end cwhite">
+        <div id="remaining-time" class="ms-auto text-end cwhite font-size-vw-0_75 badge bg-warning text-dark margin-right--0_75rem">
             30:00
         </div>
     </div>

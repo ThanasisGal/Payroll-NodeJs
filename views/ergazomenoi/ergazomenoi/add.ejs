@@ -317,13 +317,14 @@
         checkboxId: 'systatiko_shmeioma',
         selectId  : 'programma_dypa',
         hiddenId  : 'programma_dypa_stathera',
-        extraFieldIds: [
+        
+		extraFieldIds: [
             'egkritikh_apofash_dypa',
             'hmeromhnia_enarxhs_programmatos',
             'hmeromhnia_lhxhs_programmatos'
         ],
-        // αν θες να καθαρίζουν όταν γίνεται disable:
-    clearOnDisable: true,
+
+		clearOnDisable: true,
     });
 
     // Αδεια Διαμονής με Άμεση Πρόσβαση για Εργασία
@@ -331,11 +332,13 @@
         checkboxId: 'adeia_diamonhs_me_amesh_prosbash_gia_ergasia',
         selectId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
         hiddenId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera',
+
         extraFieldIds: [
             'arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
             'hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia'
         ],
-    clearOnDisable: true,
+	    
+		clearOnDisable: true,
     });
 
     // Αδεια Διαμονής χωρίς Άμεση Πρόσβαση για Εργασία
@@ -343,11 +346,13 @@
         checkboxId: 'adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia',
         selectId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
         hiddenId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera',
+
         extraFieldIds: [
             'arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
             'hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia'
         ],
-    clearOnDisable: true,
+    	
+		clearOnDisable: true,
     });
 
     // Θεματικό Πεδίο Επαγγελματικής Κατάρτισης
@@ -355,9 +360,14 @@
         checkboxId: 'epaggelmatikh_katartish',
         selectId  : 'thematiko_pedio',
         hiddenId  : 'thematiko_pedio_stathera',
-		extraFieldIds: [
-		]
-    clearOnDisable: true,
+
+        // ✅ ΝΕΟ:  Cascading selects που θα enable/disable μαζί
+        cascadingSelectIds: [
+            'thematikh_enothta',
+            'foreas_katartishs'
+        ],
+        
+        clearOnDisable: true,
     });
 
 </script>
