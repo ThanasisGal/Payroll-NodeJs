@@ -60,6 +60,9 @@ const kentraKostoys                         = require('../dropdowns/ergazomenoi/
 const krathseis                             = require('../dropdowns/ergazomenoi/krathseis');
 const adeies_diamonhs_typos_0               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_0');
 const adeies_diamonhs_typos_1               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_1');
+const thematika_pedia                       = require('../dropdowns/ergazomenoi/thematika_pedia');
+const thematikes_enothtes                    = require('../dropdowns/ergazomenoi/thematikes_enothtes');
+const foreis_katartishs                      = require('../dropdowns/ergazomenoi/foreis_katartishs');
 
 const symbaseis                             = require('../dropdowns/symbaseis/symbaseis');
 const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/kathgoriesSymbaseon');
@@ -111,6 +114,9 @@ const   {
             KathgoriesErgasiasModel,
             KrathseisModel,
             AdeiesDiamonhsModel,
+            ThematikaPediaModel,
+            ThematikesEnothtesModel,
+            ForeisEkpaideyshsModel,
         } = statheraArxeiaModels;
 
 const   {
@@ -309,6 +315,13 @@ router.get('/ergazomenoi/krathseis',                    buildDropdownRoute(Krath
 // ✅ Άδειες Διαμονής με typos = "0"
 router.get('/ergazomenoi/adeies_diamonhs_typos_0',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_0.options));
 router.get('/ergazomenoi/adeies_diamonhs_typos_1',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_1.options));
+
+// =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION5 -> ΕΠΑΓΓ. ΚΑΤΑΡΤΙΣΗ ==============================
+
+// ✅ Άδειες Διαμονής με typos = "0"
+router.get('/ergazomenoi/thematiko_pedio',              buildDropdownRoute(ThematikaPediaModel, thematika_pedia.options));
+router.get('/ergazomenoi/thematikh_enothta',            buildDropdownRoute(ThematikesEnothtesModel, thematikes_enothtes.options));
+router.get('/ergazomenoi/foreas_katartishs',            buildDropdownRoute(ForeisEkpaideyshsModel, foreis_katartishs.options));
 
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 

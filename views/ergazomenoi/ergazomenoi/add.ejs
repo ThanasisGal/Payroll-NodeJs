@@ -263,6 +263,7 @@
 <script type="module" src="<%= script('ergazomenoi/genika/updateLinkFromTomDropdown') %>"></script>
 <script type="module" src="<%= script('ergazomenoi/genika/addStoixeiaSymbaseon') %>"></script>
 <script type="module" src="<%= script('ergazomenoi/genika/reCalcApodoxes') %>"></script>
+<script type="module" src="<%= script('profTrainingDropdownChain') %>"></script>
 
 <script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
 <script src="<%= script('common/checkHlikia') %>"></script>
@@ -346,6 +347,16 @@
             'arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
             'hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia'
         ],
+    clearOnDisable: true,
+    });
+
+    // Θεματικό Πεδίο Επαγγελματικής Κατάρτισης
+    bindCheckboxControlsSelect({
+        checkboxId: 'epaggelmatikh_katartish',
+        selectId  : 'thematiko_pedio',
+        hiddenId  : 'thematiko_pedio_stathera',
+		extraFieldIds: [
+		]
     clearOnDisable: true,
     });
 
