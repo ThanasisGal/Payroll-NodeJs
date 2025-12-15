@@ -61,8 +61,9 @@ const krathseis                             = require('../dropdowns/ergazomenoi/
 const adeies_diamonhs_typos_0               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_0');
 const adeies_diamonhs_typos_1               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_1');
 const thematika_pedia                       = require('../dropdowns/ergazomenoi/thematika_pedia');
-const thematikes_enothtes                    = require('../dropdowns/ergazomenoi/thematikes_enothtes');
-const foreis_katartishs                      = require('../dropdowns/ergazomenoi/foreis_katartishs');
+const thematikes_enothtes                   = require('../dropdowns/ergazomenoi/thematikes_enothtes');
+const foreis_katartishs                     = require('../dropdowns/ergazomenoi/foreis_katartishs');
+const languages                             = require('../dropdowns/ergazomenoi/languages');
 
 const symbaseis                             = require('../dropdowns/symbaseis/symbaseis');
 const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/kathgoriesSymbaseon');
@@ -117,6 +118,7 @@ const   {
             ThematikaPediaModel,
             ThematikesEnothtesModel,
             ForeisEkpaideyshsModel,
+            LanguagesModel,
         } = statheraArxeiaModels;
 
 const   {
@@ -322,6 +324,7 @@ router.get('/ergazomenoi/adeies_diamonhs_typos_1',      buildDropdownRoute(Adeie
 router.get('/ergazomenoi/thematiko_pedio',              buildDropdownRoute(ThematikaPediaModel, thematika_pedia.options));
 router.get('/ergazomenoi/thematikh_enothta',            buildDropdownRoute(ThematikesEnothtesModel, thematikes_enothtes.options));
 router.get('/ergazomenoi/foreas_katartishs',            buildDropdownRoute(ForeisEkpaideyshsModel, foreis_katartishs.options));
+router.get('/ergazomenoi/language',                     buildDropdownRoute(LanguagesModel, languages.options));
 
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 

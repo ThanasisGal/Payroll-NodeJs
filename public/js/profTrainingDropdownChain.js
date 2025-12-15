@@ -208,6 +208,4 @@ import { initTomDropdown } from './dropdown-item.js';
       }
     }, 300);
   }
-
-  console.log('✅ profTrainingDropdownChain initialized');
 })();

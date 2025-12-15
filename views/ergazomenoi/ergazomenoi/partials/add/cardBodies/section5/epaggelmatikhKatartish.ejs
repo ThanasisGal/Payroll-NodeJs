@@ -12,8 +12,14 @@
 	</div>
 
 	<div class="col-1 left-align checkbox-flex-center margin-top--0_2rem">
-		<input type="checkbox" class="form-check-input custom-checkbox checkbox-class"  data-related-select="thematiko_pedio" data-related-select1="thematikh_enothta" data-related-select2="foreas_katartishs" data-related-text="antikeimeno_katartishs" data-related-date1="katartish_apo" data-related-date2="katartish_eos" data-related-number1="diarkeia_se_ores" data-related-number2="etos_apokthshs" id="epaggelmatikh_katartish" name="epaggelmatikh_katartish" value="" />
-		<label for="epaggelmatikh_katartish" id="label-epaggelmatikh_katartish" style="margin-left: 0.75rem; font-size: 0.875vw;">
+		<input type="checkbox" class="form-check-input custom-checkbox checkbox-class"
+			data-related-select="thematiko_pedio" data-related-select1="thematikh_enothta"
+			data-related-select2="foreas_katartishs" data-related-text="antikeimeno_katartishs"
+			data-related-date1="katartish_apo" data-related-date2="katartish_eos"
+			data-related-number1="diarkeia_se_ores" data-related-number2="etos_apokthshs" id="epaggelmatikh_katartish"
+			name="epaggelmatikh_katartish" value="" />
+		<label for="epaggelmatikh_katartish" id="label-epaggelmatikh_katartish"
+			class="margin-left-0_75rem font-size-0_875vw">
 			ΟΧΙ
 		</label>
 	</div>
@@ -21,117 +27,78 @@
 
 <div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
-		<label for="antikeimeno_katartishs"  class="col-form-label label-font-size">
+		<label for="antikeimeno_katartishs" class="col-form-label label-font-size">
 			Αντικείμενο Κατάρτισης
 		</label>
 	</div>
-		
+
 	<div class="col-9-74">
-		<input type="text" class="form-control input-contents" name="antikeimeno_katartishs" id="antikeimeno_katartishs" disabled>
+		<input type="text" class="form-control input-contents" name="antikeimeno_katartishs" id="antikeimeno_katartishs"
+			disabled>
 		</input>
 	</div>
 </div>
 
-<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+<div class="row form-group align-items-center mb-1 mt-0-5 bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
-		<label for="thematiko_pedio"  class="col-form-label label-font-size">
+		<label for="thematiko_pedio" class="col-form-label label-font-size">
 			Θεματικό Πεδίο
 		</label>
 	</div>
 
-	<input
-		type="hidden"
-		name="thematiko_pedio_stathera"
-		id="thematiko_pedio_stathera"
-		class="form-control input-contents"
-		value="<%= safe("thematiko_pedio_stathera") %>"
-		readonly
-	/>
+	<input type="hidden" name="thematiko_pedio_stathera" id="thematiko_pedio_stathera"
+		class="form-control input-contents" value="<%= safe("thematiko_pedio_stathera") %>" readonly />
 
 	<div class="col-9-74">
-		<select
-			id="thematiko_pedio"
-			name="thematiko_pedio"
-			class="tom-dropdown selectpicker-dropdown-normal left-align"
-			aria-label="Θεματικό Πεδίο"
-			data-api="/api/dropdown/ergazomenoi/thematiko_pedio"
-			single
-			data-target-input=<%= `thematiko_pedio_stathera` %>
-			data-preselect=<%= `thematiko_pedio_stathera` %>
-			data-preload-all="true"
-			data-pad-length="2"
-			placeholder="Αναζήτηση Θεματικού Πεδίου...">
+		<select id="thematiko_pedio" name="thematiko_pedio" class="tom-dropdown selectpicker-dropdown-normal left-align"
+			aria-label="Θεματικό Πεδίο" data-api="/api/dropdown/ergazomenoi/thematiko_pedio" single
+			data-target-input=<%= `thematiko_pedio_stathera` %> data-preselect=<%= `thematiko_pedio_stathera` %>
+			data-preload-all="true" data-pad-length="2" placeholder="Αναζήτηση Θεματικού Πεδίου...">
 		</select>
 	</div>
 </div>
 
-<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+<div class="row form-group align-items-center mb-1 mt-0-5 bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
-		<label for="thematikh_enothta"  class="col-form-label label-font-size">
+		<label for="thematikh_enothta" class="col-form-label label-font-size">
 			Θεματική Ενότητα
 		</label>
 	</div>
 
-	<input
-		type="hidden"
-		name="thematikh_enothta_stathera"
-		id="thematikh_enothta_stathera"
-		class="form-control input-contents"
-		value="<%= safe("thematikh_enothta_stathera") %>"
-		readonly
-	/>
+	<input type="hidden" name="thematikh_enothta_stathera" id="thematikh_enothta_stathera"
+		class="form-control input-contents" value="<%= safe("thematikh_enothta_stathera") %>" readonly />
 
 	<div class="col-9-74">
-		<select
-			id="thematikh_enothta"
-			name="thematikh_enothta"
-			class="tom-dropdown selectpicker-dropdown-normal left-align"
-			aria-label="Θεματική Ενότητα"
-			data-api="/api/dropdown/ergazomenoi/thematikh_enothta"
-			single
-			data-target-input=<%= `thematikh_enothta_stathera` %>
-			data-preselect=<%= `thematikh_enothta_stathera` %>
-			data-preload-all="true"
-			data-pad-length="2"
-			placeholder="Αναζήτηση Θεματικής Ενότητας...">
+		<select id="thematikh_enothta" name="thematikh_enothta"
+			class="tom-dropdown selectpicker-dropdown-normal left-align" aria-label="Θεματική Ενότητα"
+			data-api="/api/dropdown/ergazomenoi/thematikh_enothta" single
+			data-target-input=<%= `thematikh_enothta_stathera` %> data-preselect=<%= `thematikh_enothta_stathera` %>
+			data-preload-all="true" data-pad-length="2" placeholder="Αναζήτηση Θεματικής Ενότητας...">
 		</select>
 	</div>
 </div>
 
-<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+<div class="row form-group align-items-center mb-1 mt-0-5 bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
-		<label for="foreas_katartishs"  class="col-form-label label-font-size">
+		<label for="foreas_katartishs" class="col-form-label label-font-size">
 			Φορέας Κατάρτισης
 		</label>
 	</div>
 
-	<input
-		type="hidden"
-		name="foreas_katartishs_stathera"
-		id="foreas_katartishs_stathera"
-		class="form-control input-contents"
-		value="<%= safe("foreas_katartishs_stathera") %>"
-		readonly
-	/>
+	<input type="hidden" name="foreas_katartishs_stathera" id="foreas_katartishs_stathera"
+		class="form-control input-contents" value="<%= safe("foreas_katartishs_stathera") %>" readonly />
 
 	<div class="col-9-74">
-		<select
-			id="foreas_katartishs"
-			name="foreas_katartishs"
-			class="tom-dropdown selectpicker-dropdown-normal left-align"
-			aria-label="Θεματική Ενότητα"
-			data-api="/api/dropdown/ergazomenoi/foreas_katartishs"
-			single
-			data-target-input=<%= `foreas_katartishs_stathera` %>
-			data-preselect=<%= `foreas_katartishs_stathera` %>
-			data-preload-all="true"
-			data-pad-length="2"
-			placeholder="Αναζήτηση Θεματικής Ενότητας...">
+		<select id="foreas_katartishs" name="foreas_katartishs"
+			class="tom-dropdown selectpicker-dropdown-normal left-align" aria-label="Θεματική Ενότητα"
+			data-api="/api/dropdown/ergazomenoi/foreas_katartishs" single
+			data-target-input=<%= `foreas_katartishs_stathera` %> data-preselect=<%= `foreas_katartishs_stathera` %>
+			data-preload-all="true" data-pad-length="2" placeholder="Αναζήτηση Θεματικής Ενότητας...">
 		</select>
 	</div>
 </div>
 
-<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+<div class="row form-group align-items-center mb-1 mt-0-5 bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
 		<label for="katartish_apo" class="col-form-label label-font-size">
 			Διάρκεια Κατάρτισης &nbsp; &nbsp; Από
@@ -150,15 +117,15 @@
 			Έως
 		</label>
 	</div>
-	
+
 	<div class="col-1-5">
-	
+
 		<input type="date" class="date-control" name="katartish_eos" id="katartish_eos" disabled>
 		</input>
 	</div>
 </div>
 
-<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
+<div class="row form-group align-items-center mb-1 mt-0-5 bg-white margin-left--1rem margin-right--1rem">
 	<div class="col-2 text-left">
 		<label for="diarkeia_se_ores" class="col-form-label label-font-size">
 			Ώρες Διάρκειας Κατάρτισης
@@ -166,8 +133,9 @@
 	</div>
 
 	<div class="col-1-5">
-	
-		<input type="number" class="form-control input-contents" value="0" min="0" name="diarkeia_se_ores" id="diarkeia_se_ores" disabled />
+
+		<input type="number" class="form-control input-contents" value="0" min="0" name="diarkeia_se_ores"
+			id="diarkeia_se_ores" disabled />
 	</div>
 
 	<div class="col-4-75"></div>
@@ -180,81 +148,66 @@
 
 	<div class="col-1-5">
 
-		<input type="number" class="form-control input-contents" value="0" min="0"  name="etos_apokthshs" id="etos_apokthshs" disabled />
+		<input type="number" class="form-control input-contents" value="0" min="0" name="etos_apokthshs"
+			id="etos_apokthshs" disabled />
 	</div>
 </div>
 
-<hr style="margin-bottom: -0.1rem;" />
+<hr class="margin-bottom-0_2rem margin-left--1rem margin-right--1rem"  />
 
-	<div class="row form-group align-items-center mt-2 mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-	<div class="row form-group align-items-center">
+<% for (let index = 1; index <= 4; index++) { %>
+	<% const idNum = index.toString().padStart(2, '0'); %>
+	<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
+		<% if (index === 1) { %>
 		<div class="col-2 text-left">
-		<label for="allh_glossa_01"  class="col-form-label label-font-size">
-			Ξένες Γλώσσες
-		</label>
+			<label for="allh_glossa_01" class="col-form-label label-font-size">
+				Ξένες Γλώσσες
+			</label>
 		</div>
-		<div class="col-10">
-		<select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="allh_glossa_01" id="allh_glossa_01">
-		</select>
-		</div>
-	</div>
-	</div>
-
-	<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-	<div class="row form-group align-items-center">
+		<% } else { %>
 		<div class="col-2"></div>
-		<div class="col-10">
-		<select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="allh_glossa_02" id="allh_glossa_02">
-		</select>
+		<% } %>
+
+		<input type="hidden" name="allh_glossa_<%= idNum %>" id="allh_glossa_<%= idNum %>"
+			class="form-control input-contents" value="<%= safe(`allh_glossa_${idNum}`) %>" readonly />
+
+		<div class="col-9-74">
+			<select id=<%= `select_allh_glossa_${idNum}` %> name=<%= `select_allh_glossa_${idNum}` %>
+				class="tom-dropdown left-align allh_glossa-select" aria-label="Ξένες Γλώσσες"
+				data-api="/api/dropdown/ergazomenoi/language" single data-target-input=<%= `allh_glossa_${idNum}` %>
+				data-preselect=<%= `allh_glossa_${idNum}` %> data-preload-all="true" data-pad-length="2"
+				data-row-index="<%= idNum %>" placeholder="Αναζήτηση Ξένων Γλωσσών">
+			</select>
 		</div>
 	</div>
-	</div>
+<% } %>
 
-	<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-	<div class="row form-group align-items-center">
-		<div class="col-2"></div>
-		<div class="col-10">
-		<select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="allh_glossa_03" id="allh_glossa_03">
-		</select>
-		</div>
-	</div>
-	</div>
+<hr class="margin-bottom-0_2rem margin-left--1rem margin-right--1rem"  />
 
-	<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-	<div class="row form-group align-items-center">
-		<div class="col-2"></div>
-		<div class="col-10">
-		<select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="allh_glossa_04" id="allh_glossa_04">
-		</select>
-		</div>
-	</div>
-	</div>
-
-	<hr style="margin-bottom: -0.1rem;" />
-
-	<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-	<div class="row form-group align-items-center">
-		<div class="col-2 text-left">
-		<label for="gnosh_ypologiston"  class="col-form-label label-font-size">
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
+	<div class="col-2 text-left">
+		<label for="gnosh_ypologiston" class="col-form-label label-font-size">
 			Γνώση Υπολογιστών
 		</label>
-		</div>
-		<div class="col-1 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-		<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="gnosh_ypologiston" name="gnosh_ypologiston" value="" />
-		<label for="gnosh_ypologiston" id="label-gnosh_ypologiston" style="margin-left: 0.75rem; font-size: 0.875vw;">
+	</div>
+
+	<div class="col-1 left-align checkbox-flex-center margin-top--0_2rem">
+		<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="gnosh_ypologiston"
+			name="gnosh_ypologiston" value="" />
+		<label for="gnosh_ypologiston" id="label-gnosh_ypologiston" class="margin-left-0_75rem font-size-0_875vw">
 			ΟΧΙ
 		</label>
-		</div>
+	</div>
 
-		<div class="col-3"></div>
+	<div class="col-3"></div>
 
-		<div class="col-2 text-left">
-		<label for="allo_proson"  class="col-form-label label-font-size">
+	<div class="col-2 text-left">
+		<label for="allo_proson" class="col-form-label label-font-size">
 			Αλλο Προσόν
 		</label>
-		</div>
-		<div class="col-4">
+	</div>
+
+	<div class="col-3-75">
 		<input type="text" class="form-control input-contents" name="allo_proson" id="allo_proson" />
-		</div>
 	</div>
 </div>
