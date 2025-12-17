@@ -15,6 +15,11 @@
 
         <hr class="margin-top--2rem margin-bottom-1rem" />
 
+		<input type="hidden" id="calcAge" name="calcAge" value="" />
+		<input type="hidden" id="calcChildren" name="calcChildren" value="" />
+		<input type="hidden" id="calcXrhsh" name="calcXrhsh" value="<%= sessionYearInUse %>" />
+		<input type="hidden" id="createTaxScale" name="createTaxScale" value="" />
+
         <div class="sections">
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
                 <div>
@@ -286,6 +291,8 @@
 <script src="<%= script('ergazomenoi/genika/getDaysFromDate') %>"></script>
 <script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
 <script src="<%= script('ergazomenoi/genika/checkAmaTameioy') %>"></script>
+<script src="<%= script('ergazomenoi/genika/calcChildren') %>"></script>
+<script src="<%= script('ergazomenoi/genika/autoLoadTaxScale') %>"></script>
 
 
 <script nonce="<%= nonce %>" type="module">

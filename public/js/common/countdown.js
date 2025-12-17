@@ -304,15 +304,19 @@ function onSessionExpired() {
     }
 
     Swal.fire({
+        backdrop: false,
+        allowOutsideClick: false,
         title: "Λήξη Συνεδρίας",
         text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
+        showConfirmButton: true,
         showConfirmButton: false,
         allowOutsideClick: false,
         customClass: {
-            title: 'custom-title',
+            confirmButton: "class-error custom-confirm-button custom-swal-button",
+            title: "custom-title",
             popup: "custom-swal-popup",
         },
         willClose: () => {
@@ -330,19 +334,23 @@ function onGracePeriodExpired(event) {
     }
     
     Swal.fire({
+        backdrop: false,
+        allowOutsideClick: false,
         title: "Λήξη Συνεδρίας",
         text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
+        showConfirmButton: true,
         showConfirmButton: false,
         allowOutsideClick: false,
         customClass: {
-            title: 'custom-title',
+            confirmButton: "class-error custom-confirm-button custom-swal-button",
+            title: "custom-title",
             popup: "custom-swal-popup",
         },
         willClose: () => {
-            window.location.href = "/logout/end_Session?method=idle";
+            window. location.href = "/logout/end_Session? method=idle";
         },
     });
 }

@@ -9,6 +9,7 @@ const Models_D = require("../../models/ergazomenoi");
 const   {   KrathseisModel,
             PerifereiesModel,
             GenikesParametroiModel,
+            ForologikesKlimakesModel
         } = Models_A;
 
 const   { UserPrivilegesModel } = Models_B;
@@ -397,6 +398,8 @@ class ergazomenoiController {
         description: "Web Payroll System",
         };
 
+        const sessionYearInUse = req.session.yearInUse;
+
         try {
             const data = await PerifereiesModel.find().sort("kodikos");
             res.render("ergazomenoi/ergazomenoi/add", { 
@@ -404,6 +407,7 @@ class ergazomenoiController {
                 data, 
                 mode: "add", 
                 context: "ergazomenoi", 
+                sessionYearInUse,
                 rec: {}
             });
         } catch (error) {
@@ -1283,30 +1287,59 @@ class ergazomenoiController {
 
     static deleteErgazomenoi = async (req, res) => {
         try {
-        const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: req.params.id });
-        const team = ergazomenoiData.team;
-        const company = ergazomenoiData.company_kod;
-        const kodikos = ergazomenoiData.kodikos;
+            const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: req.params.id });
+            const team = ergazomenoiData.team;
+            const company = ergazomenoiData.company_kod;
+            const kodikos = ergazomenoiData.kodikos;
 
-        await ErgazomenoiModel.deleteOne({ _id: req.params.id });
+            await ErgazomenoiModel.deleteOne({ _id: req.params.id });
 
-        await IstorikoProslhpseonAllagonModel.deleteMany({
-            team: team,
-            company_kod: company,
-            kodikos: kodikos,
-        });
-        
-        await OrariaModel.deleteMany({
-            team: team,
-            company_kod: company,
-            kodikos: kodikos,
-        });
-        
-        res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+            await IstorikoProslhpseonAllagonModel.deleteMany({
+                team: team,
+                company_kod: company,
+                kodikos: kodikos,
+            });
+            
+            await OrariaModel.deleteMany({
+                team: team,
+                company_kod: company,
+                kodikos: kodikos,
+            });
+            
+            res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
         } catch (error) {
-        throw error;
+            throw error;
         }
     };
+
+    static forologikesKlimakes = async (req, res) => {
+        try {
+            const { xrhsh, kodikos } = req.body;
+            
+            if (!xrhsh || !kodikos) {
+                return res.status(400).json({ success: false, message: 'Missing data' });
+            }
+            
+            // READ from ForologikesKlimakesModel
+            const taxScale = await ForologikesKlimakesModel.findOne({ xrhsh, kodikos });
+            
+            if (taxScale) {
+                return res.json({
+                    success: true,
+                    taxScale: {
+                        perigrafh: taxScale.perigrafh 
+                    }
+                });
+            } else {
+                return res.json({ success: false, taxScale: null });
+            }
+            
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ success: false, message: 'Server error' });
+        }
+    };
+
 
     static escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Διαφυγή όλων των ειδικών χαρακτήρων
@@ -1324,6 +1357,8 @@ class ergazomenoiController {
         const highlightedText = text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
         return highlightedText;
     }
+
+
 }
 
 module.exports = ergazomenoiController;

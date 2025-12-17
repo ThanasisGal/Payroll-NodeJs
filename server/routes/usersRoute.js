@@ -361,6 +361,7 @@ router.get("/api/krathseisErgazomenon", symbaseisController.getKrathseisErgazome
 router.get("/api/genikesParametroi", genikaAPIsController.getGenikesParametroi);
 router.post("/api/getOraria", ergazomenoiController.getOrariaAnaErgazomeno);
 router.post("/api/ergazomenoi/update/:ergazomenoiId", ergazomenoiController.postErgazomenoiUpdate);
+router.post("/api/forologikes-klimakes/lookup", ergazomenoiController.forologikesKlimakes);
 
 router.get("/api/getAllErgazomenoi/:selectedTeam/:selectedCompany", programmataController.getAllErgazomenoi);
 router.get("/api/getErgazomeno/:selectedTeam/:selectedCompany/:selectedKodikos", programmataController.getErgazomeno);
