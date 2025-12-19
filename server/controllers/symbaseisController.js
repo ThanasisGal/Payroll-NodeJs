@@ -2071,7 +2071,6 @@ class symbaseisController {
             form: "YpologismoiKlimakionSymbaseon",
         }).exec();
 
-        // res.render("symbaseis/ypologismoiKlimakion/ypologismoiKlimakion", {
         res.render("symbaseis/ypologismoiKlimakion", {
             userPrivileges: userPrivileges ? userPrivileges.privileges : {},
             locals,
