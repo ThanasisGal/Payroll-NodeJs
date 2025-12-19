@@ -37,17 +37,22 @@ const PerifereiesSchema = new Schema({
   const NomikesMorfesModel = model("NomikesMorfes", NomikesMorfesSchema);
   
   const PararthmataEfkaSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
-    odos: { type: String, trim: true },
-    arithmos: { type: String, trim: true },
-    tk: { type: String, trim: true },
-    polh: { type: String, trim: true },
-    thlefono1: { type: String, trim: true },
-    thlefono2: { type: String, trim: true },
-    thlefono3: { type: String, trim: true },
-    email: { type: String, trim: true },
-  });
+      kodikos: { type: String, unique: true },
+      perigrafh: { type: String, trim: true },
+      palios_kodikos: { type: String, trim: true },
+      odos: { type: String, trim: true },
+      arithmos: { type: String, trim: true },
+      tk: { type: String, trim: true },
+      polh: { type: String, trim: true },
+      thlefono1: { type: String, trim: true },
+      thlefono2: { type: String, trim: true },
+      thlefono3: { type: String, trim: true },
+      email: { type: String, trim: true },
+    },
+    {
+      collection: "pararthmata_efka"
+    }
+  );
   const PararthmataEfkaModel = model("PararthmataEfka", PararthmataEfkaSchema);
   
   const DoySchema = new Schema({
