@@ -43,6 +43,7 @@ function syncTargetOnChange(instance, sel, hidden, opts = {}) {
     });
 }
 
+// ✅ ΣΩΣΤΟ (νέο)
 export function initOneTomSelect(sel) {
     if (!sel || !sel.id) return;
     const key = `#${sel.id}`;
@@ -53,7 +54,7 @@ export function initOneTomSelect(sel) {
 
     const api = sel.dataset.api;
     if (!api) return;
-
+    
     // Δημιουργία instance μέσω helper
     const ts = initTomDropdown({
         selector    : key,
@@ -177,8 +178,15 @@ export function initOneTomSelect(sel) {
     window.__tomInstances[key] = instance;
 }
 
+// export function initAllTomSelects(scope) {
+//     (scope || document).querySelectorAll('select.tom-dropdown').forEach(initOneTomSelect);
+// }
+
 export function initAllTomSelects(scope) {
-    (scope || document).querySelectorAll('select.tom-dropdown').forEach(initOneTomSelect);
+    const selects = (scope || document).querySelectorAll('select.tom-dropdown');
+    selects.forEach(sel => {
+        initOneTomSelect(sel);
+    });
 }
 
 // Auto-init στη φόρτωση
@@ -198,3 +206,9 @@ export function destroyTomSelectById(id) {
         delete window.__tomInstances[key];
     }
 }
+
+// ✅ Export to window for non-module scripts
+window.initOneTomSelect = initOneTomSelect;
+window.initAllTomSelects = initAllTomSelects;
+window.reinitTomDropdowns = reinitTomDropdowns;
+window.destroyTomSelectById = destroyTomSelectById;  

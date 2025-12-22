@@ -306,8 +306,19 @@ router.get('/ergazomenoi/kpk_efka_by_code',             kpkEfkaByCode.handler);
 router.get('/ergazomenoi/dypa',                         buildDropdownRoute(DypaModel , d_yp_apasxolhshs.options));
 router.get('/ergazomenoi/programma_dypa',               programmaDypa.handler);
 router.get('/ergazomenoi/kentro_kostoys',               buildDropdownRoute(KentraKostoysModel , kentraKostoys.options));
-router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(KathgoriesErgasiasModel , kathgoriesErgasias.options));
-
+// router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(KathgoriesErgasiasModel , kathgoriesErgasias.options));
+router.get('/ergazomenoi/kathgoria_ergasias', async (req, res, next) => {
+    console.log('🔍 Route hit: /ergazomenoi/kathgoria_ergasias');
+    console.log('📝 Query params:', req.query);
+    
+    try {
+        const result = await buildDropdownRoute(KathgoriesErgasiasModel, kathgoriesErgasias. options)(req, res, next);
+        console.log('✅ Result:', result);
+    } catch (err) {
+        console.error('❌ Error:', err);
+        next(err);
+    }
+});
 // =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION3 -> ΚΡΑΤΗΣΕΙΣ ==============================
 
 router.get('/ergazomenoi/krathseis',                    buildDropdownRoute(KrathseisModel, krathseis.options));

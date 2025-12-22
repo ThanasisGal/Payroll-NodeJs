@@ -621,9 +621,9 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   });
   const ForologikesKlimakesModel = model("ForologikesKlimakes", ForologikesKlimakesSchema);
 
-  module.exports = {  AdeiesDiamonhsModel,
-    AntistoixishEidikhsPeriptoshsKpkEfkaModel,
-    AntistoixishKadEidikothtesKpkEfkaModel,
+  module.exports = {AdeiesDiamonhsModel,
+                    AntistoixishEidikhsPeriptoshsKpkEfkaModel,
+                    AntistoixishKadEidikothtesKpkEfkaModel,
                     ApasxolhseisBaseiSymbashsModel,
                     AsfalistikesKlaseisModel,
                     ArgiesModel,

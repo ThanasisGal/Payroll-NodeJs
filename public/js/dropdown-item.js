@@ -1454,4 +1454,4 @@ window.tomDropdownConfig = {
 	setTemplate: (id, t) => (templateCache[id]  = t)
 };
 
-// window.initTomDropdown = initTomDropdown;
+window.initTomDropdown = initTomDropdown;

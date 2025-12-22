@@ -44,6 +44,7 @@ function createDropdownApi(model, options = {}) {
                 const value = String(req.query.value).trim();
 
                 const extraQuery = extraQueryBuilder(req. query) || {};
+
                 const withExtra = await model
                     .findOne({ ... extraQuery, [pk]: value })
                     .sort(preselectSort || {})

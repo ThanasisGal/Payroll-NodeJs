@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			const differenceInDays = parseInt(document.getElementById('differenceInDays').value);
 
 			for (let i = 1; i <= differenceInDays; i++) {  
-				const kathgoriesErgasiasDropdown = document.getElementById(`kathgoria_ergasias_${i. toString().padStart(2, '0')}`);
+				const kathgoriesErgasiasDropdown = document.getElementById(`kathgoria_ergasias_${i.toString().padStart(2, '0')}`);
 				kathgoriesErgasiasDropdown.innerHTML = '<option value="" selected></option>';
 				data.forEach(kathgoriaErgasias => {
 					const textToConvert = removeGreekAccentsAndToUpper(kathgoriaErgasias.perigrafh);
@@ -268,7 +268,18 @@ document.addEventListener('DOMContentLoaded', function() {
 		document.getElementById('differenceInDays').value = data.differenceInDays;
 
 		const container = document.getElementById('dynamicFields');
-		container.innerHTML = ''; // Clear previous fields
+		if (!container) {
+			return;
+		}
+
+		const oldSelects = container.querySelectorAll('select.tom-dropdown');
+		oldSelects.forEach(sel => {
+			if (sel.id && window.destroyTomSelectById) {
+				window.destroyTomSelectById(sel.id);
+			}
+		});
+
+		container.innerHTML = ''; // Καθαρίζει το container
 
 		for (let i = 1; i <= data.differenceInDays; i++) {
 			let i1 = i < 10 ? '0' + i : i;
@@ -291,126 +302,160 @@ document.addEventListener('DOMContentLoaded', function() {
 				<input type="hidden" name="night_holiday_overtimeParanomh_hours_day_${i1}" id="night_holiday_overtimeParanomh_hours_day_${i1}" value="0" />
 				
 				<div class="row form-group align-items-center bg-white">
-					<div class="col-0-5 text-center">
+					<div class="col-0-5 align-left">
 						<label for="hmeromhnia_${i1}" class="col-form-label field-required" id="day_label_${i1}"></label>
 					</div>
 
-					<div class="col-1-5 text-center">
+					<div class="col-1-5 align-center">
 						<input type="date" class="date-control input-date" id="hmeromhnia_${i1}" name="hmeromhnia_${i1}" value="" readonly />
 					</div>
 
 					<div class="col-2-75">
-						<input
-							type="hidden"
-							name="kathgoria_ergasias_stathera_${i1}"
-							id="kathgoria_ergasias_stathera_${i1}"
-							class="form-control input-contents"
-							value="kathgoria_ergasias_stathera_${i1}"
-							readonly
-						/>
+						<input type="hidden" name="kathgoria_ergasias_sthathera_${i1}" id="kathgoria_ergasias_stathera_${i1}" />
 
-						<select
+						<select 
+							class="tom-dropdown selectpicker-dropdown-normal left-align w-100" 
+							name="kathgoria_ergasias_${i1}" 
 							id="kathgoria_ergasias_${i1}"
-							name="kathgoria_ergasias_${i1}"
-							class="tom-dropdown left-align"
-							aria-label="Κατηγορίες Εργασίας"
-							data-api="/api/dropdown/statheraArxeia/kathgories_ergasias"
-							single
+							data-api="/api/dropdown/ergazomenoi/kathgoria_ergasias"
 							data-target-input="kathgoria_ergasias_stathera_${i1}"
 							data-preselect="kathgoria_ergasias_stathera_${i1}"
 							data-preload-all="true"
-							data-pad-length="3"
-							placeholder="Αναζήτηση Κατηγοριών Εργασίας">
+							data-pad-length="3">
 						</select>
 					</div>
-			`;
+
+					<div class="col-0-25"></div>
+				`;
 			
 			for (let j = 1; j <= 3; j++) {
 				if (j === 1) {
 					divHtml += `
-							<div class="col-0-25"></div>
-							<div class="col-1-2">
+						<div class="col-1-2">
+							<input type="time" class="date-control clearableInput" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
+						</div>
+
+						<div class="col-1-2 ml--0_2rem">
+							<input type="time" class="date-control clearableInput" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
+						</div>
+
+						<div class="col-0-5"></div>
+
+						<div class="col-1-2">
+							<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
+						</div>
+
+						<div class="col-1-2 ml--0_1rem">
+							<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
+						</div>
+
+						<div class="col-0-75"></div>
+
+						<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
+							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" value="" />
+							<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
+								ΟΧΙ
+							</label>
+						</div>
+
+						<div class="col-0-5 center-align checkbox-flex-center dispno-mt-0_4rem">
+							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="argia_${i1}" name="argia_${i1}" value="" />
+							<label for="argia_${i1}" class="ml0_75-fs-0_875vw" id="label-argia_${i1}">
+								ΟΧΙ
+							</label>
+						</div>
+					`;
+				}
+
+				if (j === 2) {
+					divHtml += `
+						<div class="row form-group align-items-center bg-white mb-2">
+							<div class="col-5 left-align">
+								<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
+							</div>
+
+							<div class="col-1-2 ml-0_7rem">
 								<input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2 ml-0_1rem">
+							<div class="col-1-2">
 								<input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 							</div>
 
 							<div class="col-0-5"></div>
 
-							<div class="col-1-2">
+							<div class="col-1-2 ml-0_3rem">
 								<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2 ml-0_2rem">
+							<div class="col-1-2">
 								<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
-							</div>
-
-							<div class="col-0-75"></div>
-
-							<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
-								<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" value="" />
-								<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
-									ΟΧΙ
-								</label>
-							</div>
-
-							<div class="col-0-5 center-align checkbox-flex-center dispno-mt-0_4rem">
-								<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="argia_${i1}" name="argia_${i1}" value="" />
-								<label for="argia_${i1}" class="ml0_75-fs-0_875vw" id="label-argia_${i1}">
-									ΟΧΙ
-								</label>
-							</div>
-						`;
-				} else {
-					divHtml += `
-						<div class="row form-group align-items-center bg-white">`;
-							if (j === 2) {
-								divHtml += `
-									<div class="col-5 left-align">
-										<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
-									</div>
-								`;
-							} else {
-								divHtml += `
-									<div class="col-4-91 left-align">
-										<label class="col-form-label field-required" id="holiday_label_${i1}"> &nbsp; </label>
-									</div>
-								`;
-							}
-							divHtml += `
-								<div class="col-1-2 ml-0_7rem">
-									<input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
-								</div>
-
-								<div class="col-1-2">
-									<input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1-2 ml-0_3rem">
-									<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
-								</div>
-
-								<div class="col-1-2">
-									<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${j === 3 ? 'disabled' : ''} />
-								</div>
 							</div>
 						</div>
 					`;
-				}
+				} 
+
+				if (j === 3) {
+					const eidikh = document.getElementById('eidikh_kathgoria_stathera')?. value || '';
+					const isHolidayEnabled = (eidikh === '0004' || eidikh === '0005');
+					const disabledAttr = isHolidayEnabled ? '' : 'disabled';
+
+					divHtml += `
+						<div class="row form-group align-items-center bg-white">
+							<div class="col-5 left-align">
+								<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="holiday_label_${i1}" name="holiday_label_${i1}" readonly />
+							</div>
+
+							<div class="col-1-2 ml-0_7rem">
+								<input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+							</div>
+
+							<div class="col-1-2">
+								<input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+							</div>
+
+							<div class="col-0-5"></div>
+
+							<div class="col-1-2 ml-0_3rem">
+								<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+							</div>
+
+							<div class="col-1-2">
+								<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+							</div>
+						</div>
+					`;
+					} 
 			}
 			
 			divHtml += `<hr class="mt0_4rem-mb0_3rem" />`;
-			container.innerHTML += divHtml;
+			container.insertAdjacentHTML('beforeend', divHtml);
 		}				
 
+		// ✅ Καλέστε ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
 		initializeSelectListeners();
 		updateDates();
 		setupEnterKeyNavigation();
-	}
+
+		// Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
+		setTimeout(() => {
+			if (window.reinitTomDropdowns) {
+				console.log('🔧 Calling reinitTomDropdowns for:', container);
+				window.reinitTomDropdowns(container);
+			} else {
+				console. error('❌ reinitTomDropdowns is not available on window');
+			}
+
+			// ✅ Αρχικοποίηση clearable inputs για τα νέα πεδία (ΜΕΣΑ στο setTimeout)
+			console.log('🧹 Checking initClearableInputs:', typeof window.initClearableInputs);
+			if (window. initClearableInputs) {
+				console.log('🧹 Calling initClearableInputs for container:', container);
+				window.initClearableInputs(container);
+			} else {
+				console.error('❌ initClearableInputs NOT found on window!');
+			}
+		}, 100);
+	}  
 
 	// =========================================================================
 	// UTILITY FUNCTIONS

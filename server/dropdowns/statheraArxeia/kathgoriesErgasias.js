@@ -5,7 +5,7 @@ const {
 } = statheraArxeiaModel;
 
 module.exports = {
-  path: '/api/dropdown/statheraArxeia/kathgories_ergasias',
+  path: '/api/dropdown/ergazomenoi/kathgoria_ergasias',
   model: KathgoriesErgasiasModel,
   options: {
     searchFields: ['kodikos', 'perigrafh'],

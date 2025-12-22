@@ -1,1 +1,1 @@
-document['addEventListener']('DOMContentLoaded',()=>{['eponymo','onoma','afm','amka']['forEach'](x=>{const g=document['getElementById'](x);if(!g)return;const f=x+'Hidden';g['addEventListener']('blur',()=>{const w=document['getElementById'](f);w&&(w['value']=g['value']);});});});
+document['addEventListener']('DOMContentLoaded',()=>{['eponymo','onoma','afm','amka']['forEach'](Z=>{const V=document['getElementById'](Z);if(!V)return;const D=Z+'Hidden';V['addEventListener']('blur',()=>{const I=document['getElementById'](D);I&&(I['value']=V['value']);});});});

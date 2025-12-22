@@ -1476,6 +1476,10 @@ a {
   height: 82vh;
 }
 
+.ml--0_05rem { margin-left: -0.05rem!important;}
+.ml--0_1rem { margin-left: -0.1rem !important;}
+.ml--0_2rem { margin-left: -0.2rem !important;}
+
 .ml-n-0 { margin-left: -0vw !important;}
 .ml-n-0-0 { margin-left: -.5vw !important;}
 .ml-n-0-0-4 { margin-left: -1.3vw !important;}
@@ -3726,18 +3730,24 @@ select.tom-dropdown {
   overflow:visible;          /* τα πάντα εντός ορίων */
 }
 .clearable-wrapper > input[type="text"] {
+  padding-right: 2.5rem;
+}
+
+.clearable-wrapper > input[type="date"],
+.clearable-wrapper > input[type="time"] {
   padding-right: 2rem;
 }
+
 /* κόκκινο Χ */
 .clear-btn {
   position: absolute;
-  right: 0.6rem;                /* απόσταση από το δεξί άκρο */
+  right: -1.5rem;                /* απόσταση από το δεξί άκρο */
   top: 50%;
   transform: translateY(-50%);
-  font-weight: 300;
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
-  color: #c62828;               /* κόκκινο */
+  color: #9e0202 !important;               /* κόκκινο */
   font-size: 1vw;
   line-height: 1;
   opacity: 0;                   /* κρυφό όταν δεν έχει κείμενο */
@@ -3746,11 +3756,14 @@ select.tom-dropdown {
 }
 .clear-btn.is-visible {
   opacity: 1;
+  color: #9e0202 !important;
   pointer-events: auto;
 }
-.clear-btn:hover { 
-  font-weight: bolder;
-  opacity: 1 !important; 
+.clear-btn.is-visible:hover { 
+  transform: translateY(-60%) scale(1.6);  /* 60% μεγαλύτερο */
+  color: #a31f1f;  /* πιο σκούρο κόκκινο */
+  font-weight: 700;
+  transition: all 0.15s ease;
 }
 
 /* Success: πράσινο / άσπρο */
