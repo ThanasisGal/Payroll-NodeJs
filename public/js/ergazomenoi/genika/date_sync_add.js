@@ -432,30 +432,45 @@ document.addEventListener('DOMContentLoaded', function() {
 			container.insertAdjacentHTML('beforeend', divHtml);
 		}				
 
-		// ✅ Καλέστε ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
-		initializeSelectListeners();
+		// ✅ Κλήση ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
 		updateDates();
 		setupEnterKeyNavigation();
 
 		// Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
 		setTimeout(() => {
-			if (window.reinitTomDropdowns) {
-				console.log('🔧 Calling reinitTomDropdowns for:', container);
+			if (window. reinitTomDropdowns) {
 				window.reinitTomDropdowns(container);
-			} else {
-				console. error('❌ reinitTomDropdowns is not available on window');
 			}
 
-			// ✅ Αρχικοποίηση clearable inputs για τα νέα πεδία (ΜΕΣΑ στο setTimeout)
-			console.log('🧹 Checking initClearableInputs:', typeof window.initClearableInputs);
-			if (window. initClearableInputs) {
-				console.log('🧹 Calling initClearableInputs for container:', container);
+			if (window.initClearableInputs) {
 				window.initClearableInputs(container);
-			} else {
-				console.error('❌ initClearableInputs NOT found on window!');
 			}
+
+			// ✅ Αρχικοποίηση listeners
+			initializeSelectListeners();
+			
+			// ✅ Auto-select "ΜΕ" για αργίες
+			setTimeout(() => {
+				if (typeof autoSelectHolidaysOnInit === 'function') {
+					autoSelectHolidaysOnInit();
+				}
+			}, 500);
 		}, 100);
-	}  
+
+		// ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
+		for (let i = 1; i <= data.differenceInDays; i++) {
+			let i1 = i < 10 ? '0' + i : i;
+			
+			for (let j = 1; j <= 3; j++) {
+				const eosOraInput = document.getElementById(`eos_ora_0${j}_${i1}`);
+				if (eosOraInput) {
+					eosOraInput.addEventListener('blur', function() {
+						calculateWeeklyTotalHours();
+					});
+				}
+			}
+		}
+	}
 
 	// =========================================================================
 	// UTILITY FUNCTIONS
@@ -507,4 +522,93 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 		});
 	}
+
+	/**
+	 * Υπολογισμός ΣΥΝΟΛΙΚΩΝ ωρών για ΟΛΗ την εβδομάδα
+	 */
+	function calculateWeeklyTotalHours() {
+		let totalMinutes = 0;
+		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+
+		// Για κάθε ημέρα
+		for (let i = 1; i <= differenceInDays; i++) {
+			let i1 = i < 10 ?  '0' + i :  i;
+
+			// Για κάθε j (1, 2, 3)
+			for (let j = 1; j <= 3; j++) {
+				const apoOra = document. getElementById(`apo_ora_0${j}_${i1}`)?.value;
+				const eosOra = document.getElementById(`eos_ora_0${j}_${i1}`)?.value;
+
+				if (!apoOra || !eosOra) {
+					continue;
+				}
+
+				const apoMinutes = timeToMinutes(apoOra);
+				const eosMinutes = timeToMinutes(eosOra);
+				let diffMinutes = eosMinutes - apoMinutes;
+
+				if (diffMinutes < 0) {
+					diffMinutes += 24 * 60;
+				}
+
+				totalMinutes += diffMinutes;
+			}
+		}
+
+		const totalHours = (totalMinutes / 60).toFixed(2);
+		const totalInput = document. getElementById('total_hours_day');
+
+		// ✅ ΕΛΕΓΧΟΣ 1: Μόνο αν totalHours <= 40
+		if (totalInput && parseFloat(totalHours) <= 40) {
+			totalInput.value = totalHours;
+			console.log(`✅ WEEKLY TOTAL:  ${totalHours} hours`);
+		} else if (parseFloat(totalHours) > 40) {
+			console.warn(`⚠️ Total hours (${totalHours}) exceeds 40!  Not updating input.`);
+			return false;
+		}
+
+		// ✅ ΕΛΕΓΧΟΣ 2: Σύγκριση με hmeres_ergasias_ebdomadas
+		const hmeresErgasiasInput = document.getElementById('hmeres_ergasias_ebdomadas');
+		if (hmeresErgasiasInput && hmeresErgasiasInput.value) {
+			const expectedHours = parseFloat(hmeresErgasiasInput.value);
+			const actualHours = parseFloat(totalHours);
+
+			if (actualHours !== expectedHours) {
+				Swal.fire({
+					backdrop: false,
+					allowOutsideClick: false,
+					icon: 'info',
+					title: 'ΠΡΟΣΟΧΗ !!!',
+					text:  'Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου',
+					showConfirmButton: true,
+					confirmButtonText: 'Κλείσιμο',
+					customClass: {
+						confirmButton: 'class-info custom-confirm-button custom-swal-button',
+						title:  'custom-title',
+						popup: 'custom-swal-popup',
+					},
+				}).then(() => {
+					try {
+						const firstEosOra = document. getElementById('eos_ora_01_01');
+						if (firstEosOra) {
+							firstEosOra.focus();
+						}
+					} catch (_) {}
+				});
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Μετατροπή "HH:MM" σε λεπτά
+	 */
+	function timeToMinutes(timeString) {
+		if (!timeString) return 0;
+		const [hours, minutes] = timeString.split(':').map(Number);
+		return hours * 60 + minutes;
+	}
+
 });

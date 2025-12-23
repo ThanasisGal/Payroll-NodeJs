@@ -2071,7 +2071,7 @@ class symbaseisController {
             form: "YpologismoiKlimakionSymbaseon",
         }).exec();
 
-        res.render("symbaseis/ypologismoiKlimakion", {
+        res.render("symbaseis/ypologismoiKlimakion/ypologismoiKlimakion", {
             userPrivileges: userPrivileges ? userPrivileges.privileges : {},
             locals,
             context: "stoixeia_symbashs",
@@ -2109,7 +2109,7 @@ class symbaseisController {
         // Εκτέλεση του bulkWrite με τις προετοιμασμένες λειτουργίες
         const result = await KlimakiaSymbaseonModel.bulkWrite(bulkOps);
         
-        res.json({ success: true, redirectUrl: "/symbaseis/ypologismoiKlimakion" });
+        res.json({ success: true, redirectUrl: "/symbaseis/ypologismoiKlimakion/" });
         } catch (error) {
         console.error('Error during bulk update:', error);
         res.status(500).json({ message: 'Σφάλμα κατά την ενημέρωση' });

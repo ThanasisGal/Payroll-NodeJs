@@ -4,16 +4,12 @@
 
 function initClearableInputs(container = document) {
     const inputs = container.querySelectorAll('input[type="text"], input[type="date"], input[type="time"]');
-    console.log('🧹 initClearableInputs found', inputs.length, 'inputs');
     
     inputs.forEach(input => {
         // Skip αν ήδη wrapped
         if (input.parentElement?. classList.contains('clearable-wrapper')) {
-            console.log('   ⏭️ Already wrapped:', input.id);
             return;
         }
-
-        console.log('   ✅ Wrapping:', input.id);
 
         const wrapper = document.createElement('span');
         wrapper.className = 'clearable-wrapper';
@@ -75,7 +71,6 @@ function initClearableInputs(container = document) {
 
 // ✅ Auto-init στο page load
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🧹 Auto-initializing clearable inputs on page load');
     initClearableInputs();
 });
 

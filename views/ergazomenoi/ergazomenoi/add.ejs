@@ -184,6 +184,77 @@
 
                             <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
+							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
+								<div class="col-5"></div>
+								<div class="col-2-1 text-center">
+									<label class="col-form-label field-required">
+									ΩΡΕΣ ΕΡΓΑΣΙΑΣ
+									</label>
+								</div>
+								
+								<div class="col-0-7"></div>
+								
+								<div class="col-2 text-center">
+									<label class="col-form-label field-required">
+									ΩΡΕΣ ΔΙΑΛΕΙΜΜΑΤΟΣ
+									</label>
+								</div>
+							</div>
+
+							<div class="row form-group align-items-center  bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80">
+								<div class="col-0-5 text-center">
+									<label class="col-form-label field-required"></label>
+								</div>
+
+								<div class="col-1-5 text-center">
+									<label class="col-form-label field-required">
+									Ημερομηνία
+									</label>
+								</div>
+
+								<div class="col-2-5 text-center">
+									<label class="col-form-label field-required">
+									Τύπος Εργασίας
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-2 text-center">
+									<label class="col-form-label field-required">
+									Από
+									</label>
+								</div>
+
+								<div class="col-1-2 text-center">
+									<label class="col-form-label field-required">
+									Έως
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-2 text-center">
+									<label class="col-form-label field-required">
+									Από
+									</label>
+								</div>
+
+								<div class="col-1-2 text-center">
+									<label class="col-form-label field-required">
+									Έως
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1 text-center">
+									<label class="col-form-label field-required">
+									Repo
+									</label>
+								</div>
+							</div>
+
               				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
                 				<input type="hidden" id="dateDifference" name="dateDifference" value="">
 
@@ -219,7 +290,6 @@
 
   		</div>
 	</div>
-</div>
 
 <% const isProduction = NODE_ENV === 'production'; %>
 
@@ -286,11 +356,11 @@
 <script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcOresApasxolhshs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
+<script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
 <script src="<%= script('ergazomenoi/genika/date_sync_add') %>"></script>
 <script src="<%= script('ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
 <script src="<%= script('ergazomenoi/genika/getDaysFromDate') %>"></script>
-<script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
 <script src="<%= script('ergazomenoi/genika/checkAmaTameioy') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcChildren') %>"></script>
 <script src="<%= script('ergazomenoi/genika/autoLoadTaxScale') %>"></script>
@@ -381,12 +451,10 @@
 </script>
 
     <!-- 
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/loadDropdowns_add.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillHiddenBankCode.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearSelects.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/infinityScrollingSelectJQuery.js"></script> -->
     <!-- <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearEfkaSelects.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/addKrathseis.js"></script> -->
 
 
 <script nonce="<%= nonce %>" type="module">
@@ -419,4 +487,5 @@
 		// αρχική κατάσταση
 		apply();
 	})();
-</script>
+</script> -->
+</div>

@@ -1,5 +1,5 @@
 :root {
-  --aaa: #0074e9;
+  --aaa: #cddbc63d;
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -4036,6 +4036,7 @@ select.tom-dropdown {
 .margin-top--0_2rem     { margin-top: -0.2rem !important; }
 .margin-top--0_3rem     { margin-top: -0.3rem !important; }
 .margin-top--0_5rem     { margin-top: -0.5rem !important; }
+.margin-top--0_65rem    { margin-top: -0.65rem !important; }
 .margin-top--0_75rem    { margin-top: -0.75rem !important; }
 .margin-top--1rem       { margin-top: -1rem !important; }
 .margin-top--1_5rem     { margin-top: -1.5rem !important; }
@@ -4263,6 +4264,7 @@ select.tom-dropdown {
 .font-size-rem-0_85 { font-size: 0.85rem; }
 .font-size-rem-1 { font-size: 1rem; }
 .font-size-rem-1_1 { font-size: 1.1rem; }
+.font-size-rem-1_3 { font-size: 1.3rem; }
 
 .fsvw-0_7 { font-size: 0.7vw; }
 .fsvw-0_8 { font-size: 0.8vw; }
@@ -5868,9 +5870,12 @@ tbody .group-row--category:first-of-type > td {
     cursor: help;
 }
 
-.bg-2b97001e { background-color: #2b97001e;}
-.bg-eeff0223 { background-color: #eeff0223;}
-.bg-3d4e001e { background-color: #3d4e001e;}
+.bg-2b97001e { background-color: #2b97001e !important;}
+.bg-eeff0223 { background-color: #eeff0223 !important;}
+.bg-3d4e001e { background-color: #3d4e001e !important;}
+.bg-cddbc63d { background-color: #cddbc63d !important;}
+.bg-41e6001e { background-color: #41e6001e !important;}
+.bg-edf1001e { background-color: #edf1001e !important;}
 
 .ts-locked .ts-control {
   background-color: #ffffff !important;
