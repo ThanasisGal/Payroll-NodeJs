@@ -50,7 +50,6 @@ function initializeSelectListeners() {
 						checkBox.disabled = true;
 					} else {
 						checkBox.disabled = false;
-						console.log(`✅ Repo ${idNum} enabled`);
 					}
 				}
 				
@@ -115,8 +114,6 @@ checkboxes.forEach(checkbox => {
 				
 				if (! hasOptions) {
 					// ❌ ΔΕΝ έχουν φορτώσει - ΑΝΑΓΚΑΣΤΙΚΟ PRELOAD
-					console.log(`⏳ Options not loaded for ${idNum}, forcing load...`);
-					
 					tomSelect.open();
 					
 					let attempts = 0;
@@ -133,10 +130,7 @@ checkboxes.forEach(checkbox => {
 							
 							if (tomSelect.options[newValue]) {
 								tomSelect.setValue(newValue);
-								console.log(`✅ setValue('${newValue}') after ${attempts} attempts`);
-							} else {
-								console.error(`❌ Option '${newValue}' not found! `);
-							}
+							} 
 							
 							setTimeout(() => {
 								tomSelect. disable();
@@ -152,7 +146,6 @@ checkboxes.forEach(checkbox => {
 					// ✅ Έχουν ήδη φορτώσει
 					if (tomSelect.options[newValue]) {
 						tomSelect.setValue(newValue);
-						console.log(`✅ setValue('${newValue}') immediately`);
 					} else {
 						console.error(`❌ Option '${newValue}' not found!  Available: `, Object.keys(tomSelect.options));
 					}
@@ -181,8 +174,6 @@ checkboxes.forEach(checkbox => {
 // =========================================================================
 
 function handleSelectChange(selectId, value) {
-	console.log(`🔔 handleSelectChange: ${selectId} = ${value}`);
-	
 	const idNum = selectId.match(/\d+$/)[0].padStart(2, '0');
 	const checkBox = document.querySelector('#repo_' + idNum);
 	const label = document.querySelector('#label-repo_' + idNum);
@@ -263,8 +254,6 @@ function autoSelectHolidaysOnInit() {
 		
 		// ✅ Αν είναι αργία
 		if (isHoliday(dateField)) {
-			console.log(`🎉 Day ${i1} is a holiday!  Auto-selecting "ΜΕ"`);
-			
 			// ✅ Disable το repo checkbox
 			if (checkBox) {
 				checkBox.checked = false;
@@ -325,7 +314,6 @@ function setValueWithRetry(tomSelect, value, idNum, hiddenInput) {
 				
 				setTimeout(() => {
 					tomSelect. disable();
-					console.log(`✅ Holiday ${idNum} set to "${value}" and disabled`);
 				}, 50);
 				
 				// ✅ Update hidden input
@@ -334,7 +322,6 @@ function setValueWithRetry(tomSelect, value, idNum, hiddenInput) {
 				}
 			} else {
 				console.error(`❌ Option "${value}" not found in TomSelect options for ${idNum}`);
-				console.log('Available options:', Object.keys(tomSelect.options));
 			}
 		} else if (attempts >= maxAttempts) {
 			clearInterval(checkInterval);

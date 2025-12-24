@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	// Tab navigation για date/time inputs
 	document.querySelectorAll('input[type="date"], input[type="time"]').forEach(input => {
-		input. addEventListener('keydown', function(event) {
+		input.addEventListener('keydown', function(event) {
 			if (event.key === 'Tab') {
 				event.preventDefault();
 				const formElements = Array.from(document.querySelectorAll('input, select, textarea, button'));
@@ -44,8 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	// =========================================================================
 
 	async function handleProslhpshChange() {
-		setAllDates(this. value);
-		await updateOrarioyEosDate(this. value);
+		setAllDates(this.value);
+		await updateOrarioyEosDate(this.value);
 	}
 
 	function handleAllaghsChange() {
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		// =====================================================================
 		// ΈΛΕΓΧΟΣ 1: Cap στη λήξη σύμβασης (αν υπάρχει και δεν είναι κενό)
 		// =====================================================================
-		if (lhxhsSymbashsInput && lhxhsSymbashsInput.value && lhxhsSymbashsInput.value. trim() !== '') {
+		if (lhxhsSymbashsInput && lhxhsSymbashsInput.value && lhxhsSymbashsInput.value.trim() !== '') {
 			const lhxhsDate = new Date(lhxhsSymbashsInput.value);
 			
 			if (!isNaN(lhxhsDate.getTime())) {
@@ -208,42 +208,6 @@ document.addEventListener('DOMContentLoaded', function() {
 	// =========================================================================
 	// API CALLS
 	// =========================================================================
-
-	async function loadKathgoriesErgasias() { 
-		try {
-			const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
-
-			const response = await fetch('/api/kathgoriesErgasias', {
-				method: 'GET',
-				credentials: 'same-origin',
-				headers: {
-					'Accept': 'application/json',
-					'X-CSRF-Token': csrfToken || '',
-					'X-Requested-With': 'XMLHttpRequest',
-					'Cache-Control': 'no-store'
-				}
-			});
-
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response. status}`);
-			}
-
-			const data = await response.json();
-			const differenceInDays = parseInt(document.getElementById('differenceInDays').value);
-
-			for (let i = 1; i <= differenceInDays; i++) {  
-				const kathgoriesErgasiasDropdown = document.getElementById(`kathgoria_ergasias_${i.toString().padStart(2, '0')}`);
-				kathgoriesErgasiasDropdown.innerHTML = '<option value="" selected></option>';
-				data.forEach(kathgoriaErgasias => {
-					const textToConvert = removeGreekAccentsAndToUpper(kathgoriaErgasias.perigrafh);
-					const option = new Option(textToConvert, kathgoriaErgasias.kodikos);
-					kathgoriesErgasiasDropdown.appendChild(option);
-				});
-			}
-		} catch (error) {
-			console.error('Error loading categories:', error);
-		}
-	}
 
 	async function updateDateDifference(startDate, endDate) {
 		const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
@@ -332,21 +296,21 @@ document.addEventListener('DOMContentLoaded', function() {
 				if (j === 1) {
 					divHtml += `
 						<div class="col-1-2">
-							<input type="time" class="date-control clearableInput" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
+							<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 						</div>
 
 						<div class="col-1-2 ml--0_2rem">
-							<input type="time" class="date-control clearableInput" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
+							<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 						</div>
 
 						<div class="col-0-5"></div>
 
 						<div class="col-1-2">
-							<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
+							<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 						</div>
 
 						<div class="col-1-2 ml--0_1rem">
-							<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
+							<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
 						</div>
 
 						<div class="col-0-75"></div>
@@ -375,28 +339,28 @@ document.addEventListener('DOMContentLoaded', function() {
 							</div>
 
 							<div class="col-1-2 ml-0_7rem">
-								<input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
+								<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 							</div>
 
 							<div class="col-1-2">
-								<input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
+								<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 							</div>
 
 							<div class="col-0-5"></div>
 
 							<div class="col-1-2 ml-0_3rem">
-								<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
+								<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 							</div>
 
 							<div class="col-1-2">
-								<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
+								<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
 							</div>
 						</div>
 					`;
 				} 
 
 				if (j === 3) {
-					const eidikh = document.getElementById('eidikh_kathgoria_stathera')?. value || '';
+					const eidikh = document.getElementById('eidikh_kathgoria_stathera')?.value || '';
 					const isHolidayEnabled = (eidikh === '0004' || eidikh === '0005');
 					const disabledAttr = isHolidayEnabled ? '' : 'disabled';
 
@@ -407,21 +371,21 @@ document.addEventListener('DOMContentLoaded', function() {
 							</div>
 
 							<div class="col-1-2 ml-0_7rem">
-								<input type="time" class="date-control" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
 							</div>
 
 							<div class="col-1-2">
-								<input type="time" class="date-control" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
 							</div>
 
 							<div class="col-0-5"></div>
 
 							<div class="col-1-2 ml-0_3rem">
-								<input type="time" class="date-control" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
 							</div>
 
 							<div class="col-1-2">
-								<input type="time" class="date-control" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
 							</div>
 						</div>
 					`;
@@ -438,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		// Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
 		setTimeout(() => {
-			if (window. reinitTomDropdowns) {
+			if (window.reinitTomDropdowns) {
 				window.reinitTomDropdowns(container);
 			}
 
@@ -446,16 +410,23 @@ document.addEventListener('DOMContentLoaded', function() {
 				window.initClearableInputs(container);
 			}
 
-			// ✅ Αρχικοποίηση listeners
 			initializeSelectListeners();
-			
-			// ✅ Auto-select "ΜΕ" για αργίες
+
 			setTimeout(() => {
 				if (typeof autoSelectHolidaysOnInit === 'function') {
 					autoSelectHolidaysOnInit();
 				}
-			}, 500);
-		}, 100);
+				
+				// ✅ Χρήση MutationObserver
+				waitForTomSelectAndApplyColors();
+				
+				// ✅ ΠΡΟΣΘΗΚΗ:   Το Καλεί ΞΑΝΑ μετά 1000ms για να πάρει τις νέες τιμές
+				setTimeout(() => {
+					updateKathgoriaBackgroundColor();
+				}, 1000);  // 1000ms μετά το auto-select
+				
+			}, 1000);
+		}, 200);
 
 		// ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
 		for (let i = 1; i <= data.differenceInDays; i++) {
@@ -476,15 +447,234 @@ document.addEventListener('DOMContentLoaded', function() {
 	// UTILITY FUNCTIONS
 	// =========================================================================
 
+	/**
+	 * ✅ Wait για TomSelect initialization με MutationObserver
+	 */
+	function waitForTomSelectAndApplyColors() {
+		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+		
+		// ✅ ΕΜΦΑΝΙΣΗ LOADER
+		const loader = document.querySelector(".loader-container");
+		if (loader) {
+			loader.classList.add("visible");
+			loader.classList.remove("is-hidden");
+		}
+		
+		const observer = new MutationObserver(() => {
+			const tsControls = document.querySelectorAll('#dynamicFields .ts-control');
+			
+			if (tsControls.length >= differenceInDays) {
+				observer.disconnect();
+				
+				setTimeout(() => {
+					updateKathgoriaBackgroundColor();
+					
+					setTimeout(() => {
+						updateKathgoriaBackgroundColor();
+						
+						// ✅ ΑΠΟΚΡΥΨΗ LOADER
+						setTimeout(() => {
+							if (loader) {
+								loader.classList.remove("visible");
+								loader.classList.add("is-hidden");
+							}
+						}, 100);
+					}, 1000);
+				}, 300);
+			}
+		});
+
+		observer.observe(document.getElementById('dynamicFields'), {
+			childList:  true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ['class']
+		});
+
+		// Timeout fallback
+		setTimeout(() => {
+			observer.disconnect();
+			const tsControls = document.querySelectorAll('#dynamicFields .ts-control');
+			
+			if (tsControls.length > 0) {
+				updateKathgoriaBackgroundColor();
+				
+				setTimeout(() => {
+					updateKathgoriaBackgroundColor();
+					
+					// ✅ ΑΠΟΚΡΥΨΗ LOADER (fallback)
+					setTimeout(() => {
+						if (loader) {
+							loader.classList.remove("visible");
+							loader.classList.add("is-hidden");
+						}
+					}, 100);
+				}, 500);
+			} else {
+				// ✅ ΑΠΟΚΡΥΨΗ LOADER (no controls found)
+				if (loader) {
+					loader.classList.remove("visible");
+					loader.classList.add("is-hidden");
+				}
+				console.error('❌ No .ts-control elements found!');
+			}
+		}, 1000);
+	}
+
+	/**
+	 * ✅ Αλλαγή background color ανάλογα με την επιλογή + πεδία ωρών
+	 */
+	function updateKathgoriaBackgroundColor() {
+		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+		const allTsControls = document.querySelectorAll('#dynamicFields .ts-control');
+		
+		for (let i = 1; i <= differenceInDays; i++) {
+			let i1 = i < 10 ? '0' + i : i;
+			const selectId = `kathgoria_ergasias_${i1}`;
+			const selectElement = document.getElementById(selectId);
+
+			if (! selectElement) {
+				continue;
+			}
+
+			const tsControl = allTsControls[i - 1];
+
+			if (!tsControl) {
+				continue;
+			}
+
+			// ✅ Handler function
+			const updateBackground = () => {
+				const value = selectElement.value;
+				
+				// ✅ Βρες το perigrafh_argias field
+				const perigrafh_argias = document.getElementById(`perigrafh_argias_${i1}`)?.value || '';
+
+				// =========================================================================
+				// CASE 1: value === 'ΜΕ'
+				// =========================================================================
+				if (value === 'ΜΕ') {
+					// ✅ Έλεγχος αν το perigrafh_argias ΔΕΝ είναι κενό
+					if (perigrafh_argias && perigrafh_argias. trim() !== '') {
+						// ✅ ΚΙΤΡΙΝΟ για TomSelect + ΟΛΑ τα πεδία ωρών (j=1,2,3)
+						tsControl. style.setProperty('background-color', '#eeff0223', 'important');
+						tsControl. style.setProperty('border-color', '#fbc02d', 'important');
+						
+						// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3)
+						for (let j = 1; j <= 3; j++) {
+							applyColorToTimeFields(i1, j, '#eeff0223', '#fbc02d');
+						}
+					} else {
+						// ❌ perigrafh_argias είναι κενό → Reset
+						tsControl.style.setProperty('background-color', '', 'important');
+						tsControl.style.setProperty('border-color', '#cccccc', 'important');
+						
+						// Reset όλα τα πεδία
+						for (let j = 1; j <= 3; j++) {
+							applyColorToTimeFields(i1, j, '', '#cccccc');
+						}
+					}
+				}
+
+				// =========================================================================
+				// CASE 2: value === 'ΑΝ'
+				// =========================================================================
+				else if (value === 'ΑΝ') {
+					// ✅ ΠΡΑΣΙΝΟ για TomSelect + ΟΛΑ τα πεδία ωρών (j=1,2,3)
+					tsControl. style.setProperty('background-color', '#2b97001e', 'important');
+					tsControl.style.setProperty('border-color', '#66bb6a', 'important');
+					
+					// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3)
+					for (let j = 1; j <= 3; j++) {
+						applyColorToTimeFields(i1, j, '#2b97001e', '#66bb6a');
+					}
+				}
+				// =========================================================================
+				// CASE 3: Άλλη τιμή
+				// =========================================================================
+				else {
+					// ✅ ΛΕΥΚΟ για TomSelect
+					tsControl.style.setProperty('background-color', '#ffffff', 'important');
+					tsControl.style.setProperty('border-color', '#cccccc', 'important');
+					
+					// Reset όλα τα πεδία
+					for (let j = 1; j <= 3; j++) {
+						applyColorToTimeFields(i1, j, '', '#cccccc');
+					}
+				}
+			};
+
+			// ✅ Attach listeners
+			if (selectElement.tomselect) {
+				selectElement.tomselect.on('change', updateBackground);
+			} else {
+				selectElement.addEventListener('change', updateBackground);
+			}
+
+			// ✅ Initial color update
+			updateBackground();
+		}
+	}
+
+	/**
+	 * ✅ Helper function - Εφαρμογή χρωμάτων σε πεδία ωρών
+	 */
+	function applyColorToTimeFields(i1, j, bgColor, borderColor) {
+		const fields = [
+			`apo_ora_0${j}_${i1}`,
+			`eos_ora_0${j}_${i1}`,
+			`dialleima_apo_ora_0${j}_${i1}`,
+			`dialleima_eos_ora_0${j}_${i1}`
+		];
+
+		fields.forEach(fieldId => {
+			const field = document.getElementById(fieldId);
+			if (field) {
+				if (bgColor) {
+					field.style.setProperty('background-color', bgColor, 'important');
+					field.style.setProperty('border-color', borderColor, 'important');
+				} else {
+					field.style.setProperty('background-color', '', 'important');
+					field.style.setProperty('border-color', borderColor, 'important');
+				}
+			}
+		});
+	}
+
+	/**
+	 * ✅ Helper function - Εφαρμογή χρωμάτων σε πεδία ωρών
+	 */
+	function applyColorToTimeFields(i1, j, bgColor, borderColor) {
+		const fields = [
+			`apo_ora_0${j}_${i1}`,
+			`eos_ora_0${j}_${i1}`,
+			`dialleima_apo_ora_0${j}_${i1}`,
+			`dialleima_eos_ora_0${j}_${i1}`
+		];
+
+		fields.forEach(fieldId => {
+			const field = document.getElementById(fieldId);
+			if (field) {
+				if (bgColor) {
+					field.style.setProperty('background-color', bgColor, 'important');
+					field.style.setProperty('border-color', borderColor, 'important');
+				} else {
+					field.style.setProperty('background-color', '', 'important');
+					field.style.setProperty('border-color', borderColor, 'important');
+				}
+			}
+		});
+	}
+
 	function formatDate(date) {
 		const day = ('0' + date.getDate()).slice(-2);
-		const month = ('0' + (date. getMonth() + 1)).slice(-2);
+		const month = ('0' + (date.getMonth() + 1)).slice(-2);
 		const year = date.getFullYear();
 		return `${day}/${month}/${year}`;
 	}
 
 	function formatDateToISO(date) {
-		const day = ('0' + date. getDate()).slice(-2);
+		const day = ('0' + date.getDate()).slice(-2);
 		const month = ('0' + (date.getMonth() + 1)).slice(-2);
 		const year = date.getFullYear();
 		return `${year}-${month}-${day}`;
@@ -536,7 +726,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 			// Για κάθε j (1, 2, 3)
 			for (let j = 1; j <= 3; j++) {
-				const apoOra = document. getElementById(`apo_ora_0${j}_${i1}`)?.value;
+				const apoOra = document.getElementById(`apo_ora_0${j}_${i1}`)?.value;
 				const eosOra = document.getElementById(`eos_ora_0${j}_${i1}`)?.value;
 
 				if (!apoOra || !eosOra) {
@@ -556,14 +746,12 @@ document.addEventListener('DOMContentLoaded', function() {
 		}
 
 		const totalHours = (totalMinutes / 60).toFixed(2);
-		const totalInput = document. getElementById('total_hours_day');
+		const totalInput = document.getElementById('total_hours_day');
 
 		// ✅ ΕΛΕΓΧΟΣ 1: Μόνο αν totalHours <= 40
 		if (totalInput && parseFloat(totalHours) <= 40) {
 			totalInput.value = totalHours;
-			console.log(`✅ WEEKLY TOTAL:  ${totalHours} hours`);
 		} else if (parseFloat(totalHours) > 40) {
-			console.warn(`⚠️ Total hours (${totalHours}) exceeds 40!  Not updating input.`);
 			return false;
 		}
 
@@ -589,7 +777,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					},
 				}).then(() => {
 					try {
-						const firstEosOra = document. getElementById('eos_ora_01_01');
+						const firstEosOra = document.getElementById('eos_ora_01_01');
 						if (firstEosOra) {
 							firstEosOra.focus();
 						}
@@ -609,6 +797,5 @@ document.addEventListener('DOMContentLoaded', function() {
 		if (!timeString) return 0;
 		const [hours, minutes] = timeString.split(':').map(Number);
 		return hours * 60 + minutes;
-	}
-
+	}	
 });

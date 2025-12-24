@@ -3735,13 +3735,17 @@ select.tom-dropdown {
 
 .clearable-wrapper > input[type="date"],
 .clearable-wrapper > input[type="time"] {
-  padding-right: 2rem;
+  padding-right: 1rem;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
 }
 
 /* κόκκινο Χ */
 .clear-btn {
   position: absolute;
-  right: -1.5rem;                /* απόσταση από το δεξί άκρο */
+  right: 0.1rem !important;
   top: 50%;
   transform: translateY(-50%);
   font-weight: 500;
@@ -4049,6 +4053,7 @@ select.tom-dropdown {
 
 .margin-top-0_1rem      { margin-top: 0.1rem; }
 .margin-top-0_2rem      { margin-top: 0.2rem; }
+.margin-top-0_3rem      { margin-top: 0.3rem; }
 .margin-top-0_5rem      { margin-top: 0.5rem !important; }
 .margin-top-0_75rem     { margin-top: 0.75rem !important; }
 .margin-top-1rem        { margin-top: 1rem !important; }
@@ -4152,6 +4157,7 @@ select.tom-dropdown {
 .height-vh-53           { height: 53vh !important; }
 .height-vh-58           { height: 58vh !important; }
 .height-vh-62           { height: 62vh !important; }
+.height-vh-63           { height: 63vh !important; }
 .height-vh-64           { height: 64vh !important; }
 .height-vh-75           { height: 75vh !important; }
 .height-vh-78           { height: 78vh !important; }
@@ -5969,4 +5975,18 @@ tbody .group-row--category:first-of-type > td {
   color: #000 !important;
   background-color: RGBA(var(--bs-warning-rgb), var(--bs-bg-opacity, 1)) !important;
   height: 22px;
+}
+
+/* ✅ Background colors για kathgoria_ergasias TomSelect */
+.ts-control.kathgoria-me {
+    background-color: #fff59d !important; /* Κίτρινο για "ΜΕ" */
+}
+
+.ts-control.kathgoria-an {
+    background-color: #c8e6c9 !important; /* Πράσινο για "ΑΝ" */
+}
+
+/* ✅ Optional: Smooth transition */
+.ts-control {
+    transition: background-color 0.3s ease;
 }
