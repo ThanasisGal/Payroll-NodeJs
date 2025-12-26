@@ -2240,6 +2240,14 @@ mark, .mark {
   color: #000000;
 }
 
+.hr-style-5 {
+  margin-top: 3.2rem !important;
+  margin-bottom: .2rem !important;
+  margin-left: -1.3rem; 
+  margin-right: -1.3rem; 
+  color: #000000;
+}
+
 #asfalistikh_klash {
   font-family: 'Roboto Mono', monospace;
 }

@@ -621,6 +621,36 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   });
   const ForologikesKlimakesModel = model("ForologikesKlimakes", ForologikesKlimakesSchema);
 
+  const ForeasEpikoyrikhsXorisEfkaSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "foreas_epikoyrikhs_xoris_efka"
+    }
+  );
+  const ForeasEpikoyrikhsXorisEfkaModel = model("ForeasEpikoyrikhsXorisEfka", ForeasEpikoyrikhsXorisEfkaSchema);
+
+  const ForeasAstheneiasXorisEfkaSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "foreas_astheneias_xoris_efka"
+    }
+  );
+  const ForeasAstheneiasXorisEfkaModel = model("ForeasAstheneiasXorisEfka", ForeasAstheneiasXorisEfkaSchema);
+
+  const IdiothtaErgoy39Par9Schema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "idiothta_antisymballomenoy_ergoy_39_par_9"
+    }
+  );
+  const IdiothtaErgoy39Par9Model = model("IdiothtaErgoy39Par9", IdiothtaErgoy39Par9Schema);
+
   module.exports = {AdeiesDiamonhsModel,
                     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
                     AntistoixishKadEidikothtesKpkEfkaModel,
@@ -642,10 +672,13 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     EkpaideytikoEpipedoModel,
                     EkptoshForoyModel,
                     EmmesosErgodothsModel, 
+                    ForeasAstheneiasXorisEfkaModel,
+                    ForeasEpikoyrikhsXorisEfkaModel,
                     ForeisEkpaideyshsModel,
                     ForologikesKlimakesModel,
                     GenikesParametroiModel,
                     IatrosErgasiasModel, 
+                    IdiothtaErgoy39Par9Model,
                     IdiothtesModel, 
                     KadEfkaModel,
                     KadModel,

@@ -27,7 +27,7 @@
 <% for (let index = 1; index <= 7; index++) { %>
 	<% const idNum = index.toString().padStart(2, '0'); %>
 
-	<div class="row form-group g-3 align-items-center mb-3">
+	<div class="row form-group g-3 align-items-center mb-1">
 		<div class="col-1 center-align">
 			<label for=<%= `select_krathsh_${index}` %> class="col-form-label label-font-size">#<%= index %>
 			</label>
@@ -53,3 +53,103 @@
 		</div>
 	</div>
 <% } %>
+
+<hr class="hr-style-5" />
+
+<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-1">
+	<div class="col-4 text-center">
+		<label class="col-form-label field-required">
+			Φορέας Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ
+		</label>
+	</div>
+
+	<div class="col-4 text-center">
+		<label class="col-form-label field-required">
+			Φορέας Ασθένειας εκτός e-ΕΦΚΑ
+		</label>
+	</div>
+
+	<div class="col-4 text-center">
+		<label class="col-form-label field-required">
+			Ιδιότητα αντισυμβαλλόμενου στο έργο αρ.39 παρ.9
+		</label>
+	</div>
+</div>
+
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem mt-2">
+	<input
+		type="hidden"
+		name="epikoyrikh_xoris_efka_stathera"
+		id="epikoyrikh_xoris_efka_stathera"
+		class="form-control input-contents"
+		value="<%= safe("epikoyrikh_xoris_efka_stathera") %>"
+	/>
+
+	<div class="col-3-75">
+		<select
+			id="epikoyrikh_xoris_efka"
+			name="epikoyrikh_xoris_efka"
+			class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+			aria-label="Φορέας Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ"
+			data-api="/api/dropdown/ergazomenoi/epikoyrikh_xoris_efka"
+			single
+			data-target-input=<%= `epikoyrikh_xoris_efka_stathera` %>
+			data-preselect=<%= `epikoyrikh_xoris_efka_stathera` %>
+			data-preload-all="true"
+			data-pad-length="2"
+			placeholder="Αναζήτηση Φορέα Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ">
+		</select>
+	</div>
+
+	<div class="col-0-25"></div>
+
+	<input
+		type="hidden"
+		name="astheneia_xoris_efka_stathera"
+		id="astheneia_xoris_efka_stathera"
+		class="form-control input-contents"
+		value="<%= safe("astheneia_xoris_efka_stathera") %>"
+	/>
+
+	<div class="col-3-75">
+		<select
+			id="astheneia_xoris_efka"
+			name="astheneia_xoris_efka"
+			class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+			aria-label="Φορέας Ασθένειας εκτός e-ΕΦΚΑ"
+			data-api="/api/dropdown/ergazomenoi/astheneia_xoris_efka"
+			single
+			data-target-input=<%= `astheneia_xoris_efka_stathera` %>
+			data-preselect=<%= `astheneia_xoris_efka_stathera` %>
+			data-preload-all="true"
+			data-pad-length="2"
+			placeholder="Αναζήτηση Φορέα Ασθένειας εκτός e-ΕΦΚΑ">
+		</select>
+	</div>
+
+	<div class="col-0-25"></div>
+
+	<input
+		type="hidden"
+		name="idiothta_sto_ergo_39_stathera"
+		id="idiothta_sto_ergo_39_stathera"
+		class="form-control input-contents"
+		value="<%= safe("idiothta_sto_ergo_39_stathera") %>"
+	/>
+
+	<div class="col-3-75">
+		<select
+			id="idiothta_sto_ergo_39"
+			name="idiothta_sto_ergo_39"
+			class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+			aria-label="Ιδιότητα αντισυμβαλλόμενου στο έργο αρ.39 παρ.9"
+			data-api="/api/dropdown/ergazomenoi/idiothta_sto_ergo_39"
+			single
+			data-target-input=<%= `idiothta_sto_ergo_39_stathera` %>
+			data-preselect=<%= `idiothta_sto_ergo_39_stathera` %>
+			data-preload-all="true"
+			data-pad-length="2"
+			placeholder="Αναζήτηση Ιδιότητας αντισυμβαλλόμενου στο έργο αρ.39  παρ.9">
+		</select>
+	</div>
+</div>

@@ -111,7 +111,7 @@ function generateSelectRowsOfSymbaseis() {
 					<label class="col-form-label label-font-size">${i}</label>
 				</div>
 				<div class="col-7">
-					<input type="text" name="stoixeio_symbashs_${idNum}_hidden" id="stoixeio_symbashs_${idNum}_hidden" />
+					<input type="hidden" name="stoixeio_symbashs_${idNum}_hidden" id="stoixeio_symbashs_${idNum}_hidden" />
 					<select 
 						class="tom-dropdown selectpicker-dropdown-normal left-align w-100" 
 						name="stoixeio_symbashs_${idNum}" 

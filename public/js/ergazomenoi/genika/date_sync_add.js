@@ -40,6 +40,286 @@ document.addEventListener('DOMContentLoaded', function() {
 	});
 
 	// =========================================================================
+	// ✅ Event listeners για Μ. Ο. ωρών ημερήσιας εργασίας
+	// =========================================================================
+	const hmeresInput = document.getElementById('hmeres_ergasias_ebdomadas');
+	const oresInput = document.getElementById('ores_ergasias_ebdomadas');
+	const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
+
+	if (hmeresInput && oresInput && moOronInput) {
+		// ✅ Event listeners για Μ.Ο. 
+		oresInput. addEventListener('blur', calculateMoOron);
+		oresInput.addEventListener('change', calculateMoOron);
+		hmeresInput.addEventListener('change', calculateMoOron);
+		
+		// ✅ EVENT LISTENER:   Validation για hmeres_ergasias_ebdomadas
+		hmeresInput.addEventListener('blur', function() {
+			const hmeres = parseFloat(this.value);
+			
+			// ✅ Έλεγχος: > 0 και <= 7
+			if (isNaN(hmeres) || hmeres <= 0 || hmeres > 7) {
+				const inputElement = this;
+				
+				Swal.fire({
+					backdrop: false,
+					allowOutsideClick: false,
+					icon: 'warning',
+					title: 'ΠΡΟΣΟΧΗ!',
+					text: 'Οι ημέρες εβδομαδιαίας εργασίας πρέπει να είναι μεταξύ 1 και 7.',
+					showConfirmButton: true,
+					confirmButtonText: 'Εντάξει',
+					customClass: {
+						confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+						title:  'custom-title',
+						popup: 'custom-swal-popup',
+					},
+				}).then(() => {
+					inputElement.value = '';
+					moOronInput.value = '';
+					
+					setTimeout(() => {
+						inputElement.focus();
+					}, 100);
+				});
+				
+				return;
+			}
+			
+			// ✅ Valid value → Calculate MO
+			calculateMoOron();
+		});
+
+		/**
+		 * ✅ Υπολογισμός Μ.Ο. ώρών με BINARY SEARCH για ακρίβεια
+		 */
+		function calculateMoOron() {
+			const hmeres = parseFloat(hmeresInput. value) || 0;
+			const ores = parseFloat(oresInput.value) || 0;
+
+			// ✅ Validation check για hmeres
+			if (hmeres <= 0 || hmeres > 7) {
+				moOronInput. value = '';
+				return;
+			}
+
+			if (hmeres === 0 || ores === 0) {
+				moOronInput.value = '';
+				return;
+			}
+
+			// ✅ Binary search για το σωστό mo_oron
+			let low = 0;
+			let high = 10;  // max 10 ώρες/ημέρα
+			let moOron = ores / hmeres;
+			let bestMoOron = moOron;
+			let bestDiff = Math.abs(moOron * hmeres - ores);
+			let iterations = 0;
+
+			while (high - low > 0.0001 && iterations < 100) {
+				moOron = (low + high) / 2;
+				const check = moOron * hmeres;
+
+				if (Math.abs(check - ores) < bestDiff) {
+					bestDiff = Math.abs(check - ores);
+					bestMoOron = moOron;
+				}
+
+				if (check < ores) {
+					low = moOron;
+				} else if (check > ores) {
+					high = moOron;
+				} else {
+					break;  // Exact match! 
+				}
+
+				iterations++;
+			}
+
+			moOron = parseFloat(bestMoOron. toFixed(4));
+			
+			// ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: moOron ΔΕΝ μπορεί να είναι > 10
+			if (moOron > 10) {
+				Swal.fire({
+					backdrop: false,
+					allowOutsideClick: false,
+					icon: 'error',
+					title: 'Προσοχή !!!',
+					text: 'Ο Μ.Ο. ωρών ημερήσιας εργασίας δεν μπορεί να υπερβαίνει τις 10 ώρες.  Παρακαλώ ελέγξτε τις τιμές που εισάγατε.',
+					showConfirmButton: true,
+					confirmButtonText: 'Εντάξει',
+					customClass: {
+						confirmButton: 'class-error custom-confirm-button custom-swal-button',
+						title: 'custom-title',
+						popup: 'custom-swal-popup',
+					},
+				}).then(() => {
+					// ✅ Clear τα πεδία
+					oresInput.value = '';
+					moOronInput.value = '';
+					
+					// ✅ Focus στο ores
+					setTimeout(() => {
+						oresInput.focus();
+					}, 100);
+				});
+				
+				return;
+			}
+
+			const finalCheck = parseFloat((moOron * hmeres).toFixed(4));
+			moOronInput.value = moOron.toFixed(4);
+		}
+
+		// ✅ Initial calculation (αν υπάρχουν τιμές)
+		if (hmeresInput.value && oresInput.value) {
+			const hmeres = parseFloat(hmeresInput.value);
+			if (hmeres > 0 && hmeres <= 7) {
+				calculateMoOron();
+			}
+		}
+	}
+
+	// =========================================================================
+	// ✅ EVENT LISTENER:  Κλικ στο tab "Ωράριο Εργασίας"
+	// =========================================================================
+
+	let hasInitializedOrariaTab = false;
+
+	const menuLinks = document.querySelectorAll('.menu_Links ul li');
+
+menuLinks.forEach(li => {
+    if (li.textContent. trim() === 'Ωράριο Εργασίας') {
+        li.addEventListener('click', async function() {
+            // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Αν το mo_oron_hmerhsias_ergasias δεν έχει τιμή
+            const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
+            const moOronValue = moOronInput?. value || '';
+            
+			if (!  moOronValue || moOronValue.trim() === '' || parseFloat(moOronValue) <= 0) {
+				// ❌ ΔΕΝ υπάρχει τιμή - Εμφάνισε μήνυμα
+				await Swal.fire({
+					backdrop: false,
+					allowOutsideClick: false,
+					icon: 'warning',
+					title: 'ΠΡΟΣΟΧΗ!',
+					text: 'Παρακαλώ συμπληρώστε πρώτα τις Ημέρες και Ώρες Εβδομαδιαίας Εργασίας για να υπολογιστεί ο Μ. Ο.  ωρών ημερήσιας εργασίας.',
+					showConfirmButton: true,
+					confirmButtonText:  'Εντάξει',
+					customClass: {
+						confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+						title: 'custom-title',
+						popup: 'custom-swal-popup',
+					}
+				});
+				
+				// ✅ ΒΗΜΑ 1: Hide ALL sections
+				document.querySelectorAll('section[data-section]').forEach(section => {
+					section.classList.remove('visible');
+				});
+				
+				// ✅ ΒΗΜΑ 2: Show "Σταθερά Στοιχεία" section
+				const statheraSection = document.querySelector('section[data-section="Σταθερά Στοιχεία"]');
+				if (statheraSection) {
+					statheraSection.classList. add('visible');
+				}
+				
+				// ✅ ΒΗΜΑ 3: Update active tab in menu
+				const menuLinksInner = document.querySelectorAll('.menu_Links ul li');
+				menuLinksInner.forEach(menuLi => {
+					if (menuLi.textContent.trim() === 'Σταθερά Στοιχεία') {
+						menuLi.classList. add('active');
+					} else {
+						menuLi.classList.remove('active');
+					}
+				});
+				
+				// ✅ ΒΗΜΑ 4: Focus μετά το switch (ΧΩΡΙΣ scrollIntoView)
+				setTimeout(() => {
+					const hmeresInput = document.getElementById('hmeres_ergasias_ebdomadas');
+					if (hmeresInput) {
+						hmeresInput.focus();
+					}
+				}, 100);
+				
+				// ✅ Σταμάτα την εκτέλεση
+				return;
+			}
+
+            // ✅ Έλεγχος αν έχει ήδη τρέξει
+            if (hasInitializedOrariaTab) {
+                return;
+            }
+            
+            // ✅ ΕΜΦΑΝΙΣΗ LOADER ΑΜΕΣΩΣ
+            const loader = document.querySelector(".loader-container");
+            if (loader) {
+                loader.classList.add("visible");
+                loader.classList.remove("is-hidden");
+            }
+            
+            // ✅ Περίμενε για τα TomSelect controls
+            try {
+                await waitForTomSelectControls();
+                
+                // ✅ Τρέξε την autoSelectHolidaysOnInit
+                if (typeof autoSelectHolidaysOnInit === 'function') {
+                    autoSelectHolidaysOnInit();
+                }
+                
+                // ✅ Περίμενε για το auto-select να ολοκληρωθεί
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // ✅ Τώρα τρέξε το updateKathgoriaBackgroundColor
+                updateKathgoriaBackgroundColor();
+                
+                // ✅ Extra call μετά από 500ms για να πιάσει τις τιμές
+                await new Promise(resolve => setTimeout(resolve, 200));
+                updateKathgoriaBackgroundColor();
+                
+                hasInitializedOrariaTab = true;
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+            } finally {
+                // ✅ ΑΠΟΚΡΥΨΗ LOADER
+                setTimeout(() => {
+                    if (loader) {
+                        loader.classList.remove("visible");
+                        loader.classList.add("is-hidden");
+                    }
+                }, 100);
+            }
+        });		
+    }
+});
+
+	/**
+	 * ✅ Helper function - Περίμενε μέχρι να υπάρχουν TomSelect controls
+	 */
+	function waitForTomSelectControls() {
+		return new Promise((resolve, reject) => {
+			const maxWaitTime = 5000; // 5 seconds
+			const checkInterval = 100; // Check every 100ms
+			let elapsedTime = 0;
+			
+			const interval = setInterval(() => {
+				const tsControls = document.querySelectorAll('#dynamicFields .ts-control');
+				const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+				
+				if (tsControls.length >= differenceInDays && differenceInDays > 0) {
+					clearInterval(interval);
+					resolve();
+				}
+				
+				elapsedTime += checkInterval;
+				if (elapsedTime >= maxWaitTime) {
+					clearInterval(interval);
+					reject(new Error('Timeout waiting for TomSelect controls'));
+				}
+			}, checkInterval);
+		});
+	}
+
+	// =========================================================================
 	// HANDLERS
 	// =========================================================================
 
@@ -316,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
 						<div class="col-0-75"></div>
 
 						<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
-							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" value="" />
+							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" tabIndex="-1"value="" />
 							<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
 								ΟΧΙ
 							</label>
@@ -411,21 +691,6 @@ document.addEventListener('DOMContentLoaded', function() {
 			}
 
 			initializeSelectListeners();
-
-			setTimeout(() => {
-				if (typeof autoSelectHolidaysOnInit === 'function') {
-					autoSelectHolidaysOnInit();
-				}
-				
-				// ✅ Χρήση MutationObserver
-				waitForTomSelectAndApplyColors();
-				
-				// ✅ ΠΡΟΣΘΗΚΗ:   Το Καλεί ΞΑΝΑ μετά 1000ms για να πάρει τις νέες τιμές
-				setTimeout(() => {
-					updateKathgoriaBackgroundColor();
-				}, 1000);  // 1000ms μετά το auto-select
-				
-			}, 1000);
 		}, 200);
 
 		// ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
@@ -448,90 +713,16 @@ document.addEventListener('DOMContentLoaded', function() {
 	// =========================================================================
 
 	/**
-	 * ✅ Wait για TomSelect initialization με MutationObserver
-	 */
-	function waitForTomSelectAndApplyColors() {
-		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
-		
-		// ✅ ΕΜΦΑΝΙΣΗ LOADER
-		const loader = document.querySelector(".loader-container");
-		if (loader) {
-			loader.classList.add("visible");
-			loader.classList.remove("is-hidden");
-		}
-		
-		const observer = new MutationObserver(() => {
-			const tsControls = document.querySelectorAll('#dynamicFields .ts-control');
-			
-			if (tsControls.length >= differenceInDays) {
-				observer.disconnect();
-				
-				setTimeout(() => {
-					updateKathgoriaBackgroundColor();
-					
-					setTimeout(() => {
-						updateKathgoriaBackgroundColor();
-						
-						// ✅ ΑΠΟΚΡΥΨΗ LOADER
-						setTimeout(() => {
-							if (loader) {
-								loader.classList.remove("visible");
-								loader.classList.add("is-hidden");
-							}
-						}, 100);
-					}, 1000);
-				}, 300);
-			}
-		});
-
-		observer.observe(document.getElementById('dynamicFields'), {
-			childList:  true,
-			subtree: true,
-			attributes: true,
-			attributeFilter: ['class']
-		});
-
-		// Timeout fallback
-		setTimeout(() => {
-			observer.disconnect();
-			const tsControls = document.querySelectorAll('#dynamicFields .ts-control');
-			
-			if (tsControls.length > 0) {
-				updateKathgoriaBackgroundColor();
-				
-				setTimeout(() => {
-					updateKathgoriaBackgroundColor();
-					
-					// ✅ ΑΠΟΚΡΥΨΗ LOADER (fallback)
-					setTimeout(() => {
-						if (loader) {
-							loader.classList.remove("visible");
-							loader.classList.add("is-hidden");
-						}
-					}, 100);
-				}, 500);
-			} else {
-				// ✅ ΑΠΟΚΡΥΨΗ LOADER (no controls found)
-				if (loader) {
-					loader.classList.remove("visible");
-					loader.classList.add("is-hidden");
-				}
-				console.error('❌ No .ts-control elements found!');
-			}
-		}, 1000);
-	}
-
-	/**
 	 * ✅ Αλλαγή background color ανάλογα με την επιλογή + πεδία ωρών
 	 */
 	function updateKathgoriaBackgroundColor() {
-		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+		const differenceInDays = parseInt(document. getElementById('differenceInDays')?.value || 0);
 		const allTsControls = document.querySelectorAll('#dynamicFields .ts-control');
 		
 		for (let i = 1; i <= differenceInDays; i++) {
-			let i1 = i < 10 ? '0' + i : i;
+			let i1 = i < 10 ? '0' + i :  i;
 			const selectId = `kathgoria_ergasias_${i1}`;
-			const selectElement = document.getElementById(selectId);
+			const selectElement = document. getElementById(selectId);
 
 			if (! selectElement) {
 				continue;
@@ -539,15 +730,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 			const tsControl = allTsControls[i - 1];
 
-			if (!tsControl) {
+			if (! tsControl) {
 				continue;
 			}
 
 			// ✅ Handler function
 			const updateBackground = () => {
 				const value = selectElement.value;
-				
-				// ✅ Βρες το perigrafh_argias field
 				const perigrafh_argias = document.getElementById(`perigrafh_argias_${i1}`)?.value || '';
 
 				// =========================================================================
@@ -555,38 +744,37 @@ document.addEventListener('DOMContentLoaded', function() {
 				// =========================================================================
 				if (value === 'ΜΕ') {
 					// ✅ Έλεγχος αν το perigrafh_argias ΔΕΝ είναι κενό
-					if (perigrafh_argias && perigrafh_argias. trim() !== '') {
-						// ✅ ΚΙΤΡΙΝΟ για TomSelect + ΟΛΑ τα πεδία ωρών (j=1,2,3)
-						tsControl. style.setProperty('background-color', '#eeff0223', 'important');
-						tsControl. style.setProperty('border-color', '#fbc02d', 'important');
+					if (perigrafh_argias && perigrafh_argias.trim() !== '') {
+						// ✅ ΚΙΤΡΙΝΟ για TomSelect
+						tsControl.style.setProperty('background-color', '#eeff0223', 'important');
+						tsControl. style. setProperty('border-color', '#fbc02d', 'important');
 						
-						// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3)
+						// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3) + ENABLE
 						for (let j = 1; j <= 3; j++) {
-							applyColorToTimeFields(i1, j, '#eeff0223', '#fbc02d');
+							applyColorToTimeFields(i1, j, '#eeff0223', '#fbc02d', true);  // ← true = ENABLE
 						}
 					} else {
-						// ❌ perigrafh_argias είναι κενό → Reset
+						// ❌ perigrafh_argias είναι κενό → Reset (χωρίς enable)
 						tsControl.style.setProperty('background-color', '', 'important');
 						tsControl.style.setProperty('border-color', '#cccccc', 'important');
 						
-						// Reset όλα τα πεδία
+						// Reset όλα τα πεδία (χωρίς enable)
 						for (let j = 1; j <= 3; j++) {
-							applyColorToTimeFields(i1, j, '', '#cccccc');
+							applyColorToTimeFields(i1, j, '', '#cccccc', false);  // ← false = ΔΕΝ αλλάζει
 						}
 					}
 				}
-
 				// =========================================================================
 				// CASE 2: value === 'ΑΝ'
 				// =========================================================================
 				else if (value === 'ΑΝ') {
-					// ✅ ΠΡΑΣΙΝΟ για TomSelect + ΟΛΑ τα πεδία ωρών (j=1,2,3)
-					tsControl. style.setProperty('background-color', '#2b97001e', 'important');
-					tsControl.style.setProperty('border-color', '#66bb6a', 'important');
+					// ✅ ΠΡΑΣΙΝΟ για TomSelect
+					tsControl.style.setProperty('background-color', '#2b97001e', 'important');
+					tsControl. style.setProperty('border-color', '#66bb6a', 'important');
 					
-					// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3)
+					// ✅ Βάψε ΟΛΑ τα πεδία ωρών (j=1,2,3) ΧΩΡΙΣ enable
 					for (let j = 1; j <= 3; j++) {
-						applyColorToTimeFields(i1, j, '#2b97001e', '#66bb6a');
+						applyColorToTimeFields(i1, j, '#2b97001e', '#66bb6a', false);  // ← false = ΔΕΝ αλλάζει disabled
 					}
 				}
 				// =========================================================================
@@ -597,9 +785,9 @@ document.addEventListener('DOMContentLoaded', function() {
 					tsControl.style.setProperty('background-color', '#ffffff', 'important');
 					tsControl.style.setProperty('border-color', '#cccccc', 'important');
 					
-					// Reset όλα τα πεδία
+					// Reset όλα τα πεδία (χωρίς enable)
 					for (let j = 1; j <= 3; j++) {
-						applyColorToTimeFields(i1, j, '', '#cccccc');
+						applyColorToTimeFields(i1, j, '', '#cccccc', false);  // ← false = ΔΕΝ αλλάζει
 					}
 				}
 			};
@@ -608,7 +796,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			if (selectElement.tomselect) {
 				selectElement.tomselect.on('change', updateBackground);
 			} else {
-				selectElement.addEventListener('change', updateBackground);
+				selectElement. addEventListener('change', updateBackground);
 			}
 
 			// ✅ Initial color update
@@ -617,9 +805,9 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 	/**
-	 * ✅ Helper function - Εφαρμογή χρωμάτων σε πεδία ωρών
+	 * ✅ Helper function - Εφαρμογή χρωμάτων σε πεδία ωρών + enable (μόνο αν shouldEnable === true)
 	 */
-	function applyColorToTimeFields(i1, j, bgColor, borderColor) {
+	function applyColorToTimeFields(i1, j, bgColor, borderColor, shouldEnable) {
 		const fields = [
 			`apo_ora_0${j}_${i1}`,
 			`eos_ora_0${j}_${i1}`,
@@ -630,38 +818,20 @@ document.addEventListener('DOMContentLoaded', function() {
 		fields.forEach(fieldId => {
 			const field = document.getElementById(fieldId);
 			if (field) {
+				// ✅ Apply colors
 				if (bgColor) {
-					field.style.setProperty('background-color', bgColor, 'important');
+					field.style. setProperty('background-color', bgColor, 'important');
 					field.style.setProperty('border-color', borderColor, 'important');
 				} else {
 					field.style.setProperty('background-color', '', 'important');
 					field.style.setProperty('border-color', borderColor, 'important');
 				}
-			}
-		});
-	}
-
-	/**
-	 * ✅ Helper function - Εφαρμογή χρωμάτων σε πεδία ωρών
-	 */
-	function applyColorToTimeFields(i1, j, bgColor, borderColor) {
-		const fields = [
-			`apo_ora_0${j}_${i1}`,
-			`eos_ora_0${j}_${i1}`,
-			`dialleima_apo_ora_0${j}_${i1}`,
-			`dialleima_eos_ora_0${j}_${i1}`
-		];
-
-		fields.forEach(fieldId => {
-			const field = document.getElementById(fieldId);
-			if (field) {
-				if (bgColor) {
-					field.style.setProperty('background-color', bgColor, 'important');
-					field.style.setProperty('border-color', borderColor, 'important');
-				} else {
-					field.style.setProperty('background-color', '', 'important');
-					field.style.setProperty('border-color', borderColor, 'important');
+				
+				// ✅ ΜΟΝΟ αν shouldEnable === true → removeAttribute('disabled')
+				if (shouldEnable === true) {
+					field.removeAttribute('disabled');
 				}
+				// ✅ Για όλες τις άλλες περιπτώσεις (false) → ΔΕΝ αλλάζει το disabled state
 			}
 		});
 	}
@@ -720,16 +890,37 @@ document.addEventListener('DOMContentLoaded', function() {
 		let totalMinutes = 0;
 		const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
 
+		// ✅ Πάρε το Μ. Ο.  ωρών ημερήσιας εργασίας
+		const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
+		const moOron = parseFloat(moOronInput?.value) || 0;
+
+		// ✅ Object για tracking ημερήσιων συνόλων
+		const dailyHours = {};
+		let hasExceeded = false;
+		const exceededDays = [];
+
+		// ✅ Έλεγχος αν ΟΛΑ τα kathgoria_ergasias έχουν τιμή
+		let allKathgoriesCompleted = true;
+
 		// Για κάθε ημέρα
 		for (let i = 1; i <= differenceInDays; i++) {
-			let i1 = i < 10 ?  '0' + i :  i;
+			let i1 = i < 10 ? '0' + i : i;
+			let dailyMinutes = 0;
+
+			// ✅ Έλεγχος αν το kathgoria_ergasias έχει τιμή
+			const kathgoriaInput = document.getElementById(`kathgoria_ergasias_stathera_${i1}`);
+			const kathgoriaValue = kathgoriaInput?.value || '';
+
+			if (! kathgoriaValue || ! ['ΑΝ', 'ΕΡΓ', 'ΜΕ', 'ΤΗΛ'].includes(kathgoriaValue)) {
+				allKathgoriesCompleted = false;
+			}
 
 			// Για κάθε j (1, 2, 3)
 			for (let j = 1; j <= 3; j++) {
 				const apoOra = document.getElementById(`apo_ora_0${j}_${i1}`)?.value;
 				const eosOra = document.getElementById(`eos_ora_0${j}_${i1}`)?.value;
 
-				if (!apoOra || !eosOra) {
+				if (! apoOra || !eosOra) {
 					continue;
 				}
 
@@ -741,7 +932,25 @@ document.addEventListener('DOMContentLoaded', function() {
 					diffMinutes += 24 * 60;
 				}
 
+				dailyMinutes += diffMinutes;
 				totalMinutes += diffMinutes;
+			}
+
+			// ✅ Μετατροπή σε ώρες για την ημέρα
+			const dailyHoursValue = (dailyMinutes / 60);
+			dailyHours[i1] = dailyHoursValue;
+
+			// ✅ ΕΛΕΓΧΟΣ: Ημερήσιο σύνολο > Μ.Ο. ?  
+			if (moOron > 0 && dailyHoursValue > moOron) {
+				hasExceeded = true;
+				
+				// Βρες την ημερομηνία για καλύτερο μήνυμα
+				const dayLabel = document. getElementById(`day_label_${i1}`)?.textContent || `Ημέρα ${i}`;
+				exceededDays.push({
+					day: dayLabel,
+					hours: dailyHoursValue. toFixed(2),
+					mo: moOron.toFixed(4)
+				});
 			}
 		}
 
@@ -755,38 +964,62 @@ document.addEventListener('DOMContentLoaded', function() {
 			return false;
 		}
 
-		// ✅ ΕΛΕΓΧΟΣ 2: Σύγκριση με hmeres_ergasias_ebdomadas
-		const hmeresErgasiasInput = document.getElementById('hmeres_ergasias_ebdomadas');
-		if (hmeresErgasiasInput && hmeresErgasiasInput.value) {
-			const expectedHours = parseFloat(hmeresErgasiasInput.value);
-			const actualHours = parseFloat(totalHours);
+		// ✅ ΕΛΕΓΧΟΣ:  Ημερήσιο σύνολο > Μ.Ο. ? 
+		if (hasExceeded) {
+			// Δημιουργία λίστας ημερών
+			let daysMessage = exceededDays. map(day => 
+				`<div style="text-align:  left; margin:  5px 0;">
+					<strong>${day.day}: </strong> ${day.hours} ώρες (Μ. Ο.: ${day.mo})
+				</div>`
+			).join('');
 
-			if (actualHours !== expectedHours) {
-				Swal.fire({
-					backdrop: false,
-					allowOutsideClick: false,
-					icon: 'info',
-					title: 'ΠΡΟΣΟΧΗ !!!',
-					text:  'Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου',
-					showConfirmButton: true,
-					confirmButtonText: 'Κλείσιμο',
-					customClass: {
-						confirmButton: 'class-info custom-confirm-button custom-swal-button',
-						title:  'custom-title',
-						popup: 'custom-swal-popup',
-					},
-				}).then(() => {
-					try {
-						const firstEosOra = document.getElementById('eos_ora_01_01');
-						if (firstEosOra) {
-							firstEosOra.focus();
-						}
-					} catch (_) {}
-				});
-				return false;
-			}
+			Swal.fire({
+				backdrop: false,
+				allowOutsideClick: false,
+				icon:  'warning',
+				title:  'ΠΡΟΣΟΧΗ - ΥΠΕΡΒΑΣΗ ΩΡΩΝ !!!',
+				html: `
+					<div style="text-align: center;">
+						<p>Οι παρακάτω ημέρες έχουν περισσότερες ώρες από τον Μ. Ο. ημερήσιας εργασίας:</p>
+						${daysMessage}
+					</div>
+				`,
+				showConfirmButton: true,
+				confirmButtonText: 'Το κατάλαβα',
+				customClass: {
+					confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+					title: 'custom-title',
+					popup: 'custom-swal-popup',
+				},
+			});
 		}
 
+		// ✅ ΕΛΕΓΧΟΣ 2: Σύγκριση με ores_ergasias_ebdomadas
+		// ✅ ΜΟΝΟ αν ΟΛΑ τα kathgoria_ergasias έχουν τιμή
+		if (allKathgoriesCompleted) {
+			const oresErgasiasInput = document.getElementById('ores_ergasias_ebdomadas');
+			if (oresErgasiasInput && oresErgasiasInput.value) {
+				const expectedHours = parseFloat(oresErgasiasInput.value);
+				const actualHours = parseFloat(totalHours);
+
+				if (actualHours !== expectedHours) {
+					Swal.fire({
+						backdrop: false,
+						allowOutsideClick: false,
+						icon:  'info',
+						title: 'ΠΡΟΣΟΧΗ !!!',
+						text: 'Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου',
+						showConfirmButton: true,
+						confirmButtonText:  'Κλείσιμο',
+						customClass: {
+							confirmButton:  'class-info custom-confirm-button custom-swal-button',
+							title:  'custom-title',
+							popup: 'custom-swal-popup',
+						},
+					});
+				}
+			}
+		}
 		return true;
 	}
 

@@ -57,7 +57,12 @@ const kpkEfkaByCode                         = require('../dropdowns/ergazomenoi/
 const d_yp_apasxolhshs                      = require('../dropdowns/ergazomenoi/dypa');
 const programmaDypa                         = require('../dropdowns/ergazomenoi/programmataDypa');
 const kentraKostoys                         = require('../dropdowns/ergazomenoi/kentraKostoys');
+
 const krathseis                             = require('../dropdowns/ergazomenoi/krathseis');
+const foreas_epikoyrikhs_xoris_efka         = require('../dropdowns/ergazomenoi/foreas_epikoyrikhs_xoris_efka');
+const foreas_astheneias_xoris_efka           = require('../dropdowns/ergazomenoi/foreas_astheneias_xoris_efka');
+const idiothta_antisymbal_sto_ergo_39        = require('../dropdowns/ergazomenoi/idiothta_antisymbal_sto_ergo_39');
+
 const adeies_diamonhs_typos_0               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_0');
 const adeies_diamonhs_typos_1               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_1');
 const thematika_pedia                       = require('../dropdowns/ergazomenoi/thematika_pedia');
@@ -113,7 +118,12 @@ const   {
             KadEfkaModel,
             KentraKostoysModel,
             KathgoriesErgasiasModel,
+
             KrathseisModel,
+            ForeasEpikoyrikhsXorisEfkaModel,
+            ForeasAstheneiasXorisEfkaModel,
+            IdiothtaErgoy39Par9Model,
+
             AdeiesDiamonhsModel,
             ThematikaPediaModel,
             ThematikesEnothtesModel,
@@ -322,6 +332,21 @@ router.get('/ergazomenoi/kathgoria_ergasias', async (req, res, next) => {
 // =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION3 -> ΚΡΑΤΗΣΕΙΣ ==============================
 
 router.get('/ergazomenoi/krathseis',                    buildDropdownRoute(KrathseisModel, krathseis.options));
+router.get('/ergazomenoi/epikoyrikh_xoris_efka', 
+                                                        buildDropdownRoute(
+                                                            ForeasEpikoyrikhsXorisEfkaModel, 
+                                                            foreas_epikoyrikhs_xoris_efka.options)
+);
+router.get('/ergazomenoi/astheneia_xoris_efka', 
+                                                        buildDropdownRoute(
+                                                            ForeasAstheneiasXorisEfkaModel, 
+                                                            foreas_astheneias_xoris_efka. options)
+);
+router.get('/ergazomenoi/idiothta_sto_ergo_39', 
+                                                        buildDropdownRoute(
+                                                            IdiothtaErgoy39Par9Model, 
+                                                            idiothta_antisymbal_sto_ergo_39.options)
+);  
 
 // =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION4 -> ΑΛΛΟΔΑΠΟΙ ==============================
 
