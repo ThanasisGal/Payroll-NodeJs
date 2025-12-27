@@ -41,6 +41,16 @@
 
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-4 right-align">
+            <label for="apasxolhsh_kata_tis_argies" class="col-form-label label-font-size">Επιτρέπεται η λειτουργία της εταιρείας κατά τις Κυριακές - Αργίες</label>
+        </div>
+        <div class="col-1 left-align checkbox-flex-center">
+            <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="apasxolhsh_kata_tis_argies" name="apasxolhsh_kata_tis_argies" <%= company.apasxolhsh_kata_tis_argies ? 'checked' : '' %> value="" /> 
+            <label for="apasxolhsh_kata_tis_argies" id="label-apasxolhsh_kata_tis_argies" class="input-content margin-left-0_75rem fw600">ΟΧΙ</label>
+        </div>
+    </div>
+
+    <div class="row form-group g-3 align-items-center mb-0-5">
+        <div class="col-4 right-align">
             <label for="keimeno_exoflhshs" class="col-form-label label-font-size">Κείμενο Εξοφλητικής Απόδειξης</label>
         </div>
         <div class="col-8">

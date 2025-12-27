@@ -3931,7 +3931,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .addStoixSymb001 { background-color: #ffffff; margin-left: -1rem; margin-right: -1rem; margin-bottom: -0.6rem !important;}
 .addStoixSymb002 { background-color: #eeff0223;}
-.addStoixSymb002 { background-color: #2b97001e}
+.addStoixSymb003 { background-color: #2b97001e}
 
 /* Ασφαλείς, ειδικές κλάσεις για να μην συγκρούονται */
 #remaining-time.rt-white  {

@@ -19,6 +19,7 @@
 		<input type="hidden" id="calcChildren" name="calcChildren" value="" />
 		<input type="hidden" id="calcXrhsh" name="calcXrhsh" value="<%= sessionYearInUse %>" />
 		<input type="hidden" id="createTaxScale" name="createTaxScale" value="" />
+		<input type="hidden" name="apasxolhshTisArgies" id="apasxolhshTisArgies" class="form-control input-contents" value="<%= companyData.apasxolhsh_kata_tis_argies %>" />
 
         <div class="sections">
             <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
@@ -185,7 +186,18 @@
                             <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
 							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
-								<div class="col-5"></div>
+								<div class="col-5">
+									<% if (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') { %>
+										<label class="col-form-label font-size-rem-1_1rem font-weight-700 cgreen">
+											Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες
+										</label>
+									<% } else { %>
+										<label class="col-form-label font-size-rem-1rem font-weight-700 cred">
+											Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες
+										</label>
+									<% } %>
+								</div>
+
 								<div class="col-2-1 text-center">
 									<label class="col-form-label field-required">
 									ΩΡΕΣ ΕΡΓΑΣΙΑΣ
@@ -201,7 +213,7 @@
 								</div>
 							</div>
 
-							<div class="row form-group align-items-center  bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80">
+							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80">
 								<div class="col-0-5 text-center">
 									<label class="col-form-label field-required"></label>
 								</div>

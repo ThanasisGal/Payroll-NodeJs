@@ -54,6 +54,7 @@ const CompaniesSchema = new Schema(
         doropasxa_apd: { type: Boolean, default: false },
         doroxrist_apd: { type: Boolean, default: false },
         ypologismos_epi_pragmatikoy_oromisthioy: { type: Boolean, default: false },
+        apasxolhsh_kata_tis_argies: { type: Boolean, default: false },
         keimeno_exoflhshs: { type: String, trim: true },
         users: [
             {

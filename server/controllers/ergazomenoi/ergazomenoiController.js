@@ -4,6 +4,7 @@ const fs = require("fs-extra");
 
 const Models_A = require("../../models/stathera_arxeia");
 const Models_B = require("../../models/privileges");
+const Models_C = require("../../models/companies");
 const Models_D = require("../../models/ergazomenoi");
 
 const   {   KrathseisModel,
@@ -13,6 +14,8 @@ const   {   KrathseisModel,
         } = Models_A;
 
 const   { UserPrivilegesModel } = Models_B;
+
+const   { CompaniesModel } = Models_C;
 
 const   {   ErgazomenoiModel,
             OrariaModel,
@@ -399,11 +402,15 @@ class ergazomenoiController {
         };
 
         const sessionYearInUse = req.session.yearInUse;
+        const companyId = req.session.companyInUse;
 
         try {
+            const companyData = await CompaniesModel.findById(companyId).lean();
+
             const data = await PerifereiesModel.find().sort("kodikos");
             res.render("ergazomenoi/ergazomenoi/add", { 
                 locals,
+                companyData,
                 data, 
                 mode: "add", 
                 context: "ergazomenoi", 

@@ -10,7 +10,8 @@ var checkboxes = [
   "oikodomika_erga",
   "ypergolabia",
   "nomiko_prosopo",
-  "karta_ergasias"
+  "karta_ergasias",
+  "apasxolhsh_kata_tis_argies"
   ];
 
   // Επανάληψη της λίστας για να καλέσω την setupCheckbox για κάθε checkbox
