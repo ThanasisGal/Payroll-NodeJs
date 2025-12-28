@@ -424,14 +424,17 @@ class ergazomenoiController {
     
     static checkAfmErgazomenoy = async (req, res) => {
         try {
-        const { afm } = req.body;
-        const doc = await ErgazomenoiModel.findOne({ afm: afm });
+            const { afm } = req.body;
 
-        if (doc) {
-            res.json(doc);
-        }
+            const doc = await ErgazomenoiModel.findOne({ afm:  afm });
+
+            if (doc) {
+                return res.json(doc);
+            } else {
+                return res.json(null);
+            }
         } catch (err) {
-        res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
+            return res.status(500).json({ error: "Σφάλμα κατά την αναζήτηση στη βάση δεδομένων" });
         }
     };
 
@@ -494,13 +497,13 @@ class ergazomenoiController {
             patronymo: formData.patronymo,
             eponymo_mhteras: formData.eponymo_mhteras,
             mhtronymo: formData.mhtronymo,
-            afm: formData.afmHidden,
+            afm: formData.afm_ergazomenoyHidden,
             doy: formData.doy,
             typos_taytothtas: formData.typos_taytothtas,
             adt: formData.adt,
             hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
             arxh_ekdoshs: formData.arxh_ekdoshs,
-            amka: formData.amkaHidden,
+            amka: formData.amka_ergazomenoyHidden,
             hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
             topos_gennhshs: formData.topos_gennhshs,
             arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
@@ -890,13 +893,13 @@ class ergazomenoiController {
         patronymo: formData.patronymo,
         eponymo_mhteras: formData.eponymo_mhteras,
         mhtronymo: formData.mhtronymo,
-        afm: formData.afmHidden,
+        afm: formData.afm_ergazomenoyHidden,
         doy: formData.doy,
         typos_taytothtas: formData.typos_taytothtas,
         adt: formData.adt,
         hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
         arxh_ekdoshs: formData.arxh_ekdoshs,
-        amka: formData.amkaHidden,
+        amka: formData.amka_ergazomenoyHidden,
         hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
         topos_gennhshs: formData.topos_gennhshs,
         arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,

@@ -7,6 +7,15 @@
 // - Σύνδεση με TomSelect & native <select>, γέμισμα σχετικών πεδίων
 // ============================================================================
 
+const debounceTimers = {};
+const abortControllers = {};
+const activeRequests = {};  // ✅ Track active requests
+
+const debounceByKey = (key, fn, delay = 400) => {  // ✅ Αύξηση σε 400ms
+    clearTimeout(debounceTimers[key]);
+    debounceTimers[key] = setTimeout(fn, delay);
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     // ==========================================================================
     // CSRF setup
@@ -26,17 +35,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================================================
     const fetchJson = async (url, bodyObj, method = "POST", signal) => {
         await ensureCsrfTokenAvailable();
-        return fetch(url, {
-            method,
-            credentials: "same-origin",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-            },
-            body: method === "GET" ? undefined : JSON.stringify(bodyObj ?? {}),
-            signal,
-        });
+        try {
+            const fetchOptions = {
+                method,
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+                },
+                body: method === "GET" ? undefined : JSON.stringify(bodyObj ??  {}),
+                signal,
+            };
+            
+            const response = await fetch(url, fetchOptions);
+            return response;
+            
+        } catch (error) {
+            console.error('❌ fetchJson error:', error);
+            throw error;
+        }
     };
 
     // ==========================================================================
@@ -68,10 +86,26 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const createAbortSignal = (key) => {
-        if (abortControllers[key]) abortControllers[key].abort();
+        // Αν υπάρχει ήδη active request, μην ξεκινήσεις νέο
+        if (activeRequests[key]) {
+            throw new Error('Request already in progress');  // ✅ Throw για να σταματήσει
+        }
+        
+        // Ακύρωση παλιού controller (για safety)
+        if (abortControllers[key] && !abortControllers[key].signal.aborted) {
+            abortControllers[key].abort('Replaced by new request');
+        }
+
         const controller = new AbortController();
         abortControllers[key] = controller;
+        activeRequests[key] = true;  // ✅ Mark as active
+        
         return controller.signal;
+    };
+
+    const cleanupAbortSignal = (key) => {
+        delete activeRequests[key];
+        delete abortControllers[key];
     };
 
     // ==========================================================================
@@ -279,13 +313,79 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // τελικός έλεγχος στο blur (με SweetAlert + refocus)
+        //     inputEl.addEventListener("blur", () => {
+        //         debounceByKey(fieldId, async () => {
+        //             let rawValue = inputEl.value?.trim() || "";
+        //             if (rawValue === "") { resetAfmState(inputEl); return; }
+
+        //             const onlyDigits = rawValue.replace(/\D/g, "");
+        //             if (onlyDigits !== rawValue) { inputEl.value = onlyDigits; rawValue = onlyDigits; }
+
+        //             if (!isValidAfm9Digits(rawValue)) {
+        //                 setAfmError(inputEl);
+
+        //                 // guard: μην ξανατρέξεις αν είναι ήδη ανοιχτό alert για αυτό το input
+        //                 if (inputEl.__swalOpen) return;
+        //                 inputEl.__swalOpen = true;
+
+        //                 try {
+        //                     await Swal.fire({
+        //                         icon: "warning",
+        //                         title: "Λάθος ΑΦΜ",
+        //                         text: "Πληκτρολογήστε σωστό 9-ψήφιο ΑΦΜ ή αφήστε το πεδίο κενό.",
+        //                         showConfirmButton: true,
+        //                         confirmButtonText: "Κλείσιμο",
+        //                         backdrop: false,
+        //                         allowOutsideClick: false,
+        //                         focusConfirm: true,
+        //                         returnFocus: false,             // μην κάνει auto-return focus το Swal
+        //                         didClose: () => {
+        //                             // δώσε εσύ πίσω το focus στο ΑΦΜ, σε microtask/next tick
+        //                             setTimeout(() => { 
+        //                             inputEl.focus();
+        //                             inputEl.select();
+        //                             }, 0);
+        //                         },
+        //                         customClass: {
+        //                             confirmButton: "class-warning custom-confirm-button custom-swal-button",
+        //                             title: "custom-title",
+        //                             popup: "custom-swal-popup",
+        //                         },
+        //                     });
+        //                 } finally {
+        //                     inputEl.value = "";
+        //                     resetAfmState(inputEl);
+        //                     inputEl.__swalOpen = false;
+        //                 }
+        //                 return;
+        //             } else {
+        //                 setAfmOK(inputEl);
+        //             }
+
+        //             // Κλήση του κατάλληλου handler (API, γέμισμα πεδίων κ.λπ.)
+        //             const handler = afmFieldToHandlerMap[fieldId];
+        //             try {
+        //                 const signal = createAbortSignal(fieldId);
+        //                 await handler(rawValue, signal);
+        //             } catch (err) {
+        //                 if (err?.name !== "AbortError") console.error("Σφάλμα:", err);
+        //             }
+        //         });
+        //     });
+
         inputEl.addEventListener("blur", () => {
             debounceByKey(fieldId, async () => {
-                let rawValue = inputEl.value?.trim() || "";
-                if (rawValue === "") { resetAfmState(inputEl); return; }
+                let rawValue = inputEl.value?. trim() || "";
+                if (rawValue === "") { 
+                    resetAfmState(inputEl); 
+                    return; 
+                }
 
                 const onlyDigits = rawValue.replace(/\D/g, "");
-                if (onlyDigits !== rawValue) { inputEl.value = onlyDigits; rawValue = onlyDigits; }
+                if (onlyDigits !== rawValue) { 
+                    inputEl.value = onlyDigits; 
+                    rawValue = onlyDigits; 
+                }
 
                 if (!isValidAfm9Digits(rawValue)) {
                     setAfmError(inputEl);
@@ -328,16 +428,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     setAfmOK(inputEl);
                 }
 
-                // Κλήση του κατάλληλου handler (API, γέμισμα πεδίων κ.λπ.)
+                // Κλήση του κατάλληλου handler
                 const handler = afmFieldToHandlerMap[fieldId];
+
                 try {
                     const signal = createAbortSignal(fieldId);
                     await handler(rawValue, signal);
                 } catch (err) {
-                    if (err?.name !== "AbortError") console.error("Σφάλμα:", err);
+                    if (err?.message === 'Request already in progress') {
+                        return;  // ✅ Αγνόησε το duplicate
+                    }
+                    if (err?.name !== "AbortError") {
+                        console.error("Σφάλμα:", err);
+                    }
                 }
-            });
-        });
+            }, 100);  // ✅ 100ms debounce
+        });        
     });
 
     // ==========================================================================
@@ -605,35 +711,47 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function fetchErgazomenoiData(afm, signal) {
-        const resp = await fetchJson("/api/afmErgazomenoy", { afm }, "POST", signal);
-        if (!resp.ok) throw new Error("Σφάλμα κατά την αποστολή αιτήματος");
-        const data = await resp.json();
-        if (data) {
-            const esc = (s) =>
-                String(s ?? "")
-                .trim()
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#39;");
-            const afmTxt = esc(data.afm);
-            const epon = esc(data.eponymia);
-            const first = esc(data.firstname);
-
-            Swal.fire({
-                icon: "error",
-                title: "Προσοχή",
-                html: `Η εταιρεία με ΑΦΜ <strong>${afmTxt} (${epon} ${first})</strong> είναι ήδη καταχωρημένη. Δεν επιτρέπεται διπλή, ως προς το ΑΦΜ, καταχώρηση.`,
-                backdrop: false,
-                allowOutsideClick: false,
-                customClass: {
-                    confirmButton: "class-normal custom-confirm-button custom-swal-button",
-                    title: "custom-title",
-                    popup: "custom-swal-popup",
-                },
-                confirmButtonText: "Κλείσιμο",
-            });
+        const fieldId = 'afm_ergazomenoy';
+        
+        try {
+            
+            const resp = await fetchJson("/api/afmErgazomenoy", { afm }, "POST", signal);
+            
+            if (!resp.ok) throw new Error("Σφάλμα κατά την αποστολή αιτήματος");
+            
+            const data = await resp.json();
+            
+            if (data) {
+                const esc = (s) => String(s ??  "").trim()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+                    
+                await Swal.fire({
+                    icon: "error",
+                    title: "Προσοχή",
+                    html: `Υπάρχει ήδη καταχώρηση με ΑΦΜ <strong>${esc(data.afm)} (${esc(data.eponymia)} ${esc(data.firstname)})</strong>...`,
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    customClass: {
+                        confirmButton: "class-normal custom-confirm-button custom-swal-button",
+                        title: "custom-title",
+                        popup: "custom-swal-popup",
+                    },
+                    confirmButtonText: "Κλείσιμο",
+                });
+            }
+            
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return null;
+            }
+            console.error('❌ Error:', error);
+            throw error;
+        } finally {
+            cleanupAbortSignal(fieldId);  // ✅ Καθαρισμός
         }
     }
 

@@ -28,7 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
           field.focus();
           return;
         }
-
         const fetchDataFunction = afmMappings[fieldId];
 
         try {

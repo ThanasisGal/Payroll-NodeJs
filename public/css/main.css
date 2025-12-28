@@ -1,5 +1,5 @@
 :root {
-  --aaa: #cddbc63d;
+  --aaa: #f5f5f5b4;
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -856,6 +856,11 @@ small,
 .field-required {
   font-weight: 700;
   color: #005f28;
+}
+
+.field-required-gray {
+  font-weight: 700;
+  color: #858585;
 }
 
 .pageItem {
@@ -4273,12 +4278,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .font-size-vw-23 { font-size: 23vw; }
 .font-size-vw-24 { font-size: 24vw; }
 
-.font-size-rem-0_72 { font-size: 0.72rem; }
-.font-size-rem-0_80 { font-size: 0.80rem; }
-.font-size-rem-0_85 { font-size: 0.85rem; }
-.font-size-rem-1 { font-size: 1rem; }
-.font-size-rem-1_1 { font-size: 1.1rem; }
-.font-size-rem-1_3 { font-size: 1.3rem; }
+.font-size-rem-0_72 { font-size: 0.72rem !important; }
+.font-size-rem-0_80 { font-size: 0.80rem !important; }
+.font-size-rem-0_85 { font-size: 0.85rem !important; }
+.font-size-rem-0_95 { font-size: 0.95rem !important; }
+.font-size-rem-1 { font-size: 1rem !important; }
+.font-size-rem-1_1 { font-size: 1.1rem !important; }
+.font-size-rem-1_3 { font-size: 1.3rem !important; }
 
 .fsvw-0_7 { font-size: 0.7vw; }
 .fsvw-0_8 { font-size: 0.8vw; }
@@ -5997,4 +6003,39 @@ tbody .group-row--category:first-of-type > td {
 /* ✅ Optional: Smooth transition */
 .ts-control {
     transition: background-color 0.3s ease;
+}
+
+.error-header {
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.warning-header {
+    margin-top: -5px;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 0.80rem;
+}
+
+.error-grid-container {
+    max-height: 20vh;
+    overflow-y:  auto;
+    margin-top:  0.75rem;
+}
+
+.error-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    text-align: left;
+}
+
+.error-item {
+    padding:  5px;
+    border:  1px solid #ddd;
+    background: #f5f5f5b4;
+}
+
+.custom-html-container {
+    overflow:  visible !important;
 }
