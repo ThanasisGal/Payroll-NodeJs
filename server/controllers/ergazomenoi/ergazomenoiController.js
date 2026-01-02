@@ -448,365 +448,365 @@ class ergazomenoiController {
         const { formData, filesToUpdate } = req.body;
         
         try {
-        const lastRecord = await ErgazomenoiModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse })
-            .sort({ _id: -1 })
-            .limit(1);
-        let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
-        if (kodValue !== null) {
-            kodValue++;
-        } else {
-            kodValue = 1;
-        }
-        aa_kod = kodValue;
-        kodikosValue = kodValue;
+            const lastRecord = await ErgazomenoiModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse })
+                .sort({ _id: -1 })
+                .limit(1);
+            let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
+            if (kodValue !== null) {
+                kodValue++;
+            } else {
+                kodValue = 1;
+            }
+            aa_kod = kodValue;
+            kodikosValue = kodValue;
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
 
         try {
-        const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: kodikosValue })
-            .sort({ _id: -1 })
-            .limit(1);
-        let aaValue = lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10) : null;
-        if (aaValue !== null) {
-            aaValue++;
-        } else {
-            aaValue = 1;
-        }
-        aa_eggr = aaValue;
+            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: kodikosValue })
+                .sort({ _id: -1 })
+                .limit(1);
+            let aaValue = lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10) : null;
+            if (aaValue !== null) {
+                aaValue++;
+            } else {
+                aaValue = 1;
+            }
+            aa_eggr = aaValue;
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
 
         const days = 7;
         const sessions = 3;
 
         if (!formData.hmeromhnia_proslhpshs && !formData.hmeromhnia_allaghs_symbashs) {
-        res.json({ success: false, errorMessage: "Είναι υποχρεωτική η συμπλήρωση των Ημερομηνιών Πρόσληψης και Αλλαγής Σύμβασης", redirectUrl: "/ergazomenoi/ergazomenoi" });
+            res.json({ success: false, errorMessage: "Πρέπει να συμπληρωθούν όλα τα υποχρεωτικά πεδία για να συνεχίσετε την πρόσληψη του εργαζομένου", redirectUrl: "/ergazomenoi/ergazomenoi" });
         } else {
-        if (filesToUpdate.employees) {
-            const newErgazomenos = ErgazomenoiModel({
-            team: sessionUserTeam,
-            company_kod: sessionCompanyInUse,
-            kodikos: aa_kod.toString().padStart(4, '0'),
-            energos: formData.energos,
-            fylo: formData.fylo,
-            eponymo: formData.eponymoHidden,
-            onoma: formData.onomaHidden,
-            eponymo_patera: formData.eponymo_patera,
-            patronymo: formData.patronymo,
-            eponymo_mhteras: formData.eponymo_mhteras,
-            mhtronymo: formData.mhtronymo,
-            afm: formData.afm_ergazomenoyHidden,
-            doy: formData.doy,
-            typos_taytothtas: formData.typos_taytothtas,
-            adt: formData.adt,
-            hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
-            arxh_ekdoshs: formData.arxh_ekdoshs,
-            amka: formData.amka_ergazomenoyHidden,
-            hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
-            topos_gennhshs: formData.topos_gennhshs,
-            arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
-            yphkoothta: formData.yphkoothta,
-            odos: formData.odos,
-            arithmos: formData.arithmos,
-            tk: formData.tk,
-            thlefono: formData.thlefono,
-            perifereia: formData.perifereia,
-            nomos: formData.nomos,
-            dhmos: formData.dhmos,
-            polh: formData.polh,
-            email: formData.email,
-            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
-            kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
-            sxesh_ergasias: formData.sxesh_ergasias,
-            apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
-            ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
-            ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
-            karta_ergasias: formData.karta_ergasias,
-            evelikth_proselefsh: formData.evelikth_proselefsh,
-            syggeneia: formData.syggeneia,
-            syggenikh_sxesh: formData.syggenikh_sxesh,
-            proyphresia_se_eth: formData.proyphresia_se_eth,
-            proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
-            proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
-            synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
-            synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
-            misthologiko_klimakio: formData.misthologiko_klimakio,
-            plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
-            dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
-            hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
-            ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
-            dialleima_se_lepta: formData.dialleima_se_lepta,
-            dialleima_entos_ektos_orarioy: formData.dialleima_entos_ektos_orarioy,
-            symbatikes_ores_ergasias: formData.symbatikes_ores_ergasias,
-            typos_orarioy: formData.typos_orarioy,
-            synexes_diakekomeno: formData.synexes_diakekomeno,
-            pshfiakh_organosh: formData.pshfiakh_organosh,
-            apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs,
-            asfalish_me_tekmarta: formData.asfalish_me_tekmarta,
-            asfalistikh_klash: formData.asfalistikh_klash,
-            epoxikos: formData.epoxikos,
-            tmhma: formData.tmhma,
-            eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
-            oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
-            arithmos_teknon: formData.arithmos_teknon,
-            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
-            eidikothta: formData.eidikothta,
-            antikeimeno_ergasion: formData.antikeimeno_ergasion,
-            typos_ergazomenon: formData.typos_ergazomenon,
-            ypokatasthma: formData.ypokatasthma,
-            xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
-            eidikothta_erganh: formData.eidikothta_erganh,
-            kad_efka: formData.kad_efka,
-            eidikothta_efka: formData.eidikothta_efka,
-            kpk_efka: formData.kpk_efka,
-            kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
-            epa_efka: formData.epa_efka,
-            meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
-            epidothsh_eisforon_ergodoth: formData.epidothsh_eisforon_ergodoth,
-            diathesimothta: formData.diathesimothta,
-            enarxh_diathesimothtas: formData.enarxh_diathesimothtas,
-            lhxh_diathesimothtas: formData.lhxh_diathesimothtas,
-            palios_neos: formData.palios_neos,
-            amoibetai_me_sse: formData.amoibetai_me_sse,
-            trapeza: formData.trapeza,
-            iban: formData.iban,
-            arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
-            systatiko_shmeioma: formData.systatiko_shmeioma,
-            programma_dypa: formData.programma_dypa,
-            egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
-            hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos,
-            hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos,
-            antikatastash_ergazomenoy: formData.antikatastash_ergazomenoy,
-            afm_antikatastath: formData.afm_antikatastath,
-            amka_antikatastath: formData.amka_antikatastath,
-            epidoma_anergias: formData.epidoma_anergias,
-            dypa: formData.dypa,
-            thesh_eythynhs: formData.thesh_eythynhs,
-            eidikh_periptosh: formData.eidikh_periptosh,
-            kentro_kostoys_1: formData.kentro_kostoys_1,
-            pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1,
-            kentro_kostoys_2: formData.kentro_kostoys_2,
-            pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2,
-            kentro_kostoys_3: formData.kentro_kostoys_3,
-            pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3,
-            kentro_kostoys_4: formData.kentro_kostoys_4,
-            pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4,
-            symbash: formData.symbash,
-            kathgoria_symbashs: formData.kathgoria_symbashs,
-            eidikothta_symbashs: formData.eidikothta_symbashs,
-            synolo_symbashs: formData.synolo_symbashs,
-            synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
-            nomimosMisthos: formData.nomimosMisthos,
-            nomimoHmeromisthio: formData.nomimoHmeromisthio,
-            nomimoOromisthio: formData.nomimoOromisthio,
-            pragmatikosMisthos: formData.pragmatikosMisthos,
-            pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
-            pragmatikoOromisthio: formData.pragmatikoOromisthio,
-            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy,
-            adeia_diamonhs_me_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
-            eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-            arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-            hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-            adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-            eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-            arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-            hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-            adeia_eisodoy_gia_epoxikh_apasxolhsh: formData.adeia_eisodoy_gia_epoxikh_apasxolhsh,
-            arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh,
-            apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
-            eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
-            epaggelmatikh_katartish: formData.epaggelmatikh_katartish,
-            antikeimeno_katartishs: formData.antikeimeno_katartishs,
-            thematiko_pedio: formData.thematiko_pedio,
-            thematikh_enothta: formData.thematikh_enothta,
-            foreas_katartishs: formData.foreas_katartishs,
-            katartish_apo: formData.katartish_apo,
-            katartish_eos: formData.katartish_eos,
-            diarkeia_se_ores: formData.diarkeia_se_ores,
-            etos_apokthshs: formData.etos_apokthshs,
-            allh_glossa_01: formData.allh_glossa_01,
-            allh_glossa_02: formData.allh_glossa_02,
-            allh_glossa_03: formData.allh_glossa_03,
-            allh_glossa_04: formData.allh_glossa_04,
-            gnosh_ypologiston: formData.gnosh_ypologiston,
-            allo_proson: formData.allo_proson,
-            oros_sth_symbash_n_3986_2011: formData.oros_sth_symbash_n_3986_2011,
-            kataggelia_katopin_eggrafhs_proeidopoihshs: formData.kataggelia_katopin_eggrafhs_proeidopoihshs,
-            hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs,
-            omadikh_apolysh: formData.omadikh_apolysh,
-            arithmos_apofashs_gia_omadikh_apolysh: formData.arithmos_apofashs_gia_omadikh_apolysh,
-            hmeromhnia_apofashs_gia_omadikh_apolysh: formData.hmeromhnia_apofashs_gia_omadikh_apolysh,
-            epidosh_me_dikastiko_epimelhth: formData.epidosh_me_dikastiko_epimelhth,
-            hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs,
-            hmeromhnia_katabolhs_ths_apozhmioshs: formData.hmeromhnia_katabolhs_ths_apozhmioshs,
-            shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
-            parathrhseis: formData.parathrhseis,
-            symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
-            symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
-            paketo_apodoxon: formData.paketo_apodoxon,
-            mhniaia_repo: formData.mhniaia_repo,
-            ypologismos_foroy: formData.ypologismos_foroy,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            });
-            
-            fieldsStoixeionSymbashs.forEach(fieldStoixeio => { 
-            for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-                const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
-                if (numberFields.has(fieldStoixeio)) {
-                newErgazomenos[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
-                } else {
-                newErgazomenos[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
+            if (filesToUpdate.employees) {
+                const newErgazomenos = ErgazomenoiModel({
+                    team: sessionUserTeam,
+                    company_kod: sessionCompanyInUse,
+                    kodikos: aa_kod.toString().padStart(4, '0'),
+                    energos: formData.energos,
+                    fylo: formData.fylo,
+                    eponymo: formData.eponymoHidden,
+                    onoma: formData.onomaHidden,
+                    eponymo_patera: formData.eponymo_patera,
+                    patronymo: formData.patronymo,
+                    eponymo_mhteras: formData.eponymo_mhteras,
+                    mhtronymo: formData.mhtronymo,
+                    afm: formData.afm_ergazomenoyHidden,
+                    doy: formData.doy,
+                    typos_taytothtas: formData.typos_taytothtas,
+                    adt: formData.adt,
+                    hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
+                    arxh_ekdoshs: formData.arxh_ekdoshs,
+                    amka: formData.amka_ergazomenoyHidden,
+                    hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
+                    topos_gennhshs: formData.topos_gennhshs,
+                    arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
+                    yphkoothta: formData.yphkoothta,
+                    odos: formData.odos,
+                    arithmos: formData.arithmos,
+                    tk: formData.tk,
+                    thlefono: formData.thlefono,
+                    perifereia: formData.perifereia,
+                    nomos: formData.nomos,
+                    dhmos: formData.dhmos,
+                    polh: formData.polh,
+                    email: formData.email,
+                    hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
+                    hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
+                    hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
+                    hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
+                    hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
+                    hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+                    kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
+                    sxesh_ergasias: formData.sxesh_ergasias,
+                    apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
+                    ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
+                    ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
+                    karta_ergasias: formData.karta_ergasias,
+                    evelikth_proselefsh: formData.evelikth_proselefsh,
+                    syggeneia: formData.syggeneia,
+                    syggenikh_sxesh: formData.syggenikh_sxesh,
+                    proyphresia_se_eth: formData.proyphresia_se_eth,
+                    proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
+                    proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
+                    synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
+                    synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
+                    misthologiko_klimakio: formData.misthologiko_klimakio,
+                    plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
+                    dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
+                    hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
+                    ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
+                    dialleima_se_lepta: formData.dialleima_se_lepta,
+                    dialleima_entos_ektos_orarioy: formData.dialleima_entos_ektos_orarioy,
+                    symbatikes_ores_ergasias: formData.symbatikes_ores_ergasias,
+                    typos_orarioy: formData.typos_orarioy,
+                    synexes_diakekomeno: formData.synexes_diakekomeno,
+                    pshfiakh_organosh: formData.pshfiakh_organosh,
+                    apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs,
+                    asfalish_me_tekmarta: formData.asfalish_me_tekmarta,
+                    asfalistikh_klash: formData.asfalistikh_klash,
+                    epoxikos: formData.epoxikos,
+                    tmhma: formData.tmhma,
+                    eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
+                    oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
+                    arithmos_teknon: formData.arithmos_teknon,
+                    ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
+                    eidikothta: formData.eidikothta,
+                    antikeimeno_ergasion: formData.antikeimeno_ergasion,
+                    typos_ergazomenon: formData.typos_ergazomenon,
+                    ypokatasthma: formData.ypokatasthma,
+                    xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
+                    eidikothta_erganh: formData.eidikothta_erganh,
+                    kad_efka: formData.kad_efka,
+                    eidikothta_efka: formData.eidikothta_efka,
+                    kpk_efka: formData.kpk_efka,
+                    kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
+                    epa_efka: formData.epa_efka,
+                    meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
+                    epidothsh_eisforon_ergodoth: formData.epidothsh_eisforon_ergodoth,
+                    diathesimothta: formData.diathesimothta,
+                    enarxh_diathesimothtas: formData.enarxh_diathesimothtas,
+                    lhxh_diathesimothtas: formData.lhxh_diathesimothtas,
+                    palios_neos: formData.palios_neos,
+                    amoibetai_me_sse: formData.amoibetai_me_sse,
+                    trapeza: formData.trapeza,
+                    iban: formData.iban,
+                    arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
+                    systatiko_shmeioma: formData.systatiko_shmeioma,
+                    programma_dypa: formData.programma_dypa,
+                    egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
+                    hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos,
+                    hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos,
+                    antikatastash_ergazomenoy: formData.antikatastash_ergazomenoy,
+                    afm_antikatastath: formData.afm_antikatastath,
+                    amka_antikatastath: formData.amka_antikatastath,
+                    epidoma_anergias: formData.epidoma_anergias,
+                    dypa: formData.dypa,
+                    thesh_eythynhs: formData.thesh_eythynhs,
+                    eidikh_periptosh: formData.eidikh_periptosh,
+                    kentro_kostoys_1: formData.kentro_kostoys_1,
+                    pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1,
+                    kentro_kostoys_2: formData.kentro_kostoys_2,
+                    pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2,
+                    kentro_kostoys_3: formData.kentro_kostoys_3,
+                    pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3,
+                    kentro_kostoys_4: formData.kentro_kostoys_4,
+                    pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4,
+                    symbash: formData.symbash,
+                    kathgoria_symbashs: formData.kathgoria_symbashs,
+                    eidikothta_symbashs: formData.eidikothta_symbashs,
+                    synolo_symbashs: formData.synolo_symbashs,
+                    synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
+                    nomimosMisthos: formData.nomimosMisthos,
+                    nomimoHmeromisthio: formData.nomimoHmeromisthio,
+                    nomimoOromisthio: formData.nomimoOromisthio,
+                    pragmatikosMisthos: formData.pragmatikosMisthos,
+                    pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
+                    pragmatikoOromisthio: formData.pragmatikoOromisthio,
+                    hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy,
+                    adeia_diamonhs_me_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
+                    eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+                    arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+                    hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+                    adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                    eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                    arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                    hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                    adeia_eisodoy_gia_epoxikh_apasxolhsh: formData.adeia_eisodoy_gia_epoxikh_apasxolhsh,
+                    arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh,
+                    apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+                    eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+                    epaggelmatikh_katartish: formData.epaggelmatikh_katartish,
+                    antikeimeno_katartishs: formData.antikeimeno_katartishs,
+                    thematiko_pedio: formData.thematiko_pedio,
+                    thematikh_enothta: formData.thematikh_enothta,
+                    foreas_katartishs: formData.foreas_katartishs,
+                    katartish_apo: formData.katartish_apo,
+                    katartish_eos: formData.katartish_eos,
+                    diarkeia_se_ores: formData.diarkeia_se_ores,
+                    etos_apokthshs: formData.etos_apokthshs,
+                    allh_glossa_01: formData.allh_glossa_01,
+                    allh_glossa_02: formData.allh_glossa_02,
+                    allh_glossa_03: formData.allh_glossa_03,
+                    allh_glossa_04: formData.allh_glossa_04,
+                    gnosh_ypologiston: formData.gnosh_ypologiston,
+                    allo_proson: formData.allo_proson,
+                    oros_sth_symbash_n_3986_2011: formData.oros_sth_symbash_n_3986_2011,
+                    kataggelia_katopin_eggrafhs_proeidopoihshs: formData.kataggelia_katopin_eggrafhs_proeidopoihshs,
+                    hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs,
+                    omadikh_apolysh: formData.omadikh_apolysh,
+                    arithmos_apofashs_gia_omadikh_apolysh: formData.arithmos_apofashs_gia_omadikh_apolysh,
+                    hmeromhnia_apofashs_gia_omadikh_apolysh: formData.hmeromhnia_apofashs_gia_omadikh_apolysh,
+                    epidosh_me_dikastiko_epimelhth: formData.epidosh_me_dikastiko_epimelhth,
+                    hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs,
+                    hmeromhnia_katabolhs_ths_apozhmioshs: formData.hmeromhnia_katabolhs_ths_apozhmioshs,
+                    shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
+                    parathrhseis: formData.parathrhseis,
+                    symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
+                    symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
+                    paketo_apodoxon: formData.paketo_apodoxon,
+                    mhniaia_repo: formData.mhniaia_repo,
+                    ypologismos_foroy: formData.ypologismos_foroy,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                });
+                
+                fieldsStoixeionSymbashs.forEach(fieldStoixeio => { 
+                    for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
+                        const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+                        if (numberFields.has(fieldStoixeio)) {
+                            newErgazomenos[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                        } else {
+                            newErgazomenos[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
+                        }
+                    }
+                });
+                
+                fieldsKrathseon.forEach(fieldKrathsh => {
+                    for (let i = 1; i <= arithmosKrathseon; i++) {
+                        const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                        newErgazomenos[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                    }
+                });
+                
+                try {
+                    await ErgazomenoiModel.create(newErgazomenos);
+                    // res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+                } catch (error) {
+                    console.log("Σφάλμα :", error);
                 }
             }
-            });
-            
-            fieldsKrathseon.forEach(fieldKrathsh => {
-            for (let i = 1; i <= arithmosKrathseon; i++) {
-                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-                newErgazomenos[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
-            }
-            });
-            
-            try {
-            await ErgazomenoiModel.create(newErgazomenos);
-            // res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
-            } catch (error) {
-            console.log("Σφάλμα :", error);
-            }
-        }
 
-        if (filesToUpdate.schedules) {
-            function createOrarioData(i1) {
-            return {
+            if (filesToUpdate.schedules) {
+                function createOrarioData(i1) {
+                return {
+                    team: sessionUserTeam,
+                    company_kod: sessionCompanyInUse,
+                    kodikos: aa_kod.toString().padStart(4, '0'),
+                    hmeromhnia: formData[`hmeromhnia_${i1}`],
+                    kathgoria_ergasias: formData[`kathgoria_ergasias_${i1}`],
+                    apo_ora_01: formData[`apo_ora_01_${i1}`],
+                    eos_ora_01: formData[`eos_ora_01_${i1}`],
+                    dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
+                    dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
+                    apo_ora_02: formData[`apo_ora_02_${i1}`],
+                    eos_ora_02: formData[`eos_ora_02_${i1}`],
+                    dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
+                    dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
+                    apo_ora_03: formData[`apo_ora_03_${i1}`],
+                    eos_ora_03: formData[`eos_ora_03_${i1}`],
+                    dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
+                    dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
+                    repo: formData[`repo_${i1}`] || false,
+                    adeia: false,
+                    astheneia: false,
+                    argia: formData[`argia_${i1}`] || false,
+                    perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
+                    kathgoria_adeias: "",
+                    ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
+                    ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`]).toFixed(4),
+                    ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`]).toFixed(4),
+                    ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`]).toFixed(4),
+                    ores_yperergasias_nyxtas: parseFloat(formData[`night_overwork_hours_day_${i1}`]).toFixed(4),
+                    ores_yperergasias_argion: parseFloat(formData[`holiday_overwork_hours_day_${i1}`]).toFixed(4),
+                    ores_yperergasias_argion_nyxtas: parseFloat(formData[`night_holiday_overwork_hours_day_${i1}`]).toFixed(4),
+                    ores_nominhs_yperorias: parseFloat(formData[`overtimeNomimh_hours_day_${i1}`]).toFixed(4),
+                    ores_nominhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
+                    ores_nominhs_yperorias_argion: parseFloat(formData[`holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
+                    ores_nominhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
+                    ores_paranomhs_yperorias: parseFloat(formData[`overtimeParanomh_hours_day_${i1}`]).toFixed(4),
+                    ores_paranomhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
+                    ores_paranomhs_yperorias_argion: parseFloat(formData[`holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
+                    ores_paranomhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
+                };
+                }
+
+                let promises = [];
+                const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
+                const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
+
+                let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
+                let i = 1;
+                
+                while (currentDate <= toDate) {
+                let i1 = i < 10 ? '0' + i : i;
+                const newOrario = new OrariaModel(createOrarioData(i1));
+                promises.push(OrariaModel.create(newOrario));
+                
+                currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
+                i++;
+                }
+                
+                try {
+                await Promise.all(promises);
+                } catch (error) {
+                console.error('Σφάλμα κατά τη δημιουργία των οραρίων:', error);
+                }
+            }
+
+            if (filesToUpdate.history) {
+                const newIstoriko = IstorikoProslhpseonAllagonModel({
                 team: sessionUserTeam,
                 company_kod: sessionCompanyInUse,
                 kodikos: aa_kod.toString().padStart(4, '0'),
-                hmeromhnia: formData[`hmeromhnia_${i1}`],
-                kathgoria_ergasias: formData[`kathgoria_ergasias_${i1}`],
-                apo_ora_01: formData[`apo_ora_01_${i1}`],
-                eos_ora_01: formData[`eos_ora_01_${i1}`],
-                dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
-                dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
-                apo_ora_02: formData[`apo_ora_02_${i1}`],
-                eos_ora_02: formData[`eos_ora_02_${i1}`],
-                dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
-                dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
-                apo_ora_03: formData[`apo_ora_03_${i1}`],
-                eos_ora_03: formData[`eos_ora_03_${i1}`],
-                dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
-                dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
-                repo: formData[`repo_${i1}`] || false,
-                adeia: false,
-                astheneia: false,
-                argia: formData[`argia_${i1}`] || false,
-                perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
-                kathgoria_adeias: "",
-                ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
-                ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`]).toFixed(4),
-                ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`]).toFixed(4),
-                ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`]).toFixed(4),
-                ores_yperergasias_nyxtas: parseFloat(formData[`night_overwork_hours_day_${i1}`]).toFixed(4),
-                ores_yperergasias_argion: parseFloat(formData[`holiday_overwork_hours_day_${i1}`]).toFixed(4),
-                ores_yperergasias_argion_nyxtas: parseFloat(formData[`night_holiday_overwork_hours_day_${i1}`]).toFixed(4),
-                ores_nominhs_yperorias: parseFloat(formData[`overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-                ores_nominhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-                ores_nominhs_yperorias_argion: parseFloat(formData[`holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-                ores_nominhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-                ores_paranomhs_yperorias: parseFloat(formData[`overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-                ores_paranomhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-                ores_paranomhs_yperorias_argion: parseFloat(formData[`holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-                ores_paranomhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-            };
-            }
+                aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
+                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
+                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
+                hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
+                hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
+                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
+                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+                afora_proslhpsh: true,
+                kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
+                misthologiko_klimakio: formData.misthologiko_klimakio,
+                symbash: formData.symbash,
+                kathgoria_symbashs: formData.kathgoria_symbashs,
+                eidikothta_symbashs: formData.eidikothta_symbashs,
+                synolo_symbashs: formData.synolo_symbashs,
+                synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
+                nomimosMisthos: formData.nomimosMisthos,
+                nomimoHmeromisthio: formData.nomimoHmeromisthio,
+                nomimoOromisthio: formData.nomimoOromisthio,
+                pragmatikosMisthos: formData.pragmatikosMisthos,
+                pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
+                pragmatikoOromisthio: formData.pragmatikoOromisthio,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                });
 
-            let promises = [];
-            const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
-            const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
-
-            let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
-            let i = 1;
-            
-            while (currentDate <= toDate) {
-            let i1 = i < 10 ? '0' + i : i;
-            const newOrario = new OrariaModel(createOrarioData(i1));
-            promises.push(OrariaModel.create(newOrario));
-            
-            currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
-            i++;
-            }
-            
-            try {
-            await Promise.all(promises);
-            } catch (error) {
-            console.error('Σφάλμα κατά τη δημιουργία των οραρίων:', error);
-            }
-        }
-
-        if (filesToUpdate.history) {
-            const newIstoriko = IstorikoProslhpseonAllagonModel({
-            team: sessionUserTeam,
-            company_kod: sessionCompanyInUse,
-            kodikos: aa_kod.toString().padStart(4, '0'),
-            aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
-            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
-            afora_proslhpsh: true,
-            kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
-            misthologiko_klimakio: formData.misthologiko_klimakio,
-            symbash: formData.symbash,
-            kathgoria_symbashs: formData.kathgoria_symbashs,
-            eidikothta_symbashs: formData.eidikothta_symbashs,
-            synolo_symbashs: formData.synolo_symbashs,
-            synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
-            nomimosMisthos: formData.nomimosMisthos,
-            nomimoHmeromisthio: formData.nomimoHmeromisthio,
-            nomimoOromisthio: formData.nomimoOromisthio,
-            pragmatikosMisthos: formData.pragmatikosMisthos,
-            pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
-            pragmatikoOromisthio: formData.pragmatikoOromisthio,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            });
-
-            fieldsStoixeionSymbashs.forEach(fieldStoixeio => {
-            for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-                const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
-                if (numberFields.has(fieldStoixeio)) {
-                newIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
-                } else {
-                newIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
+                fieldsStoixeionSymbashs.forEach(fieldStoixeio => {
+                for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
+                    const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+                    if (numberFields.has(fieldStoixeio)) {
+                    newIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                    } else {
+                    newIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
+                    }
                 }
+                });
+                
+                fieldsKrathseon.forEach(fieldKrathsh => {
+                for (let i = 1; i <= arithmosKrathseon; i++) {
+                    const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                    newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                }
+                });
+                
+                try {
+                    await IstorikoProslhpseonAllagonModel.create(newIstoriko);
+                    res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+                } catch (error) {
+                    console.log("Σφάλμα :", error);
+                }
+            } else {
+                res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
             }
-            });
-            
-            fieldsKrathseon.forEach(fieldKrathsh => {
-            for (let i = 1; i <= arithmosKrathseon; i++) {
-                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-                newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
-            }
-            });
-            
-            try {
-            await IstorikoProslhpseonAllagonModel.create(newIstoriko);
-            res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
-            } catch (error) {
-            console.log("Σφάλμα :", error);
-            }
-        } else {
-            res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
-        }
         }
     };
 

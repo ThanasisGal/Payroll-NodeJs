@@ -368,6 +368,7 @@
 <script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcOresApasxolhshs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
+<script src="<%= script('ergazomenoi/genika/epidothseis_auto_clear') %>"></script>
 <script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
 <script src="<%= script('ergazomenoi/genika/date_sync_add') %>"></script>
 <script src="<%= script('ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs') %>"></script>
@@ -394,6 +395,28 @@
         selectId  : 'asfalistikh_klash',
         hiddenId  : 'asfalistikh_klash_stathera'
     });
+
+	// Μείωση Εργατικής Εισφοράς
+    bindCheckboxControlsSelect({
+        checkboxId: 'meiosh_eisforon_ergazomenon',
+        selectId  : 'meiosh_ergatikhs_eisforas',
+        hiddenId  : 'kodikos_meioshs_stathera'
+    });
+
+	// Επιδότηση Εργοδοτικής Εισφοράς
+    bindCheckboxControlsSelect({
+        checkboxId: 'epidothsh_eisforon_ergodoth',
+        selectId  : 'epidothsh_ergodotikhs_eisforas',
+        hiddenId  : 'kodikos_epidothshs_stathera'
+    });
+
+	// Μείωση Εισφορών Μητέρων
+    bindCheckboxControlsSelect({
+        checkboxId: 'mhteres',
+        selectId  : 'meiosh_eisforas_mhteron',
+        hiddenId  : 'kodikos_meioshs_eisforon_mhteron_stathera'
+    });
+
 
     // Λήψη επιδόματος ανεργίας
     bindCheckboxControlsSelect({
@@ -467,9 +490,9 @@
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearSelects.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/infinityScrollingSelectJQuery.js"></script> -->
     <!-- <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearEfkaSelects.js"></script>
+ -->
 
-
-<script nonce="<%= nonce %>" type="module">
+<!-- <script nonce="<%= nonce %>" type="module">
 	// --- ΣΤΟΧΕΥΜΕΝΟ hook για το antikatastash_ergazomenoy ---
 	(function () {
 		const cb  = document.getElementById('antikatastash_ergazomenoy');

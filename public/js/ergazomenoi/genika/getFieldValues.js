@@ -3,7 +3,8 @@
 document.addEventListener("DOMContentLoaded", () => {
     const isEmpty = v => !String(v ?? "").trim();
     const isEmptyArray = v => !Array.isArray(v) || v.length === 0;
-  
+    let message = "";
+
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -99,10 +100,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const CRITICAL_FIELDS = {
                 'formData.karta_ergasias': '⚠️ Κάρτα Εργασίας',
                 'formData.evelikth_proselefsh': '⚠️ Ευέλικτη Προσέλευση (λεπτά)',
-                'formData.epidoma_anergias': '⚠️ Λήψη Επιδόματος Ανεργίας',
+                // 'formData.epidoma_anergias': '⚠️ Λήψη Επιδόματος Ανεργίας',
                 'formData.systatiko_shmeioma': '⚠️ Τοποθέτηση με Συστατικό Σημείωμα',
                 'formData.topothethsh_me_programma': '⚠️ Τοποθέτηση με Πρόγραμμα',
-                'formData.dialleima_entos_ektos_orarioy': '⚠️ Εντός/Εκτός Ωραρίου',
+                // 'formData.dialleima_entos_ektos_orarioy': '⚠️ Εντός/Εκτός Ωραρίου',
                 // Προσθέτουμε όσα θέλουμε για να τονίσουμε την σπουδαιότητα τους
             };
 
@@ -204,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             htmlContainer: "custom-html-container",
                         },
                     });
-                    return; // ✅ Return μόνο αν υπάρχουν non-critical errors
+                    // return; // ✅ Return μόνο αν υπάρχουν non-critical errors
                 }
                 // ✅ Αν υπάρχουν ΜΟΝΟ critical errors, συνεχίζει κανονικά (δεν κάνει return)
             }
@@ -212,47 +213,69 @@ document.addEventListener("DOMContentLoaded", () => {
             // Εμφάνιση sweetAlert με προσαρμοσμένο HTML για επιλογή των αρχείων προς ενημέρωση
             const result = await Swal.fire({
                 backdrop: false,
-				allowOutsideClick: false,
+                allowOutsideClick:  false,
                 icon: 'info',
                 title: 'ΑΜΕΣΗ ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
                 html: `
-                    <div class="col-8 left-align checkbox-flex-center">
-                        <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="employees" name="files" value="employees" checked />
-                        <label for="employees" id="label-employees" class="ml0_75-fs-0_875vw">
-                        Αναγγελία Πρόσληψης
-                        </label><br>
+                    <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" id="employees" name="files" value="employees" checked 
+                                class="custom-checkbox" />
+                            <label for="employees" class="margin-0 cursor-pointer font-size-rem-1_05">
+                                Αναγγελία Πρόσληψης
+                            </label>
+                        </div>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" id="schedules" name="files" value="schedules" checked 
+                                class="custom-checkbox" />
+                            <label for="schedules" class="margin-0 cursor-pointer font-size-rem-1_05">
+                                Δήλωση Μεταβολής Στοιχείων Εργασιακής Σχέσης
+                            </label>
+                        </div>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" id="history" name="files" value="history" checked 
+                                class="custom-checkbox" />
+                            <label for="history" class="margin-0 cursor-pointer font-size-rem-1_05">
+                                Ψηφιακό Οργάνωση Χρόνου Εργασίας
+                            </label>
+                        </div>
                     </div>
                 `,
-            //     <div class="col-8 left-align checkbox-flex-center">
-            //         <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="schedules" name="files" value="schedules" checked />
-            //         <label for="schedules" id="label-schedules" class="ml0_75-fs-0_875vw">
-            //         Ωράρια ( ΕΡΓΑΝΗ ΙΙ )
-            //         </label><br>
-            //     </div>
-            //     <div class="col-8 left-align checkbox-flex-center">
-            //         <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="history" name="files" value="history" checked />
-            //         <label for="history" id="label-history" class="ml0_75-fs-0_875vw">
-            //         Ιστορικό Προσλήψεων - Αλλαγών Συμβάσεων
-            //         </label><br>
-            //     </div>`,
                 focusConfirm: false,
                 preConfirm: () => {
                     const filesToUpdate = {
                         employees: document.getElementById('employees').checked,
-                //         schedules: document.getElementById('schedules').checked,
-                //         history: document.getElementById('history').checked
+                        schedules: document.getElementById('schedules').checked,
+                        history: document.getElementById('history').checked
                     };
                     return filesToUpdate;
                 },
                 confirmButtonText: 'Ενημέρωση',
-                cancelButtonText: 'Ακύρωση',
-                showCancelButton: true,
-                customClass: {
-                confirmButton: "class-info custom-confirm-button custom-swal-button",
-                title: 'custom-title',
+                cancelButtonText:  'Ακύρωση',
+                showCancelButton:   true,
+                customClass:  {
+                    confirmButton: "class-info custom-confirm-button custom-swal-button",
+                    cancelButton: "class-secondary custom-cancel-button custom-swal-button",
+                    title: 'custom-title',
+                    popup: "custom-swal-popup",
+                    htmlContainer: 'custom-html-container',
                 },
             });
-            
+
+            // ✅ Έλεγχος αν ο χρήστης πάτησε "Ακύρωση"
+            if (result.isDismissed) {
+                return;
+            }
+
+            // ✅ Αν πάτησε "Ενημέρωση", συνεχίζει κανονικά
+
+            const payload = {
+                formData:  formData,
+                filesToUpdate: result.value
+            };
+
             const response = await fetch("/ergazomenoi/ergazomenoi/add", {
                 method: "POST",
                 headers: {
@@ -260,8 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 "CSRF-Token": csrfToken,   // ✅ για csurf
                 },
                 credentials: "include",      // ✅ στείλε session cookies
-                body: JSON.stringify(formData),
-                // filesToUpdate: result.value,
+                body: JSON.stringify(payload),
             });
 
             // 1) αν ο browser ακολούθησε redirect
@@ -308,6 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const ct = response.headers.get("content-type") || "";
             if (ct.includes("application/json")) {
                 const data = await response.json();
+                message = data?.errorMessage || "";
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
@@ -356,8 +379,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 allowOutsideClick: false,
                 icon: "error",
                 title: "Αποτυχία αποθήκευσης",
-                timer: 1200,
-                text: String(err?.message || err),
+                timer: 5200,
+                text: String(message || err),
                 showConfirmButton: true,
                 confirmButtonText: "Κλείσιμο",
                 customClass: {
@@ -368,56 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
     }
-            
-    //         if (!response.ok) {
-    //             throw new Error(`HTTP error! status: ${response.status}`);
-    //         }
-        
-    //         const data = await response.json();
-    //         if (data.success) {
-    //             let itemsList = `<ul>`;
-    //             if (result.value.employees) {
-    //                 itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Εργαζομένων</li>`;
-    //             }
-    //             if (result.value.schedules) {
-    //                 itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Ωραρίων</li>`;
-    //             }
-    //             if (result.value.history) {
-    //                 itemsList += `<li><i class="bi bi-check-lg cgreen"></i> Ιστορικού Προσλήψεων - Αλλαγών</li>`;
-    //             }
-    //             itemsList += `</ul>`;
-            
-    //             Swal.fire({
-    //                 icon: "success",
-    //                 title: "Επιτυχής ενημέρωση των αρχείων:",
-    //                 html: itemsList,
-    //                 timer: 1500,
-    //                 confirmButtonText: "Κλείσιμο",
-    //                 customClass: {
-    //                     title: 'custom-title',
-    //                     popup: "custom-swal-popup",
-    //                     confirmButton: "class-success custom-confirm-button custom-swal-button",
-    //                 },
-    //             }).then(() => {
-    //                 window.location.href = data.redirectUrl;
-    //             });
-    //         } else {
-    //             await Swal.fire({
-    //                 icon: "error",
-    //                 title: "Προσοχή",
-    //                 html: data.errorMessage,
-    //                 confirmButtonText: 'Κλείσιμο',
-    //                 customClass: {
-    //                     confirmButton: "class-success custom-confirm-button custom-swal-button",
-    //                     title: 'custom-title',
-    //                 },
-    //             });
-    //         }
-    //     } catch (error) {
-    //         console.error("Σφάλμα:", error);
-    //         Swal.fire('Σφάλμα', 'Σφάλμα κατά τη διαδικασία ενημέρωσης: ' + error.message, 'error');
-    //     }
-    // }
 
     const buttons = document.querySelectorAll(".submitButton");
 

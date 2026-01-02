@@ -48,12 +48,17 @@ const perifereies                           = require("../dropdowns/ergazomenoi/
 const nomoi                                 = require("../dropdowns/ergazomenoi/nomoi");
 const dhmoi                                 = require("../dropdowns/ergazomenoi/dhmoi");
 const poleis                                = require("../dropdowns/ergazomenoi/poleis");
+
 const kadEfka                               = require("../dropdowns/ergazomenoi/kadEfka");
 const eidikothtesEfka                       = require('../dropdowns/ergazomenoi/eidikothtesEfka');
 const kpkEfka                               = require('../dropdowns/ergazomenoi/kpkEfka');
 const epaEfka                               = require('../dropdowns/ergazomenoi/epaEfka');
 const antistoixishEpaKpk                    = require('../dropdowns/ergazomenoi/antistoixishEpaKpk');
 const kpkEfkaByCode                         = require('../dropdowns/ergazomenoi/kpkEfkaByCode');
+const meioseisEisforonErgazomenon           = require('../dropdowns/ergazomenoi/meioseisEisforonErgazomenon');
+const epidothseisEisforonErgodoth           = require('../dropdowns/ergazomenoi/epidothseisEisforonErgodoth');
+const meioseisEisforonMhteron               = require('../dropdowns/ergazomenoi/meioseisEisforonMhteron');
+
 const d_yp_apasxolhshs                      = require('../dropdowns/ergazomenoi/dypa');
 const programmaDypa                         = require('../dropdowns/ergazomenoi/programmataDypa');
 const kentraKostoys                         = require('../dropdowns/ergazomenoi/kentraKostoys');
@@ -84,58 +89,57 @@ const   {
         } = companiesModels;
 
 const   {
-            NomikesMorfesModel,
-            PararthmataEfkaModel,
-            DoyModel,
-            PerifereiesModel,
-            NomoiModel, 
-            DhmoiModel, 
-            PoleisModel, 
-            TameiaModel,
-            KadModel,
-            Typoi_ApodoxonModel,
-            TmhmataModel,
-            PeriodsModel,
-            SepeModel,
-            DypaModel,
-            IdiothtesModel,
-            TypoiTaytothtonModel,
-            BanksModel,
-            YphkoothtesModel,
-            EidikesKathgoriesModel,
-            OikogeneiakhKatastashModel,
-            KathestosApasxolhshsModel,
-            SxeseisErgasiasModel,
-            SyggenikesSxeseisModel,
-            TheseisEythynhsModel,
-            EidikesPeriptoseisModel,
+            AdeiesDiamonhsModel,
             ApasxolhseisBaseiSymbashsModel, 
             AsfalistikesKlaseisModel,
-            EkpaideytikoEpipedoModel,
+            BanksModel,
+            DhmoiModel, 
+            DoyModel,
+            DypaModel,
+            EidikesKathgoriesModel,
+            EidikesPeriptoseisModel,
             EidikothtesEfarmoghsModel,
-            TypoiErgazomenonModel,
             EidikothtesErganhModel,
-            KadEfkaModel,
-            KentraKostoysModel,
-            KathgoriesErgasiasModel,
-
-            KrathseisModel,
-            ForeasEpikoyrikhsXorisEfkaModel,
+            EkpaideytikoEpipedoModel,
             ForeasAstheneiasXorisEfkaModel,
+            ForeisEkpaideyshsModel,
+            ForeasEpikoyrikhsXorisEfkaModel,
             IdiothtaErgoy39Par9Model,
-
-            AdeiesDiamonhsModel,
+            IdiothtesModel,
+            KadEfkaModel,
+            KadModel,
+            KathgoriesErgasiasModel,
+            KentraKostoysModel,
+            KrathseisModel,
+            KathestosApasxolhshsModel,
+            LanguagesModel,
+            NomikesMorfesModel,
+            NomoiModel, 
+            OikogeneiakhKatastashModel,
+            PararthmataEfkaModel,
+            PerifereiesModel,
+            PeriodsModel,
+            PoleisModel, 
+            SepeModel,
+            SxeseisErgasiasModel,
+            SyggenikesSxeseisModel,
+            TameiaModel,
             ThematikaPediaModel,
             ThematikesEnothtesModel,
-            ForeisEkpaideyshsModel,
-            LanguagesModel,
+            TheseisEythynhsModel,
+            TmhmataModel,
+            Typoi_ApodoxonModel,
+            TypoiEpidothseonModel,
+            TypoiErgazomenonModel,
+            TypoiTaytothtonModel,
+            YphkoothtesModel,
         } = statheraArxeiaModels;
 
 const   {
-            SymbaseisModel,
-            KathgoriesSymbaseonModel,
             EidikothtesAnaKathgoriaSymbaseonModel,
-            StoixeiaSymbaseonModel
+            KathgoriesSymbaseonModel,
+            StoixeiaSymbaseonModel,
+            SymbaseisModel
         } = symbaseisModels;
 
 
@@ -313,9 +317,15 @@ router.get('/ergazomenoi/kpk_efka',                     kpkEfka.handler);
 router.get('/ergazomenoi/epa_efka',                     epaEfka.handler);
 router.get('/ergazomenoi/antistoixishEpaKpk',           antistoixishEpaKpk.handler);
 router.get('/ergazomenoi/kpk_efka_by_code',             kpkEfkaByCode.handler);
+router.get('/ergazomenoi/meiosh_ergatikhs_eisforas',    buildDropdownRoute(TypoiEpidothseonModel , meioseisEisforonErgazomenon.options));
+router.get('/ergazomenoi/epidothsh_ergodotikhs_eisforas',
+                                                        buildDropdownRoute(TypoiEpidothseonModel , epidothseisEisforonErgodoth.options));
+router.get('/ergazomenoi/meiosh_eisforas_mhteron',      buildDropdownRoute(TypoiEpidothseonModel , meioseisEisforonMhteron.options));
+    
 router.get('/ergazomenoi/dypa',                         buildDropdownRoute(DypaModel , d_yp_apasxolhshs.options));
 router.get('/ergazomenoi/programma_dypa',               programmaDypa.handler);
 router.get('/ergazomenoi/kentro_kostoys',               buildDropdownRoute(KentraKostoysModel , kentraKostoys.options));
+
 // router.get('/ergazomenoi/kathgoria_ergasias',           buildDropdownRoute(KathgoriesErgasiasModel , kathgoriesErgasias.options));
 router.get('/ergazomenoi/kathgoria_ergasias', async (req, res, next) => {
     console.log('🔍 Route hit: /ergazomenoi/kathgoria_ergasias');

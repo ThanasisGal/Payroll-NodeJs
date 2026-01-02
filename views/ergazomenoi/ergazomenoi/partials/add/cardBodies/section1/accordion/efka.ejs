@@ -179,6 +179,8 @@
                 </div>
             </div>
 
+            <div class="height-vh-0_3"></div>
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
                     <label for="meiosh_eisforon_ergazomenon" class="col-form-label label-font-size">
@@ -192,11 +194,44 @@
                     </label>
                 </div>
 
-                <div class="col-3"></div>
+                <input
+                    type="hidden"
+                    name="kodikos_meioshs_stathera"
+                    id="kodikos_meioshs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("kodikos_meioshs_stathera") %>"
+                />
 
+                <!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+                <input type="hidden" name="pososto_asfalismenoy_meioshs_stathera" id="pososto_asfalismenoy_meioshs_stathera" value="<%= safe("pososto_asfalismenoy_meioshs_stathera") %>" />
+                <input type="hidden" name="pososto_ergodoth_meioshs_stathera" id="pososto_ergodoth_meioshs_stathera" value="<%= safe("pososto_ergodoth_meioshs_stathera") %>" />
+                <input type="hidden" name="isxyei_apo_meioshs_stathera" id="isxyei_apo_meioshs_stathera" value="<%= safe("isxyei_apo_meioshs_stathera") %>" />
+                <input type="hidden" name="isxyei_eos_meioshs_stathera" id="isxyei_eos_meioshs_stathera" value="<%= safe("isxyei_eos_meioshs_stathera") %>" />
+
+                <div class="col-8-74">
+                    <select
+                        id="meiosh_ergatikhs_eisforas"
+                        name="meiosh_ergatikhs_eisforas"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Μείωση Εργατικής Εισφοράς"
+                        data-api="/api/dropdown/ergazomenoi/meiosh_ergatikhs_eisforas"
+                        single
+                        data-target-input=<%= `kodikos_meioshs_stathera` %>
+                        data-preselect=<%= `kodikos_meioshs_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_meioshs_stathera","pososto_ergodoth":"pososto_ergodoth_meioshs_stathera","isxyei_apo":"isxyei_apo_meioshs_stathera","isxyei_eos":"isxyei_eos_meioshs_stathera"}'
+                        placeholder="Αναζήτηση Μείωσης Εργατικής Εισφοράς">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_3"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
                     <label for="epidothsh_eisforon_ergodoth" class="col-form-label label-font-size">
-                    Επιδ/ση Εργοδ/κής Εισφοράς
+                    Επιδότηση Εργοδοτικής Εισφοράς
                     </label>
                 </div>
                 <div class="col-1 left-align checkbox-flex-center">
@@ -204,6 +239,84 @@
                     <label for="epidothsh_eisforon_ergodoth" id="label-epidothsh_eisforon_ergodoth" class="margin-left-0_75rem  font-size-vw-0_875">
                     ΟΧΙ
                     </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="kodikos_epidothshs_stathera"
+                    id="kodikos_epidothshs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("kodikos_epidothshs_stathera") %>"
+                />
+
+                <!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+                <input type="hidden" name="pososto_asfalismenoy_epidothshs_stathera" id="pososto_asfalismenoy_epidothshs_stathera" value="<%= safe("pososto_asfalismenoy_epidothshs_stathera") %>" />
+                <input type="hidden" name="pososto_ergodoth_epidothshs_stathera" id="pososto_ergodoth_epidothshs_stathera" value="<%= safe("pososto_ergodoth_epidothshs_stathera") %>" />
+                <input type="hidden" name="isxyei_apo_epidothshs_stathera" id="isxyei_apo_epidothshs_stathera" value="<%= safe("isxyei_apo_epidothshs_stathera") %>" />
+                <input type="hidden" name="isxyei_eos_epidothshs_stathera" id="isxyei_eos_epidothshs_stathera" value="<%= safe("isxyei_eos_epidothshs_stathera") %>" />
+
+                <div class="col-8-74">
+                    <select
+                        id="epidothsh_ergodotikhs_eisforas"
+                        name="epidothsh_ergodotikhs_eisforas"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Επιδότηση Εργοδοτικής Εισφοράς"
+                        data-api="/api/dropdown/ergazomenoi/epidothsh_ergodotikhs_eisforas"
+                        single
+                        data-target-input=<%= `kodikos_epidothshs_stathera` %>
+                        data-preselect=<%= `kodikos_epidothshs_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_epidothshs_stathera","pososto_ergodoth":"pososto_ergodoth_epidothshs_stathera","isxyei_apo":"isxyei_apo_epidothshs_stathera","isxyei_eos":"isxyei_eos_epidothshs_stathera"}'
+                        placeholder="Αναζήτηση Επιδότησης Εισφοράς">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_3"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="mhteres" class="col-form-label label-font-size">
+                    ΜΗΤΕΡΕΣ Μείωση Εισφορών
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="mhteres" name="mhteres" value="" />
+                    <label for="mhteres" id="label-mhteres" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="kodikos_meioshs_eisforon_mhteron_stathera"
+                    id="kodikos_meioshs_eisforon_mhteron_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("kodikos_meioshs_eisforon_mhteron_stathera") %>"
+                />
+
+                <!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+                <input type="hidden" name="pososto_asfalismenoy_eisforon_mhteron_stathera" id="pososto_asfalismenoy_eisforon_mhteron_stathera" value="<%= safe("pososto_asfalismenoy_eisforon_mhteron_stathera") %>" />
+                <input type="hidden" name="pososto_ergodoth_eisforon_mhteron_stathera" id="pososto_ergodoth_eisforon_mhteron_stathera" value="<%= safe("pososto_ergodoth_eisforon_mhteron_stathera") %>" />
+                <input type="hidden" name="isxyei_apo_eisforon_mhteron_stathera" id="isxyei_apo_eisforon_mhteron_stathera" value="<%= safe("isxyei_apo_eisforon_mhteron_stathera") %>" />
+                <input type="hidden" name="isxyei_eos_eisforon_mhteron_stathera" id="isxyei_eos_eisforon_mhteron_stathera" value="<%= safe("isxyei_eos_eisforon_mhteron_stathera") %>" />
+
+                <div class="col-8-74">
+                    <select
+                        id="meiosh_eisforas_mhteron"
+                        name="meiosh_eisforas_mhteron"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Μείωση Εισφορών Μητέρων"
+                        data-api="/api/dropdown/ergazomenoi/meiosh_eisforas_mhteron"
+                        single
+                        data-target-input=<%= `kodikos_meioshs_eisforon_mhteron_stathera` %>
+                        data-preselect=<%= `kodikos_meioshs_eisforon_mhteron_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_eisforon_mhteron_stathera","pososto_ergodoth":"pososto_ergodoth_eisforon_mhteron_stathera","isxyei_apo":"isxyei_apo_eisforon_mhteron_stathera","isxyei_eos":"isxyei_eos_eisforon_mhteron_stathera"}'
+                        placeholder="Αναζήτηση Μείωσης Εισφορών Μητέρων">
+                    </select>
                 </div>
             </div>
 

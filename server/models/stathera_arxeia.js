@@ -651,6 +651,21 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   );
   const IdiothtaErgoy39Par9Model = model("IdiothtaErgoy39Par9", IdiothtaErgoy39Par9Schema);
 
+  const TypoiEpidothseonSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+      pososto_asfalismenoy: { type: Number, default: 0 },
+      pososto_ergodoth: { type: Number, default: 0 },
+      isxyei_apo: { type: Date },
+      isxyei_eos: { type: Date },
+      typos: { type: String, trim: true },
+    },
+    {
+      collection: "typoi_epidothseon"
+    }
+  );
+  const TypoiEpidothseonModel = model("TypoiEpidothseon", TypoiEpidothseonSchema);
+
   module.exports = {AdeiesDiamonhsModel,
                     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
                     AntistoixishKadEidikothtesKpkEfkaModel,
@@ -710,6 +725,7 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     TheseisEythynhsModel,
                     TmhmataModel,
                     Typoi_ApodoxonModel,
+                    TypoiEpidothseonModel,
                     TypoiErgazomenonModel,
                     TypoiTaytothtonModel, 
                     XrhseisModel, 
