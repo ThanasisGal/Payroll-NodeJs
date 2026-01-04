@@ -187,15 +187,12 @@
 
 							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
 								<div class="col-5">
-									<% if (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') { %>
-										<label class="col-form-label font-size-rem-1_1rem font-weight-700 cgreen">
-											Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες
-										</label>
-									<% } else { %>
-										<label class="col-form-label font-size-rem-1rem font-weight-700 cred">
-											Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες
-										</label>
-									<% } %>
+									<label class="col-form-label font-size-rem-1rem font-weight-700 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
+										<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') 
+											? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
+											:  'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
+										%>
+									</label>
 								</div>
 
 								<div class="col-2-1 text-center">
@@ -364,7 +361,7 @@
 <script src="<%= script('common/sectionsVisible') %>"></script>
 <script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>
-<script src="<%= script('ergazomenoi/genika/toggleDisabledSelectViaCheckbox') %>"></script>
+<script src="<%= script('ergazomenoi/genika/	') %>"></script>
 <script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcOresApasxolhshs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
@@ -427,7 +424,7 @@
 
     // Τοποθέτηση με Συστατικό Σημείωμα
     bindCheckboxControlsSelect({
-        checkboxId: 'systatiko_shmeioma',
+        checkboxId: 'topothethsh_me_programma',
         selectId  : 'programma_dypa',
         hiddenId  : 'programma_dypa_stathera',
         

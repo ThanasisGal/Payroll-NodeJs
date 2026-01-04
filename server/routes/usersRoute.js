@@ -4,9 +4,12 @@ const router = express.Router();
 const userController = require("../controllers/userController.js");
 const companiesController = require("../controllers/companies/companiesController.js");
 const mainAppController = require("../controllers/mainAppController.js");
+
 const checkUserAuth = require("../middlewares/auth-middleware.js");
 const getSessionVars = require("../middlewares/session-variables.js");
 const checkAuth = require("../middlewares/checkValidUser.js");
+const sanitizeNumberFields = require('../middlewares/sanitizeNumbers');
+
 const ypokatasthmataController = require("../controllers/companies/ypokatasthmataController.js");
 const nomimoiekprosopoiController = require("../controllers/companies/nomimoiekprosopoiController.js");
 const passwordsController = require("../controllers/companies/passwordsController.js");
@@ -162,7 +165,7 @@ router.get("/kad/updates", checkAuth, krathseisController.kadKodikosSort);
 // Ergazomenoi Router
 router.get("/ergazomenoi/ergazomenoi", checkAuth, ergazomenoiController.mainErgazomenoiForm);
 router.get("/ergazomenoi/ergazomenoi/add", checkAuth, ergazomenoiController.addErgazomenoiForm);
-router.post("/ergazomenoi/ergazomenoi/add", checkAuth, ergazomenoiController.postErgazomenoiForm);
+router.post("/ergazomenoi/ergazomenoi/add", checkAuth, sanitizeNumberFields, ergazomenoiController.postErgazomenoiForm);
 router.get("/ergazomenoi/ergazomenoi/edit/:id", checkAuth, ergazomenoiController.editErgazomenoiForm);
 router.get("/ergazomenoi/ergazomenoi/istoriko/:kod", checkAuth, ergazomenoiController.getIstorikoData);
 router.post("/ergazomenoi/ergazomenoi/istoriko/:kod", checkAuth, ergazomenoiController.updateIstorikoData);

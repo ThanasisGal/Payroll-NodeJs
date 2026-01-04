@@ -219,9 +219,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 html: `
                     <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox" id="employees" name="files" value="employees" checked 
+                            <input type="checkbox" id="e3_anaggelia_proslhpshs" name="files" value="e3_anaggelia_proslhpshs" checked 
                                 class="custom-checkbox" />
-                            <label for="employees" class="margin-0 cursor-pointer font-size-rem-1_05">
+                            <label for="e3_anaggelia_proslhpshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                                 Αναγγελία Πρόσληψης
                             </label>
                         </div>
@@ -246,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 focusConfirm: false,
                 preConfirm: () => {
                     const filesToUpdate = {
-                        employees: document.getElementById('employees').checked,
+                        e3_anaggelia_proslhpshs: document.getElementById('e3_anaggelia_proslhpshs').checked,
                         schedules: document.getElementById('schedules').checked,
                         history: document.getElementById('history').checked
                     };

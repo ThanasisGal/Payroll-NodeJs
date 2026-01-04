@@ -57,23 +57,23 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
-                    <label for="hmeromhnia_apoxorhshs" class="col-form-label label-font-size">
-                    Ημ/νία Αποχώρησης
-                    </label>
-                </div>
-                <div class="col-1-5">
-                    <input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="" />
-                </div>
-
-                <div class="col-2-5"></div>
-
-                    <div class="col-2 left-align">
                     <label for="hmeromhnia_lhxhs_symbashs" class="col-form-label label-font-size field-required">
                     Ημ/νία Λήξης Σύμβασης
                     </label>
                 </div>
                 <div class="col-1-5">
                     <input type="date" name="hmeromhnia_lhxhs_symbashs" id="hmeromhnia_lhxhs_symbashs" class="date-control" value="" />
+                </div>
+
+                <div class="col-2-5"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_apoxorhshs" class="col-form-label label-font-size">
+                    Ημ/νία Αποχώρησης
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="" />
                 </div>
             </div>
 
@@ -160,18 +160,18 @@
                     </label>
                 </div>
                 <div class="col-1 left-align">
-                    <input type="number" id="proyphresia_se_eth" name="proyphresia_se_eth" class="form-control input-contents right-align" min="0" max="40" value="0" />
+                    <input type="number" id="proyphresia_se_eth" name="proyphresia_se_eth" class="form-control input-contents right-align" min="0" max="40" value="0" autocomplete="off" />
                 </div>
             
                 <div class="col-3"></div>
 
                 <div class="col-2 left-align">
-                    <label for="proyphresia_se_mhnes" class="col-form-label label-font-size field-required">
+                    <label for="proyphresia_se_mhnes" class="col-form-label label-font-size">
                     Μήνες Προϋπηρεσίας
                     </label>
                 </div>
                 <div class="col-1 left-align">
-                    <input type="number" id="proyphresia_se_mhnes" name="proyphresia_se_mhnes" class="form-control input-contents right-align" min="0" max="11" value="0" />
+                    <input type="number" id="proyphresia_se_mhnes" name="proyphresia_se_mhnes" class="form-control input-contents right-align" min="0" max="11" value="0" autocomplete="off" />
                 </div>
             </div>
 
@@ -199,12 +199,12 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
-                    <label for="proyphresia_adeias_se_eth" class="col-form-label label-font-size field-required">
+                    <label for="proyphresia_adeias_se_eth" class="col-form-label label-font-size">
                     Έτη Προϋπηρεσίας (Άδεια)
                     </label>
                 </div>
                 <div class="col-1 left-align">
-                    <input type="number" id="proyphresia_adeias_se_eth" name="proyphresia_adeias_se_eth" class="form-control input-contents right-align" min="0" max="40" value="0" />
+                    <input type="number" id="proyphresia_adeias_se_eth" name="proyphresia_adeias_se_eth" class="form-control input-contents right-align" min="0" max="40" value="0" autocomplete="off" />
                 </div>
             
                 <div class="col-3"></div>
@@ -344,6 +344,75 @@
                     </select>
                 </div>
             </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="topos_ergasias" class="col-form-label label-font-size field-required">
+                    Τόπος Εργασίας
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="topos_ergasias" name="topos_ergasias" value="" />
+                    <label for="topos_ergasias" id="label-topos_ergasias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="xronos_katabolhs_apodoxon" class="col-form-label label-font-size">
+                    Χρόνος Καταβολής Αποδοχών
+                    </label>
+                </div>
+                <div class="col-4 left-align">
+                    <input type="text" id="xronos_katabolhs_apodoxon" name="xronos_katabolhs_apodoxon" class="form-control input-contents clearableInputs left-align" value="" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="afora_dokimastikh_periodo" class="col-form-label label-font-size field-required">
+                    Αφορά Δοκιμαστική Περίοδο
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_dokimastikh_periodo" name="afora_dokimastikh_periodo" value="" />
+                    <label for="afora_dokimastikh_periodo" id="label-afora_dokimastikh_periodo" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmnia_lhxhs_dokimastikhs_periodoy" class="col-form-label label-font-size field-required">
+                    Ημ/νία Λήξης Δοκ/τικής Περιόδου
+                    </label>
+                </div>
+                <div class="col-1-5 left-align">
+                    <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" class="date-control" value="" />
+                </div>
+            </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
                     <label for="thesh_eythynhs" class="col-form-label label-font-size">

@@ -85,6 +85,7 @@ let _AA_STOIXEIOY = 0,
 document.addEventListener("DOMContentLoaded", function () {
 	_PLHRHS_APASXOLHSH = document.getElementById('plhrhs_apasxolhsh');
 	generateSelectRowsOfSymbaseis();
+	setupAutocompleteHack();
 	addEventListeners();
 	calculateTotal();
 	watchEidikothtaChanges();
@@ -123,12 +124,27 @@ function generateSelectRowsOfSymbaseis() {
 				</div>
 				<div class="col-0-5"></div>
 				<div class="col-1-5">
-					<input type="number" class="form-control input-contents right-align clearAble addStoixSymb002" name="poso_symbashs_${idNum}" id="poso_symbashs_${idNum}" readonly />
+					<input 
+						type="number" 
+						class="form-control input-contents right-align clearAble addStoixSymb002" 
+						name="poso_symbashs_${idNum}" 
+						id="poso_symbashs_${idNum}" 
+						readonly 
+						autocomplete="off" 
+					/>
 				</div>
 				<div class="col-0-5"></div>
 				<div class="col-1-5">
-					<input type="number" class="form-control input-contents right-align numeric clearAble addStoixSymb003" name="poso_symbashs_basei_oron_ergasias_${idNum}" 
-						id="poso_symbashs_basei_oron_ergasias_${idNum}" step="0.01" />
+					<input 
+						type="number" 
+						class="form-control input-contents right-align numeric clearAble addStoixSymb003" 
+						name="poso_symbashs_basei_oron_ergasias_${idNum}" 
+						id="poso_symbashs_basei_oron_ergasias_${idNum}" 
+						step="0.01" 
+						autocomplete="off"
+						readonly
+                		data-autocomplete-hack="true"
+					/>
 				</div>
 				<button type="button" class="btn rounded-4 col-0-3 clear-row border-0" 
 					id="clearSelectSymbaseon-${idNum}" 
@@ -142,6 +158,19 @@ function generateSelectRowsOfSymbaseis() {
 		`;
 		container.insertAdjacentHTML('beforeend', rowHTML);
 	}
+}
+
+function setupAutocompleteHack() {
+	const container = document.getElementById('stoixeiaSymbaseonContainer');
+	if (!container) return;
+	
+	// Event delegation:  ένας listener για όλα τα inputs
+	container.addEventListener('focus', (e) => {
+		const input = e.target;
+		if (input.matches && input.matches('input[data-autocomplete-hack="true"]')) {
+			input.removeAttribute('readonly');
+		}
+	}, true);  // true = capture phase (πιάνει το focus πριν φτάσει στο input)
 }
 
 // ========================================================================
@@ -203,6 +232,10 @@ function handleInputEvent(event) {
 }
 
 function formatNumericInput(input) {
+	if (!input || !input.value) {
+        return;
+    }
+
 	const cursorPosition = input.selectionStart;
 	const originalValue = input.value;
 	
@@ -215,10 +248,20 @@ function formatNumericInput(input) {
 	const newValue = formatDecimal(numValue, 2);
 
 	if (newValue !== originalValue) {
-		input.value = newValue;
-		const diff = newValue.length - originalValue.length;
-		const newPos = Math.max(0, cursorPosition + diff);
-		input.setSelectionRange(newPos, newPos);
+        if (input.type === 'text' && input.setSelectionRange) {
+            try {
+                const diff = newValue.length - originalValue.length;
+                const newPos = Math.max(0, cursorPosition + diff);
+                input.setSelectionRange(newPos, newPos);
+            } catch (err) {
+                // Αγνόησε σφάλματα
+            }
+        }
+
+		// input.value = newValue;
+		// const diff = newValue.length - originalValue.length;
+		// const newPos = Math.max(0, cursorPosition + diff);
+		// input.setSelectionRange(newPos, newPos);
 	}
 }
 

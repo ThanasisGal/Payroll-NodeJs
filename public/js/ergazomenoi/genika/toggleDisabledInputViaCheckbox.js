@@ -34,7 +34,7 @@ function toggleInputs(checkboxId, inputIds) {
     }
 
     // Δέσιμο event (σε κάποια custom checkboxes το 'input' πιάνει καλύτερα)
-    checkbox.addEventListener('change', apply);
+    checkbox.addEventListener('change', apply); 
     checkbox.addEventListener('input', apply);
 
     // Αρχική εφαρμογή

@@ -368,6 +368,57 @@ export const initTomDropdown = ({
         onInitialize() {
             const ts = this;
 
+    // ========================================================================
+    // CUSTOM KEYBOARD SHORTCUTS
+    // ========================================================================
+    // ✅ Χρησιμοποίησε το wrapper αντί για control_input
+    const keyHandler = function(e) {
+        // Alt + ArrowDown → Open dropdown
+        if (e.altKey && e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (! ts.isOpen) {
+                ts.open();
+            }
+            return false;
+        }
+        
+        // Alt + ArrowUp → Close dropdown
+        if (e. altKey && e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (ts.isOpen) {
+                ts.close();
+            }
+            return false;
+        }
+        
+        // F4 → Toggle
+        if (e.key === 'F4') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (ts.isOpen) {
+                ts.close();
+            } else {
+                ts.open();
+            }
+            return false;
+        }
+    };
+
+    // ✅ Attach στο wrapper (που υπάρχει ήδη)
+    if (ts.wrapper) {
+        ts.wrapper.addEventListener('keydown', keyHandler, true);
+    }
+
+    // ✅ Fallback:  Attach και στο control_input όταν γίνει available
+    setTimeout(() => {
+        if (ts.control_input && ! ts.control_input.__keyHandlerBound) {
+            ts.control_input.addEventListener('keydown', keyHandler);
+            ts.control_input.__keyHandlerBound = true;
+        }
+    }, 100);
+
             const resetList = () => {
                 this.setTextboxValue('');
                 this.clearFilter();
