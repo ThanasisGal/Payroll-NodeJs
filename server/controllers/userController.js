@@ -36,9 +36,9 @@ var redir, tmpEmail;
 // Helper: συγχρονίζει συλλογή με βάση πρότυπο
 async function syncFromTemplate({
   Model,
-  userIdStr,         // π.χ. String(user._id)
-  templateId,        // π.χ. process.env.PROTYPO_ID
-  uniqueKey,         // π.χ. 'form' για UserPrivileges, 'li_Id' για SidebarStatus
+  userIdStr,         // π.χ.String(user._id)
+  templateId,        // π.χ.process.env.PROTYPO_ID
+  uniqueKey,         // π.χ.'form' για UserPrivileges, 'li_Id' για SidebarStatus
   projection = { _id: 0, userId: 0 }, // να μη φέρνουμε _id/userId από το πρότυπο
 }) {
   if (!templateId) return;
@@ -603,18 +603,18 @@ static sendUserVerifyEmail = async (req, res) => {
             }
 
             if (!user.isVerified) {
-                await res. flash("error", "Δεν έχετε κάνει επαλήθευση του Email σας. Επαληθεύστε το email και συνεχίστε.. .");
+                await res.flash("error", "Δεν έχετε κάνει επαλήθευση του Email σας. Επαληθεύστε το email και συνεχίστε...");
                 return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             if (user.situation === "I") {
                 await res.flash("error", "Είστε απενεργοποιημένος χρήστης. Επικοινωνήστε με τον διαχειριστή...");
-                return res. render("login/login", { bodyClass: "home-bg-cdn" });
+                return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
             const isMatch = await bcrypt.compare(password, user.password);
             if (!(user.email === String(email).trim().toLowerCase() && isMatch)) {
-                await res. flash("error", "Το email ή ο κωδικός πρόσβασης δεν είναι έγκυρα...");
+                await res.flash("error", "Το email ή ο κωδικός πρόσβασης δεν είναι έγκυρα...");
                 return res.render("login/login", { bodyClass: "home-bg-cdn" });
             }
 
@@ -625,7 +625,7 @@ static sendUserVerifyEmail = async (req, res) => {
             // ✅ Set session data
             // ═══════════════════════════════════════════════════════════
             req.session.userId = user._id;
-            req. session.userName = user.firstName;
+            req.session.userName = user.firstName;
             req.session.userTeam = user.team;
             req.session.userRole = user.privileges;
             req.session.userStatus = user.situation;
@@ -633,11 +633,11 @@ static sendUserVerifyEmail = async (req, res) => {
             req.session.companyDescription = "";
             req.session.yearInUse = String(year);
             req.session.periodInUse = month;
-            req. session.periodInUseDescr = monthNames[now.getMonth()];
-            req.session. appDate = `${day}/${month}/${year}`;
+            req.session.periodInUseDescr = monthNames[now.getMonth()];
+            req.session.appDate = `${day}/${month}/${year}`;
             req.session.currentTyposApodoxon = "001";
             req.session.energoi = true;
-            req.session. ypokatasthma = "";
+            req.session.ypokatasthma = "";
             
             // ✅ ΚΡΙΣΙΜΟ: Set lastActivity για countdown
             req.session.lastActivity = Date.now();
@@ -669,15 +669,15 @@ static sendUserVerifyEmail = async (req, res) => {
             const parameter = await ParamModel.findOne({ usrId: req.session.userId });
             if (parameter) {
                 if (parameter.usedYear) req.session.yearInUse = parameter.usedYear;
-                if (parameter.usedPeriod) req.session.periodInUse = parameter. usedPeriod;
-                if (parameter.usedPeriodDescr) req.session. periodInUseDescr = parameter.usedPeriodDescr;
+                if (parameter.usedPeriod) req.session.periodInUse = parameter.usedPeriod;
+                if (parameter.usedPeriodDescr) req.session.periodInUseDescr = parameter.usedPeriodDescr;
                 if (parameter.appDate) req.session.appDate = parameter.appDate;
 
                 if (parameter.companyId && parameter.companyId.length > 0) {
                     const companies = await CompaniesModel.findById(parameter.companyId);
                     if (companies) {
                         req.session.companyInUse = parameter.companyId;
-                        req.session.companyDescription = `${companies.eponymia} ${companies. firstname}`.trim();
+                        req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`.trim();
                     }
                     redir = "/mainapp";
                 } else {
@@ -689,7 +689,7 @@ static sendUserVerifyEmail = async (req, res) => {
                         xrhsh: parameter.usedYear,
                         kodikos: parameter.usedPeriod,
                     });
-                    if (periodoi) req. session.periodInUseDescr = periodoi.perigrafh;
+                    if (periodoi) req.session.periodInUseDescr = periodoi.perigrafh;
                 }
             } else {
                 redir = "/companies/genikastoixeia";
@@ -697,7 +697,7 @@ static sendUserVerifyEmail = async (req, res) => {
 
         } catch (error) {
             console.error('❌ Login error:', error);
-            await res.flash("error", "Αδυναμία Σύνδεσης.  Επικοινωνήστε με τον Διαχειριστή");
+            await res.flash("error", "Αδυναμία Σύνδεσης. Επικοινωνήστε με τον Διαχειριστή");
             redir = "login/login";
         }
 
@@ -974,46 +974,131 @@ static sendUserVerifyEmail = async (req, res) => {
     };
 
     static changeUserPassword = async (req, res) => {
-        const { email, old_password, password, password_confirmation } = req.body;
-
-        const user = await UserModel.findOne({ email: email });
-
-        if (!user || !user._id) {
-            await res.flash("error", "Ο χρήστης δεν είναι αυθεντικοποιημένος");
-            return res.redirect("/login");
-        }
-
-        if (email && old_password && password && password_confirmation) {
-            // const user = await UserModel.findOne({ email: email });
-
-            if (!user) {
-                await res.flash("warning", "Δεν βρέθηκε χρήστης με αυτό το email");
+        try {
+            // ✅ 1.Έλεγχος authentication (χρησιμοποίησε session, όχι body email)
+            if (!req.session || !req.session.userId) {
+                await res.flash("error", "Πρέπει να είστε συνδεδεμένος για να αλλάξετε τον κωδικό");
                 return res.redirect("/login");
             }
 
-            const isMatchOldPassword = await bcrypt.compare(old_password, user.password);
+            const { old_password, password, password_confirmation } = req.body;
 
-            if (isMatchOldPassword) {
-                if (password === password_confirmation) {
-                    const salt = await bcrypt.genSalt(10);
-                    const newHashPassword = await bcrypt.hash(password, salt);
-
-                    await UserModel.findByIdAndUpdate(user._id, {
-                        $set: { password: newHashPassword },
-                    });
-
-                    await res.flash("info", "Επιτυχής αλλαγή Password");
-                } else {
-                    await res.flash("warning", "Δεν συμφωνεί ο νέος κωδικός πρόσβασης (Password) με την επιβεβαίωση του κωδικού πρόσβασης");
-                }
-            } else {
-                await res.flash("info", "Δεν συμφωνεί το τρέχον password που πληκτρολογήσατε με το ήδη καταχωρημένο");
+            // ✅ 2.Validation
+            if (!old_password || !password || !password_confirmation) {
+                await res.flash("warning", "Όλα τα πεδία είναι υποχρεωτικά");
+                return res.redirect("/login/change_password");
             }
-        } else {
-            await res.flash("info", "Όλα τα πεδία είναι υποχρεωτικά");
-        }
 
-        res.redirect("/login");
+            if (password !== password_confirmation) {
+                await res.flash("warning", "Ο νέος κωδικός δεν συμφωνεί με την επιβεβαίωση");
+                return res.redirect("/login/change_password");
+            }
+
+            if (password.length < 8) {
+                await res.flash("warning", "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες");
+                return res.redirect("/login/change_password");
+            }
+
+            // ✅ 3.Βρες τον χρήστη από το session (όχι από το body)
+            const user = await UserModel.findById(req.session.userId);
+            
+            if (!user) {
+                await res.flash("error", "Ο χρήστης δεν βρέθηκε");
+                return res.redirect("/login");
+            }
+
+            // ✅ 4.Verify old password
+            const isMatchOldPassword = await bcrypt.compare(old_password, user.password);
+            
+            if (!isMatchOldPassword) {
+                await res.flash("error", "Ο τρέχων κωδικός δεν είναι σωστός");
+                return res.redirect("/login/change_password");
+            }
+
+            // ✅ 5.Check if new password is same as old
+            const isSameAsOld = await bcrypt.compare(password, user.password);
+            if (isSameAsOld) {
+                await res.flash("warning", "Ο νέος κωδικός πρέπει να είναι διαφορετικός από τον παλιό");
+                return res.redirect("/login/change_password");
+            }
+
+            // ✅ 6.Hash & save new password
+            const salt = await bcrypt.genSalt(10);
+            const newHashPassword = await bcrypt.hash(password, salt);
+
+            await UserModel.findByIdAndUpdate(user._id, {
+                $set: { 
+                    password: newHashPassword,
+                    updatedAt: new Date()
+                }
+            });
+
+            // ✅ 7.Log the password change
+            logger.info(`✅ Password changed successfully: `, {
+                userId: user._id,
+                email: user.email,
+                ip: req.ip,
+                timestamp: new Date().toISOString()
+            });
+
+            // ✅ 8.(Optional) Invalidate all other sessions
+            const sessionStore = req.sessionStore;
+            if (sessionStore && sessionStore.all) {
+                sessionStore.all((err, sessions) => {
+                    if (err) {
+                        logger.error('Session enumeration error:', err);
+                        return;
+                    }
+                    
+                    // Destroy όλα τα sessions του χρήστη εκτός από το τρέχον
+                    const currentSessionId = req.sessionID;
+                    for (const sid in sessions) {
+                        const session = sessions[sid];
+                        if (session.userId === String(user._id) && sid !== currentSessionId) {
+                            sessionStore.destroy(sid, (destroyErr) => {
+                                if (destroyErr) {
+                                    logger.error('Session destroy error:', destroyErr);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            // ✅ 9.Send email notification
+            try {
+                await transporter.sendMail({
+                    from: `"Web Payroll System" <${process.env.EMAIL_USER}>`,
+                    to: user.email,
+                    subject: "Επιτυχής αλλαγή κωδικού πρόσβασης",
+                    html: `
+                    <h3>Αγαπητέ/ή ${user.firstName},</h3>
+                    <p>Ο κωδικός πρόσβασής σας άλλαξε επιτυχώς στις <b>${new Date().toLocaleString("el-GR")}</b>.</p>
+                    <p>✅ Αν εσείς κάνατε αυτή την αλλαγή, μπορείτε να αγνοήσετε αυτό το μήνυμα.</p>
+                    <p style="color: red;">
+                        ⚠️ Αν δεν ήσασταν εσείς, επικοινωνήστε ΑΜΕΣΑ με τον Administrator 
+                        και αλλάξτε ξανά τον κωδικό σας.
+                    </p>
+                    <hr>
+                    <small>Αυτό το email δημιουργήθηκε αυτόματα από το Web Payroll System.</small>
+                    `
+                });
+            } catch (emailErr) {
+                logger.error('Email notification error:', emailErr);
+                // Δεν κάνουμε throw - το password άλλαξε ήδη
+            }
+
+            // ✅ 10.Success message & redirect
+            await res.flash("success", "Ο κωδικός σας άλλαξε επιτυχώς. Χρησιμοποιήστε τον νέο κωδικό στην επόμενη σύνδεση.");
+            
+            // Redirect στο dashboard (όχι logout)
+            return res.redirect("/mainapp");
+
+        } catch (error) {
+            logger.error('changeUserPassword error:', error);
+            await res.flash("error", "Σφάλμα κατά την αλλαγή κωδικού. Δοκιμάστε ξανά.");
+            return res.redirect("/login/change_password");
+        }
     };
 
     static resetPasswordForm = async (req, res) => {
@@ -1152,25 +1237,81 @@ static sendUserVerifyEmail = async (req, res) => {
     static showResetPasswordForm = async (req, res) => {
         try {
             const { uid, token } = req.params;
-            const user = await UserModel.findById(uid);
-            if (!user) {
-                await res.flash("warning", "Μη έγκυρος σύνδεσμος.");
-                return res.redirect("/");
+            
+            // ✅ 1. Validate parameters
+            if (!uid || ! token) {
+                await res. flash("error", "Μη έγκυρος σύνδεσμος");
+                return res.redirect("/login");
             }
 
-            const secret = user._id + user.password + process.env.JWT_SECRET_KEY;
-            try {
-                jwt.verify(token, secret);
-                // ΣΗΜ.: περνάμε και error: null για ομοιομορφία
-                return res.render("login/set_new_password", { uid, token, error: null });
-            } catch (err) {
-                await res.flash("warning", "Μη έγκυρος ή ληγμένος σύνδεσμος.");
-                return res.redirect("/");
+            // ✅ 2. Find user
+            const user = await UserModel. findById(uid);
+            if (!user) {
+                logger. warn('⚠️ Password reset attempt for non-existent user:', { uid });
+                await res.flash("error", "Ο χρήστης δεν βρέθηκε");
+                return res.redirect("/login");
             }
+
+            // ✅ 3. Verify token
+            const secret = user._id + user.password + process.env. JWT_SECRET_KEY;
+            
+            try {
+                const decoded = jwt.verify(token, secret);
+                
+                // ✅ 4. Token user ID check
+                if (decoded.userID !== String(user._id)) {
+                    logger.warn('⚠️ Token userID mismatch:', { 
+                        tokenUserId: decoded.userID, 
+                        urlUserId:  uid 
+                    });
+                    await res.flash("error", "Μη έγκυρος σύνδεσμος");
+                    return res.redirect("/login");
+                }
+
+                // ✅ 5. Log access
+                logger.info('✅ Password reset form accessed:', {
+                    userId: user._id,
+                    email: user.email,
+                    ip: req.ip,
+                    timestamp: new Date().toISOString()
+                });
+
+                // ✅ 6. Render form
+                return res.render("login/set_new_password", { 
+                    uid, 
+                    token,
+                    email: user.email,
+                    error: null,
+                    nonce:  res.locals.nonce,
+                    locals: {
+                        title: "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
+                });
+
+            } catch (jwtErr) {
+                // ✅ 7. Handle token errors
+                if (jwtErr. name === 'TokenExpiredError') {
+                    logger.warn('⚠️ Expired password reset token:', { 
+                        userId: user._id,
+                        email: user.email,
+                        expiredAt: jwtErr.expiredAt
+                    });
+                    await res.flash("error", "Ο σύνδεσμος έληξε (5 λεπτά). Ζητήστε νέο σύνδεσμο επαναφοράς.");
+                } else {
+                    logger.warn('⚠️ Invalid password reset token:', { 
+                        userId:  user._id,
+                        error: jwtErr.message
+                    });
+                    await res.flash("error", "Μη έγκυρος σύνδεσμος");
+                }
+                return res.redirect("/login");
+            }
+
         } catch (err) {
-            console.error(err);
-            await res.flash("error", "Σφάλμα.");
-            return res.redirect("/");
+            logger.error('showResetPasswordForm error:', err);
+            await res.flash("error", "Σφάλμα.  Δοκιμάστε ξανά.");
+            return res.redirect("/login");
         }
     };
 
@@ -1179,53 +1320,217 @@ static sendUserVerifyEmail = async (req, res) => {
             const { uid, token } = req.params;
             const { password, password2 } = req.body;
 
+            // ✅ 1. Validate parameters
+            if (!uid || !token) {
+                await res.flash("error", "Μη έγκυρος σύνδεσμος");
+                return res.redirect("/login");
+            }
+
+            // ✅ 2. Find user FIRST (before validation)
+            const user = await UserModel.findById(uid);
+            if (!user) {
+                logger.warn('⚠️ Password reset attempt for non-existent user:', { uid });
+                await res.flash("error", "Ο χρήστης δεν βρέθηκε");
+                return res.redirect("/login");
+            }
+
+            // ✅ 3. Verify token BEFORE processing password
+            const secret = user._id + user.password + process.env.JWT_SECRET_KEY;
+            
+            try {
+                const decoded = jwt.verify(token, secret);
+                
+                if (decoded.userID !== String(user._id)) {
+                    logger.warn('⚠️ Token userID mismatch during reset:', { 
+                        tokenUserId: decoded.userID, 
+                        urlUserId: uid 
+                    });
+                    await res.flash("error", "Μη έγκυρος σύνδεσμος");
+                    return res.redirect("/login");
+                }
+
+            } catch (jwtErr) {
+                if (jwtErr. name === 'TokenExpiredError') {
+                    logger.warn('⚠️ Expired token during password reset:', { 
+                        userId: user._id,
+                        email: user.email
+                    });
+                    await res.flash("error", "Ο σύνδεσμος έληξε.  Ζητήστε νέο σύνδεσμο επαναφοράς.");
+                } else {
+                    logger. warn('⚠️ Invalid token during password reset:', { 
+                        userId: user._id,
+                        error: jwtErr.message
+                    });
+                    await res.flash("error", "Μη έγκυρος σύνδεσμος");
+                }
+                return res.redirect("/login");
+            }
+
+            // ✅ 4. Validate passwords (NOW user is defined)
             if (!password || !password2) {
                 return res.status(400).render("login/set_new_password", {
                     uid,
                     token,
-                    error: "Είναι υποχρεωτικό να συμπληρώσετε και τα δύο πεδία."
+                    email: user.email,
+                    nonce: res.locals.nonce,
+                    error: "Είναι υποχρεωτικό να συμπληρώσετε και τα δύο πεδία",
+                    locals: {
+                        title: "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
                 });
             }
+
             if (password !== password2) {
                 return res.status(400).render("login/set_new_password", {
                     uid,
                     token,
-                    error: "Οι κωδικοί δεν ταιριάζουν.",
-                    values: { password2 }     // Δεν κρατάμε το password για λόγους ασφάλειας· μόνο το password2 αν θέλουμε καλύτερη UX.
+                    email: user. email,
+                    nonce: res.locals.nonce,
+                    error: "Οι κωδικοί δεν ταιριάζουν",
+                    locals: {
+                        title: "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
                 });
             }
+
             if (password.length < 8) {
                 return res.status(400).render("login/set_new_password", {
                     uid,
                     token,
-                    error: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες."
+                    email:  user.email,
+                    nonce: res.locals.nonce,
+                    error: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες",
+                    locals: {
+                        title: "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
                 });
             }
 
-            const user = await UserModel.findById(uid);
-            if (!user) {
-                await res.flash("warning", "Μη έγκυρος σύνδεσμος.");
-                return res.redirect("/");
+            // ✅ 5. Password strength validation
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/;
+            if (!passwordRegex.test(password)) {
+                return res.status(400).render("login/set_new_password", {
+                    uid,
+                    token,
+                    email: user. email,
+                    nonce: res.locals.nonce,
+                    error: "Ο κωδικός πρέπει να περιέχει:  κεφαλαία, πεζά, αριθμό και ειδικό χαρακτήρα (@$!%*?&)",
+                    locals: {
+                        title: "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
+                });
             }
 
-            const secret = user._id + user.password + process.env.JWT_SECRET_KEY;
-            try {
-                jwt.verify(token, secret);
-            } catch (err) {
-                await res.flash("warning", "Μη έγκυρος ή ληγμένος σύνδεσμος.");
-                return res.redirect("/");
+            // ✅ 6. Check if new password is same as old
+            const isSameAsOld = await bcrypt.compare(password, user.password);
+            if (isSameAsOld) {
+                return res.status(400).render("login/set_new_password", {
+                    uid,
+                    token,
+                    email: user.email,
+                    nonce: res.locals.nonce,
+                    error: "Ο νέος κωδικός πρέπει να είναι διαφορετικός από τον παλιό",
+                    locals: {
+                        title:  "Ορισμός νέου κωδικού",
+                        description: "Web Payroll System"
+                    }
+                });
             }
 
+            // ✅ 7. Hash new password
             const salt = await bcrypt.genSalt(10);
-            user.password = await bcrypt.hash(password, salt);
+            const hashedPassword = await bcrypt. hash(password, salt);
+
+            // ✅ 8. Update password
+            user.password = hashedPassword;
+            user.updatedAt = new Date();
             await user.save();
 
-            await res.flash("success", "Ο κωδικός άλλαξε με επιτυχία. Συνδεθείτε με τον νέο κωδικό.");
+            // ✅ 9. Invalidate all sessions
+            const sessionStore = req.sessionStore;
+            if (sessionStore && sessionStore.all) {
+                sessionStore.all((err, sessions) => {
+                    if (err) {
+                        logger.error('Session enumeration error:', err);
+                        return;
+                    }
+                    
+                    for (const sid in sessions) {
+                        const session = sessions[sid];
+                        if (session.userId === String(user._id)) {
+                            sessionStore.destroy(sid, (destroyErr) => {
+                                if (destroyErr) {
+                                    logger.error('Session destroy error:', destroyErr);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            // ✅ 10. Log successful reset
+            logger.info('✅ Password reset successful:', {
+                userId: user._id,
+                email: user.email,
+                ip: req.ip,
+                timestamp: new Date().toISOString()
+            });
+
+            // ✅ 11. Send confirmation email
+            try {
+                await transporter.sendMail({
+                    from: `"Web Payroll System" <${process.env.EMAIL_USER}>`,
+                    to: user.email,
+                    subject: "Επιτυχής επαναφορά κωδικού πρόσβασης",
+                    html: `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                        <h2>Επιτυχής Επαναφορά Κωδικού</h2>
+                        <p>Αγαπητέ/ή <strong>${user.firstName} ${user.lastName}</strong>,</p>
+                        
+                        <p>Ο κωδικός πρόσβασής σας άλλαξε επιτυχώς στις 
+                        <strong>${new Date().toLocaleString("el-GR", { timeZone: "Europe/Athens" })}</strong>.</p>
+                        
+                        <p>✅ Μπορείτε τώρα να συνδεθείτε με τον νέο κωδικό σας.</p>
+                        
+                        <p style="margin:  20px 0;">
+                            <a href="${process.env.APP_ORIGIN || 'http://localhost:5000'}/login" 
+                            style="background:#28a745; color:#fff; padding:10px 15px; border-radius:5px; text-decoration:none;">
+                                Σύνδεση
+                            </a>
+                        </p>
+                        
+                        <hr style="margin: 20px 0;">
+                        
+                        <p style="color:  red; font-weight: bold;">
+                            ⚠️ Αν δεν ζητήσατε εσείς την επαναφορά, επικοινωνήστε ΑΜΕΣΑ 
+                            με τον Administrator.
+                        </p>
+                        
+                        <p style="font-size: 14px; color:#555;">
+                            Για ασφάλεια, όλες οι ενεργές συνεδρίες σας έχουν τερματιστεί.
+                        </p>
+                        
+                        <hr style="margin:20px 0;">
+                        <small>Αυτό το email δημιουργήθηκε αυτόματα από το Web Payroll System.</small>
+                    </div>
+                    `
+                });
+            } catch (emailErr) {
+                logger.error('Password reset confirmation email error:', emailErr);
+            }
+
+            // ✅ 12. Success & redirect
+            await res.flash("success", "Ο κωδικός άλλαξε επιτυχώς! Συνδεθείτε με τον νέο κωδικό.");
             return res.redirect("/login");
+
         } catch (err) {
-            console.error(err);
-            await res.flash("error", "Σφάλμα κατά την αλλαγή κωδικού.");
-            return res.redirect("/");
+            logger.error('handleResetPassword error:', err);
+            await res.flash("error", "Σφάλμα κατά την αλλαγή κωδικού. Δοκιμάστε ξανά.");
+            return res. redirect("/login");
         }
     };
 
@@ -1241,54 +1546,261 @@ static sendUserVerifyEmail = async (req, res) => {
         }
     };
 
-    static logout = (req, res) => {
-        const sid = req.sessionID;
+    // static logout = (req, res) => {
+    //     const sid = req.sessionID;
 
+    //     req.session.destroy(err => {
+    //         if (err) {
+    //             console.error('logout destroy error:', err);
+    //             return res.redirect('/');
+    //         }
+
+    //         try { req.sessionStore?.destroy?.(sid); } catch {}
+
+    //         res.clearCookie(sessionOpts.name || 'sid', {
+    //             path    : sessionOpts.cookie.path ?? '/',
+    //             sameSite: sessionOpts.cookie.sameSite ?? 'lax',
+    //             httpOnly: sessionOpts.cookie.httpOnly !== false,
+    //             secure  : sessionOpts.cookie.secure ?? false,
+    //         });
+
+    //         const nonce = res.locals.nonce;
+    //         const redirectUrl = 'https://www.google.com'; // ή '/login'
+
+    //         return res.status(200).send(`
+    //             <!doctype html>
+    //             <html lang="el">
+    //                 <head>
+    //                     <meta charset="utf-8" />
+    //                     <title>Αποσύνδεση...</title>
+    //                 </head>
+    //                 <body>
+    //                     <script nonce="${nonce}">
+    //                         try {
+    //                             // σβήσε ΜΟΝΟ όσα αρχίζουν από "wps:"
+    //                             for (const key of Object.keys(window.sessionStorage)) {
+    //                                 if (key && key.indexOf('wps:') === 0) {
+    //                                     window.sessionStorage.removeItem(key);
+    //                                 }
+    //                             }
+    //                         } catch (e) {
+    //                             // αγνόησέ το
+    //                         }
+    //                         // μετά redirect
+    //                         window.location.href = ${JSON.stringify(redirectUrl)};
+    //                     </script>
+    //                 </body>
+    //             </html>
+    //         `);
+    //     });
+    // };
+
+    static logout = (req, res) => {
+        // ✅ 1.Έλεγχος authentication
+        if (!req.session || !req.session.userId) {
+            logger.warn('⚠️ Logout attempted without session:', { 
+                ip: req.ip,
+                userAgent: req.headers['user-agent']
+            });
+            return res.redirect('/login');
+        }
+
+        const sid = req.sessionID;
+        const userId = req.session.userId;
+        const userEmail = req.session.userEmail || 'unknown';
+
+        // ✅ 2.Destroy session
         req.session.destroy(err => {
             if (err) {
-                console.error('logout destroy error:', err);
+                logger.error('❌ Logout destroy error:', { 
+                    userId, 
+                    error: err.message 
+                });
                 return res.redirect('/');
             }
 
-            try { req.sessionStore?.destroy?.(sid); } catch {}
+            // ✅ 3.Destroy session από το store (MongoDB)
+            try { 
+                req.sessionStore?.destroy?.(sid, (storeErr) => {
+                    if (storeErr) {
+                        logger.error('Session store destroy error:', storeErr);
+                    }
+                }); 
+            } catch (destroyErr) {
+                logger.error('Session store destroy exception:', destroyErr);
+            }
 
-            res.clearCookie(sessionOpts.name || 'sid', {
-                path    : sessionOpts.cookie.path ?? '/',
-                sameSite: sessionOpts.cookie.sameSite ?? 'lax',
+            // ✅ 4.Clear session cookie
+            res.clearCookie(sessionOpts.name || 'connect.sid', {
+                path: sessionOpts.cookie.path ??  '/',
+                sameSite:  sessionOpts.cookie.sameSite ?? 'lax',
                 httpOnly: sessionOpts.cookie.httpOnly !== false,
-                secure  : sessionOpts.cookie.secure ?? false,
+                secure: sessionOpts.cookie.secure ?? false,
             });
 
+            // ✅ 5.Clear CSRF cookie
+            const csrfCookieName = isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token';
+            res.clearCookie(csrfCookieName, {
+                path: '/',
+                sameSite: 'lax',
+                httpOnly: true,
+                secure: isProd,
+            });
+
+            // ✅ 6.Log successful logout
+            logger.info(`✅ User logout successful: `, {
+                userId,
+                email: userEmail,
+                ip:  req.ip,
+                timestamp: new Date().toISOString()
+            });
+
+            // ✅ 7.Redirect με cleanup
             const nonce = res.locals.nonce;
-            const redirectUrl = 'https://www.google.com'; // ή '/login'
+            const redirectUrl = 'https://www.google.gr'; // ✅ Redirect to Google Greece
 
             return res.status(200).send(`
                 <!doctype html>
                 <html lang="el">
                     <head>
                         <meta charset="utf-8" />
+                        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline';">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <title>Αποσύνδεση...</title>
+                        <style>
+                            body {
+                                font-family:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                margin: 0;
+                                background: linear-gradient(135deg, #5a7c5e 0%, #7a9b7e 50%, #8b7355 100%);
+                            }
+                            .logout-container {
+                                text-align:  center;
+                                padding: 3rem 2rem;
+                                background: white;
+                                border-radius: 16px;
+                                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                                max-width: 400px;
+                                width:  90%;
+                            }
+                            .spinner {
+                                border: 4px solid #f3f3f3;
+                                border-top: 4px solid #6b8e6f;
+                                border-radius:  50%;
+                                width:  50px;
+                                height: 50px;
+                                animation: spin 1s linear infinite;
+                                margin: 0 auto 1.5rem;
+                            }
+                            @keyframes spin {
+                                0% { transform: rotate(0deg); }
+                                100% { transform: rotate(360deg); }
+                            }
+                            h2 {
+                                color:  #4a6b4e;
+                                margin: 0 0 0.5rem;
+                                font-size: 1.5rem;
+                                font-weight: 600;
+                            }
+                            p {
+                                color: #666;
+                                margin: 0;
+                                font-size: 0.95rem;
+                            }
+                            .success-icon {
+                                font-size: 3rem;
+                                color:  #6b8e6f;
+                                margin-bottom: 1rem;
+                                display: none;
+                            }
+                            .logo {
+                                width: 80px;
+                                height: 80px;
+                                margin: 0 auto 1.5rem;
+                                background:  linear-gradient(135deg, #6b8e6f 0%, #8b7355 100%);
+                                border-radius: 50%;
+                                display: flex;
+                                align-items: center;
+                                justify-content:  center;
+                                font-size: 2rem;
+                                color: white;
+                                font-weight:  bold;
+                            }
+                        </style>
                     </head>
                     <body>
+                        <div class="logout-container">
+                            <div class="logo">WPS</div>
+                            <div class="spinner"></div>
+                            <div class="success-icon" id="successIcon">✓</div>
+                            <h2>Αποσύνδεση... </h2>
+                            <p>Παρακαλώ περιμένετε</p>
+                        </div>
                         <script nonce="${nonce}">
-                            try {
-                                // σβήσε ΜΟΝΟ όσα αρχίζουν από "wps:"
-                                for (const key of Object.keys(window.sessionStorage)) {
-                                    if (key && key.indexOf('wps:') === 0) {
-                                        window.sessionStorage.removeItem(key);
+                            (function() {
+                                'use strict';
+                                
+                                try {
+                                    // ✅ Clear wps: prefixed sessionStorage items
+                                    const keysToRemove = [];
+                                    for (let i = 0; i < window.sessionStorage.length; i++) {
+                                        const key = window.sessionStorage.key(i);
+                                        if (key && key.indexOf('wps:') === 0) {
+                                            keysToRemove.push(key);
+                                        }
                                     }
+                                    
+                                    keysToRemove.forEach(function(key) {
+                                        try {
+                                            window.sessionStorage.removeItem(key);
+                                        } catch (e) {
+                                            console.error('Failed to remove sessionStorage key:', key, e);
+                                        }
+                                    });
+                                    
+                                    // ✅ Optional: Clear localStorage with wps: prefix
+                                    const localKeysToRemove = [];
+                                    for (let i = 0; i < window.localStorage.length; i++) {
+                                        const key = window.localStorage.key(i);
+                                        if (key && key.indexOf('wps:') === 0) {
+                                            localKeysToRemove.push(key);
+                                        }
+                                    }
+                                    
+                                    localKeysToRemove.forEach(function(key) {
+                                        try {
+                                            window.localStorage.removeItem(key);
+                                        } catch (e) {
+                                            console.error('Failed to remove localStorage key:', key, e);
+                                        }
+                                    });
+                                    
+                                } catch (e) {
+                                    console.error('Storage cleanup error:', e);
                                 }
-                            } catch (e) {
-                                // αγνόησέ το
-                            }
-                            // μετά redirect
-                            window.location.href = ${JSON.stringify(redirectUrl)};
+                                
+                                // ✅ Show success animation
+                                setTimeout(function() {
+                                    const spinner = document.querySelector('.spinner');
+                                    const successIcon = document.getElementById('successIcon');
+                                    if (spinner) spinner.style.display = 'none';
+                                    if (successIcon) successIcon.style.display = 'block';
+                                }, 300);
+                                
+                                // ✅ Redirect after cleanup
+                                setTimeout(function() {
+                                    window.location.href = ${JSON.stringify(redirectUrl)};
+                                }, 800);
+                            })();
                         </script>
                     </body>
                 </html>
             `);
         });
-    };
-}
+    }
+;}
 
 module.exports = userController;

@@ -4108,6 +4108,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .margin-left--0_5rem    { margin-left: -0.5rem !important; }
 .margin-left--1rem      { margin-left: -1rem !important; }
 .margin-left--1_5rem    { margin-left: -1.5rem !important; }
+.margin-left--2rem      { margin-left: -2rem !important; }
+.margin-left--3rem      { margin-left: -3rem !important; }
+.margin-left--4rem      { margin-left: -4rem !important; }
+.margin-left--5rem      { margin-left: -5rem !important; }
+.margin-left--6rem      { margin-left: -6rem !important; }
 
 .margin-left-0_75rem    { margin-left: 0.75rem !important; }
 .margin-left-1rem       { margin-left: 1rem !important; }
@@ -4330,6 +4335,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .display-none { display: none !important;}
 .display-flex { display: flex !important;}
 .flex-direction-column { flex-direction: column !important; }
+.display-inline { display: inline !important;}
 
 .width-20-px      { width: 20px !important; }
 .height-20-px     { height: 20px !important; }
