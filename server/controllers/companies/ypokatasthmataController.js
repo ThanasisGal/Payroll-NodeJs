@@ -17,7 +17,7 @@ class ypokatasthmataController {
     static mainYpokatasthmataForm = async (req, res) => {
         const locals = {
             title: "Υποκαταστήματα",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const sessionCompanyInUse = req.session.companyInUse;
@@ -119,7 +119,7 @@ class ypokatasthmataController {
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
             title: "Προσθήκη Νέου Υποκαταστήματος",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -239,7 +239,7 @@ class ypokatasthmataController {
     static searchGetYpokatasthmata = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Υποκαταστημάτων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -355,7 +355,7 @@ class ypokatasthmataController {
     static searchPostYpokatasthmata = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Υποκαταστημάτων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -478,7 +478,7 @@ class ypokatasthmataController {
     static editYpokatasthmataForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Υποκ/των",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {

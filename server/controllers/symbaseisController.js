@@ -55,7 +55,7 @@ class symbaseisController {
     static mainSymbaseisForm = async (req, res, next) => {
         const locals = {
             title: "Διαχείριση Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -116,7 +116,7 @@ class symbaseisController {
     static addSymbaseisForm = async (req, res) => {
         const locals = {
             title: "Προσθήκη Νέας Σύμβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
     
         let aa_kodikos = null;
@@ -162,7 +162,7 @@ class symbaseisController {
     static searchPostSymbaseis = async (req, res) => {
         const locals = {
         title: "Αναζήτηση Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -243,7 +243,7 @@ class symbaseisController {
     static searchGetSymbaseis = async (req, res) => {
         const locals = {
         title: "Αναζήτηση Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -319,7 +319,7 @@ class symbaseisController {
     static editSymbaseisForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -409,7 +409,7 @@ class symbaseisController {
     static mainKathgoriesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Διαχείριση Κατηγοριών Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         const sessionUserId = req.session.userId;
 
@@ -436,7 +436,7 @@ class symbaseisController {
     static addKathgoriesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Προσθήκη Νέας Κατηγορίας",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -503,7 +503,7 @@ class symbaseisController {
     static searchPostKathgoriesSymbaseon = async (req, res, next) => {
         const locals = {
             title: 'Αναζήτηση Κατηγοριών Συμβάσεων',
-            description: 'Web Payroll System',
+            description: 'Web Payroll Solutions',
         };
 
         try {
@@ -591,7 +591,7 @@ class symbaseisController {
     static searchGetKathgoriesSymbaseon = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κατηγοριών Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -684,7 +684,7 @@ class symbaseisController {
     static editKathgoriesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Κατηγοριών Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -815,7 +815,7 @@ class symbaseisController {
     static mainEidikothtesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Διαχείριση Ειδικοτήτων Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         const sessionUserId = req.session.userId;
         const basePer = Number(process.env.EGGRAFES) || 10;
@@ -845,7 +845,7 @@ class symbaseisController {
     static searchPostEidikothtesSymbaseon = async (req, res, next) => {
         const locals = {
             title: 'Αναζήτηση Ειδικοτήτων Συμβάσεων',
-            description: 'Web Payroll System',
+            description: 'Web Payroll Solutions',
         };
 
         try {
@@ -955,7 +955,7 @@ class symbaseisController {
 	static searchGetEidikothtesSymbaseon = async (req, res, next) => {
 		const locals = {
 			title: "Αναζήτηση Ειδικοτήτων Συμβάσεων",
-			description: "Web Payroll System",
+			description: "Web Payroll Solutions",
 		};
 
 		try {
@@ -1102,7 +1102,7 @@ class symbaseisController {
     static addEidikothtesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Προσθήκη Νέας Ειδικότητας",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -1176,7 +1176,7 @@ class symbaseisController {
     static editEidikothtesSymbaseonForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Ειδικοτήτων Συμβάσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -1371,7 +1371,7 @@ class symbaseisController {
     static mainStoixeiaSymbaseonForm = async (req, res) => {
         const locals = {
         title: "Διαχείριση Στοιχείων Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
         const sessionUserId = req.session.userId;
 
@@ -1398,7 +1398,7 @@ class symbaseisController {
 	static searchPostStoixeiaSymbaseon = async (req, res, next) => {
 		const locals = {
 			title: "Αναζήτηση Στοιχείων Συμβάσεων",
-			description: "Web Payroll System",
+			description: "Web Payroll Solutions",
 		};
 
 		try {
@@ -1559,7 +1559,7 @@ class symbaseisController {
 	static searchGetStoixeiaSymbaseon = async (req, res, next) => {
 		const locals = {
 			title: "Αναζήτηση Στοιχείων Συμβάσεων",
-			description: "Web Payroll System",
+			description: "Web Payroll Solutions",
 		};
 
 		try {
@@ -1712,7 +1712,7 @@ class symbaseisController {
     static addStoixeiaSymbaseonForm = async (req, res) => {
         const locals = {
         title: "Προσθήκη Νέου Στοιχείου",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };  
         
         try {
@@ -1821,7 +1821,7 @@ class symbaseisController {
     static editStoixeiaSymbaseonForm = async (req, res) => {
         const locals = {
         title: "Συντήρηση Στοιχείων Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -2025,7 +2025,7 @@ class symbaseisController {
     static mainKlimakiaForm = async (req, res) => {
         const locals = {
         title: "Κλιμάκια Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         const companyId = req.session.companyInUse;
@@ -2056,7 +2056,7 @@ class symbaseisController {
     static mainYpologismoiForm = async (req, res) => {
         const locals = {
         title: "Υπολογισμοί Κλιμακίων Συμβάσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         const companyId = req.session.companyInUse;

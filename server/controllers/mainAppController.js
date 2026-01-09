@@ -21,7 +21,7 @@ class mainAppController {
     static getMainAppForm = async (req, res) => {
         const locals = {
             title: "Payroll",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         res.render("mainapp", {
             locals,
@@ -160,7 +160,7 @@ class mainAppController {
     static getYearsForm = async (req, res) => {
         const locals = {
             title: "Αλλαγή Χρήσης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         res.render("dates/yearInUse", {
             locals,
@@ -281,7 +281,7 @@ class mainAppController {
     static getPeriodsForm = async (req, res) => {
         const locals = {
             title: "Περίοδος Εργασίας",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         res.render("dates/periods", {
             locals,
@@ -467,7 +467,7 @@ class mainAppController {
     static getAppDateForm = async (req, res) => {
         const locals = {
             title: "Ημ/νία Εφαρμογής",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
         res.render("dates/appDate", {
             locals,

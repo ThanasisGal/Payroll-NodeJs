@@ -16,7 +16,7 @@ class trapezesController {
     static mainTrapezesForm = async (req, res) => {
         const locals = {
             title: "Τράπεζες Ανά Εταρεία",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const sessionCompanyInUse = req.session.companyInUse;
@@ -106,7 +106,7 @@ class trapezesController {
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
             title: "Προσθήκη Νέας Τράπεζας",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -175,7 +175,7 @@ class trapezesController {
     static searchGetTrapezes = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Τραπεζών",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -265,7 +265,7 @@ class trapezesController {
     static searchPostTrapezes = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Τραπεζών",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -362,7 +362,7 @@ class trapezesController {
     static editTrapezesForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Τραπεζών",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {

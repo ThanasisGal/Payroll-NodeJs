@@ -17,7 +17,7 @@ class krathseisController {
     static mainKrathseisForm = async (req, res) => {
         const locals = {
             title: "Κρατήσεις",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const sessionUserId = req.session.userId;
@@ -91,7 +91,7 @@ class krathseisController {
     static searchPostKrathseis = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -178,7 +178,7 @@ class krathseisController {
     static searchGetKrathseis = async (req, res) => {
         const locals = {
         title: "Αναζήτηση Κρατήσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -260,7 +260,7 @@ class krathseisController {
     static addKrathseisForm = async (req, res) => {
         const locals = {
         title: "Προσθήκη Νέας Κράτησης",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -381,7 +381,7 @@ class krathseisController {
     static editKrathseisForm = async (req, res) => {
         const locals = {
         title: "Συντήρηση Κρατήσεων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -503,7 +503,7 @@ class krathseisController {
 
         const locals = {
             title: "Συντήρηση Ποσοστών Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -570,7 +570,7 @@ class krathseisController {
         let plasmatikhAxia = 0;
         const locals = {
             title: "Προσθήκη Νέου Ποσοστού Κράτησης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -584,7 +584,7 @@ class krathseisController {
     static addPosostaKrathseonForm = async (req, res) => {
         const locals = {
             title: "Προσθήκη Νέων Ποσοστών Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {

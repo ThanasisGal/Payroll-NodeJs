@@ -44,7 +44,7 @@ class programmataController {
   static mainProgrammaErgasiasForm = async (req, res) => {
     const locals = {
       title: "Προγράμματα Εργασίας",
-      description: "Web Payroll System",
+      description: "Web Payroll Solutions",
     };
 
     const companyId = req.session.companyInUse;
@@ -259,7 +259,7 @@ class programmataController {
   static mainAntigrafhProgrammatonForm = async (req, res) => {
     const locals = {
       title: "Αντιγραφή Προγραμμάτων Εργασίας",
-      description: "Web Payroll System",
+      description: "Web Payroll Solutions",
     };
 
     const companyId = req.session.companyInUse;

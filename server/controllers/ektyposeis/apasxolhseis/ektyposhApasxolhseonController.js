@@ -331,7 +331,7 @@ class ektyposhApasxolhseonController {
     static mainApodeixeisErgazomenonForm = async (req, res) => {
         const locals = {
             title: "Εκτύπωση Ατομικών Εκκαθαρίσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         await ensureOutputFolder();

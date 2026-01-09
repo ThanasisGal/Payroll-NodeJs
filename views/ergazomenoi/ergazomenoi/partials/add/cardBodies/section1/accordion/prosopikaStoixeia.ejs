@@ -561,6 +561,54 @@
 
             <hr  class="hr-style" />
 
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-bottom-0_65rem">
+                <div class="col-2 left-align">
+                    <label for="ekpaideytiko_epipedo" class="col-form-label label-font-size field-required">
+                    Εκπαιδευτικό Επίπεδο
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="ekpaideytiko_epipedo_stathera"
+                    id="ekpaideytiko_epipedo_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("ekpaideytiko_epipedo_stathera") %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="ekpaideytiko_epipedo"
+                        name="ekpaideytiko_epipedo"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Εκπαιδευτικό Επίπεδο"
+                        data-api="/api/dropdown/ergazomenoi/ekpaideytiko_epipedo"
+                        single
+                        data-target-input=<%= `ekpaideytiko_epipedo_stathera` %>
+                        data-preselect=<%= `ekpaideytiko_epipedo_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Εκπαιδευτικού Επιπέδου">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="thesh_eythynhs" class="col-form-label label-font-size">
+                    Φορολογική Κλίμακα
+                    </label>
+                </div>
+
+                <div class="col-4">
+                    <input type="text" name="forologikh_klimaka" id="forologikh_klimaka" class="form-control input-contents" value="" readonly/>
+                </div>
+            </div>
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
                 <div class="col-2 left-align">
                     <label for="trapeza" class="col-form-label label-font-size">

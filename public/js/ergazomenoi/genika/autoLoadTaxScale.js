@@ -33,6 +33,18 @@
      * Fetch tax scale from database
      */
     async function fetchTaxScale() {
+    const csrfToken = getCsrfToken();
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔐 CSRF Token:', csrfToken);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    if (!csrfToken) {
+        console.error('❌ No CSRF token found!');
+        return;
+    }
+    
+
         try {
             const xrhsh = calcXrhshField.value.trim();
             const calcAge = calcAgeField.value.trim();
@@ -45,14 +57,14 @@
             
             // API call
             const response = await fetch('/api/forologikes-klimakes/lookup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'CSRF-Token': getCsrfToken()
+                method:  'POST',
+                headers:  {
+                    'Content-Type':  'application/json',
+                    'csrf-token': csrfToken  // ✅ ΑΛΛΑΓΗ:    lowercase & direct variable
                 },
                 body: JSON.stringify({ xrhsh, kodikos }),
                 credentials: 'same-origin'
-            });
+            });            
             
             if (!response.ok) {
                 throw new Error('API error');

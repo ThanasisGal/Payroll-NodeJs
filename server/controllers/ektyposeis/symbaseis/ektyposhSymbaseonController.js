@@ -328,7 +328,7 @@ class ektyposhSymbaseonController {
     static mainSymbaseisErgazomenonForm = async (req, res) => {
         const locals = {
             title: "Εκτύπωση Συμβάσεων Εργαζόμενων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         await ensureOutputFolder();

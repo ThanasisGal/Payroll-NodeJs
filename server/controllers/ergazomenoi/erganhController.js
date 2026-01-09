@@ -479,7 +479,7 @@ class erganhController {
     static mainEisagoghOrarionApoErganhForm = async (req, res) => {
         const locals = {
             title: "Εισαγωγή Ωραρίων από Εργάνη",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const companyId = req.session.companyInUse;
@@ -513,7 +513,7 @@ class erganhController {
     static mainEisagoghOrarionApoKartesForm = async (req, res) => {
         const locals = {
             title: "Εισαγωγή Ωραρίων από Κάρτες",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const companyId = req.session.companyInUse;
@@ -546,7 +546,7 @@ class erganhController {
     static mainApologistikosPinakasForm = async (req, res) => {
         const locals = {
         title: "Απολογιστικός Πίνακας",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         const companyId = req.session.companyInUse;
@@ -2224,7 +2224,7 @@ class erganhController {
   static mainExagoghOrarionSeErganhForm = async (req, res) => {
     const locals = {
       title: "Ενημέρωση Ψηφιακών Ωραρίων ΕΓΑΝΗ",
-      description: "Web Payroll System",
+      description: "Web Payroll Solutions",
     };
 
     const companyId = req.session.companyInUse;

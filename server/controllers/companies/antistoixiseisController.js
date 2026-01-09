@@ -14,7 +14,7 @@ class antistoixiseisController {
     static mainAntistoixiseisForm = async (req, res) => {
         const locals = {
             title: "Αντιστοιχισεις Κ.Π.Κ.",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const sessionUserId = req.session.userId;
@@ -101,7 +101,7 @@ class antistoixiseisController {
     static searchPostAntistoixiseis = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -188,7 +188,7 @@ class antistoixiseisController {
     static searchGetAntistoixiseis = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -269,7 +269,7 @@ class antistoixiseisController {
     static addAntistoixiseisForm = async (req, res) => {
         const locals = {
             title: "Προσθήκη Νέας Αντιστοίχισης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -304,7 +304,7 @@ class antistoixiseisController {
 
         const locals = {
             title: "Προσθήκη Νέας Αντιστοίχισης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -369,7 +369,7 @@ class antistoixiseisController {
     static editAntistoixiseisForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Ποσοστών Κρατήσεων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {

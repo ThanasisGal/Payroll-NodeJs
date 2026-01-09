@@ -6,8 +6,7 @@ const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secr
 const mongoUrl = process.env.MONGODB_URL;
 
 const sessionOpts = {
-    name: 'sid',
-    secret,
+    secret: process.env.SESSION_SECRET || process.env.SECRET || "default-secret",
     resave: false,
     saveUninitialized: false,
     store: mongoUrl

@@ -1,5 +1,5 @@
 :root {
-  --aaa: #e4cece9a;
+  --aaa: rgba(228, 206, 206, 0.604);
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -3811,8 +3811,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 /* Success: πράσινο / άσπρο */
 .alert-success{
-  --bs-alert-bg: #0b8800;
-  --bs-alert-color: #ffffff;
+  --bs-alert-bg: #0b880057;
+  --bs-alert-color: #000000;
   --bs-alert-border-color: #0b8800;
 }
 
@@ -4141,6 +4141,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .margin-bottom-0_01rem  { margin-bottom: 0.01rem !important; }
 .margin-bottom-0_1rem   { margin-bottom: 0.1rem !important; }
 .margin-bottom-0_3rem   { margin-bottom: 0.3rem !important; }
+.margin-bottom-0_65rem  { margin-bottom: 0.65rem !important; }
+.margin-bottom-0_75rem  { margin-bottom: 0.75rem !important; }
 .margin-bottom-1rem     { margin-bottom: 1rem !important; }
 
 .padding-0              { padding: 0; }

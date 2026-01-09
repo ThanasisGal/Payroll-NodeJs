@@ -374,8 +374,6 @@ document.addEventListener("DOMContentLoaded", () => {
     hideCountdown(remainingTimeElement);
     initCountdown(remainingTimeElement);
 
-    // console.log('✅ Countdown initialized (client-side - 1 server call only!)');
-
     window.addEventListener('beforeunload', () => {
         if (window.CountdownManager.countdownInterval) {
             clearInterval(window.CountdownManager.countdownInterval);

@@ -26,11 +26,9 @@ const MongoStore = require("connect-mongo");
 const { sessionOpts, isProd } = require('./config/sessionOpts');
 const flash = require("express-flash-message").default;
 const helmet = require("helmet");
-const { doubleCsrf } = require("csrf-csrf");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
-
 const connectDB = require("./server/config/db");
 const geoGuard = require("./server/middlewares/geoGuard");
 const usersRoute = require("./server/routes/usersRoute");
@@ -56,13 +54,13 @@ const EGGRAFES = Number.parseInt(process.env.EGGRAFES ??  '15', 10) || 15;
 logger.info("========================================");
 logger.info("🔧 ENVIRONMENT CONFIG");
 logger.info("========================================");
-logger.info(`NODE_ENV:          ${node_env}`);
-logger.info(`STATIC_BASE:      ${STATIC_BASE}`);
+logger.info(`NODE_ENV:           ${node_env}`);
+logger.info(`STATIC_BASE:       ${STATIC_BASE}`);
 logger.info(`isProd:           ${isProd}`);
 logger.info(`CDN_DOMAIN:       ${CDN_DOMAIN}`);
 logger.info(`S3_BUCKET:        ${S3_BUCKET}`);
 if (CLOUDFRONT_DOMAIN) {
-    logger.info(`CloudFront:        ${CLOUDFRONT_DOMAIN}`);
+    logger.info(`CloudFront:         ${CLOUDFRONT_DOMAIN}`);
 }
 logger.info("========================================");
 
@@ -175,7 +173,8 @@ if (! mongoUrl) {
 }
 
 app.use(session(sessionOpts));
-logger.info(`Sessions:  ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
+
+logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 app.use(flash({ sessionKeyName: "flashMessage" }));
 app.use(getSessionVars);
@@ -286,7 +285,7 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                 return res.json({
                     success: true,
                     refreshed: true,
-                    remainingTime:  formatTime(newRemainingMs),
+                    remainingTime: formatTime(newRemainingMs),
                     remainingMs: newRemainingMs,
                     message: 'Session refreshed to 30: 00'
                 });
@@ -355,7 +354,7 @@ const buildCSPDirectives = () => {
     
     const directives = {
         "default-src": ["'self'"],
-        "script-src":  [
+        "script-src": [
             "'self'",
             (req, res) => `'nonce-${res.locals.nonce}'`,
             ...cdnDomains
@@ -415,31 +414,55 @@ app.use(
 );
 
 /* -------------------------------------------------------------------------- */
-/*                    ✅ CSRF Protection (csrf-csrf)                          */
+/*                    ✅ CSRF Protection (CUSTOM Implementation)              */
 /* -------------------------------------------------------------------------- */
 
-const CSRF_SECRET = process.env.CSRF_SECRET || secret;
-
-const {
-    generateToken,
-    doubleCsrfProtection,
-} = doubleCsrf({
-    getSecret: () => CSRF_SECRET,
-    cookieName: isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token',
-    cookieOptions: {
+// ✅ Simple CSRF implementation χωρίς sessionID dependency
+function generateSimpleCsrfToken(req, res) {
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Store token in cookie
+    res.cookie(isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token', token, {
+        httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: isProd,
-        httpOnly: true,
-    },
-    size: 64,
-    ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-    getTokenFromRequest: (req) => {
-        return req.body._csrf || req.headers['csrf-token'] || req.headers['x-csrf-token'] || req.query._csrf;
-    },
+        maxAge: 1800000, // 30 minutes
+        ...(isProd ?  { domain: process.env.DOMAIN } : {}),
+    });
+    
+    return token;
+}
+
+function validateSimpleCsrfToken(req) {
+    const cookieToken = req.cookies[isProd ? '__Host-psifi.x-csrf-token' :  'psifi.x-csrf-token'];
+    
+    const headerToken = req.body?._csrf ||
+                       req.headers['csrf-token'] ||
+                       req.headers['x-csrf-token'] ||
+                       req.query?._csrf;
+    
+    return cookieToken && headerToken && cookieToken === headerToken;
+}
+
+// ✅ Make CSRF token available to all views
+app.use((req, res, next) => {
+    try {
+        const existingToken = req.cookies[isProd ?  '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token'];
+        
+        if (existingToken) {
+            res.locals.csrfToken = existingToken;
+        } else {
+            res.locals.csrfToken = generateSimpleCsrfToken(req, res);
+        }
+    } catch (err) {
+        logger.error('Error generating CSRF token for views:', err);
+        res.locals.csrfToken = '';
+    }
+    next();
 });
 
-// ✅ CSRF middleware με skip logic
+// ✅ CSRF Protection middleware
 app.use((req, res, next) => {
     const skipPaths = [
         '/health',
@@ -451,46 +474,50 @@ app.use((req, res, next) => {
         '/login/userLogin',
         '/register/userRegistration',
         '/login/send-reset-password-email',
-        '/login/verify-email',                  
+        '/login/verify-email',
         '/login/change_password/changepassword',
         '/logout/userLogout',
+        '/public/',
+        '/css/',
+        '/js/',
+        '/images/',
+        '/uploads/',
+        '/static/',
     ];
-    
-    const skipCSRF = skipPaths.some(path => req.path === path || req.path.startsWith(path)) ||
-                     req.method === 'GET' ||
-                     req.method === 'HEAD' ||
-                     req.method === 'OPTIONS' ||
-                     req.headers['x-amz-date'] ||
-                     req.headers['user-agent']?.includes('Amazon');
-    
-    if (skipCSRF) {
-        // ✅ Για skipped paths, δημιούργησε dummy token για compatibility
-        res.locals.csrfToken = 'csrf-disabled-for-this-endpoint';
+
+    if (skipPaths.some(path => req.path.startsWith(path))) {
         return next();
     }
+
+    if (req.method === 'GET') {
+        return next();
+    }
+
+    // ✅ Validate CSRF token
+    if (! validateSimpleCsrfToken(req)) {
+        logger.error('❌ CSRF validation FAILED: ');
+        logger.error(`  Path: ${req.path}`);
+        logger.error(`  Method: ${req.method}`);
+        logger.error(`  Cookie token: ${req.cookies[isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token']?.substring(0, 20)}...`);
+        logger.error(`  Header token: ${req.headers['csrf-token']?.substring(0, 20)}...`);
+
+        return res.status(403).json({
+            error: 'CSRF validation failed',
+            message: 'Invalid or missing CSRF token'
+        });
+    }
+
+    if (req.path.includes('/api/forologikes-klimakes')) {
+        logger.info('✅ CSRF validation PASSED');
+    }
     
-    // ✅ Για authenticated POST/PUT/DELETE (μετά το login), ελέγξε το CSRF
-    doubleCsrfProtection(req, res, (err) => {
-        if (err) {
-            logger.error('CSRF protection error:', err.message || 'Unknown CSRF error');
-            return next(err);
-        }
-        
-        try {
-            res.locals.csrfToken = req.csrfToken ?  req.csrfToken() : generateToken(req, res);
-        } catch (tokenErr) {
-            logger.error('CSRF token generation error:', tokenErr.message);
-            res.locals.csrfToken = '';
-        }
-        
-        next();
-    });
+    next();
 });
 
 // CSRF token endpoint
 app.get("/csrf-token", (req, res) => {
     try {
-        const token = generateToken(req, res);
+        const token = generateSimpleCsrfToken(req, res);
         return res.json({ csrfToken: token });
     } catch (err) {
         logger.error('CSRF token endpoint error:', err.message);
@@ -498,7 +525,6 @@ app.get("/csrf-token", (req, res) => {
     }
 });
 
-// CSRF error handler
 app.use(async (err, req, res, next) => {
     if (err && (err.code === 'EBADCSRFTOKEN' || err.message?.includes('csrf') || err.message?.includes('CSRF') || err.message?.includes('invalid'))) {
         logger.warn("CSRF token απορρίφθηκε", {

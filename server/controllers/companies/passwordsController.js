@@ -16,7 +16,7 @@ class passwordsController {
     static mainPasswordsForm = async (req, res) => {
         const locals = {
             title: "Κωδικοί Πρόσβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         const sessionCompanyInUse = req.session.companyInUse;
@@ -106,7 +106,7 @@ class passwordsController {
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
             title: "Προσθήκη Νέου Κωδικού Πρόσβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -151,7 +151,7 @@ class passwordsController {
     static searchGetPasswords = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κωδικών Πρόσβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -235,7 +235,7 @@ class passwordsController {
     static searchPostPasswords = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Κωδικών Πρόσβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -326,7 +326,7 @@ class passwordsController {
     static editPasswordsForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση κωδικών Πρόσβασης",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {

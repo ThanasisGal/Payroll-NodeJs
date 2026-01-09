@@ -36,7 +36,7 @@ const arithmosKrathseon = 7;
 class ergazomenoiController {
 
     static mainErgazomenoiForm = async (req, res) => {
-        const locals = { title: "Εργαζόμενοι", description: "Web Payroll System" };
+        const locals = { title: "Εργαζόμενοι", description: "Web Payroll Solutions" };
 
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
@@ -104,7 +104,7 @@ class ergazomenoiController {
     static editErgazomenoiForm = async (req, res) => {
         const locals = {
         title: "Συντήρηση Στοιχείων Εργαζομένων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -139,7 +139,7 @@ class ergazomenoiController {
     static getIstorikoData = async (req, res) => {
         const locals = {
         title: "Συντήρηση Στοιχείων Εργαζομένων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -200,7 +200,7 @@ class ergazomenoiController {
     static searchPostErgazomenoi = async (req, res) => {
         const locals = {
         title: "Αναζήτηση Εργαζομένων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -302,7 +302,7 @@ class ergazomenoiController {
     static searchGetErgazomenoi = async (req, res) => {
         const locals = {
         title: "Αναζήτηση Εργαζομένων",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         try {
@@ -398,7 +398,7 @@ class ergazomenoiController {
     static addErgazomenoiForm = async (req, res) => {
         const locals = {
         title: "Προσθήκη Νέου Εργαζόμενου",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         const sessionYearInUse = req.session.yearInUse;
@@ -415,6 +415,8 @@ class ergazomenoiController {
                 mode: "add", 
                 context: "ergazomenoi", 
                 sessionYearInUse,
+                csrfToken: res.locals.csrfToken,
+                nonce: res.locals.nonce,         
                 rec: {}
             });
         } catch (error) {

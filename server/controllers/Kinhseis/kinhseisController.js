@@ -92,7 +92,7 @@ class kinhseisController {
     static mainApasxolhseisForm = async (req, res) => {
         const locals = {
         title: "Απασχολήσεις",
-        description: "Web Payroll System",
+        description: "Web Payroll Solutions",
         };
 
         await handleProductionDownloadPath();

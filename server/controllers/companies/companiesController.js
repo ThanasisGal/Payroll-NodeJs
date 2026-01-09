@@ -66,12 +66,12 @@ async function upsertSafe(Model, filter, set, setOnInsert = {}, options = {}) {
 /* -------------------------- controller --------------------------------- */
 class companiesController {
     static mainAppForm = async (req, res) => {
-        const locals = { title: "Payroll", description: "Web Payroll System" };
+        const locals = { title: "Payroll", description: "Web Payroll Solutions" };
         res.render("mainapp", { locals });
     };
 
     static mainCompaniesForm = async (req, res) => {
-        const locals = { title: "Εταιρείες", description: "Web Payroll System" };
+        const locals = { title: "Εταιρείες", description: "Web Payroll Solutions" };
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
@@ -121,7 +121,7 @@ class companiesController {
     };
 
     static searchPostCompanies = async (req, res) => {
-        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll System" };
+        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll Solutions" };
 
         try {
             const searchTerm = normalizeStr(req.body.searchTerm);
@@ -186,7 +186,7 @@ class companiesController {
     };
 
     static searchGetCompanies = async (req, res) => {
-        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll System" };
+        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll Solutions" };
 
         try {
             const searchTerm = normalizeStr(req.body?.searchTerm || "");
@@ -248,7 +248,7 @@ class companiesController {
     };
 
     static addCompanyForm = async (req, res) => {
-        const locals = { title: "Προσθήκη Νέας Εταιρείας", description: "Web Payroll System" };
+        const locals = { title: "Προσθήκη Νέας Εταιρείας", description: "Web Payroll Solutions" };
         try {
             const data = await PerifereiesModel.find().sort("kodikos");
             res.render("companies/genikastoixeia/add", { locals, data, mode: "add", context: "company", rec: {} });
@@ -476,7 +476,7 @@ class companiesController {
     };
 
     static choiseCompanies = async (req, res) => {
-        const locals = { title: "Payroll", description: "Web Payroll System" };
+        const locals = { title: "Payroll", description: "Web Payroll Solutions" };
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
 
@@ -509,7 +509,7 @@ class companiesController {
     };
 
     static editCompanyForm = async (req, res) => {
-        const locals = { title: "Διόρθωση Εταιρείας", description: "Web Payroll System" };
+        const locals = { title: "Διόρθωση Εταιρείας", description: "Web Payroll Solutions" };
 
         try {
             const [perifereies, nomikes_morfes, pararthmata_efka, doys, tameia] = await Promise.all([

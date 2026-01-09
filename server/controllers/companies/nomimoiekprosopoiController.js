@@ -16,7 +16,7 @@ function formatNumber(number, totalLength) {
 class nomimoiekprosopoiController {
 
     static mainNomimoiEkprosopoiForm = async (req, res) => {
-        const locals = { title: "Νόμιμοι Εκπρόσωποι", description: "Web Payroll System" };
+        const locals = { title: "Νόμιμοι Εκπρόσωποι", description: "Web Payroll Solutions" };
 
         const sessionCompanyInUse = req.session.companyInUse;
         const sessionUserId       = req.session.userId;
@@ -158,7 +158,7 @@ class nomimoiekprosopoiController {
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
             title: "Προσθήκη Νέου Νόμιμου Εκπρόσωπου",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -250,7 +250,7 @@ class nomimoiekprosopoiController {
     static searchGetNomimoiEkprosopoi = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Νόμιμων Εκπροσώπων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -368,7 +368,7 @@ class nomimoiekprosopoiController {
     static searchPostNomimoiEkprosopoi = async (req, res) => {
         const locals = {
             title: "Αναζήτηση Νομίμων Εκπρόσώπων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
@@ -490,7 +490,7 @@ class nomimoiekprosopoiController {
     static editNomimoiEkprosopoiForm = async (req, res) => {
         const locals = {
             title: "Συντήρηση Νομ.Εκπροσώπων",
-            description: "Web Payroll System",
+            description: "Web Payroll Solutions",
         };
 
         try {
