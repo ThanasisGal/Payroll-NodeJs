@@ -358,7 +358,11 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const SxeseisErgasiasSchema = new Schema({
     kodikos: { type: String, unique: true },
     perigrafh: { type: String, trim: true },
-  });
+  },
+    {
+      collection: "sxeseis_ergasias"
+    }
+  );
   const SxeseisErgasiasModel = model("SxeseisErgasias", SxeseisErgasiasSchema);
   
   const SyggenikesSxeseisSchema = new Schema({
@@ -370,7 +374,11 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   const TheseisEythynhsSchema = new Schema({
     kodikos: { type: String, unique: true },
     perigrafh: { type: String, trim: true },
-  });
+  },
+    {
+      collection: "theseis_eythynhs"
+    }
+  );
   const TheseisEythynhsModel = model("TheseisEythynhs", TheseisEythynhsSchema);
   
   const EidikesPeriptoseisSchema = new Schema({
@@ -666,10 +674,41 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
   );
   const TypoiEpidothseonModel = model("TypoiEpidothseon", TypoiEpidothseonSchema);
 
+  const ForeasKyriasAsfalishsSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "foreas_kyrias_asfalishs"
+    }
+  );
+  const ForeasKyriasAsfalishsModel = model("ForeasKyriasAsfalishs", ForeasKyriasAsfalishsSchema);
+
+  const ForeasEpikoyrikhsAsfalishsSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "foreas_epikoyrikhs_asfalishs"
+    }
+  );
+  const ForeasEpikoyrikhsAsfalishsModel = model("ForeasEpikoyrikhsAsfalishs", ForeasEpikoyrikhsAsfalishsSchema);
+
+  const ApodoxhOysiodonOronSchema = new Schema({
+      kodikos: { type: String, unique: true, index: true},
+      perigrafh: { type: String, trim: true },
+    },
+    {
+      collection: "oysiodeis_oroi"
+    }
+  );
+  const ApodoxhOysiodonOronModel = model("ApodoxhOysiodonOron", ApodoxhOysiodonOronSchema);
+
   module.exports = {AdeiesDiamonhsModel,
                     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
                     AntistoixishKadEidikothtesKpkEfkaModel,
                     ApasxolhseisBaseiSymbashsModel,
+                    ApodoxhOysiodonOronModel,
                     AsfalistikesKlaseisModel,
                     ArgiesModel,
                     BanksModel, 
@@ -689,7 +728,9 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     EmmesosErgodothsModel, 
                     ForeasAstheneiasXorisEfkaModel,
                     ForeasEpikoyrikhsXorisEfkaModel,
+                    ForeasEpikoyrikhsAsfalishsModel,
                     ForeisEkpaideyshsModel,
+                    ForeasKyriasAsfalishsModel,
                     ForologikesKlimakesModel,
                     GenikesParametroiModel,
                     IatrosErgasiasModel, 

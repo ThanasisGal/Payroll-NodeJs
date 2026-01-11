@@ -49,6 +49,8 @@ const nomoi                                 = require("../dropdowns/ergazomenoi/
 const dhmoi                                 = require("../dropdowns/ergazomenoi/dhmoi");
 const poleis                                = require("../dropdowns/ergazomenoi/poleis");
 
+const foreas_kyrias_asfalishs               = require('../dropdowns/ergazomenoi/foreas_kyrias_asfalishs');
+const foreas_epikoyrikhs_asfalishs          = require('../dropdowns/ergazomenoi/foreas_epikoyrikhs_asfalishs');
 const kadEfka                               = require("../dropdowns/ergazomenoi/kadEfka");
 const eidikothtesEfka                       = require('../dropdowns/ergazomenoi/eidikothtesEfka');
 const kpkEfka                               = require('../dropdowns/ergazomenoi/kpkEfka');
@@ -70,10 +72,13 @@ const idiothta_antisymbal_sto_ergo_39        = require('../dropdowns/ergazomenoi
 
 const adeies_diamonhs_typos_0               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_0');
 const adeies_diamonhs_typos_1               = require('../dropdowns/ergazomenoi/adeies_diamonhs_typos_1');
+
 const thematika_pedia                       = require('../dropdowns/ergazomenoi/thematika_pedia');
 const thematikes_enothtes                   = require('../dropdowns/ergazomenoi/thematikes_enothtes');
 const foreis_katartishs                     = require('../dropdowns/ergazomenoi/foreis_katartishs');
 const languages                             = require('../dropdowns/ergazomenoi/languages');
+
+const oysiodeis_oroi                        = require('../dropdowns/ergazomenoi/oysiodeisOroi');
 
 const symbaseis                             = require('../dropdowns/symbaseis/symbaseis');
 const kathgoriesSymbaseon                   = require('../dropdowns/symbaseis/kathgoriesSymbaseon');
@@ -91,6 +96,7 @@ const   {
 const   {
             AdeiesDiamonhsModel,
             ApasxolhseisBaseiSymbashsModel, 
+            ApodoxhOysiodonOronModel,
             AsfalistikesKlaseisModel,
             BanksModel,
             DhmoiModel, 
@@ -104,6 +110,8 @@ const   {
             ForeasAstheneiasXorisEfkaModel,
             ForeisEkpaideyshsModel,
             ForeasEpikoyrikhsXorisEfkaModel,
+            ForeasEpikoyrikhsAsfalishsModel,
+            ForeasKyriasAsfalishsModel,
             IdiothtaErgoy39Par9Model,
             IdiothtesModel,
             KadEfkaModel,
@@ -311,6 +319,9 @@ router.get('/ergazomenoi/perifereia',                   buildDropdownRoute(Perif
 router.get('/ergazomenoi/nomos',                        buildDropdownRoute(NomoiModel , nomoi.options));
 router.get('/ergazomenoi/dhmos',                        buildDropdownRoute(DhmoiModel , dhmoi.options));
 router.get('/ergazomenoi/polh',                         buildDropdownRoute(PoleisModel , poleis.options));
+
+router.get('/ergazomenoi/foreas_kyrias_asfalishs',      buildDropdownRoute(ForeasKyriasAsfalishsModel , foreas_kyrias_asfalishs.options));
+router.get('/ergazomenoi/foreas_epikoyrikhs_asfalishs', buildDropdownRoute(ForeasEpikoyrikhsAsfalishsModel , foreas_epikoyrikhs_asfalishs.options));
 router.get('/ergazomenoi/kad_efka',                     buildDropdownRoute(KadEfkaModel , kadEfka.options));
 router.get('/ergazomenoi/eidikothta_efka',              eidikothtesEfka.handler);
 router.get('/ergazomenoi/kpk_efka',                     kpkEfka.handler);
@@ -362,6 +373,7 @@ router.get('/ergazomenoi/idiothta_sto_ergo_39',
 
 // ✅ Άδειες Διαμονής με typos = "0"
 router.get('/ergazomenoi/adeies_diamonhs_typos_0',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_0.options));
+// ✅ Άδειες Διαμονής με typos = "1"
 router.get('/ergazomenoi/adeies_diamonhs_typos_1',      buildDropdownRoute(AdeiesDiamonhsModel, adeies_diamonhs_typos_1.options));
 
 // =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION5 -> ΕΠΑΓΓ. ΚΑΤΑΡΤΙΣΗ ==============================
@@ -371,6 +383,10 @@ router.get('/ergazomenoi/thematiko_pedio',              buildDropdownRoute(Thema
 router.get('/ergazomenoi/thematikh_enothta',            buildDropdownRoute(ThematikesEnothtesModel, thematikes_enothtes.options));
 router.get('/ergazomenoi/foreas_katartishs',            buildDropdownRoute(ForeisEkpaideyshsModel, foreis_katartishs.options));
 router.get('/ergazomenoi/language',                     buildDropdownRoute(LanguagesModel, languages.options));
+
+// =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION6 -> ΔΙΑΦΟΡΑ ================================
+
+router.get('/ergazomenoi/oysiodeis_oroi',               buildDropdownRoute(ApodoxhOysiodonOronModel, oysiodeis_oroi.options));
 
 // ============================= ΣΥΜΒΑΣΕΙΣ -> ΚΑΤΗΓΟΡΙΕΣ ΣΥΜΒΑΣΕΩΝ ===============================
 

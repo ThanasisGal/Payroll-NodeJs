@@ -6,6 +6,7 @@ const Models_A = require("../../models/stathera_arxeia");
 const Models_B = require("../../models/privileges");
 const Models_C = require("../../models/companies");
 const Models_D = require("../../models/ergazomenoi");
+const Models_E = require("../../models/pdfDocument");
 
 const   {   KrathseisModel,
             PerifereiesModel,
@@ -21,6 +22,8 @@ const   {   ErgazomenoiModel,
             ProdhlomenaOrariaModel,
             IstorikoProslhpseonAllagonModel,
         } = Models_D;
+
+const   { pdfDocumentl } = Models_E;
 
 let nextPageSearchTerm = "";
 
@@ -735,10 +738,26 @@ class ergazomenoiController {
         newErgazomenos.createdAt = Date.now();
         newErgazomenos.updatedAt = Date.now();
 
+        let savedErgazomenos = null; // ✅ Δήλωση
+
         try {
-            await ErgazomenoiModel.create(newErgazomenos);
+            savedErgazomenos = await ErgazomenoiModel.create(newErgazomenos); // ✅ Αποθήκευση
+            console.log("Εργαζόμενος αποθηκεύτηκε με _id:", savedErgazomenos._id);
         } catch (error) {
             console.log("Σφάλμα κατά τη αποθήκευση του/ης εργαζομένου/ης:", error);
+            return res.status(500).json({ 
+                success: false, 
+                errorMessage: "Σφάλμα κατά τη αποθήκευση του εργαζόμενου" 
+            });
+        }
+
+        // ✅ Έλεγχος ότι το _id υπάρχει
+        if (! savedErgazomenos || ! savedErgazomenos._id) {
+            console.error("ΣΦΑΛΜΑ: Ο εργαζόμενος δημιουργήθηκε αλλά δεν έχει _id!");
+            return res.status(500).json({ 
+                success: false, 
+                errorMessage: "Εσωτερικό σφάλμα:  Δεν βρέθηκε ID εργαζόμενου" 
+            });
         }
 
         function createOrarioData(i1) {
@@ -862,16 +881,32 @@ class ergazomenoiController {
         try {
             await IstorikoProslhpseonAllagonModel.create(newIstoriko);
         } catch (error) {
-            return res.status(500).json({ success: false, message: "Σφάλμα κατά την αποθήκευση του ιστορικού" });
+            console.log("Σφάλμα κατά την αποθήκευση του ιστορικού:", error);
+            return res.status(500).json({ 
+                success: false, 
+                errorMessage: "Σφάλμα κατά την αποθήκευση του ιστορικού" 
+            });
         }
 
+        // ✅ ΤΕΛΙΚΟ RESPONSE με _id
         try {
-
-            return res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+            return res.json({ 
+                success: true, 
+                data: {
+                    _id: savedErgazomenos._id,           // ✅ Για PDF upload
+                    kodikos: savedErgazomenos.kodikos,
+                    eponymo: savedErgazomenos.eponymo,
+                    onoma: savedErgazomenos.onoma
+                },
+                redirectUrl: "/ergazomenoi/ergazomenoi" 
+            });
         } catch (error) {
-            console.log("Σφάλμα κατά τη δημιουργία ιστορικού:", error);
+            console.log("Σφάλμα κατά τη δημιουργία απάντησης:", error);
+            return res.status(500).json({ 
+                success: false, 
+                errorMessage: "Σφάλμα κατά την ολοκλήρωση" 
+            });
         }        
-        
         
         
         

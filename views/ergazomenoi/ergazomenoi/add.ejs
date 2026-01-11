@@ -391,6 +391,8 @@
 <script src="<%= script('ergazomenoi/genika/calcChildren') %>"></script>
 <script src="<%= script('ergazomenoi/genika/autoLoadTaxScale') %>"></script>
 <script src="<%= script('ergazomenoi/genika/autoCalculateEndDate') %>"></script>
+<script src="<%= script('ergazomenoi/genika/dokimastikhPeriodos_Blur') %>"></script>
+<script src="<%= script('ergazomenoi/genika/pdf_Upload_Modal') %>"></script>
 
 <script nonce="<%= nonce %>" type="module">
     import { bindCheckboxControlsSelect } from 'dependent-select-toggle';
@@ -445,6 +447,7 @@
         hiddenId  : 'programma_dypa_stathera',
         
 		extraFieldIds: [
+            'ypoxreotikh_ek_toy_nomoy_katartish',
             'egkritikh_apofash_dypa',
             'hmeromhnia_enarxhs_programmatos',
             'hmeromhnia_lhxhs_programmatos'

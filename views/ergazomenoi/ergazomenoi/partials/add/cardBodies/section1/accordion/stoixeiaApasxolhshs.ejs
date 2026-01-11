@@ -1,4 +1,4 @@
-<div class="accordion-item">
+<div class="accordion-item margin-top--2_5rem">
     <h2 class="accordion-header">
         <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="true" aria-controls="panelsStayOpen-collapseThree" 
         tabindex="-1">
@@ -13,7 +13,7 @@
         <div class="accordion-body bg-white margin-bottom--0_5rem">
             <input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4_5rem">
                 <div class="col-2 left-align">
                     <label for="plhrhs_apasxolhsh" class="col-form-label label-font-size">
                     Πλήρης Απασχόληση
@@ -29,15 +29,44 @@
                 <div class="col-3"></div>
 
                 <div class="col-2 left-align">
-                    <label for="dieythethsh_xronoy_ergasias" class="col-form-label label-font-size">
-                    Διευθέτηση Χρόνου Εργαίας
+                    <label for="mh_problepsimo_programma" class="col-form-label label-font-size field-required">
+                    Μη Προβλέψιμο Πρόγραμμα Οργάνωσης Χρόνου Εργασίας
                     </label>
                 </div>
                 <div class="col-1 left-align checkbox-flex-center">
-                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="dieythethsh_xronoy_ergasias" name="dieythethsh_xronoy_ergasias" value="" />
-                    <label for="dieythethsh_xronoy_ergasias" id="label-dieythethsh_xronoy_ergasias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="mh_problepsimo_programma" name="mh_problepsimo_programma" value="" />
+                    <label for="mh_problepsimo_programma" id="label-mh_problepsimo_programma" class="margin-left-0_75rem  font-size-vw-0_875">
                     ΟΧΙ
                     </label>
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+                <div class="col-2 left-align">
+                    <label for="hmeres_ores_anaforas" class="col-form-label label-font-size field-required">
+                    Ημέρες & Ώρες Αναφοράς
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="hmeres_ores_anaforas" id="hmeres_ores_anaforas" data-bs-toggle="tooltip" title="Ενδεικτικό παράδειγμα: «Το πρώτο δεκαήμερο κάθε μήνα ή την τελευταία Κυριακή κάθε μήνα, μεταξύ 08.00-16.00" data-bs-placement="bottom" data-tooltip-max-width="15vw" class="form-control input-contents" autocomplete="off" maxlength="1000" />
+                </div>
+
+                <div class="col-2 left-align">
+                    <label for="eidopoihsh_prin_thn_anathesh" class="col-form-label label-font-size field-required">
+                    Ελάχιστη Ειδοποίηση πριν την Ανάθεση Εργασίας
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="eidopoihsh_prin_thn_anathesh" id="eidopoihsh_prin_thn_anathesh" data-bs-toggle="tooltip" title="Ενδεικτικό Παράδειγμα: Μεγαλύτερη των 24 ωρών, Ίση με 24 ώρες, Μικρότερη των 24 ωρών – Έκτακτη ανάγκη" data-bs-placement="bottom" data-tooltip-max-width="15vw" class="form-control input-contents" autocomplete="off" maxlength="50" />
+                </div>
+
+                <div class="col-2 left-align">
+                    <label for="prothesmia_akyroshs_ths_anatheshs" class="col-form-label label-font-size field-required">
+                    Προθεσμία Ακύρωσης της Ανάθεσης Εργασίας
+                    </label>
+                </div>
+                <div class="col-2">
+                    <input type="text" name="prothesmia_akyroshs_ths_anatheshs" id="prothesmia_akyroshs_ths_anatheshs" data-bs-toggle="tooltip" title="Ενδεικτικό Παράδειγμα: Μεγαλύτερη των 24 ωρών, Ίση με 24 ώρες, Μικρότερη των 24 ωρών – Έκτακτη ανάγκη. &nbsp; &nbsp; &nbsp; Σε περίπτωση που μετά την ειδοποίηση και πάντως πριν από την ανάληψη της εργασίας ο εργοδότης ακυρώσει την ανάθεση της, ο εργαζόμενος δικαιούται αποζημίωση που αντιστοιχεί στα ωρομίσθια των ωρών εργασίας που δεν του ανατέθηκαν, σύμφωνα με την παρ. 3 του άρθρου 182Α του Κώδικα Ατομικού Εργατικού Δικαίου" data-bs-placement="bottom" data-tooltip-max-width="25vw" class="form-control input-contents" autocomplete="off" maxlength="50" />
                 </div>
             </div>
 
@@ -86,7 +115,7 @@
 
                 <div class="col-1-7 left-align">
                     <label for="dialleima_entos_ektos_orarioy" class="col-form-label label-font-size field-required">
-                    Εντός/Εκτός Ωραρίου
+                    Διάλειμμα Εντός Ωραρίου
                     </label>
                 </div>
                 <div class="col-1 left-align checkbox-flex-center">
@@ -356,36 +385,37 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
-                    <label for="eidikothta" class="col-form-label label-font-size">
-                    Ειδικότητα
+                    <label for="eidikothta_erganh" class="col-form-label label-font-size field-required">
+                    Ειδικότητα (ΕΡΓΑΝΗ)
                     </label>
                 </div>
 
                 <input
                     type="hidden"
-                    name="eidikothta_stathera"
-                    id="eidikothta_stathera"
+                    name="eidikothta_erganh_stathera"
+                    id="eidikothta_erganh_stathera"
                     class="form-control input-contents"
-                    value="<%= safe("eidikothta_stathera") %>"
+                    value="<%= safe("eidikothta_erganh_stathera") %>"
                 />
 
-                <div class="col-3-74">
+                <div class="col-9-74">
                     <select
-                        id="eidikothta"
-                        name="eidikothta"
+                        id="eidikothta_erganh"
+                        name="eidikothta_erganh"
                         class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Ειδικότητα"
-                        data-api="/api/dropdown/ergazomenoi/eidikothta"
+                        aria-label="Ειδικότητα ΕΡΓΑΝΗ"
+                        data-api="/api/dropdown/ergazomenoi/eidikothta_erganh"
                         single
-                        data-target-input=<%= `eidikothta_stathera` %>
-                        data-preselect=<%= `eidikothta_stathera` %>
-                        data-preload-all="true"
-                        data-pad-length="3"
+                        data-dd-width="40vw"
+                        data-target-input=<%= `eidikothta_erganh_stathera` %>
+                        data-preselect=<%= `eidikothta_erganh_stathera` %>
+                        data-preload-all="false"
+                        data-pad-length="6"
                         data-xrhsh-related="false"
                         data-team-related="false"
                         data-company-related="false"
                         data-mhnas-related="false"
-                        placeholder="Αναζήτηση Ειδικότητας">
+                        placeholder="Αναζήτηση Ειδικότητας ΕΡΓΑΝΗ">
                     </select>
                 </div>
             </div>
@@ -496,37 +526,36 @@
                 <div class="col-3"></div>
 
                 <div class="col-2 left-align">
-                    <label for="eidikothta_erganh" class="col-form-label label-font-size">
-                    Ειδικότητα ΕΡΓΑΝΗ
+                    <label for="eidikothta" class="col-form-label label-font-size">
+                    Ειδικότητα
                     </label>
                 </div>
 
                 <input
                     type="hidden"
-                    name="eidikothta_erganh_stathera"
-                    id="eidikothta_erganh_stathera"
+                    name="eidikothta_stathera"
+                    id="eidikothta_stathera"
                     class="form-control input-contents"
-                    value="<%= safe("eidikothta_erganh_stathera") %>"
+                    value="<%= safe("eidikothta_stathera") %>"
                 />
 
                 <div class="col-3-74">
                     <select
-                        id="eidikothta_erganh"
-                        name="eidikothta_erganh"
+                        id="eidikothta"
+                        name="eidikothta"
                         class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Ειδικότητα ΕΡΓΑΝΗ"
-                        data-api="/api/dropdown/ergazomenoi/eidikothta_erganh"
+                        aria-label="Ειδικότητα"
+                        data-api="/api/dropdown/ergazomenoi/eidikothta"
                         single
-                        data-dd-width="40vw"
-                        data-target-input=<%= `eidikothta_erganh_stathera` %>
-                        data-preselect=<%= `eidikothta_erganh_stathera` %>
-                        data-preload-all="false"
-                        data-pad-length="6"
+                        data-target-input=<%= `eidikothta_stathera` %>
+                        data-preselect=<%= `eidikothta_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
                         data-xrhsh-related="false"
                         data-team-related="false"
                         data-company-related="false"
                         data-mhnas-related="false"
-                        placeholder="Αναζήτηση Ειδικότητας ΕΡΓΑΝΗ">
+                        placeholder="Αναζήτηση Ειδικότητας">
                     </select>
                 </div>
             </div>
@@ -571,5 +600,6 @@
                     </div>
                 </div>
             </div>
+            <div class="height-vh-3_5"></div>
         </div>
     </div>

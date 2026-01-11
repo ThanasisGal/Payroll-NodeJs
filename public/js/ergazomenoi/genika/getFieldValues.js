@@ -308,50 +308,187 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
             }
 
-            // 4) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
+            // // 4) 204 No Content → δικό μας redirect (προσαρμόσ’ το όπου θέλεις)
+            // if (response.status === 204) {
+            //     await Swal.fire({
+            //         backdrop: false,            // overlay
+            //         allowOutsideClick: false,
+            //         icon: "success",
+            //         title: "Επιτυχής καταχώριση!",
+            //         timer: 1200,
+            //         showConfirmButton: false,
+            //         customClass: {
+            //             confirmButton: "class-success custom-confirm-button custom-swal-button",
+            //             title: "custom-title",
+            //             popup: "custom-swal-popup",
+            //         },
+            //     }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+            //     return;
+            // }
+
+
+
+            // 4) 204 No Content → δικό μας redirect
             if (response.status === 204) {
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
-                    timer: 1200,
-                    showConfirmButton: false,
-                    customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                // ⚠️ ΠΡΟΣΟΧΗ: 204 No Content δεν επιστρέφει data/body! 
+                // Αν έχει επιλεγεί PDF, ΔΕΝ μπορεί να γίνει upload χωρίς ergazomenosId
+                
+                if (window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload()) {
+                    // Ειδοποίηση ότι το PDF δεν ανέβηκε
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon:  "warning",
+                        title: "Ο εργαζόμενος αποθηκεύτηκε",
+                        html: `<p><strong>Αλλά το PDF δεν ανέβηκε!</strong></p>
+                            <p style="color:  #666; font-size: 0.9rem; margin-top: 10px;">
+                                Ο server επέστρεψε 204 No Content χωρίς ID εργαζόμενου.
+                            </p>
+                            <p style="color:  #999; font-size: 0.85rem; margin-top: 10px;">
+                                💡 Συμβουλή: Αλλάξτε τον backend να επιστρέφει JSON με _id
+                            </p>`,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: "class-warning custom-confirm-button custom-swal-button",
+                            title: "custom-title",
+                            popup:  "custom-swal-popup",
+                        },
+                    }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                } else {
+                    // Δεν υπάρχει PDF, κανονικό success
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: "success",
+                        title: "Επιτυχής καταχώριση!",
+                        timer:  1200,
+                        showConfirmButton: false,
+                        customClass: {
+                            confirmButton:  "class-success custom-confirm-button custom-swal-button",
+                            title: "custom-title",
+                            popup: "custom-swal-popup",
+                        },
+                    }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                }
                 return;
             }
 
+            // // 5) JSON απάντηση
+            // const ct = response.headers.get("content-type") || "";
+            // if (ct.includes("application/json")) {
+            //     const data = await response.json();
+            //     message = data?.errorMessage || "";
+            //     if (!response.ok || !data?.success) {
+            //         throw new Error(`HTTP ${response.status} / success=${data?.success}`);
+            //     }
+            //     await Swal.fire({
+            //         backdrop: false,            // overlay
+            //         allowOutsideClick: false,
+            //         icon: "success",
+            //         title: "Επιτυχής καταχώριση!",
+            //         timer: 1200,
+            //         showConfirmButton: false,
+            //         customClass: {
+            //             confirmButton: "class-success custom-confirm-button custom-swal-button",
+            //             title: "custom-title",
+            //             popup: "custom-swal-popup",
+            //         },
+            //     }).then(() => {
+            //         window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+            //     });
+            //     return;
+            // }
+
+
+
+            
             // 5) JSON απάντηση
             const ct = response.headers.get("content-type") || "";
             if (ct.includes("application/json")) {
                 const data = await response.json();
                 message = data?.errorMessage || "";
-                if (!response.ok || !data?.success) {
+                if (!response.ok || ! data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
-                await Swal.fire({
-                    backdrop: false,            // overlay
-                    allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
-                    timer: 1200,
-                    showConfirmButton: false,
-                    customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => {
-                    window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
-                });
+                
+                // ✅ ΠΡΟΣΘΗΚΗ:  Upload PDF αν υπάρχει
+                let pdfUploadSuccess = true;
+                let pdfUploadError = null;
+                
+                if (window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload()) {
+                    const ergazomenosId = data?. data?._id || data?._id || data?.id;
+                    
+                    if (ergazomenosId) {
+                        try {
+                            console.log('Uploading PDF for ergazomenos:', ergazomenosId);
+                            const uploadResult = await window.pdfUploadModule.uploadPendingFile(ergazomenosId);
+                            
+                            if (uploadResult. success) {
+                                console. log('PDF uploaded successfully:', uploadResult);
+                            } else {
+                                pdfUploadSuccess = false;
+                                pdfUploadError = uploadResult.error || 'Upload failed';
+                            }
+                        } catch (uploadError) {
+                            console.error('PDF upload failed:', uploadError);
+                            pdfUploadSuccess = false;
+                            pdfUploadError = uploadError.message;
+                        }
+                    } else {
+                        console.warn('No ergazomenosId found in response, skipping PDF upload');
+                        pdfUploadSuccess = false;
+                        pdfUploadError = 'Δεν βρέθηκε ID εργαζόμενου';
+                    }
+                }
+                
+                // Success message
+                if (pdfUploadSuccess) {
+                    // Όλα πήγαν καλά
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: "success",
+                        title: "Επιτυχής καταχώριση!",
+                        html: window.pdfUploadModule?. hasPendingUpload() 
+                            ? "<p>Ο εργαζόμενος και το PDF αποθηκεύτηκαν με επιτυχία! </p>"
+                            : "<p>Ο εργαζόμενος αποθηκεύτηκε με επιτυχία!</p>",
+                        timer: 1500,
+                        showConfirmButton:  false,
+                        customClass: {
+                            confirmButton: "class-success custom-confirm-button custom-swal-button",
+                            title: "custom-title",
+                            popup: "custom-swal-popup",
+                        },
+                    }).then(() => {
+                        window. location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+                    });
+                } else {
+                    // Εργαζόμενος saved, αλλά PDF failed
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: "warning",
+                        title: "Ο εργαζόμενος αποθηκεύτηκε",
+                        html: `<p><strong>Αλλά το PDF δεν ανέβηκε! </strong></p>
+                            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                                Σφάλμα: ${pdfUploadError || 'Άγνωστο σφάλμα'}
+                            </p>
+                            <p style="color:  #999; font-size: 0.85rem; margin-top: 10px;">
+                                Μπορείτε να ανεβάσετε το PDF αργότερα από την επεξεργασία. 
+                            </p>`,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton:  "class-warning custom-confirm-button custom-swal-button",
+                            title: "custom-title",
+                            popup: "custom-swal-popup",
+                        },
+                    }).then(() => {
+                        window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+                    });
+                }
+                
                 return;
-            }
-
+}
             // 6) Άλλος content-type αλλά OK (π.χ. HTML)
             if (response.ok) {
                 await Swal.fire({

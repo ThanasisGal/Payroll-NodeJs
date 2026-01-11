@@ -1,4 +1,4 @@
-<div class="accordion-item">
+<div class="accordion-item margin-top--2_5rem">
     <h2 class="accordion-header">
         <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="true" aria-controls="panelsStayOpen-collapseFour" 
         tabindex="-1">
@@ -11,7 +11,76 @@
         <% const safe = (k) => (rec && rec[k]) || ''; %>
 
         <div class="accordion-body bg-white margin-bottom--0_5rem">
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+                <div class="col-2 text-left">
+                    <label for="foreas_kyrias_asfalishs" class="col-form-label label-font-size field-required">
+                    Φορέας Κύριας Ασφάλισης
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="foreas_kyrias_asfalishs_stathera"
+                    id="foreas_kyrias_asfalishs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("foreas_kyrias_asfalishs_stathera") %>"
+                />
+
+                <div class="col-9-74">
+                    <select
+                        id="foreas_kyrias_asfalishs"
+                        name="foreas_kyrias_asfalishs"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Φορέας Κύριας Ασφάλισης"
+                        data-api="/api/dropdown/ergazomenoi/foreas_kyrias_asfalishs"
+                        single
+                        data-target-input=<%= `foreas_kyrias_asfalishs_stathera` %>
+                        data-preselect=<%= `foreas_kyrias_asfalishs_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        placeholder="Αναζήτηση Φορέα Κύριας Ασφάλισης">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_3"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1rem">
+                <div class="col-2 text-left">
+                    <label for="foreas_epikoyrikhs_asfalishs" class="col-form-label label-font-size field-required">
+                    Φορέας Επικουρικής Ασφάλισης
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="foreas_epikoyrikhs_asfalishs_stathera"
+                    id="foreas_epikoyrikhs_asfalishs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe("foreas_epikoyrikhs_asfalishs_stathera") %>"
+                />
+
+                <div class="col-9-74">
+                    <select
+                        id="foreas_epikoyrikhs_asfalishs"
+                        name="foreas_epikoyrikhs_asfalishs"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Φορέας Επικουρικής Ασφάλισης"
+                        data-api="/api/dropdown/ergazomenoi/foreas_epikoyrikhs_asfalishs"
+                        single
+                        data-target-input=<%= `foreas_epikoyrikhs_asfalishs_stathera` %>
+                        data-preselect=<%= `foreas_epikoyrikhs_asfalishs_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="3"
+                        placeholder="Αναζήτηση Φορέα Επικουρικής Ασφάλισης">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_3"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
                     <label for="kad_efka" class="col-form-label label-font-size field-required">
                     Κ.Α.Δ. ΕΦΚΑ
@@ -181,6 +250,19 @@
 
             <div class="height-vh-0_3"></div>
 
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1rem">
+                <div class="col-2 left-align">
+                    <label for="prosthetes_asfalistikes_apodoxes" class="col-form-label label-font-size">
+                    Πρόσθετες Ασφ/στικές Αποδοχές
+                    </label>
+                </div>
+                <div class="col-10">
+                    <input type="text" name="prosthetes_asfalistikes_apodoxes" id="prosthetes_asfalistikes_apodoxes" class="form-control input-contents" value="" autocomplete="off" maxlength="500" />
+                </div>
+            </div>
+            
+            <div class="height-vh-0_3"></div>
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
                     <label for="meiosh_eisforon_ergazomenon" class="col-form-label label-font-size">
@@ -320,7 +402,9 @@
                 </div>
             </div>
 
-            <hr class="hr-style" />
+            <div class="height-vh-0_8"></div>
+
+            <hr class="hr-style-6" />
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
@@ -348,8 +432,8 @@
                     ΟΧΙ
                 </label>
             </div>
+            <div class="height-vh-1_5"></div>
         </div>
-
     </div>
   </div>
 </div>

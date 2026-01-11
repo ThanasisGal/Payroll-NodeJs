@@ -4,6 +4,10 @@
 .env.production
 .aws/
 
+# Uploaded files
+uploads/
+!uploads/.gitkeep
+
 # Παραγόμενα αρχεία και φακέλοι
 public/json/*.json
 public/pdf/*.pdf

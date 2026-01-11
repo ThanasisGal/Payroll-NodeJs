@@ -1,9 +1,14 @@
 const express = require("express");
 const router = express.Router();
 
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+
 const userController = require("../controllers/userController.js");
 const companiesController = require("../controllers/companies/companiesController.js");
 const mainAppController = require("../controllers/mainAppController.js");
+const pdfDocumentsController = require("../controllers/pdfDocumentController.js");
 
 const checkUserAuth = require("../middlewares/auth-middleware.js");
 const getSessionVars = require("../middlewares/session-variables.js");
@@ -28,6 +33,56 @@ const ektyposhApasxolhseonController = require("../controllers/ektyposeis/apasxo
 
 const TmhmataModel = require('../models/stathera_arxeia.js');
 const PeriodsModel = require('../models/stathera_arxeia.js');
+
+// ============================================================================
+// ✅ ΠΡΟΣΘΗΚΗ:  MULTER CONFIGURATION για PDF Upload
+// ============================================================================
+
+const storage = multer.diskStorage({
+    destination: async function(req, file, cb) {
+        try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            
+            const uploadPath = path.join('uploads', 'pdfs', String(year), month, day);
+            await fs. mkdir(uploadPath, { recursive:  true });
+            
+            cb(null, uploadPath);
+        } catch (error) {
+            console.error('Error creating upload directory:', error);
+            cb(error);
+        }
+    },
+    
+    filename: function(req, file, cb) {
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 100000);
+        const sanitizedName = file.originalname
+            .replace(/[^a-zA-Z0-9.-]/g, '_')
+            .toLowerCase();
+        
+        const uniqueName = `${timestamp}-${random}-${sanitizedName}`;
+        cb(null, uniqueName);
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+    } else {
+        cb(new Error('Μόνο αρχεία PDF επιτρέπονται! '), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+// ============================================================================
 
 // Route Level Middlware - To Protected Route
 router.use("/changepassword", checkUserAuth);
@@ -365,6 +420,11 @@ router.get("/api/genikesParametroi", genikaAPIsController.getGenikesParametroi);
 router.post("/api/getOraria", ergazomenoiController.getOrariaAnaErgazomeno);
 router.post("/api/ergazomenoi/update/:ergazomenoiId", ergazomenoiController.postErgazomenoiUpdate);
 router.post("/api/forologikes-klimakes/lookup", ergazomenoiController.forologikesKlimakes);
+
+router.post('/api/upload-pdf', checkAuth, upload.single('pdfFile'), pdfDocumentsController.uploadPdf);
+router.get('/api/pdf/: ergazomenosId', checkAuth, pdfDocumentsController.getPdfsByErgazomenos);
+router.get('/api/download-pdf/:id', checkAuth, pdfDocumentsController.downloadPdf);
+router.delete('/api/delete-pdf/:id', checkAuth, pdfDocumentsController.deletePdf);
 
 router.get("/api/getAllErgazomenoi/:selectedTeam/:selectedCompany", programmataController.getAllErgazomenoi);
 router.get("/api/getErgazomeno/:selectedTeam/:selectedCompany/:selectedKodikos", programmataController.getErgazomeno);

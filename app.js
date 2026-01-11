@@ -34,6 +34,7 @@ const geoGuard = require("./server/middlewares/geoGuard");
 const usersRoute = require("./server/routes/usersRoute");
 const dropdownRoutes = require("./server/routes/dropdownRoutes");
 const apiRoutes = require("./server/routes/apiRoutes");
+
 const getSessionVars = require("./server/middlewares/session-variables");
 const logger = require("./server/utils/logger");
 
@@ -152,6 +153,38 @@ app.use("/static", express.static(path.join(__dirname, "public"), {
             res.set('Cache-Control', 'public, max-age=86400, immutable');
         } else {
             res.set('Cache-Control', 'public, max-age=604800');
+        }
+    }
+}));
+
+const checkFileAuth = (req, res, next) => {
+    if (!req.session || !req. session.userId) {
+        logger.warn(`Unauthorized file access attempt: ${req.path} from IP ${req.ip}`);
+        return res.status(401).send('Unauthorized - Please login');
+    }
+    
+    logger.info(`File access: ${req.path} by user ${req. session.userId}`);
+    next();
+};
+
+// ============================================================================
+// Serve Uploads (Protected)
+// ============================================================================
+
+app.use('/uploads', checkFileAuth, express.static(path.join(__dirname, 'uploads'), {
+    maxAge: 0,
+    dotfiles: 'deny',
+    index: false, // Disable directory listing
+    setHeaders: (res, filepath) => {
+        // Security headers
+        res.set('X-Content-Type-Options', 'nosniff');
+        res.set('X-Frame-Options', 'DENY');
+        res.set('Referrer-Policy', 'no-referrer');
+        
+        if (filepath. endsWith('.pdf')) {
+            res.set('Content-Type', 'application/pdf');
+            res.set('Content-Disposition', 'inline');
+            res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline';");
         }
     }
 }));

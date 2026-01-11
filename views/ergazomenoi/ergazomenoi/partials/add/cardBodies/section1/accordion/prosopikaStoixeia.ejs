@@ -69,7 +69,7 @@
                 <div class="col-0-5"></div>
 
                 <div class="col-1 right-align">
-                    <label for="fylo" class="col-form-label label-font-size">
+                    <label for="fylo" class="col-form-label label-font-size field-required">
                     Φύλο
                     </label>
                 </div>
@@ -228,7 +228,18 @@
                     <input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="" autocomplete="off" />
                 </div>
 
-                <div class="col-2"></div>
+                <div class="col-2 margin-bottom-0_2rem">
+                    <button 
+                        type="button" 
+                        id="customButton_anhlikoi" 
+                        class="btn btn-orange rounded-4 buttons-content w-100"
+                        disabled>
+                        <i class="bi bi-cloud-arrow-up"></i> 
+                        Βιβλιάριο Ανηλίκου (pdf)
+                    </button>
+                </div>
+
+                <!-- <div class="col-2"></div> -->
 
                 <div class="col-2 left-align">
                     <label for="email" class="col-form-label label-font-size field-required-gray">
@@ -656,6 +667,7 @@
                     <input type="text" name="iban" id="iban" class="form-control input-contents" value="GR" autocomplete="off" />
                 </div>
             </div>
+            <div class="height-vh-3_5"></div>
         </div>
     </div>
 </div>

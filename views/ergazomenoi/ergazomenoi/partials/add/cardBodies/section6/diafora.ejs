@@ -1,3 +1,5 @@
+<% const safe = (k) => (rec && rec[k]) || ''; %>
+
 <div class="row form-group align-items-center mt-n-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-3 left-align">
       	<label for="symfonhtheis_misthos_genikos" class="col-form-label label-font-size">
@@ -77,6 +79,124 @@
       	</label>
 	</div>
 </div>
+
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--0_3rem">
+	<div class="col-2 text-left">
+		<label for="oysiodeis_oroi" class="col-form-label label-font-size field-required font-size-rem-1">
+		ΑΠΟΔΟΧΗ ΟΥΣΙΩΔΩΝ ΟΡΩΝ
+		</label>
+	</div>
+
+	<input
+		type="hidden"
+		name="oysiodeis_oroi_stathera"
+		id="oysiodeis_oroi_stathera"
+		class="form-control input-contents"
+		value="<%= safe("oysiodeis_oroi_stathera") %>"
+	/>
+
+	<div class="col-6-75">
+		<select
+			id="oysiodeis_oroi"
+			name="oysiodeis_oroi"
+			class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+			aria-label="Αποδοχή Ουσιωδών Όρων"
+			data-api="/api/dropdown/ergazomenoi/oysiodeis_oroi"
+			single
+			data-target-input="oysiodeis_oroi_stathera"
+			data-preselect="oysiodeis_oroi_stathera"
+			data-preload-all="true"
+			data-pad-length="3"
+			placeholder="Αναζήτηση τρόπων Αποδοχής Ουσιωδών Όρων... ">
+		</select>
+	</div>
+
+	<div class="col-0-25"></div>
+
+	<div class="col-3 right-align">
+		<button 
+			type="button" 
+			id="customButton_oysiodeis_oroi" 
+			class="btn btn-brown rounded-4 buttons-content w-100"
+			disabled>
+			<i class="bi bi-cloud-arrow-up"></i> 
+			Αρχείο Αποδοχής Ουσιωδών Όρων (pdf)
+		</button>
+	</div>
+</div>
+
+<!-- ========================================================================
+MODAL ΓΙΑ DRAG & DROP UPLOAD
+======================================================================== -->
+<div id="pdfUploadModal" class="pdf-modal hidden">
+	<div class="pdf-modal-content">
+		<div class="pdf-modal-header">
+			<h3>Μεταφόρτωση Αρχείου PDF</h3>
+			<button type="button" class="pdf-modal-close" id="closePdfModal">
+				<i class="bi bi-x-lg"></i>
+			</button>
+		</div>
+		
+		<div class="pdf-modal-body">
+			<!-- Drag & Drop Zone -->
+			<div id="pdfDropZone" class="pdf-drop-zone">
+				<div class="pdf-drop-zone-content">
+					<i class="bi bi-file-earmark-pdf pdf-drop-icon"></i>
+					<h4>Σύρετε το PDF εδώ</h4>
+					<p>ή κάντε κλικ για επιλογή</p>
+					<small class="text-muted">Μέγιστο μέγεθος: 10MB</small>
+				</div>
+				<input 
+					type="file" 
+					id="pdfFileInput" 
+					name="pdfFile" 
+					accept=".pdf,application/pdf" 
+					class="hidden" 
+				/>
+			</div>
+			
+			<!-- File Preview -->
+			<div id="pdfFilePreview" class="pdf-file-preview hidden">
+				<div class="pdf-file-info">
+					<i class="bi bi-file-earmark-pdf text-danger pdf-file-icon"></i>
+					<div class="pdf-file-details">
+						<strong id="pdfFileName"></strong>
+						<small id="pdfFileSize" class="text-muted"></small>
+					</div>
+					<button type="button" id="removePdfFile" class="pdf-btn-remove">
+						<i class="bi bi-trash"></i>
+					</button>
+				</div>
+				
+				<!-- Preview Button -->
+				<div class="pdf-preview-actions">
+					<button type="button" id="showPdfPreview" class="btn btn-info btn-sm">
+						<i class="bi bi-eye"></i> Προεπισκόπηση
+					</button>
+				</div>
+				
+				<div class="pdf-progress hidden" id="pdfProgressBar">
+					<div class="pdf-progress-fill" id="pdfProgressFill"></div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="pdf-modal-footer">
+			<button type="button" class="btn btn-secondary" id="cancelPdfUpload">Ακύρωση</button>
+			<button type="button" class="btn btn-success" id="confirmPdfUpload" disabled>Αποθήκευση</button>
+		</div>
+	</div>
+</div>
+
+<!-- Hidden field για το uploaded file ID -->
+<input type="hidden" id="pdfFilePath" name="pdfFilePath" value="" />
+
+
+
+
+
+
+<div class="height-vh-1_5"></div>
 
 <hr class="margin-top--0_05rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
 
@@ -226,6 +346,7 @@
 	        name="parathrhseis"
     	    id="parathrhseis"
         	cols="30"
-	        rows="2"></textarea>
+	        rows="2"
+			maxlength="100"></textarea>
     </div>
 </div>

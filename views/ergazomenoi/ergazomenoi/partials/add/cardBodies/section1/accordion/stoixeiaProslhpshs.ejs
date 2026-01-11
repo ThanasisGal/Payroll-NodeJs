@@ -1,4 +1,4 @@
-<div class="accordion-item">
+<div class="accordion-item margin-top--2_5rem">
     <h2 class="accordion-header">
         <button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseTwo" aria-expanded="true" aria-controls="panelsStayOpen-collapseTwo" 
         tabindex="-1">
@@ -148,6 +148,32 @@
                         data-mhnas-related="false"
                         placeholder="Αναζήτηση Σχέσης Εργασίας">
                     </select>
+                </div>
+            </div>
+            
+            <div class="height-vh-0_1"></div>
+            
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="afora_dokimastikh_periodo" class="col-form-label label-font-size field-required">
+                    Αφορά Δοκιμαστική Περίοδο
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_dokimastikh_periodo" name="afora_dokimastikh_periodo" value="" />
+                    <label for="afora_dokimastikh_periodo" id="label-afora_dokimastikh_periodo" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmnia_lhxhs_dokimastikhs_periodoy" class="col-form-label label-font-size field-required">
+                    Ημ/νία Λήξης Δοκ/τικής Περιόδου
+                    </label>
+                </div>
+                <div class="col-1-5 left-align">
+                    <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" data-bs-toggle="tooltip" title="Στην Αορίστου Χρόνου η δοκιμαστική περίοδος είναι έως 6 μήνες ενώ στην ορισμένου χρόνου έως το ¼ της χρονικής διάρκειάς της και σε κάθε περίπτωση έως 6 μήνες." data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="" />
                 </div>
             </div>
 
@@ -362,12 +388,12 @@
                 <div class="col-0-25"></div>
 
                 <div class="col-2 left-align">
-                    <label for="xronos_katabolhs_apodoxon" class="col-form-label label-font-size">
-                    Χρόνος Καταβολής Αποδοχών
+                    <label for="topos_ergasias_parathrhseis" class="col-form-label label-font-size">
+                    Τόπος Εργασίας-Παρατηρήσεις
                     </label>
                 </div>
                 <div class="col-4 left-align">
-                    <input type="text" id="xronos_katabolhs_apodoxon" name="xronos_katabolhs_apodoxon" class="form-control input-contents clearableInputs left-align" value="" />
+                    <input type="text" id="topos_ergasias_parathrhseis" name="topos_ergasias_parathrhseis" class="form-control input-contents clearableInputs left-align" value="" maxlength="500" />
                 </div>
             </div>
 
@@ -375,44 +401,59 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
-                    <label for="afora_dokimastikh_periodo" class="col-form-label label-font-size field-required">
-                    Αφορά Δοκιμαστική Περίοδο
+                    <label for="xronos_katabolhs_apodoxon" class="col-form-label label-font-size field-required">
+                    Χρόνος Καταβολής Αποδοχών
+                    </label>
+                </div>
+
+                <div class="col-10 left-align">
+                    <input type="text" id="xronos_katabolhs_apodoxon" name="xronos_katabolhs_apodoxon" class="form-control input-contents clearableInputs left-align" value="" maxlength="100" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="efarmostea_sse" class="col-form-label label-font-size field-required">
+                    Εφαρμοστέα Σ.Σ.Ε.
                     </label>
                 </div>
                 <div class="col-3-75 left-align checkbox-flex-center">
-                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_dokimastikh_periodo" name="afora_dokimastikh_periodo" value="" />
-                    <label for="afora_dokimastikh_periodo" id="label-afora_dokimastikh_periodo" class="margin-left-0_75rem  font-size-vw-0_875">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="efarmostea_sse" name="efarmostea_sse" value="" />
+                    <label for="efarmostea_sse" id="label-efarmostea_sse" class="margin-left-0_75rem  font-size-vw-0_875">
                     </label>
                 </div>
 
                 <div class="col-0-25"></div>
 
                 <div class="col-2 left-align">
-                    <label for="hmnia_lhxhs_dokimastikhs_periodoy" class="col-form-label label-font-size field-required">
-                    Ημ/νία Λήξης Δοκ/τικής Περιόδου
+                    <label for="efarmostea_sse_parathrhseis" class="col-form-label label-font-size">
+                    Εφαρμοστέα ΣΣΕ-Παρατηρήσεις
                     </label>
                 </div>
-                <div class="col-1-5 left-align">
-                    <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" class="date-control" value="" />
+                <div class="col-4 left-align">
+                    <input type="text" id="efarmostea_sse_parathrhseis" name="efarmostea_sse_parathrhseis" class="form-control input-contents clearableInputs left-align" value="" maxlength="500" />
                 </div>
             </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <div class="height-vh-3_5"></div>
         </div>
     </div>
 </div>
