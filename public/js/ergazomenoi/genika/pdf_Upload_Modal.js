@@ -1,6 +1,11 @@
-document. addEventListener('DOMContentLoaded', function() {
-    const customButton = document.getElementById('customButton_oysiodeis_oroi');
+document.addEventListener('DOMContentLoaded', function() {
+    // =========================================================================
+    // DOM ELEMENTS
+    // =========================================================================
+    
+    const uploadButtons = document.querySelectorAll('.pdf-upload-btn');
     const pdfModal = document.getElementById('pdfUploadModal');
+    const pdfModalTitle = document.getElementById('pdfModalTitle');
     const closePdfModal = document.getElementById('closePdfModal');
     const cancelPdfUpload = document.getElementById('cancelPdfUpload');
     const pdfDropZone = document.getElementById('pdfDropZone');
@@ -10,56 +15,187 @@ document. addEventListener('DOMContentLoaded', function() {
     const pdfFileSize = document.getElementById('pdfFileSize');
     const removePdfFile = document.getElementById('removePdfFile');
     const confirmPdfUpload = document.getElementById('confirmPdfUpload');
-    const pdfFilePath = document.getElementById('pdfFilePath');
     const pdfProgressBar = document.getElementById('pdfProgressBar');
     const pdfProgressFill = document.getElementById('pdfProgressFill');
     const showPdfPreview = document.getElementById('showPdfPreview');
     
+    // =========================================================================
+    // CONSTANTS & STATE
+    // =========================================================================
+    
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    let selectedFile = null;
+    const selectedFiles = {}; // { 'anhlikoi': File, 'allodapoi': File, 'oysiodeis_oroi': File }
     let currentBlobUrl = null;
-    
+    let currentDocumentType = 'oysiodeis_oroi';
+
     // =========================================================================
-    // OPEN/CLOSE MAIN MODAL
+    // UPDATE BUTTON/BADGE DISPLAY - ✅ ΝΕΟ:  Toggle button ⇄ badge
     // =========================================================================
-    
-    if (customButton) {
-        customButton.addEventListener('click', function() {
-            if (! this.disabled) {
-                openModal();
+
+    function updateButtonBadge() {
+        uploadButtons.forEach(button => {
+            const docType = button.dataset.documentType;
+            const file = selectedFiles[docType];
+            
+            // Βρες το wrapper container
+            const wrapper = button.closest('.pdf-button-wrapper');
+            if (!wrapper) {
+                console.warn('⚠️ No wrapper found for button:', button.id);
+                return;
+            }
+            
+            // Βρες το badge replacement
+            const badge = wrapper.querySelector('.pdf-badge-replacement');
+            if (!badge) {
+                console.warn('⚠️ No badge replacement found for button:', button.id);
+                return;
+            }
+            
+            if (file) {
+                // ✅ Έχουμε file → Κρύψε button, δείξε badge
+                button.classList.add('hidden');
+                badge.classList.remove('hidden');
+                
+                // Update badge filename
+                const filenameSpan = badge.querySelector('.badge-filename');
+                if (filenameSpan) {
+                    const shortName = file.name.length > 20 
+                        ?  file.name.substring(0, 17) + '...' 
+                        : file.name;
+                    filenameSpan.textContent = shortName;
+                }
+                
+            } else {
+                // ❌ Δεν έχουμε file → Δείξε button, κρύψε badge
+                button.classList.remove('hidden');
+                badge.classList.add('hidden');
             }
         });
     }
+
+    // =========================================================================
+    // BADGE CLICK HANDLERS - ✅ ΝΕΟ
+    // =========================================================================
+
+    // Click στο badge → Ανοίγει modal για αλλαγή αρχείου
+    document.addEventListener('click', function(e) {
+        const badge = e.target.closest('.pdf-badge-replacement');
+        
+        if (badge && !e.target.closest('.badge-remove-btn')) {
+            // Click στο badge (όχι στο X button)
+            const docType = badge.dataset.documentType;
+            
+            // Βρες το αντίστοιχο button
+            const wrapper = badge.closest('.pdf-button-wrapper');
+            const button = wrapper?.querySelector('.pdf-upload-btn');
+            
+            if (button && ! button.disabled) {
+                // Trigger το click του button
+                button.click();
+            }
+        }
+    });
+
+    // Click στο X button μέσα στο badge → Αφαίρεση αρχείου
+    document.addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.badge-remove-btn');
+        
+        if (removeBtn) {
+            e.stopPropagation(); // Μην trigger το badge click
+            
+            const docType = removeBtn.dataset.documentType;
+            
+            // Αφαίρεση file
+            delete selectedFiles[docType];
+            
+            // Update UI
+            updateButtonBadge();
+            
+            // Optional: Toast message
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'info',
+                title: 'Αρχείο αφαιρέθηκε',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.style.borderRadius = '12px';
+                    toast.style.boxShadow = '0 8px 30px rgba(0,0,0,0.2)';
+                }
+            });
+        }
+    });
+
+    // =========================================================================
+    // OPEN/CLOSE MODAL
+    // =========================================================================
+
+    uploadButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            if (! this.disabled) {
+                currentDocumentType = this.dataset.documentType;
+                if (! currentDocumentType) {
+                    console.error('❌ Button missing data-document-type attribute! ');
+                    return;
+                }
+                
+                const title = this.dataset.title || 'Μεταφόρτωση PDF';
+                
+                if (pdfModalTitle) {
+                    pdfModalTitle.textContent = title;
+                }
+                
+                if (pdfModal) {
+                    pdfModal.dataset.documentType = currentDocumentType;
+                }
+                
+                const existingFile = selectedFiles[currentDocumentType];
+                if (existingFile) {
+                    displayFileInfo(existingFile);
+                }
+                
+                openModal();
+            }
+        });
+    });
     
     function openModal() {
         pdfModal.classList.remove('hidden');
         pdfModal.classList.add('flex-visible');
-        resetModal();
+        resetModalUI();
     }
     
     function closeModal() {
         pdfModal.classList.add('hidden');
         pdfModal.classList.remove('flex-visible');
-        resetModal();
+        resetModalUI();
     }
     
-    function resetModal() {
-        selectedFile = null;
+    function resetModalUI() {
         pdfFileInput.value = '';
         
-        // Cleanup blob URL
         if (currentBlobUrl) {
             URL.revokeObjectURL(currentBlobUrl);
             currentBlobUrl = null;
         }
         
-        pdfDropZone.classList.remove('hidden');
-        pdfFilePreview.classList.add('hidden');
-        pdfProgressBar.classList.add('hidden');
+        const currentFile = selectedFiles[currentDocumentType];
         
+        if (currentFile) {
+            pdfDropZone.classList.add('hidden');
+            pdfFilePreview.classList.remove('hidden');
+            displayFileInfo(currentFile);
+        } else {
+            pdfDropZone.classList.remove('hidden');
+            pdfFilePreview.classList.add('hidden');
+        }
+        
+        pdfProgressBar.classList.add('hidden');
         pdfProgressFill.removeAttribute('data-progress');
         
-        confirmPdfUpload.disabled = true;
+        confirmPdfUpload.disabled = ! currentFile;
         cancelPdfUpload.disabled = false;
     }
     
@@ -83,10 +219,10 @@ document. addEventListener('DOMContentLoaded', function() {
     // =========================================================================
     
     pdfDropZone.addEventListener('click', () => pdfFileInput.click());
-    pdfFileInput.addEventListener('change', (e) => handleFiles(e. target.files));
+    pdfFileInput.addEventListener('change', (e) => handleFiles(e.target.files));
     
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        pdfDropZone. addEventListener(eventName, preventDefaults, false);
+        pdfDropZone.addEventListener(eventName, preventDefaults, false);
     });
     
     function preventDefaults(e) {
@@ -94,15 +230,15 @@ document. addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
     }
     
-    ['dragenter', 'dragover']. forEach(eventName => {
+    ['dragenter', 'dragover'].forEach(eventName => {
         pdfDropZone.addEventListener(eventName, () => {
             pdfDropZone.classList.add('dragover');
         });
     });
     
-    ['dragleave', 'drop']. forEach(eventName => {
+    ['dragleave', 'drop'].forEach(eventName => {
         pdfDropZone.addEventListener(eventName, () => {
-            pdfDropZone.classList. remove('dragover');
+            pdfDropZone.classList.remove('dragover');
         });
     });
     
@@ -120,7 +256,6 @@ document. addEventListener('DOMContentLoaded', function() {
         
         const file = files[0];
         
-        // Validation:  PDF only
         if (file.type !== 'application/pdf') {
             await Swal.fire({
                 backdrop: false,
@@ -136,13 +271,12 @@ document. addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Validation: File size
         if (file.size > MAX_FILE_SIZE) {
             await Swal.fire({
                 backdrop: false,
                 icon: 'error',
                 title: 'Αρχείο πολύ μεγάλο!',
-                html: `Το αρχείο υπερβαίνει το μέγιστο επιτρεπόμενο μέγεθος των <strong>10MB</strong>. <br>Μέγεθος αρχείου: <strong>${formatFileSize(file. size)}</strong>`,
+                html: `Το αρχείο υπερβαίνει το μέγιστο επιτρεπόμενο μέγεθος των <strong>10MB</strong>. <br>Μέγεθος αρχείου: <strong>${formatFileSize(file.size)}</strong>`,
                 confirmButtonText: 'Εντάξει',
                 customClass: {
                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
@@ -152,13 +286,13 @@ document. addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // All validations passed
-        selectedFile = file;
+        selectedFiles[currentDocumentType] = file;
+        
         displayFileInfo(file);
     }
     
     function displayFileInfo(file) {
-        pdfFileName.textContent = file. name;
+        pdfFileName.textContent = file.name;
         pdfFileSize.textContent = formatFileSize(file.size);
         
         pdfDropZone.classList.add('hidden');
@@ -167,7 +301,7 @@ document. addEventListener('DOMContentLoaded', function() {
     }
     
     // =========================================================================
-    // PDF PREVIEW (ΑΝΟΙΓΕΙ ΣΕ ΝΕΟ TAB - 100% CSP-COMPLIANT)
+    // PDF PREVIEW
     // =========================================================================
     
     if (showPdfPreview) {
@@ -175,24 +309,22 @@ document. addEventListener('DOMContentLoaded', function() {
     }
     
     function openPreviewInNewTab() {
-        if (! selectedFile) return;
+        const file = selectedFiles[currentDocumentType];
+        if (! file) return;
         
         try {
-            // Cleanup previous blob URL if exists
             if (currentBlobUrl) {
                 URL.revokeObjectURL(currentBlobUrl);
             }
             
-            // Create Blob URL
-            currentBlobUrl = URL.createObjectURL(selectedFile);
+            currentBlobUrl = URL.createObjectURL(file);
             
-            // Show loading modal
             Swal.fire({
                 backdrop: 'rgba(0,0,0,0.7)',
                 html: `
                     <div style="padding: 30px;">
                         <div class="enhanced-loader"></div>
-                        <h3 style="margin-top: 25px; color: #667eea; font-weight: 600;">
+                        <h3 style="margin-top:  25px; color: #667eea; font-weight: 600;">
                             Άνοιγμα Προεπισκόπησης
                         </h3>
                         <p style="color: #999; margin-top: 10px;">
@@ -209,15 +341,15 @@ document. addEventListener('DOMContentLoaded', function() {
                             width: 60px;
                             height: 60px;
                             margin: 0 auto;
-                            border: 4px solid #f3f3f3;
+                            border:  4px solid #f3f3f3;
                             border-top: 4px solid #667eea;
                             border-right: 4px solid #764ba2;
                             border-radius: 50%;
                             animation: enhancedSpin 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
                         }
                         @keyframes enhancedSpin {
-                            0% { transform:  rotate(0deg); }
-                            100% { transform: rotate(360deg); }
+                            0% { transform: rotate(0deg); }
+                            100% { transform:  rotate(360deg); }
                         }
                         .swal2-popup {
                             border-radius: 20px ! important;
@@ -233,7 +365,6 @@ document. addEventListener('DOMContentLoaded', function() {
                 const newWindow = window.open(currentBlobUrl, '_blank');
                 
                 if (! newWindow) {
-                    // Enhanced popup blocker warning
                     Swal.fire({
                         backdrop: 'rgba(0,0,0,0.7)',
                         html: `
@@ -246,7 +377,7 @@ document. addEventListener('DOMContentLoaded', function() {
                                     <p style="margin: 0 0 15px 0; color: #666; font-weight: 500;">
                                         <strong>📋 Οδηγίες:</strong>
                                     </p>
-                                    <ol style="color: #666; padding-left: 20px; margin: 0; line-height: 1.8;">
+                                    <ol style="color: #666; padding-left:  20px; margin: 0; line-height: 1.8;">
                                         <li>Κάντε κλικ στο <strong>🚫</strong> εικονίδιο στη γραμμή διευθύνσεων</li>
                                         <li>Επιλέξτε <strong>"Να επιτρέπονται πάντα τα αναδυόμενα"</strong></li>
                                         <li>Ανανεώστε τη σελίδα και δοκιμάστε ξανά</li>
@@ -260,7 +391,7 @@ document. addEventListener('DOMContentLoaded', function() {
                         confirmButtonText: '👌 Κατάλαβα',
                         confirmButtonColor: '#ff6b6b',
                         customClass: {
-                            popup:  'animated-popup',
+                            popup: 'animated-popup',
                             confirmButton: 'animated-button'
                         },
                         didOpen: () => {
@@ -268,10 +399,10 @@ document. addEventListener('DOMContentLoaded', function() {
                             style.textContent = `
                                 .animated-popup {
                                     animation: zoomIn 0.3s ease ! important;
-                                    border-radius: 20px !important;
+                                    border-radius: 20px ! important;
                                 }
                                 @keyframes zoomIn {
-                                    from { opacity: 0; transform: scale(0.8); }
+                                    from { opacity: 0; transform:  scale(0.8); }
                                     to { opacity: 1; transform: scale(1); }
                                 }
                                 .animated-button {
@@ -289,7 +420,6 @@ document. addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 } else {
-                    // Enhanced success modal
                     Swal.fire({
                         backdrop: 'rgba(0,0,0,0.7)',
                         html: `
@@ -307,22 +437,22 @@ document. addEventListener('DOMContentLoaded', function() {
                                 <h2 style="font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;">
                                     Προεπισκόπηση Ανοιχτή! 
                                 </h2>
-                                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; margin: 20px 0; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);">
+                                <div style="background:  linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 15px; margin: 20px 0; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);">
                                     <div style="display: flex; align-items: center; gap: 15px;">
                                         <div style="font-size: 40px;">📄</div>
                                         <div style="text-align: left; flex: 1;">
                                             <p style="color: white; font-size: 1.05rem; margin: 0; font-weight: 600; word-break: break-all;">
-                                                ${selectedFile.name}
+                                                ${file.name}
                                             </p>
                                             <p style="color: rgba(255,255,255,0.85); font-size: 0.9rem; margin: 5px 0 0 0;">
-                                                📦 Μέγεθος: ${formatFileSize(selectedFile.size)}
+                                                📦 Μέγεθος: ${formatFileSize(file.size)}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                                 <div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); padding: 20px; border-radius: 12px; border-left: 5px solid #4caf50; margin: 20px 0; text-align: left;">
-                                    <p style="margin:  0 0 12px 0; color: #2e7d32; font-weight: 700; font-size: 1.05rem;">
-                                        ✅ Επόμενα Βήματα:
+                                    <p style="margin: 0 0 12px 0; color: #2e7d32; font-weight: 700; font-size: 1.05rem;">
+                                        ✅ Επόμενα Βήματα: 
                                     </p>
                                     <div style="color: #555; line-height: 1.8;">
                                         <p style="margin: 8px 0;"><strong>1️⃣</strong> Ελέγξτε το PDF στη νέα καρτέλα</p>
@@ -349,9 +479,9 @@ document. addEventListener('DOMContentLoaded', function() {
                         },
                         didOpen: () => {
                             const style = document.createElement('style');
-                            style. textContent = `
+                            style.textContent = `
                                 .success-popup-enhanced {
-                                    border-radius: 20px !important;
+                                    border-radius:  20px !important;
                                     box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important;
                                     animation: successSlideIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
                                 }
@@ -380,7 +510,7 @@ document. addEventListener('DOMContentLoaded', function() {
                                 .success-checkmark {
                                     width: 80px;
                                     height: 80px;
-                                    margin: 0 auto;
+                                    margin:  0 auto;
                                 }
                                 .check-icon {
                                     width: 80px;
@@ -398,14 +528,14 @@ document. addEventListener('DOMContentLoaded', function() {
                                     position: absolute;
                                     z-index: 10;
                                 }
-                                .icon-line. line-tip {
+                                .icon-line.line-tip {
                                     top: 46px;
-                                    left: 14px;
+                                    left:  14px;
                                     width: 25px;
                                     transform: rotate(45deg);
                                     animation: checkTip 0.75s;
                                 }
-                                . icon-line.line-long {
+                                .icon-line.line-long {
                                     top: 38px;
                                     right: 8px;
                                     width:  47px;
@@ -451,7 +581,6 @@ document. addEventListener('DOMContentLoaded', function() {
                         }
                     });
                     
-                    // Enhanced toast when preview closes
                     const checkWindowClosed = setInterval(() => {
                         if (newWindow.closed) {
                             clearInterval(checkWindowClosed);
@@ -467,11 +596,11 @@ document. addEventListener('DOMContentLoaded', function() {
                                 title: '✅ Προεπισκόπηση Ολοκληρώθηκε',
                                 html: '<small>Πατήστε "Αποθήκευση" στη φόρμα για να ολοκληρωθεί</small>',
                                 showConfirmButton: false,
-                                timer: 4000,
+                                timer: 2500,
                                 timerProgressBar: true,
                                 didOpen: (toast) => {
                                     toast.style.borderRadius = '12px';
-                                    toast. style.boxShadow = '0 8px 30px rgba(0,0,0,0.2)';
+                                    toast.style.boxShadow = '0 8px 30px rgba(0,0,0,0.2)';
                                 }
                             });
                         }
@@ -480,17 +609,17 @@ document. addEventListener('DOMContentLoaded', function() {
             }, 1000);
             
         } catch (error) {
-            console. error('Preview error:', error);
+            console.error('Preview error:', error);
             Swal.fire({
                 backdrop: 'rgba(0,0,0,0.7)',
                 icon: 'error',
                 title: 'Σφάλμα Προεπισκόπησης',
                 html: `
-                    <div style="padding: 15px;">
+                    <div style="padding:  15px;">
                         <p style="color: #666; margin-bottom: 15px;">
                             Δεν ήταν δυνατή η προεπισκόπηση του αρχείου. 
                         </p>
-                        <div style="background: #fff3cd; border:  2px solid #ffc107; border-radius: 10px; padding: 15px; margin: 15px 0;">
+                        <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px; padding: 15px; margin: 15px 0;">
                             <p style="color: #856404; margin: 0; font-weight: 500;">
                                 ⚠️ Μπορείτε να συνεχίσετε με την αποθήκευση χωρίς προεπισκόπηση. 
                             </p>
@@ -506,9 +635,10 @@ document. addEventListener('DOMContentLoaded', function() {
     // =========================================================================
     // REMOVE FILE
     // =========================================================================
-    
-    removePdfFile. addEventListener('click', () => {
-        selectedFile = null;
+
+    removePdfFile.addEventListener('click', () => {
+        delete selectedFiles[currentDocumentType];
+        
         pdfFileInput.value = '';
         
         if (currentBlobUrl) {
@@ -519,36 +649,37 @@ document. addEventListener('DOMContentLoaded', function() {
         pdfDropZone.classList.remove('hidden');
         pdfFilePreview.classList.add('hidden');
         confirmPdfUpload.disabled = true;
+        
+        updateButtonBadge();
     });
     
     // =========================================================================
-    // CONFIRM BUTTON - ΚΛΕΙΝΕΙ ΤΟ MODAL (ΔΕΝ ΚΑΝΕΙ UPLOAD)
+    // CONFIRM BUTTON
     // =========================================================================
-    
+
     confirmPdfUpload.addEventListener('click', () => {
-        if (!selectedFile) return;
+        const file = selectedFiles[currentDocumentType];
+        if (!file) return;
         
-        // Απλά κλείνει το modal - το upload θα γίνει από τη φόρμα
+        updateButtonBadge();
         closeModal();
         
-        // Optional: Show confirmation
         Swal.fire({
-            backdrop: false,
             toast: true,
             position: 'top-end',
             icon: 'info',
             title: '✅ PDF επιλέχθηκε',
             html: '<small>Πατήστε <strong>"Αποθήκευση"</strong> στη φόρμα για να ολοκληρωθεί το upload</small>',
             showConfirmButton: false,
-            timer: 4000,
-            timerProgressBar: true,
-            didOpen:  (toast) => {
-                toast.style.borderRadius = '12px';
-                toast.style. boxShadow = '0 8px 30px rgba(0,0,0,0.2)';
+            timer: 2000,
+            timerProgressBar:  true,
+            didOpen: (toast) => {
+                toast.style.borderRadius = '4px';
+                toast.style.boxShadow = '0 8px 30px rgba(0,0,0,0.2)';
             }
         });
     });
-    
+
     // =========================================================================
     // HELPER FUNCTIONS
     // =========================================================================
@@ -562,110 +693,134 @@ document. addEventListener('DOMContentLoaded', function() {
     }
     
     // =========================================================================
-    // PUBLIC API - Για χρήση από τη φόρμα
+    // PUBLIC API
     // =========================================================================
-    
+
     window.pdfUploadModule = {
-        // Check αν έχει επιλεγεί PDF
         hasPendingUpload: function() {
-            return selectedFile !== null;
+            return Object.keys(selectedFiles).length > 0;
         },
         
-        // Get το PDF file info
-        getFileInfo: function() {
-            if (!selectedFile) return null;
+        getFileInfo: function(documentType) {
+            const file = selectedFiles[documentType];
+            if (!file) return null;
             return {
-                name: selectedFile. name,
-                size: selectedFile.size,
-                type: selectedFile.type
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                documentType: documentType
             };
         },
         
-        // Upload το PDF με το ergazomenosId που μόλις δημιουργήθηκε
-        uploadPendingFile: async function(ergazomenosId) {
-            return new Promise((resolve, reject) => {
-                if (!selectedFile) {
-                    resolve({ success: true, message: 'No file to upload' });
-                    return;
-                }
-                
-                if (!ergazomenosId) {
-                    reject(new Error('ergazomenosId is required'));
-                    return;
-                }
-                
-                const formData = new FormData();
-                formData. append('pdfFile', selectedFile);
-                formData.append('ergazomenosId', ergazomenosId);
-                formData.append('documentType', 'oysiodeis_oroi');
-                
-                const xhr = new XMLHttpRequest();
-                
-                // Progress tracking
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        const percentComplete = Math.round((e.loaded / e.total) * 100);
-                        console.log(`Upload progress: ${percentComplete}%`);
-                    }
-                });
-                
-                // Upload complete
-                xhr.addEventListener('load', () => {
-                    if (xhr.status === 200) {
-                        const result = JSON.parse(xhr.responseText);
-                        if (result.success) {
-                            resolve({
-                                success: true,
-                                fileId: result.file.id,
-                                message: result.message
-                            });
-                        } else {
-                            reject(new Error(result.error || 'Upload failed'));
-                        }
-                    } else {
-                        try {
-                            const error = JSON.parse(xhr.responseText);
-                            reject(new Error(error.error || 'Upload failed'));
-                        } catch (e) {
-                            reject(new Error('Upload failed with status:  ' + xhr.status));
-                        }
-                    }
-                });
-                
-                // Error handling
-                xhr.addEventListener('error', () => {
-                    reject(new Error('Σφάλμα δικτύου'));
-                });
-                
-                xhr.addEventListener('abort', () => {
-                    reject(new Error('Η μεταφόρτωση ακυρώθηκε'));
-                });
-                
-                xhr.open('POST', '/api/upload-pdf', true);
-                
-                // CSRF Token
-                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-                if (csrfToken) {
-                    xhr.setRequestHeader('X-CSRF-Token', csrfToken);
-                }
-                
-                xhr.send(formData);
-            });
+        getAllFiles: function() {
+            return Object.keys(selectedFiles).map(docType => ({
+                name: selectedFiles[docType].name,
+                size: selectedFiles[docType].size,
+                type: selectedFiles[docType].type,
+                documentType: docType
+            }));
         },
         
-        // Clear το selected file
-        clearSelectedFile: function() {
-            selectedFile = null;
-            pdfFileInput. value = '';
+        uploadPendingFiles: async function(ergazomenosId) {
+            if (Object.keys(selectedFiles).length === 0) {
+                return { success: true, message: 'No files to upload' };
+            }
+            
+            if (!ergazomenosId) {
+                throw new Error('ergazomenosId is required');
+            }
+            
+            const results = [];
+            
+            for (const [documentType, file] of Object.entries(selectedFiles)) {
+                try {
+                    const result = await uploadSingleFile(file, documentType, ergazomenosId);
+                    results.push({ documentType, success: true, result });
+                } catch (error) {
+                    console.error(`❌ ${documentType} upload failed: `, error);
+                    results.push({ documentType, success: false, error: error.message });
+                }
+            }
+            
+            const allSuccess = results.every(r => r.success);
+            const failedUploads = results.filter(r => !r.success);
+            
+            return {
+                success: allSuccess,
+                results: results,
+                failed: failedUploads,
+                message: allSuccess 
+                    ? `Όλα τα ${results.length} αρχεία ανέβηκαν επιτυχώς`
+                    : `${failedUploads.length} από ${results.length} αρχεία απέτυχαν`
+            };
+        },
+        
+        clearAllFiles: function() {
+            Object.keys(selectedFiles).forEach(key => delete selectedFiles[key]);
+            
+            pdfFileInput.value = '';
             if (currentBlobUrl) {
                 URL.revokeObjectURL(currentBlobUrl);
                 currentBlobUrl = null;
             }
-            pdfDropZone. classList.remove('hidden');
-            pdfFilePreview.classList. add('hidden');
+            pdfDropZone.classList.remove('hidden');
+            pdfFilePreview.classList.add('hidden');
             if (confirmPdfUpload) {
                 confirmPdfUpload.disabled = true;
             }
+            
+            updateButtonBadge();
         }
     };
+    
+    // =========================================================================
+    // HELPER:  UPLOAD SINGLE FILE
+    // =========================================================================
+    
+    function uploadSingleFile(file, documentType, ergazomenosId) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('ergazomenosId', ergazomenosId);
+            formData.append('documentType', documentType);
+            
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                }
+            });
+            
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.success) {
+                        resolve(result);
+                    } else {
+                        reject(new Error(result.error || 'Upload failed'));
+                    }
+                } else {
+                    try {
+                        const error = JSON.parse(xhr.responseText);
+                        reject(new Error(error.error || 'Upload failed'));
+                    } catch (e) {
+                        reject(new Error('Upload failed with status:  ' + xhr.status));
+                    }
+                }
+            });
+            
+            xhr.addEventListener('error', () => reject(new Error('Σφάλμα δικτύου')));
+            xhr.addEventListener('abort', () => reject(new Error('Η μεταφόρτωση ακυρώθηκε')));
+            
+            xhr.open('POST', '/api/upload-pdf', true);
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            if (csrfToken) {
+                xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+            }
+            
+            xhr.send(formData);
+        });
+    }
 });

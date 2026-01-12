@@ -229,17 +229,39 @@
                 </div>
 
                 <div class="col-2 margin-bottom-0_2rem">
-                    <button 
-                        type="button" 
-                        id="customButton_anhlikoi" 
-                        class="btn btn-orange rounded-4 buttons-content w-100"
-                        disabled>
-                        <i class="bi bi-cloud-arrow-up"></i> 
-                        Βιβλιάριο Ανηλίκου (pdf)
-                    </button>
+                    <!-- Wrapper για button + badge toggle -->
+                    <div class="pdf-button-wrapper">
+                        <!-- Original Button (εμφανίζεται όταν ΔΕΝ έχει file) -->
+                        <button 
+                            type="button" 
+                            id="customButton_anhlikoi" 
+                            class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+                            data-document-type="anhlikoi"
+                            data-title="Βιβλιάριο Ανηλίκου"
+                            disabled>
+                            <i class="bi bi-cloud-arrow-up"></i> 
+                            Βιβλιάριο Ανηλίκου (pdf)
+                        </button>
+                        
+                        <!-- Badge Replacement (εμφανίζεται όταν έχει αρχείο) -->
+                        <div 
+                            class="pdf-badge-replacement hidden" 
+                            data-document-type="anhlikoi"
+                            title="Κλικ για αλλαγή αρχείου">
+                            <div class="badge-content">
+                                <i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+                                <span class="badge-filename text-left">file.pdf</span>
+                            </div>
+                            <button 
+                                type="button" 
+                                class="badge-remove-btn" 
+                                title="Αφαίρεση αρχείου"
+                                data-document-type="anhlikoi">
+                                <i class="bi bi-x-circle-fill"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
-                <!-- <div class="col-2"></div> -->
 
                 <div class="col-2 left-align">
                     <label for="email" class="col-form-label label-font-size field-required-gray">

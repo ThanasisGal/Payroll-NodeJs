@@ -15,12 +15,9 @@ const { Schema: _Schema, model } = require("mongoose");
         documentType: {
             type: String,
             enum:  [
-                'oysiodeis_oroi',
-                'symvash_ergasias',
-                'tropopoihsh',
-                'pistopoihtiko',
-                'adeies',
-                'other'
+                'anhlikoi',
+                'allodapoi',
+                'oysiodeis_oroi'
             ],
             required:  true,
             default: 'oysiodeis_oroi',

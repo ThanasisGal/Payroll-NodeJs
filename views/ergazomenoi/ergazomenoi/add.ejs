@@ -539,4 +539,69 @@
 		apply();
 	})();
 </script> -->
+
+
+<!-- ========================================================================
+PDF UPLOAD MODAL (Shared across all sections)
+======================================================================== -->
+<div id="pdfUploadModal" class="pdf-modal hidden">
+    <div class="pdf-modal-content">
+        <div class="pdf-modal-header">
+            <h3 id="pdfModalTitle">Μεταφόρτωση Αρχείου PDF</h3>
+            <button type="button" class="pdf-modal-close" id="closePdfModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <div class="pdf-modal-body">
+            <!-- Drag & Drop Zone -->
+            <div id="pdfDropZone" class="pdf-drop-zone">
+                <div class="pdf-drop-zone-content">
+                    <i class="bi bi-file-earmark-pdf pdf-drop-icon"></i>
+                    <h4>Σύρετε το PDF εδώ</h4>
+                    <p>ή κάντε κλικ για επιλογή</p>
+                    <small class="text-muted">Μέγιστο μέγεθος: 10MB</small>
+                </div>
+                <input 
+                    type="file" 
+                    id="pdfFileInput" 
+                    name="pdfFile" 
+                    accept=".pdf,application/pdf" 
+                    class="hidden" 
+                />
+            </div>
+            
+            <!-- File Preview -->
+            <div id="pdfFilePreview" class="pdf-file-preview hidden">
+                <div class="pdf-file-info">
+                    <i class="bi bi-file-earmark-pdf text-danger pdf-file-icon"></i>
+                    <div class="pdf-file-details">
+                        <strong id="pdfFileName"></strong>
+                        <small id="pdfFileSize" class="text-muted"></small>
+                    </div>
+                    <button type="button" id="removePdfFile" class="pdf-btn-remove">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                
+                <!-- Preview Button -->
+                <div class="pdf-preview-actions">
+                    <button type="button" id="showPdfPreview" class="btn btn-info btn-sm">
+                        <i class="bi bi-eye"></i> Προεπισκόπηση
+                    </button>
+                </div>
+                
+                <div class="pdf-progress hidden" id="pdfProgressBar">
+                    <div class="pdf-progress-fill" id="pdfProgressFill"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="pdf-modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancelPdfUpload">Ακύρωση</button>
+            <button type="button" class="btn btn-success" id="confirmPdfUpload" disabled>Αποθήκευση</button>
+        </div>
+    </div>
+</div>
+
 </div>
