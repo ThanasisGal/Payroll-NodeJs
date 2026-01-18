@@ -455,7 +455,7 @@ function generateSimpleCsrfToken(req, res) {
     const token = crypto.randomBytes(32).toString('hex');
     
     // Store token in cookie
-    rres.cookie('psifl.x-csrf-token', token, {
+    res.cookie('psifl.x-csrf-token', token, {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
