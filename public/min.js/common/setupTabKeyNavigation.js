@@ -1,0 +1,1 @@
+document['addEventListener']('DOMContentLoaded',function(){const r=document['querySelectorAll']('.date-control');r['forEach']((Y,G)=>{Y['addEventListener']('keydown',function(m){if('Tab'===m['key'])if(m['preventDefault'](),m['shiftKey']){const T=r[G-0x1];T&&T['focus']();}else{const k=r[G+0x1];k&&k['focus']();}});});});

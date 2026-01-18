@@ -13,11 +13,11 @@ const ALLOWED_MIME_TYPES = process.env.ALLOWED_MIME_TYPES
     ? process.env.ALLOWED_MIME_TYPES.split(',').map(type => type.trim())
     : ['application/pdf'];
 
-console.log('📋 Multer Config Loaded:', {
-    uploadDir: UPLOAD_BASE_DIR,
-    maxFileSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(2)} MB`,
-    allowedTypes: ALLOWED_MIME_TYPES
-});
+// console.log('📋 Multer Config Loaded:', {
+//     uploadDir: UPLOAD_BASE_DIR,
+//     maxFileSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(2)} MB`,
+//     allowedTypes: ALLOWED_MIME_TYPES
+// });
 
 /**
  * ============================================================================

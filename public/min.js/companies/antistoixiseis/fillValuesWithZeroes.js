@@ -1,0 +1,1 @@
+document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x22text\x22]')['forEach'](i=>{i['addEventListener']('blur',function(){let M=this['maxLength'],J=this['value'];M>0x0&&J['length']<M&&(this['value']=J['padStart'](M,'0'));});});});

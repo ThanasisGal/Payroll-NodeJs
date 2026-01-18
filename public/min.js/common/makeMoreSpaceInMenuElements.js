@@ -1,0 +1,1 @@
+document['addEventListener']('DOMContentLoaded',function(){[{'triggerId':'li224','targetId':'li23'}]['forEach'](y=>{const m=document['getElementById'](y['triggerId']),O=document['getElementById'](y['targetId']);m['addEventListener']('mouseenter',function(){O['classList']['add']('mt-3');}),m['addEventListener']('mouseleave',function(){O['classList']['remove']('mt-3');});});});
