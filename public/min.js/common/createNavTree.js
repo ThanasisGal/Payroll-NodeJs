@@ -1,1 +1,0 @@
-document['addEventListener']('DOMContentLoaded',function(){NavTree['createBySelector']('#nav-tree',{'searchable':!0x0,'showEmptyGroups':!0x0,'groupOpenIconClass':'bi','groupOpenIcon':'bi-caret-down','groupCloseIconClass':'bi','groupCloseIcon':'bi-caret-right','linkIconClass':'bi','linkIcon':'bi-link','searchPlaceholderText':'Αναζήτηση','iconPlace':'end'});});

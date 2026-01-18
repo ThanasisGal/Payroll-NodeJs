@@ -1,1 +1,0 @@
-document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x27number\x27]')['forEach'](E=>{E['addEventListener']('focus',function(){this['select']();}),E['addEventListener']('blur',function(){''===this['value']&&(this['value']='0');});});});

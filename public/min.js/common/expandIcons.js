@@ -1,1 +1,0 @@
-document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('.expand-icon')['forEach'](k=>{k['addEventListener']('click',()=>{const E=k['parentElement'];E['classList']['toggle']('collapsed');const U=E['querySelector']('.sub-menu');U['style']['display']='none'===U['style']['display']?'block':'none';});});});

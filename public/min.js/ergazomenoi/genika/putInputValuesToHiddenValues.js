@@ -1,1 +1,0 @@
-document['addEventListener']('DOMContentLoaded',()=>{['eponymo','onoma','afm_ergazomenoy','amka_ergazomenoy']['forEach'](U=>{const l=document['getElementById'](U);if(!l)return;const d=U+'Hidden';l['addEventListener']('blur',()=>{const u=document['getElementById'](d);u&&(u['value']=l['value']);});});});

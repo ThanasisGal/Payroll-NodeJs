@@ -1,1 +1,0 @@
-document['addEventListener']('DOMContentLoaded',function(){document['getElementById']('searchInput')['addEventListener']('keydown',function(M){'Enter'===M['key']&&(M['preventDefault'](),document['querySelector']('form[name=\x27SearchForm\x27]')['submit']());});});
