@@ -455,7 +455,7 @@ function generateSimpleCsrfToken(req, res) {
     const token = crypto.randomBytes(32).toString('hex');
     
     // Store token in cookie
-    res.cookie(isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token', token, {
+    rres.cookie('psifl.x-csrf-token', token, {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
@@ -468,7 +468,7 @@ function generateSimpleCsrfToken(req, res) {
 }
 
 function validateSimpleCsrfToken(req) {
-    const cookieToken = req.cookies[isProd ? '__Host-psifi.x-csrf-token' :  'psifi.x-csrf-token'];
+    const cookieToken = req.cookies['psifl.x-csrf-token'];
     
     const headerToken = req.body?._csrf ||
                        req.headers['csrf-token'] ||
@@ -481,12 +481,12 @@ function validateSimpleCsrfToken(req) {
 // ✅ Make CSRF token available to all views
 app.use((req, res, next) => {
     try {
-        const existingToken = req.cookies[isProd ?  '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token'];
+        const existingToken = req.cookies['psifl.x-csrf-token'];  // ← ΑΛΛΑΞΕ ΕΔΩ!
         
         if (existingToken) {
             res.locals.csrfToken = existingToken;
         } else {
-            res.locals.csrfToken = generateSimpleCsrfToken(req, res);
+            res.locals. csrfToken = generateSimpleCsrfToken(req, res);
         }
     } catch (err) {
         logger.error('Error generating CSRF token for views:', err);
@@ -531,9 +531,8 @@ app.use((req, res, next) => {
         logger.error('❌ CSRF validation FAILED: ');
         logger.error(`  Path: ${req.path}`);
         logger.error(`  Method: ${req.method}`);
-        logger.error(`  Cookie token: ${req.cookies[isProd ? '__Host-psifi.x-csrf-token' : 'psifi.x-csrf-token']?.substring(0, 20)}...`);
+        logger.error(`  Cookie token: ${req.cookies['psifl.x-csrf-token']?.substring(0, 20)}...`);        
         logger.error(`  Header token: ${req.headers['csrf-token']?.substring(0, 20)}...`);
-
         return res.status(403).json({
             error: 'CSRF validation failed',
             message: 'Invalid or missing CSRF token'
