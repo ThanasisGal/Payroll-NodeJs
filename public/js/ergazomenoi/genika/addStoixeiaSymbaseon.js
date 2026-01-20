@@ -149,7 +149,7 @@ function generateSelectRowsOfSymbaseis() {
 				<button type="button" class="btn rounded-4 col-0-3 clear-row border-0" 
 					id="clearSelectSymbaseon-${idNum}" 
 					data-bs-toggle="tooltip" 
-					title="Καθαρισμός όλης της τρέχουσας γραμμής" 
+					data-bs-title="Καθαρισμός όλης της τρέχουσας γραμμής" 
 					data-bs-placement="bottom" 
 					data-target="stoixeio_symbashs_${idNum}">
 					<i class="bi bi-x-lg cdarkred"></i>

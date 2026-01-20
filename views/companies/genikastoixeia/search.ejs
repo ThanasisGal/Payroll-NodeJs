@@ -58,7 +58,7 @@
                     id="select-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Επιλέξτε την εταιρεία..."
+                    data-bs-toggle="tooltip" data-bs-title="Επιλέξτε την εταιρεία..."
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
                     class="btn btn-success rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.read) ? 'disabled-link' : '' %>"
@@ -70,7 +70,7 @@
                     id="edit-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση..."
+                    data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση..."
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled-link' : '' %>"
@@ -82,7 +82,7 @@
                     id="delete-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Διαγραφή της επιλεγμένης εταιρείας."
+                    data-bs-toggle="tooltip" data-bs-title="Διαγραφή της επιλεγμένης εταιρείας."
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.delete) ? 'disabled-link' : '' %>"
@@ -96,7 +96,7 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
-                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    data-bs-title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2  col-2">
                     <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                 </a>

@@ -124,7 +124,7 @@ window.generateSelectRowsOfKrathseis = async function (data, sharedParams) {
                 <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" 
                         id="clearSelectKrathseon_${i.toString().padStart(2, '0')}" 
                         style="border: 0;" data-bs-toggle="tooltip" tabIndex="-1" 
-                        title="Καθαρισμός του πεδίου Κράτηση" 
+                        data-bs-title="Καθαρισμός του πεδίου Κράτηση" 
                         data-bs-placement="bottom" data-target="krathsh_${i.toString().padStart(2, '0')}">
                         <i class="bi bi-trash" style="color: red"></i>
                 </button>

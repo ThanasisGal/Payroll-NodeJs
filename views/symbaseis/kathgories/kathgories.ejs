@@ -95,7 +95,7 @@
                     href="#"
                     role="button"
                     data-bs-toggle="tooltip" 
-                    title="Προσθήκη νέας κατηγορίας"
+                    data-bs-title="Προσθήκη νέας κατηγορίας"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
@@ -108,7 +108,7 @@
                     href="#"
                     role="button"
                     data-bs-toggle="tooltip" 
-                    title="μφάνιση - Διόρθωση της επιλεγμένης Κατηγορίας"
+                    data-bs-title="μφάνιση - Διόρθωση της επιλεγμένης Κατηγορίας"
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
@@ -120,7 +120,7 @@
                     id="delete-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Διαγραφή της επιλεγμένης Κατηγορίας"
+                    data-bs-toggle="tooltip" data-bs-title="Διαγραφή της επιλεγμένης Κατηγορίας"
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
@@ -135,7 +135,7 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="top"
                     data-tooltip-max-width="15vw"
-                    title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                    data-bs-title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
                     <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                 </a>

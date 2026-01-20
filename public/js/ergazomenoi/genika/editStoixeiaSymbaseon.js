@@ -55,7 +55,7 @@ function generateSelectRowsOfSymbaseis() {
           <div class="col-1-5">
             <input type="text" class="form-control input-contents right-align numeric clearAble" name="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" id="poso_symbashs_basei_oron_ergasias_${i.toString().padStart(2, '0')}" value="${selectedPosoSymbashsBaseiOronErgasiasValue}" style="background-color: #2b97001e" ${readOnlyAttribute} />
           </div>
-          <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectSymbaseon-${i.toString().padStart(2, '0')}" style="border: 0;" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Στοιχείο Σύμβασης" data-bs-placement="bottom" data-target="stoixeio_symbashs_${i.toString().padStart(2, '0')}">
+          <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectSymbaseon-${i.toString().padStart(2, '0')}" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός του πεδίου Στοιχείο Σύμβασης" data-bs-placement="bottom" data-target="stoixeio_symbashs_${i.toString().padStart(2, '0')}">
             <i class="bi bi-trash" style="color: red"></i>
           </button>
         </div>

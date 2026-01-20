@@ -112,7 +112,7 @@
             <div class="d-inline-block d-flex cardFooter01">
                 <div class="d-flex cardFooter02">
                     <a id="add-btn" href="#" role="button" data-bs-toggle="tooltip"
-                        title="Υπολογισμός των κλιμακίων των συμβάσεων" data-bs-placement="bottom"
+                        data-bs-title="Υπολογισμός των κλιμακίων των συμβάσεων" data-bs-placement="bottom"
                         data-tooltip-max-width="15vw"
                         class="btn btn-brown rounded-4 buttons-content margin-left-1rem mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
                         data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
@@ -120,7 +120,7 @@
                     </a>
 
                     <a id="update-klimakia-btn" href="#" role="button" data-bs-toggle="tooltip"
-                        title="Ενημέρωση της Βάσης Δεδομένων των Κλιμακίων Συμβάσεων" data-bs-placement="bottom"
+                        data-bs-title="Ενημέρωση της Βάσης Δεδομένων των Κλιμακίων Συμβάσεων" data-bs-placement="bottom"
                         data-tooltip-max-width="15vw"
                         class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
                         data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
@@ -128,7 +128,7 @@
                     </a>
 
                     <a id="back-btn" href="/mainapp" role="button" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                        data-tooltip-max-width="10vw" title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
+                        data-tooltip-max-width="10vw" data-bs-title="Επιστροφή στην Αρχική Σελίδα της εφαρμογής"
                         class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2">
                         <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                     </a>

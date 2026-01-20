@@ -74,7 +74,7 @@
                     data-scope="nested"
                     data-tooltip-max-width="15vw"
                     data-bs-toggle="tooltip" 
-                    title="Προσθήκη νέας αντιστοίχισης Κ.Π.Κ." 
+                    data-bs-title="Προσθήκη νέας αντιστοίχισης Κ.Π.Κ." 
                     data-bs-placement="bottom"
                     class="btn btn-brown fsvw-0_8 rounded-4 mb-3 mt-2 mr-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.create) ? 'disabled-link' : '' %>"
                     data-allowed="<%= (userPrivileges.admin || userPrivileges.create) ? '1' : '0' %>">
@@ -87,7 +87,7 @@
                     role="button"
                     data-scope="nested"
                     data-tooltip-max-width="15vw"
-                    data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων των  αντιστοιχίσεων Κ.Π.Κ." 
+                    data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων των  αντιστοιχίσεων Κ.Π.Κ." 
                     data-bs-placement="bottom" 
                     class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.update) ? 'disabled-link' : '' %>"
                     data-allowed="<%= (userPrivileges.admin || userPrivileges.update) ? '1' : '0' %>">
@@ -100,7 +100,7 @@
                     role="button"
                     data-scope="nested"
                     data-tooltip-max-width="15vw"
-                    data-bs-toggle="tooltip" title="Διαγραφή των στοιχείων της επιλεγμένης αντιστοίχισης Κ.Π.Κ." 
+                    data-bs-toggle="tooltip" data-bs-title="Διαγραφή των στοιχείων της επιλεγμένης αντιστοίχισης Κ.Π.Κ." 
                     data-bs-placement="bottom"
                     class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <%= (!userPrivileges.admin && !userPrivileges.delete) ? 'disabled-link' : '' %>"
                     data-allowed="<%= (userPrivileges.admin || userPrivileges.delete) ? '1' : '0' %>">
@@ -113,7 +113,7 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
-                    title="Επιστροφή στην Αρχική Σελίδα των Αντιστοιχίσεων Κ.Π.Κ."
+                    data-bs-title="Επιστροφή στην Αρχική Σελίδα των Αντιστοιχίσεων Κ.Π.Κ."
                     class="btn btn-brown rounded-4 mb-3 mt-2 col-2-5">
                     <i class="bi bi-chevron-double-left"></i> Επιστροφή
                 </a>

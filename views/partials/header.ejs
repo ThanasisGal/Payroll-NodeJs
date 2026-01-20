@@ -7,20 +7,20 @@
         <div class="input-group">
 
             <div class="col-4-00">
-                <a href="/companies/genikastoixeia/" id="selectedCompany" class="form-control form-control-dark rounded-0 border-0 header-app-style-company" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή εταιρείας">
+                <a href="/companies/genikastoixeia/" id="selectedCompany" class="form-control form-control-dark rounded-0 border-0 header-app-style-company" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-title="Αλλαγή εταιρείας">
                     <% if (typeof companyDescription !== 'undefined' && companyDescription.length > 0) { %> Εταιρεία : <%= companyDescription %> <% } %>
                 </a>
             </div>
 
             <div class="col-1-25">
-                <a href="/dates/getYearsForm" id="selectedYear" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή έτους χρήσης">
+                <a href="/dates/getYearsForm" id="selectedYear" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-title="Αλλαγή έτους χρήσης">
                     <% if (typeof yearInUse !== 'undefined' && yearInUse.length > 0) { %>
                     Χρήση : <%= yearInUse %> <% } %>
                 </a>
             </div>
 
             <div class="col-1-75">
-                <a href="/dates/getPeriodsForm" id="selectedPeriod" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή περιόδου">
+                <a href="/dates/getPeriodsForm" id="selectedPeriod" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-title="Αλλαγή περιόδου">
                     <% if (typeof periodInUseDescr !== 'undefined' && periodInUseDescr.length > 0) { %>
                         Περίοδος : <%= periodInUseDescr %>
                     <% } %>
@@ -28,7 +28,7 @@
             </div>
 
             <div class="col-2-25">
-                <a href="/dates/getAppDateForm" id="selectedDate" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή ημερομηνίας χρήσης της εφαρμογής">
+                <a href="/dates/getAppDateForm" id="selectedDate" class="form-control form-control-dark rounded-0 border-0 header-app-style-other" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-title="Αλλαγή ημερομηνίας χρήσης της εφαρμογής">
                     <% if (typeof appDate !== 'undefined' && appDate.length > 0) { %>
                         Ημ/νία Χρήσης : 
                         <%= `${appDate.substring(8,10)}/${appDate.substring(5,7)}/${appDate.substring(0,4)}` %> 
@@ -39,7 +39,7 @@
             </div>
 
             <div class="col-2-5">
-                <a href="/login" id="selectedUser" class="form-control form-control-dark rounded-0 border-0 header-app-style-user" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" title="Αλλαγή χρήστη">
+                <a href="/login" id="selectedUser" class="form-control form-control-dark rounded-0 border-0 header-app-style-user" data-bs-toggle="tooltip" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-title="Αλλαγή χρήστη">
                     <% if (typeof userΝame != 'undefined' && userΝame.length > 0) { %>
                         Χρήστης : <%= userΝame %> <i class="bi bi-arrow-right"></i> Group : [<%= userΤeam %>] 
                     <% } else { %>

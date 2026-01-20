@@ -60,7 +60,7 @@
           id="edit-btn"
           href="#" 
           role="button" style="font-size: 0.8vw;"
-          data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom" 
+          data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom" 
           class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>disabled-link<% } %>"
           <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>onclick="event.preventDefault();" <% } %>>
           <i class="bi bi-pencil-square"></i> Συντήρηση
@@ -70,7 +70,7 @@
           id="delete-btn"
           href="#"
           role="button"
-          data-bs-toggle="tooltip" title="Διαγραφή των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom"  style="font-size: 0.8vw;" 
+          data-bs-toggle="tooltip" data-bs-title="Διαγραφή των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom"  style="font-size: 0.8vw;" 
           class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>disabled-link<% } %>"
           <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>onclick="event.preventDefault();" <% } %>>
           <i class="bi bi-trash"></i> Διαγραφή
@@ -150,6 +150,6 @@
   <script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
   <script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script>
   <script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+  <!-- <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script> -->
   <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
 <% } %>

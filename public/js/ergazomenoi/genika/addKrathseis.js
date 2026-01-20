@@ -22,7 +22,7 @@ function generateSelectRowsOfKrathseis() {
           <input type="text" class="form-control input-contents right-align clearAble" name="ama_krathshs_${i.toString().padStart(2, '0')}" id="ama_krathshs_${i.toString().padStart(2, '0')}" maxlength="9" />
         </div>
         <div class="col-0-2"></div>
-        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectKrathseon-${i.toString().padStart(2, '0')} border-0" data-bs-toggle="tooltip" title="Καθαρισμός του πεδίου Κράτηση" data-bs-placement="bottom" data-target="krathsh_${i.toString().padStart(2, '0')}">
+        <button type="button" class="btn rounded-4 mt-2 col-0-3 clear-row" id="clearSelectKrathseon-${i.toString().padStart(2, '0')} border-0" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός του πεδίου Κράτηση" data-bs-placement="bottom" data-target="krathsh_${i.toString().padStart(2, '0')}">
           <i class="bi bi-trash cred"></i>
         </button>
       </div>

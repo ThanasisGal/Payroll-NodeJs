@@ -57,7 +57,7 @@
                     id="edit-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων του Κωδικού Πρόσβασης"
+                    data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων του Κωδικού Πρόσβασης"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled-link' : '' %>"
@@ -69,7 +69,7 @@
                     id="delete-btn"
                     href="#"
                     role="button"
-                    data-bs-toggle="tooltip" title="Διαγραφή του επιλεγμένου Κωδικού Πρόσβασης"
+                    data-bs-toggle="tooltip" data-bs-title="Διαγραφή του επιλεγμένου Κωδικού Πρόσβασης"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.delete) ? 'disabled-link' : '' %>"
@@ -83,7 +83,7 @@
                     data-bs-toggle="tooltip"
                     data-bs-placement="bottom"
                     data-tooltip-max-width="15vw"
-                    title="Επιστροφή στην Αρχική Σελίδα των Κωδικών Πρόσβασης"
+                    data-bs-title="Επιστροφή στην Αρχική Σελίδα των Κωδικών Πρόσβασης"
                     class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-3">
                     <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
                 </a>

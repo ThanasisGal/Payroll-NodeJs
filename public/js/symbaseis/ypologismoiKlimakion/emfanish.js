@@ -381,7 +381,7 @@ function renderNestedTablesEmfanish(tbody) {
 											role="button"
 											class="amendment-button button-style-1 color3498DB"
 											data-bs-toggle="tooltip" 
-											title="Διόρθωση Ποσού"
+											data-bs-title="Διόρθωση Ποσού"
 											data-bs-placement="bottom"
 											data-tooltip-max-width="15vw"
 											data-allowed="1">
@@ -393,7 +393,7 @@ function renderNestedTablesEmfanish(tbody) {
 											role="button"
 											class="delete-button button-style-1 colorE74C3C"
 											data-bs-toggle="tooltip" 
-											title="Διαγραφή Γραμμής"
+											data-bs-title="Διαγραφή Γραμμής"
 											data-bs-placement="bottom"
 											data-tooltip-max-width="15vw"
 											data-allowed="1">
@@ -405,7 +405,7 @@ function renderNestedTablesEmfanish(tbody) {
 											role="button"
 											class="save-button button-style-1 color27AE60"
 											data-bs-toggle="tooltip" 
-											title="Αποθήκευση Αλλαγών"
+											data-bs-title="Αποθήκευση Αλλαγών"
 											data-bs-placement="bottom"
 											data-tooltip-max-width="15vw"
 											data-allowed="1">
@@ -417,7 +417,7 @@ function renderNestedTablesEmfanish(tbody) {
 											role="button"
 											class="undo-button button-style-1 colorF39C12"
 											data-bs-toggle="tooltip" 
-											title="Αναίρεση"
+											data-bs-title="Αναίρεση"
 											data-bs-placement="bottom"
 											data-tooltip-max-width="15vw"
 											data-allowed="1">

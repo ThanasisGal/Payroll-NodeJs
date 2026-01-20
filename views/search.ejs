@@ -56,10 +56,10 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex flex-row justify-content-end gap-2">
-                                        <a href="/admin/view/<%= element._id %>" role="button" class="btn btn-secondary btn-small" title="Προβολή"><i class="bi bi-eye"></i>
+                                        <a href="/admin/view/<%= element._id %>" role="button" class="btn btn-secondary btn-small" data-bs-title="Προβολή"><i class="bi bi-eye"></i>
                                         </a>
 
-                                        <a href="/admin/edit/<%= element._id %>" type="button" class="btn btn-secondary btn-small" title="Διόρθωση"><i class="bi bi-pencil"></i>
+                                        <a href="/admin/edit/<%= element._id %>" type="button" class="btn btn-secondary btn-small" data-bs-title="Διόρθωση"><i class="bi bi-pencil"></i>
                                         </a>
 
                                         <form
@@ -72,7 +72,7 @@
                                             <button
                                                 type="submit"
                                                 class="btn btn-secondary btn-small"
-                                                title="Διαγραφή">
+                                                data-bs-title="Διαγραφή">
                                                 <i class="bi bi-person-x"></i>
                                             </button>
                                         </form>

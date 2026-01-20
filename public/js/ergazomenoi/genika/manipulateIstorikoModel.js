@@ -43,15 +43,15 @@ document.addEventListener('DOMContentLoaded', function() {
         <td class="col-1-5">
           <div class="d-flex justify-content-center align-items-center">
 
-            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center edit" data-bs-toggle="tooltip" title="Επεξεργασία εγγραφής" data-bs-placement="top">
+            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center edit" data-bs-toggle="tooltip" data-bs-title="Επεξεργασία εγγραφής" data-bs-placement="top">
               <i class="bi bi-pencil-square" style="font-size: 20px;"></i>
             </button>
   
-            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center delete" data-bs-toggle="tooltip" title="Διαγραφή εγγραφής" data-bs-placement="top">
+            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center delete" data-bs-toggle="tooltip" data-bs-title="Διαγραφή εγγραφής" data-bs-placement="top">
               <i class="bi bi-trash3" style="font-size: 20px;"></i>
             </button>
 
-            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center cancel aorato" style="display:none;" data-bs-toggle="tooltip" title="Επαναφορά εγγραφής" data-bs-placement="top">
+            <button type="button" class="btn rounded-1 buttons-content d-flex justify-content-center align-items-center cancel aorato" style="display:none;" data-bs-toggle="tooltip" data-bs-title="Επαναφορά εγγραφής" data-bs-placement="top">
               <i class="bi bi-arrow-counterclockwise" style="font-size: 20px;"></i>
             </button>
           </div>

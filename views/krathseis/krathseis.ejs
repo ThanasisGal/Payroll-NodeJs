@@ -79,7 +79,7 @@
     <div class="d-flex" style="margin: -0.5rem 0.625rem 2rem;">
       <div class="d-flex dropup" style="width: 60%; justify-content: space-around;">
         <div class="dropup">
-          <button class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-12 dropdown-toggle <% if (!userPrivileges.admin && !userPrivileges.create) { %>disabled-link<% } %>" type="button" id="add-btn" data-bs-toggle="dropdown" aria-expanded="false" id="add-btn" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-boundary="viewport" title="Επιλογή προσθήκης νέας κράτησης ή νέων ποσοστών κρατήσεων" <% if (!userPrivileges.admin && !userPrivileges.create) { %>onclick="event.preventDefault();"<% } %>>
+          <button class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-12 dropdown-toggle <% if (!userPrivileges.admin && !userPrivileges.create) { %>disabled-link<% } %>" type="button" id="add-btn" data-bs-toggle="dropdown" aria-expanded="false" id="add-btn" data-bs-placement="bottom" data-tooltip-max-width="15vw" data-bs-boundary="viewport" data-bs-title="Επιλογή προσθήκης νέας κράτησης ή νέων ποσοστών κρατήσεων" <% if (!userPrivileges.admin && !userPrivileges.create) { %>onclick="event.preventDefault();"<% } %>>
             <i class="buttons-content bi bi-plus-circle" style="margin-left: 3vw;"></i> Εισαγωγή &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
           </button>
           <ul class="dropdown-menu custom-dropdown-menu" aria-labelledby="add-btn">
@@ -92,7 +92,7 @@
           id="edit-btn""
           href="#" 
           role="button"
-          data-bs-toggle="tooltip" title="Εμφάνιση - Διόρθωση των στοιχείων των κρατήσεων ή των ποσοστών των κρατήσεων ανάλογα με το τι θα επιλέξετε" data-tooltip-max-width="15vw" data-bs-placement="bottom" 
+          data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων των κρατήσεων ή των ποσοστών των κρατήσεων ανάλογα με το τι θα επιλέξετε" data-tooltip-max-width="15vw" data-bs-placement="bottom" 
           class="btn btn-brown rounded-4 mb-3 buttons-content mt-2 col-2-5 <% if (!userPrivileges.admin && !userPrivileges.update) { %>disabled-link<% } %>"
           <% if (!userPrivileges.admin && !userPrivileges.update) { %>onclick="event.preventDefault();"<% } %> >
           <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
@@ -102,7 +102,7 @@
           id="delete-btn"
           href="#"
           role="button"
-          data-bs-toggle="tooltip" title="Διαγραφή των στοιχείων του επιλεγμένου νόμιμου εκπρόσωπου"
+          data-bs-toggle="tooltip" data-bs-title="Διαγραφή των στοιχείων του επιλεγμένου νόμιμου εκπρόσωπου"
           data-bs-placement="bottom" 
           data-tooltip-max-width="15vw"
           class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2-5 <% if (!userPrivileges.admin && !userPrivileges.delete) { %>disabled-link<% } %>"
@@ -187,5 +187,5 @@
   <script nonce="<%= nonce %>" src="/static/js/krathseis/nestingTables.js"></script>
   <script nonce="<%= nonce %>" src="/static/js/krathseis/selectRowInTable.js"></script>
   <script nonce="<%= nonce %>" src="/static/js/krathseis/selectRowsInNestedTable.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script>
+  <!-- <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script> -->
 <% } %>
