@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # CSS Deployment Script - Linux Version WITH INTERACTIVE VERSIONING
-# Auto:    Version++ → Minify → S3 → CloudFront → Git → EC2
+# Auto:  Version++ → Minify → S3 → CloudFront → Git → EC2
 # =============================================================================
 
 set -euo pipefail
@@ -23,8 +23,8 @@ AWS_REGION="eu-central-1"
 CDN_URL="https://cdn.webpayrollsolutions.com"
 CLOUDFRONT_DIST_ID="E2FVQEZRP01HIX"
 
-# EC2 Configuration
-EC2_KEY="$HOME/Utilities/AWS-EC2-S3/pair-key-pem/Payroll_NodeJS_Server_Frankfurt.pem"
+# EC2 Configuration - FIX: Use consistent path
+EC2_KEY="$HOME/.ssh/Payroll_NodeJS_Server_Frankfurt.pem"
 EC2_USER_HOST="ubuntu@63.178.15.216"
 
 # Colors
@@ -102,7 +102,36 @@ echo "Start Time: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================="
 echo ""
 
-cd "$PROJECT_DIR" || { log_error "Directory $PROJECT_DIR not found. "; exit 1; }
+cd "$PROJECT_DIR" || { log_error "Directory $PROJECT_DIR not found."; exit 1; }
+
+# =============================================================================
+# PREREQUISITES CHECK
+# =============================================================================
+
+log_info "Checking prerequisites..."
+
+# Check EC2 key
+if [[ !  -f "$EC2_KEY" ]]; then
+    log_error "EC2 key not found:  $EC2_KEY"
+    exit 1
+fi
+
+# Check AWS CLI
+if ! command -v aws &> /dev/null; then
+    log_error "AWS CLI not installed!"
+    exit 1
+fi
+
+# Check if css:deploy script exists in package.json
+if !  grep -q '"css:deploy"' "$PACKAGE_JSON"; then
+    log_error "'css:deploy' script not found in package.json!"
+    log_info "Add this to package.json scripts:"
+    echo '  "css:deploy": "csso public/css/main.css -o public/css/main.min.css && aws s3 cp public/css/main.min.css s3://'"$S3_BUCKET"'/'"$S3_CSS_PATH"' --content-type '"'"'text/css'"'"' --cache-control '"'"'public, max-age=31536000'"'"' --region '"$AWS_REGION"'"'
+    exit 1
+fi
+
+log_success "Prerequisites OK"
+echo ""
 
 # =============================================================================
 # STEP 0: VERSION MANAGEMENT
@@ -203,8 +232,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-if [[ ! -f "$CSS_MINIFIED" ]]; then
-    log_error "Minified file not created:  $CSS_MINIFIED"
+if [[ !  -f "$CSS_MINIFIED" ]]; then
+    log_error "Minified file not created: $CSS_MINIFIED"
     exit 1
 fi
 
@@ -222,14 +251,24 @@ echo ""
 
 log_step "Step 2: Invalidating CloudFront cache..."
 
-# Add timeout to prevent hanging (10 seconds max)
-INVALIDATION_RESULT=$(timeout 10s aws cloudfront create-invalidation \
-    --distribution-id "$CLOUDFRONT_DIST_ID" \
-    --paths "/$S3_CSS_PATH" \
-    --region us-east-1 \
-    --output json 2>&1)
-
-INVALIDATION_EXIT_CODE=$? 
+# Check if timeout command exists
+if command -v timeout &> /dev/null; then
+    # Use timeout to prevent hanging
+    INVALIDATION_RESULT=$(timeout 10s aws cloudfront create-invalidation \
+        --distribution-id "$CLOUDFRONT_DIST_ID" \
+        --paths "/$S3_CSS_PATH" \
+        --region us-east-1 \
+        --output json 2>&1)
+    INVALIDATION_EXIT_CODE=$?
+else
+    # Fallback without timeout
+    INVALIDATION_RESULT=$(aws cloudfront create-invalidation \
+        --distribution-id "$CLOUDFRONT_DIST_ID" \
+        --paths "/$S3_CSS_PATH" \
+        --region us-east-1 \
+        --output json 2>&1)
+    INVALIDATION_EXIT_CODE=$? 
+fi
 
 if [[ $INVALIDATION_EXIT_CODE -eq 124 ]]; then
     # Timeout occurred
@@ -239,7 +278,7 @@ elif [[ $INVALIDATION_EXIT_CODE -eq 0 ]]; then
     # Success
     INVAL_ID=$(echo "$INVALIDATION_RESULT" | grep -o '"Id": "[^"]*"' | head -1 | cut -d'"' -f4)
     if [[ -n "$INVAL_ID" ]]; then
-        log_success "CloudFront invalidation created (ID:  $INVAL_ID)"
+        log_success "CloudFront invalidation created (ID: $INVAL_ID)"
         log_info "Cache will clear in ~2-3 minutes"
     else
         log_warning "CloudFront invalidation completed but ID not found"
@@ -262,17 +301,17 @@ read -p "💬 Enter commit message (or press Enter for default): " COMMIT_MSG
 
 if [[ -z "$COMMIT_MSG" ]]; then
     if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
-        COMMIT_MSG="Update CSS v$NEW_VERSION ($BUMP_TYPE) - $(date '+%Y-%m-%d %H:%M:%S')"
+        COMMIT_MSG="🎨 Update CSS v$NEW_VERSION ($BUMP_TYPE) - $(date '+%Y-%m-%d %H:%M:%S')"
     else
-        COMMIT_MSG="Update CSS - $(date '+%Y-%m-%d %H:%M:%S')"
+        COMMIT_MSG="🎨 Update CSS - $(date '+%Y-%m-%d %H:%M:%S')"
     fi
 fi
 
-# Add files (including package.json if version changed)
+# Add files (only CSS + package.json if version changed)
 if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
-    git add app.js package.json public/css/main.css public/css/main.min.css
+    git add package.json public/css/main.css public/css/main.min.css
 else
-    git add app.js public/css/main.css public/css/main.min.css
+    git add public/css/main.css public/css/main.min.css
 fi
 
 if [[ -n $(git status --porcelain) ]]; then
@@ -297,7 +336,7 @@ echo ""
 # STEP 4: EC2 DEPLOYMENT
 # =============================================================================
 
-read -p "🌐 Deploy to EC2? (y/n): " DEPLOY_EC2
+read -p "🌐 Deploy to EC2?  (y/n): " DEPLOY_EC2
 
 if [[ "$DEPLOY_EC2" == "y" || "$DEPLOY_EC2" == "Y" ]]; then
     echo ""
@@ -355,9 +394,9 @@ echo "📊 SUMMARY:"
 if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
     echo "  ✅ Version updated:  $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)"
 else
-    echo "  ℹ️  Version unchanged:  $CURRENT_VERSION"
+    echo "  ℹ️  Version unchanged: $CURRENT_VERSION"
 fi
-echo "  ✅ CSS minified: $ORIGINAL_SIZE → $MINIFIED_SIZE bytes (${REDUCTION}% reduction)"
+echo "  ✅ CSS minified:  $ORIGINAL_SIZE → $MINIFIED_SIZE bytes (${REDUCTION}% reduction)"
 echo "  ✅ Uploaded to S3: s3://$S3_BUCKET/$S3_CSS_PATH"
 echo "  ✅ CDN URL: $CDN_URL/$S3_CSS_PATH"
 echo "  ✅ CloudFront invalidated"
@@ -368,8 +407,8 @@ fi
 echo ""
 echo "💡 NEXT STEPS:"
 echo "  1. Wait 2-3 minutes for CloudFront cache to clear"
-echo "  2. Clear browser cache: Ctrl+Shift+Delete"
-echo "  3. Hard refresh: Ctrl+Shift+R"
+echo "  2. Clear browser cache:  Ctrl+Shift+Delete"
+echo "  3. Hard refresh:  Ctrl+Shift+R"
 echo ""
 echo "=========================================="
 echo ""

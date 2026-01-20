@@ -11,7 +11,7 @@ set -euo pipefail
 # =============================================================================
 
 DOMAIN="webpayrollsolutions.com"
-AWS_REGION="eu-central-1"
+HOSTED_ZONE_ID="Z08781101STB1NL30PU2"  # Hardcoded - από το screenshot
 LOG_FILE="/tmp/dns-update-$(date +%Y%m%d).log"
 JSON_FILE="/tmp/route53-change-batch.json"
 
@@ -43,39 +43,17 @@ log_error() {
 
 log_info "Starting DNS Auto-Update for $DOMAIN..."
 
-# Check if AWS CLI is installed
-if !  command -v aws &> /dev/null; then
-    log_error "AWS CLI is not installed.  Please install it first."
-    log_info "Install:  curl 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip' && unzip awscliv2.zip && sudo ./aws/install"
+# Check AWS CLI
+if ! command -v aws &> /dev/null; then
+    log_error "AWS CLI not installed"
     exit 1
 fi
 
 # Check AWS credentials
 if ! aws sts get-caller-identity &>/dev/null; then
     log_error "AWS credentials not configured!"
-    log_info "Run: aws configure"
     exit 1
 fi
-
-# AWS credentials are automatically loaded from: 
-# - ~/.aws/credentials
-# - Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-# - EC2 IAM Role (if running on EC2)
-
-# Get Hosted Zone ID
-log_info "Fetching Hosted Zone ID..."
-HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
-    --query "HostedZones[?Name == '$DOMAIN. ']. Id" \
-    --output text \
-    --region "$AWS_REGION" 2>/dev/null)
-
-if [[ -z "$HOSTED_ZONE_ID" ]]; then
-    log_error "Hosted Zone for $DOMAIN not found."
-    exit 1
-fi
-
-# Remove /hostedzone/ prefix if present
-HOSTED_ZONE_ID="${HOSTED_ZONE_ID#/hostedzone/}"
 
 log_info "Using Hosted Zone ID: $HOSTED_ZONE_ID"
 
@@ -90,36 +68,39 @@ fi
 
 log_info "Current Public IP: $NEW_IP"
 
-# Get current DNS IP
+# Get current DNS IP (Route 53 stores domains with trailing dot)
 log_info "Fetching current DNS IP..."
 CURRENT_IP=$(aws route53 list-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
-    --query "ResourceRecordSets[?Name == '$DOMAIN.'].ResourceRecords[0].Value" \
-    --output text \
-    --region "$AWS_REGION" 2>/dev/null)
+    --query "ResourceRecordSets[?Name == '${DOMAIN}.' && Type == 'A']. ResourceRecords[0].Value | [0]" \
+    --output text 2>/dev/null || echo "")
+
+if [[ -z "$CURRENT_IP" || "$CURRENT_IP" == "None" ]]; then
+    CURRENT_IP="Not set"
+fi
 
 log_info "Current DNS IP: $CURRENT_IP"
 
 # Check if update is needed
 if [[ "$NEW_IP" == "$CURRENT_IP" ]]; then
-    log_info "No IP change detected. DNS is up-to-date."
+    log_info "No IP change detected.  DNS is up-to-date."
     exit 0
 fi
 
-log_warning "New IP detected: $NEW_IP (Old IP: $CURRENT_IP)"
+log_warning "New IP detected:  $NEW_IP (Old IP:  $CURRENT_IP)"
 log_info "Updating Route 53..."
 
 # Create JSON change batch
 cat > "$JSON_FILE" <<EOF
 {
-    "Changes": [
+    "Changes":  [
         {
             "Action": "UPSERT",
             "ResourceRecordSet": {
-                "Name":  "$DOMAIN",
+                "Name": "${DOMAIN}",
                 "Type": "A",
-                "TTL": 300,
-                "ResourceRecords":  [
+                "TTL":  300,
+                "ResourceRecords": [
                     {
                         "Value": "$NEW_IP"
                     }
@@ -130,27 +111,28 @@ cat > "$JSON_FILE" <<EOF
 }
 EOF
 
-log_info "JSON change batch created: $JSON_FILE"
+log_info "JSON change batch created"
 
-# Update Route 53
-CHANGE_ID=$(aws route53 change-resource-record-sets \
+# Update Route 53 (NO --region flag needed!)
+CHANGE_RESULT=$(aws route53 change-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
     --change-batch "file://$JSON_FILE" \
-    --query "ChangeInfo.Id" \
-    --output text \
-    --region "$AWS_REGION" 2>&1)
+    --output json 2>&1)
 
 if [[ $? -eq 0 ]]; then
+    CHANGE_ID=$(echo "$CHANGE_RESULT" | grep -o '"Id": "[^"]*"' | head -1 | cut -d'"' -f4)
     log_info "✅ DNS successfully updated to $NEW_IP"
     log_info "Change ID: $CHANGE_ID"
     
-    # Wait for change to propagate
+    # Wait for propagation
     log_info "Waiting for DNS propagation..."
-    aws route53 wait resource-record-sets-changed --id "$CHANGE_ID" --region "$AWS_REGION" 2>/dev/null || true
+    if [[ -n "$CHANGE_ID" ]]; then
+        aws route53 wait resource-record-sets-changed --id "$CHANGE_ID" 2>/dev/null || true
+    fi
     log_info "✅ DNS change propagated!"
 else
     log_error "Failed to update DNS"
-    log_error "Error:  $CHANGE_ID"
+    log_error "Error: $CHANGE_RESULT"
     exit 1
 fi
 
@@ -158,5 +140,4 @@ fi
 rm -f "$JSON_FILE"
 
 log_info "DNS Auto-Update complete!"
-
 exit 0
