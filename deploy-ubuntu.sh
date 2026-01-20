@@ -1431,13 +1431,34 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     pm2 logs payroll --lines 20 --nostream || echo "[EC2] Could not fetch logs"
     
     echo ""
-    echo "[EC2] Checking for errors in new logs..."
-    ERROR_COUNT=$(pm2 logs payroll --err --lines 50 --nostream 2>/dev/null | wc -l || echo "0")
-    if [ "$ERROR_COUNT" -gt 0 ]; then
-        echo "[EC2] ⚠️  Found $ERROR_COUNT error lines:"
-        pm2 logs payroll --err --lines 10 --nostream
+    echo "[EC2] Checking application status..."
+
+    # Check PM2 status
+    APP_STATUS=\$(ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 jlist 2>/dev/null | jq -r '.[] | select(.name==\"payroll\") | .pm2_env. status' 2>/dev/null || echo 'unknown'")
+
+    if [ "\$APP_STATUS" = "online" ]; then
+    	echo "[EC2] ✅ Application status:  ONLINE"
+    
+        # Check for CRITICAL errors only (not warnings)
+        echo "[EC2] Checking for critical errors..."
+       	CRITICAL_ERRORS=\$(ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 50 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash' | wc -l" || echo "0")
+    
+       	if [ "\$CRITICAL_ERRORS" -gt 0 ]; then
+   		echo "[EC2] ⚠️  Found \$CRITICAL_ERRORS critical error(s):"
+	   	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 20 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash'"
+       	else
+	   	echo "[EC2] ✅ No critical errors found!"
+       	fi
+    
+       	# Show last 5 lines of output for verification
+    	echo ""
+    	echo "[EC2] Last 5 lines of output:"
+    	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --out --lines 5 --nostream 2>/dev/null || echo 'No output logs'"
     else
-        echo "[EC2] ✅ No errors in fresh logs!"
+    	echo "[EC2] ❌ Application status: \$APP_STATUS"
+	echo "[EC2] Full error log:"
+    	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 30 --nostream"
+    	exit 1
     fi
     
     echo ""
