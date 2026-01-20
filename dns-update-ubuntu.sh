@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
-# DNS Auto-Update Script for Ubuntu/Linux
-# Updates Route 53 A record with current public IP
-# =============================================================================
-
 set -euo pipefail
 
 # =============================================================================
@@ -11,7 +6,6 @@ set -euo pipefail
 # =============================================================================
 
 DOMAIN="webpayrollsolutions.com"
-HOSTED_ZONE_ID="Z08781101STB1NL30PU2"  # Hardcoded - από το screenshot
 LOG_FILE="/tmp/dns-update-$(date +%Y%m%d).log"
 JSON_FILE="/tmp/route53-change-batch.json"
 
@@ -55,6 +49,22 @@ if ! aws sts get-caller-identity &>/dev/null; then
     exit 1
 fi
 
+# Get Hosted Zone ID dynamically
+log_info "Fetching Hosted Zone ID..."
+HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
+    --query "HostedZones[?Name == '${DOMAIN}.'].Id | [0]" \
+    --output text 2>/dev/null || echo "")
+
+# Remove /hostedzone/ prefix
+HOSTED_ZONE_ID="${HOSTED_ZONE_ID#/hostedzone/}"
+
+if [[ -z "$HOSTED_ZONE_ID" || "$HOSTED_ZONE_ID" == "None" ]]; then
+    log_error "Hosted Zone for $DOMAIN not found."
+    log_info "Available Hosted Zones:"
+    aws route53 list-hosted-zones --query "HostedZones[*].[Name,Id]" --output table 2>/dev/null || echo "Failed to list zones"
+    exit 1
+fi
+
 log_info "Using Hosted Zone ID: $HOSTED_ZONE_ID"
 
 # Get current public IP
@@ -68,14 +78,15 @@ fi
 
 log_info "Current Public IP: $NEW_IP"
 
-# Get current DNS IP (Route 53 stores domains with trailing dot)
+# Get current DNS IP
 log_info "Fetching current DNS IP..."
 CURRENT_IP=$(aws route53 list-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
-    --query "ResourceRecordSets[?Name == '${DOMAIN}.' && Type == 'A']. ResourceRecords[0].Value | [0]" \
+    --query "ResourceRecordSets[?Name == '${DOMAIN}.' && Type == 'A'].ResourceRecords[0].Value | [0]" \
     --output text 2>/dev/null || echo "")
 
 if [[ -z "$CURRENT_IP" || "$CURRENT_IP" == "None" ]]; then
+    log_warning "No A record found - will create new one"
     CURRENT_IP="Not set"
 fi
 
@@ -87,7 +98,7 @@ if [[ "$NEW_IP" == "$CURRENT_IP" ]]; then
     exit 0
 fi
 
-log_warning "New IP detected:  $NEW_IP (Old IP:  $CURRENT_IP)"
+log_warning "New IP detected:  $NEW_IP (Old IP: $CURRENT_IP)"
 log_info "Updating Route 53..."
 
 # Create JSON change batch
@@ -99,8 +110,8 @@ cat > "$JSON_FILE" <<EOF
             "ResourceRecordSet": {
                 "Name": "${DOMAIN}",
                 "Type": "A",
-                "TTL":  300,
-                "ResourceRecords": [
+                "TTL": 300,
+                "ResourceRecords":  [
                     {
                         "Value": "$NEW_IP"
                     }
@@ -113,7 +124,7 @@ EOF
 
 log_info "JSON change batch created"
 
-# Update Route 53 (NO --region flag needed!)
+# Update Route 53
 CHANGE_RESULT=$(aws route53 change-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
     --change-batch "file://$JSON_FILE" \
