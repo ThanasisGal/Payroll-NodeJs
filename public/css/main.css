@@ -1,5 +1,5 @@
 :root {
-  --aaa: rgba(228, 206, 206, 0.604);
+  --aaa: #212529;
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -12,7 +12,7 @@
   --bg-header: #012b0fb2;
   --bg-footer: #15446333;
   --bg-d-flex-hover: #0066ff2d;
-  --bs-body-color-rgb: 33, 37, 41;
+  --bs-body-color-rgb: #212529;
   --bs-card-cap-bg: rgba(var(--bs-body-color-rgb), 0.5);
   --sidebar-bg: #c9c9c9d0;
   --sidebar-w: 21rem;   /* πλάτος sidebar */
@@ -288,8 +288,8 @@ html, body {
   display: block;
   width: 100%;
   padding: 0.25rem 0.5rem;
-  font-size: 0.9vw;
-  font-weight: 600;
+  font-size: 0.85vw;
+  font-weight: 500;
   line-height: 1.3;
   color: var(--bs-body-color);
   -webkit-appearance: none;
@@ -298,7 +298,6 @@ html, body {
   background-color: var(--bs-body-bg);
   background-clip: padding-box;
   border: var(--bs-border-width) solid #797a7c8c;
-  ;
   border-radius: var(--bs-border-radius);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
