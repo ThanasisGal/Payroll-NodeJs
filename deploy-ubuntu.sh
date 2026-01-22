@@ -1406,7 +1406,7 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     echo "[EC2] Flushing old PM2 logs..."
     pm2 flush
     
-    rm -f /home/ubuntu/. pm2/logs/payroll-error. log
+    rm -f /home/ubuntu/.pm2/logs/payroll-error.log
     rm -f /home/ubuntu/.pm2/logs/payroll-out.log
 
     echo "[EC2] Reloading PM2..."
@@ -1446,7 +1446,7 @@ if [[ $?  -eq 0 ]]; then
     
     # Check PM2 status (runs locally via SSH)
     APP_STATUS=$(ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
-        "pm2 jlist 2>/dev/null | jq -r '. [] | select(.name==\"payroll\") | .pm2_env.status' 2>/dev/null || echo 'unknown'")
+        "pm2 jlist 2>/dev/null | jq -r '.[] | select(.name==\"payroll\") | .pm2_env.status' 2>/dev/null || echo 'unknown'")
     
     if [[ "$APP_STATUS" == "online" ]]; then
         log_success "Application status: ONLINE ✅"
