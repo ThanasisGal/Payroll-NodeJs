@@ -48,4 +48,5 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleInputs('kataggelia_katopin_eggrafhs_proeidopoihshs', ['hmeromhnia_eggrafhs_proeidopoihshs']);
     toggleInputs('omadikh_apolysh', ['arithmos_apofashs_gia_omadikh_apolysh', 'hmeromhnia_apofashs_gia_omadikh_apolysh']);
     toggleInputs('epidosh_me_dikastiko_epimelhth', ['hmeromhnia_epidoshs']);
-});
+    toggleInputs('dieythethsh_ergasias', ['hmnia_enarxhs_dieythethshs_ergasias', 'hmnia_lhxhs_dieythethshs_ergasias']);
+})

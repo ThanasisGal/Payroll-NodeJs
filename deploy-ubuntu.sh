@@ -1406,7 +1406,7 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     echo "[EC2] Flushing old PM2 logs..."
     pm2 flush
     
-    rm -f /home/ubuntu/.pm2/logs/payroll-error.log
+    rm -f /home/ubuntu/. pm2/logs/payroll-error. log
     rm -f /home/ubuntu/.pm2/logs/payroll-out.log
 
     echo "[EC2] Reloading PM2..."
@@ -1431,39 +1431,57 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     pm2 logs payroll --lines 20 --nostream || echo "[EC2] Could not fetch logs"
     
     echo ""
-    echo "[EC2] Checking application status..."
+    echo "[EC2] ✅ Remote deployment commands completed!"
+ENDSSH
 
-    # Check PM2 status
-    APP_STATUS=\$(ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 jlist 2>/dev/null | jq -r '.[] | select(.name==\"payroll\") | .pm2_env. status' 2>/dev/null || echo 'unknown'")
+# ============================================================================
+# POST-DEPLOYMENT VERIFICATION (runs locally, NOT on EC2)
+# ============================================================================
 
-    if [ "\$APP_STATUS" = "online" ]; then
-    	echo "[EC2] ✅ Application status:  ONLINE"
-    
-        # Check for CRITICAL errors only (not warnings)
-        echo "[EC2] Checking for critical errors..."
-       	CRITICAL_ERRORS=\$(ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 50 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash' | wc -l" || echo "0")
-    
-       	if [ "\$CRITICAL_ERRORS" -gt 0 ]; then
-   		echo "[EC2] ⚠️  Found \$CRITICAL_ERRORS critical error(s):"
-	   	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 20 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash'"
-       	else
-	   	echo "[EC2] ✅ No critical errors found!"
-       	fi
-    
-       	# Show last 5 lines of output for verification
-    	echo ""
-    	echo "[EC2] Last 5 lines of output:"
-    	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --out --lines 5 --nostream 2>/dev/null || echo 'No output logs'"
-    else
-    	echo "[EC2] ❌ Application status: \$APP_STATUS"
-	echo "[EC2] Full error log:"
-    	ssh -i "\$EC2_KEY" "\$EC2_USER@\$EC2_HOST" "pm2 logs payroll --err --lines 30 --nostream"
-    	exit 1
-    fi
+if [[ $?  -eq 0 ]]; then
+    log_success "Remote commands executed successfully"
     
     echo ""
-    echo "✅ Deployment successful!"
-ENDSSH
+    log_info "Verifying application status from local machine..."
+    
+    # Check PM2 status (runs locally via SSH)
+    APP_STATUS=$(ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
+        "pm2 jlist 2>/dev/null | jq -r '. [] | select(.name==\"payroll\") | .pm2_env.status' 2>/dev/null || echo 'unknown'")
+    
+    if [[ "$APP_STATUS" == "online" ]]; then
+        log_success "Application status: ONLINE ✅"
+        
+        # Check for CRITICAL errors only (not warnings)
+        log_info "Checking for critical errors..."
+        CRITICAL_ERRORS=$(ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
+            "pm2 logs payroll --err --lines 50 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash' | wc -l" 2>/dev/null || echo "0")
+        
+        if [[ $CRITICAL_ERRORS -gt 0 ]]; then
+            log_warning "Found $CRITICAL_ERRORS critical error(s):"
+            echo ""
+            ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
+                "pm2 logs payroll --err --lines 10 --nostream 2>/dev/null | grep -iE 'error:|exception:|fatal:|crash'" || true
+        else
+            log_success "No critical errors found!  ✅"
+        fi
+        
+        # Show last 5 lines of output for verification
+        echo ""
+        log_info "Last 5 lines of application output:"
+        ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
+            "pm2 logs payroll --out --lines 5 --nostream 2>/dev/null" || log_info "No output logs available"
+    else
+        log_error "Application status:  $APP_STATUS ❌"
+        log_error "Fetching error logs..."
+        echo ""
+        ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" \
+            "pm2 logs payroll --err --lines 30 --nostream 2>/dev/null" || log_error "Could not fetch error logs"
+        exit 1
+    fi
+else
+    log_error "Remote deployment failed!"
+    exit 1
+fi
 
 DEPLOY_END=$(date +%s)
 DEPLOY_DURATION=$((DEPLOY_END - DEPLOY_START))
