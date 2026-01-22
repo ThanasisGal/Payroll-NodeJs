@@ -350,9 +350,18 @@ if [[ "$DEPLOY_EC2" == "y" || "$DEPLOY_EC2" == "Y" ]]; then
         echo "[EC2] Navigating to project directory..."
         cd ~/Payroll-NodeJs
         
-        echo "[EC2] Pulling latest changes from GitHub..."
-        git pull origin main
-        
+ 	echo "[EC2] Checking git remote configuration..."
+	CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+
+	if [[ "$CURRENT_REMOTE" == https://* ]]; then
+	    echo "[EC2] Converting HTTPS remote to SSH..."
+	    git remote set-url origin git@github.com:ThanasisGal/Payroll-NodeJs.git
+	    echo "[EC2] ✅ Remote changed to SSH"
+	fi
+
+	echo "[EC2] Pulling latest changes from GitHub..."
+	git pull origin main
+	
         echo "[EC2] Restarting application with PM2..."
         pm2 restart all --update-env
         
