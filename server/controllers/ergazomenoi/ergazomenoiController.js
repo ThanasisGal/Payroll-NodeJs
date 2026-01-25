@@ -25,6 +25,14 @@ const   {   ErgazomenoiModel,
 
 const   { pdfDocumentl } = Models_E;
 
+// ✅ IMPORTS
+const { savePdfFromBase64 } = require('../../utils/pdfHandler');
+class ErgazomenoiController {
+    static postErgazomenoiForm = async (req, res) => {
+        const sessionUserTeam = req.session.userTeam;
+        // ... υπόλοιπος κώδικας ...
+    }
+}
 let nextPageSearchTerm = "";
 
 const fieldsStoixeionSymbashs = ['stoixeio_symbashs', 'poso_symbashs', 'poso_symbashs_basei_oron_ergasias'];
@@ -760,6 +768,88 @@ class ergazomenoiController {
             });
         }
 
+        // =========================================================================
+        // ✅ ΕΠΕΞΕΡΓΑΣΙΑ PDF BASE64 DATA
+        // =========================================================================
+
+        const pdfFieldMappings = {
+            'arxeio_apodoxhs_oron_atomikhs_symbashs_base64': {
+                documentType: 'arxeio_symbashs',
+                dbField: 'arxeio_apodoxhs_oron_atomikhs_symbashs_path'
+            },
+            'arxeio_apodoxhs_oysiodon_oron_base64': {
+                documentType: 'oysiodeis_oroi',
+                dbField: 'arxeio_apodoxhs_oysiodon_oron_path'
+            },
+            'bibliario_anhlikoy_base64': {
+                documentType: 'anhlikoi',
+                dbField: 'bibliario_anhlikoy_path'
+            },
+            'arxeio_nomimopoihtikon_eggrafon_base64': {
+                documentType: 'allodapoi',
+                dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
+            }
+        };
+
+        const pdfResults = [];
+        const ergazomenosId = savedErgazomenos._id.toString();
+
+        for (const [base64Field, mapping] of Object.entries(pdfFieldMappings)) {
+            const base64Data = formData[base64Field];
+            
+            if (base64Data && base64Data.startsWith('data:application/pdf;base64,')) {
+                try {
+                    console.log(`📄 Processing PDF: ${mapping.documentType}`);
+                    
+                    const pdfPath = savePdfFromBase64(
+                        base64Data,
+                        mapping.documentType,
+                        ergazomenosId
+                    );
+                    
+                    // Update το document με το path
+                    savedErgazomenos[mapping.dbField] = pdfPath;
+                    
+                    pdfResults.push({
+                        documentType: mapping.documentType,
+                        success: true,
+                        path: pdfPath
+                    });
+                    
+                    console.log(`✅ PDF saved: ${mapping.documentType} → ${pdfPath}`);
+                    
+                } catch (error) {
+                    console.error(`❌ Failed to process ${mapping.documentType}:`, error.message);
+                    pdfResults.push({
+                        documentType: mapping.documentType,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+        }
+
+        // ✅ Save το document με τα PDF paths
+        if (pdfResults.length > 0) {
+            try {
+                await savedErgazomenos.save();
+                console.log(`✅ Updated ergazomenos with ${pdfResults.length} PDF paths`);
+            } catch (error) {
+                console.error(`❌ Failed to save PDF paths:`, error);
+            }
+        }
+
+        // ✅ Logging
+        const successCount = pdfResults.filter(r => r.success).length;
+        const failCount = pdfResults.filter(r => !r.success).length;
+
+        if (successCount > 0) {
+            console.log(`📎 Successfully saved ${successCount} PDFs`);
+        }
+        if (failCount > 0) {
+            console.warn(`⚠️ Failed to save ${failCount} PDFs`);
+        }
+
         function createOrarioData(i1) {
             return {
                 team: sessionUserTeam,
@@ -888,16 +978,22 @@ class ergazomenoiController {
             });
         }
 
-        // ✅ ΤΕΛΙΚΟ RESPONSE με _id
+        // ✅ ΤΕΛΙΚΟ RESPONSE με _id και PDF results
         try {
-            return res.json({ 
+            return res.status(201).json({ 
                 success: true, 
                 data: {
-                    _id: savedErgazomenos._id,           // ✅ Για PDF upload
+                    _id: savedErgazomenos._id,
                     kodikos: savedErgazomenos.kodikos,
                     eponymo: savedErgazomenos.eponymo,
-                    onoma: savedErgazomenos.onoma
+                    onoma: savedErgazomenos.onoma,
+                    // ✅ Προσθήκη PDF paths
+                    arxeio_apodoxhs_oron_atomikhs_symbashs_path: savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
+                    arxeio_apodoxhs_oysiodon_oron_path: savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
+                    bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
+                    arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
                 },
+                pdfResults: pdfResults, // ✅ Πληροφορίες για PDFs
                 redirectUrl: "/ergazomenoi/ergazomenoi" 
             });
         } catch (error) {
@@ -907,7 +1003,6 @@ class ergazomenoiController {
                 errorMessage: "Σφάλμα κατά την ολοκλήρωση" 
             });
         }        
-        
         
         
         

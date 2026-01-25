@@ -32,6 +32,7 @@ const yphkoothtes                           = require('../dropdowns/ergazomenoi/
 const eidikesKathgories                     = require('../dropdowns/ergazomenoi/eidikesKathgories');
 const oikogeneiakesKatastaseis              = require('../dropdowns/ergazomenoi/oikogeneiakesKatastaseis');
 const trapezes                              = require('../dropdowns/ergazomenoi/trapezes');
+const typoiDaneismoy                        = require('../dropdowns/ergazomenoi/typoiDaneismoy');
 const kathestosApasxolhseon                 = require('../dropdowns/ergazomenoi/kathestosApasxolhseon');
 const sxeseisErgasias                       = require('../dropdowns/ergazomenoi/sxeseisErgasias');
 const syggenikesSxeseis                     = require('../dropdowns/ergazomenoi/syggenikesSxeseis');
@@ -136,6 +137,7 @@ const   {
             ThematikesEnothtesModel,
             TheseisEythynhsModel,
             TmhmataModel,
+            TypoiDaneismoyModel,
             Typoi_ApodoxonModel,
             TypoiEpidothseonModel,
             TypoiErgazomenonModel,
@@ -256,6 +258,7 @@ router.get('/ergazomenoi/yphkoothta',                   buildDropdownRoute(Yphko
 router.get('/ergazomenoi/eidikh_kathgoria',             buildDropdownRoute(EidikesKathgoriesModel , eidikesKathgories.options));
 router.get('/ergazomenoi/oikogeneiakh_katastash',       buildDropdownRoute(OikogeneiakhKatastashModel , oikogeneiakesKatastaseis.options));
 router.get('/ergazomenoi/trapeza',                      buildDropdownRoute(BanksPerCompanyModel , trapezes.options));
+router.get('/ergazomenoi/typos_daneismoy',              buildDropdownRoute(TypoiDaneismoyModel , typoiDaneismoy.options));
 router.get('/ergazomenoi/kathestos_apasxolhshs',        buildDropdownRoute(KathestosApasxolhshsModel , kathestosApasxolhseon.options));
 router.get('/ergazomenoi/sxesh_ergasias',               buildDropdownRoute(SxeseisErgasiasModel , sxeseisErgasias.options));
 router.get('/ergazomenoi/syggenikh_sxesh',              buildDropdownRoute(SyggenikesSxeseisModel , syggenikesSxeseis.options));

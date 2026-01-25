@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
     var checkboxes = [
-        "energos", "fylo", "apasxolhsh_gia_proth_fora", "karta_ergasias", "syggeneia", "topos_ergasias", "afora_dokimastikh_periodo", "dieythethsh_ergasias", "efarmostea_sse", "plhrhs_apasxolhsh", "mh_problepsimo_programma", "dialleima_entos_ektos_orarioy", "typos_orarioy", "synexes_diakekomeno", "pshfiakh_organosh", "asfalish_me_tekmarta", "epoxikos", "xarakthrismos_ergazomenon", "meiosh_eisforon_ergazomenon", "epidothsh_eisforon_ergodoth", "mhteres", "diathesimothta", "palios_neos", "amoibetai_me_sse", "systatiko_shmeioma", "topothethsh_me_programma", "ypoxreotikh_ek_toy_nomoy_katartish", "antikatastash_ergazomenoy", "epidoma_anergias", "adeia_diamonhs_me_amesh_prosbash_gia_ergasia", "adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia", "adeia_eisodoy_gia_epoxikh_apasxolhsh", "epaggelmatikh_katartish", "ypologismos_foroy", "gnosh_ypologiston", "oros_sth_symbash_n_3986_2011", "kataggelia_katopin_eggrafhs_proeidopoihshs", "omadikh_apolysh", "epidosh_me_dikastiko_epimelhth", "repo_01", "repo_02", "repo_03", "repo_04", "repo_05", "repo_06", "repo_07", "argia_01", "argia_02", "argia_03", "argia_04", "argia_05", "argia_06", "argia_07"
+        "energos", "fylo", "apasxolhsh_gia_proth_fora", "karta_ergasias", "syggeneia", "topos_ergasias", "afora_daneismo_ergazomenoy", "afora_dokimastikh_periodo", "dieythethsh_ergasias", "efarmostea_sse", "plhrhs_apasxolhsh", "mh_problepsimo_programma", "dialleima_entos_ektos_orarioy", "typos_orarioy", "synexes_diakekomeno", "pshfiakh_organosh", "asfalish_me_tekmarta", "epoxikos", "xarakthrismos_ergazomenon", "meiosh_eisforon_ergazomenon", "epidothsh_eisforon_ergodoth", "mhteres", "diathesimothta", "palios_neos", "amoibetai_me_sse", "systatiko_shmeioma", "topothethsh_me_programma", "ypoxreotikh_ek_toy_nomoy_katartish", "antikatastash_ergazomenoy", "epidoma_anergias", "adeia_diamonhs_me_amesh_prosbash_gia_ergasia", "adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia", "adeia_eisodoy_gia_epoxikh_apasxolhsh", "epaggelmatikh_katartish", "ypologismos_foroy", "gnosh_ypologiston", "oros_sth_symbash_n_3986_2011", "kataggelia_katopin_eggrafhs_proeidopoihshs", "omadikh_apolysh", "epidosh_me_dikastiko_epimelhth", "repo_01", "repo_02", "repo_03", "repo_04", "repo_05", "repo_06", "repo_07", "argia_01", "argia_02", "argia_03", "argia_04", "argia_05", "argia_06", "argia_07"
     ];
 
     checkboxes.forEach(function(checkboxId) {
@@ -89,14 +89,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 
                 const shouldEnable = (currentValue === '0' || currentValue === 0);
                 customButton_oysiodeis_oroi.disabled = ! shouldEnable;
-                customButton_oysiodeis_oroi.style.opacity = shouldEnable ? '1' : '0.5';
+                customButton_oysiodeis_oroi.style.opacity = shouldEnable ? '1' : '0.4';
                 customButton_oysiodeis_oroi.style.cursor = shouldEnable ? 'pointer' : 'not-allowed';
             }
         }
         
         // ✅ Initial disabled state
         customButton_oysiodeis_oroi.disabled = true;
-        customButton_oysiodeis_oroi.style.opacity = '0.5';
+        customButton_oysiodeis_oroi.style.opacity = '0.4';
         customButton_oysiodeis_oroi.style.cursor = 'not-allowed';
         
         // ✅ Check κάθε 100ms (polling)
@@ -125,13 +125,13 @@ document.addEventListener("DOMContentLoaded", function () {
             
             // Αν έστω ένα είναι checked, enable το button, αλλιώς disable
             customButtonAllodapoi.disabled = !atLeastOneChecked;
-            customButtonAllodapoi.style.opacity = atLeastOneChecked ? '1' : '0.5';
+            customButtonAllodapoi.style.opacity = atLeastOneChecked ? '1' : '0.4';
             customButtonAllodapoi.style.cursor = atLeastOneChecked ? 'pointer' : 'not-allowed';
         }
         
         // ✅ Initial disabled state
         customButtonAllodapoi.disabled = true;
-        customButtonAllodapoi.style.opacity = '0.5';
+        customButtonAllodapoi.style.opacity = '0.4';
         customButtonAllodapoi.style. cursor = 'not-allowed';
         
         // ✅ Άκουσε για changes στα checkboxes
@@ -169,14 +169,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Αν το πεδίο είναι enabled (disabled=false), τότε enable το button
                 const shouldEnable = ! currentDisabledState;
                 customButtonAnhlikoi.disabled = !shouldEnable;
-                customButtonAnhlikoi.style.opacity = shouldEnable ? '1' : '0.5';
+                customButtonAnhlikoi.style.opacity = shouldEnable ? '1' : '0.4';
                 customButtonAnhlikoi.style.cursor = shouldEnable ? 'pointer' : 'not-allowed';
             }
         }
         
         // ✅ Initial disabled state
         customButtonAnhlikoi.disabled = true;
-        customButtonAnhlikoi.style.opacity = '0.5';
+        customButtonAnhlikoi.style.opacity = '0.4';
         customButtonAnhlikoi.style. cursor = 'not-allowed';
         
         // ✅ Check κάθε 100ms (polling)
@@ -286,7 +286,34 @@ function setFieldsDisabled(fieldIds, disabled) {
             toggleCheckboxState(fieldId, false);
         }
 
-        // 5) Εξαναγκασμός redraw/ενημέρωσης listeners
+        // 3) Βρες και disable το label
+        var label = document.querySelector('label[for="' + fieldId + '"]');
+        if (label) {
+            if (disabled) {
+                label.classList.add('disabled');
+            } else {
+                label.classList.remove('disabled');
+            }
+        }
+
+        // 4) Αν υπάρχει TomSelect, disable το wrapper
+        if (el.tomselect) {
+            if (disabled) {
+                el.tomselect.disable();
+                el.tomselect.wrapper?.classList?.add('disabled');
+            } else {
+                el.tomselect.enable();
+                el.tomselect.wrapper?.classList?.remove('disabled');
+            }
+        }
+
+        // 5) Αν υπάρχει flatpickr, disable το
+        if (el._flatpickr) {
+            el._flatpickr.set('clickOpens', !disabled);
+            el._flatpickr.input.disabled = disabled;
+        }
+
+        // 6) Εξαναγκασμός redraw/ενημέρωσης listeners
         el.dispatchEvent(new Event("change", { bubbles: true }));
     });
 }

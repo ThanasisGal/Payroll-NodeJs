@@ -26,7 +26,6 @@ const { Schema: _Schema, model } = require("mongoose");
         hmeromhnia_gennhshs: { type: Date },
         topos_gennhshs: { type: String, trim: true },
         arithmos_bibliarioy_anhlikoy: { type: String, trim: true },
-        bibliario_anhlikoy_base64: { type: String },
         email: { type: String, trim: true },
         yphkoothta: { type: String, trim: true },
         eidikh_kathgoria_ergazomenoy: { type: String, trim: true },
@@ -44,13 +43,17 @@ const { Schema: _Schema, model } = require("mongoose");
         forologikh_klimaka: { type: String, trim: true },
         trapeza: { type: String, trim: true },
         iban: { type: String, trim: true },
-        
+
         hmeromhnia_proslhpshs: { type: Date },
         hmeromhnia_allaghs_symbashs: { type: Date },
         hmeromhnia_allaghs_orarioy_apo: { type: Date },
         hmeromhnia_allaghs_orarioy_eos: { type: Date },
         hmeromhnia_lhxhs_symbashs: { type: Date },
         hmeromhnia_apoxorhshs: { type: Date },
+        afora_daneismo_ergazomenoy: { type: Boolean, default: false },
+        typos_daneismoy: { type: String, defalt: null, trim: true },
+        hmnia_enarxhs_daneismoy: { type: Date, default: null },
+        hmnia_lhxhs_daneismoy: { type: Date, default: null },
         afora_dokimastikh_periodo: { type: Boolean, default: false },
         hmnia_lhxhs_dokimastikhs_periodoy: { type: Date },
         kathestos_apasxolhshs: { type: String, trim: true },
@@ -136,7 +139,7 @@ const { Schema: _Schema, model } = require("mongoose");
         isxyei_eos_eisforon_mhteron: { type: Date },
         palios_neos: { type: Boolean, default: false },
         amoibetai_me_sse: { type: Boolean, default: false },
-
+        
         epidoma_anergias: { type: Boolean, default: false },
         dypa: { type: String, trim: true },
         arithmos_deltioy_anergias: { type: String, trim: true },
@@ -150,7 +153,6 @@ const { Schema: _Schema, model } = require("mongoose");
         antikatastash_ergazomenoy: { type: Boolean, default: false },
         afm_antikatastath: { type: String, trim: true, length: 9 },
         amka_antikatastath: { type: String, trim: true, length: 11 },
-
         kentro_kostoys_1: { type: String, trim: true },
         pososto_apasxolhshs_kk1: { type: Number, default: 0 },
         kentro_kostoys_2: { type: String, trim: true },
@@ -159,8 +161,7 @@ const { Schema: _Schema, model } = require("mongoose");
         pososto_apasxolhshs_kk3: { type: Number, default: 0 },
         kentro_kostoys_4: { type: String, trim: true },
         pososto_apasxolhshs_kk4: { type: Number, default: 0 },
-        kodikos_forologikhs_klimakas: { type: String, trim: true },
-
+        
         symbash: { type: String, trim: true },
         kathgoria_symbashs: { type: String, trim: true },
         eidikothta_symbashs: { type: String, trim: true },
@@ -248,8 +249,6 @@ const { Schema: _Schema, model } = require("mongoose");
         arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: { type: String, trim: true },
         apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
         eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
-        arxio_nomimopoihtikon_eggrafon_base64: { type: String },
-
         epaggelmatikh_katartish: { type: Boolean, default: false },
         antikeimeno_katartishs: { type: String, trim: true },
         thematiko_pedio: { type: String, trim: true },
@@ -282,12 +281,20 @@ const { Schema: _Schema, model } = require("mongoose");
         hmeromhnia_katabolhs_ths_apozhmioshs: { type: Date },
         shmeioseis_apozhmioshs: { type: String, trim: true },
         parathrhseis: { type: String, trim: true },
-        arxeio_apodoxhs_oysiodon_oron_base64: { type: String },
-        arxeio_apodoxhs_oron_atomikhs_symbashs_base64: { type: String },
+        bibliario_anhlikoy_path: { type: String, default: null, trim: true },
+        arxeio_nomimopoihtikon_eggrafon_path: { type: String, default: null, trim: true },
+        arxeio_apodoxhs_oysiodon_oron_path: { type: String, default: null, trim: true },
+        arxeio_apodoxhs_oron_atomikhs_symbashs_path: { type: String, default: null, trim: true },
+        bibliario_anhlikoy_base64: { type: String, default: null },
+        arxeio_nomimopoihtikon_eggrafon_base64: { type: String, default: null },
+        arxeio_apodoxhs_oysiodon_oron_base64: { type: String, default: null },
+        arxeio_apodoxhs_oron_atomikhs_symbashs_base64: { type: String, default: null },
+        
         createdAt: { type: Date, default: Date.now() },
         updatedAt: { type: Date, default: Date.now() },
     },
     {
+        timestamps: true,
         collection: "ergazomenoi"
     });
 

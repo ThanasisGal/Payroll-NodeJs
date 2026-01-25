@@ -80,6 +80,78 @@
             <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="afora_daneismo_ergazomenoy" id="afora_daneismo_ergazomenoy_label" class="col-form-label label-font-size field-required">
+                    Αφορά Δανεισμό Εργαζόμενου
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_daneismo_ergazomenoy" name="afora_daneismo_ergazomenoy" value="" />
+                    <label for="afora_daneismo_ergazomenoy" id="label-afora_daneismo_ergazomenoy" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="typos_daneismoy" id="typos_daneismoy_label" class="col-form-label label-font-size field-required">
+                    Τύπος Δανεισμού
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="typos_daneismoy_stathera"
+                    id="typos_daneismoy_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('typos_daneismoy_stathera') %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="typos_daneismoy"
+                        name="typos_daneismoy"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Τύπος Δανεισμού"
+                        data-api="/api/dropdown/ergazomenoi/typos_daneismoy"
+                        single
+                        data-target-input=<%= `typos_daneismoy_stathera` %>
+                        data-preselect=<%= `typos_daneismoy_stathera` %>
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        placeholder="Αναζήτηση Τύπου Δανεισμού">
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align" disabled>
+                    <label for="hmnia_enarxhs_daneismoy" id="hmnia_enarxhs_daneismoy_label" class="col-form-label label-font-size field-required">
+                    Ημ/νία Έναρξης Δανεισμού
+                    </label>
+                </div>
+                <div class="col-1-5 left-align">
+                    <input type="date" id="hmnia_enarxhs_daneismoy" name="hmnia_enarxhs_daneismoy" class="date-control" value="" />
+                </div>
+                
+                <div class="col-2-5"></div>
+                
+                <div class="col-2 left-align">
+                    <label for="hmnia_lhxhs_daneismoy" id="hmnia_lhxhs_daneismoy_label" class="col-form-label label-font-size field-required">
+                    Ημ/νία Λήξης Δανεισμού
+                    </label>
+                </div>
+                <div class="col-1-5 left-align">
+                    <input type="date" id="hmnia_lhxhs_daneismoy" name="hmnia_lhxhs_daneismoy" class="date-control" value="" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
             
                 <div class="col-2 left-align">
                     <label for="afora_dokimastikh_periodo" class="col-form-label label-font-size field-required">
@@ -96,7 +168,7 @@
 
                 <div class="col-2 left-align">
                     <label for="hmnia_lhxhs_dokimastikhs_periodoy" class="col-form-label label-font-size field-required">
-                    Ημ/νία Λήξης Δοκ/τικής Περιόδου
+                    Ημ/νία Λήξης Δοκιμ/κής Περιόδου
                     </label>
                 </div>
                 <div class="col-1-5 left-align">
@@ -119,7 +191,7 @@
                     name="kathestos_apasxolhshs_stathera"
                     id="kathestos_apasxolhshs_stathera"
                     class="form-control input-contents"
-                    value="<%= safe("kathestos_apasxolhshs_stathera") %>"
+                    value="<%= safe('kathestos_apasxolhshs_stathera') %>"
                 />
 
                 <div class="col-3-75">
@@ -129,9 +201,8 @@
                         class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
                         aria-label="Καθεστώς Απασχόλησης"
                         data-api="/api/dropdown/ergazomenoi/kathestos_apasxolhshs"
-                        single
-                        data-target-input=<%= `kathestos_apasxolhshs_stathera` %>
-                        data-preselect=<%= `kathestos_apasxolhshs_stathera` %>
+                        data-target-input="kathestos_apasxolhshs_stathera"
+                        data-preselect="kathestos_apasxolhshs_stathera"
                         data-preload-all="true"
                         data-pad-length="1"
                         data-xrhsh-related="false"

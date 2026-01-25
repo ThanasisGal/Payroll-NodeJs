@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const kodikos_krathshs = selectedOption.getAttribute('data-kodikos');
     
     posoPlasmatikhsAxiasField.disabled = !ypologismosEpiPlasmatikhs;
-    labelPosoPlasmatikhsAxias.style.opacity = ypologismosEpiPlasmatikhs ? "1" : "0.3";
+    labelPosoPlasmatikhsAxias.style.opacity = ypologismosEpiPlasmatikhs ? "1" : "0.4";
     document.getElementById("krathshId").value = id_krathshs;
     document.getElementById("kodikos").value = kodikos_krathshs;
   };

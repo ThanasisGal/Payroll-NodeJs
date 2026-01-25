@@ -64,7 +64,7 @@ function disableButton_Permissions(button) {
     if (button) {
         button.classList.add("disabled-link");
         button.style.pointerEvents = "none"; // Αποτρέπει το κλικ
-        button.style.opacity = "0.5"; // Οπτικό feedback
+        button.style.opacity = "0.4"; // Οπτικό feedback
         button.style.color = "black";
     }
 }

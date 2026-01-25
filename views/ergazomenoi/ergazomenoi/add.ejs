@@ -405,6 +405,26 @@
         hiddenId  : 'syggenikh_sxesh_stathera'
     });
 
+    // Αφορά δανεισμό εργαζομένου
+    bindCheckboxControlsSelect({
+        checkboxId: 'afora_daneismo_ergazomenoy',
+        selectId  : 'typos_daneismoy',
+        hiddenId  : 'typos_daneismoy_stathera',
+        
+		extraFieldIds: [
+            'hmnia_enarxhs_daneismoy',
+            'hmnia_lhxhs_daneismoy'
+        ],
+
+		labelIds: [
+			'typos_daneismoy_label',
+			'hmnia_enarxhs_daneismoy_label',
+			'hmnia_lhxhs_daneismoy_label'
+		],
+
+		clearOnDisable: true,
+    });
+
     // Ασφαλιστική κλάση
     bindCheckboxControlsSelect({
         checkboxId: 'asfalish_me_tekmarta',

@@ -36,6 +36,16 @@ const PerifereiesSchema = new Schema({
   });
   const NomikesMorfesModel = model("NomikesMorfes", NomikesMorfesSchema);
   
+  const TypoiDaneismoySchema = new Schema({
+    kodikos: { type: String, unique: true },
+    perigrafh: { type: String, trim: true },
+  },
+    {
+      collection: "typoi_daneismoy"
+    }
+  );
+  const TypoiDaneismoyModel = model("TypoiDaneismoy", TypoiDaneismoySchema);
+  
   const PararthmataEfkaSchema = new Schema({
       kodikos: { type: String, unique: true },
       perigrafh: { type: String, trim: true },
@@ -766,6 +776,7 @@ const EmmesosErgodothsModel = model("EmmesosErgodoths", EmmesosErgodothsSchema);
                     TheseisEythynhsModel,
                     TmhmataModel,
                     Typoi_ApodoxonModel,
+                    TypoiDaneismoyModel,
                     TypoiEpidothseonModel,
                     TypoiErgazomenonModel,
                     TypoiTaytothtonModel, 
