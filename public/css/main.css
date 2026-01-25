@@ -4111,6 +4111,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .margin-top--0_75rem    { margin-top: -0.75rem !important; }
 .margin-top--1rem       { margin-top: -1rem !important; }
 .margin-top--1_5rem     { margin-top: -1.5rem !important; }
+.margin-top--1_8rem     { margin-top: -1.8rem !important; }
 .margin-top--2rem       { margin-top: -2rem !important; }
 .margin-top--2_5rem     { margin-top: -2.5rem !important; }
 .margin-top--3rem       { margin-top: -3rem !important; }
@@ -4188,6 +4189,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .white-space-nowrap     { white-space: nowrap; }
 
+.width-percent-10       { width: 10%; }
 .width-percent-15       { width: 15%; }
 .width-percent-20       { width: 20%; }
 .width-percent-30       { width: 30%; }
@@ -6942,4 +6944,15 @@ tbody .group-row--category:first-of-type > td {
     .badge-remove-btn {
         font-size: 1rem;
     }
+}
+
+label.disabled {
+    opacity: 0.4;
+    color: #6c757d;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.justify-content-space-around {
+    justify-content: space-around;
 }
