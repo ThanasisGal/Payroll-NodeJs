@@ -34,6 +34,7 @@ const geoGuard = require("./server/middlewares/geoGuard");
 const usersRoute = require("./server/routes/usersRoute");
 const dropdownRoutes = require("./server/routes/dropdownRoutes");
 const apiRoutes = require("./server/routes/apiRoutes");
+require('./server/config/aws');
 
 const getSessionVars = require("./server/middlewares/session-variables");
 const logger = require("./server/utils/logger");
