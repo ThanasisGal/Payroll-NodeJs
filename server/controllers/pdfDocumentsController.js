@@ -1,111 +1,100 @@
+// server/controllers/pdfDocumentsController.js
+
 const PdfDocument = require('../models/pdfDocument');
 const fs = require('fs').promises;
 const path = require('path');
 
 class PdfDocumentsController {
-    /**
-     * POST /api/upload-pdf
-     * Αποθηκεύει PDF αρχείο στο filesystem και metadata στη MongoDB
-     */
+    // ========================================================================
+    // UPLOAD PDF
+    // ========================================================================
     static uploadPdf = async (req, res) => {
         try {
-            // 1️⃣ Validation:  Έλεγχος αν υπάρχει αρχείο
-            if (! req.file) {
+            // 1️⃣ Validation
+            if (!req.file) {
                 return res.status(400).json({ 
                     success: false, 
                     message: 'Δεν βρέθηκε αρχείο PDF' 
                 });
             }
 
-            // 2️⃣ Validation: Έλεγχος απαραίτητων πεδίων
             const { ergazomenosId, documentType } = req.body;
             
-            if (!ergazomenosId) {
-                // Διαγραφή του αρχείου που ανέβηκε
+            if (!ergazomenosId || !documentType) {
                 await fs.unlink(req.file.path);
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Το ergazomenosId είναι υποχρεωτικό' 
+                    message: 'Τα πεδία ergazomenosId και documentType είναι υποχρεωτικά' 
                 });
             }
 
-            if (!documentType) {
-                await fs.unlink(req.file.path);
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Το documentType είναι υποχρεωτικό' 
-                });
-            }
-
-            // 3️⃣ Validation: Έλεγχος έγκυρου documentType
-            const validTypes = ['anhlikoi', 'allodapoi', 'oysiodeis_oroi'];
+            const validTypes = ['anhlikoi', 'allodapoi', 'oysiodeis_oroi', 'arxeio_symbashs'];
             if (!validTypes.includes(documentType)) {
                 await fs.unlink(req.file.path);
                 return res.status(400).json({ 
                     success: false, 
-                    message: `Μη έγκυρος τύπος εγγράφου. Επιτρεπόμενοι:  ${validTypes.join(', ')}` 
+                    message: `Μη έγκυρος τύπος εγγράφου` 
                 });
             }
 
-            // 4️⃣ Έλεγχος αν υπάρχει ήδη αρχείο για αυτόν τον εργαζόμενο και τύπο
+            // 2️⃣ ✅ Soft delete existing document
             const existingDoc = await PdfDocument.findOne({
                 ergazomenosId,
-                documentType,
-                isActive: true
+                documentType
             });
 
             if (existingDoc) {
-                // Soft delete:  Μαρκάρουμε το παλιό ως inactive
-                existingDoc.isActive = false;
-                existingDoc.replacedAt = new Date();
-                await existingDoc.save();
-                
-                // 🔥 Προαιρετικά:  Διαγραφή του παλιού φυσικού αρχείου
+                // Διαγραφή παλιού φυσικού αρχείου
                 try {
-                    await fs.unlink(existingDoc.filePath);
-                    console.log(`✅ Παλιό αρχείο διαγράφηκε: ${existingDoc.filePath}`);
-                } catch (unlinkErr) {
-                    console.error('⚠️ Σφάλμα κατά τη διαγραφή παλιού αρχείου:', unlinkErr);
+                    const oldFilePath = path.join(__dirname, '../../uploads', existingDoc.relativePath);
+                    await fs.unlink(oldFilePath);
+                    console.log(`✅ Παλιό αρχείο διαγράφηκε: ${existingDoc.relativePath}`);
+                } catch (err) {
+                    console.error('⚠️ Σφάλμα κατά τη διαγραφή παλιού αρχείου:', err);
                 }
+                
+                // Διαγραφή παλιού record
+                await existingDoc.deleteOne();
             }
 
-            // 5️⃣ Δημιουργία νέου document στη MongoDB
+            // 3️⃣ Calculate relative path
+            const relativePath = req.file.path.replace(/\\/g, '/').replace('uploads/', '');
+
+            // 4️⃣ Create new document
             const newPdfDocument = new PdfDocument({
                 ergazomenosId,
                 documentType,
-                fileName: req.file.filename,
                 originalName: req.file.originalname,
-                filePath: req.file.path,
+                storedFilename: req.file.filename,
+                relativePath: relativePath,
                 fileSize: req.file.size,
                 mimeType: req.file.mimetype,
-                uploadedBy: req.session?.userId || null, // ✅ Από session
-                uploadedAt: new Date(),
-                isActive: true
+                uploadedBy: req.session?.userId || null,
             });
 
-            // 6️⃣ Αποθήκευση στη βάση
+            // 5️⃣ Save
             const savedDocument = await newPdfDocument.save();
 
             console.log(`✅ PDF αποθηκεύτηκε: ${savedDocument._id} | Type: ${documentType}`);
 
-            // 7️⃣ Success Response
+            // 6️⃣ Success Response
             return res.status(201).json({
                 success: true,
                 message: 'Το αρχείο αποθηκεύτηκε επιτυχώς',
                 data: {
                     id: savedDocument._id,
-                    fileName: savedDocument.fileName,
                     originalName: savedDocument.originalName,
                     fileSize: savedDocument.fileSize,
                     documentType: savedDocument.documentType,
-                    uploadedAt: savedDocument.uploadedAt
+                    uploadDate: savedDocument.uploadDate,
+                    fullPath: savedDocument.fullPath // ✅ Virtual field
                 }
             });
 
         } catch (error) {
             console.error('❌ Upload Error:', error);
             
-            // 🧹 Cleanup:  Διαγραφή αρχείου σε περίπτωση σφάλματος
+            // Cleanup
             if (req.file) {
                 try {
                     await fs.unlink(req.file.path);
@@ -117,25 +106,113 @@ class PdfDocumentsController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την αποθήκευση του αρχείου',
-                error: process.env.NODE_ENV === 'development' ? error.message :  undefined
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     };
 
-    // 🔄 Placeholder για τις υπόλοιπες μεθόδους (ΒΗΜΑ 2)
+    // ========================================================================
+    // GET PDFs BY ERGAZOMENOS
+    // ========================================================================
     static getPdfsByErgazomenos = async (req, res) => {
-        // TODO:  ΒΗΜΑ 2
-        res.status(501).json({ message: 'Not implemented yet' });
+        try {
+            const { ergazomenosId } = req.params;
+            const { documentType } = req.query;
+            
+            // ✅ Χρήση static method από model
+            const docs = await PdfDocument.findByErgazomenos(ergazomenosId, documentType);
+            
+            res.status(200).json({
+                success: true,
+                count: docs.length,
+                documents: docs
+            });
+            
+        } catch (error) {
+            console.error('Error fetching PDFs:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Σφάλμα κατά την ανάκτηση των αρχείων'
+            });
+        }
     };
 
+    // ========================================================================
+    // DOWNLOAD PDF
+    // ========================================================================
     static downloadPdf = async (req, res) => {
-        // TODO: ΒΗΜΑ 2
-        res.status(501).json({ message: 'Not implemented yet' });
+        try {
+            const { id } = req.params;
+            
+            const doc = await PdfDocument.findById(id);
+            
+            if (!doc) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Το αρχείο δεν βρέθηκε'
+                });
+            }
+            
+            const filePath = path.join(__dirname, '../../uploads', doc.relativePath);
+            
+            // Check if file exists
+            try {
+                await fs.access(filePath);
+            } catch (err) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Το φυσικό αρχείο δεν βρέθηκε'
+                });
+            }
+            
+            // Set headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.originalName)}"`);
+            
+            // Stream file
+            const fileStream = require('fs').createReadStream(filePath);
+            fileStream.pipe(res);
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Σφάλμα κατά τη λήψη του αρχείου'
+            });
+        }
     };
 
+    // ========================================================================
+    // DELETE PDF
+    // ========================================================================
     static deletePdf = async (req, res) => {
-        // TODO: ΒΗΜΑ 2
-        res.status(501).json({ message: 'Not implemented yet' });
+        try {
+            const { id } = req.params;
+            
+            const doc = await PdfDocument.findById(id);
+            
+            if (!doc) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'Το αρχείο δεν βρέθηκε'
+                });
+            }
+            
+            // ✅ Χρήση instance method
+            await doc.deleteFile();
+            
+            res.status(200).json({
+                success: true,
+                message: 'Το αρχείο διαγράφηκε με επιτυχία'
+            });
+            
+        } catch (error) {
+            console.error('Delete error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Σφάλμα κατά τη διαγραφή του αρχείου'
+            });
+        }
     };
 }
 

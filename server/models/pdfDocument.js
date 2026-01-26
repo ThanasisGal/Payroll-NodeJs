@@ -17,7 +17,8 @@ const { Schema: _Schema, model } = require("mongoose");
             enum:  [
                 'anhlikoi',
                 'allodapoi',
-                'oysiodeis_oroi'
+                'oysiodeis_oroi',
+                'arxeio_symbashs'
             ],
             required:  true,
             default: 'oysiodeis_oroi',

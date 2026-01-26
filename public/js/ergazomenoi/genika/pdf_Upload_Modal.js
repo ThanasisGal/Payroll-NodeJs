@@ -284,32 +284,74 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // =========================================================================
-    // PDF PREVIEW (keeping your existing preview code)
+    // ✅ PDF PREVIEW - FULLY WORKING VERSION
     // =========================================================================
     
     if (showPdfPreview) {
-        showPdfPreview.addEventListener('click', openPreviewInNewTab);
+        showPdfPreview.addEventListener('click', openPreviewModal);
     }
     
-    function openPreviewInNewTab() {
+    async function openPreviewModal() {
         const file = selectedFiles[currentDocumentType];
-        if (!file) return;
+        if (!file) {
+            console.warn('⚠️ No file selected for preview');
+            return;
+        }
         
         try {
+            // ✅ Revoke previous blob URL
             if (currentBlobUrl) {
                 URL.revokeObjectURL(currentBlobUrl);
             }
             
+            // ✅ Create new blob URL
             currentBlobUrl = URL.createObjectURL(file);
             
-            // ... (keep all your existing preview SweetAlert code) ...
+            console.log('📄 Opening PDF in new tab:', file.name);
+            
+            // ✅ Open in new tab
+            const newWindow = window.open(currentBlobUrl, '_blank');
+            
+            if (!newWindow) {
+                // Popup blocked
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Popup blocked',
+                    html: `Παρακαλώ επιτρέψτε τα popups για να δείτε το PDF.<br>
+                        <a href="${currentBlobUrl}" target="_blank" style="color: #3085d6; text-decoration: underline;">
+                            Κάντε κλικ εδώ για άνοιγμα
+                        </a>`,
+                    confirmButtonText: 'Εντάξει'
+                });
+            } else {
+                // Success toast
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: '✅ PDF άνοιξε σε νέο tab',
+                    showConfirmButton: false,
+                    timer: 2000,
+                    timerProgressBar: true
+                });
+            }
             
         } catch (error) {
-            console.error('Preview error:', error);
-            // ... (keep your existing error handling) ...
+            console.error('❌ Preview error:', error);
+            
+            await Swal.fire({
+                backdrop: false,
+                icon: 'error',
+                title: 'Σφάλμα προεπισκόπησης',
+                text: 'Δεν ήταν δυνατή η φόρτωση του PDF.',
+                confirmButtonText: 'Εντάξει',
+                customClass: {
+                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                }
+            });
         }
     }
-    
+
     // =========================================================================
     // REMOVE FILE
     // =========================================================================
@@ -332,25 +374,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // =========================================================================
-    // CONFIRM BUTTON - ✅ SIMPLIFIED (no hidden input saving)
+    // CONFIRM BUTTON
     // =========================================================================
 
     confirmPdfUpload.addEventListener('click', async () => {
         const file = selectedFiles[currentDocumentType];
         if (!file) return;
         
-        // ✅ Just update UI - no base64 conversion here
         updateButtonBadge();
         closeModal();
         
         Swal.fire({
             toast: true,
             position: 'top-end',
-            icon: 'info',
+            icon: 'success',
             title: '✅ PDF επιλέχθηκε',
             html: '<small>Πατήστε <strong>"Αποθήκευση"</strong> στη φόρμα για να ολοκληρωθεί</small>',
             showConfirmButton: false,
-            timer: 2000,
+            timer: 2500,
             timerProgressBar: true,
             didOpen: (toast) => {
                 toast.style.borderRadius = '12px';
@@ -372,20 +413,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // =========================================================================
-    // PUBLIC API - ✅ MINIMAL & CLEAN
+    // PUBLIC API
     // =========================================================================
 
     window.pdfUploadModule = {
-        /**
-         * Check if there are any pending PDFs
-         */
         hasPendingUpload: function() {
             return Object.keys(selectedFiles).length > 0;
         },
         
-        /**
-         * Get info about a specific PDF
-         */
         getFileInfo: function(documentType) {
             const file = selectedFiles[documentType];
             if (!file) return null;
@@ -397,9 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         },
         
-        /**
-         * Get info about all selected PDFs
-         */
         getAllFiles: function() {
             return Object.keys(selectedFiles).map(docType => ({
                 name: selectedFiles[docType].name,
@@ -409,9 +441,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }));
         },
         
-        /**
-         * ✅ NEW: Convert a specific PDF to base64 (on-demand)
-         */
         getFileAsBase64: async function(documentType) {
             const file = selectedFiles[documentType];
             if (!file) {
@@ -433,9 +462,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         },
         
-        /**
-         * Clear all selected PDFs
-         */
         clearAllFiles: function() {
             Object.keys(selectedFiles).forEach(key => delete selectedFiles[key]);
             

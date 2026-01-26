@@ -490,7 +490,7 @@ const fs = require('fs').promises;
 const userController = require("../controllers/userController.js");
 const companiesController = require("../controllers/companies/companiesController.js");
 const mainAppController = require("../controllers/mainAppController.js");
-const pdfDocumentsController = require("../controllers/pdfDocumentController.js");
+const pdfDocumentsController = require("../controllers/pdfDocumentsController.js");
 const ypokatasthmataController = require("../controllers/companies/ypokatasthmataController.js");
 const nomimoiekprosopoiController = require("../controllers/companies/nomimoiekprosopoiController.js");
 const passwordsController = require("../controllers/companies/passwordsController.js");
@@ -783,7 +783,7 @@ router.post("/login/change_password/changepassword", userController.changeUserPa
 // ✅ PDF MANAGEMENT API ROUTES
 // ============================================================================
 router.post('/api/upload-pdf', checkAuth, upload.single('pdfFile'), pdfDocumentsController.uploadPdf);
-router.get('/api/pdf/: ergazomenosId', checkAuth, pdfDocumentsController.getPdfsByErgazomenos);
+router.get('/api/pdf/:ergazomenosId', checkAuth, pdfDocumentsController.getPdfsByErgazomenos);
 router.get('/api/download-pdf/:id', checkAuth, pdfDocumentsController.downloadPdf);
 router.delete('/api/delete-pdf/:id', checkAuth, pdfDocumentsController.deletePdf);
 
