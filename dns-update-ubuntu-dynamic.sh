@@ -2,21 +2,17 @@
 set -euo pipefail
 
 # =============================================================================
-# DNS Auto-Update - FIXED VERSION (EC2 IP Only)
+# CONFIGURATION
 # =============================================================================
 
 DOMAIN="webpayrollsolutions.com"
 LOG_FILE="/tmp/dns-update-$(date +%Y%m%d).log"
 JSON_FILE="/tmp/route53-change-batch.json"
 
-# Target EC2 IP (STATIC - won't change based on where script runs)
-EC2_PUBLIC_IP="63.178.15.216"
-
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-BLUE='\033[0;34m'
 NC='\033[0m'
 
 # =============================================================================
@@ -35,31 +31,11 @@ log_error() {
     echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} ❌ $1" | tee -a "$LOG_FILE"
 }
 
-log_step() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} 👉 $1" | tee -a "$LOG_FILE"
-}
-
 # =============================================================================
 # MAIN SCRIPT
 # =============================================================================
 
-echo ""
-echo "=========================================="
-echo "🌐 DNS AUTO-UPDATE (EC2 SAFE MODE)"
-echo "=========================================="
-
-log_info "Target Domain: $DOMAIN"
-log_info "Target EC2 IP: $EC2_PUBLIC_IP"
-echo ""
-
-# Detect where script is running
-CURRENT_MACHINE_IP=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]' || echo "unknown")
-log_info "Current machine IP: $CURRENT_MACHINE_IP"
-
-if [[ "$CURRENT_MACHINE_IP" != "$EC2_PUBLIC_IP" ]]; then
-    log_warning "⚠️  Running from local machine (not EC2)"
-    log_info "💡 DNS will be set to EC2 IP ($EC2_PUBLIC_IP), not local IP"
-fi
+log_info "Starting DNS Auto-Update for $DOMAIN..."
 
 # Check AWS CLI
 if ! command -v aws &> /dev/null; then
@@ -70,12 +46,11 @@ fi
 # Check AWS credentials
 if ! aws sts get-caller-identity &>/dev/null; then
     log_error "AWS credentials not configured!"
-    log_info "💡 Run: aws configure"
     exit 1
 fi
 
 # Get Hosted Zone ID dynamically
-log_step "Fetching Hosted Zone ID..."
+log_info "Fetching Hosted Zone ID..."
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
     --query "HostedZones[?Name == '${DOMAIN}.'].Id | [0]" \
     --output text 2>/dev/null || echo "")
@@ -84,54 +59,61 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID#/hostedzone/}"
 
 if [[ -z "$HOSTED_ZONE_ID" || "$HOSTED_ZONE_ID" == "None" ]]; then
-    log_error "Hosted Zone for $DOMAIN not found"
-    log_info "Available zones:"
-    aws route53 list-hosted-zones --query "HostedZones[*].[Name,Id]" --output table 2>/dev/null || true
+    log_error "Hosted Zone for $DOMAIN not found."
+    log_info "Available Hosted Zones:"
+    aws route53 list-hosted-zones --query "HostedZones[*].[Name,Id]" --output table 2>/dev/null || echo "Failed to list zones"
     exit 1
 fi
 
-log_info "✅ Hosted Zone ID: $HOSTED_ZONE_ID"
+log_info "Using Hosted Zone ID: $HOSTED_ZONE_ID"
+
+# Get current public IP
+log_info "Fetching current public IP..."
+NEW_IP=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')
+
+if [[ -z "$NEW_IP" ]]; then
+    log_error "Failed to fetch public IP"
+    exit 1
+fi
+
+log_info "Current Public IP: $NEW_IP"
 
 # Get current DNS IP
-log_step "Fetching current DNS record..."
-CURRENT_DNS_IP=$(aws route53 list-resource-record-sets \
+log_info "Fetching current DNS IP..."
+CURRENT_IP=$(aws route53 list-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
     --query "ResourceRecordSets[?Name == '${DOMAIN}.' && Type == 'A'].ResourceRecords[0].Value | [0]" \
     --output text 2>/dev/null || echo "")
 
-if [[ -z "$CURRENT_DNS_IP" || "$CURRENT_DNS_IP" == "None" ]]; then
+if [[ -z "$CURRENT_IP" || "$CURRENT_IP" == "None" ]]; then
     log_warning "No A record found - will create new one"
-    CURRENT_DNS_IP="Not set"
+    CURRENT_IP="Not set"
 fi
 
-log_info "Current DNS IP: $CURRENT_DNS_IP"
-log_info "Target EC2 IP:  $EC2_PUBLIC_IP"
+log_info "Current DNS IP: $CURRENT_IP"
 
 # Check if update is needed
-if [[ "$EC2_PUBLIC_IP" == "$CURRENT_DNS_IP" ]]; then
-    log_info "✅ DNS already points to EC2 - no update needed"
-    echo ""
+if [[ "$NEW_IP" == "$CURRENT_IP" ]]; then
+    log_info "No IP change detected.  DNS is up-to-date."
     exit 0
 fi
 
-log_warning "⚠️  DNS mismatch detected!"
-log_warning "   Current: $CURRENT_DNS_IP"
-log_warning "   Target:  $EC2_PUBLIC_IP"
-log_step "Updating Route 53..."
+log_warning "New IP detected:  $NEW_IP (Old IP: $CURRENT_IP)"
+log_info "Updating Route 53..."
 
 # Create JSON change batch
 cat > "$JSON_FILE" <<EOF
 {
-    "Changes": [
+    "Changes":  [
         {
             "Action": "UPSERT",
             "ResourceRecordSet": {
                 "Name": "${DOMAIN}",
                 "Type": "A",
                 "TTL": 300,
-                "ResourceRecords": [
+                "ResourceRecords":  [
                     {
-                        "Value": "$EC2_PUBLIC_IP"
+                        "Value": "$NEW_IP"
                     }
                 ]
             }
@@ -150,27 +132,23 @@ CHANGE_RESULT=$(aws route53 change-resource-record-sets \
 
 if [[ $? -eq 0 ]]; then
     CHANGE_ID=$(echo "$CHANGE_RESULT" | grep -o '"Id": "[^"]*"' | head -1 | cut -d'"' -f4)
-    log_info "✅ DNS updated to $EC2_PUBLIC_IP"
+    log_info "✅ DNS successfully updated to $NEW_IP"
+    log_info "Change ID: $CHANGE_ID"
     
+    # Wait for propagation
+    log_info "Waiting for DNS propagation..."
     if [[ -n "$CHANGE_ID" ]]; then
-        log_info "Change ID: $CHANGE_ID"
-        log_step "Waiting for DNS propagation..."
         aws route53 wait resource-record-sets-changed --id "$CHANGE_ID" 2>/dev/null || true
-        log_info "✅ DNS propagated!"
     fi
+    log_info "✅ DNS change propagated!"
 else
     log_error "Failed to update DNS"
-    log_error "$CHANGE_RESULT"
+    log_error "Error: $CHANGE_RESULT"
     exit 1
 fi
 
 # Cleanup
 rm -f "$JSON_FILE"
 
-echo ""
-log_info "🎉 DNS Auto-Update complete!"
-log_info "Domain $DOMAIN now points to EC2: $EC2_PUBLIC_IP"
-echo "=========================================="
-echo ""
-
+log_info "DNS Auto-Update complete!"
 exit 0

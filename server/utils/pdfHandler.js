@@ -2,9 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { uploadBufferToS3, deleteFileFromS3 } = require('./s3Helper');
 
 /**
- * Δημιουργία φακέλου αν δεν υπάρχει
+ * Δημιουργία φακέλου αν δεν υπάρχει (DEPRECATED - used only for local fallback)
  */
 function ensureDirectoryExists(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -14,13 +15,13 @@ function ensureDirectoryExists(dirPath) {
 }
 
 /**
- * Αποθήκευση PDF από base64 string
+ * Αποθήκευση PDF από base64 string (Updated για S3)
  * @param {string} base64String - The base64 encoded PDF
  * @param {string} documentType - Type of document (e.g., 'arxeio_symbashs')
  * @param {string} ergazomenosId - ID of the ergazomenos
- * @returns {string} - Relative path to saved file
+ * @returns {Promise<string>} - S3 key (NOT local path!)
  */
-function savePdfFromBase64(base64String, documentType, ergazomenosId) {
+async function savePdfFromBase64(base64String, documentType, ergazomenosId) {
     try {
         // Validation
         if (!base64String || !base64String.startsWith('data:application/pdf;base64,')) {
@@ -47,20 +48,24 @@ function savePdfFromBase64(base64String, documentType, ergazomenosId) {
         const timestamp = Date.now();
         const filename = `${ergazomenosId}_${documentType}_${timestamp}.pdf`;
         
-        // ⚠️ ΠΡΟΣΟΧΗ: Το path είναι relative στο server/ folder
-        // server/utils/pdfHandler.js → ../.. πάει στο root
-        const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'pdfs', documentType);
-        ensureDirectoryExists(uploadDir);
+        // Generate S3 key
+        const s3Key = `pdfs/${documentType}/${filename}`;
         
-        const filepath = path.join(uploadDir, filename);
+        console.log(`📤 Uploading PDF to S3: ${s3Key} (${(buffer.length / 1024).toFixed(2)}KB)`);
         
-        // Save to filesystem
-        fs.writeFileSync(filepath, buffer);
+        // Upload to S3 (or local mock in dev)
+        const uploadResult = await uploadBufferToS3(buffer, s3Key, 'application/pdf');
         
-        console.log(`✅ PDF saved: ${filename} (${(buffer.length / 1024).toFixed(2)}KB)`);
+        if (!uploadResult.success) {
+            throw new Error('S3 upload failed');
+        }
         
-        // Return relative path (για το database)
-        return `/uploads/pdfs/${documentType}/${filename}`;
+        console.log(`✅ PDF saved: ${filename}`);
+        console.log(`   S3 Key: ${s3Key}`);
+        console.log(`   Location: ${uploadResult.s3Url || uploadResult.localPath}`);
+        
+        // Return S3 key (NOT local path!)
+        return s3Key;
         
     } catch (error) {
         console.error(`❌ Failed to save PDF (${documentType}):`, error.message);
@@ -69,27 +74,43 @@ function savePdfFromBase64(base64String, documentType, ergazomenosId) {
 }
 
 /**
- * Διαγραφή PDF από filesystem
- * @param {string} pdfPath - Relative path to PDF
+ * Διαγραφή PDF από S3 (Updated)
+ * @param {string} s3Key - S3 key (e.g., 'pdfs/arxeio_symbashs/file.pdf')
  */
-function deletePdf(pdfPath) {
+async function deletePdf(s3Key) {
     try {
-        if (!pdfPath) return;
+        if (!s3Key) return;
         
-        // server/utils → ../.. → root
-        const fullPath = path.join(__dirname, '..', '..', pdfPath);
+        console.log(`🗑️  Deleting PDF from S3: ${s3Key}`);
         
-        if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-            console.log(`✅ PDF deleted: ${pdfPath}`);
+        const deleteResult = await deleteFileFromS3(s3Key);
+        
+        if (deleteResult.success) {
+            console.log(`✅ PDF deleted: ${s3Key}`);
         }
+        
     } catch (error) {
         console.error(`❌ Failed to delete PDF:`, error.message);
     }
 }
 
+/**
+ * LEGACY FUNCTION - Keep for backward compatibility with old local paths
+ * Converts old local paths to S3 keys
+ */
+function convertLocalPathToS3Key(localPath) {
+    // Old: /uploads/pdfs/arxeio_symbashs/file.pdf
+    // New: pdfs/arxeio_symbashs/file.pdf
+    if (!localPath) return null;
+    
+    return localPath
+        .replace(/^\/uploads\//, '')
+        .replace(/^uploads\//, '');
+}
+
 module.exports = {
     savePdfFromBase64,
     deletePdf,
-    ensureDirectoryExists
+    ensureDirectoryExists, // Keep for backward compatibility
+    convertLocalPathToS3Key
 };

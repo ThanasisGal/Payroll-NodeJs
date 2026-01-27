@@ -39,8 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         formData[input.name] = null;
                     } 
                     // Number (κενό)
-                    else if (input.type === "number" && input.value === "") {
-                        formData[input.name] = 0;
+                    else if (input.type === "number") {
+                        const parsed = parseFloat(input.value);
+                        formData[input.name] = isNaN(parsed) ? 0 : parsed;
                     } 
                     // File upload
                     else if (input.type === "file" && input.files.length > 0) {

@@ -27,12 +27,13 @@ const   { pdfDocumentl } = Models_E;
 
 // ✅ IMPORTS
 const { savePdfFromBase64 } = require('../../utils/pdfHandler');
-class ErgazomenoiController {
-    static postErgazomenoiForm = async (req, res) => {
-        const sessionUserTeam = req.session.userTeam;
-        // ... υπόλοιπος κώδικας ...
-    }
-}
+
+// class ErgazomenoiController {
+//     static postErgazomenoiForm = async (req, res) => {
+//         const sessionUserTeam = req.session.userTeam;
+//         // ... υπόλοιπος κώδικας ...
+//     }
+// }
 let nextPageSearchTerm = "";
 
 const fieldsStoixeionSymbashs = ['stoixeio_symbashs', 'poso_symbashs', 'poso_symbashs_basei_oron_ergasias'];
@@ -768,9 +769,11 @@ class ergazomenoiController {
             });
         }
 
-        // =========================================================================
-        // ✅ ΕΠΕΞΕΡΓΑΣΙΑ PDF BASE64 DATA
-        // =========================================================================
+        // ======================================================================
+        // ✅ ΕΠΕΞΕΡΓΑΣΙΑ PDF BASE64 DATA (Updated για S3)
+        // ======================================================================
+
+        const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 
         const pdfFieldMappings = {
             'arxeio_apodoxhs_oron_atomikhs_symbashs_base64': {
@@ -801,22 +804,23 @@ class ergazomenoiController {
                 try {
                     console.log(`📄 Processing PDF: ${mapping.documentType}`);
                     
-                    const pdfPath = savePdfFromBase64(
+                    // ✅ NOW ASYNC! Use await
+                    const s3Key = await savePdfFromBase64(
                         base64Data,
                         mapping.documentType,
                         ergazomenosId
                     );
                     
-                    // Update το document με το path
-                    savedErgazomenos[mapping.dbField] = pdfPath;
+                    // Store S3 key (NOT local path!)
+                    savedErgazomenos[mapping.dbField] = s3Key;
                     
                     pdfResults.push({
                         documentType: mapping.documentType,
                         success: true,
-                        path: pdfPath
+                        s3Key: s3Key
                     });
                     
-                    console.log(`✅ PDF saved: ${mapping.documentType} → ${pdfPath}`);
+                    console.log(`✅ PDF saved: ${mapping.documentType} → ${s3Key}`);
                     
                 } catch (error) {
                     console.error(`❌ Failed to process ${mapping.documentType}:`, error.message);
@@ -829,11 +833,11 @@ class ergazomenoiController {
             }
         }
 
-        // ✅ Save το document με τα PDF paths
+        // ✅ Save το document με τα S3 keys
         if (pdfResults.length > 0) {
             try {
                 await savedErgazomenos.save();
-                console.log(`✅ Updated ergazomenos with ${pdfResults.length} PDF paths`);
+                console.log(`✅ Updated ergazomenos with ${pdfResults.length} PDF S3 keys`);
             } catch (error) {
                 console.error(`❌ Failed to save PDF paths:`, error);
             }
@@ -844,61 +848,63 @@ class ergazomenoiController {
         const failCount = pdfResults.filter(r => !r.success).length;
 
         if (successCount > 0) {
-            console.log(`📎 Successfully saved ${successCount} PDFs`);
+            console.log(`📎 Successfully uploaded ${successCount} PDFs to S3`);
         }
         if (failCount > 0) {
-            console.warn(`⚠️ Failed to save ${failCount} PDFs`);
+            console.warn(`⚠️ Failed to upload ${failCount} PDFs`);
         }
 
-        function createOrarioData(i1) {
-            return {
-                team: sessionUserTeam,
-                company_kod: sessionCompanyInUse,
-                kodikos: aa_kod.toString().padStart(4, '0'),
-                hmeromhnia: formData[`hmeromhnia_${i1}`],
-                kathgoria_ergasias: formData[`kathgoria_ergasias_sthathera_${i1}`],
-                apo_ora_01: formData[`apo_ora_01_${i1}`],
-                eos_ora_01: formData[`eos_ora_01_${i1}`],
-                dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
-                dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
-                apo_ora_02: formData[`apo_ora_02_${i1}`],
-                eos_ora_02: formData[`eos_ora_02_${i1}`],
-                dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
-                dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
-                apo_ora_03: formData[`apo_ora_03_${i1}`],
-                eos_ora_03: formData[`eos_ora_03_${i1}`],
-                dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
-                dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
-                repo: formData[`repo_${i1}`] || false,
-                adeia: false,
-                astheneia: false,
-                argia: formData[`argia_${i1}`] || false,
-                perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
-                kathgoria_adeias: "",
-                ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
-            };
-        }
+        if (formData.hmeromhnia_allaghs_orarioy_apo != null && hmeromhnia_allaghs_orarioy_eos != null) {
+            function createOrarioData(i1) {
+                return {
+                    team: sessionUserTeam,
+                    company_kod: sessionCompanyInUse,
+                    kodikos: aa_kod.toString().padStart(4, '0'),
+                    hmeromhnia: formData[`hmeromhnia_${i1}`],
+                    kathgoria_ergasias: formData[`kathgoria_ergasias_sthathera_${i1}`],
+                    apo_ora_01: formData[`apo_ora_01_${i1}`],
+                    eos_ora_01: formData[`eos_ora_01_${i1}`],
+                    dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
+                    dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
+                    apo_ora_02: formData[`apo_ora_02_${i1}`],
+                    eos_ora_02: formData[`eos_ora_02_${i1}`],
+                    dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
+                    dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
+                    apo_ora_03: formData[`apo_ora_03_${i1}`],
+                    eos_ora_03: formData[`eos_ora_03_${i1}`],
+                    dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
+                    dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
+                    repo: formData[`repo_${i1}`] || false,
+                    adeia: false,
+                    astheneia: false,
+                    argia: formData[`argia_${i1}`] || false,
+                    perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
+                    kathgoria_adeias: "",
+                    ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
+                };
+            }
 
-        let promises = [];
-        const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
-        const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
+            let promises = [];
+            const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
+            const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
 
-        let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
-        let i = 1;
-        
-        while (currentDate <= toDate) {
-            let i1 = i < 10 ? '0' + i : i;
-            const newOrario = new ProdhlomenaOrariaModel(createOrarioData(i1));
-            promises.push(ProdhlomenaOrariaModel.create(newOrario));
+            let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
+            let i = 1;
             
-            currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
-            i++;
-        }
-        
-        try {
-            await Promise.all(promises);
-        } catch (error) {
-            console.error('Σφάλμα κατά τη αποθήκευση των οραρίων:', error);
+            while (currentDate <= toDate) {
+                let i1 = i < 10 ? '0' + i : i;
+                const newOrario = new ProdhlomenaOrariaModel(createOrarioData(i1));
+                promises.push(ProdhlomenaOrariaModel.create(newOrario));
+                
+                currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
+                i++;
+            }
+            
+            try {
+                await Promise.all(promises);
+            } catch (error) {
+                console.error('Σφάλμα κατά τη αποθήκευση των οραρίων:', error);
+            }
         }
 
         const newIstoriko = IstorikoProslhpseonAllagonModel({

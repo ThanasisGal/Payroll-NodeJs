@@ -158,6 +158,15 @@ app.use("/static", express.static(path.join(__dirname, "public"), {
     }
 }));
 
+// =========================================================================
+// LOCAL S3 MOCK - Serve uploaded files in development
+// =========================================================================
+if (process.env.NODE_ENV === 'development' || process.env.USE_LOCAL_STORAGE === 'true') {
+    const uploadsPath = path.join(__dirname, 'uploads/s3-mock');
+    app.use('/uploads/s3-mock', express.static(uploadsPath));
+    logger.info('📁 DEV MODE: Serving local S3 mock files from: ' + uploadsPath);
+}
+
 const checkFileAuth = (req, res, next) => {
     if (!req.session || !req. session.userId) {
         logger.warn(`Unauthorized file access attempt: ${req.path} from IP ${req.ip}`);
