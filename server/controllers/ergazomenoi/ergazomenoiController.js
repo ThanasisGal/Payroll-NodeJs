@@ -27,13 +27,8 @@ const   { pdfDocumentl } = Models_E;
 
 // ✅ IMPORTS
 const { savePdfFromBase64 } = require('../../utils/pdfHandler');
+const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 
-// class ErgazomenoiController {
-//     static postErgazomenoiForm = async (req, res) => {
-//         const sessionUserTeam = req.session.userTeam;
-//         // ... υπόλοιπος κώδικας ...
-//     }
-// }
 let nextPageSearchTerm = "";
 
 const fieldsStoixeionSymbashs = ['stoixeio_symbashs', 'poso_symbashs', 'poso_symbashs_basei_oron_ergasias'];
@@ -1527,6 +1522,67 @@ class ergazomenoiController {
         }
     };
 
+    // ======================================================================
+    // ✅ GET ERGAZOMENOS BY ID (with presigned PDF URLs)
+    // ======================================================================
+    static getErgazomenosById = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            
+            const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId);
+            
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Εργαζόμενος δεν βρέθηκε'
+                });
+            }
+            
+            // ✅ Add presigned URLs for PDFs
+            const ergazomenosWithUrls = await addPdfUrlsToErgazomenos(ergazomenos);
+            
+            return res.status(200).json({
+                success: true,
+                data: ergazomenosWithUrls
+            });
+            
+        } catch (error) {
+            console.error('❌ Error fetching ergazomenos:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα server'
+            });
+        }
+    };
+
+    // ======================================================================
+    // ✅ GET ALL ERGAZOMENOI (with presigned PDF URLs)
+    // ======================================================================
+    static getAllErgazomenoiWithUrls = async (req, res) => {
+        try {
+            const companyId = req.session.companyInUse;
+            
+            const ergazomenoi = await ErgazomenoiModel.find({ company_kod: companyId });
+            
+            // ✅ Add presigned URLs for all ergazomenoi
+            const ergazomenoiWithUrls = await Promise.all(
+                ergazomenoi.map(erg => addPdfUrlsToErgazomenos(erg))
+            );
+            
+            return res.status(200).json({
+                success: true,
+                data: ergazomenoiWithUrls
+            });
+            
+        } catch (error) {
+            console.error('❌ Error fetching ergazomenoi:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα server'
+            });
+        }
+    };
+
     static forologikesKlimakes = async (req, res) => {
         try {
             const { xrhsh, kodikos } = req.body;
@@ -1572,8 +1628,8 @@ class ergazomenoiController {
         const highlightedText = text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
         return highlightedText;
     }
-
-
 }
 
 module.exports = ergazomenoiController;
+module.exports.getErgazomenosById = ergazomenoiController.getErgazomenosById;
+module.exports.getAllErgazomenoiWithUrls = ergazomenoiController.getAllErgazomenoiWithUrls;

@@ -204,6 +204,8 @@ router.get("/ergazomenoi/ergazomenoi", checkAuth, ergazomenoiController.mainErga
 router.get("/ergazomenoi/ergazomenoi/add", checkAuth, ergazomenoiController.addErgazomenoiForm);
 router.post("/ergazomenoi/ergazomenoi/add", checkAuth, sanitizeNumberFields, ergazomenoiController.postErgazomenoiForm);
 router.get("/ergazomenoi/ergazomenoi/edit/:id", checkAuth, ergazomenoiController.editErgazomenoiForm);
+router.get("/api/ergazomenoi/:id", ergazomenoiController.getErgazomenosById);
+router.get("/api/ergazomenoi", ergazomenoiController.getAllErgazomenoiWithUrls);
 router.get("/ergazomenoi/ergazomenoi/istoriko/: kod", checkAuth, ergazomenoiController.getIstorikoData);
 router.post("/ergazomenoi/ergazomenoi/istoriko/: kod", checkAuth, ergazomenoiController.updateIstorikoData);
 router.delete("/ergazomenoi/ergazomenoi/delete/:id", checkAuth, ergazomenoiController.deleteErgazomenoi);
