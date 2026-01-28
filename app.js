@@ -393,7 +393,7 @@ const buildCSPDirectives = () => {
         cdnDomains.push(`https://${CLOUDFRONT_DOMAIN}`);
     }
     
-    logger.info(`CSP: Επιτρέπονται scripts από:  ${cdnDomains.join(', ')}`);
+    logger.info(`CSP: Επιτρέπονται scripts από: ${cdnDomains.join(', ')}`);
     
     const directives = {
         "default-src": ["'self'"],
@@ -409,7 +409,7 @@ const buildCSPDirectives = () => {
             ...cdnDomains
         ],
         "style-src-attr": ["'unsafe-inline'"],
-        "style-src":  [
+        "style-src": [
             "'self'",
             "https://fonts.googleapis.com",
             ...cdnDomains
@@ -433,10 +433,14 @@ const buildCSPDirectives = () => {
             ...cdnDomains
         ],
         "worker-src": ["'self'", "blob:"],
-        "object-src": ["'none'"],
+        
+        // ✅ CRITICAL CHANGES: Allow blob URLs for PDF preview
+        "object-src": ["'self'", "blob:"],     // ← CHANGED from ["'none'"]
+        "frame-src": ["'self'", "blob:"],      // ← CHANGED from ["'self'"]
+        "child-src": ["'self'", "blob:"],      // ← NEW! For new tab PDFs
+        
         "base-uri": ["'self'"],
         "form-action": ["'self'"],
-        "frame-src": ["'self'"],
         "frame-ancestors": ["'none'"]
     };
     

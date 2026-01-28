@@ -665,6 +665,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/epidothseis_auto_clear.js"
     "public/js/ergazomenoi/genika/dokimastikhPeriodos_Blur.js"
     "public/js/ergazomenoi/genika/pdf_Upload_Modal.js"
+    "public/js/ergazomenoi/genika/pdfPreviewModule.js"
 )
 
 # =============================================================================
