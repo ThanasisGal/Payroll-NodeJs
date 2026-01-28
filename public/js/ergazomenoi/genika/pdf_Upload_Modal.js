@@ -271,9 +271,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         selectedFiles[currentDocumentType] = file;
+        
+        // ✅ INJECT FILE TO PREVIEW MODULE (with documentType)
+        if (window.pdfPreviewModule) {
+            console.log('💉 Injecting file to preview module:', file.name, 'as', currentDocumentType);
+            window.pdfPreviewModule.injectFile(file, currentDocumentType);
+        }
+
+        // ��� ALSO inject to pdfUploadModule's selectedFiles (redundant but safe)
+        console.log(`✅ selectedFiles[${currentDocumentType}] =`, file.name);        
         displayFileInfo(file);
     }
-    
+
     function displayFileInfo(file) {
         pdfFileName.textContent = file.name;
         pdfFileSize.textContent = formatFileSize(file.size);
@@ -442,26 +451,40 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         getFileAsBase64: async function(documentType) {
+            // ✅ DEBUG LOGS
+            console.log(`🔍 getFileAsBase64 called for: "${documentType}"`);
+            console.log(`📦 selectedFiles keys:`, Object.keys(selectedFiles));
+            
+            if (selectedFiles[documentType]) {
+                console.log(`📄 File found: ${selectedFiles[documentType].name} (${selectedFiles[documentType].size} bytes)`);
+            } else {
+                console.log(`❌ NO FILE for "${documentType}"!`);
+            }
+            
             const file = selectedFiles[documentType];
+            
             if (!file) {
                 console.warn(`⚠️ No file selected for ${documentType}`);
                 return null;
             }
             
+            console.log(`📄 Converting to base64: ${file.name}`);
+            
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    console.log(`✅ Converted ${documentType} to base64 (${(e.target.result.length / 1024).toFixed(2)}KB)`);
+                    const base64Length = e.target.result.length;
+                    console.log(`✅ Converted ${documentType} → ${file.name} (${(base64Length / 1024).toFixed(2)}KB base64)`);
                     resolve(e.target.result);
                 };
                 reader.onerror = (error) => {
-                    console.error(`❌ Failed to convert ${documentType}:`, error);
+                    console.error(`❌ Failed to read ${documentType}:`, error);
                     reject(error);
                 };
                 reader.readAsDataURL(file);
             });
         },
-        
+
         clearAllFiles: function() {
             Object.keys(selectedFiles).forEach(key => delete selectedFiles[key]);
             

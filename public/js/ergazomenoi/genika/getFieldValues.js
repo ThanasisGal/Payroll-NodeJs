@@ -95,34 +95,60 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // =========================================================================
-        // ✅ CONVERT PDFs TO BASE64 (using pdfPreviewModule)
+        // ✅ CONVERT PDFs TO BASE64 (using pdfUploadModule - PRIMARY SOURCE)
         // =========================================================================
 
+        console.log('📎 Converting PDFs to base64 for upload...');
+
+        // Map document types to form field names
+        const pdfMappings = {
+            'arxeio_symbashs': 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
+            'oysiodeis_oroi': 'arxeio_apodoxhs_oysiodon_oron_base64',
+            'anhlikoi': 'bibliario_anhlikoy_base64',
+            'allodapoi': 'arxeio_nomimopoihtikon_eggrafon_base64'
+        };
+
+        // ✅ PRIMARY: Get files from pdfUploadModule (selectedFiles)
+        if (window.pdfUploadModule) {
+            for (const [documentType, base64Field] of Object.entries(pdfMappings)) {
+                try {
+                    const base64Data = await window.pdfUploadModule.getFileAsBase64(documentType);
+                    
+                    if (base64Data) {
+                        formData[base64Field] = base64Data;
+                        console.log(`✅ Added ${documentType} from pdfUploadModule (${(base64Data.length / 1024).toFixed(2)}KB)`);
+                    } else {
+                        console.log(`⚠️ No file for ${documentType} in pdfUploadModule`);
+                    }
+                } catch (error) {
+                    console.error(`❌ Failed to convert ${documentType}:`, error);
+                }
+            }
+        } else {
+            console.warn('⚠️ pdfUploadModule not loaded!');
+        }
+
+        // ✅ FALLBACK: Check pdfPreviewModule (for drag & drop without modal confirm)
         if (window.pdfPreviewModule) {
-            console.log('📎 Converting PDFs to base64 for upload...');
-            
-            // Map input IDs to form data field names
-            const pdfMappings = {
-                'arxeio_apodoxhs_oron_atomikhs_symbashs_input': 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
-                'arxeio_apodoxhs_oysiodon_oron_input': 'arxeio_apodoxhs_oysiodon_oron_base64',
-                'bibliario_anhlikoy_input': 'bibliario_anhlikoy_base64',
-                'arxeio_nomimopoihtikon_eggrafon_input': 'arxeio_nomimopoihtikon_eggrafon_base64'
-            };
-            
-            for (const [inputId, base64Field] of Object.entries(pdfMappings)) {
-                if (window.pdfPreviewModule.hasFile(inputId)) {
+            for (const [documentType, base64Field] of Object.entries(pdfMappings)) {
+                // Only use if field is still empty
+                if (!formData[base64Field] && window.pdfPreviewModule.hasFile(documentType)) {
                     try {
-                        const base64Data = await window.pdfPreviewModule.getFileAsBase64(inputId);
+                        const base64Data = await window.pdfPreviewModule.getFileAsBase64(documentType);
+                        
                         if (base64Data) {
                             formData[base64Field] = base64Data;
-                            console.log(`✅ Added ${inputId} to formData (${(base64Data.length / 1024).toFixed(2)}KB)`);
+                            console.log(`✅ Added ${documentType} from pdfPreviewModule (fallback) (${(base64Data.length / 1024).toFixed(2)}KB)`);
                         }
                     } catch (error) {
-                        console.error(`❌ Failed to convert ${inputId}:`, error);
+                        console.error(`❌ Failed to convert ${documentType} from preview module:`, error);
                     }
                 }
             }
         }
+
+        console.log("📦 Final formData with PDFs:", Object.keys(formData).filter(k => k.includes('base64')));
+
         console.log("📦 Συλλεγμένα δεδομένα φόρμας:", formData);
 
         try {
@@ -208,7 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (hasNonCriticalErrors) {
                     const errorItems = errors.map((error, index) => {
                         const cssClass = error.critical ? 'error-item error-critical' : 'error-item';
-                        return `<div class="${cssClass}"><strong>${index + 1}</strong>. ${error.text}</div>`;
+                        return `<div class="${cssClass}"><strong>${index + 1}</strong>.${error.text}</div>`;
                     }).join('');
                     
                     const gridHTML = `

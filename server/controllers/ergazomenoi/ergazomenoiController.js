@@ -795,18 +795,24 @@ class ergazomenoiController {
         for (const [base64Field, mapping] of Object.entries(pdfFieldMappings)) {
             const base64Data = formData[base64Field];
             
+            // ✅ DEBUG: Log BEFORE check
+            console.log(`🔍 Checking ${base64Field}:`, {
+                hasData: !!base64Data,
+                isPdf: base64Data?.startsWith('data:application/pdf;base64,'),
+                size: base64Data ? `${(base64Data.length / 1024).toFixed(2)}KB` : 'N/A',
+                documentType: mapping.documentType
+            });
+            
             if (base64Data && base64Data.startsWith('data:application/pdf;base64,')) {
                 try {
                     console.log(`📄 Processing PDF: ${mapping.documentType}`);
                     
-                    // ✅ NOW ASYNC! Use await
                     const s3Key = await savePdfFromBase64(
                         base64Data,
                         mapping.documentType,
                         ergazomenosId
                     );
                     
-                    // Store S3 key (NOT local path!)
                     savedErgazomenos[mapping.dbField] = s3Key;
                     
                     pdfResults.push({
@@ -825,6 +831,8 @@ class ergazomenoiController {
                         error: error.message
                     });
                 }
+            } else {
+                console.log(`⏭️  Skipping ${mapping.documentType} (no data)`);
             }
         }
 

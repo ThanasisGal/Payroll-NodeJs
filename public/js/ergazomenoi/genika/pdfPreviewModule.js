@@ -1,339 +1,322 @@
 // public/js/ergazomenoi/genika/pdfPreviewModule.js
 
 /**
- * PDF Preview Module for Ergazomenoi (CSP-compliant)
- * No inline onclick handlers
- * Uses blob URLs for production compatibility
+ * PDF Preview Module - HOOKS INTO EXISTING MODAL SYSTEM
+ * Listens for drag & drop completion events from existing system
  */
 
 (function() {
     'use strict';
     
-    /**
-     * Debounce helper - prevents multiple rapid calls
-     */
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-    
-    // Flag για να αποτρέψουμε multiple opens
     let isPreviewOpen = false;
-    
-    // Store current files for preview
     const fileStore = new Map();
     
-    /**
-     * Initialize module
-     */
     function init() {
-        console.log('✅ PDF preview module initializing...');
+        console.log('✅ PDF preview module (HOOK-BASED) initializing...');
         
-        // ✅ Disable conflicting event handlers FIRST
         disableConflictingHandlers();
-        
-        attachModalListeners();
         attachPreviewListeners();
-        attachTrashListeners();
+        hookIntoExistingSystem();
         
         console.log('✅ PDF preview module ready');
     }
 
-    /**
-     * ✅ Disable conflicting preview handlers
-     */
     function disableConflictingHandlers() {
-        // Find all preview buttons
         const previewButtons = document.querySelectorAll('button');
         
         previewButtons.forEach(button => {
-            const buttonText = button.textContent.trim();
-            
-            if (buttonText.includes('Προεπισκόπηση')) {
-                // Remove inline onclick
-                if (button.onclick) {
-                    button.onclick = null;
-                    console.log('🗑️ Removed inline onclick from preview button');
-                }
-                
-                // Remove inline attributes
+            if (button.textContent.includes('Προεπισκόπηση')) {
+                if (button.onclick) button.onclick = null;
                 button.removeAttribute('onclick');
                 
-                // Clone and replace to remove ALL event listeners
                 const newButton = button.cloneNode(true);
                 button.parentNode.replaceChild(newButton, button);
-                
-                console.log('✅ Cleaned preview button:', buttonText.substring(0, 30));
-            }
-        });
-    }
-
-    /**
-     * Attach modal event listeners
-     */
-    function attachModalListeners() {
-        // Listen for modal file inputs
-        document.addEventListener('change', function(event) {
-            const target = event.target;
-            
-            if (target.type === 'file' && target.accept && target.accept.includes('pdf')) {
-                handleFileSelection(target);
             }
         });
     }
     
-    /**
-     * Attach preview button listeners (CSP-compliant)
-     */
     function attachPreviewListeners() {
         document.addEventListener('click', function(event) {
             const button = event.target.closest('button');
             
             if (!button) return;
             
-            const buttonText = button.textContent.trim();
-            const hasPreviewClass = button.classList.contains('pdf-preview-btn') || 
-                                   button.dataset.action === 'preview-pdf';
-            
-            if (buttonText.includes('Προεπισκόπηση') || hasPreviewClass) {
-                // ✅ CRITICAL: Stop ALL event propagation
+            if (button.textContent.includes('Προεπισκόπηση')) {
                 event.preventDefault();
                 event.stopPropagation();
                 event.stopImmediatePropagation();
                 
-                // ✅ Remove any existing onclick handler
-                if (button.onclick) {
-                    button.onclick = null;
-                    console.log('🗑️ Removed conflicting onclick handler');
-                }
-                
-                handlePreviewClick(button);
-                
-                return false; // ✅ Extra safety
+                handlePreviewClick();
+                return false;
             }
-        }, true); // ✅ Capture phase (runs BEFORE other listeners)
-    }
-
-    /**
-     * Attach trash button listeners (CSP-compliant)
-     */
-    function attachTrashListeners() {
-        document.addEventListener('click', function(event) {
-            const button = event.target.closest('button');
-            
-            if (!button) return;
-            
-            // Check if it's a trash/remove button
-            const isTrashButton = button.classList.contains('badge-remove-btn') ||
-                                 button.dataset.action === 'remove-pdf' ||
-                                 button.querySelector('.bi-x-circle-fill') ||
-                                 button.querySelector('[data-bs-title*="Αφαίρεση"]');
-            
-            if (isTrashButton) {
-                event.preventDefault();
-                event.stopPropagation();
-                handleTrashClick(button);
-            }
-        });
+        }, true);
     }
     
     /**
-     * Handle file selection (with persistent storage)
+     * ✅ NEW: Hook into existing modal drag & drop system
      */
-    function handleFileSelection(input) {
-        const file = input.files[0];
+    function hookIntoExistingSystem() {
+        console.log('✅ Hooking into existing modal system...');
         
+        // ✅ ADD THIS LINE:
+        patchExistingModalSystem();
+        
+        // Listen for file selection confirmation (when badge appears)
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    // Check if PDF badge was added
+                    if (node.nodeType === 1 && 
+                        (node.classList?.contains('pdf-badge') || 
+                         node.classList?.contains('pdf-badge-replacement') ||
+                         node.textContent?.includes('.pdf'))) {
+                        
+                        console.log('📎 PDF badge detected! Extracting file...');
+                        extractFileFromBadge(node);
+                    }
+                });
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Also watch for ANY change event (existing system might trigger it)
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.type === 'file') {
+                console.log('📎 Change event on file input');
+                
+                // Try to get file from event details
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    console.log('✅ Got file from change event:', file.name);
+                    storeFile(file, e.target);
+                }
+            }
+        }, true);
+        
+        // Watch for any DOM element with PDF filename
+        setInterval(() => {
+            const pdfElements = document.querySelectorAll('[class*="pdf"], [id*="pdf"]');
+            pdfElements.forEach(el => {
+                const text = el.textContent || el.innerText || '';
+                if (text.toLowerCase().includes('.pdf') && text.length < 100) {
+                    // Found element with PDF filename
+                    const match = text.match(/([^\\/]+\.pdf)/i);
+                    if (match) {
+                        const filename = match[1];
+                        if (!fileStore.has('_filename')) {
+                            console.log('📎 Found PDF filename in DOM:', filename);
+                            fileStore.set('_filename', filename);
+                        }
+                    }
+                }
+            });
+        }, 1000);
+        
+        console.log('✅ Hooks active');
+    }
+    
+/**
+ * ✅ AUTO-INJECT: Patch existing modal system
+ */
+function patchExistingModalSystem() {
+    console.log('🔧 Patching existing modal drag & drop...');
+    
+    // Find all drop zones
+    const dropZones = document.querySelectorAll('.drop-zone, [data-drop-zone], .modal');
+    
+    dropZones.forEach(zone => {
+        // Override drop event
+        zone.addEventListener('drop', function(e) {
+            console.log('📎 Drop event intercepted!');
+            
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files[0]) {
+                const file = dt.files[0];
+                
+                if (file.name.toLowerCase().endsWith('.pdf')) {
+                    console.log('✅ Auto-injecting dropped PDF:', file.name);
+                    
+                    // Store immediately
+                    fileStore.set('_current', file);
+                    
+                    // Try to find input
+                    const modal = zone.closest('.modal') || zone;
+                    const input = modal.querySelector('input[type="file"]');
+                    
+                    if (input) {
+                        const key = input.id || input.name || input.dataset.documentType || 'pdf';
+                        fileStore.set(key, file);
+                        console.log(`✅ Stored as: _current, ${key}`);
+                    }
+                }
+            }
+        }, true); // ← Capture phase (runs BEFORE existing handler)
+    });
+    
+    console.log(`🔧 Patched ${dropZones.length} drop zones`);
+}
+
+
+
+    /**
+     * Extract file from badge element
+     */
+    function extractFileFromBadge(badge) {
+        // Try to find filename in badge
+        const text = badge.textContent || badge.innerText || '';
+        const match = text.match(/([^\\/]+\.pdf)/i);
+        
+        if (match) {
+            const filename = match[1];
+            console.log('📝 Extracted filename:', filename);
+            fileStore.set('_filename', filename);
+        }
+        
+        // Try to find associated input
+        const modal = badge.closest('.modal');
+        if (modal) {
+            const inputs = modal.querySelectorAll('input[type="file"]');
+            inputs.forEach(input => {
+                if (input.files && input.files[0]) {
+                    console.log('✅ Found file in associated input:', input.files[0].name);
+                    storeFile(input.files[0], input);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Store file
+     */
+    function storeFile(file, input) {
         if (!file) return;
         
-        // Validate PDF
-        if (file.type !== 'application/pdf') {
-            alert('❌ Επιλέξτε αρχείο PDF!');
-            input.value = '';
-            return;
-        }
+        const key = input?.id || input?.name || input?.dataset?.documentType || 'pdf';
         
-        // Check size (max 10MB)
-        const MAX_SIZE = 10 * 1024 * 1024;
-        if (file.size > MAX_SIZE) {
-            alert(`❌ Το αρχείο είναι πολύ μεγάλο! (${(file.size / 1024 / 1024).toFixed(2)}MB > 10MB)`);
-            input.value = '';
-            return;
-        }
+        fileStore.set('_current', file);
+        fileStore.set(key, file);
         
-        // ✅ Store με multiple keys
-        const documentType = input.dataset.documentType || input.id || input.name;
-        fileStore.set(documentType, file);
-        fileStore.set('_current_preview', file);
-        
-        console.log(`✅ PDF stored: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-        console.log(`📦 Keys: ${documentType}, _current_preview`);
-    }
-
-    /**
-     * Handle preview button click
-     */
-    function handlePreviewClick(button) {
-        console.log('👁️ Preview button clicked');
-        
-        // Find associated file
-        const file = findAssociatedFile(button);
-        
-        if (!file) {
-            alert('❌ Δεν βρέθηκε αρχείο για προβολή');
-            return;
-        }
-        
-        // ✅ Preview using blob URL
-        previewPdfFile(file);
+        console.log(`✅ Stored: ${file.name} as [_current, ${key}]`);
     }
     
     /**
-     * Handle trash button click
+     * Handle preview click
      */
-    function handleTrashClick(button) {
-        console.log('🗑️ Trash button clicked');
+    function handlePreviewClick() {
+        console.log('👁️ Preview clicked');
         
-        const documentType = button.dataset.documentType;
+        // Check fileStore first
+        let file = fileStore.get('_current');
         
-        if (!documentType) {
-            console.warn('⚠️ No documentType found on trash button');
+        if (!file) {
+            console.warn('⚠️ No file in fileStore, asking user to re-drop...');
+            alert('❌ Δεν βρέθηκε αρχείο.\n\nΠαρακαλώ κάντε drag & drop το PDF ξανά και περιμένετε να εμφανιστεί το badge.');
             return;
         }
         
-        // Remove from store
-        fileStore.delete(documentType);
-        fileStore.delete('_current_preview');
-        
-        // Hide badge, show upload button
-        const badge = document.querySelector(`.pdf-badge-replacement[data-document-type="${documentType}"]`);
-        const uploadBtn = document.querySelector(`.pdf-upload-btn[data-document-type="${documentType}"]`);
-        
-        if (badge) {
-            badge.classList.add('hidden');
-        }
-        
-        if (uploadBtn) {
-            uploadBtn.classList.remove('hidden');
-        }
-        
-        // Clear file input
-        const fileInput = document.querySelector(`input[data-document-type="${documentType}"]`);
-        if (fileInput) {
-            fileInput.value = '';
-        }
-        
-        console.log(`✅ Removed PDF: ${documentType}`);
+        console.log('✅ Previewing:', file.name);
+        previewPdf(file);
     }
     
     /**
-     * Find file (with multiple fallback strategies)
+     * Preview PDF
      */
-    function findAssociatedFile(button) {
-        console.log('🔍 Finding file...');
-        
-        // Strategy 1: Current preview
-        if (fileStore.has('_current_preview')) {
-            const file = fileStore.get('_current_preview');
-            console.log('✅ Found: _current_preview →', file.name);
-            return file;
-        }
-        
-        // Strategy 2: Modal input
-        const modal = button.closest('.modal');
-        if (modal) {
-            const fileInput = modal.querySelector('input[type="file"][accept*="pdf"]');
-            if (fileInput?.files?.[0]) {
-                const file = fileInput.files[0];
-                console.log('✅ Found: modal input →', file.name);
-                return file;
-            }
-        }
-        
-        // Strategy 3: Document type
-        const documentType = button.dataset.documentType;
-        if (documentType && fileStore.has(documentType)) {
-            const file = fileStore.get(documentType);
-            console.log('✅ Found: documentType →', file.name);
-            return file;
-        }
-        
-        // Strategy 4: Any file
-        for (const [key, value] of fileStore.entries()) {
-            if (!key.startsWith('_') && value instanceof File) {
-                console.log('✅ Found: fallback →', value.name);
-                return value;
-            }
-        }
-        
-        console.error('❌ No file found!');
-        return null;
-    }
-
-    /**
-     * ✅ Preview PDF (no false warnings, duplicate prevention)
-     */
-    function previewPdfFile(file) {
-        if (!file) {
-            console.error('❌ No file provided');
-            return;
-        }
-        
-        // ✅ Check duplicate
-        if (isPreviewOpen) {
-            console.warn('⚠️ Ignoring duplicate preview request');
-            return;
-        }
+    function previewPdf(file) {
+        if (!file) return;
+        if (isPreviewOpen) return;
         
         try {
             isPreviewOpen = true;
             
             const blobUrl = URL.createObjectURL(file);
-            console.log('👁️ Opening PDF:', file.name);
+            console.log('👁️ Opening:', file.name);
             
             window.open(blobUrl, '_blank', 'noopener,noreferrer');
             
-            // Reset flag after 1 second
-            setTimeout(() => {
-                isPreviewOpen = false;
-            }, 1000);
-            
-            // Cleanup blob after 2 minutes
-            setTimeout(() => {
-                URL.revokeObjectURL(blobUrl);
-                console.log('🗑️ Cleaned up blob URL');
-            }, 120000);
+            setTimeout(() => { isPreviewOpen = false; }, 1000);
+            setTimeout(() => { URL.revokeObjectURL(blobUrl); }, 120000);
             
         } catch (error) {
             isPreviewOpen = false;
-            console.error('❌ Preview error:', error);
+            console.error('❌ Error:', error);
             alert('Σφάλμα κατά την προβολή του PDF');
         }
+    }
+    
+    /**
+     * Convert file to base64
+     */
+    function getFileAsBase64(documentType) {
+        return new Promise((resolve, reject) => {
+            const file = fileStore.get(documentType) || fileStore.get('_current');
+            
+            if (!file) {
+                resolve(null);
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
     
     /**
      * Public API
      */
     window.pdfPreviewModule = {
-        previewFile: previewPdfFile,
-        getStoredFile: (documentType) => fileStore.get(documentType),
-        hasFile: (documentType) => fileStore.has(documentType),
-        clearAll: () => fileStore.clear()
+        previewFile: previewPdf,
+        getStoredFile: (type) => {
+            if (type === '_current' || type === '_current_preview') {
+                return fileStore.get(type);
+            }
+            return fileStore.get(type); // ONLY exact match!
+        },
+        hasFile: (type) => {
+            if (type === '_current' || type === '_current_preview') {
+                return fileStore.has(type);
+            }
+            return fileStore.has(type); // ONLY exact match!
+        },
+        getFileAsBase64: getFileAsBase64,
+        clearAll: () => fileStore.clear(),
+        
+        // ✅ FIXED: Accept documentType parameter
+        injectFile: (file, documentType) => {
+            if (!file) {
+                console.warn('⚠️ injectFile called with no file');
+                return;
+            }
+            
+            console.log('💉 File injected:', file.name, 'as', documentType);
+            
+            // ✅ Store with BOTH documentType AND _current
+            if (documentType) {
+                fileStore.set(documentType, file);
+                console.log(`✅ Stored as: ${documentType}`);
+            }
+            
+            // ✅ ALWAYS store as _current (last uploaded fallback)
+            fileStore.set('_current', file);
+            
+            // ✅ DEBUG: Show all stored files
+            const allKeys = Array.from(fileStore.keys()).filter(k => k !== '_filename');
+            console.log('📊 FileStore now has:', allKeys);
+        }
     };
-    
-    // Initialize on DOM ready
+
+    // Initialize
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
     
-    console.log('✅ PDF preview module loaded (CSP-compliant)');
+    console.log('✅ PDF preview module loaded (HOOK-BASED)');
     
 })();
