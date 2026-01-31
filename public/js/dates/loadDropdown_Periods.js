@@ -74,8 +74,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 periodoiDropdown.appendChild(option);
             });
 
-            console.log(`Loaded ${data.periodoi. length} periods`);
-
         } catch (error) {
             console.error("Error loading periods:", error);
             periodoiDropdown.innerHTML = '<option value="">Σφάλμα φόρτωσης</option>';

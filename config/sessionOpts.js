@@ -30,15 +30,4 @@ const sessionOpts = {
     unset: 'destroy',  // ✅ Clear session on logout
 };
 
-// console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-// console.log('🔧 SESSION OPTIONS:');
-// console.log('   Name:', sessionOpts.name);
-// console.log('   Environment:', isProd ? 'PRODUCTION' : 'DEVELOPMENT');
-// console.log('   Cookie Secure:', sessionOpts.cookie.secure);
-// console.log('   Cookie SameSite:', sessionOpts. cookie.sameSite);
-// console.log('   Cookie MaxAge (min):', diarkeia_session);
-// console.log('   Proxy Trust:', sessionOpts.proxy);
-// console.log('   Store:', mongoUrl ? 'MongoDB' : 'MemoryStore');
-// console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
 module.exports = { sessionOpts, isProd };

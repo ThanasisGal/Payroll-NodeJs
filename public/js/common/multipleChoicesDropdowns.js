@@ -61,7 +61,6 @@ const setupAllDynamicChoices = () => {
           scrollTarget.addEventListener('scroll', async () => {
             const bottom = scrollTarget.scrollTop + scrollTarget.clientHeight;
             if (bottom >= scrollTarget.scrollHeight - 20) {
-              console.log(`🔄 Scrolled to bottom. Loading page ${currentPage}...`);
               await loadData();
             }
           });

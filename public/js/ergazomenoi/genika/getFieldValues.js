@@ -105,7 +105,8 @@ document.addEventListener("DOMContentLoaded", () => {
             'arxeio_symbashs': 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
             'oysiodeis_oroi': 'arxeio_apodoxhs_oysiodon_oron_base64',
             'anhlikoi': 'bibliario_anhlikoy_base64',
-            'allodapoi': 'arxeio_nomimopoihtikon_eggrafon_base64'
+            'allodapoi': 'arxeio_nomimopoihtikon_eggrafon_base64',
+            'symbash_daneismoy': 'arxeio_symbashs_daneismoy_base64'
         };
 
         // ✅ PRIMARY: Get files from pdfUploadModule (selectedFiles)

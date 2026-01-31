@@ -57,6 +57,7 @@ async function addPdfUrlsToErgazomenos(ergazomenos) {
         'arxeio_apodoxhs_oron_atomikhs_symbashs_path',
         'arxeio_apodoxhs_oysiodon_oron_path',
         'bibliario_anhlikoy_path',
+        'arxeio_symbashs_daneismoy_path',
         'arxeio_nomimopoihtikon_eggrafon_path'
     ];
     

@@ -35,10 +35,6 @@
     async function fetchTaxScale() {
     const csrfToken = getCsrfToken();
     
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔐 CSRF Token:', csrfToken);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
     if (!csrfToken) {
         console.error('❌ No CSRF token found!');
         return;

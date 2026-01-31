@@ -31,7 +31,6 @@ document.querySelectorAll('select.tom-dropdown[data-target-input]').forEach(sel 
         const perigrafiInput = document.getElementById('perigrafh_stathera');
         if (perigrafiInput && item) {
           perigrafiInput.value = item.perigrafh || '';
-          console.log('Updated perigrafh_stathera after load:', perigrafiInput.value);
         }
       }
     }
@@ -53,7 +52,6 @@ document.querySelectorAll('select.tom-dropdown[data-target-input]').forEach(sel 
       
       if (perigrafiInput && item) {
         perigrafiInput.value = item.perigrafh || '';
-        console.log('Updated perigrafh_stathera on change:', perigrafiInput.value);
       }
     }
   });

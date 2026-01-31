@@ -285,38 +285,11 @@ function walkDirectory(dir, exclude = ['node_modules', '.git', 'uploads', 'build
 }
 
 // Run check
-console.log('🔍 Checking CSRF tokens in all HTTP requests...');
-console.log(`📂 Starting from:  ${process.cwd()}`);
-console.log(`🚫 Excluding: node_modules, .git, uploads, build, public/min.js\n`);
-
 walkDirectory('.');
 
 // Print results
-console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-console.log(`📊 CSRF CHECK RESULTS:`);
-console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-console.log(`   📁 Files scanned:         ${results.allFiles.length}`);
-console.log(`   ✅ With CSRF token:      ${results.withCSRF. length}`);
-console.log(`   ❌ WITHOUT CSRF token:   ${results. withoutCSRF.length}`);
-console.log(`   ℹ️  GET requests:        ${results.getRequests.length} (CSRF not needed)`);
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
 if (results.withoutCSRF.length > 0) {
-    console.log('⚠️  REQUESTS WITHOUT CSRF TOKEN (NEED FIX):\n');
-    results.withoutCSRF.forEach((r, index) => {
-        console.log(`${index + 1}. 📍 ${r.file}:${r.line} (${r.type})`);
-    });
-    console.log('');
-} else {
-    console.log('🎉 All POST/PUT/DELETE requests have CSRF tokens!\n');
-}
-
-if (results.withCSRF.length > 0) {
-    console.log(`✅ ${results.withCSRF.length} requests with CSRF token (CORRECT)\n`);
-}
-
-if (results.getRequests.length > 0) {
-    console.log(`ℹ️  ${results. getRequests.length} GET requests found (CSRF not required)\n`);
+    results.withoutCSRF.forEach((r, index) => {});
 }
 
 // Save fixes to txt file
@@ -342,7 +315,6 @@ if (results.fixes.length > 0) {
     });
     
     fs.writeFileSync('csrf-fixes.txt', fixContent, 'utf8');
-    console.log('✅ Fixes saved to:  csrf-fixes.txt\n');
 }
 
 // Save JSON report
@@ -358,18 +330,6 @@ const report = {
 };
 
 fs.writeFileSync('csrf-check-report.json', JSON.stringify(report, null, 2));
-console.log('✅ Full report saved to: csrf-check-report.json');
 
 // Summary
-console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-if (results.withoutCSRF.length === 0 && results.withCSRF. length > 0) {
-    console.log('🏆 PERFECT! All requests are properly protected with CSRF tokens!');
-} else if (results.withoutCSRF.length > 0) {
-    console.log(`⚠️  WARNING: ${results.withoutCSRF.length} requests need CSRF protection! `);
-    console.log(`📝 Check csrf-fixes.txt for suggested fixes`);
-} else if (results.withCSRF.length === 0 && results.getRequests. length === 0) {
-    console.log('ℹ️  No HTTP requests found in the project.');
-}
-console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
 process.exit(results.withoutCSRF.length > 0 ? 1 : 0);

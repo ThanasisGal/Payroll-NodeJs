@@ -74,8 +74,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 xrhseisDropdown.appendChild(option);
             });
 
-            console.log(`Loaded ${data.xrhseis.length} years`);
-
         } catch (error) {
             console.error("Error loading years:", error);
             xrhseisDropdown.innerHTML = '<option value="">Σφάλμα φόρτωσης</option>';

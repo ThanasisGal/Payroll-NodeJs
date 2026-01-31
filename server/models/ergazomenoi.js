@@ -285,10 +285,12 @@ const { Schema: _Schema, model } = require("mongoose");
         arxeio_nomimopoihtikon_eggrafon_path: { type: String, default: null, trim: true },
         arxeio_apodoxhs_oysiodon_oron_path: { type: String, default: null, trim: true },
         arxeio_apodoxhs_oron_atomikhs_symbashs_path: { type: String, default: null, trim: true },
+        arxeio_symbashs_daneismoy_path: { type: String, default: null, trim: true },
         bibliario_anhlikoy_base64: { type: String, default: null },
         arxeio_nomimopoihtikon_eggrafon_base64: { type: String, default: null },
         arxeio_apodoxhs_oysiodon_oron_base64: { type: String, default: null },
         arxeio_apodoxhs_oron_atomikhs_symbashs_base64: { type: String, default: null },
+        arxeio_symbashs_daneismoy_base64: { type: String, default: null, trim: true },
         
         createdAt: { type: Date, default: Date.now() },
         updatedAt: { type: Date, default: Date.now() },

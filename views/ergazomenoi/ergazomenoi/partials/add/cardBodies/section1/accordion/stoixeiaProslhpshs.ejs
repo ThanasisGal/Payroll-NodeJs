@@ -85,13 +85,48 @@
                     Αφορά Δανεισμό Εργαζόμενου
                     </label>
                 </div>
-                <div class="col-3-75 left-align checkbox-flex-center">
+                <div class="col-1 left-align checkbox-flex-center">
                     <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_daneismo_ergazomenoy" name="afora_daneismo_ergazomenoy" value="" />
                     <label for="afora_daneismo_ergazomenoy" id="label-afora_daneismo_ergazomenoy" class="margin-left-0_75rem  font-size-vw-0_875">
                     </label>
                 </div>
 
-                <div class="col-0-25"></div>
+                <div class="col-3 margin-bottom-0_2rem">
+                    <!-- Wrapper για button + badge toggle -->
+                    <div class="pdf-button-wrapper">
+                        <!-- Original Button (εμφανίζεται όταν ΔΕΝ έχει file) -->
+                        <button 
+                            type="button" 
+                            id="customButton_symbash_daneismoy" 
+                            class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+                            data-document-type="symbash_daneismoy"
+                            data-data-bs-title="Αρχείο Σύμβασης Δανεισμού"
+                            disabled>
+                            <i class="bi bi-cloud-arrow-up"></i> 
+                            Αρχείο Σύμβασης Δανεισμού (pdf)
+                        </button>
+                        
+                        <!-- Badge Replacement (εμφανίζεται όταν έχει αρχείο) -->
+                        <div 
+                            class="pdf-badge-replacement hidden" 
+                            data-document-type="symbash_daneismoy"
+                            data-bs-title="Κλικ για αλλαγή αρχείου">
+                            <div class="badge-content">
+                                <i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+                                <span class="badge-filename text-left">file.pdf</span>
+                            </div>
+                            <button 
+                                type="button" 
+                                class="badge-remove-btn" 
+                                data-bs-title="Αφαίρεση αρχείου"
+                                data-document-type="symbash_daneismoy">
+                                <i class="bi bi-x-circle-fill"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- <div class="col-0-25"></div> -->
 
                 <div class="col-2 left-align">
                     <label for="typos_daneismoy" id="typos_daneismoy_label" class="col-form-label label-font-size field-required">

@@ -5,17 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!selectEl || !hiddenCode || !hiddenDesc) return;
 
-  console.log('Initial values:', {
-    hiddenCode: hiddenCode.value,
-    hiddenDesc: hiddenDesc.value
-  });
-
   function updateHiddenFromTomSelect() {
     const ts = selectEl.tomselect;
     if (!ts) return;
 
     const value = ts.getValue();
-    console.log('TomSelect value:', value);
 
     if (!value) {
       hiddenDesc.value = '';
@@ -24,17 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Πάρε το item από τα options
     const item = ts.options[value];
-    console.log('Selected item:', item);
 
     if (item) {
       // Ενημέρωσε ΚΑΙ τα δύο hidden inputs
       hiddenCode.value = item.kodikos || item.value || '';
       hiddenDesc.value = item.perigrafh || '';
-
-      console.log('Updated values:', {
-        hiddenCode: hiddenCode.value,
-        hiddenDesc: hiddenDesc.value
-      });
 
       // Dispatch events
       hiddenCode.dispatchEvent(new Event('change', { bubbles: true }));
@@ -54,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // Έλεγξε αν έχει φορτώσει τα options
       if (Object.keys(ts.options).length > 0) {
-        console.log('TomSelect loaded with options:', Object.keys(ts.options).length);
         clearInterval(checkTomSelect);
         
         // Αρχική ενημέρωση
@@ -62,7 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Listener για μελλοντικές αλλαγές
         ts.on('change', () => {
-          console.log('TomSelect changed');
           updateHiddenFromTomSelect();
         });
       }

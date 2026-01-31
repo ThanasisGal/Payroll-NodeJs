@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Ορισμός της συνάρτησης clearRowOnly εδώ
   function clearRowOnly(rowId, recalc) {
-    console.log('Clearing row:', rowId);
     const row = document.getElementById(rowId);
     if (row) {
       row.querySelectorAll('input, select').forEach(input => input.value = '');

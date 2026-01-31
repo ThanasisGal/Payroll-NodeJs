@@ -189,6 +189,36 @@ document.addEventListener("DOMContentLoaded", function () {
         // �� Initial check
         checkAndUpdateAnhlikoiButton();
     }
+
+    // =========================================================================
+    // ✅ ΣΥΜΒΑΣΗ ΔΑΝΕΙΣΜΟΥ - BUTTON CONTROL (POLLING)
+    // =========================================================================
+    const aforaSymbashDaneismoy = document.getElementById('afora_daneismo_ergazomenoy');
+    const customButtonSymbashDaneismoy = document.getElementById('customButton_symbash_daneismoy');
+    
+    if (customButtonSymbashDaneismoy) {
+        // Function που ελέγχει και ενημερώνει το button για αλλοδαπούς
+        function checkAndUpdateSymbashDaneismoyButton() {
+            const atLeastOneChecked = (aforaSymbashDaneismoy && aforaSymbashDaneismoy.checked);
+            
+            customButtonSymbashDaneismoy.disabled = !atLeastOneChecked;
+            customButtonSymbashDaneismoy.style.opacity = atLeastOneChecked ? '1' : '0.4';
+            customButtonSymbashDaneismoy.style.cursor = atLeastOneChecked ? 'pointer' : 'not-allowed';
+        }
+        
+        // ✅ Initial disabled state
+        customButtonSymbashDaneismoy.disabled = true;
+        customButtonSymbashDaneismoy.style.opacity = '0.4';
+        customButtonSymbashDaneismoy.style.cursor = 'not-allowed';
+        
+        // ✅ Άκουσε για changes στα checkboxes
+        if (aforaSymbashDaneismoy) {
+            aforaSymbashDaneismoy.addEventListener('change', checkAndUpdateSymbashDaneismoyButton);
+        }
+        
+        // ✅ Initial check
+        checkAndUpdateSymbashDaneismoyButton();
+    }
 });
 
 function toggleCheckboxState(checkboxId, isChecked) {

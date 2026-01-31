@@ -783,6 +783,10 @@ class ergazomenoiController {
                 documentType: 'anhlikoi',
                 dbField: 'bibliario_anhlikoy_path'
             },
+            'arxeio_symbashs_daneismoy_base64': {
+                documentType: 'symbash_daneismoy',
+                dbField: 'arxeio_symbashs_daneismoy_path'
+            },
             'arxeio_nomimopoihtikon_eggrafon_base64': {
                 documentType: 'allodapoi',
                 dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
@@ -1000,6 +1004,7 @@ class ergazomenoiController {
                     arxeio_apodoxhs_oron_atomikhs_symbashs_path: savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
                     arxeio_apodoxhs_oysiodon_oron_path: savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
+                    arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
                     arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
                 },
                 pdfResults: pdfResults, // ✅ Πληροφορίες για PDFs
