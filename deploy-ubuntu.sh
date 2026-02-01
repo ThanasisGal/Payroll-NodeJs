@@ -755,7 +755,7 @@ case $BUMP_CHOICE in
 esac
 
 if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
-    sed -i "s/\"version\":   \"$CURRENT_VERSION\"/\"version\":  \"$NEW_VERSION\"/" "$PACKAGE_JSON"
+    sed -i "s/\"version\": *\"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$PACKAGE_JSON"
     
     if [[ $? -eq 0 ]]; then
         echo ""
