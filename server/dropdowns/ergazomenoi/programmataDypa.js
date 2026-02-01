@@ -10,14 +10,6 @@ const padRight = (s = '', targetLen = 11) => {
   return t.length >= targetLen ? t : t + NBSP.repeat(targetLen - t.length);
 };
 
-// Ομάδα/επικεφαλίδα: πρώτο γράμμα του τίτλου (fallback: 'Λοιπά')
-// const groupOf = (doc) => {
-//   const t = (doc.titlos || '').trim();
-//   // πάρε τον πρώτο “χρήσιμο” χαρακτήρα (γράμμα/αριθμό)
-//   const m = t.match(/[\p{L}\p{N}]/u);
-//   return (m ? m[0] : 'Λ')?.toUpperCase() || 'Λοιπά';
-// };
-
 const mapOption = (doc, padLen = 11) => ({
   value   : doc.kodikos,
   label   : `${(doc.kodikos || '').trim()} — ${padRight(doc.kodikos_programmatos, padLen)} — ${(doc.titlos || '').trim()}`,

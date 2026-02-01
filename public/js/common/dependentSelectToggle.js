@@ -74,22 +74,70 @@ export function bindCheckboxControlsSelect({
         el.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
+    // function toggleField(el, enabled) {
+    //     if (!el) return;
+        
+    //     // native disable
+    //     el.disabled = !enabled;
+
+    //     // TomSelect
+    //     const inst = getTom(el);
+    //     if (inst) {
+    //         if (enabled) {
+    //             inst. enable();
+    //         } else {
+    //             if (clearOnDisable) inst.clear();
+    //             inst.disable();
+    //         }
+    //         inst.wrapper?. classList?. toggle('disabled', !enabled);
+    //     }
+
+    //     // flatpickr enable/disable
+    //     if (el._flatpickr) {
+    //         el._flatpickr.set('clickOpens', enabled);
+    //         el._flatpickr.input.disabled = !enabled;
+    //     }
+
+    //     // Clear value if disabled
+    //     if (!enabled && clearOnDisable) {
+    //         clearFieldValue(el);
+    //     }
+    // }
+
     function toggleField(el, enabled) {
         if (!el) return;
         
-        // native disable
+        // ✅ ΝΕΟ: Χειρισμός για <a> και <button> elements
+        if (el.tagName === 'A' || el.tagName === 'BUTTON') {
+            if (enabled) {
+                el.style.pointerEvents = '';
+                el.style.opacity = '';
+                el.style.cursor = '';
+                el.removeAttribute('aria-disabled');
+                el.classList.remove('disabled');
+            } else {
+                el.style.pointerEvents = 'none';
+                el.style.opacity = '0.4';
+                el.style.cursor = 'not-allowed';
+                el.setAttribute('aria-disabled', 'true');
+                el.classList.add('disabled');
+            }
+            return; // Έξοδος γιατί τα links/buttons δεν έχουν .disabled property
+        }
+        
+        // native disable (για inputs, selects, κλπ)
         el.disabled = !enabled;
 
         // TomSelect
         const inst = getTom(el);
         if (inst) {
             if (enabled) {
-                inst. enable();
+                inst.enable();
             } else {
                 if (clearOnDisable) inst.clear();
                 inst.disable();
             }
-            inst.wrapper?. classList?. toggle('disabled', !enabled);
+            inst.wrapper?.classList?.toggle('disabled', !enabled);
         }
 
         // flatpickr enable/disable

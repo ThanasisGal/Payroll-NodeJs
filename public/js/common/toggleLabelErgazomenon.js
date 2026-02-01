@@ -266,6 +266,29 @@ function toggleCheckboxState(checkboxId, isChecked) {
             // ✅ Κρύψε ολόκληρη τη γραμμή (row)
             hideEntireRowForFields(["hmeres_ores_anaforas", "eidopoihsh_prin_thn_anathesh", "prothesmia_akyroshs_ths_anatheshs"], ! isChecked);
             break;
+        case "dieythethsh_ergasias":
+            label.textContent = isChecked ? "ΝΑΙ" : "ΟΧΙ";
+            
+            // Clear τα date fields
+            document.getElementById("hmnia_enarxhs_dieythethshs_ergasias").value = null;
+            document.getElementById("hmnia_lhxhs_dieythethshs_ergasias").value = null;
+            
+            // ✅ Disable τα date inputs
+            setFieldsDisabled([
+                "hmnia_enarxhs_dieythethshs_ergasias", 
+                "hmnia_lhxhs_dieythethshs_ergasias"
+            ], !isChecked);
+            
+            var targetLabel = document.getElementById("hmnia_lhxhs_dokimastikhs_periodoy_label");
+            if (targetLabel) {
+                if (!isChecked) {
+                    targetLabel.classList.add('disabled');
+                } else {
+                    targetLabel.classList.remove('disabled');
+                }
+            }
+        break;
+
         case "efarmostea_sse":  
             label.textContent = isChecked ? "ΝΑΙ" : "ΟΧΙ - ΚΑΤΩΤΑΤΕΣ ΝΟΜΟΘ/ΝΕΣ ΑΠΟΔΟΧΕΣ ΕΓΣΣΕ";
             document.getElementById("efarmostea_sse_parathrhseis").value = null;
