@@ -499,7 +499,6 @@ declare -a modules=(
     "public/js/companies/genikastoixeia/initTameiaDropdowns.js"
     "public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js"
     "public/js/ergazomenoi/genika/reCalcApodoxes.js"
-    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
     "public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js"
     "public/js/modules/apodoxesCalculations.js"
     "public/js/utils/formatNumber.js"
@@ -666,6 +665,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/dokimastikhPeriodos_Blur.js"
     "public/js/ergazomenoi/genika/pdf_Upload_Modal.js"
     "public/js/ergazomenoi/genika/pdfPreviewModule.js"
+    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
 )
 
 # =============================================================================
