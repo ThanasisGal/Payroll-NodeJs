@@ -98,8 +98,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // ✅ CONVERT PDFs TO BASE64 (using pdfUploadModule - PRIMARY SOURCE)
         // =========================================================================
 
-        console.log('📎 Converting PDFs to base64 for upload...');
-
         // Map document types to form field names
         const pdfMappings = {
             'arxeio_symbashs': 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
@@ -117,9 +115,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     if (base64Data) {
                         formData[base64Field] = base64Data;
-                        console.log(`✅ Added ${documentType} from pdfUploadModule (${(base64Data.length / 1024).toFixed(2)}KB)`);
-                    } else {
-                        console.log(`⚠️ No file for ${documentType} in pdfUploadModule`);
                     }
                 } catch (error) {
                     console.error(`❌ Failed to convert ${documentType}:`, error);
@@ -139,7 +134,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         if (base64Data) {
                             formData[base64Field] = base64Data;
-                            console.log(`✅ Added ${documentType} from pdfPreviewModule (fallback) (${(base64Data.length / 1024).toFixed(2)}KB)`);
                         }
                     } catch (error) {
                         console.error(`❌ Failed to convert ${documentType} from preview module:`, error);
@@ -147,8 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         }
-
-        console.log("📦 Final formData with PDFs:", Object.keys(formData).filter(k => k.includes('base64')));
 
         console.log("📦 Συλλεγμένα δεδομένα φόρμας:", formData);
 
@@ -334,8 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 filesToUpdate: result.value
             };
 
-            console.log('🚀 Sending POST request...');
-            
             const response = await fetch("/ergazomenoi/ergazomenoi/add", {
                 method: "POST",
                 headers: {
@@ -419,8 +409,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
                 
-                console.log('✅ Server response:', data);
-                
                 // ✅ CHECK: Did we send PDFs?
                 const hadPdfs = window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload();
                 
@@ -429,12 +417,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const successfulPdfs = pdfResults.filter(r => r.success);
                 const failedPdfs = pdfResults.filter(r => !r.success);
                 
-                console.log(`📊 PDF Results: ${successfulPdfs.length} success, ${failedPdfs.length} failed`);
-                
                 // ✅ Clear in-memory PDFs (no longer needed)
                 if (hadPdfs && window.pdfUploadModule.clearAllFiles) {
                     window.pdfUploadModule.clearAllFiles();
-                    console.log('🗑️ Cleared in-memory PDFs');
                 }
                 
                 // ✅ Success/Warning Messages
@@ -538,5 +523,4 @@ document.addEventListener("DOMContentLoaded", () => {
         button.addEventListener("click", handleFormSubmit);
     });
     
-    console.log('✅ Form submission handler initialized');
 });

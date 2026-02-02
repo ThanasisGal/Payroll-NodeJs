@@ -526,6 +526,8 @@ class ergazomenoiController {
             nomos: formData.nomos_stathera,
             dhmos: formData.dhmos_stathera,
             polh: formData.polh_stathera,
+            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo_stathera,
+            forologikh_klimaka: formData.forologikh_klimaka,
             trapeza: formData.trapeza_stathera,
             iban: formData.iban,
 
@@ -535,6 +537,12 @@ class ergazomenoiController {
             hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
+            typos_daneismoy: formData.typos_daneismoy_stathera,
+            hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
+            hmnia_lhxhs_daneismoy: formData.hmnia_lhxhs_daneismoy || null,
+            afora_dokimastikh_periodo: formData.afora_dokimastikh_periodo,
+            hmnia_lhxhs_dokimastikhs_periodoy: formData.hmnia_lhxhs_dokimastikhs_periodoy || null,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs_stathera,
             sxesh_ergasias: formData.sxesh_ergasias_stathera,
             proyphresia_se_eth: formData.proyphresia_se_eth,
@@ -547,10 +555,19 @@ class ergazomenoiController {
             syggenikh_sxesh: formData.syggenikh_sxesh_stathera,
             thesh_eythynhs: formData.thesh_eythynhs_stathera,
             eidikh_periptosh: formData.eidikh_periptosh_stathera,
-            forologikh_klimaka: formData.forologikh_klimaka,
-            
+            topos_ergasias: formData.topos_ergasias,
+            topos_ergasias_parathrhseis: formData.topos_ergasias_parathrhseis,
+            xronos_katabolhs_apodoxon: formData.xronos_katabolhs_apodoxon,
+            efarmostea_sse: formData.efarmostea_sse,
+            efarmostea_sse_parathrhseis: efarmostea_sse_parathrhseis,
             plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
+            mh_problepsimo_programma: formData.mh_problepsimo_programma,
+            hmeres_ores_anaforas: formData.hmeres_ores_anaforas,
+            eidopoihsh_prin_thn_anathesh: formData.eidopoihsh_prin_thn_anathesh,
+            prothesmia_akyroshs_ths_anatheshs: formData.prothesmia_akyroshs_ths_anatheshs,
             dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
+            hmnia_enarxhs_dieythethshs_ergasias: formData.hmnia_enarxhs_dieythethshs_ergasias,
+            hmnia_lhxhs_dieythethshs_ergasias: formData.hmnia_lhxhs_dieythethshs_ergasias,
             hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
             ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
             mo_oron_hmerhsias_ergasias: formData.mo_oron_hmerhsias_ergasias,
@@ -570,22 +587,23 @@ class ergazomenoiController {
             asfalistikh_klash: formData.asfalistikh_klash_stathera,
             epoxikos: formData.epoxikos,
             tmhma: formData.tmhma_stathera,
-            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo_stathera,
-            eidikothta: formData.eidikothta_stathera,
+            eidikothta_erganh: formData.eidikothta_erganh_stathera,
             antikeimeno_ergasion: formData.antikeimeno_ergasion,
             typos_ergazomenon: formData.typos_ergazomenon_stathera,
             ypokatasthma: formData.ypokatasthma_stathera,
             xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
-            eidikothta_erganh: formData.eidikothta_erganh_stathera,
+            eidikothta: formData.eidikothta_stathera,
             diathesimothta: formData.diathesimothta,
             enarxh_diathesimothtas: formData.enarxh_diathesimothtas || null,
             lhxh_diathesimothtas: formData.lhxh_diathesimothtas || null,
-
+            foreas_kyrias_asfalishs: formData.foreas_kyrias_asfalishs_stathera,
+            foreas_epikoyrikhs_asfalishs: formData.foreas_epikoyrikhs_asfalishs_stathera,
             kad_efka: formData.kad_efka_stathera,
             eidikothta_efka: formData.eidikothta_efka_stathera,
             kpk_efka: formData.kpk_efka_stathera,
             kpk_efka_basei_symbashs: formData.tmp_kpk_efka_stathera,
             epa_efka: formData.epa_efka_stathera,
+            prosthetes_asfalistikes_apodoxes: formData.prosthetes_asfalistikes_apodoxes,
             meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
             kodikos_meioshs: formData.kodikos_meioshs_stathera,
             pososto_asfalismenoy_meioshs: formData.pososto_asfalismenoy_meioshs_stathera,
@@ -612,6 +630,7 @@ class ergazomenoiController {
             arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
             systatiko_shmeioma: formData.systatiko_shmeioma,
             topothethsh_me_programma: formData.topothethsh_me_programma,
+            ypoxreotikh_ek_toy_nomoy_katartish: formData.ypoxreotikh_ek_toy_nomoy_katartish,
             programma_dypa: formData.programma_dypa_stathera,
             egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
             hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos || null,
@@ -632,15 +651,6 @@ class ergazomenoiController {
             symbash: formData.symbash_stathera,
             kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
             eidikothta_symbashs: formData.eidikothta_symbashs_stathera,
-            synolo_symbashs: formData.synolo_symbashs,
-            synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
-            nomimosMisthos: formData.nomimosMisthos,
-            nomimoHmeromisthio: formData.nomimoHmeromisthio,
-            nomimoOromisthio: formData.nomimoOromisthio,
-            pragmatikosMisthos: formData.pragmatikosMisthos,
-            pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
-            pragmatikoOromisthio: formData.pragmatikoOromisthio,
-
         });
         
         const fieldsWithHidden = new Set(['stoixeio_symbashs']);
@@ -673,6 +683,15 @@ class ergazomenoiController {
                 }
             });
         }
+
+        newErgazomenos.synolo_symbashs = formData.synolo_symbashs;
+        newErgazomenos.synolo_symbashs_basei_oron_ergasias = formData.synolo_symbashs_basei_oron_ergasias;
+        newErgazomenos.nomimosMisthos = formData.nomimosMisthos;
+        newErgazomenos.nomimoHmeromisthio = formData.nomimoHmeromisthio;
+        newErgazomenos.nomimoOromisthio = formData.nomimoOromisthio;
+        newErgazomenos.pragmatikosMisthos = formData.pragmatikosMisthos;
+        newErgazomenos.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
+        newErgazomenos.pragmatikoOromisthio = formData.pragmatikoOromisthio;
 
         // Ορισμός σειράς fields
         const fieldsKrathseonInOrder = [

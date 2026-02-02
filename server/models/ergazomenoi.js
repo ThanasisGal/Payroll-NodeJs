@@ -153,6 +153,7 @@ const { Schema: _Schema, model } = require("mongoose");
         antikatastash_ergazomenoy: { type: Boolean, default: false },
         afm_antikatastath: { type: String, trim: true, length: 9 },
         amka_antikatastath: { type: String, trim: true, length: 11 },
+        
         kentro_kostoys_1: { type: String, trim: true },
         pososto_apasxolhshs_kk1: { type: Number, default: 0 },
         kentro_kostoys_2: { type: String, trim: true },
