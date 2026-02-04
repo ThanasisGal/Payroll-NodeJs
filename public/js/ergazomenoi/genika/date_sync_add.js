@@ -54,10 +54,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	if (hmeresInput && oresInput && moOronInput) {
 		// ✅ Event listeners για Μ. Ο. 
-		oresInput.addEventListener('blur', calculateMoOron);
-		oresInput.addEventListener('change', calculateMoOron);
-		hmeresInput.addEventListener('change', calculateMoOron);
-		
+		oresInput.addEventListener('blur', () => {
+			calculateMoOron();
+			validateOrarioErgasiasTab(); // ✅ Call μετά τον υπολογισμό
+		});
+		oresInput.addEventListener('change', () => {
+			calculateMoOron();
+			validateOrarioErgasiasTab();
+		});
+		hmeresInput.addEventListener('change', () => {
+			calculateMoOron();
+			validateOrarioErgasiasTab();
+		});1904
+
+		// ✅ ΜΟΝΟ change events για τα date fields (ΟΧΙ blur!)
+		orarioyApoInput.addEventListener('change', validateOrarioErgasiasTab);
+		orarioyEosInput.addEventListener('change', validateOrarioErgasiasTab);
+
 		// ✅ EVENT LISTENER:  Validation για hmeres_ergasias_ebdomadas
 		hmeresInput.addEventListener('blur', function() {
 			const hmeres = parseFloat(this.value);
@@ -186,6 +199,52 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 	// =========================================================================
+	// ✅ ΝΕΟΣ: Validation function για το "Ωράριο Εργασίας" tab (με debounce)
+	// =========================================================================
+	let validateOrarioDebounceTimer = null;
+
+	function validateOrarioErgasiasTab() {
+		// ✅ Clear previous timer
+		if (validateOrarioDebounceTimer) {
+			clearTimeout(validateOrarioDebounceTimer);
+		}
+
+		// ✅ Set new timer (300ms delay)
+		validateOrarioDebounceTimer = setTimeout(() => {
+			const apoDate = orarioyApoInput?.value;
+			const eosDate = orarioyEosInput?.value;
+			const hmeres = parseFloat(hmeresInput?.value);
+			const ores = parseFloat(oresInput?.value);
+
+			// ✅ Βρες το tab "Ωράριο Εργασίας"
+			const orarioTab = Array.from(document.querySelectorAll('.menu_Links ul li')).find(
+				li => li.textContent.trim() === 'Ωράριο Εργασίας'
+			);
+
+			if (!orarioTab) return;
+
+			// ✅ Έλεγχος όλων των προϋποθέσεων
+			const isValid = apoDate && 
+							eosDate && 
+							apoDate <= eosDate && 
+							!isNaN(hmeres) && 
+							hmeres > 0 && 
+							!isNaN(ores) && 
+							ores > 0;
+
+			if (isValid) {
+				// ✅ Enable το tab
+				orarioTab.classList.remove('disabled');
+			} else {
+				// ❌ Disable το tab
+				orarioTab.classList.add('disabled');
+			}
+		}, 300);
+	}
+	// ✅ Initial validation check (on page load)
+	validateOrarioErgasiasTab();
+
+	// =========================================================================
 	// ✅ EVENT LISTENER: Κλικ στο tab "Ωράριο Εργασίας"
 	// =========================================================================
 
@@ -196,6 +255,59 @@ document.addEventListener('DOMContentLoaded', function() {
 	menuLinks.forEach(li => {
 		if (li.textContent.trim() === 'Ωράριο Εργασίας') {
 			li.addEventListener('click', async function() {
+				// ✅ Έλεγχος αν το tab είναι disabled
+				if (this.classList.contains('disabled')) {
+					// ❌ Δείξε μήνυμα
+					const apoDate = orarioyApoInput?.value;
+					const eosDate = orarioyEosInput?.value;
+					const hmeres = parseFloat(hmeresInput?.value);
+					const ores = parseFloat(oresInput?.value);
+
+					let missingFields = [];
+					if (!apoDate) missingFields.push('Ημερομηνία Αλλαγής Ωραρίου (ΑΠΟ)');
+					if (!eosDate) missingFields.push('Ημερομηνία Αλλαγής Ωραρίου (ΕΩΣ)');
+					if (apoDate && eosDate && apoDate > eosDate) {
+						missingFields.push('Η Ημερομηνία ΑΠΟ πρέπει να είναι <= ΕΩΣ');
+					}
+					if (isNaN(hmeres) || hmeres <= 0) missingFields.push('Ημέρες Εργασίας Εβδομάδας');
+					if (isNaN(ores) || ores <= 0) missingFields.push('Ώρες Εργασίας Εβδομάδας');
+
+					await Swal.fire({
+						backdrop: false,
+						allowOutsideClick: false,
+						icon: 'warning',
+						title: 'ΠΡΟΣΟΧΗ!',
+						html: `
+							<div style="text-align: center;">
+								<p>Για να ενεργοποιηθεί το <strong>Ωράριο Εργασίας</strong>, πρέπει να συμπληρώσετε:</p>
+								<ul style="text-align: left; display: inline-block; margin-top: 10px;">
+									${missingFields.map(field => `<li>${field}</li>`).join('')}
+								</ul>
+							</div>
+						`,
+						showConfirmButton: true,
+						confirmButtonText: 'Εντάξει',
+						customClass: {
+							confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+							title: 'custom-title',
+							popup: 'custom-swal-popup',
+						}
+					});
+
+					// ✅ Focus στο πρώτο κενό πεδίο
+					if (!apoDate) {
+						orarioyApoInput.focus();
+					} else if (!eosDate) {
+						orarioyEosInput.focus();
+					} else if (isNaN(hmeres) || hmeres <= 0) {
+						hmeresInput.focus();
+					} else if (isNaN(ores) || ores <= 0) {
+						oresInput.focus();
+					}
+
+					return; // ✅ Σταμάτα την εκτέλεση
+				}
+
 				// ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Αν το mo_oron_hmerhsias_ergasias δεν έχει τιμή
 				const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
 				const moOronValue = moOronInput?.value || '';
@@ -271,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
 						autoSelectHolidaysOnInit();
 					}
 					
-					// ✅ Περίμενε για το auto-select να ολοκληρωθεί
+					// ✅ Π��ρίμενε για το auto-select να ολοκληρωθεί
 					await new Promise(resolve => setTimeout(resolve, 200));
 					
 					// ✅ Τώρα τρέξε το updateKathgoriaBackgroundColor
@@ -551,225 +663,244 @@ document.addEventListener('DOMContentLoaded', function() {
 	// API CALLS
 	// =========================================================================
 
+	let isUpdatingDateDifference = false;
+
 	async function updateDateDifference(startDate, endDate) {
-		const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
-	
-		if (!csrfToken) {
-			console.error('❌ CSRF token not found! ');
-			throw new Error('CSRF token missing. Please refresh the page.');
-		}
-
-		const response = await fetch('/api/dateDifference', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'CSRF-Token': csrfToken,
-				'X-CSRF-Token': csrfToken
-			},
-			credentials: 'include',
-			body: JSON.stringify({ startDate, endDate })
-		});
-		
-		const data = await response.json();
-		document.getElementById('differenceInDays').value = data.differenceInDays;
-
-		const container = document.getElementById('dynamicFields');
-		if (! container) {
+		// ✅ Έλεγχος: Αν τρέχει ήδη, μην ξανατρέξεις
+		if (isUpdatingDateDifference) {
+			console.warn('⚠️ updateDateDifference already running, skipping...');
 			return;
 		}
 
-		const oldSelects = container.querySelectorAll('select.tom-dropdown');
-		oldSelects.forEach(sel => {
-			if (sel.id && window.destroyTomSelectById) {
-				window.destroyTomSelectById(sel.id);
+		isUpdatingDateDifference = true;
+
+		try {
+			const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+		
+			if (!csrfToken) {
+				console.error('❌ CSRF token not found! ');
+				throw new Error('CSRF token missing. Please refresh the page.');
 			}
-		});
 
-		container.innerHTML = ''; // Καθαρίζει το container
-
-		for (let i = 1; i <= data.differenceInDays; i++) {
-			let i1 = i < 10 ? '0' + i : i;
+			const response = await fetch('/api/dateDifference', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'CSRF-Token': csrfToken,
+					'X-CSRF-Token': csrfToken
+				},
+				credentials: 'include',
+				body: JSON.stringify({ startDate, endDate })
+			});
 			
-			let divHtml = `
-				<input type="hidden" name="total_hours_day_${i1}" id="total_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_hours_day_${i1}" id="night_hours_day_${i1}" value="0" />
-				<input type="hidden" name="holiday_hours_day_${i1}" id="holiday_hours_day_${i1}" value="0" />
-				<input type="hidden" name="overwork_hours_day_${i1}" id="overwork_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_overwork_hours_day_${i1}" id="night_overwork_hours_day_${i1}" value="0" />
-				<input type="hidden" name="holiday_overwork_hours_day_${i1}" id="holiday_overwork_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_holiday_overwork_hours_day_${i1}" id="night_holiday_overwork_hours_day_${i1}" value="0" />
-				<input type="hidden" name="overtimeNomimh_hours_day_${i1}" id="overtimeNomimh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_overtimeNomimh_hours_day_${i1}" id="night_overtimeNomimh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="holiday_overtimeNomimh_hours_day_${i1}" id="holiday_overtimeNomimh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_holiday_overtimeNomimh_hours_day_${i1}" id="night_holiday_overtimeNomimh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="overtimeParanomh_hours_day_${i1}" id="overtimeParanomh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_overtimeParanomh_hours_day_${i1}" id="night_overtimeParanomh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="holiday_overtimeParanomh_hours_day_${i1}" id="holiday_overtimeParanomh_hours_day_${i1}" value="0" />
-				<input type="hidden" name="night_holiday_overtimeParanomh_hours_day_${i1}" id="night_holiday_overtimeParanomh_hours_day_${i1}" value="0" />
-				
-				<div class="row form-group align-items-center bg-white">
-					<div class="col-0-5 align-left">
-						<label for="hmeromhnia_${i1}" class="col-form-label field-required" id="day_label_${i1}"></label>
-					</div>
+			const data = await response.json();
 
-					<div class="col-1-5 align-center">
-						<input type="date" class="date-control input-date" id="hmeromhnia_${i1}" name="hmeromhnia_${i1}" value="" readonly />
-					</div>
+			document.getElementById('differenceInDays').value = data.differenceInDays;
 
-					<div class="col-2-75">
-						<input type="hidden" name="kathgoria_ergasias_sthathera_${i1}" id="kathgoria_ergasias_stathera_${i1}" />
+			const container = document.getElementById('dynamicFields');
+			if (! container) {
+				return;
+			}
 
-						<select 
-							class="tom-dropdown selectpicker-dropdown-normal left-align w-100" 
-							name="kathgoria_ergasias_${i1}" 
-							id="kathgoria_ergasias_${i1}"
-							data-api="/api/dropdown/ergazomenoi/kathgoria_ergasias"
-							data-target-input="kathgoria_ergasias_stathera_${i1}"
-							data-preselect="kathgoria_ergasias_stathera_${i1}"
-							data-preload-all="true"
-							data-pad-length="3">
-						</select>
-					</div>
-
-					<div class="col-0-25"></div>
-				`;
-			
-			for (let j = 1; j <= 3; j++) {
-				if (j === 1) {
-					divHtml += `
-						<div class="col-1-2">
-							<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
-						</div>
-
-						<div class="col-1-2 ml--0_2rem">
-							<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
-						</div>
-
-						<div class="col-0-5"></div>
-
-						<div class="col-1-2">
-							<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
-						</div>
-
-						<div class="col-1-2 ml--0_1rem">
-							<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
-						</div>
-
-						<div class="col-0-75"></div>
-
-						<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
-							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" tabIndex="-1"value="" />
-							<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
-								ΟΧΙ
-							</label>
-						</div>
-
-						<div class="col-0-5 center-align checkbox-flex-center dispno-mt-0_4rem">
-							<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="argia_${i1}" name="argia_${i1}" value="" />
-							<label for="argia_${i1}" class="ml0_75-fs-0_875vw" id="label-argia_${i1}">
-								ΟΧΙ
-							</label>
-						</div>
-					`;
+			const oldSelects = container.querySelectorAll('select.tom-dropdown');
+			oldSelects.forEach(sel => {
+				if (sel.id && window.destroyTomSelectById) {
+					window.destroyTomSelectById(sel.id);
 				}
+			});
 
-				if (j === 2) {
-					divHtml += `
-						<div class="row form-group align-items-center bg-white mb-2">
-							<div class="col-5 left-align">
-								<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
-							</div>
+			container.innerHTML = ''; // Καθαρίζει το container
 
-							<div class="col-1-2 ml-0_7rem">
+			for (let i = 1; i <= data.differenceInDays; i++) {
+				let i1 = i < 10 ? '0' + i : i;
+				
+				let divHtml = `
+					<input type="hidden" name="total_hours_day_${i1}" id="total_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_hours_day_${i1}" id="night_hours_day_${i1}" value="0" />
+					<input type="hidden" name="holiday_hours_day_${i1}" id="holiday_hours_day_${i1}" value="0" />
+					<input type="hidden" name="overwork_hours_day_${i1}" id="overwork_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_overwork_hours_day_${i1}" id="night_overwork_hours_day_${i1}" value="0" />
+					<input type="hidden" name="holiday_overwork_hours_day_${i1}" id="holiday_overwork_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_holiday_overwork_hours_day_${i1}" id="night_holiday_overwork_hours_day_${i1}" value="0" />
+					<input type="hidden" name="overtimeNomimh_hours_day_${i1}" id="overtimeNomimh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_overtimeNomimh_hours_day_${i1}" id="night_overtimeNomimh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="holiday_overtimeNomimh_hours_day_${i1}" id="holiday_overtimeNomimh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_holiday_overtimeNomimh_hours_day_${i1}" id="night_holiday_overtimeNomimh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="overtimeParanomh_hours_day_${i1}" id="overtimeParanomh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_overtimeParanomh_hours_day_${i1}" id="night_overtimeParanomh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="holiday_overtimeParanomh_hours_day_${i1}" id="holiday_overtimeParanomh_hours_day_${i1}" value="0" />
+					<input type="hidden" name="night_holiday_overtimeParanomh_hours_day_${i1}" id="night_holiday_overtimeParanomh_hours_day_${i1}" value="0" />
+					
+					<div class="row form-group align-items-center bg-white">
+						<div class="col-0-5 align-left">
+							<label for="hmeromhnia_${i1}" class="col-form-label field-required" id="day_label_${i1}"></label>
+						</div>
+
+						<div class="col-1-5 align-center">
+							<input type="date" class="date-control input-date" id="hmeromhnia_${i1}" name="hmeromhnia_${i1}" value="" readonly />
+						</div>
+
+						<div class="col-2-75">
+							<input type="hidden" name="kathgoria_ergasias_sthathera_${i1}" id="kathgoria_ergasias_stathera_${i1}" />
+
+							<select 
+								class="tom-dropdown selectpicker-dropdown-normal left-align w-100" 
+								name="kathgoria_ergasias_${i1}" 
+								id="kathgoria_ergasias_${i1}"
+								data-api="/api/dropdown/ergazomenoi/kathgoria_ergasias"
+								data-target-input="kathgoria_ergasias_stathera_${i1}"
+								data-preselect="kathgoria_ergasias_stathera_${i1}"
+								data-preload-all="true"
+								data-pad-length="3">
+							</select>
+						</div>
+
+						<div class="col-0-25"></div>
+					`;
+				
+				for (let j = 1; j <= 3; j++) {
+					if (j === 1) {
+						divHtml += `
+							<div class="col-1-2">
 								<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2">
+							<div class="col-1-2 ml--0_2rem">
 								<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 							</div>
 
 							<div class="col-0-5"></div>
 
-							<div class="col-1-2 ml-0_3rem">
+							<div class="col-1-2">
 								<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2">
+							<div class="col-1-2 ml--0_1rem">
 								<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
 							</div>
-						</div>
-					`;
-				} 
 
-				if (j === 3) {
-					const eidikh = document.getElementById('eidikh_kathgoria_stathera')?.value || '';
-					
-					// ✅ j=3 fields είναι disabled by default
-					// ✅ Enable ΜΟΝΟ αν eidikh === 0004/0005
-					const isHolidayEnabled = (eidikh === '0004' || eidikh === '0005');
-					const disabledAttr = isHolidayEnabled ?  '' : 'disabled';
+							<div class="col-0-75"></div>
 
-					divHtml += `
-						<div class="row form-group align-items-center bg-white">
-							<div class="col-5 left-align">
-								<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="holiday_label_${i1}" name="holiday_label_${i1}" readonly />
+							<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
+								<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" tabIndex="-1"value="" />
+								<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
+									ΟΧΙ
+								</label>
 							</div>
 
-							<div class="col-1-2 ml-0_7rem">
-								<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+							<div class="col-0-5 center-align checkbox-flex-center dispno-mt-0_4rem">
+								<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="argia_${i1}" name="argia_${i1}" value="" />
+								<label for="argia_${i1}" class="ml0_75-fs-0_875vw" id="label-argia_${i1}">
+									ΟΧΙ
+								</label>
 							</div>
+						`;
+					}
 
-							<div class="col-1-2">
-								<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+					if (j === 2) {
+						divHtml += `
+							<div class="row form-group align-items-center bg-white mb-2">
+								<div class="col-5 left-align">
+									<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
+								</div>
+
+								<div class="col-1-2 ml-0_7rem">
+									<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
+								</div>
+
+								<div class="col-1-2">
+									<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-2 ml-0_3rem">
+									<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
+								</div>
+
+								<div class="col-1-2">
+									<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
+								</div>
 							</div>
+						`;
+					} 
 
-							<div class="col-0-5"></div>
+					if (j === 3) {
+						const eidikh = document.getElementById('eidikh_kathgoria_stathera')?.value || '';
+						
+						// ✅ j=3 fields είναι disabled by default
+						// ✅ Enable ΜΟΝΟ αν eidikh === 0004/0005
+						const isHolidayEnabled = (eidikh === '0004' || eidikh === '0005');
+						const disabledAttr = isHolidayEnabled ?  '' : 'disabled';
 
-							<div class="col-1-2 ml-0_3rem">
-								<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+						divHtml += `
+							<div class="row form-group align-items-center bg-white">
+								<div class="col-5 left-align">
+									<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="holiday_label_${i1}" name="holiday_label_${i1}" readonly />
+								</div>
+
+								<div class="col-1-2 ml-0_7rem">
+									<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								</div>
+
+								<div class="col-1-2">
+									<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-2 ml-0_3rem">
+									<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								</div>
+
+								<div class="col-1-2">
+									<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
+								</div>
 							</div>
+						`;
+					}
+				}
+				
+				divHtml += `<hr class="mt0_4rem-mb0_3rem" />`;
+				container.insertAdjacentHTML('beforeend', divHtml);
+			}				
 
-							<div class="col-1-2">
-								<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
-							</div>
-						</div>
-					`;
+			// ✅ Κλήση ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
+			updateDates();
+			setupEnterKeyNavigation();
+
+			// Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
+			setTimeout(() => {
+				if (window.reinitTomDropdowns) {
+					window.reinitTomDropdowns(container);
+				}
+
+				if (window.initClearableInputs) {
+					window.initClearableInputs(container);
+				}
+
+				initializeSelectListeners();
+			}, 200);
+
+			// ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
+			for (let i = 1; i <= data.differenceInDays; i++) {
+				let i1 = i < 10 ? '0' + i :  i;
+				
+				for (let j = 1; j <= 3; j++) {
+					const eosOraInput = document.getElementById(`eos_ora_0${j}_${i1}`);
+					if (eosOraInput) {
+						eosOraInput.addEventListener('blur', function() {
+							calculateWeeklyTotalHours();
+						});
+					}
 				}
 			}
-			
-			divHtml += `<hr class="mt0_4rem-mb0_3rem" />`;
-			container.insertAdjacentHTML('beforeend', divHtml);
-		}				
-
-		// ✅ Κλήση ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
-		updateDates();
-		setupEnterKeyNavigation();
-
-		// Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
-		setTimeout(() => {
-			if (window.reinitTomDropdowns) {
-				window.reinitTomDropdowns(container);
-			}
-
-			if (window.initClearableInputs) {
-				window.initClearableInputs(container);
-			}
-
-			initializeSelectListeners();
-		}, 200);
-
-		// ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
-		for (let i = 1; i <= data.differenceInDays; i++) {
-			let i1 = i < 10 ? '0' + i :  i;
-			
-			for (let j = 1; j <= 3; j++) {
-				const eosOraInput = document.getElementById(`eos_ora_0${j}_${i1}`);
-				if (eosOraInput) {
-					eosOraInput.addEventListener('blur', function() {
-						calculateWeeklyTotalHours();
-					});
-				}
-			}
+		} catch (error) {
+			console.error('❌ Error in updateDateDifference:', error);
+			throw error;
+		} finally {
+			// ✅ ΚΡΙΤΙΚΟ: Reset το flag
+			isUpdatingDateDifference = false;
 		}
 	}
 

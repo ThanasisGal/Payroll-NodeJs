@@ -20,30 +20,38 @@ document.addEventListener("DOMContentLoaded", () => {
         sections.forEach((section) => {
             const inputs = section.querySelectorAll("input, select, textarea");
             inputs.forEach((input) => {
-                // Έλεγχος για INPUT
+                // =====================================================================
+                // ✅ INPUT HANDLING
+                // =====================================================================
                 if (input.tagName === "INPUT") {
-                    // Readonly ή Disabled inputs
-                    if (input.hasAttribute("readonly") || input.hasAttribute("disabled")) {
-                        formData[input.name] = input.value;
+                    
+                    // ✅ 1. CHECKBOX (πρώτο, γιατί έχει priority)
+                    if (input.type === "checkbox") {
+                        formData[input.name] = input.checked === true;
                     } 
-                    // Checkbox
-                    else if (input.type === "checkbox") {
-                        formData[input.name] = input.checked;
+                    
+                    // ✅ 2. HIDDEN BOOLEAN (δεύτερο)
+                    else if (input.type === "hidden" && (input.value === "true" || input.value === "false")) {
+                        formData[input.name] = input.value === "true";
+                    }
+                    
+                    // ✅ 3. DATE (κενό)
+                    else if (input.type === "date") {
+                        formData[input.name] = input.value === "" ? null : input.value;
                     } 
-                    // Date (κενό)
-                    else if (input.type === "date" && input.value === "") {
-                        formData[input.name] = null;
+                    
+                    // ✅ 4. TIME (κενό)
+                    else if (input.type === "time") {
+                        formData[input.name] = input.value === "" ? null : input.value;
                     } 
-                    // Time (κενό)
-                    else if (input.type === "time" && input.value === "") {
-                        formData[input.name] = null;
-                    } 
-                    // Number (κενό)
+                    
+                    // ✅ 5. NUMBER
                     else if (input.type === "number") {
                         const parsed = parseFloat(input.value);
                         formData[input.name] = isNaN(parsed) ? 0 : parsed;
                     } 
-                    // File upload
+                    
+                    // ✅ 6. FILE
                     else if (input.type === "file" && input.files.length > 0) {
                         const filePromise = new Promise((resolve, reject) => {
                             const reader = new FileReader();
@@ -56,39 +64,40 @@ document.addEventListener("DOMContentLoaded", () => {
                         });
                         filePromises.push(filePromise);
                     } 
-                    // Κανονικό input
-                    else {
-                        formData[input.name] = input.value;
-                    }
-                } 
-                // Έλεγχος για TEXTAREA
-                else if (input.tagName === "TEXTAREA") {
-                    // Disabled ή readonly textarea
-                    if (input.hasAttribute("readonly") || input.hasAttribute("disabled")) {
-                        formData[input.name] = input.value;
-                    } else {
-                        formData[input.name] = input.value;
-                    }
-                } 
-                // Έλεγχος για SELECT
-                else if (input.tagName === "SELECT") {
-                    // Disabled select
-                    if (input.hasAttribute("disabled")) {
-                        if (input.multiple) {
-                            const selectedOptions = Array.from(input.selectedOptions).map(option => option.value);
-                            formData[input.name] = selectedOptions.length > 0 ? selectedOptions : [];
+                    
+                    // ✅ 7. READONLY/DISABLED (τελευταίο fallback)
+                    else if (input.hasAttribute("readonly") || input.hasAttribute("disabled")) {
+                        // Ειδική περίπτωση: αν είναι number, parse το
+                        if (input.type === "number") {
+                            const parsed = parseFloat(input.value);
+                            formData[input.name] = isNaN(parsed) ? 0 : parsed;
                         } else {
-                            formData[input.name] = input.selectedIndex === -1 ? null : input.options[input.selectedIndex].value;
+                            formData[input.name] = input.value;
                         }
                     } 
-                    // Κανονικό select
+                    
+                    // ✅ 8. DEFAULT (κανονικό input)
                     else {
-                        if (input.multiple) {
-                            const selectedOptions = Array.from(input.selectedOptions).map(option => option.value);
-                            formData[input.name] = selectedOptions.length > 0 ? selectedOptions : [];
-                        } else {
-                            formData[input.name] = input.selectedIndex === -1 ? null : input.options[input.selectedIndex].value;
-                        }
+                        formData[input.name] = input.value;
+                    }
+                } 
+                
+                // =====================================================================
+                // ✅ TEXTAREA HANDLING
+                // =====================================================================
+                else if (input.tagName === "TEXTAREA") {
+                    formData[input.name] = input.value;
+                } 
+                
+                // =====================================================================
+                // ✅ SELECT HANDLING
+                // =====================================================================
+                else if (input.tagName === "SELECT") {
+                    if (input.multiple) {
+                        const selectedOptions = Array.from(input.selectedOptions).map(option => option.value);
+                        formData[input.name] = selectedOptions.length > 0 ? selectedOptions : [];
+                    } else {
+                        formData[input.name] = input.selectedIndex === -1 ? null : input.options[input.selectedIndex].value;
                     }
                 }
             });

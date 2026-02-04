@@ -40,6 +40,39 @@ const numberFields = new Set(['poso_symbashs', 'poso_symbashs_basei_oron_ergasia
 const arithmosStoixeionSymbashs = 15;
 const arithmosKrathseon = 7;
 
+// =========================================================================
+// ✅ HELPER FUNCTION: Validation για Ωράριο Εργασίας
+// =========================================================================
+function validateOrarioFields(formData) {
+    const apoDate = formData.hmeromhnia_allaghs_orarioy_apo;
+    const eosDate = formData.hmeromhnia_allaghs_orarioy_eos;
+    const hmeres = parseFloat(formData.hmeres_ergasias_ebdomadas);
+    const ores = parseFloat(formData.ores_ergasias_ebdomadas);
+
+    // Check 1: Dates exist and are not empty
+    if (!apoDate || apoDate === '' || !eosDate || eosDate === '') {
+        return { valid: false, reason: 'Missing date fields (APO or EOS)' };
+    }
+
+    // Check 2: Apo <= Eos
+    if (apoDate > eosDate) {
+        return { valid: false, reason: 'Start date is after end date' };
+    }
+
+    // Check 3: Hmeres exists and > 0
+    if (!formData.hmeres_ergasias_ebdomadas || isNaN(hmeres) || hmeres <= 0) {
+        return { valid: false, reason: 'Invalid or missing hmeres_ergasias_ebdomadas' };
+    }
+
+    // Check 4: Ores exists and > 0
+    if (!formData.ores_ergasias_ebdomadas || isNaN(ores) || ores <= 0) {
+        return { valid: false, reason: 'Invalid or missing ores_ergasias_ebdomadas' };
+    }
+
+    // ✅ All checks passed
+    return { valid: true };
+}
+
 class ergazomenoiController {
 
     static mainErgazomenoiForm = async (req, res) => {
@@ -455,7 +488,7 @@ class ergazomenoiController {
         let aa_kod = null, aa_eggr = null, kodikosValue = 0;
 
         const { formData, filesToUpdate } = req.body;
-        
+
         try {
             const lastRecord = await ErgazomenoiModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse })
                 .sort({ _id: -1 })
@@ -559,7 +592,8 @@ class ergazomenoiController {
             topos_ergasias_parathrhseis: formData.topos_ergasias_parathrhseis,
             xronos_katabolhs_apodoxon: formData.xronos_katabolhs_apodoxon,
             efarmostea_sse: formData.efarmostea_sse,
-            efarmostea_sse_parathrhseis: efarmostea_sse_parathrhseis,
+            efarmostea_sse_parathrhseis: formData.efarmostea_sse_parathrhseis || "",
+
             plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
             mh_problepsimo_programma: formData.mh_problepsimo_programma,
             hmeres_ores_anaforas: formData.hmeres_ores_anaforas,
@@ -758,9 +792,6 @@ class ergazomenoiController {
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
 
-        newErgazomenos.createdAt = Date.now();
-        newErgazomenos.updatedAt = Date.now();
-
         let savedErgazomenos = null; // ✅ Δήλωση
 
         try {
@@ -880,7 +911,12 @@ class ergazomenoiController {
             console.warn(`⚠️ Failed to upload ${failCount} PDFs`);
         }
 
-        if (formData.hmeromhnia_allaghs_orarioy_apo != null && hmeromhnia_allaghs_orarioy_eos != null) {
+        newErgazomenos.createdAt = Date.now();
+        newErgazomenos.updatedAt = Date.now();
+
+        const orarioValidation = validateOrarioFields(formData);
+
+        if (orarioValidation.valid) {
             function createOrarioData(i1) {
                 return {
                     team: sessionUserTeam,
@@ -931,6 +967,15 @@ class ergazomenoiController {
             } catch (error) {
                 console.error('Σφάλμα κατά τη αποθήκευση των οραρίων:', error);
             }
+        } else {
+            // ❌ Validation failed
+            console.warn(`⚠️ Ωράριο Εργασίας validation failed: ${orarioValidation.reason}`);
+            console.warn('Debug info:', {
+                apoDate: formData.hmeromhnia_allaghs_orarioy_apo,
+                eosDate: formData.hmeromhnia_allaghs_orarioy_eos,
+                hmeres: formData.hmeres_ergasias_ebdomadas,
+                ores: formData.ores_ergasias_ebdomadas
+            });
         }
 
         const newIstoriko = IstorikoProslhpseonAllagonModel({

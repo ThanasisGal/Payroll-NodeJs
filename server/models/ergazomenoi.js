@@ -250,6 +250,7 @@ const { Schema: _Schema, model } = require("mongoose");
         arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: { type: String, trim: true },
         apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
         eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
+        
         epaggelmatikh_katartish: { type: Boolean, default: false },
         antikeimeno_katartishs: { type: String, trim: true },
         thematiko_pedio: { type: String, trim: true },

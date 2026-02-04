@@ -6956,3 +6956,8 @@ label.disabled {
 .justify-content-space-around {
     justify-content: space-around;
 }
+
+#gotoProgrammaDypa:not(.disabled):hover i {
+  transform: translateX(2px);
+  transition: transform 0.2s;
+}
