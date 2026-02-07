@@ -6961,3 +6961,443 @@ label.disabled {
   transform: translateX(2px);
   transition: transform 0.2s;
 }
+
+/* ============================================================================
+   Upload Templates Page - Full Height Layout
+   ============================================================================ */
+
+/* ✅ Main container - Full viewport height */
+body.upload-templates-page main.main-transparent {
+    height: calc(100vh - 100px);
+    overflow: hidden;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ✅ Upload Card - Flex container */
+body.upload-templates-page .upload-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar για upload-card */
+body.upload-templates-page .upload-card::-webkit-scrollbar {
+    width: 10px;
+}
+
+body.upload-templates-page .upload-card::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 5px;
+}
+
+body.upload-templates-page .upload-card::-webkit-scrollbar-thumb {
+    background: #007bff;
+    border-radius: 5px;
+}
+
+body.upload-templates-page .upload-card::-webkit-scrollbar-thumb:hover {
+    background: #0056b3;
+}
+
+/* Page Title */
+body.upload-templates-page h1 {
+    font-size: 24px;
+    margin-bottom: 12px;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   Info Box - 2 Column Layout
+   ============================================================================ */
+
+body.upload-templates-page .info-box {
+    background: #e7f3ff;
+    border-left: 4px solid #007bff;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+body.upload-templates-page .info-box h4 {
+    margin-top: 0;
+    margin-bottom: 6px;
+    color: #0056b3;
+    font-size: 13px;
+}
+
+/* ✅ 2-column layout για οδηγίες */
+body.upload-templates-page .info-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+body.upload-templates-page .info-box ul {
+    margin-bottom: 0;
+    padding-left: 18px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+body.upload-templates-page .info-box li {
+    margin-bottom: 3px;
+}
+
+/* ============================================================================
+   Fixed Containers (No Flicker)
+   ============================================================================ */
+
+/* Alert Container - Always reserves space */
+body.upload-templates-page .alert-container-fixed {
+    min-height: 45px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+body.upload-templates-page .alert-container-fixed:empty {
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+/* Alert Styles */
+body.upload-templates-page .alert {
+    padding: 12px 16px;
+    margin-bottom: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+body.upload-templates-page .alert-success {
+    background: #d4edda;
+    color: #155724;
+    border-left: 4px solid #28a745;
+}
+
+body.upload-templates-page .alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #dc3545;
+}
+
+/* ============================================================================
+   Form Layout
+   ============================================================================ */
+
+/* Form - Flex container */
+body.upload-templates-page #uploadForm {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Form Groups */
+body.upload-templates-page .form-group {
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+body.upload-templates-page .form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: #333;
+    font-size: 13px;
+}
+
+body.upload-templates-page .form-control {
+    width: 100%;
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+/* Extra fix για select elements */
+body.upload-templates-page select.form-control {
+    padding: 10px 8px;
+    height: auto;
+    min-height: 38px;
+}
+
+/* Form Row (2 columns) */
+body.upload-templates-page .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+/* Helper Text */
+body.upload-templates-page .helper-text {
+    display: block;
+    margin-top: 4px;
+    color: #666;
+    font-size: 11px;
+}
+
+/* ============================================================================
+   File Input
+   ============================================================================ */
+
+/* File Input Wrapper */
+body.upload-templates-page .file-input-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+}
+
+body.upload-templates-page .file-input-wrapper input[type=file] {
+    font-size: 100px;
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+body.upload-templates-page .file-input-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #007bff;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    border: none;
+    font-size: 13px;
+}
+
+body.upload-templates-page .file-input-button:hover {
+    background: #0056b3;
+}
+
+/* File Count Badge */
+body.upload-templates-page .file-count-badge {
+    display: inline-block;
+    background: #007bff;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+/* ============================================================================
+   File List
+   ============================================================================ */
+
+/* ✅ File List - Flexible height με scrollbar */
+body.upload-templates-page .file-list {
+    margin-top: 10px;
+    flex: 1;
+    min-height: 100px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 8px;
+    background: #fafafa;
+}
+
+/* Custom scrollbar για file list */
+body.upload-templates-page .file-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+body.upload-templates-page .file-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+body.upload-templates-page .file-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+body.upload-templates-page .file-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Empty State */
+body.upload-templates-page .empty-state {
+    color: #999;
+    text-align: center;
+    padding: 12px;
+    font-size: 12px;
+}
+
+/* File Item */
+body.upload-templates-page .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    background: white;
+    font-size: 12px;
+}
+
+body.upload-templates-page .file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+body.upload-templates-page .file-name {
+    font-weight: 500;
+    color: #333;
+}
+
+body.upload-templates-page .file-meta {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+}
+
+body.upload-templates-page .file-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+
+/* Base Button */
+body.upload-templates-page .btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Preview Button */
+body.upload-templates-page .btn-preview {
+    background: #17a2b8;
+    color: white;
+}
+
+body.upload-templates-page .btn-preview:hover {
+    background: #138496;
+}
+
+/* Remove Button */
+body.upload-templates-page .btn-remove {
+    background: #dc3545;
+    color: white;
+}
+
+body.upload-templates-page .btn-remove:hover {
+    background: #c82333;
+}
+
+/* Upload Button */
+body.upload-templates-page .btn-upload {
+    background: #28a745;
+    color: white;
+    padding: 10px 28px;
+    font-size: 14px;
+    flex-shrink: 0;
+    min-width: 180px;
+}
+
+body.upload-templates-page .btn-upload:hover {
+    background: #218838;
+}
+
+body.upload-templates-page .btn-upload:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Close Button */
+body.upload-templates-page .btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 10px 28px;
+    font-size: 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-width: 120px;
+}
+
+body.upload-templates-page .btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* ============================================================================
+   Progress Bar
+   ============================================================================ */
+
+/* Progress Bar Container - Always reserves space */
+body.upload-templates-page .progress-container-fixed {
+    min-height: 35px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Progress Bar (hidden by default) */
+body.upload-templates-page .progress-bar {
+    width: 100%;
+    height: 30px;
+    background: #e0e0e0;
+    border-radius: 15px;
+    overflow: hidden;
+    display: none;
+}
+
+body.upload-templates-page .progress-bar.active {
+    display: block;
+}
+
+body.upload-templates-page .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    transition: width 0.3s ease;
+    width: 0;
+}
