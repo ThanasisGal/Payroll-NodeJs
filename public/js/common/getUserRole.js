@@ -5,7 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	const currentPath = window.location.pathname;
 	
 	// If on home page or login pages, skip permission check
-	if (publicPages. some(page => currentPath === page)) {
+	if (publicPages.some(page => currentPath === page)) {
 		return;
 	}
 

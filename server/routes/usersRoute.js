@@ -1,5 +1,3 @@
-// module.exports =  router;
-
 const express = require("express");
 const router = express.Router();
 const multer = require('multer'); // ✅ Κρατάμε για error handling
@@ -46,7 +44,7 @@ const PeriodsModel = require('../models/stathera_arxeia.js');
 // ============================================================================
 // ✅ MULTER CONFIGURATION - Import από κεντρικό config
 // ============================================================================
-const upload = require("../config/multer");
+const { upload } = require('../config/multer');  // ✅ Destructure
 
 // ============================================================================
 // MIDDLEWARE - Route Level
@@ -95,6 +93,7 @@ router.delete("/admin/edit/:id", userController.deletePostUser);
 router.get("/admin/delete/:id", userController.checkAndDeletePostUser);
 router.post("/admin/search", userController.searchPostUser);
 router.get("/admin/search", userController.searchGetUser);
+// router.get("/admin/aws_s3", userController.transferTxtFilesToAwsS3);
 
 // ============================================================================
 // MAIN APP ROUTES

@@ -20,8 +20,69 @@
                     <a class="disabled menu-li menu-item mt-1 ajustedGap-menu" href="/"> Αρχική Σελίδα</a>
                 </li>
 
-                <li id="li1" data-value="li1">
-                    <a class="menu-li menu-item disabled ajustedGap-menu" href="/admin">Admin</a>
+                <li id="li1" data-value="li1">  <!--  Admin -->
+                    <a class="menu-li menu-item disabled ajustedGap-menu"> Admin <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i></a>
+
+                    <ul class="submenu">  <!-- ΕΝΑ submenu που περιέχει όλα τα items -->
+                        
+                        <!-- Χρήστες -->
+                        <li id="li11" data-value="li11">
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu"> Χρήστες <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li111" data-value="li111">
+                                    <a 
+                                        id="admin_users" 
+                                        class="disabled childmenu-li menu-item" 
+                                        href="/admin" 
+                                        data-ml-1913="1"
+                                        data-ml-1680="1"
+                                        data-ml-1600="1"
+                                        data-ml-1440="1"
+                                        data-ml-1366="1"
+                                        data-ml-1360="1"
+                                        data-ml-1280="1"
+                                        data-ml-1152="1"
+                                        data-ml-1024="1"
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="right" 
+                                        data-tooltip-max-width="15vw" 
+                                        data-bs-title="Διαχείριση των στοιχείων των Χρηστών"> 
+                                        Διαχείριση Χρηστών
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <!-- Cloud -->
+                        <li id="li12" data-value="li12">
+                            <a class="disabled submenu-li menu-item ajustedGap-submenu"> Cloud <i class="bi bi-chevron-down chevron-icon margin-right-0_5rem"></i></a>
+
+                            <ul class="submenu">
+                                <li id="li121" data-value="li121">
+                                    <a 
+                                        id="aws_s3" 
+                                        class="disabled childmenu-li menu-item" 
+                                        href="/api/admin/aws_s3" 
+                                        data-ml-1913="1"
+                                        data-ml-1680="1"
+                                        data-ml-1600="1"
+                                        data-ml-1440="1"
+                                        data-ml-1366="1"
+                                        data-ml-1360="1"
+                                        data-ml-1280="1"
+                                        data-ml-1152="1"
+                                        data-ml-1024="1"
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="right" 
+                                        data-tooltip-max-width="15vw" 
+                                        data-bs-title="Αποστολή αρχείων txt στο Cloud"> 
+                                        Αποστολή txt αρχείων
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
                 </li>
 
                 <li id="li2" data-value="li2">  <!--  Αρχεία -->
@@ -594,7 +655,7 @@
                     </ul>
                 </li>
 
-                <li id="li4" data-value="li4">
+                <li id="li4" data-value="li4">  <!--  Εκτυπώσεις -->
                     <a class="disabled menu-li menu-item"> Εκτυπώσεις <i class="bi bi-chevron-down chevron-icon margin-right--1px"></i> </a>
                     
                     <ul class="submenu">
@@ -638,7 +699,7 @@
 
                 </li>
 
-                <li id="li5" data-value="li5">
+                <li id="li5" data-value="li5">  <!--  Παράμετροι -->
                     <a class="disabled menu-li menu-item"> Παράμετροι <i class="bi bi-chevron-down chevron-icon margin-right--1px"></i></a>
                     <ul class="submenu">
 
@@ -670,14 +731,14 @@
                     <!-- more menu items -->
                 </li>
 
-                <li id="li6" data-value="li6">
+                <li id="li6" data-value="li6">  <!--  Επικοινωνία -->
                     <a class="disabled menu-li  menu-item" href="#"> Επικοινωνία </a>
                 </li>
 
             </ul>
         </div>
 
-        <div class="logout-section cblack">
+        <div class="logout-section cblack">     <!--  Αποσύνδεση -->
             <a
                 id="li7"
                 type="button"

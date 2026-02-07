@@ -13,12 +13,6 @@ const ALLOWED_MIME_TYPES = process.env.ALLOWED_MIME_TYPES
     ? process.env.ALLOWED_MIME_TYPES.split(',').map(type => type.trim())
     : ['application/pdf'];
 
-// console.log('📋 Multer Config Loaded:', {
-//     uploadDir: UPLOAD_BASE_DIR,
-//     maxFileSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(2)} MB`,
-//     allowedTypes: ALLOWED_MIME_TYPES
-// });
-
 /**
  * ============================================================================
  * HELPER FUNCTIONS
@@ -39,11 +33,11 @@ const sanitizeFolderName = (name) => {
 
 /**
  * ============================================================================
- * MULTER STORAGE CONFIGURATION
+ * MULTER STORAGE - Disk Storage για PDFs
  * ============================================================================
  * Δομή: uploads/pdfs/{team}/{company}/{year}/{kodikos}/ΠΡΟΣΛΗΨΕΙΣ/
  */
-const storage = multer.diskStorage({
+const pdfStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         try {
             // 1️⃣ Παίρνουμε τα session fields
@@ -73,7 +67,7 @@ const storage = multer.diskStorage({
             // 5️⃣ Δημιουργία φακέλων (recursive)
             fs.mkdirSync(uploadPath, { recursive: true });
             
-            console.log(`📁 Upload path:  ${uploadPath}`);
+            console.log(`📁 PDF upload path: ${uploadPath}`);
             cb(null, uploadPath);
             
         } catch (error) {
@@ -99,7 +93,7 @@ const storage = multer.diskStorage({
             // Format: {documentType}_{timestamp}_{random}.pdf
             const fileName = `${documentType}_${timestamp}_${randomStr}${ext}`;
             
-            console.log(`📄 Generated filename: ${fileName}`);
+            console.log(`📄 Generated PDF filename: ${fileName}`);
             cb(null, fileName);
             
         } catch (error) {
@@ -111,10 +105,12 @@ const storage = multer.diskStorage({
 
 /**
  * ============================================================================
- * FILE FILTER - Επιτρέπει μόνο συγκεκριμένους τύπους αρχείων
+ * FILE FILTERS
  * ============================================================================
  */
-const fileFilter = (req, file, cb) => {
+
+// ✅ PDF File Filter
+const pdfFileFilter = (req, file, cb) => {
     const allowedExtensions = ['.pdf'];
     
     const ext = path.extname(file.originalname).toLowerCase();
@@ -124,7 +120,21 @@ const fileFilter = (req, file, cb) => {
     if (ALLOWED_MIME_TYPES.includes(mimeType) && allowedExtensions.includes(ext)) {
         cb(null, true); // Accept file
     } else {
-        const error = new Error(`Μόνο αρχεία ${allowedExtensions.join(', ')} επιτρέπονται! `);
+        const error = new Error(`Μόνο αρχεία ${allowedExtensions.join(', ')} επιτρέπονται!`);
+        error.code = 'INVALID_FILE_TYPE';
+        cb(error, false);
+    }
+};
+
+// ✅ Text Template File Filter
+const textFileFilter = (req, file, cb) => {
+    const allowedExtensions = ['.txt'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    if (ext === '.txt' || file.mimetype === 'text/plain') {
+        cb(null, true); // Accept file
+    } else {
+        const error = new Error('Μόνο .txt αρχεία επιτρέπονται για templates!');
         error.code = 'INVALID_FILE_TYPE';
         cb(error, false);
     }
@@ -132,16 +142,29 @@ const fileFilter = (req, file, cb) => {
 
 /**
  * ============================================================================
- * MULTER INSTANCE - Τελική διαμόρφωση
+ * MULTER INSTANCES
  * ============================================================================
  */
-const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
+
+// ✅ PDF Upload - Disk Storage
+const uploadPdf = multer({
+    storage: pdfStorage,
+    fileFilter: pdfFileFilter,
     limits: {
         fileSize: MAX_FILE_SIZE,  // ✅ Από .env (10MB)
         files: 1,                  // 1 αρχείο κάθε φορά
         fieldSize: 5 * 1024 * 1024 // 5MB για metadata fields
+    }
+});
+
+// ✅ Text Template Upload - Memory Storage
+const uploadTextTemplate = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: textFileFilter,
+    limits: {
+        fileSize: 1024 * 1024,  // 1MB max per file
+        files: 20,              // ✅ Up to 20 files at once
+        fieldSize: 100 * 1024
     }
 });
 
@@ -150,9 +173,15 @@ const upload = multer({
  * EXPORTS
  * ============================================================================
  */
-module.exports = upload;
+module.exports = {
+    upload: uploadPdf,           // ✅ Default export (backward compatibility)
+    uploadPdf,                   // ✅ Explicit για PDFs
+    uploadTextTemplate,          // ✅ Για text templates
+    UPLOAD_BASE_DIR,             // ✅ Export constants
+    MAX_FILE_SIZE,
+    ALLOWED_MIME_TYPES,
+    sanitizeFolderName           // ✅ Export helper (optional)
+};
 
-// ✅ Export και τις constants αν χρειαστούν αλλού
-module.exports.UPLOAD_BASE_DIR = UPLOAD_BASE_DIR;
-module.exports.MAX_FILE_SIZE = MAX_FILE_SIZE;
-module.exports.ALLOWED_MIME_TYPES = ALLOWED_MIME_TYPES;
+// ✅ Legacy support - για παλιό code που κάνει: const upload = require('./multer')
+module.exports.default = uploadPdf;

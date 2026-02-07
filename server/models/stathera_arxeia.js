@@ -350,7 +350,13 @@
 		kodikos: { type: String, unique: true },
 		perigrafh: { type: String, trim: true },
 		ores_plhroys_apasxolhshs: { type: Number },
-	});
+		prefix: { type: String, trim: true },
+	},
+		{
+			collection: "Eidikes_Kathgories"
+		}
+	);
+
 	const EidikesKathgoriesModel = model("EidikesKathgories", EidikesKathgoriesSchema);
 	
 	const OikogeneiakhKatastashSchema = new Schema({

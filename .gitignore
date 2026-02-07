@@ -17,6 +17,12 @@ uploads/pdfs/**
 !uploads/pdfs/**/
 !uploads/pdfs/**/.gitkeep
 
+# Text Cache
+public/txt-cache/
+
+# Test files
+server/utils/test-*.js
+
 # ============================================================================
 # Παραγόμενα αρχεία (generated files)
 # ============================================================================

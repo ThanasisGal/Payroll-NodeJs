@@ -914,6 +914,34 @@ class ergazomenoiController {
         newErgazomenos.createdAt = Date.now();
         newErgazomenos.updatedAt = Date.now();
 
+        // ============================================================================
+        // ✅ AUTOMATIC CONTRACT PDF GENERATION
+        // ============================================================================
+
+        const { generateContractPDF } = require('../utils/contractGenerator');
+
+        try {
+            console.log('\n📄 Generating contract PDF automatically...');
+            
+            const userContext = {
+                team: sessionUserTeam,
+                companyFolder: sessionCompanyInUse.toString()
+            };
+            
+            const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
+            
+            // Save S3 key στο document
+            savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path = contractS3Key;
+            await savedErgazomenos.save();
+            
+            console.log(`✅ Contract PDF generated and saved: ${contractS3Key}`);
+            
+        } catch (pdfError) {
+            console.error('❌ Failed to generate contract PDF:', pdfError);
+            // Don't fail the whole request - PDF generation is optional
+            console.warn('⚠️ Continuing without contract PDF...');
+        }
+
         const orarioValidation = validateOrarioFields(formData);
 
         if (orarioValidation.valid) {

@@ -34,10 +34,17 @@ const geoGuard = require("./server/middlewares/geoGuard");
 const usersRoute = require("./server/routes/usersRoute");
 const dropdownRoutes = require("./server/routes/dropdownRoutes");
 const apiRoutes = require("./server/routes/apiRoutes");
+const adminRoutes = require('./server/routes/adminRoutes');
 require('./server/config/aws');
 
 const getSessionVars = require("./server/middlewares/session-variables");
 const logger = require("./server/utils/logger");
+
+// ============================================================================
+// ✅ TEXT CACHE SYSTEM IMPORTS
+// ============================================================================
+const textLoader = require('./server/utils/textLoader');
+const textCacheManager = require('./server/utils/textCacheManager');
 
 const app = express();
 app.disable("x-powered-by");
@@ -50,7 +57,7 @@ const grace_period = Number(process.env.GRACE_PERIOD || 2);
 
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
-const EGGRAFES = Number.parseInt(process.env.EGGRAFES ??  '15', 10) || 15;
+const EGGRAFES = Number.parseInt(process.env.EGGRAFES ?? '15', 10) || 15;
 
 // Εκκίνηση - καταγραφή ρυθμίσεων
 logger.info("========================================");
@@ -168,12 +175,12 @@ if (process.env.NODE_ENV === 'development' || process.env.USE_LOCAL_STORAGE === 
 }
 
 const checkFileAuth = (req, res, next) => {
-    if (!req.session || !req. session.userId) {
+    if (!req.session || !req.session.userId) {
         logger.warn(`Unauthorized file access attempt: ${req.path} from IP ${req.ip}`);
         return res.status(401).send('Unauthorized - Please login');
     }
     
-    logger.info(`File access: ${req.path} by user ${req. session.userId}`);
+    logger.info(`File access: ${req.path} by user ${req.session.userId}`);
     next();
 };
 
@@ -184,14 +191,13 @@ const checkFileAuth = (req, res, next) => {
 app.use('/uploads', checkFileAuth, express.static(path.join(__dirname, 'uploads'), {
     maxAge: 0,
     dotfiles: 'deny',
-    index: false, // Disable directory listing
+    index: false,
     setHeaders: (res, filepath) => {
-        // Security headers
         res.set('X-Content-Type-Options', 'nosniff');
         res.set('X-Frame-Options', 'DENY');
         res.set('Referrer-Policy', 'no-referrer');
         
-        if (filepath. endsWith('.pdf')) {
+        if (filepath.endsWith('.pdf')) {
             res.set('Content-Type', 'application/pdf');
             res.set('Content-Disposition', 'inline');
             res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline';");
@@ -211,13 +217,13 @@ app.locals.NODE_ENV = node_env;
 /* -------------------------------------------------------------------------- */
 /*                              Ρύθμιση Session                               */
 /* -------------------------------------------------------------------------- */
-if (! mongoUrl) {
+if (!mongoUrl) {
     logger.error("MONGODB_URL δεν έχει οριστεί. Χρήση MemoryStore (μόνο dev).");
 }
 
 app.use(session(sessionOpts));
 
-logger.info(`Sessions: ${mongoUrl ?  "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
+logger.info(`Sessions: ${mongoUrl ? "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 app.use(flash({ sessionKeyName: "flashMessage" }));
 app.use(getSessionVars);
@@ -230,7 +236,7 @@ app.use((req, res, next) => {
     const skipPaths = ['/static', '/api', '/login', '/logout', '/remaining-time', '/csrf-token'];
     const shouldSkip = skipPaths.some(path => req.path.startsWith(path));
     
-    if (! shouldSkip && req.session && req.session.userId) {
+    if (!shouldSkip && req.session && req.session.userId) {
         const now = Date.now();
         const lastActivity = req.session.lastActivity || 0;
         const timeSinceLastActivity = now - lastActivity;
@@ -258,7 +264,7 @@ app.get("/remaining-time", (req, res) => {
         });
     }
 
-    if (! req.session) {
+    if (!req.session) {
         return res.status(500).json({ 
             error: 'Session middleware error',
             remainingTime: 0 
@@ -330,7 +336,7 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                     refreshed: true,
                     remainingTime: formatTime(newRemainingMs),
                     remainingMs: newRemainingMs,
-                    message: 'Session refreshed to 30: 00'
+                    message: 'Session refreshed to 30:00'
                 });
             });
         } else {
@@ -338,7 +344,7 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                 success: true,
                 refreshed: false,
                 remainingTime: formatTime(remainingMs),
-                remainingMs:  remainingMs,
+                remainingMs: remainingMs,
                 gracePeriod: true,
                 message: 'Grace period active - session NOT refreshed'
             });
@@ -433,12 +439,9 @@ const buildCSPDirectives = () => {
             ...cdnDomains
         ],
         "worker-src": ["'self'", "blob:"],
-        
-        // ✅ CRITICAL CHANGES: Allow blob URLs for PDF preview
-        "object-src": ["'self'", "blob:"],     // ← CHANGED from ["'none'"]
-        "frame-src": ["'self'", "blob:"],      // ← CHANGED from ["'self'"]
-        "child-src": ["'self'", "blob:"],      // ← NEW! For new tab PDFs
-        
+        "object-src": ["'self'", "blob:"],
+        "frame-src": ["'self'", "blob:"],
+        "child-src": ["'self'", "blob:"],
         "base-uri": ["'self'"],
         "form-action": ["'self'"],
         "frame-ancestors": ["'none'"]
@@ -464,18 +467,16 @@ app.use(
 /*                    ✅ CSRF Protection (CUSTOM Implementation)              */
 /* -------------------------------------------------------------------------- */
 
-// ✅ Simple CSRF implementation χωρίς sessionID dependency
 function generateSimpleCsrfToken(req, res) {
     const token = crypto.randomBytes(32).toString('hex');
     
-    // Store token in cookie
     res.cookie('psifl.x-csrf-token', token, {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: isProd,
-        maxAge: 1800000, // 30 minutes
-        ...(isProd ?  { domain: process.env.DOMAIN } : {}),
+        maxAge: 1800000,
+        ...(isProd ? { domain: process.env.DOMAIN } : {}),
     });
     
     return token;
@@ -492,15 +493,14 @@ function validateSimpleCsrfToken(req) {
     return cookieToken && headerToken && cookieToken === headerToken;
 }
 
-// ✅ Make CSRF token available to all views
 app.use((req, res, next) => {
     try {
-        const existingToken = req.cookies['psifl.x-csrf-token'];  // ← ΑΛΛΑΞΕ ΕΔΩ!
+        const existingToken = req.cookies['psifl.x-csrf-token'];
         
         if (existingToken) {
             res.locals.csrfToken = existingToken;
         } else {
-            res.locals. csrfToken = generateSimpleCsrfToken(req, res);
+            res.locals.csrfToken = generateSimpleCsrfToken(req, res);
         }
     } catch (err) {
         logger.error('Error generating CSRF token for views:', err);
@@ -509,7 +509,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// ✅ CSRF Protection middleware
 app.use((req, res, next) => {
     const skipPaths = [
         '/health',
@@ -540,12 +539,11 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // ✅ Validate CSRF token
-    if (! validateSimpleCsrfToken(req)) {
+    if (!validateSimpleCsrfToken(req)) {
         logger.error('❌ CSRF validation FAILED: ');
         logger.error(`  Path: ${req.path}`);
         logger.error(`  Method: ${req.method}`);
-        logger.error(`  Cookie token: ${req.cookies['psifl.x-csrf-token']?.substring(0, 20)}...`);        
+        logger.error(`  Cookie token: ${req.cookies['psifl.x-csrf-token']?.substring(0, 20)}...`);
         logger.error(`  Header token: ${req.headers['csrf-token']?.substring(0, 20)}...`);
         return res.status(403).json({
             error: 'CSRF validation failed',
@@ -560,7 +558,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// CSRF token endpoint
 app.get("/csrf-token", (req, res) => {
     try {
         const token = generateSimpleCsrfToken(req, res);
@@ -589,7 +586,7 @@ app.use(async (err, req, res, next) => {
         if (req.xhr || req.headers.accept?.includes('application/json')) {
             return res.status(403).json({ 
                 success: false, 
-                error:  'CSRF token invalid',
+                error: 'CSRF token invalid',
                 message: 'Η συνεδρία έληξε. Παρακαλώ ανανεώστε τη σελίδα.'
             });
         }
@@ -612,7 +609,7 @@ app.locals.css = (path) => {
     const cleanPath = path.replace(/\.css$/i, '').trim().replace(/\s+/g, '');
     
     if (node_env === 'production') {
-        return `https://cdn.webpayrollsolutions.com/assets/own/css/${cleanPath}.min.css? v=${cssVersion}`;
+        return `https://cdn.webpayrollsolutions.com/assets/own/css/${cleanPath}.min.css?v=${cssVersion}`;
     } else {
         return `/static/css/${cleanPath}.css?v=${cssVersion}`;
     }
@@ -676,6 +673,7 @@ app.use(
 app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
+app.use('/api/admin', adminRoutes);
 
 /* -------------------------------------------------------------------------- */
 /*                              Διαχείριση σφαλμάτων                          */
@@ -692,9 +690,126 @@ app.use((req, res) => {
     });
 });
 
+// ============================================================================
+// ✅ TEXT CACHE SYSTEM INITIALIZATION
+// ============================================================================
+async function initializeTextCacheSystem() {
+    try {
+        logger.info('\n' + '='.repeat(70));
+        logger.info('🚀 INITIALIZING TEXT CACHE SYSTEM');
+        logger.info('='.repeat(70) + '\n');
+
+        // STEP 1: Load Eidikes Kathgories από MongoDB
+        logger.info('📚 STEP 1/2: Loading Eidikes Kathgories from MongoDB...\n');
+        
+        await textLoader.initializeConditionsMap();
+        
+        const categoryMap = textLoader.getCategoryCodeMap();
+        const categoryCount = Object.keys(categoryMap).length;
+        
+        if (categoryCount === 0) {
+            throw new Error('No valid categories loaded from MongoDB!');
+        }
+        
+        logger.info(`\n✅ STEP 1/2 COMPLETE: ${categoryCount} categories loaded\n`);
+
+        // STEP 2: Initialize Text Cache Manager
+        logger.info('☁️  STEP 2/2: Syncing templates from S3 and loading to RAM...\n');
+        
+        await textCacheManager.initialize();
+        
+        const cacheStats = textCacheManager.getStats();
+        
+        if (cacheStats.totalFiles === 0) {
+            logger.warn('⚠️  WARNING: No template files found in S3 cache!');
+            logger.warn('⚠️  Make sure you have uploaded txt files to S3.');
+        } else {
+            logger.info(`\n✅ STEP 2/2 COMPLETE: ${cacheStats.totalFiles} templates loaded to RAM\n`);
+        }
+
+        logger.info('='.repeat(70));
+        logger.info('✅ TEXT CACHE SYSTEM INITIALIZED SUCCESSFULLY');
+        logger.info('='.repeat(70));
+        logger.info(`📊 Categories: ${categoryCount}`);
+        logger.info(`📊 Templates:  ${cacheStats.totalFiles}`);
+        logger.info(`📊 Memory:     ${cacheStats.memory?.cacheSizeMB || 'N/A'} MB`);
+        logger.info(`📊 Teams:      ${Object.keys(cacheStats.teams || {}).join(', ') || 'None'}`);
+        logger.info('='.repeat(70) + '\n');
+
+    } catch (error) {
+        logger.error('\n' + '='.repeat(70));
+        logger.error('❌ FATAL ERROR: Text Cache System initialization failed!');
+        logger.error('='.repeat(70));
+        logger.error('Error:', error.message);
+        logger.error('Stack:', error.stack);
+        logger.error('='.repeat(70) + '\n');
+        
+        logger.error('❌ Application cannot start without text cache system.');
+        process.exit(1);
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                 Εκκίνηση                                   */
 /* -------------------------------------------------------------------------- */
-app.listen(port, "0.0.0.0", () => {
-    logger.info(`🚀 App listening at http://${host}:${port}`);
-});
+
+async function startServer() {
+    try {
+        // Wait for MongoDB
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 1) {
+            logger.info('⏳ Waiting for MongoDB connection...');
+            await new Promise((resolve) => {
+                mongoose.connection.once('open', resolve);
+            });
+        }
+
+        // ✅ Initialize Text Cache System
+        await initializeTextCacheSystem();
+
+        // Start server
+        app.listen(port, "0.0.0.0", () => {
+            logger.info('\n' + '='.repeat(70));
+            logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
+            logger.info('='.repeat(70));
+            logger.info(`📍 URL: http://${host}:${port}`);
+            logger.info(`🌍 Environment: ${node_env}`);
+            logger.info('='.repeat(70) + '\n');
+        });
+
+    } catch (error) {
+        logger.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
+}
+
+// ============================================================================
+// Graceful Shutdown
+// ============================================================================
+async function gracefulShutdown(signal) {
+    logger.info(`\n⚠️  Received ${signal}, starting graceful shutdown...`);
+
+    try {
+        textCacheManager.stopAutoRefresh();
+        logger.info('✅ Text cache auto-refresh stopped');
+
+        const mongoose = require('mongoose');
+        await mongoose.connection.close();
+        logger.info('✅ MongoDB connection closed');
+
+        logger.info('✅ Graceful shutdown complete');
+        process.exit(0);
+
+    } catch (error) {
+        logger.error('❌ Error during graceful shutdown:', error);
+        process.exit(1);
+    }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// ============================================================================
+// Start Application
+// ============================================================================
+startServer();
