@@ -35,6 +35,7 @@ const usersRoute = require("./server/routes/usersRoute");
 const dropdownRoutes = require("./server/routes/dropdownRoutes");
 const apiRoutes = require("./server/routes/apiRoutes");
 const adminRoutes = require('./server/routes/adminRoutes');
+const sessionRoutes = require("./server/routes/sessionRoute");
 require('./server/config/aws');
 
 const getSessionVars = require("./server/middlewares/session-variables");
@@ -52,8 +53,8 @@ app.disable("x-powered-by");
 const host = process.env.HOST || "localhost";
 const port = Number(process.env.PORT || 5000);
 
-const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 30);
-const grace_period = Number(process.env.GRACE_PERIOD || 2);
+const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 60);
+const grace_period = Number(process.env.GRACE_PERIOD || 5);
 
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
@@ -336,7 +337,7 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                     refreshed: true,
                     remainingTime: formatTime(newRemainingMs),
                     remainingMs: newRemainingMs,
-                    message: 'Session refreshed to 30:00'
+                    message: 'Session refreshed to 60:00'
                 });
             });
         } else {
@@ -674,6 +675,7 @@ app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
 app.use('/api/admin', adminRoutes);
+app.use('/', sessionRoutes);
 
 /* -------------------------------------------------------------------------- */
 /*                              Διαχείριση σφαλμάτων                          */

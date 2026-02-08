@@ -1,7 +1,7 @@
 const MongoStore = require('connect-mongo');
 
 const isProd = process.env.NODE_ENV === 'production';
-const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 30);
+const diarkeia_session = Number(process.env.DIARKEIA_SESSION || 60);
 const secret = process.env.SESSION_SECRET || process.env.SECRET || "default-secret";
 const mongoUrl = process.env.MONGODB_URL;
 

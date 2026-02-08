@@ -748,23 +748,6 @@ static sendUserVerifyEmail = async (req, res) => {
                 console.log('   Last Activity:', new Date(req.session.lastActivity).toISOString());
                 console.log('   Redirecting to:', redir);
                 
-                // // ✅ CRITICAL FIX: Manually set session cookie
-                // // Express session middleware sometimes doesn't set it automatically
-                // const cookieOptions = {
-                //     httpOnly: true,
-                //     secure: isProd,
-                //     sameSite: 'lax',
-                //     path: '/',
-                //     maxAge: 1000 * 60 * (Number(process.env.DIARKEIA_SESSION) || 30)
-                // };
-                
-                // // res.cookie('sid', req.sessionID, cookieOptions);
-                
-                // console.log('   Cookie manually set: sid=' + req.sessionID. substring(0, 20) + '...');
-                // console.log('   Cookie options:', cookieOptions);
-                // console.log('   Redirecting to:', redir);
-                // console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-                
                 return res.redirect(redir);
             });
         } else {

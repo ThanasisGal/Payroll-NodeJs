@@ -918,7 +918,7 @@ class ergazomenoiController {
         // ✅ AUTOMATIC CONTRACT PDF GENERATION
         // ============================================================================
 
-        const { generateContractPDF } = require('../utils/contractGenerator');
+        const { generateContractPDF } = require('../../utils/contractGenerator');
 
         try {
             console.log('\n📄 Generating contract PDF automatically...');

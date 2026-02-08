@@ -93,7 +93,6 @@ router.delete("/admin/edit/:id", userController.deletePostUser);
 router.get("/admin/delete/:id", userController.checkAndDeletePostUser);
 router.post("/admin/search", userController.searchPostUser);
 router.get("/admin/search", userController.searchGetUser);
-// router.get("/admin/aws_s3", userController.transferTxtFilesToAwsS3);
 
 // ============================================================================
 // MAIN APP ROUTES

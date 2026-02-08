@@ -6,14 +6,14 @@
  * Purpose:
  * - Automatically refresh session countdown when user navigates between pages
  * - ONLY works for authenticated users (logged in)
- * - Resets countdown from current time to full 30:00
+ * - Resets countdown from current time to full 60:00
  * - Respects grace period (last 2 minutes - no refresh)
  * 
  * How it works:
  * 1. On page load, check if user is authenticated
  * 2. If authenticated, send POST to /api/session/refresh
  * 3. Server checks remaining time:
- *    - If > 2 minutes remaining → Reset to 30:00 ✓
+ *    - If > 2 minutes remaining → Reset to 60:00 ✓
  *    - If ≤ 2 minutes remaining → Don't reset (grace period)
  * 4. Force countdown UI to update with new time
  * 
@@ -32,7 +32,7 @@
     // CONFIG
     // ═══════════════════════════════════════════════════════════════════════════
     const CONFIG = {
-        GRACE_PERIOD_MINUTES: 2,      // Grace period threshold (λεπτά)
+        GRACE_PERIOD_MINUTES: 5,      // Grace period threshold (λεπτά)
         CHECK_INTERVAL: 5000,          // Check interval (milliseconds)
         DEBUG: false,                  // Set to true for detailed console logging
         MAX_RETRIES: 3,                // Max retry attempts on failure
@@ -236,7 +236,7 @@
 
             // ✅ Handle success cases
             if (data.success && data.refreshed) {
-                log('✅ Session refreshed to 30:00');
+                log('✅ Session refreshed to 60:00');
                 
                 // ✅ Force countdown reset (if countdown. js is loaded)
                 if (typeof window.forceRefreshCountdown === 'function') {

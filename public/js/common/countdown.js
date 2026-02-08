@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * SESSION COUNTDOWN - CLIENT-SIDE (No polling!  Works with httpOnly cookies!)
+ * SESSION COUNTDOWN - CLIENT-SIDE (Clickable Refresh)
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -15,28 +15,48 @@ window.CountdownManager = {
     gracePeriodActive: false,
     isRunning: false,
     remainingTimeElement: null,
-    lastAuthState: null
+    lastAuthState: null,
+    isRefreshing: false
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 const CONFIG = {
-    SESSION_DURATION_MS: 30 * 60 * 1000,
-    GRACE_PERIOD_MS: 2 * 60 * 1000,
+    SESSION_DURATION_MS: 60 * 60 * 1000,
+    GRACE_PERIOD_MS: 5 * 60 * 1000,
     UPDATE_INTERVAL_MS: 1000,
     WARNING_THRESHOLD_MS: 15 * 60 * 1000,
     DANGER_THRESHOLD_MS: 5 * 60 * 1000,
-    DEBUG: false
+    DEBUG: true  // Αλλάξτε σε false για production
 };
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════���══════════════════════════
 // UTILITY: Debug logging
 // ═══════════════════════════════════════════════════════════════════════════
 function log(...args) {
     if (CONFIG.DEBUG) {
         console.log('[Countdown]', ...args);
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: Get CSRF token
+// ═══════════════════════════════════════════════════════════════════════════
+function getCSRFToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) {
+        const token = meta.getAttribute('content');
+        if (token) return token;
+    }
+    
+    const input = document.querySelector('input[name="_csrf"]');
+    if (input) {
+        const token = input.value;
+        if (token) return token;
+    }
+    
+    return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -64,7 +84,7 @@ function updateTextColor(remainingMs, userType, element) {
     } else {
         if (remainingMs >= CONFIG.WARNING_THRESHOLD_MS) {
             element.classList.add("rt-white");
-        } else if (remainingMs >= CONFIG. DANGER_THRESHOLD_MS) {
+        } else if (remainingMs >= CONFIG.DANGER_THRESHOLD_MS) {
             element.classList.add("rt-orange");
         } else {
             element.classList.add("rt-red");
@@ -77,15 +97,31 @@ function updateTextColor(remainingMs, userType, element) {
 // ═══════════════════════════════════════════════════════════════════════════
 function showCountdown(element) {
     if (element) {
-        element.style.visibility = 'visible';
-        element.style.opacity = '1';
+        element.classList.add('remaining-time-visible');
     }
 }
 
 function hideCountdown(element) {
     if (element) {
-        element.style. visibility = 'hidden';
-        element.style.opacity = '0';
+        element.classList.remove('remaining-time-visible');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER: Update clickable state
+// ═══════════════════════════════════════════════════════════════════════════
+function updateClickableState(element) {
+    if (!element) return;
+    
+    const isAuthenticated = window.CountdownManager.wasAuthenticated && 
+                          window.CountdownManager.currentUserType === 'authenticated';
+    
+    if (isAuthenticated) {
+        element.classList.add('remaining-time-clickable');
+        element.removeAttribute('title');
+    } else {
+        element.classList.remove('remaining-time-clickable');
+        element.removeAttribute('title');
     }
 }
 
@@ -118,7 +154,7 @@ async function fetchInitialRemainingTime() {
             };
         }
 
-        if (! response.ok) {
+        if (!response.ok) {
             log('❌ Server error:', response.status);
             return null;
         }
@@ -153,18 +189,15 @@ async function fetchInitialRemainingTime() {
 async function initCountdown(element) {
     log('🚀 Initializing countdown...');
 
-    // Fetch session data from server
     const sessionData = await fetchInitialRemainingTime();
     
     if (!sessionData) {
-        // Fetch failed - use grace period as fallback
-        log('⚠️ Server fetch failed → Using grace period (2:00)');
+        log('⚠️ Server fetch failed → Using grace period (5:00)');
         window.CountdownManager.gracePeriodActive = true;
         window.CountdownManager.currentUserType = 'anonymous';
-        window.CountdownManager.sessionEndTime = Date.now() + CONFIG. GRACE_PERIOD_MS;
+        window.CountdownManager.sessionEndTime = Date.now() + CONFIG.GRACE_PERIOD_MS;
         window.CountdownManager.wasAuthenticated = false;
     } else if (sessionData.authenticated) {
-        // ✅ AUTHENTICATED USER
         log('✅ User IS authenticated');
         
         window.CountdownManager.sessionEndTime = Date.now() + sessionData.remainingMs;
@@ -174,8 +207,7 @@ async function initCountdown(element) {
         
         log('📊 Session time:', formatTime(sessionData.remainingMs));
     } else {
-        // ❌ NOT AUTHENTICATED → Grace period
-        log('⚠️ User NOT authenticated → Using grace period (2:00)');
+        log('⚠️ User NOT authenticated → Using grace period (5:00)');
         
         window.CountdownManager.gracePeriodActive = true;
         window.CountdownManager.currentUserType = 'anonymous';
@@ -184,13 +216,14 @@ async function initCountdown(element) {
     }
 
     log('📊 Final state:', {
-        endTime: new Date(window.CountdownManager. sessionEndTime).toLocaleTimeString(),
+        endTime: new Date(window.CountdownManager.sessionEndTime).toLocaleTimeString(),
         userType: window.CountdownManager.currentUserType,
         gracePeriod: window.CountdownManager.gracePeriodActive,
         wasAuthenticated: window.CountdownManager.wasAuthenticated
     });
 
     startCountdown(element);
+    updateClickableState(element);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -215,10 +248,10 @@ function startCountdown(element) {
 // UPDATE: Display countdown
 // ═══════════════════════════════════════════════════════════════════════════
 function updateCountdownDisplay(element) {
-    if (! element) return;
+    if (!element) return;
 
     const now = Date.now();
-    const remainingMs = Math.max(0, window.CountdownManager. sessionEndTime - now);
+    const remainingMs = Math.max(0, window.CountdownManager.sessionEndTime - now);
 
     showCountdown(element);
     element.textContent = formatTime(remainingMs);
@@ -233,7 +266,7 @@ function updateCountdownDisplay(element) {
 // HANDLE: Session expiry
 // ═══════════════════════════════════════════════════════════════════════════
 function handleSessionExpiry(element) {
-    log('⏰ Session expired! ');
+    log('⏰ Session expired!');
 
     if (window.CountdownManager.countdownInterval) {
         clearInterval(window.CountdownManager.countdownInterval);
@@ -242,7 +275,7 @@ function handleSessionExpiry(element) {
     }
 
     if (element) {
-        element.textContent = "Λήξη! ";
+        element.textContent = "Λήξη!";
         element.classList.remove("rt-white", "rt-orange");
         element.classList.add("rt-red");
     }
@@ -255,26 +288,160 @@ function handleSessionExpiry(element) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GLOBAL API: Force refresh
+// CLICK HANDLER: Refresh session on click
+// ═══════════════════════════════════════════════════════════════════════════
+async function handleRemainingTimeClick(event) {
+    event.preventDefault();
+    
+    const element = event.currentTarget;
+    
+    // Έλεγχος αν ο χρήστης είναι authenticated
+    if (!window.CountdownManager.wasAuthenticated || 
+        window.CountdownManager.currentUserType !== 'authenticated') {
+        log('⚠️ Click ignored - user not authenticated');
+        return;
+    }
+    
+    // Αποφυγή multiple clicks
+    if (window.CountdownManager.isRefreshing) {
+        log('⚠️ Already refreshing...');
+        return;
+    }
+    
+    window.CountdownManager.isRefreshing = true;
+    
+    // Visual feedback
+    const originalText = element.textContent;
+    element.classList.add('refreshing');
+    
+    log('🔄 Manual refresh triggered by click on remaining-time');
+    
+    try {
+        // Λήψη CSRF token
+        const csrfToken = getCSRFToken();
+        
+        if (!csrfToken) {
+            log('❌ No CSRF token found');
+            showRefreshError(element);
+            element.textContent = originalText;
+            return;
+        }
+        
+        // Call unified API endpoint
+        const response = await fetch('/api/session/refresh', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken,
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.success && data.refreshed) {
+                // Χρήση του remainingMs αντί για remainingTime
+                const remainingMs = data.remainingMs || data.remainingTime;
+                
+                log('✅ Session refreshed successfully to:', formatTime(remainingMs));
+                
+                // Update countdown
+                window.CountdownManager.sessionEndTime = Date.now() + remainingMs;  // ← ΔΙΟΡΘΩΣΗ
+                updateCountdownDisplay(element);
+
+                // Show success feedback
+                showRefreshSuccess(element);
+                
+            } else if (data.gracePeriod) {
+                const remainingMs = data.remainingMs || data.remainingTime;
+                
+                log('⏰ Grace period active - session NOT refreshed');
+                log(`   Remaining time: ${formatTime(remainingMs || 0)}`);
+
+                // Ενημέρωση χρήστη ότι είναι σε grace period
+                element.textContent = originalText;
+                showRefreshWarning(element);
+                
+            } else {
+                log('❌ Refresh failed:', data.error || data.message);
+                element.textContent = originalText;
+                showRefreshError(element);
+            }
+        } else if (response.status === 401) {
+            log('❌ Unauthorized - session expired');
+            element.textContent = originalText;
+            showRefreshError(element);
+        } else {
+            log('❌ Refresh request failed:', response.status);
+            element.textContent = originalText;
+            showRefreshError(element);
+        }
+    } catch (error) {
+        log('❌ Refresh error:', error);
+        element.textContent = originalText;
+        showRefreshError(element);
+    } finally {
+        // Re-enable
+        setTimeout(() => {
+            element.classList.remove('refreshing');
+            window.CountdownManager.isRefreshing = false;
+        }, 800);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEEDBACK: Visual feedback functions
+// ═══════════════════════════════════════════════════════════════════════════
+function showRefreshSuccess(element) {
+    if (element) {
+        element.classList.add('refresh-success');
+        setTimeout(() => {
+            element.classList.remove('refresh-success');
+        }, 1000);
+    }
+}
+
+function showRefreshWarning(element) {
+    if (element) {
+        element.classList.add('refresh-warning');
+        setTimeout(() => {
+            element.classList.remove('refresh-warning');
+        }, 1000);
+    }
+}
+
+function showRefreshError(element) {
+    if (element) {
+        element.classList.add('refresh-error');
+        setTimeout(() => {
+            element.classList.remove('refresh-error');
+        }, 1000);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GLOBAL API: Force refresh (for sessionRefresh.js)
 // ═══════════════════════════════════════════════════════════════════════════
 window.forceRefreshCountdown = async function() {
     log('🔄 Force refresh triggered');
 
     const element = window.CountdownManager.remainingTimeElement;
     
-    if (! element) {
+    if (!element) {
         log('⚠️ Countdown element not found');
         return;
     }
 
-    if (! window.CountdownManager.wasAuthenticated) {
+    if (!window.CountdownManager.wasAuthenticated) {
         log('⚠️ Not authenticated, skipping refresh');
         return;
     }
 
     const freshData = await fetchInitialRemainingTime();
     
-    if (freshData && freshData.authenticated && ! freshData.expired) {
+    if (freshData && freshData.authenticated && !freshData.expired) {
         window.CountdownManager.sessionEndTime = Date.now() + freshData.remainingMs;
         window.CountdownManager.currentUserType = 'authenticated';
         window.CountdownManager.gracePeriodActive = false;
@@ -283,7 +450,7 @@ window.forceRefreshCountdown = async function() {
         
         updateCountdownDisplay(element);
         
-        if (! window.CountdownManager.isRunning) {
+        if (!window.CountdownManager.isRunning) {
             startCountdown(element);
         }
     } else {
@@ -295,7 +462,7 @@ window.forceRefreshCountdown = async function() {
 // EVENT: Session expired
 // ═══════════════════════════════════════════════════════════════════════════
 function onSessionExpired() {
-    if (! window.CountdownManager.wasAuthenticated) {
+    if (!window.CountdownManager.wasAuthenticated) {
         return;
     }
 
@@ -307,11 +474,10 @@ function onSessionExpired() {
         backdrop: false,
         allowOutsideClick: false,
         title: "Λήξη Συνεδρίας",
-        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
+        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε...",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
-        showConfirmButton: true,
         showConfirmButton: false,
         allowOutsideClick: false,
         customClass: {
@@ -320,7 +486,7 @@ function onSessionExpired() {
             popup: "custom-swal-popup",
         },
         willClose: () => {
-            window. location.href = "/logout/end_Session? method=idle";
+            window.location.href = "/logout/end_Session?method=idle";
         },
     });
 }
@@ -337,11 +503,10 @@ function onGracePeriodExpired(event) {
         backdrop: false,
         allowOutsideClick: false,
         title: "Λήξη Συνεδρίας",
-        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας.  Συνδεθείτε ξανά για να συνεχίσετε.. .",
+        text: "Η συνεδρία σας έχει λήξει λόγω αδράνειας. Συνδεθείτε ξανά για να συνεχίσετε...",
         icon: "error",
         timer: 4000,
         timerProgressBar: true,
-        showConfirmButton: true,
         showConfirmButton: false,
         allowOutsideClick: false,
         customClass: {
@@ -350,7 +515,7 @@ function onGracePeriodExpired(event) {
             popup: "custom-swal-popup",
         },
         willClose: () => {
-            window. location.href = "/logout/end_Session? method=idle";
+            window.location.href = "/logout/end_Session?method=idle";
         },
     });
 }
@@ -361,15 +526,19 @@ function onGracePeriodExpired(event) {
 document.addEventListener("DOMContentLoaded", () => {
     const remainingTimeElement = document.getElementById("remaining-time");
     
-    if (! remainingTimeElement) {
+    if (!remainingTimeElement) {
         log('ℹ️ No countdown element in DOM');
         return;
     }
 
-    window.CountdownManager. remainingTimeElement = remainingTimeElement;
+    window.CountdownManager.remainingTimeElement = remainingTimeElement;
 
     document.addEventListener("sessionExpired", onSessionExpired);
-    document. addEventListener("gracePeriodExpired", onGracePeriodExpired);
+    document.addEventListener("gracePeriodExpired", onGracePeriodExpired);
+
+    // Add click handler to remaining-time element
+    remainingTimeElement.addEventListener('click', handleRemainingTimeClick);
+    log('🖱️ Click handler attached to remaining-time');
 
     hideCountdown(remainingTimeElement);
     initCountdown(remainingTimeElement);
