@@ -299,7 +299,7 @@ const { Schema: _Schema, model } = require("mongoose");
     },
     {
         timestamps: true,
-        collection: "ergazomenoi"
+        collection: "Ergazomenoi"
     });
 
     ErgazomenoiSchema.index(
@@ -342,7 +342,7 @@ const { Schema: _Schema, model } = require("mongoose");
         ores_ergasias: { type: Number, default: 0 },
     },
     {
-        collection: "prodhlomena_oraria"
+        collection: "Prodhlomena_Oraria"
     });
 
     ProdhlomenaOrariaSchema.index({
@@ -395,7 +395,7 @@ const { Schema: _Schema, model } = require("mongoose");
         ores_paranomhs_yperorias_argion_nyxtas: { type: Number, default: 0 },
     },
     {
-        collection: "oraria_apo_kartes"
+        collection: "Oraria_Apo_Kartes"
     });
 
     const OrariaFromCardsModel = model("OrariaFromCards", OrariaFromCardsSchema);
@@ -508,7 +508,7 @@ const { Schema: _Schema, model } = require("mongoose");
         apologitiko_biblio: { type: Boolean, default: false },
     },
     {
-        collection: "oraria_apologistika"
+        collection: "Oraria_Apologistika"
     });
 
     OrariaApologistikaSchema.index({
@@ -601,7 +601,7 @@ const { Schema: _Schema, model } = require("mongoose");
         updatedAt: { type: Date, default: Date.now() },
     },
     {
-        collection: "istoriko_proslhpseon_allagon"
+        collection: "Istoriko_Proslhpseon_Allagon"
     });
 
     const IstorikoProslhpseonAllagonModel = model("IstorikoProslhpseonAllagon", IstorikoProslhpseonAllagonSchema);

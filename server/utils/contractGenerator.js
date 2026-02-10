@@ -34,15 +34,33 @@ const { CompaniesModel,
 
 const execAsync = promisify(exec);
 
-const isWindows = process.platform === 'win32';
+// ============================================================================
+// CONFIGURATION - Environment-aware paths
+// ============================================================================
 
-const docxTemplatePath = isWindows
-    ? 'C:/Payroll-NodeJs/public/templates/ΑΡΧΙΚΗ ΣΥΜΒΑΣΗ ΕΡΓΑΖΟΜΕΝΩΝ.docx'
-    : '/home/ubuntu/Payroll-NodeJs/public/templates/ΑΡΧΙΚΗ ΣΥΜΒΑΣΗ ΕΡΓΑΖΟΜΕΝΩΝ.docx';
+const baseDir = process.cwd();
 
-const outputFolder = isWindows
-    ? "C:/Payroll-NodeJs/public/pdf/"
-    : "/home/ubuntu/Payroll-NodeJs/public/pdf/";
+const docxTemplatePath = path.join(
+    baseDir,
+    'public',
+    'templates',
+    'ΑΡΧΙΚΗ ΣΥΜΒΑΣΗ ΕΡΓΑΖΟΜΕΝΩΝ.docx'
+);
+
+const outputFolder = path.join(baseDir, 'public', 'pdf');
+
+// Ensure output folder exists at startup
+fs.ensureDirSync(outputFolder);
+
+// Verify template exists
+if (!fs.existsSync(docxTemplatePath)) {
+    console.error('❌ Template not found:', docxTemplatePath);
+    console.error('   Please ensure the template file exists at this location.');
+} else {
+    console.log('✅ Template loaded:', docxTemplatePath);
+}
+
+console.log('📁 Output folder:', outputFolder);
 
 // ============================================================================
 // Helper Functions
@@ -148,6 +166,11 @@ async function generateContractPDF(ergazomenos, userContext) {
         // Ensure output folder exists
         await fs.ensureDir(outputFolder);
         
+        // Verify template exists
+        if (!await fs.pathExists(docxTemplatePath)) {
+            throw new Error(`Template file not found: ${docxTemplatePath}`);
+        }
+        
         // Fetch company data
         const company = await CompaniesModel.findOne({ _id: ergazomenos.company_kod }).lean();
         if (!company) {
@@ -231,7 +254,7 @@ async function generateContractPDF(ergazomenos, userContext) {
         
         switch (ergazomenos.kathestos_apasxolhshs) {
             case "0":
-                apasxolhsh = "ΠΛΗΡΟΥΣ";
+                apasxolhsh = "ΠΛ��ΡΟΥΣ";
                 typos = "μισθωτός";
                 typos_erg = typos;
                 typos_erg_genikh = "μισθωτού";
@@ -371,7 +394,10 @@ async function generateContractPDF(ergazomenos, userContext) {
         console.log('📝 Generating DOCX from template...');
         const content = await fs.readFile(docxTemplatePath, 'binary');
         const zip = new PizZip(content);
-        const doc = new Docxtemplater(zip);
+        const doc = new Docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        });
         doc.render(data);
         
         // Save temporary DOCX
@@ -384,6 +410,9 @@ async function generateContractPDF(ergazomenos, userContext) {
         
         // ✅ Convert to PDF με LibreOffice
         console.log('🔄 Converting DOCX to PDF with LibreOffice...');
+        
+        // Detect LibreOffice path
+        const isWindows = process.platform === 'win32';
         const libreOfficePath = isWindows
             ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
             : `/usr/bin/libreoffice`;
@@ -400,21 +429,20 @@ async function generateContractPDF(ergazomenos, userContext) {
         const tempPdfPath = path.join(outputFolder, `contract_${ergazomenos.kodikos}_${timestamp}.pdf`);
         
         // Verify PDF was created
-        try {
-            await fs.access(tempPdfPath);
-            console.log('✅ PDF generated:', path.basename(tempPdfPath));
-        } catch {
+        if (!await fs.pathExists(tempPdfPath)) {
             throw new Error('PDF file was not created');
         }
         
+        console.log('✅ PDF generated:', path.basename(tempPdfPath));
+        
         // ✅ Upload to S3
         console.log('☁️  Uploading PDF to S3...');
-        const { uploadFileToS3 } = require('./s3Uploader');
+        const { uploadBufferToS3 } = require('./s3Helper');
         
         const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/employee_${ergazomenos.kodikos}_contract.pdf`;
         
         const pdfBuffer = await fs.readFile(tempPdfPath);
-        await uploadFileToS3(pdfBuffer, s3Key, 'application/pdf');
+        await uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf');
         
         console.log(`✅ PDF uploaded to S3: ${s3Key}`);
         

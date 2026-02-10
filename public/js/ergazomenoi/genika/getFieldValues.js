@@ -186,8 +186,8 @@ document.addEventListener("DOMContentLoaded", () => {
             // Έλεγχοι
             addError('eponymoHidden', 'Επώνυμο');
             addError('onomaHidden', 'Όνομα');
-            addError('afmHidden', 'ΑΦΜ');
-            addError('amkaHidden', 'ΑΜΚΑ');
+            addError('afm_ergazomenoyHidden', 'ΑΦΜ');
+            addError('amka_ergazomenoyHidden', 'ΑΜΚΑ');
             addError('patronymo', 'Πατρώνυμο');
             addError('mhtronymo', 'Μητρώνυμο');
             addError('doy_stathera', 'Δ.Ο.Υ.');

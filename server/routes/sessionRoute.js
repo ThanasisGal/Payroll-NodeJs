@@ -85,7 +85,7 @@ router.get('/remaining-time', (req, res) => {
         
         res.json({
             userType: 'authenticated',
-            remainingTime: remainingTime,  // ← NUMBER (milliseconds) - ΣΩΣΤΟ!
+            remainingTime: remainingTime,  // ← NUMBER (milliseconds)
             gracePeriod: false,
             message: 'Session active'
         });

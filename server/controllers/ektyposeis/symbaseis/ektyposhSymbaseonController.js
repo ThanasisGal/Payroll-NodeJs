@@ -832,6 +832,7 @@ const pdfjsLib = require("pdfjs-dist");
 
 // ✅ TEXT CACHE SYSTEM IMPORTS
 const { loadTextsByCategory, combineTexts, CATEGORIES } = require('../../../utils/textLoader');
+const { getCompanyFolder } = require('../../../utils/userContext');  // ✅ Import at top!
 
 const Models_A = require("../../../models/stathera_arxeia");
 const Models_B = require("../../../models/privileges");
@@ -1128,17 +1129,26 @@ async function compressAndSavePdf(pdfPath, company) {
 // ============================================================================
 // ✅ NEW: Get User Context Helper
 // ============================================================================
-function getUserContext(req) {
+async function getUserContext(req) {
     const team = req.session?.userTeam || req.body?.team;
     const companyId = req.session?.companyInUse || req.body?.company;
     
-    // Convert company ObjectId to folder name (adjust based on your structure)
-    // Example: If company folder is same as company ID
-    const companyFolder = companyId?.toString();
+    if (!team || !companyId) {
+        console.error('❌ Missing team or companyId in getUserContext');
+        return {
+            team: team || 'UNKNOWN',
+            companyFolder: '0000_UNKNOWN'
+        };
+    }
+    
+    // ✅ Use getCompanyFolder to get proper slug
+    const companyFolder = await getCompanyFolder(companyId, team);
+    
+    console.log(`📁 Resolved company folder: ${companyFolder}`);
     
     return {
         team: team,
-        companyFolder: companyFolder
+        companyFolder: companyFolder  // ✅ "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ"
     };
 }
 
@@ -1195,7 +1205,7 @@ class ektyposhSymbaseonController {
 
         try {
             // ✅ Get user context for text loading
-            const userContext = getUserContext(req);
+            const userContext = await getUserContext(req);
             console.log('📍 User context:', userContext);
 
             // Διαγραφή παλιών αρχείων

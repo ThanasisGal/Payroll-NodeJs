@@ -28,6 +28,7 @@ const   { pdfDocumentl } = Models_E;
 // ✅ IMPORTS
 const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
+const { getUserContext } = require('../../utils/userContext');
 
 let nextPageSearchTerm = "";
 
@@ -923,10 +924,12 @@ class ergazomenoiController {
         try {
             console.log('\n📄 Generating contract PDF automatically...');
             
-            const userContext = {
-                team: sessionUserTeam,
-                companyFolder: sessionCompanyInUse.toString()
-            };
+            const userContext = await getUserContext(req);
+
+            // const userContext = {
+            //     team: sessionUserTeam,
+            //     companyFolder: sessionCompanyInUse.toString()
+            // };
             
             const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
             

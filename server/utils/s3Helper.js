@@ -40,7 +40,7 @@ async function saveToLocalStorage(s3Key, data) {
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(localPath, data);
     
-    console.log(`📁 DEV MODE: Saved locally: ${localPath}`);
+    // console.log(`📁 DEV MODE: Saved locally: ${localPath}`);
     
     return {
         success: true,

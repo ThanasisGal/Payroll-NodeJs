@@ -298,32 +298,151 @@ function loadTextByNumber(team, companyFolder, category, eidikh_kathgoria, numbe
  * loadTextsByPrefix()
  * ============================================================================
  */
+/**
+ * ============================================================================
+ * loadTextsByPrefix() - WITH DEBUG LOGGING
+ * ============================================================================
+ * 
+ * Φορτώνει όλα τα templates που ξεκινούν με συγκεκριμένο prefix
+ * 
+ * @param {string} team - Team name (π.χ. "THA")
+ * @param {string} companyFolder - Company folder με slug (π.χ. "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ")
+ * @param {string} category - Category (π.χ. "symbash")
+ * @param {string} prefix - Prefix για search (π.χ. "_HOTEL_")
+ * @returns {Object} Templates object { filename: content, ... }
+ * 
+ * ΠΑΡΑΔΕΙΓΜΑ:
+ * loadTextsByPrefix("THA", "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ", "symbash", "_HOTEL_")
+ * ��� Returns: { "_HOTEL_0001": "content1", "_HOTEL_0002": "content2", ... }
+ */
 function loadTextsByPrefix(team, companyFolder, category, prefix) {
     try {
+        // ✅ Validation
         if (!prefix) {
             console.warn('⚠️ loadTextsByPrefix: prefix is empty');
             return {};
         }
         
-        const results = {};
+        // ✅ Debug logging (can be toggled via env var)
+        const DEBUG = process.env.DEBUG_TEXT_LOADER === 'true';
+        
+        if (DEBUG) {
+            console.log('');
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('🔍 loadTextsByPrefix() DEBUG');
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('📥 Input Parameters:');
+            console.log(`   team:           "${team}"`);
+            console.log(`   companyFolder:  "${companyFolder}"`);
+            console.log(`   category:       "${category}"`);
+            console.log(`   prefix:         "${prefix}"`);
+        }
+        
+        // ✅ Construct search path
         const pathPrefix = `txt/${team}/${companyFolder}/${category}/`;
         
+        if (DEBUG) {
+            console.log('');
+            console.log('🔍 Search Configuration:');
+            console.log(`   pathPrefix:     "${pathPrefix}"`);
+            console.log(`   Cache size:     ${cacheManager.memoryCache.size} files`);
+        }
+        
+        // ✅ Show cache contents (first 10 keys) if debug
+        if (DEBUG && cacheManager.memoryCache.size > 0) {
+            console.log('');
+            console.log('📦 Cache Contents (first 10 keys):');
+            let count = 0;
+            for (const [key] of cacheManager.memoryCache.entries()) {
+                console.log(`   ${count + 1}. ${key}`);
+                count++;
+                if (count >= 10) {
+                    if (cacheManager.memoryCache.size > 10) {
+                        console.log(`   ... and ${cacheManager.memoryCache.size - 10} more`);
+                    }
+                    break;
+                }
+            }
+        } else if (DEBUG) {
+            console.log('');
+            console.log('⚠️  Cache is EMPTY! No files loaded.');
+        }
+        
+        // ✅ Search for matching templates
+        const results = {};
+        let pathMatchCount = 0;
+        let prefixMatchCount = 0;
+        
         for (const [key, value] of cacheManager.memoryCache.entries()) {
+            // Check if key starts with our path
             if (key.startsWith(pathPrefix)) {
+                pathMatchCount++;
+                
+                // Extract filename (remove path and .txt extension)
                 const filename = key
                     .substring(pathPrefix.length)
                     .replace('.txt', '');
                 
+                if (DEBUG && pathMatchCount <= 5) {
+                    console.log(`   ✅ Path match ${pathMatchCount}: ${key}`);
+                    console.log(`      → Filename: "${filename}"`);
+                    console.log(`      → Starts with "${prefix}"? ${filename.startsWith(prefix)}`);
+                }
+                
+                // Check if filename starts with prefix
                 if (filename.startsWith(prefix)) {
                     results[filename] = value;
+                    prefixMatchCount++;
                 }
             }
+        }
+        
+        // ✅ Results summary
+        if (DEBUG) {
+            console.log('');
+            console.log('📊 Search Results:');
+            console.log(`   Path matches:   ${pathMatchCount} files`);
+            console.log(`   Prefix matches: ${prefixMatchCount} files`);
+            console.log(`   Final results:  ${Object.keys(results).length} templates`);
+            
+            if (Object.keys(results).length > 0) {
+                console.log('');
+                console.log('✅ Found templates:');
+                Object.keys(results).forEach((filename, i) => {
+                    const contentLength = results[filename]?.length || 0;
+                    console.log(`   ${i + 1}. ${filename} (${contentLength} chars)`);
+                });
+            } else {
+                console.log('');
+                console.log('❌ No templates found!');
+                console.log('');
+                console.log('🔍 Troubleshooting:');
+                console.log('   1. Check if cache is loaded (cache size should be > 0)');
+                console.log('   2. Verify pathPrefix matches actual S3 structure');
+                console.log(`      Expected: ${pathPrefix}...`);
+                console.log('   3. Check if files were uploaded with correct prefix');
+                console.log(`      Looking for: ${prefix}*`);
+                console.log('   4. Verify companyFolder is slug (not ObjectId)');
+                console.log(`      Current: ${companyFolder}`);
+            }
+            
+            console.log('═══════════════════════════════════════════════════════════');
+            console.log('');
+        }
+        
+        // ✅ Always log if no results (even without DEBUG mode)
+        if (Object.keys(results).length === 0) {
+            console.warn(`⚠️ loadTextsByPrefix: No templates found for prefix "${prefix}"`);
+            console.warn(`   Path: ${pathPrefix}`);
+            console.warn(`   Cache size: ${cacheManager.memoryCache.size}`);
+            console.warn(`   Set DEBUG_TEXT_LOADER=true for detailed logging`);
         }
         
         return results;
         
     } catch (error) {
-        console.error(`Error loading texts by prefix: ${prefix}`, error);
+        console.error(`❌ Error loading texts by prefix: ${prefix}`, error);
+        console.error('   Stack:', error.stack);
         return {};
     }
 }

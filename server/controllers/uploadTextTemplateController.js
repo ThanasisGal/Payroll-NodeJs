@@ -1,22 +1,23 @@
 // ============================================================================
-// Upload Text Template Controller
+// Upload Text Template Controller - FIXED
 // Handles multi-file .txt uploads to AWS S3
 // ============================================================================
 
 const { uploadBufferToS3 } = require('../utils/s3Helper');
 const textCacheManager = require('../utils/textCacheManager');
+const { getCompanyFolder } = require('../utils/userContext'); // ✅ Import!
 
 // ============================================================================
 // Upload Text Templates to S3
 // ============================================================================
 exports.uploadTemplates = async (req, res) => {
     try {
-        console.log('🔥 POST /api/admin/templates/upload received');
-        console.log('   Headers:', req.headers);
-        console.log('   Body:', req.body);
-        console.log('   Files:', req.files ? req.files.length : 0);
+        // console.log('🔥 POST /api/admin/templates/upload received');
+        // console.log('   Headers:', req.headers);
+        // console.log('   Body:', req.body);
+        // console.log('   Files:', req.files ? req.files.length : 0);
 
-        const { team, company, category } = req.body;
+        const { team, company, category } = req.body;  // company = _id από frontend
         const files = req.files;
 
         // Validation: Check files
@@ -35,7 +36,14 @@ exports.uploadTemplates = async (req, res) => {
             });
         }
 
-        console.log(`📤 Uploading ${files.length} templates to ${category}`);
+        // ✅ ΔΙΟΡΘΩΣΗ: Get company folder με slug
+        // console.log(`🔍 Resolving company folder for: ${company}`);
+        const companyFolder = await getCompanyFolder(company, team);
+        // console.log(`✅ Company folder resolved: ${companyFolder}`);
+        // Π.χ. "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ"
+
+        // console.log(`📤 Uploading ${files.length} templates to ${category}`);
+        // console.log(`📁 Target path: txt/${team}/${companyFolder}/${category}/`);
 
         // Process all files
         const results = [];
@@ -54,12 +62,15 @@ exports.uploadTemplates = async (req, res) => {
                     continue;
                 }
 
-                // Construct S3 key
-                const s3Key = `txt/${team}/${company}/${category}/${filename}`;
+                // ✅ ΔΙΟΡΘΩΣΗ: Construct S3 key με slug
+                const s3Key = `txt/${team}/${companyFolder}/${category}/${filename}`;
+                // Π.χ. txt/THA/0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ/symbash/_HOTEL_0001.txt ✅
 
-                // ✅ Upload to S3 using buffer (NOT file.path)
+                // console.log(`📤 Uploading: ${s3Key}`);
+
+                // Upload to S3 using buffer
                 const result = await uploadBufferToS3(
-                    file.buffer,  // ✅ Use buffer from memoryStorage
+                    file.buffer,
                     s3Key,
                     'text/plain; charset=utf-8'
                 );
@@ -71,7 +82,7 @@ exports.uploadTemplates = async (req, res) => {
                     success: true
                 });
 
-                console.log(`✅ ${filename} uploaded successfully`);
+                // console.log(`✅ ${filename} uploaded successfully`);
 
             } catch (error) {
                 errors.push({
@@ -84,14 +95,14 @@ exports.uploadTemplates = async (req, res) => {
 
         // ✅ Reload text cache after successful uploads
         if (results.length > 0) {
-            console.log('🔄 Reloading text cache system...');
+            // console.log('🔄 Reloading text cache system...');
             try {
                 const refreshResult = await textCacheManager.refresh();
-                if (refreshResult.success) {
-                    console.log(`✅ Cache reloaded: ${refreshResult.totalFiles} templates in memory`);
-                } else {
-                    console.warn('⚠️ Cache reload failed:', refreshResult.error);
-                }
+                // if (refreshResult.success) {
+                //     console.log(`✅ Cache reloaded: ${refreshResult.totalFiles} templates in memory`);
+                // } else {
+                //     console.warn('⚠️ Cache reload failed:', refreshResult.error);
+                // }
             } catch (error) {
                 console.error('❌ Cache reload error:', error.message);
             }
@@ -103,10 +114,12 @@ exports.uploadTemplates = async (req, res) => {
             uploaded: results.length,
             failed: errors.length,
             results,
-            errors
+            errors,
+            // ✅ Include για debugging
+            uploadPath: `txt/${team}/${companyFolder}/${category}/`
         };
 
-        console.log(`📊 Upload complete: ${results.length} success, ${errors.length} failed`);
+        // console.log(`📊 Upload complete: ${results.length} success, ${errors.length} failed`);
 
         res.json(response);
 

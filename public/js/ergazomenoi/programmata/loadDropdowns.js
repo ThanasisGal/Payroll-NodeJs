@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const txtContent = selectedOption.text;
       const lastFourChars = txtContent.slice(-4);
       document.getElementById("kodikosHidden").value = lastFourChars;
-      document.getElementById("afmHidden").value = txtContent.slice(-17, -7);
+      document.getElementById("afm_ergazomenoyHidden").value = txtContent.slice(-17, -7);
       try {
         let selectedKodikos = document.getElementById("kodikosHidden").value;
         const response = await fetch(`/api/getErgazomeno/${selectedTeam}/${selectedCompany}/${selectedKodikos}`);
@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     } else {
       document.getElementById("kodikosHidden").value = '';
-      document.getElementById("afmHidden").value = '';
+      document.getElementById("afm_ergazomenoyHidden").value = '';
     }
   });
   

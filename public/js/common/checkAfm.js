@@ -710,51 +710,77 @@ document.addEventListener("DOMContentLoaded", () => {
         await setNativeSelectAndTriggerChange("polh", d.polh);
     }
 
-    async function fetchErgazomenoiData(afm, signal) {
-        const fieldId = 'afm_ergazomenoy';
+async function fetchErgazomenoiData(afm, signal) {
+    const fieldId = 'afm_ergazomenoy';
+    
+    try {
+        const resp = await fetchJson("/api/afmErgazomenoy", { afm }, "POST", signal);
         
-        try {
-            
-            const resp = await fetchJson("/api/afmErgazomenoy", { afm }, "POST", signal);
-            
-            if (!resp.ok) throw new Error("Σφάλμα κατά την αποστολή αιτήματος");
-            
-            const data = await resp.json();
-            
-            if (data) {
-                const esc = (s) => String(s ??  "").trim()
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#39;");
-                    
-                await Swal.fire({
-                    icon: "error",
-                    title: "Προσοχή",
-                    html: `Υπάρχει ήδη καταχώρηση με ΑΦΜ <strong>${esc(data.afm)} (${esc(data.eponymia)} ${esc(data.firstname)})</strong>...`,
-                    backdrop: false,
-                    allowOutsideClick: false,
-                    customClass: {
-                        confirmButton: "class-normal custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                    confirmButtonText: "Κλείσιμο",
-                });
-            }
-            
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                return null;
-            }
-            console.error('❌ Error:', error);
-            throw error;
-        } finally {
-            cleanupAbortSignal(fieldId);  // ✅ Καθαρισμός
+        if (!resp.ok) {
+            throw new Error("Σφάλμα κατά την αποστολή αιτήματος");
         }
+        
+        const data = await resp.json();
+        
+        // ✅ ΑΝ ΥΠΑΡΧΕΙ ΤΟ ΑΦΜ (duplicate)
+        if (data && data.afm) {
+            const esc = (s) => String(s ?? "").trim()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+                
+            await Swal.fire({
+                icon: "error",
+                title: "Προσοχή",
+                html: `Υπάρχει ήδη καταχώρηση με ΑΦΜ <strong>${esc(data.afm)} (${esc(data.eponymia)} ${esc(data.firstname)})</strong>. Δεν επιτρέπεται διπλή καταχώρηση.`,
+                backdrop: false,
+                allowOutsideClick: false,
+                customClass: {
+                    confirmButton: "class-normal custom-confirm-button custom-swal-button",
+                    title: "custom-title",
+                    popup: "custom-swal-popup",
+                },
+                confirmButtonText: "Κλείσιμο",
+            });
+            
+            // ❌ Clear το πεδίο μετά το error
+            const inputEl = document.getElementById('afm_ergazomenoy');
+            if (inputEl) inputEl.value = '';
+            
+            return { exists: true, data };
+            
+        } else {
+            // ✅ ΑΝ ΔΕΝ ΥΠΑΡΧΕΙ ΤΟ ΑΦΜ (νέος εργαζόμενος)
+            console.log('✅ ΑΦΜ δεν υπάρχει - επιτρέπεται η καταχώρηση');
+            
+            // ✅ 1. Παραμένει η τιμή στο visible input (δεν κάνουμε τίποτα)
+            
+            // ✅ 2. Ενημερώνουμε το hidden field
+            const hiddenInput = document.getElementById('afm_ergazomenoyHidden');
+            if (hiddenInput) {
+                hiddenInput.value = afm;
+                console.log('✅ Hidden field updated:', afm);
+            }
+            
+            return { exists: false, data: null };
+        }
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('⏹️ Request cancelled');
+            return null;
+        }
+        
+        console.error('❌ Error checking AFM:', error);
+        throw error;
+        
+    } finally {
+        // ✅ 3. Καθαρισμός του abort controller & active request flag
+        cleanupAbortSignal(fieldId);
     }
-
+}
     /** Κενός handler όπου δεν χρειάζεται ενέργεια */
     async function noOpHandler() {}
 });

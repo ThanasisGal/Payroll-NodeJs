@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   const selectedTeam = document.getElementById('team').value;
   const selectedCompany = document.getElementById('company_kod').value;
   const selectedKodikos = document.getElementById('kodikosHidden');
-  const selectedAfm = document.getElementById('afmHidden');
+  const selectedAfm = document.getElementById('afm_ergazomenoyHidden');
   const selectedUsername = document.getElementById('username').value;
   const selectedPassword = document.getElementById('password').value;
   const fromDateField = document.getElementById('apo_hmeromhnia');

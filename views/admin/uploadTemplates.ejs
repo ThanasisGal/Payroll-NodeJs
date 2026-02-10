@@ -10,13 +10,13 @@
         <h4>ℹ️ Οδηγίες</h4>
         <div class="info-columns">
             <ul>
-                <li><strong>Team & Company:</strong> Προσυμπληρωμένα</li>
-                <li><strong>Category:</strong> symbash, anhlikoi, allodapoi</li>
-                <li><strong>Prefix:</strong> Ειδική κατηγορία (_HOTEL_)</li>
+                <li><strong>Group / Team & Εταιρεία:</strong> Προσυμπληρωμένα</li>
+                <li><strong>Φάκελος:</strong> symbash, anhlikoi, allodapoi κλπ</li>
+                <li><strong>Ειδική Κατηγορία (Prefix):</strong> ΞΕΝΟΔΟΧΟΙ ΚΛΠ</li>
             </ul>
             <ul>
-                <li><strong>Files:</strong> .txt αρχεία, UTF-8, max 1MB</li>
-                <li><strong>Auto-naming:</strong> PREFIX_0001.txt, ...</li>
+                <li><strong>Αρχεία:</strong> .txt αρχεία, UTF-8, max 1MB</li>
+                <li><strong>Μετονομασία:</strong> PREFIX_0001.txt, ...</li>
             </ul>
         </div>
     </div>
@@ -35,33 +35,43 @@
             <div class="form-group">
                 <label for="team">Team *</label>
                 <input type="text" 
-                       id="team" 
-                       name="team" 
-                       class="form-control" 
-                       value="<%= sessionTeam %>" 
-                       readonly 
-                       required>
+                    id="team" 
+                    name="team" 
+                    class="form-control" 
+                    value="<%= sessionTeam %>" 
+                    readonly 
+                    required>
             </div>
             
             <div class="form-group">
-                <label for="company">Company *</label>
+                <label for="companyDisplay">Company *</label>
+                
+                <%# ✅ FIXED: Hidden field με id για JavaScript %>
+                <input type="hidden" 
+                    id="company"
+                    name="company" 
+                    value="<%= companyId %>">
+                
+                <%# Display field %>
                 <input type="text" 
-                       id="company" 
-                       name="company" 
-                       class="form-control" 
-                       value="<%= companyKod %>" 
-                       readonly 
-                       required>
-                <small class="helper-text"><%= companyName %></small>
+                    id="companyDisplay" 
+                    class="form-control" 
+                    value="<%= companyKod %> - <%= companyName %>" 
+                    readonly 
+                    title="Company: <%= companyName %>">
+                
+                <small class="helper-text">
+                    📁 Upload to: txt/<%= sessionTeam %>/<%= companyKod %>_<company_name>/<category>/
+                </small>
             </div>
-        </div>
-        
+        </div>        
+
         <%# Row 2: Category & Prefix %>
         <div class="form-row">
             <div class="form-group">
-                <label for="category">Category *</label>
+                <label for="category">Φάκελος *</label>
                 <select id="category" name="category" class="form-control" required>
-                    <option value="">-- Επίλεξε Κατηγορία --</option>
+                    <option value="">-- Επίλεξε Κατηγορία / Φάκελο --</option>
                     <option value="symbash">Συμβάσεις (symbash)</option>
                     <option value="anhlikoi">Ανήλικοι (anhlikoi)</option>
                     <option value="allodapoi">Αλλοδαποί (allodapoi)</option>
@@ -101,12 +111,12 @@
         <%# Row 3: File Selection %>
         <div class="form-group">
             <label>
-                Select Files * 
+                Επιλογή Αρχείων * 
                 <span class="file-count-badge" id="fileCountBadge" style="display:none;">0 files</span>
             </label>
             <div class="file-input-wrapper">
                 <button type="button" class="file-input-button" id="fileSelectBtn">
-                    📁 Choose .txt Files
+                    📁 Επιλέξτε τα .txt Αρχεία
                 </button>
                 <input type="file" 
                        id="fileInput" 
@@ -343,7 +353,7 @@
             }
             
             const team = document.getElementById('team').value;
-            const company = document.getElementById('company').value;
+            const company = document.querySelector('input[name="company"]').value;
             const category = document.getElementById('category').value;
             const csrfToken = document.querySelector('input[name="_csrf"]').value;
             
@@ -369,7 +379,7 @@
                 formData.append('company', company);
                 formData.append('category', category);
                 
-                console.log(`🚀 Uploading ${selectedFiles.length} files...`);
+                // console.log(`🚀 Uploading ${selectedFiles.length} files...`);
                 
                 // Show progress
                 progressFill.style.width = '50%';
@@ -386,7 +396,7 @@
                 
                 const result = await response.json();
                 
-                console.log('📦 Upload result:', result);
+                // console.log('📦 Upload result:', result);
                 
                 // Update progress to 100%
                 progressFill.style.width = '100%';
