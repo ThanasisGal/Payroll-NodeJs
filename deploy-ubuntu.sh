@@ -1435,12 +1435,6 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     echo "🔄 RESTARTING APPLICATION"
     echo "=========================================="
     
-    echo "[EC2] Flushing old PM2 logs..."
-    pm2 flush
-
-    # rm -f /home/ubuntu/.pm2/logs/payroll-error.log
-    # rm -f /home/ubuntu/.pm2/logs/payroll-out.log
-
     # ✅ Ensure custom logs path exists (PM2 uses these paths)
     echo "[EC2] Ensuring custom PM2 logs directory exists..."
     mkdir -p /home/ubuntu/Payroll-NodeJs/logs
@@ -1448,6 +1442,12 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
           /home/ubuntu/Payroll-NodeJs/logs/pm2-error.log
     chown -R ubuntu:ubuntu /home/ubuntu/Payroll-NodeJs/logs
     chmod -R 755 /home/ubuntu/Payroll-NodeJs/logs
+
+    echo "[EC2] Flushing old PM2 logs..."
+    pm2 flush
+
+    # rm -f /home/ubuntu/.pm2/logs/payroll-error.log
+    # rm -f /home/ubuntu/.pm2/logs/payroll-out.log
 
     echo "[EC2] Reloading PM2..."
     if pm2 describe payroll > /dev/null 2>&1; then
