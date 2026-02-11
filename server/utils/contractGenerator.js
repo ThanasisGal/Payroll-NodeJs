@@ -190,21 +190,24 @@ async function generateContractPDF(ergazomenos, userContext) {
                                 + (company.firstname ? company.firstname.trim() : "");
         
         // Gender-based variables
-        const _CAPITAL_ONOMASTIKH_A = ergazomenos.fylo ? "Ο"  : "Η";
-        const _CAPITAL_ONOMASTIKH_K = ergazomenos.fylo ? "ΟΣ" : "Η";
-        const _CAPITAL_GENIKH_A     = ergazomenos.fylo ? "ΟΥ" : "ΗΣ";
-        const _CAPITAL_AITIATIKH_A  = ergazomenos.fylo ? "ΟΝ" : "ΗΝ";
-        const _ONOMASTIKH_A         = ergazomenos.fylo ? "ο"  : "η";
-        const _ONOMASTIKH_K         = ergazomenos.fylo ? "ος" : "η";
-        const _GENIKH_A             = ergazomenos.fylo ? "ου" : "ης";
-        const _AITIATIKH_A          = ergazomenos.fylo ? "ον" : "ην";
-        const _ANTONYMIA_O          = ergazomenos.fylo ? "ός" : "ή";
-        const _ANTONYMIA_G          = ergazomenos.fylo ? "ού" : "ής";
-        const _ANTONYMIA_A          = ergazomenos.fylo ? "όν" : "ήν";
+        const _CAPITAL_ONOMASTIKH_A = ergazomenos.fylo ? "Η"  : "Ο" ;
+        const _CAPITAL_ONOMASTIKH_K = ergazomenos.fylo ? "Η"  : "ΟΣ";
+        const _CAPITAL_GENIKH_A     = ergazomenos.fylo ? "ΗΣ" : "ΟΥ";
+        const _CAPITAL_AITIATIKH_A  = ergazomenos.fylo ? "ΗΝ" : "ΟΝ";
+        const _ONOMASTIKH_A         = ergazomenos.fylo ? "η"  : "ο" ;
+        const _ONOMASTIKH_K         = ergazomenos.fylo ? "η"  : "ος";
+        const _GENIKH_A             = ergazomenos.fylo ? "ης" : "ου";
+        const _AITIATIKH_A          = ergazomenos.fylo ? "ην" : "ον";
+        const _ANTONYMIA_O          = ergazomenos.fylo ? "ή"  : "ός";
+        const _ANTONYMIA_G          = ergazomenos.fylo ? "ής" : "ού";
+        const _ANTONYMIA_A          = ergazomenos.fylo ? "ήν" : "όν";
         
         // ✅ Load dynamic texts from S3 cache
         let _HOTEL = "";
         let _ADDITIONAL_CLAUSES = "";
+
+        // ✅ NEW: κρατάμε και τα κομμάτια για τα placeholders _HOTEL_0001..0004
+        let hotelParts = {};
         
         if (ergazomenos.eidikh_kathgoria_ergazomenoy && userContext) {
             try {
@@ -216,6 +219,9 @@ async function generateContractPDF(ergazomenos, userContext) {
                     CATEGORIES.SYMBASH,
                     ergazomenos.eidikh_kathgoria_ergazomenoy
                 );
+
+                // ✅ NEW
+                hotelParts = templates || {};
                 
                 if (Object.keys(templates).length > 0) {
                     _HOTEL = combineTexts(templates);
@@ -235,6 +241,8 @@ async function generateContractPDF(ergazomenos, userContext) {
                 if (ergazomenos.eidikh_kathgoria_ergazomenoy === "0009") {
                     _HOTEL = "Ειδικότερα συμφωνείται ότι, με μονομερή ενέργεια ο εργοδότης έχει τη δυνατότητα εφαρμογής των ρυθμίσεων της δεσμευτικής για όλους τους εργοδότες ΣΣΕ Ξενοδοχειακών επιχειρήσεων όλης της χώρας 2023 -2024, άρθρο 5 και τυχόν ισχύουσα δεσμευτική τοπική σε κάποια εγκατάσταση για την εφαρμογή του 5νθημέρου και την εργασία της έκτης ημέρας, κατά περίπτωση.";
                 }
+                // ✅ NEW: για να μην περάσει ποτέ undefined στο docx
+                hotelParts = {};
             }
         }
         
@@ -254,7 +262,7 @@ async function generateContractPDF(ergazomenos, userContext) {
         
         switch (ergazomenos.kathestos_apasxolhshs) {
             case "0":
-                apasxolhsh = "ΠΛ��ΡΟΥΣ";
+                apasxolhsh = "ΠΛΗΡΟΥΣ";
                 typos = "μισθωτός";
                 typos_erg = typos;
                 typos_erg_genikh = "μισθωτού";
@@ -317,13 +325,11 @@ async function generateContractPDF(ergazomenos, userContext) {
             _EPONYMIA: eponymia_Etairias,
             _ODOS: company.odos ? company.odos.trim() : "..........",
             _ARITHMOS: company.arithmos ? company.arithmos.trim() : ".....",
-            _AFM: company.afm ? company.afm.trim() : "..........",
-            _DOY: doy?.perigrafh ? doy.perigrafh.trim() : "..........",
+            _AFM_ETAIREIAS: company.afm ? company.afm.trim() : "..........",
+            _DOY_ETAIREIAS: doy?.perigrafh ? doy.perigrafh.trim() : "..........",
             _DIALLEIMA: ergazomenos.dialleima_se_lepta || 0,
             _DIALLEIMA_LEKTIKA: numberToText(parseInt(ergazomenos.dialleima_se_lepta || 0), ''),
-            _EKTOS_ENTOS_ORARIOY: ergazomenos.dialleima_entos_ektos_orarioy 
-                ? "ΕΝΤΟΣ ΩΡΑΡΙΟΥ (αποτελεί χρόνο εργασίας και δεν επεκτείνει το ωράριο εργασίας)" 
-                : "ΕΚΤΟΣ ΩΡΑΡΙΟΥ (δεν αποτελεί χρόνο εργασίας και επεκτείνει το ωράριο εργασίας)",
+            _EKTOS_ENTOS_ORARIOY: ergazomenos.dialleima_entos_ektos_orarioy ? "ΕΝΤΟΣ ΩΡΑΡΙΟΥ" : "ΕΚΤΟΣ ΩΡΑΡΙΟΥ",
             
             _EPONYMO_EKPROSOPOY: nomimoiEkprosopoi?.eponymia 
                 ? (nomimoiEkprosopoi.eponymia.endsWith("Σ") 
@@ -335,7 +341,18 @@ async function generateContractPDF(ergazomenos, userContext) {
                     ? nomimoiEkprosopoi.onoma.slice(0, -1).trim() 
                     : nomimoiEkprosopoi.onoma).trim() 
                 : "..........",
-            
+            _PATRONYMO_EKPROSOPOY: nomimoiEkprosopoi.onoma_patera 
+                ? (nomimoiEkprosopoi.onoma_patera.endsWith("ΟΣ") 
+                    ? nomimoiEkprosopoi.onoma_patera.slice(0, -2) + "ΟΥ"
+                    : nomimoiEkprosopoi.onoma_patera.endsWith("Σ") 
+                    ? nomimoiEkprosopoi.onoma_patera.slice(0, -1).trim() 
+                    : nomimoiEkprosopoi.onoma_patera).trim()
+                : "..........",
+            _DT_EKPROSOPOY: nomimoiEkprosopoi.typos_taytothtas,
+            _ADT_EKPROSOPOY: nomimoiEkprosopoi.arithmos_taytothtas,
+            _AFM_EKPROSOPOY: nomimoiEkprosopoi.afm,
+            _THLEFONO_EKPROSOPOY: nomimoiEkprosopoi.thlefono,
+            _EMAIL_EKPROSOPOY: nomimoiEkprosopoi.email,
             _CAPITAL_ONOMASTIKH_A,
             _ONOMASTIKH_A,
             _CAPITAL_ONOMASTIKH_K,
@@ -377,7 +394,22 @@ async function generateContractPDF(ergazomenos, userContext) {
             _HOTEL,
             _ADDITIONAL_CLAUSES,
             _EPOXIKOTHTA: epoxikothta,
-            
+
+            // ✅ NEW: χειροκίνητα placeholders για docx: {_HOTEL_0001}..{_HOTEL_0004}
+            // (ποτέ undefined — πάντα string)
+            _HOTEL_0001: hotelParts._HOTEL_0001 || "",
+            _HOTEL_0002: hotelParts._HOTEL_0002 || "",
+            _HOTEL_0003: hotelParts._HOTEL_0003 || "",
+            _HOTEL_0004: hotelParts._HOTEL_0004 || "",
+            _HOTEL_0005: hotelParts._HOTEL_0005 || "",
+            _HOTEL_0006: hotelParts._HOTEL_0006 || "",
+            _HOTEL_0005: ergazomenos.dialleima_entos_ektos_orarioy
+                ? (hotelParts._HOTEL_0005 || "")
+                : "",
+            _HOTEL_0006: ergazomenos.dialleima_entos_ektos_orarioy
+                ? ""
+                : (hotelParts._HOTEL_0006 || ""),
+
             _TYPOS_ERG: typos_erg,
             _TYPOS_ERG_GENIKH: typos_erg_genikh,
             _TYPOS_ERG_GENIKH_CAPITAL: typos_erg_genikh_capital,

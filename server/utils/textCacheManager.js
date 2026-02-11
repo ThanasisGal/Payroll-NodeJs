@@ -63,40 +63,40 @@ class TextCacheManager {
      * syncFromS3() - Κατεβάζει όλα τα files από S3
      */
     async syncFromS3() {
-        if (this.isRefreshing) {
-            return;
-        }
+        if (this.isRefreshing) return;
 
         try {
             this.isRefreshing = true;
-            const listCommand = new ListObjectsV2Command({
-                Bucket: this.bucket,
-                Prefix: "txt/"
-            });
-            
-            const response = await this.s3Client.send(listCommand);
-            
-            if (!response.Contents || response.Contents.length === 0) {
+
+            // 1) Πάρε ΟΛΑ τα S3 keys (pagination)
+            const s3KeysSet = await this.listAllS3Keys("txt/");
+
+            if (!s3KeysSet || s3KeysSet.size === 0) {
+                logger.warn("⚠️ No txt/ files found in S3");
                 return;
             }
 
+            // 2) Σβήσε orphans από local cache
+            const { deleted, kept } = await this.deleteOrphanCacheFiles(s3KeysSet);
+            logger.info(`🧹 Cache cleanup: deleted ${deleted} orphan files, kept ${kept}`);
+
+            // 3) Κατέβασε/ενημέρωσε όλα τα υπάρχοντα keys
             let syncedCount = 0;
-            for (const item of response.Contents) {
-                const key = item.Key;
-                if (key.endsWith("/")) continue;
-                
+            for (const key of s3KeysSet) {
                 await this.downloadFile(key);
                 syncedCount++;
             }
 
             this.lastRefresh = new Date();
-            
+            logger.info(`✅ Synced ${syncedCount} files from S3`);
+
         } catch (error) {
             logger.error("❌ Σφάλμα κατά το sync από S3:", error.message);
         } finally {
             this.isRefreshing = false;
         }
     }
+
 
     /**
      * downloadFile() - Κατεβάζει ένα αρχείο από S3
@@ -136,6 +136,41 @@ class TextCacheManager {
         });
     }
 
+    /**
+     * Λίστα όλων των S3 keys κάτω από ένα Prefix (με pagination)
+     * @returns {Promise<Set<string>>}
+     */
+    async listAllS3Keys(prefix = "txt/") {
+        const keys = new Set();
+        let continuationToken = undefined;
+
+        while (true) {
+            const listCommand = new ListObjectsV2Command({
+                Bucket: this.bucket,
+                Prefix: prefix,
+                MaxKeys: 1000,
+                ContinuationToken: continuationToken
+            });
+
+            const response = await this.s3Client.send(listCommand);
+
+            if (response.Contents) {
+                for (const item of response.Contents) {
+                    if (!item?.Key) continue;
+                    if (item.Key.endsWith("/")) continue; // ignore "folders"
+                    keys.add(item.Key);
+                }
+            }
+
+            if (!response.IsTruncated) break;
+            continuationToken = response.NextContinuationToken;
+            if (!continuationToken) break;
+        }
+
+        return keys;
+    }
+
+
     // ========================================================================
     // ΜΕΡΟΣ 3: Memory Cache & Fast Access
     // ========================================================================
@@ -161,35 +196,49 @@ class TextCacheManager {
      * Key:  "txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt"
      * Value: "Το περιεχόμενο του αρχείου..."
      */
-    async loadToMemory() {
-        try {
-            // Clear existing cache
-            this.memoryCache.clear();
-            
-            // Βρίσκουμε όλα τα .txt files αναδρομικά
-            const files = await this.getAllCachedFiles(this.cacheDir);
-            
-            // Φορτώνουμε το καθένα στη μνήμη
-            for (const filePath of files) {
-                // Παίρνουμε το relative path από το cache directory
-                // Π.χ. "txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt"
-                const relativePath = path.relative(this.cacheDir, filePath);
-                
-                // Διαβάζουμε το περιεχόμενο
-                const content = await fs.readFile(filePath, "utf-8");
-                
-                // Normalize path (Windows: \ → /)
-                const cacheKey = relativePath.replace(/\\/g, "/");
-                
-                // Αποθηκεύουμε στο Map
-                this.memoryCache.set(cacheKey, content.trim());
+async loadToMemory() {
+    try {
+        // Clear existing cache
+        this.memoryCache.clear();
+
+        // Βρίσκουμε όλα τα .txt files αναδρομικά
+        const files = await this.getAllCachedFiles(this.cacheDir);
+
+        let invalidCount = 0;
+
+        for (const filePath of files) {
+            // Παίρνουμε το relative path από το cache directory
+            // π.χ. "txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt"
+            const relativePath = path
+                .relative(this.cacheDir, filePath)
+                .replace(/\\/g, "/");
+
+            // 🚨 Guard: company folder χωρίς slug (π.χ. txt/THA/0001/symbash)
+            if (/^txt\/THA\/\d{4}\/symbash\//.test(relativePath)) {
+                logger.error(`🚨 INVALID CACHE PATH DETECTED (ignored): ${relativePath}`);
+                invalidCount++;
+                continue; // ❗ δεν το φορτώνουμε στη μνήμη
             }
-            
-        } catch (error) {
-            logger.error("❌ Σφάλμα κατά τη φόρτωση στη μνήμη:", error);
-            // Δεν κάνουμε throw - το app μπορεί να τρέξει
+
+            // Διαβάζουμε το περιεχόμενο
+            const content = await fs.readFile(filePath, "utf-8");
+
+            // Αποθηκεύουμε στο Map
+            this.memoryCache.set(relativePath, content.trim());
         }
+
+        if (invalidCount > 0) {
+            logger.error(`🚨 ${invalidCount} invalid cache files were detected and ignored`);
+        }
+
+        logger.info(`🧠 Memory cache loaded: ${this.memoryCache.size} files`);
+
+    } catch (error) {
+        logger.error("❌ Σφάλμα κατά τη φόρτωση στη μνήμη:", error);
+        // Δεν κάνουμε throw – το app μπορεί να τρέξει
     }
+}
+
 
     /**
      * ========================================================================
@@ -235,6 +284,40 @@ class TextCacheManager {
         }
         
         return files;
+    }
+
+    /**
+     * Διαγράφει από το disk cache ό,τι ΔΕΝ υπάρχει στο S3 (orphans)
+     *
+     * @param {Set<string>} s3KeysSet - Set με όλα τα keys που υπάρχουν στο S3 (π.χ. "txt/THA/0001_.../symbash/_HOTEL_0001.txt")
+     * @returns {Promise<{deleted: number, kept: number}>}
+     */
+    async deleteOrphanCacheFiles(s3KeysSet) {
+        let deleted = 0;
+        let kept = 0;
+
+        // Βρίσκουμε όλα τα cached .txt files (αναδρομικά)
+        const localFiles = await this.getAllCachedFiles(this.cacheDir);
+
+        for (const filePath of localFiles) {
+            // Μετατρέπουμε σε key μορφή "txt/THA/...."
+            const relativePath = path.relative(this.cacheDir, filePath).replace(/\\/g, "/");
+
+            // Αν δεν υπάρχει στο S3 → delete
+            if (!s3KeysSet.has(relativePath)) {
+                try {
+                    await fs.remove(filePath);
+                    deleted++;
+                    // logger.warn(`🗑️ Deleted orphan cache file: ${relativePath}`);
+                } catch (err) {
+                    logger.error(`❌ Failed to delete orphan file: ${relativePath}`, err.message);
+                }
+            } else {
+                kept++;
+            }
+        }
+
+        return { deleted, kept };
     }
 
     /**
