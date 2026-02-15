@@ -441,8 +441,8 @@ const buildCSPDirectives = () => {
         ],
         "worker-src": ["'self'", "blob:"],
         "object-src": ["'self'", "blob:"],
-        "frame-src": ["'self'", "blob:"],
-        "child-src": ["'self'", "blob:"],
+        "frame-src": ["'self'", "blob:", "https://*.amazonaws.com", "https://*.cloudfront.net"],
+        "child-src": ["'self'", "blob:", "https://*.amazonaws.com", "https://*.cloudfront.net"],
         "base-uri": ["'self'"],
         "form-action": ["'self'"],
         "frame-ancestors": ["'none'"]
