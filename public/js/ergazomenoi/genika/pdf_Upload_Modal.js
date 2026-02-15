@@ -274,12 +274,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // ✅ INJECT FILE TO PREVIEW MODULE (with documentType)
         if (window.pdfPreviewModule) {
-            console.log('💉 Injecting file to preview module:', file.name, 'as', currentDocumentType);
             window.pdfPreviewModule.injectFile(file, currentDocumentType);
         }
 
-        // ��� ALSO inject to pdfUploadModule's selectedFiles (redundant but safe)
-        console.log(`✅ selectedFiles[${currentDocumentType}] =`, file.name);        
         displayFileInfo(file);
     }
 
@@ -293,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // =========================================================================
-    // ✅ PDF PREVIEW - FULLY WORKING VERSION
+    // ✅ PDF PREVIEW 
     // =========================================================================
     
     if (showPdfPreview) {
@@ -315,8 +312,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // ✅ Create new blob URL
             currentBlobUrl = URL.createObjectURL(file);
-            
-            console.log('📄 Opening PDF in new tab:', file.name);
             
             // ✅ Open in new tab
             const newWindow = window.open(currentBlobUrl, '_blank');
@@ -451,24 +446,12 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
         getFileAsBase64: async function(documentType) {
-            // ✅ DEBUG LOGS
-            console.log(`🔍 getFileAsBase64 called for: "${documentType}"`);
-            console.log(`📦 selectedFiles keys:`, Object.keys(selectedFiles));
-            
-            if (selectedFiles[documentType]) {
-                console.log(`📄 File found: ${selectedFiles[documentType].name} (${selectedFiles[documentType].size} bytes)`);
-            } else {
-                console.log(`❌ NO FILE for "${documentType}"!`);
-            }
-            
             const file = selectedFiles[documentType];
             
             if (!file) {
                 console.warn(`⚠️ No file selected for ${documentType}`);
                 return null;
             }
-            
-            console.log(`📄 Converting to base64: ${file.name}`);
             
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -500,10 +483,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             updateButtonBadge();
-            
-            console.log('🗑️ All PDF files cleared');
         }
     };
-    
-    console.log('✅ PDF Upload Module initialized');
 });

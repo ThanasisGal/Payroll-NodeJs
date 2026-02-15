@@ -173,7 +173,7 @@ class ergazomenoiController {
             rec: {}
         });
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
     };
 
@@ -336,7 +336,7 @@ class ergazomenoiController {
             totalRecs: totalRecords,
         });
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
     };
 
@@ -432,7 +432,7 @@ class ergazomenoiController {
             totalRecs: totalRecords,
         });
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
     };
 
@@ -797,9 +797,7 @@ class ergazomenoiController {
 
         try {
             savedErgazomenos = await ErgazomenoiModel.create(newErgazomenos); // ✅ Αποθήκευση
-            console.log("Εργαζόμενος αποθηκεύτηκε με _id:", savedErgazomenos._id);
         } catch (error) {
-            console.log("Σφάλμα κατά τη αποθήκευση του/ης εργαζομένου/ης:", error);
             return res.status(500).json({ 
                 success: false, 
                 errorMessage: "Σφάλμα κατά τη αποθήκευση του εργαζόμενου" 
@@ -850,18 +848,8 @@ class ergazomenoiController {
         for (const [base64Field, mapping] of Object.entries(pdfFieldMappings)) {
             const base64Data = formData[base64Field];
             
-            // ✅ DEBUG: Log BEFORE check
-            console.log(`🔍 Checking ${base64Field}:`, {
-                hasData: !!base64Data,
-                isPdf: base64Data?.startsWith('data:application/pdf;base64,'),
-                size: base64Data ? `${(base64Data.length / 1024).toFixed(2)}KB` : 'N/A',
-                documentType: mapping.documentType
-            });
-            
             if (base64Data && base64Data.startsWith('data:application/pdf;base64,')) {
                 try {
-                    console.log(`📄 Processing PDF: ${mapping.documentType}`);
-                    
                     const s3Key = await savePdfFromBase64(
                         base64Data,
                         mapping.documentType,
@@ -875,9 +863,6 @@ class ergazomenoiController {
                         success: true,
                         s3Key: s3Key
                     });
-                    
-                    console.log(`✅ PDF saved: ${mapping.documentType} → ${s3Key}`);
-                    
                 } catch (error) {
                     console.error(`❌ Failed to process ${mapping.documentType}:`, error.message);
                     pdfResults.push({
@@ -895,7 +880,6 @@ class ergazomenoiController {
         if (pdfResults.length > 0) {
             try {
                 await savedErgazomenos.save();
-                console.log(`✅ Updated ergazomenos with ${pdfResults.length} PDF S3 keys`);
             } catch (error) {
                 console.error(`❌ Failed to save PDF paths:`, error);
             }
@@ -920,29 +904,36 @@ class ergazomenoiController {
         // ============================================================================
 
         const { generateContractPDF } = require('../../utils/contractGenerator');
+        const { generatePresignedUrl } = require('../../utils/s3Helper'); // ✅ FIXED!
+
+        let contractPdfData = null;
 
         try {
-            console.log('\n📄 Generating contract PDF automatically...');
-            
             const userContext = await getUserContext(req);
-
-            // const userContext = {
-            //     team: sessionUserTeam,
-            //     companyFolder: sessionCompanyInUse.toString()
-            // };
             
             const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
+            
+            // ✅ Generate signed URL (10 minutes expiration)
+            const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
             
             // Save S3 key στο document
             savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path = contractS3Key;
             await savedErgazomenos.save();
             
-            console.log(`✅ Contract PDF generated and saved: ${contractS3Key}`);
+            contractPdfData = {
+                url: pdfUrl,
+                s3Key: contractS3Key,
+                showPreview: true
+            };
             
         } catch (pdfError) {
-            console.error('❌ Failed to generate contract PDF:', pdfError);
-            // Don't fail the whole request - PDF generation is optional
-            console.warn('⚠️ Continuing without contract PDF...');
+            console.error('⚠️ Error generating contract PDF:', pdfError);
+            console.error('Stack:', pdfError.stack);
+            
+            contractPdfData = {
+                error: 'PDF generation failed: ' + pdfError.message,
+                showPreview: false
+            };
         }
 
         const orarioValidation = validateOrarioFields(formData);
@@ -1086,23 +1077,63 @@ class ergazomenoiController {
             });
         }
 
-        // ✅ ΤΕΛΙΚΟ RESPONSE με _id και PDF results
+        // ============================================================================
+        // ✅ ΤΕΛΙΚΟ RESPONSE (μόνο ΕΔΩ επιστρέφουμε!)
+        // ============================================================================
+
         try {
+            // ✅ Get company data for email
+            let company = req.session?.companyData || null;
+            
+            // ❌ If not in session, fetch from DB
+            if (!company && sessionCompanyInUse) {
+                try {
+                    company = await CompaniesModel.findById(sessionCompanyInUse).lean();
+                } catch (error) {
+                    console.error('❌ [BACKEND] Error fetching company:', error.message);
+                    company = null;
+                }
+            }
+            
+            // ✅ Extract company contact info
+            const companyEmail = company?.email || null;
+            const companyPhone = company?.thlefono || null;
+            const companyName = company ? `${company.eponymia || ''} ${company.firstname || ''}`.trim() : null;
+
+            // ✅ Determine company type (ΕΤΑΙΡΕΙΑ vs ΕΠΙΧΕΙΡΗΣΗ)
+            let companyType = 'ΕΠΙΧΕΙΡΗΣΗ'; // Default
+            if (company && company.eponymia) {
+                const firstname = (company.firstname || '').trim();
+                if (!firstname || firstname === '') {
+                    companyType = 'ΕΤΑΙΡΕΙΑ'; // Εταιρεία (no firstname)
+                } else {
+                    companyType = 'ΕΠΙΧΕΙΡΗΣΗ'; // Ατομική επιχείρηση (has firstname)
+                }
+            }
+
             return res.status(201).json({ 
-                success: true, 
+                success: true,
+                message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',
                 data: {
                     _id: savedErgazomenos._id,
                     kodikos: savedErgazomenos.kodikos,
                     eponymo: savedErgazomenos.eponymo,
                     onoma: savedErgazomenos.onoma,
-                    // ✅ Προσθήκη PDF paths
+                    email: savedErgazomenos.email,           // ✅ ADD employee email
+                    fylo: savedErgazomenos.fylo,             // ✅ ADD gender
+                    yphkoothta: savedErgazomenos.yphkoothta, // ✅ ADD nationality
                     arxeio_apodoxhs_oron_atomikhs_symbashs_path: savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
                     arxeio_apodoxhs_oysiodon_oron_path: savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
                     arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
                     arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
                 },
-                pdfResults: pdfResults, // ✅ Πληροφορίες για PDFs
+                pdfResults: pdfResults,
+                contractPdf: contractPdfData,
+                companyEmail: companyEmail,      // ✅ NEW
+                companyPhone: companyPhone,      // ✅ NEW
+                companyName: companyName,        // ✅ NEW
+                companyType: companyType,        // ✅ NEW!
                 redirectUrl: "/ergazomenoi/ergazomenoi" 
             });
         } catch (error) {
@@ -1112,8 +1143,6 @@ class ergazomenoiController {
                 errorMessage: "Σφάλμα κατά την ολοκλήρωση" 
             });
         }        
-        
-        
         
         
     }
@@ -1189,7 +1218,7 @@ class ergazomenoiController {
         }
         aa_eggr = aaValue;
         } catch (error) {
-        console.log("Σφάλμα :", error);
+            console.log("Σφάλμα :", error);
         }
 
         const filteredDataErgazomenoi = {

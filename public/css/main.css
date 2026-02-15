@@ -7607,3 +7607,263 @@ body.upload-templates-page .progress-fill {
     background-color: #6c757d !important; /* γκρι */
     color: white !important;
 }
+
+/* ========================================================================
+   PDF PREVIEW MODAL (για σύμβαση) - UPDATED
+   ======================================================================== */
+
+/* ✅ Modal Overlay - Πιο ανοιχτό backdrop */
+.pdf-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5); /* ✅ Changed from 0.75 to 0.5 */
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(3px); /* ✅ Reduced blur */
+}
+
+.pdf-modal:not(.hidden) {
+    display: flex !important;
+}
+
+/* ✅ Modal Container */
+.pdf-preview-modal-large {
+    width: 90vw !important;
+    max-width: 1400px !important;
+    height: 90vh !important;
+    max-height: 900px;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+/* ✅ Header - OPTION 2 */
+.pdf-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: linear-gradient(to right, #1b3f21 0%, #467d44 100%);
+    color: white;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.pdf-modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+}
+
+.pdf-modal-close {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    font-size: 1.1rem;
+}
+
+.pdf-modal-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: rotate(90deg);
+}
+
+/* ✅ Body */
+.pdf-preview-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ✅ Iframe */
+.pdf-preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+    flex: 1;
+    display: block;
+    object-fit: contain;
+}
+
+/* ✅ Loading Spinner */
+.pdf-preview-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    z-index: 10;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.pdf-preview-loading.hidden {
+    display: none;
+}
+
+.pdf-preview-loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3rem;
+    color: #7d6844;
+}
+
+.pdf-preview-loading p {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #666;
+    font-weight: 500;
+}
+
+/* ✅ Footer - 3 buttons */
+.pdf-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 24px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.pdf-modal-footer .btn {
+    padding: 8px 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+/* ✅ Secondary button (Παράλειψη) */
+.pdf-modal-footer .btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.pdf-modal-footer .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+/* ✅ Info button (Λήψη & Email) */
+.pdf-modal-footer .btn-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    flex: 1;
+}
+
+.pdf-modal-footer .btn-info:hover:not(:disabled) {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+}
+
+.pdf-modal-footer .btn-info:disabled {
+    background: #d6d8db;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ✅ Success button (Λήψη & Συνέχεια) */
+.pdf-modal-footer .btn-success {
+    background: linear-gradient(135deg, #705f42 0%, #8b7355 100%);
+    color: white;
+    flex: 1;
+}
+
+.pdf-modal-footer .btn-success:hover {
+    background: linear-gradient(135deg, #5f4e35 0%, #7a6347 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(112, 95, 66, 0.4);
+}
+
+.pdf-modal-footer .btn i,
+.pdf-modal-footer .btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ✅ Animations */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ✅ Responsive */
+@media (max-width: 768px) {
+    .pdf-preview-modal-large {
+        width: 95vw !important;
+        height: 95vh !important;
+    }
+    
+    .pdf-modal-header {
+        padding: 10px 16px;
+    }
+    
+    .pdf-modal-header h3 {
+        font-size: 1.1rem;
+    }
+    
+    .pdf-modal-close {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .pdf-modal-footer {
+        flex-direction: column;
+        padding: 10px 16px;
+        gap: 8px;
+    }
+    
+    .pdf-modal-footer .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

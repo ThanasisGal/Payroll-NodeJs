@@ -379,8 +379,6 @@
                 formData.append('company', company);
                 formData.append('category', category);
                 
-                // console.log(`🚀 Uploading ${selectedFiles.length} files...`);
-                
                 // Show progress
                 progressFill.style.width = '50%';
                 progressFill.textContent = '50% - Uploading...';
@@ -395,8 +393,6 @@
                 });
                 
                 const result = await response.json();
-                
-                // console.log('📦 Upload result:', result);
                 
                 // Update progress to 100%
                 progressFill.style.width = '100%';

@@ -151,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        console.log("📦 Συλλεγμένα δεδομένα φόρμας:", formData);
+        // console.log("📦 Συλλεγμένα δεδομένα φόρμας:", formData);
 
         try {
             await Promise.all(filePromises);
@@ -433,25 +433,48 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 // ✅ Success/Warning Messages
                 if (failedPdfs.length === 0) {
-                    // ✅ ALL PDFs saved successfully (or no PDFs at all)
-                    await Swal.fire({
-                        backdrop: false,
-                        allowOutsideClick: false,
-                        icon: "success",
-                        title: "Επιτυχής καταχώριση!",
-                        html: successfulPdfs.length > 0
-                            ? `<p>Ο εργαζόμενος αποθηκεύτηκε!</p><p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
-                            : "<p>Ο εργαζόμενος αποθηκεύτηκε επιτυχώς!</p>",
-                        timer: 1500,
-                        showConfirmButton: false,
-                        customClass: {
-                            confirmButton: "class-success custom-confirm-button custom-swal-button",
-                            title: "custom-title",
-                            popup: "custom-swal-popup",
-                        },
-                    }).then(() => {
-                        window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
-                    });
+                    // ✅ CHECK: Does response have contract PDF preview?
+                    if (data.contractPdf && data.contractPdf.showPreview && data.contractPdf.url) {
+                        // ✅ Show PDF preview modal
+                        // ✅ Get employee name from form data
+                        const employeeName = `${formData.eponymoHidden || ''} ${formData.onomaHidden || ''}`.trim() || 'UNKNOWN';
+
+                        // ✅ Get company data from response (backend should send this)
+                        const companyData = {
+                            email: data.companyEmail || null,
+                            phone: data.companyPhone || null,
+                            name: data.companyName || null,
+                            type: data.companyType || 'ΕΠΙΧΕΙΡΗΣΗ'
+                        };
+
+                        // ✅ Call modal with all data
+                        showContractPdfModal(
+                            data.contractPdf.url, 
+                            data.redirectUrl || "/ergazomenoi/ergazomenoi",
+                            employeeName,
+                            companyData
+                        );
+                    } else {
+                        // ✅ No PDF preview - normal success
+                        await Swal.fire({
+                            backdrop: false,
+                            allowOutsideClick: false,
+                            icon: "success",
+                            title: "Επιτυχής καταχώριση!",
+                            html: successfulPdfs.length > 0
+                                ? `<p>Ο εργαζόμενος αποθηκεύτηκε!</p><p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
+                                : "<p>Ο εργαζόμενος αποθηκεύτηκε επιτυχώς!</p>",
+                            timer: 1500,
+                            showConfirmButton: false,
+                            customClass: {
+                                confirmButton: "class-success custom-confirm-button custom-swal-button",
+                                title: "custom-title",
+                                popup: "custom-swal-popup",
+                            },
+                        }).then(() => {
+                            window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+                        });
+                    }
                 } else {
                     // ⚠️ Some PDFs failed to save
                     const failedTypes = failedPdfs.map(f => f.documentType).join(', ');
@@ -531,5 +554,180 @@ document.addEventListener("DOMContentLoaded", () => {
     buttons.forEach((button) => {
         button.addEventListener("click", handleFormSubmit);
     });
-    
+
+    // ============================================================================
+    // PDF CONTRACT PREVIEW MODAL
+    // ============================================================================
+
+    function showContractPdfModal(pdfUrl, redirectUrl, employeeName = 'UNKNOWN', companyData = {}) {
+        const modal = document.getElementById('pdfPreviewContractModal');
+        const iframe = document.getElementById('pdfPreviewIframe');
+        const loading = document.getElementById('pdfPreviewLoading');
+        const closeBtn = document.getElementById('closePdfPreviewModal');
+        const skipBtn = document.getElementById('skipPdfDownload');
+        const downloadBtn = document.getElementById('downloadAndContinue');
+        const emailBtn = document.getElementById('downloadAndEmail');
+        
+        if (!modal || !iframe) {
+            console.error('❌ PDF preview modal elements not found!');
+            window.location.href = redirectUrl;
+            return;
+        }
+        
+        // ✅ Check if email exists in form
+        const emailInput = document.getElementById('email') || document.querySelector('input[name="email"]');
+        const employeeEmail = emailInput?.value?.trim() || '';
+        
+        // ✅ Enable/disable email button based on email presence
+        if (emailBtn) {
+            if (employeeEmail && employeeEmail.includes('@')) {
+                emailBtn.disabled = false;
+                emailBtn.title = `Αποστολή στο ${employeeEmail}`;
+            } else {
+                emailBtn.disabled = true;
+                emailBtn.title = 'Δεν υπάρχει email εργαζόμενου';
+            }
+        }
+        
+        // ✅ Show modal
+        modal.classList.remove('hidden');
+        
+        if (loading) {
+            loading.classList.remove('hidden');
+        }
+        
+        // ✅ Load PDF
+        iframe.src = pdfUrl;
+        
+        // ✅ Hide loading spinner when iframe loads
+        iframe.onload = () => {
+            if (loading) {
+                loading.classList.add('hidden');
+            }
+        };
+        
+        // ✅ Handle error
+        iframe.onerror = (error) => {
+            console.error('❌ PDF loading error:', error);
+            if (loading) {
+                loading.innerHTML = '<p class="text-danger">❌ Αποτυχία φόρτωσης PDF</p>';
+            }
+        };
+        
+        // ✅ Close handlers
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            iframe.src = '';
+            window.location.href = redirectUrl;
+        };
+        
+        // ✅ Download handler
+        const downloadAndClose = () => {
+            window.open(pdfUrl, '_blank');
+            setTimeout(closeModal, 500);
+        };
+        
+        // ✅ Download + Email handler
+        const downloadAndSendEmail = async () => {
+            if (!employeeEmail) {
+                await Swal.fire({
+                    backdrop: false,
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    text: 'Δεν βρέθηκε email εργαζόμενου!',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Download PDF
+            window.open(pdfUrl, '_blank');
+            
+            // Show loading
+            emailBtn.disabled = true;
+            emailBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Αποστολή...';
+            
+            try {
+                // ✅ Send email request
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+                
+                // ✅ Get form data for email
+                const fyloInput = document.getElementById('fylo') || document.querySelector('input[name="fylo"]');
+                const fyloValue = fyloInput?.value === 'true' || fyloInput?.checked === true;
+
+                const yphkoothtaInput = document.getElementById('yphkoothta_stathera') || document.querySelector('select[name="yphkoothta_stathera"]');
+                const yphkoothtaValue = yphkoothtaInput?.value || '048';
+
+                const requestBody = {
+                    email: employeeEmail,
+                    pdfUrl: pdfUrl,
+                    employeeName: employeeName,
+                    fylo: fyloValue,
+                    yphkoothta: yphkoothtaValue,
+                    companyEmail: companyData?.email || null,
+                    companyPhone: companyData?.phone || null,
+                    companyName: companyData?.name || null,
+                    companyType: companyData?.type || 'ΕΠΙΧΕΙΡΗΣΗ'
+                };
+
+                const response = await fetch('/api/send-contract-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    await Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: `✅ Email στάλθηκε στο ${employeeEmail}`,
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                    
+                    setTimeout(closeModal, 1000);
+                } else {
+                    throw new Error(data.message || 'Email failed');
+                }
+                
+            } catch (error) {
+                console.error('❌ Email error:', error);
+                
+                await Swal.fire({
+                    backdrop: false,
+                    icon: 'error',
+                    title: 'Αποτυχία αποστολής email',
+                    text: String(error.message || error),
+                    confirmButtonText: 'OK'
+                });
+                
+                // Restore button
+                emailBtn.disabled = false;
+                emailBtn.innerHTML = '<i class="bi bi-envelope-arrow-down"></i> Λήψη & Αποστολή Email';
+            }
+        };
+        
+        // ✅ Event listeners
+        if (closeBtn) closeBtn.onclick = closeModal;
+        if (skipBtn) skipBtn.onclick = closeModal;
+        if (downloadBtn) downloadBtn.onclick = downloadAndClose;
+        if (emailBtn) emailBtn.onclick = downloadAndSendEmail;
+        
+        // ✅ ESC key to close
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+    }
 });

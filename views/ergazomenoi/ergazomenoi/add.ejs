@@ -658,4 +658,48 @@ PDF UPLOAD MODAL (Shared across all sections)
     </div>
 </div>
 
+<!-- ========================================================================
+PDF PREVIEW MODAL (Contract Preview & Download)
+======================================================================== -->
+<div id="pdfPreviewContractModal" class="pdf-modal hidden">
+    <div class="pdf-modal-content pdf-preview-modal-large">
+        <div class="pdf-modal-header">
+            <h3>📄 Σύμβαση Εργαζόμενου</h3>
+            <button type="button" class="pdf-modal-close" id="closePdfPreviewModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <div class="pdf-modal-body pdf-preview-body">
+            <!-- PDF Preview iframe -->
+            <iframe
+                id="pdfPreviewIframe"
+                class="pdf-preview-iframe"
+                title="Contract PDF Preview"
+            ></iframe>
+            
+            <!-- Loading spinner -->
+            <div id="pdfPreviewLoading" class="pdf-preview-loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Φόρτωση...</span>
+                </div>
+                <p>Φόρτωση PDF...</p>
+            </div>
+        </div>
+        
+        <div class="pdf-modal-footer">
+            <button type="button" class="btn btn-secondary" id="skipPdfDownload">
+                Παράλειψη
+            </button>
+            
+            <button type="button" class="btn btn-info" id="downloadAndEmail" disabled>
+                <i class="bi bi-envelope-arrow-down"></i> Λήψη & Αποστολή Email
+            </button>
+            
+            <button type="button" class="btn btn-success" id="downloadAndContinue">
+                <i class="bi bi-download"></i> Λήψη PDF & Συνέχεια
+            </button>
+        </div>
+    </div>
+</div>
 </div>
