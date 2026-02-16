@@ -449,7 +449,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         // ✅ Call modal with all data
                         showContractPdfModal(
-                            data.contractPdf.url, 
+                            data.contractPdf.url,     // Presigned URL (για iframe)
+                            data.contractPdf.s3Key,   // ✅ ADD: S3 key (για email)
                             data.redirectUrl || "/ergazomenoi/ergazomenoi",
                             employeeName,
                             companyData
@@ -559,7 +560,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // PDF CONTRACT PREVIEW MODAL
     // ============================================================================
 
-    function showContractPdfModal(pdfUrl, redirectUrl, employeeName = 'UNKNOWN', companyData = {}) {
+    function showContractPdfModal(pdfUrl, s3Key, redirectUrl, employeeName = 'UNKNOWN', companyData = {}) {
         const modal = document.getElementById('pdfPreviewContractModal');
         const iframe = document.getElementById('pdfPreviewIframe');
         const loading = document.getElementById('pdfPreviewLoading');
@@ -660,7 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const requestBody = {
                     email: employeeEmail,
-                    pdfUrl: pdfUrl,
+                    pdfUrl: s3Key,  // ✅ CORRECT - raw S3 key
                     employeeName: employeeName,
                     fylo: fyloValue,
                     yphkoothta: yphkoothtaValue,
@@ -669,6 +670,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     companyName: companyData?.name || null,
                     companyType: companyData?.type || 'ΕΠΙΧΕΙΡΗΣΗ'
                 };
+
+                // ✅ DEBUG
+                console.log('🔍 [FRONTEND] Sending email with S3 key:', s3Key);
+                console.log('   Starts with contracts/:', s3Key?.startsWith('contracts/'));
 
                 const response = await fetch('/api/send-contract-email', {
                     method: 'POST',

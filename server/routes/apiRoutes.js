@@ -24,12 +24,13 @@ router.get('/symbaseis/stoixeiaSymbaseon',      symbaseisController.listStoixeia
 /**
  * POST /api/send-contract-email
  * Send contract PDF via email to employee
+ * ✅ FIXED: Support both local paths AND S3 keys
  */
 router.post('/send-contract-email', async (req, res) => {
     try {
         const { 
             email,           // Employee email
-            pdfUrl,          // PDF URL path
+            pdfUrl,          // PDF URL path OR S3 key
             employeeName,    // Employee full name
             fylo,            // Gender (false = male, true = female)
             yphkoothta,      // Nationality code (048 = Greek)
@@ -39,7 +40,9 @@ router.post('/send-contract-email', async (req, res) => {
             companyType      // Εταιρεία / Επιχείρηση
         } = req.body;
         
+        // ============================================================================
         // ✅ VALIDATION
+        // ============================================================================
         
         if (!email || !email.includes('@')) {
             console.error('❌ [API] Invalid email:', email);
@@ -57,55 +60,90 @@ router.post('/send-contract-email', async (req, res) => {
             });
         }
         
-        // ✅ DETERMINE LANGUAGE (Greek if nationality = 048)
-        const isGreek = yphkoothta === '048';
+        // ============================================================================
+        // ✅ DETERMINE LANGUAGE & GENDER
+        // ============================================================================
         
-        // ✅ DETERMINE GENDER (fylo: false = male, true = female)
+        const isGreek = yphkoothta === '048';
         const isMale = fylo === false || fylo === 'false';
 
-        // ✅ CONVERT PDF URL TO FILESYSTEM PATH
-        // PDFs are stored in uploads/ (at root level, NOT in public/)
-        const pdfPath = pdfUrl.startsWith('/uploads/')
-            ? path.join(process.cwd(), pdfUrl)  // /uploads/... → <root>/uploads/...
-            : pdfUrl;
+        // ============================================================================
+        // ✅ SMART PATH DETECTION: S3 key OR local path
+        // ============================================================================
+        
+        let pdfPath;
+        let pdfFilename;
+        
+        console.log('\n🔍 [API] PDF Path Detection:');
+        console.log('   pdfUrl:', pdfUrl);
+        console.log('   pdfUrl type:', typeof pdfUrl);
+        
+        // Check if it's an S3 key (starts with "contracts/")
+        const isS3Key = typeof pdfUrl === 'string' && pdfUrl.startsWith('contracts/');
+        
+        if (isS3Key) {
+            // ✅ S3 KEY: Pass directly (no decoding, no filesystem check)
+            console.log('   ✅ Detected: S3 key');
+            
+            // Decode if URL-encoded (fix Greek characters)
+            pdfPath = decodeURIComponent(pdfUrl);
+            pdfFilename = path.basename(pdfPath);
+            
+            console.log('   Decoded S3 key:', pdfPath);
+            console.log('   Filename:', pdfFilename);
+            
+        } else if (pdfUrl.startsWith('/uploads/')) {
+            // ✅ LOCAL PATH: Convert to filesystem path
+            console.log('   ✅ Detected: Local filesystem path');
+            
+            pdfPath = path.join(process.cwd(), pdfUrl);
+            pdfFilename = path.basename(pdfPath);
+            
+            console.log('   Filesystem path:', pdfPath);
+            console.log('   Filename:', pdfFilename);
+            
+            // ✅ CHECK IF FILE EXISTS (with retry for async generation)
+            let pdfExists = false;
+            let retries = 0;
+            const maxRetries = 10;
 
-        // ✅ EXTRACT FILENAME FROM PATH
-        const pdfFilename = path.basename(pdfPath);
-
-        // ✅ CHECK IF FILE EXISTS (with retry mechanism for async PDF generation)
-        let pdfExists = false;
-        let retries = 0;
-        const maxRetries = 10; // 10 retries = 5 seconds
-
-        while (!pdfExists && retries < maxRetries) {
-            try {
-                await fs.access(pdfPath);
-                pdfExists = true;
-            } catch (error) {
-                retries++;
-                if (retries < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
-                } else {
-                    console.error('❌ [API] PDF file NOT FOUND after retries:', pdfPath);
-                    
-                    // ✅ DEBUG: List available files
-                    try {
-                        const dir = path.dirname(pdfPath);
-                        const files = await fs.readdir(dir);
-                    } catch (e) {
-                        console.error('❌ [API] Cannot read directory:', e.message);
+            while (!pdfExists && retries < maxRetries) {
+                try {
+                    await fs.access(pdfPath);
+                    pdfExists = true;
+                    console.log('   ✅ File exists on filesystem');
+                } catch (error) {
+                    retries++;
+                    if (retries < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } else {
+                        console.error('❌ [API] PDF file NOT FOUND after retries:', pdfPath);
+                        throw new Error(`Το αρχείο PDF δεν βρέθηκε: ${pdfFilename}`);
                     }
-                    
-                    throw new Error(`Το αρχείο PDF δεν βρέθηκε: ${pdfFilename}`);
                 }
             }
+            
+        } else {
+            // ❌ UNKNOWN FORMAT
+            console.error('❌ [API] Unknown pdfUrl format:', pdfUrl);
+            throw new Error('Μη έγκυρη μορφή PDF path');
         }
 
+        console.log();
+
+        // ============================================================================
         // ✅ SEND EMAIL
+        // ============================================================================
+        
+        console.log('📧 [API] Sending email...');
+        console.log('   To:', email);
+        console.log('   PDF Path:', pdfPath);
+        console.log('   Filename:', pdfFilename);
+        
         const result = await sendContractEmail({
             to: email,
             employeeName: employeeName || 'Εργαζόμενε/η',
-            pdfPath: pdfPath,
+            pdfPath: pdfPath,  // ✅ Can be S3 key OR local path
             pdfFilename: pdfFilename,
             isGreek: isGreek,
             isMale: isMale,
@@ -116,6 +154,8 @@ router.post('/send-contract-email', async (req, res) => {
         });
         
         // ✅ SUCCESS RESPONSE
+        console.log('✅ [API] Email sent successfully');
+        
         res.json({
             success: true,
             message: `Email στάλθηκε επιτυχώς στο ${email}`,
@@ -133,5 +173,6 @@ router.post('/send-contract-email', async (req, res) => {
         });
     }
 });
+
 
 module.exports = router;
