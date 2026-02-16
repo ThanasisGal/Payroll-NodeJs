@@ -223,10 +223,6 @@ function parseTableColumns(text) {
     
     const result = formattedRows.join('\n');
     
-    if (formattedRows.length > 0) {
-        console.log(`   📊 Table: ${formattedRows.length} rows with bullets`);
-    }
-    
     return result;
 }
 
@@ -251,7 +247,6 @@ async function findTextInPdf(pdfPath, searchText) {
         
         for (const item of textContent.items) {
             if (item.str.includes(searchText)) {
-                console.log(`📍 Found text "${searchText}" on page ${pageNum}`);
                 position = {
                     pageIndex: pageNum,
                     x: item.transform[4],
@@ -273,7 +268,6 @@ async function findTextInPdf(pdfPath, searchText) {
  */
 async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) {
     if (!position) {
-        console.log("⚠️ Text position not found, skipping image insertion");
         return false;
     }
     
@@ -321,7 +315,6 @@ async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) 
         const pdfBytesModified = await pdfDoc.save();
         await fs.writeFile(outputPath, pdfBytesModified);
         
-        console.log('✅ Image inserted successfully');
         return true;
         
     } catch (error) {
@@ -352,11 +345,8 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
     }
     
     if (Object.keys(categoryParts).length === 0) {
-        console.log('ℹ️ No category templates to process');
         return placeholders;
     }
-    
-    console.log(`🔧 Processing ${Object.keys(categoryParts).length} category templates...`);
     
     try {
         // 1️⃣ Βασικά placeholders (απλά templates)
@@ -383,7 +373,6 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
                     hasTable = tableText && tableText.length > 0;
                     
                     const rowCount = tableText ? tableText.split('\n').length : 0;
-                    console.log(`   ✅ Table: ${key} → ${rowCount} rows, ${tableText.length} chars`);
                 } catch (error) {
                     console.error(`   ❌ Error parsing table ${key}:`, error.message);
                 }
@@ -396,33 +385,17 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
                 const prefix = key.replace('_0005', '');
                 const shouldShow = ergazomenos && ergazomenos.dialleima_entos_ektos_orarioy === true;
                 placeholders[`${prefix}_0005`] = shouldShow ? (value || "") : "";
-                
-                if (shouldShow) {
-                    console.log(`   ✅ Conditional: ${prefix}_0005 → SHOWN (διάλειμμα ΕΝΤΟΣ)`);
-                }
             }
             
             if (key && key.endsWith('_0006')) {
                 const prefix = key.replace('_0006', '');
                 const shouldShow = ergazomenos && ergazomenos.dialleima_entos_ektos_orarioy === false;
                 placeholders[`${prefix}_0006`] = shouldShow ? (value || "") : "";
-                
-                if (shouldShow) {
-                    console.log(`   ✅ Conditional: ${prefix}_0006 → SHOWN (διάλειμμα ΕΚΤΟΣ)`);
-                }
             }
         }
         
         // 4️⃣ ✅ Set _SHOW_TABLE flag
         placeholders._SHOW_TABLE = hasTable;
-        
-        if (hasTable) {
-            console.log(`   ✅ _SHOW_TABLE = true`);
-        } else {
-            console.log(`   ℹ️ _SHOW_TABLE = false`);
-        }
-        
-        console.log(`✅ Generated ${Object.keys(placeholders).length} dynamic placeholders`);
         
         return placeholders;
         
@@ -438,13 +411,6 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
 
 async function generateContractPDF(ergazomenos, userContext) {
     try {
-        console.log(`\n📄 ════════════════════════════════════════════════════════`);
-        console.log(`📄 Generating contract PDF`);
-        console.log(`📄 Employee: ${ergazomenos.onoma} ${ergazomenos.eponymo}`);
-        console.log(`📄 Code: ${ergazomenos.kodikos}`);
-        console.log(`📄 Category: ${ergazomenos.eidikh_kathgoria_ergazomenoy || 'N/A'}`);
-        console.log(`📄 ════════════════════════════════════════════════════════\n`);
-        
         await fs.ensureDir(outputFolder);
         
         if (!await fs.pathExists(docxTemplatePath)) {
@@ -484,8 +450,6 @@ async function generateContractPDF(ergazomenos, userContext) {
         
         if (ergazomenos.eidikh_kathgoria_ergazomenoy && userContext) {
             try {
-                console.log(`📚 Loading templates for category: ${ergazomenos.eidikh_kathgoria_ergazomenoy}`);
-                
                 const templates = loadTextsByCategory(
                     userContext.team,
                     userContext.companyFolder,
@@ -497,7 +461,6 @@ async function generateContractPDF(ergazomenos, userContext) {
                 
                 if (Object.keys(templates).length > 0) {
                     _COMBINED_TEXT = combineTexts(templates);
-                    console.log(`✅ Loaded ${Object.keys(templates).length} templates (${_COMBINED_TEXT.length} chars)`);
                 } else {
                     console.warn(`⚠️ No templates found for category ${ergazomenos.eidikh_kathgoria_ergazomenoy}`);
                 }
@@ -679,12 +642,10 @@ async function generateContractPDF(ergazomenos, userContext) {
             ),
         };
         
-        console.log('\n🔧 Generating dynamic placeholders...');
         const dynamicPlaceholders = generateCategoryPlaceholders(categoryParts, ergazomenos);
         
         Object.assign(data, dynamicPlaceholders);
         
-        console.log('\n🔍 Validating placeholders...');
         const undefinedKeys = [];
         for (const [key, value] of Object.entries(data)) {
             if (value === undefined || value === null) {
@@ -696,11 +657,8 @@ async function generateContractPDF(ergazomenos, userContext) {
         if (undefinedKeys.length > 0) {
             console.warn(`⚠️ Fixed ${undefinedKeys.length} undefined placeholders:`);
             undefinedKeys.forEach(k => console.warn(`   - ${k}`));
-        } else {
-            console.log(`✅ All ${Object.keys(data).length} placeholders validated`);
         }
         
-        console.log('\n📝 Generating DOCX from template...');
         const content = await fs.readFile(docxTemplatePath, 'binary');
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, {
@@ -714,10 +672,6 @@ async function generateContractPDF(ergazomenos, userContext) {
         const tempDocxPath = path.join(outputFolder, `contract_${ergazomenos.kodikos}_${timestamp}.docx`);
         const updatedDocx = doc.getZip().generate({ type: 'nodebuffer' });
         await fs.writeFile(tempDocxPath, updatedDocx);
-        
-        console.log('✅ DOCX generated:', path.basename(tempDocxPath));
-        
-        console.log('🔄 Converting DOCX to PDF with LibreOffice...');
         
         const isWindows = process.platform === 'win32';
         const libreOfficePath = isWindows
@@ -739,16 +693,12 @@ async function generateContractPDF(ergazomenos, userContext) {
             throw new Error('PDF file was not created');
         }
         
-        console.log('✅ PDF generated:', path.basename(tempPdfPath));
-
         // ============================================================================
         // ✅ INSERT COMPANY STAMP (ΣΦΡΑΓΙΔΑ) INTO PDF
         // ============================================================================
 
         if (company.sfragida) {
             try {
-                console.log('🖼️  Inserting company stamp into PDF...');
-                
                 const searchText = 'ΕΙΣΑΓΩΓΗ ΕΙΚΟΝΑΣ ΕΔΩ';
                 const position = await findTextInPdf(tempPdfPath, searchText);
                 
@@ -760,9 +710,7 @@ async function generateContractPDF(ergazomenos, userContext) {
                         position
                     );
                     
-                    if (success) {
-                        console.log('✅ Company stamp inserted successfully');
-                    } else {
+                    if (!success) {
                         console.warn('⚠️ Failed to insert stamp');
                     }
                 } else {
@@ -773,11 +721,8 @@ async function generateContractPDF(ergazomenos, userContext) {
                 console.error('❌ Error inserting stamp:', stampError.message);
                 // Continue without stamp (non-fatal error)
             }
-        } else {
-            console.log('ℹ️  No company stamp (sfragida) available');
         }
 
-        console.log('☁️  Uploading PDF to S3...');
         const { uploadBufferToS3 } = require('./s3Helper');
 
         // ✅ Sanitize filename components
@@ -798,39 +743,29 @@ async function generateContractPDF(ergazomenos, userContext) {
         const eponymo = sanitizeFilename(ergazomenos.eponymo || 'UNKNOWN');
         const onoma = sanitizeFilename(ergazomenos.onoma || 'UNKNOWN');
 
-        // ✅ S3 key με Greek characters (S3 supports UTF-8)
-        const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/${kodikos}_${eponymo}_${onoma}_contract.pdf`;
+        // ✅ Generate timestamp (human-readable format)
+        const now = new Date();
+        const timestamps = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0')
+        ].join('-') + '_' + [
+            String(now.getHours()).padStart(2, '0'),
+            String(now.getMinutes()).padStart(2, '0'),
+            String(now.getSeconds()).padStart(2, '0')
+        ].join('-');
 
-        console.log(`📝 [CONTRACT] S3 Key: ${s3Key}`);
-        // ✅ DEBUG: Print exact S3 key
-        console.log('\n🔍 [DEBUG] S3 Key Generation:');
-        console.log('   Raw eponymo:', ergazomenos.eponymo);
-        console.log('   Raw onoma:', ergazomenos.onoma);
-        console.log('   Sanitized eponymo:', eponymo);
-        console.log('   Sanitized onoma:', onoma);
-        console.log('   Final S3 key:', s3Key);
-        console.log('   S3 key length:', s3Key.length);
-        console.log('   Contains URL encoding:', s3Key.includes('%'));
-        console.log();
+        const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/${kodikos}_${eponymo}_${onoma}_contract_${timestamps}.pdf`;
 
         const pdfBuffer = await fs.readFile(tempPdfPath);
         await uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf');
 
-        console.log(`✅ PDF uploaded to S3: ${s3Key}`);
-
-        console.log('🧹 Cleaning up temporary files...');
         try {
             await fs.unlink(tempDocxPath);
             await fs.unlink(tempPdfPath);
-            console.log('✅ Temporary files cleaned');
         } catch (cleanupError) {
             console.warn('⚠️ Failed to clean up temp files:', cleanupError.message);
         }
-        
-        console.log(`\n✅ ════════════════════════════════════════════════════════`);
-        console.log(`✅ Contract PDF generation complete!`);
-        console.log(`✅ S3 Key: ${s3Key}`);
-        console.log(`✅ ════════════════════════════════════════════════════════\n`);
         
         return s3Key;
         

@@ -335,6 +335,108 @@ document.addEventListener("DOMContentLoaded", () => {
                 filesToUpdate: result.value
             };
 
+            // ============================================================================
+            // ✅ SHOW PROGRESS BAR MODAL
+            // ============================================================================
+
+            Swal.fire({
+                title: 'Δημιουργία Σύμβασης Εργασίας',
+                html: `
+                    <div class="pdf-generation-progress">
+                        <div class="progress-spinner">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-step-text" id="progress-step-text">
+                            Προετοιμασία...
+                        </div>
+                        
+                        <div class="progress-bar-container">
+                            <div class="custom-progress">
+                                <div class="custom-progress-bar progress-bar-striped progress-bar-animated" 
+                                    id="pdf-progress-bar" 
+                                    role="progressbar"
+                                    aria-valuenow="0"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    style="width: 0%">
+                                    0%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="progress-info-text">
+                            <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                            <ul class="progress-steps-list">
+                                <li>Αποθήκευση στοιχείων εργαζόμενου</li>
+                                <li>Δημιουργία εγγράφου από template</li>
+                                <li>Μετατροπή σε PDF</li>
+                                <li>Ασφαλή αποθήκευση στο cloud</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="progress-time-estimate">
+                            <span style="margin-right: 8px;">⏱️</span>
+                            <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
+                        </div>
+                    </div>
+                `,
+                backdrop: false,
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                customClass: {
+                    popup: 'custom-swal-popup',
+                    title: 'custom-title'
+                },
+                didOpen: () => {
+                    // ✅ Start progress simulation
+                    startProgressAnimation();
+                }
+            });
+
+            // ============================================================================
+            // ✅ PROGRESS ANIMATION FUNCTION
+            // ============================================================================
+
+            function startProgressAnimation() {
+                const steps = [
+                    { percent: 15, text: 'Αποθήκευση στοιχείων εργαζόμενου...', duration: 800 },
+                    { percent: 30, text: 'Δημιουργία DOCX από template...', duration: 1500 },
+                    { percent: 50, text: 'Συμπλήρωση στοιχείων σύμβασης...', duration: 2000 },
+                    { percent: 70, text: 'Μετατροπή DOCX σε PDF...', duration: 3000 },
+                    { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
+                    { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
+                ];
+                
+                let currentStepIndex = 0;
+                
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+                    
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('pdf-progress-bar');
+                    const progressText = document.getElementById('progress-step-text');
+                    
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+                    
+                    currentStepIndex++;
+                    
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+                
+                // Start animation
+                setTimeout(updateProgress, 500);
+            }
+
             const response = await fetch("/ergazomenoi/ergazomenoi/add", {
                 method: "POST",
                 headers: {
@@ -344,6 +446,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 credentials: "include",
                 body: JSON.stringify(payload),
             });
+
+            // ============================================================================
+            // ✅ SMOOTH PROGRESS COMPLETION
+            // ============================================================================
+
+            // Calculate minimum wait time (sum of all animation durations: ~9.6s)
+            const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
+
+            // Wait minimum 3 seconds so user can see the progress animation
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Smoothly transition to 100%
+            const progressBar = document.getElementById('pdf-progress-bar');
+            const progressText = document.getElementById('progress-step-text');
+
+            if (progressBar && progressText) {
+                // Force 100% completion
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                progressBar.classList.remove('progress-bar-animated');
+                progressBar.setAttribute('aria-valuenow', 100);
+                progressText.textContent = 'Ολοκλήρωση...';
+                
+                // Show completion message for 1 second
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            // Close progress modal smoothly
+            Swal.close();
 
             // =========================================================================
             // RESPONSE HANDLING
@@ -468,11 +598,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             type: data.companyType || 'ΕΠΙΧΕΙΡΗΣΗ'
                         };
 
-                        // ✅ Call modal with s3Key
-                        console.log('🔍 [FRONTEND] Calling modal with:');
-                        console.log('   pdfUrl:', data.contractPdf.url);
-                        console.log('   s3Key:', data.contractPdf.s3Key);
-                        
                         showContractPdfModal(
                             data.contractPdf.url, 
                             data.contractPdf.s3Key,  // ✅ Pass s3Key
@@ -695,10 +820,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     companyName: companyData?.name || null,
                     companyType: companyData?.type || 'ΕΠΙΧΕΙΡΗΣΗ'
                 };
-
-                // ✅ DEBUG
-                console.log('🔍 [FRONTEND] Sending email with S3 key:', s3Key);
-                console.log('   Starts with contracts/:', s3Key?.startsWith('contracts/'));
 
                 const response = await fetch('/api/send-contract-email', {
                     method: 'POST',

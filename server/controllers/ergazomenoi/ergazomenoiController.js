@@ -149,29 +149,29 @@ class ergazomenoiController {
         };
 
         try {
-        const userTeam = req.session.userTeam;
-        const companyId = req.session.companyInUse;
+            const userTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
 
-        const ergazomenoiId = req.params.id;
-        const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).exec();
-        // const ergazomenoiKod = req.params.kod;
-        const ergazomenoiKod = ergazomenoiData.kodikos;
-        const istorikoData = await IstorikoProslhpseonAllagonModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod })
-        const perifereies = await PerifereiesModel.find().sort("perigrafh");
-        const genikesParametroi = await GenikesParametroiModel.find().sort({ kodikos: 1 }).lean();
-        const orariaData = await ProdhlomenaOrariaModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod, hmeromhnia: { $gte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo), $lte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos) } }).sort({ hmeromhnia: 1 }).exec();
+            const ergazomenoiId = req.params.id;
+            const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).exec();
+            // const ergazomenoiKod = req.params.kod;
+            const ergazomenoiKod = ergazomenoiData.kodikos;
+            const istorikoData = await IstorikoProslhpseonAllagonModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod })
+            const perifereies = await PerifereiesModel.find().sort("perigrafh");
+            const genikesParametroi = await GenikesParametroiModel.find().sort({ kodikos: 1 }).lean();
+            const orariaData = await ProdhlomenaOrariaModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod, hmeromhnia: { $gte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo), $lte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos) } }).sort({ hmeromhnia: 1 }).exec();
 
-        res.render("ergazomenoi/ergazomenoi/edit", {
-            locals,
-            perifereies,
-            genikesParametroi,
-            istorikoData,
-            orariaData,
-            ergazomenoiData,
-            mode: "edit", 
-            context: "ergazomenoi", 
-            rec: {}
-        });
+            res.render("ergazomenoi/ergazomenoi/edit", {
+                locals,
+                perifereies,
+                genikesParametroi,
+                istorikoData,
+                orariaData,
+                ergazomenoiData,
+                mode: "edit", 
+                context: "ergazomenoi", 
+                rec: {}
+            });
         } catch (error) {
             console.log("Σφάλμα :", error);
         }
@@ -245,96 +245,96 @@ class ergazomenoiController {
         };
 
         try {
-        let searchTerm = req.body.searchTerm;
+            let searchTerm = req.body.searchTerm;
 
-        const sessionUserId = req.session.userId;
-        const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+            const sessionUserId = req.session.userId;
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
+            const perPage = Number(process.env.EGGRAFES);
+            let page = req.query.page || 1;
 
-        let sTerm = searchNoSpecialChar;
-        nextPageSearchTerm = searchNoSpecialChar;
+            let sTerm = searchNoSpecialChar;
+            nextPageSearchTerm = searchNoSpecialChar;
 
-        // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-        const userPrivileges = await UserPrivilegesModel.findOne({
-            userId: sessionUserId,
-            form: "Ergazomenoi",
-        }).exec();
+            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: "Ergazomenoi",
+            }).exec();
 
-        // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-        const countPipeline = [
-            {
-            $match: {
-                $or: [
-                { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                { eponymo: { $regex: new RegExp(sTerm, "i") } },
-                { onoma: { $regex: new RegExp(sTerm, "i") } },
-                { patronymo: { $regex: new RegExp(sTerm, "i") } },
-                { afm: { $regex: new RegExp(sTerm, "i") } },
-                { amka: { $regex: new RegExp(sTerm, "i") } },
-                { adt: { $regex: new RegExp(sTerm, "i") } },
-                ]
-            },
-            },
-            {
-            $count: "total",
-            },
-        ];
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [
+                {
+                $match: {
+                    $or: [
+                    { kodikos: { $regex: new RegExp(sTerm, "i") } },
+                    { eponymo: { $regex: new RegExp(sTerm, "i") } },
+                    { onoma: { $regex: new RegExp(sTerm, "i") } },
+                    { patronymo: { $regex: new RegExp(sTerm, "i") } },
+                    { afm: { $regex: new RegExp(sTerm, "i") } },
+                    { amka: { $regex: new RegExp(sTerm, "i") } },
+                    { adt: { $regex: new RegExp(sTerm, "i") } },
+                    ]
+                },
+                },
+                {
+                $count: "total",
+                },
+            ];
 
-        const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
+            const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
 
-        let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-        let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-        let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-        let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            
+
+            // Αναζήτηση και επισήμανση
+            const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
+                {
+                    $match: {
+                        $or: [
+                        { kodikos: { $regex: new RegExp(sTerm, "i") } },
+                        { eponymo: { $regex: new RegExp(sTerm, "i") } },
+                        { onoma: { $regex: new RegExp(sTerm, "i") } },
+                        { patronymo: { $regex: new RegExp(sTerm, "i") } },
+                        { afm: { $regex: new RegExp(sTerm, "i") } },
+                        { amka: { $regex: new RegExp(sTerm, "i") } },
+                        { adt: { $regex: new RegExp(sTerm, "i") } },
+                        ]
+                    }
+                },
+                {
+                    $sort: {
+                        kodikos: 1,
+                    },
+                },
+            ])
+            .skip(skipRecords)
+            .limit(limitPerPage);
         
+            // Εφαρμογή της επισήμανσης
+            const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
+                ...record,
+                kodikos: this.highlightText(record.kodikos, sTerm),
+                eponymo: this.highlightText(record.eponymo, sTerm),
+                onoma: this.highlightText(record.onoma, sTerm),
+                patronymo: this.highlightText(record.patronymo, sTerm),
+                afm: this.highlightText(record.afm, sTerm),
+                amka: this.highlightText(record.amka, sTerm),
+                adt: this.highlightText(record.adt, sTerm),
+            }));
 
-        // Αναζήτηση και επισήμανση
-        const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-            {
-            $match: {
-                $or: [
-                { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                { eponymo: { $regex: new RegExp(sTerm, "i") } },
-                { onoma: { $regex: new RegExp(sTerm, "i") } },
-                { patronymo: { $regex: new RegExp(sTerm, "i") } },
-                { afm: { $regex: new RegExp(sTerm, "i") } },
-                { amka: { $regex: new RegExp(sTerm, "i") } },
-                { adt: { $regex: new RegExp(sTerm, "i") } },
-                ]
-            }
-            },
-            {
-            $sort: {
-                kodikos: 1,
-            },
-            },
-        ])
-        .skip(skipRecords)
-        .limit(limitPerPage);
-    
-        // Εφαρμογή της επισήμανσης
-        const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
-            ...record,
-            kodikos: this.highlightText(record.kodikos, sTerm),
-            eponymo: this.highlightText(record.eponymo, sTerm),
-            onoma: this.highlightText(record.onoma, sTerm),
-            patronymo: this.highlightText(record.patronymo, sTerm),
-            afm: this.highlightText(record.afm, sTerm),
-            amka: this.highlightText(record.amka, sTerm),
-            adt: this.highlightText(record.adt, sTerm),
-        }));
-
-        res.render("ergazomenoi/ergazomenoi/search", {
-            userPrivileges,
-            ergazomenoiFilteredRecs: highlightedRecords,
-            locals,
-            current: page,
-            pages: totalPages,
-            sTerm: sTerm,
-            entries: perPage,
-            totalRecs: totalRecords,
-        });
+            res.render("ergazomenoi/ergazomenoi/search", {
+                userPrivileges,
+                ergazomenoiFilteredRecs: highlightedRecords,
+                locals,
+                current: page,
+                pages: totalPages,
+                sTerm: sTerm,
+                entries: perPage,
+                totalRecs: totalRecords,
+            });
         } catch (error) {
             console.log("Σφάλμα :", error);
         }
@@ -347,90 +347,90 @@ class ergazomenoiController {
         };
 
         try {
-        let searchTerm = nextPageSearchTerm      //req.body.searchTerm;
+            let searchTerm = nextPageSearchTerm      //req.body.searchTerm;
 
-        const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+            const sessionUserId = req.session.userId;
+            const perPage = Number(process.env.EGGRAFES);
+            let page = req.query.page || 1;
 
-        // try {
-        // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
-        const userPrivileges = await UserPrivilegesModel.findOne({
-            userId: sessionUserId,
-            form: "Ergazomenoi",
-        }).exec();
+            // try {
+            // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: "Ergazomenoi",
+            }).exec();
 
-        // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-        const countPipeline = [
-            {
-            $match: {
-                $or: [
-                { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                { eponymo: { $regex: new RegExp(searchTerm, "i") } },
-                { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                { patronymo: { $regex: new RegExp(searchTerm, "i") } },
-                { afm: { $regex: new RegExp(searchTerm, "i") } },
-                { amka: { $regex: new RegExp(searchTerm, "i") } },
-                { adt: { $regex: new RegExp(searchTerm, "i") } },
-                ]
-            },
-            },
-            {
-            $count: "total",
-            },
-        ];
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [
+                {
+                $match: {
+                    $or: [
+                    { kodikos: { $regex: new RegExp(searchTerm, "i") } },
+                    { eponymo: { $regex: new RegExp(searchTerm, "i") } },
+                    { onoma: { $regex: new RegExp(searchTerm, "i") } },
+                    { patronymo: { $regex: new RegExp(searchTerm, "i") } },
+                    { afm: { $regex: new RegExp(searchTerm, "i") } },
+                    { amka: { $regex: new RegExp(searchTerm, "i") } },
+                    { adt: { $regex: new RegExp(searchTerm, "i") } },
+                    ]
+                },
+                },
+                {
+                $count: "total",
+                },
+            ];
 
-        const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
+            const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
 
-        let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-        let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-        let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-        let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
+            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
+            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
-        // Αναζήτηση και επισήμανση
-        const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-            {
-            $match: {
-                $or: [
-                { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                { eponymo: { $regex: new RegExp(searchTerm, "i") } },
-                { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                { patronymo: { $regex: new RegExp(searchTerm, "i") } },
-                { afm: { $regex: new RegExp(searchTerm, "i") } },
-                { amka: { $regex: new RegExp(searchTerm, "i") } },
-                { adt: { $regex: new RegExp(searchTerm, "i") } },
-                ]
-            }
-            },
-            {
-            $sort: {
-                kodikos: 1,
-            },
-            },
-        ]).skip(skipRecords).limit(limitPerPage);
-    
-        // Εφαρμογή της επισήμανσης
-        const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
-            ...record,
-            kodikos: this.highlightText(record.kodikos, searchTerm),
-            eponymo: this.highlightText(record.eponymo, searchTerm),
-            onoma: this.highlightText(record.onoma, searchTerm),
-            patronymo: this.highlightText(record.patronymo, searchTerm),
-            afm: this.highlightText(record.afm, searchTerm),
-            amka: this.highlightText(record.amka, searchTerm),
-            adt: this.highlightText(record.adt, searchTerm),
-        }));
-    
-        res.render("ergazomenoi/ergazomenoi/search", {
-            userPrivileges,
-            ergazomenoiFilteredRecs: highlightedRecords,
-            locals,
-            current: page,
-            pages: totalPages,
-            sTerm: searchTerm,
-            entries: perPage,
-            totalRecs: totalRecords,
-        });
+            // Αναζήτηση και επισήμανση
+            const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
+                {
+                    $match: {
+                        $or: [
+                        { kodikos: { $regex: new RegExp(searchTerm, "i") } },
+                        { eponymo: { $regex: new RegExp(searchTerm, "i") } },
+                        { onoma: { $regex: new RegExp(searchTerm, "i") } },
+                        { patronymo: { $regex: new RegExp(searchTerm, "i") } },
+                        { afm: { $regex: new RegExp(searchTerm, "i") } },
+                        { amka: { $regex: new RegExp(searchTerm, "i") } },
+                        { adt: { $regex: new RegExp(searchTerm, "i") } },
+                        ]
+                    }
+                },
+                {
+                    $sort: {
+                        kodikos: 1,
+                    },
+                },
+            ]).skip(skipRecords).limit(limitPerPage);
+        
+            // Εφαρμογή της επισήμανσης
+            const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
+                ...record,
+                kodikos: this.highlightText(record.kodikos, searchTerm),
+                eponymo: this.highlightText(record.eponymo, searchTerm),
+                onoma: this.highlightText(record.onoma, searchTerm),
+                patronymo: this.highlightText(record.patronymo, searchTerm),
+                afm: this.highlightText(record.afm, searchTerm),
+                amka: this.highlightText(record.amka, searchTerm),
+                adt: this.highlightText(record.adt, searchTerm),
+            }));
+        
+            res.render("ergazomenoi/ergazomenoi/search", {
+                userPrivileges,
+                ergazomenoiFilteredRecs: highlightedRecords,
+                locals,
+                current: page,
+                pages: totalPages,
+                sTerm: searchTerm,
+                entries: perPage,
+                totalRecs: totalRecords,
+            });
         } catch (error) {
             console.log("Σφάλμα :", error);
         }
@@ -889,9 +889,6 @@ class ergazomenoiController {
         const successCount = pdfResults.filter(r => r.success).length;
         const failCount = pdfResults.filter(r => !r.success).length;
 
-        if (successCount > 0) {
-            console.log(`📎 Successfully uploaded ${successCount} PDFs to S3`);
-        }
         if (failCount > 0) {
             console.warn(`⚠️ Failed to upload ${failCount} PDFs`);
         }
@@ -1110,24 +1107,6 @@ class ergazomenoiController {
                     companyType = 'ΕΠΙΧΕΙΡΗΣΗ'; // Ατομική επιχείρηση (has firstname)
                 }
             }
-
-            // ✅ DEBUG: Log final response
-            console.log('\n🔍 [BACKEND] Final JSON response:');
-            console.log('   success:', true);
-            console.log('   contractPdf exists:', !!contractPdfData);
-
-            if (contractPdfData) {
-                console.log('   contractPdf.showPreview:', contractPdfData.showPreview);
-                console.log('   contractPdf.url exists:', !!contractPdfData.url);
-                console.log('   contractPdf.url (first 100 chars):', contractPdfData.url?.substring(0, 100));
-                console.log('   contractPdf.s3Key exists:', !!contractPdfData.s3Key);
-                console.log('   contractPdf.s3Key:', contractPdfData.s3Key);
-            }
-
-            console.log('   companyEmail:', companyEmail);
-            console.log('   companyName:', companyName);
-            console.log('   companyType:', companyType);
-            console.log();
 
             return res.status(201).json({ 
                 success: true,

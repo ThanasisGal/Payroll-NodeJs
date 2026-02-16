@@ -435,21 +435,10 @@ async function sendContractEmail({
         // ============================================================================
         
         const isS3Path = pdfPath.startsWith('contracts/');
-        // ✅ DEBUG: Print exact path being used
-        console.log('\n🔍 [DEBUG] Email PDF Path:');
-        console.log('   pdfPath:', pdfPath);
-        console.log('   isS3Path:', isS3Path);
-        console.log('   pdfPath length:', pdfPath.length);
-        console.log('   Contains URL encoding:', pdfPath.includes('%'));
-        console.log();
-
         if (isS3Path) {
             // ✅ Use helper function (cleaner!)
-            console.log(`☁️  [EMAIL] Downloading PDF from S3: ${pdfPath}`);
-            
             try {
                 pdfBuffer = await downloadFileFromS3(pdfPath);
-                console.log(`✅ [EMAIL] Downloaded ${pdfBuffer.length} bytes from S3`);
             } catch (s3Error) {
                 console.error('❌ [EMAIL] Failed to download from S3:', s3Error);
                 throw new Error(`Αποτυχία λήψης PDF από S3: ${s3Error.message}`);
@@ -458,13 +447,8 @@ async function sendContractEmail({
             // ============================================================================
             // ✅ DEV MODE: Read local file
             // ============================================================================
-            
-            console.log(`📁 [EMAIL] Reading local PDF: ${pdfPath}`);
-            
             try {
                 pdfBuffer = await fs.readFile(pdfPath);
-                console.log(`✅ [EMAIL] Read ${pdfBuffer.length} bytes from local file`);
-                
             } catch (fileError) {
                 console.error('❌ [EMAIL] Failed to read local file:', fileError);
                 throw new Error(`Αποτυχία ανάγνωσης PDF αρχείου: ${fileError.message}`);
@@ -504,11 +488,7 @@ async function sendContractEmail({
             ]
         };
         
-        console.log(`📧 [EMAIL] Sending to: ${to}`);
-        
         const info = await transporter.sendMail(mailOptions);
-        
-        console.log(`✅ [EMAIL] Sent successfully! Message ID: ${info.messageId}`);
         
         return {
             success: true,
