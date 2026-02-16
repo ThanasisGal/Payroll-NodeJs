@@ -1111,6 +1111,24 @@ class ergazomenoiController {
                 }
             }
 
+            // ✅ DEBUG: Log final response
+            console.log('\n🔍 [BACKEND] Final JSON response:');
+            console.log('   success:', true);
+            console.log('   contractPdf exists:', !!contractPdfData);
+
+            if (contractPdfData) {
+                console.log('   contractPdf.showPreview:', contractPdfData.showPreview);
+                console.log('   contractPdf.url exists:', !!contractPdfData.url);
+                console.log('   contractPdf.url (first 100 chars):', contractPdfData.url?.substring(0, 100));
+                console.log('   contractPdf.s3Key exists:', !!contractPdfData.s3Key);
+                console.log('   contractPdf.s3Key:', contractPdfData.s3Key);
+            }
+
+            console.log('   companyEmail:', companyEmail);
+            console.log('   companyName:', companyName);
+            console.log('   companyType:', companyType);
+            console.log();
+
             return res.status(201).json({ 
                 success: true,
                 message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',

@@ -433,13 +433,34 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 // ✅ Success/Warning Messages
                 if (failedPdfs.length === 0) {
-                    // ✅ CHECK: Does response have contract PDF preview?
+                    // ✅ Check: Does response have contract PDF preview?
                     if (data.contractPdf && data.contractPdf.showPreview && data.contractPdf.url) {
-                        // ✅ Show PDF preview modal
+                        // ✅ VALIDATION: Check if s3Key exists
+                        if (!data.contractPdf.s3Key) {
+                            console.error('❌ [FRONTEND] Missing s3Key in backend response!');
+                            console.error('   contractPdf:', data.contractPdf);
+                            
+                            // ✅ Fallback: Show modal without email button
+                            await Swal.fire({
+                                backdrop: false,
+                                icon: 'warning',
+                                title: 'PDF Δημιουργήθηκε',
+                                html: `
+                                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
+                                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
+                                `,
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+                            });
+                            
+                            return;
+                        }
+                        
                         // ✅ Get employee name from form data
                         const employeeName = `${formData.eponymoHidden || ''} ${formData.onomaHidden || ''}`.trim() || 'UNKNOWN';
 
-                        // ✅ Get company data from response (backend should send this)
+                        // ✅ Get company data from response
                         const companyData = {
                             email: data.companyEmail || null,
                             phone: data.companyPhone || null,
@@ -447,10 +468,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             type: data.companyType || 'ΕΠΙΧΕΙΡΗΣΗ'
                         };
 
-                        // ✅ Call modal with all data
+                        // ✅ Call modal with s3Key
+                        console.log('🔍 [FRONTEND] Calling modal with:');
+                        console.log('   pdfUrl:', data.contractPdf.url);
+                        console.log('   s3Key:', data.contractPdf.s3Key);
+                        
                         showContractPdfModal(
-                            data.contractPdf.url,     // Presigned URL (για iframe)
-                            data.contractPdf.s3Key,   // ✅ ADD: S3 key (για email)
+                            data.contractPdf.url, 
+                            data.contractPdf.s3Key,  // ✅ Pass s3Key
                             data.redirectUrl || "/ergazomenoi/ergazomenoi",
                             employeeName,
                             companyData
