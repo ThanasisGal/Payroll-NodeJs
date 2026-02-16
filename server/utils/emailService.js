@@ -1,20 +1,22 @@
 const transporter = require('../../config/emailConfig');
 const path = require('path');
 const fs = require('fs').promises;
+// const { GetObjectCommand } = require('@aws-sdk/client-s3');
+// const { s3Client, S3_BUCKET_NAME } = require('../config/aws');
+const { downloadFileFromS3 } = require('./s3Helper');  // ✅ Use helper
 
 /**
-* emailService.js
-* Get email content based on language and gender
+ * emailService.js
+ * Get email content based on language and gender
  */
 function getEmailContent({ employeeName, pdfFilename, isGreek, isMale, companyEmail, companyPhone, companyName, companyType }) {
+    // ... (κράτα το ίδιο - δεν αλλάζει)
     const currentYear = new Date().getFullYear();
     
-    // ✅ Fallback values
     const email = companyEmail || 'support@WebPayrollSolutions.com';
     const phone = companyPhone || 'Δεν υπάρχει διαθέσιμο τηλέφωνο';
     const company = companyName || 'Web Payroll Solutions';
     
-    // ✅ Greek version
     if (isGreek) {
         const salutation = isMale ? 'Κε' : 'Κα';
         
@@ -206,7 +208,7 @@ ${company}
         };
     }
     
-    // ✅ English version
+    // English version (same as before)
     else {
         const salutation = isMale ? 'Mr' : 'Mrs';
         
@@ -400,11 +402,12 @@ We await your prompt response.
 }
 
 /**
+ * ✅ FIXED: Download PDF from S3 in production
  * Send contract PDF via email
  * @param {Object} options
  * @param {string} options.to - Recipient email
  * @param {string} options.employeeName - Employee name
- * @param {string} options.pdfPath - Full path to PDF file
+ * @param {string} options.pdfPath - S3 key (production) or local path (dev)
  * @param {string} options.pdfFilename - PDF filename
  * @param {boolean} options.isGreek - Is Greek national (true) or foreign (false)
  * @param {boolean} options.isMale - Is male (true) or female (false)
@@ -426,12 +429,73 @@ async function sendContractEmail({
 }) {
     try {
         let pdfBuffer;
-        try {
-            pdfBuffer = await fs.readFile(pdfPath);
-        } catch (error) {
-            console.error('❌ [EMAIL] Failed to read PDF:', error);
-            throw new Error('Αποτυχία ανάγνωσης PDF αρχείου');
+        
+        // ============================================================================
+        // ✅ SMART DETECTION: S3 key or local path?
+        // ============================================================================
+        
+        const isS3Path = pdfPath.startsWith('contracts/');
+        
+        // if (isS3Path) {
+        //     // ============================================================================
+        //     // ✅ PRODUCTION MODE: Download from S3
+        //     // ============================================================================
+            
+        //     console.log(`☁️  [EMAIL] Downloading PDF from S3: ${pdfPath}`);
+            
+        //     try {
+        //         const command = new GetObjectCommand({
+        //             Bucket: S3_BUCKET_NAME,
+        //             Key: pdfPath
+        //         });
+                
+        //         const response = await s3Client.send(command);
+                
+        //         // Convert readable stream to buffer
+        //         const chunks = [];
+        //         for await (const chunk of response.Body) {
+        //             chunks.push(chunk);
+        //         }
+        //         pdfBuffer = Buffer.concat(chunks);
+                
+        //         console.log(`✅ [EMAIL] Downloaded ${pdfBuffer.length} bytes from S3`);
+                
+        //     } catch (s3Error) {
+        //         console.error('❌ [EMAIL] Failed to download from S3:', s3Error);
+        //         throw new Error(`Αποτυχία λήψης PDF από S3: ${s3Error.message}`);
+        //     }
+
+        if (isS3Path) {
+            // ✅ Use helper function (cleaner!)
+            console.log(`☁️  [EMAIL] Downloading PDF from S3: ${pdfPath}`);
+            
+            try {
+                pdfBuffer = await downloadFileFromS3(pdfPath);
+                console.log(`✅ [EMAIL] Downloaded ${pdfBuffer.length} bytes from S3`);
+            } catch (s3Error) {
+                console.error('❌ [EMAIL] Failed to download from S3:', s3Error);
+                throw new Error(`Αποτυχία λήψης PDF από S3: ${s3Error.message}`);
+            }
+        } else {
+            // ============================================================================
+            // ✅ DEV MODE: Read local file
+            // ============================================================================
+            
+            console.log(`📁 [EMAIL] Reading local PDF: ${pdfPath}`);
+            
+            try {
+                pdfBuffer = await fs.readFile(pdfPath);
+                console.log(`✅ [EMAIL] Read ${pdfBuffer.length} bytes from local file`);
+                
+            } catch (fileError) {
+                console.error('❌ [EMAIL] Failed to read local file:', fileError);
+                throw new Error(`Αποτυχία ανάγνωσης PDF αρχείου: ${fileError.message}`);
+            }
         }
+        
+        // ============================================================================
+        // ✅ SEND EMAIL
+        // ============================================================================
         
         const emailContent = getEmailContent({
             employeeName,
@@ -462,7 +526,11 @@ async function sendContractEmail({
             ]
         };
         
+        console.log(`📧 [EMAIL] Sending to: ${to}`);
+        
         const info = await transporter.sendMail(mailOptions);
+        
+        console.log(`✅ [EMAIL] Sent successfully! Message ID: ${info.messageId}`);
         
         return {
             success: true,

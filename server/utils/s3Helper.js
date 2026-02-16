@@ -264,6 +264,81 @@ async function fileExistsInS3(s3Key) {
 }
 
 // =========================================================================
+// DOWNLOAD FILE FROM S3
+// =========================================================================
+
+/**
+ * ✅ Download file from S3 and return as buffer
+ * @param {string} s3Key - S3 object key (e.g., "contracts/team/company/file.pdf")
+ * @returns {Promise<Buffer>} File buffer
+ * 
+ * @example
+ * const buffer = await downloadFileFromS3('contracts/team1/company1/123_DOE_JOHN.pdf');
+ * // Use buffer for email attachment, image processing, etc.
+ */
+async function downloadFileFromS3(s3Key) {
+    try {
+        // =====================================================================
+        // DEV MODE: Read from local filesystem
+        // =====================================================================
+        
+        if (USE_LOCAL_STORAGE) {
+            const localPath = path.join(LOCAL_STORAGE_DIR, s3Key);
+            console.log(`📁 [S3-HELPER] DEV MODE: Reading locally: ${localPath}`);
+            
+            try {
+                const buffer = await fs.readFile(localPath);
+                console.log(`✅ [S3-HELPER] Read ${buffer.length} bytes from local file`);
+                return buffer;
+            } catch (error) {
+                console.error(`❌ [S3-HELPER] Local file not found: ${localPath}`);
+                throw new Error(`Local file not found: ${s3Key}`);
+            }
+        }
+        
+        // =====================================================================
+        // PRODUCTION: Download from AWS S3
+        // =====================================================================
+        
+        console.log(`☁️  [S3-HELPER] Downloading from S3: ${s3Key}`);
+        
+        const command = new GetObjectCommand({
+            Bucket: S3_BUCKET_NAME,
+            Key: s3Key,
+        });
+        
+        const response = await s3Client.send(command);
+        
+        // =====================================================================
+        // Convert readable stream to buffer
+        // =====================================================================
+        
+        const chunks = [];
+        for await (const chunk of response.Body) {
+            chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+        
+        console.log(`✅ [S3-HELPER] Downloaded ${buffer.length} bytes from S3`);
+        
+        return buffer;
+        
+    } catch (error) {
+        console.error('❌ [S3-HELPER] Download Error:', error.message);
+        
+        // Provide helpful error messages
+        if (error.name === 'NoSuchKey') {
+            throw new Error(`File not found in S3: ${s3Key}`);
+        }
+        if (error.name === 'AccessDenied') {
+            throw new Error(`Access denied to S3 file: ${s3Key}`);
+        }
+        
+        throw error;
+    }
+}
+
+// =========================================================================
 // EXPORTS
 // =========================================================================
 
@@ -273,5 +348,6 @@ module.exports = {
     generatePresignedUrl,
     deleteFileFromS3,
     fileExistsInS3,
+    downloadFileFromS3,  // ✅ NEW - Added for email service and other use cases
     USE_LOCAL_STORAGE, // Export for debugging
 };
