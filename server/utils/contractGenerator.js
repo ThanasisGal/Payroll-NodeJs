@@ -784,11 +784,13 @@ async function generateContractPDF(ergazomenos, userContext) {
         const sanitizeFilename = (str) => {
             if (!str) return 'UNKNOWN';
             
+            // ✅ Remove ONLY illegal characters (keep Greek letters)
             return str
                 .trim()
                 .toUpperCase()
-                .replace(/\s+/g, '_')           // Spaces → underscore
-                .replace(/[\/\\:*?"<>|]/g, '')  // ✅ Remove ΜΟΝΟ τους παράνομους χαρακτήρες
+                .replace(/\s+/g, '_')                    // Spaces → underscore
+                .replace(/[\/\\:*?"<>|]/g, '')           // Remove illegal chars
+                .replace(/[^\w\u0370-\u03FF\u1F00-\u1FFF_-]/g, '')  // Keep only: alphanumeric, Greek, underscore, hyphen
                 .substring(0, 50);
         };
 
@@ -796,7 +798,20 @@ async function generateContractPDF(ergazomenos, userContext) {
         const eponymo = sanitizeFilename(ergazomenos.eponymo || 'UNKNOWN');
         const onoma = sanitizeFilename(ergazomenos.onoma || 'UNKNOWN');
 
+        // ✅ S3 key με Greek characters (S3 supports UTF-8)
         const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/${kodikos}_${eponymo}_${onoma}_contract.pdf`;
+
+        console.log(`📝 [CONTRACT] S3 Key: ${s3Key}`);
+        // ✅ DEBUG: Print exact S3 key
+        console.log('\n🔍 [DEBUG] S3 Key Generation:');
+        console.log('   Raw eponymo:', ergazomenos.eponymo);
+        console.log('   Raw onoma:', ergazomenos.onoma);
+        console.log('   Sanitized eponymo:', eponymo);
+        console.log('   Sanitized onoma:', onoma);
+        console.log('   Final S3 key:', s3Key);
+        console.log('   S3 key length:', s3Key.length);
+        console.log('   Contains URL encoding:', s3Key.includes('%'));
+        console.log();
 
         const pdfBuffer = await fs.readFile(tempPdfPath);
         await uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf');

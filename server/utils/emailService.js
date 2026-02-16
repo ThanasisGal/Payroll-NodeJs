@@ -435,35 +435,13 @@ async function sendContractEmail({
         // ============================================================================
         
         const isS3Path = pdfPath.startsWith('contracts/');
-        
-        // if (isS3Path) {
-        //     // ============================================================================
-        //     // ✅ PRODUCTION MODE: Download from S3
-        //     // ============================================================================
-            
-        //     console.log(`☁️  [EMAIL] Downloading PDF from S3: ${pdfPath}`);
-            
-        //     try {
-        //         const command = new GetObjectCommand({
-        //             Bucket: S3_BUCKET_NAME,
-        //             Key: pdfPath
-        //         });
-                
-        //         const response = await s3Client.send(command);
-                
-        //         // Convert readable stream to buffer
-        //         const chunks = [];
-        //         for await (const chunk of response.Body) {
-        //             chunks.push(chunk);
-        //         }
-        //         pdfBuffer = Buffer.concat(chunks);
-                
-        //         console.log(`✅ [EMAIL] Downloaded ${pdfBuffer.length} bytes from S3`);
-                
-        //     } catch (s3Error) {
-        //         console.error('❌ [EMAIL] Failed to download from S3:', s3Error);
-        //         throw new Error(`Αποτυχία λήψης PDF από S3: ${s3Error.message}`);
-        //     }
+        // ✅ DEBUG: Print exact path being used
+        console.log('\n🔍 [DEBUG] Email PDF Path:');
+        console.log('   pdfPath:', pdfPath);
+        console.log('   isS3Path:', isS3Path);
+        console.log('   pdfPath length:', pdfPath.length);
+        console.log('   Contains URL encoding:', pdfPath.includes('%'));
+        console.log();
 
         if (isS3Path) {
             // ✅ Use helper function (cleaner!)
