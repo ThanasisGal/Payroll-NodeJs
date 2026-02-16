@@ -16,7 +16,10 @@ const   {   KrathseisModel,
 
 const   { UserPrivilegesModel } = Models_B;
 
-const   { CompaniesModel } = Models_C;
+const   {   CompaniesModel,
+            YpokatasthmataModel,
+            NomimoiEkprosopoiModel
+        } = Models_C;
 
 const   {   ErgazomenoiModel,
             ProdhlomenaOrariaModel,
@@ -1074,15 +1077,11 @@ class ergazomenoiController {
             });
         }
 
-        // ============================================================================
-        // ✅ ΤΕΛΙΚΟ RESPONSE (μόνο ΕΔΩ επιστρέφουμε!)
-        // ============================================================================
-
         try {
             // ✅ Get company data for email
             let company = req.session?.companyData || null;
-            
-            // ❌ If not in session, fetch from DB
+            let ypokatasthmata = "";
+
             if (!company && sessionCompanyInUse) {
                 try {
                     company = await CompaniesModel.findById(sessionCompanyInUse).lean();
@@ -1091,7 +1090,7 @@ class ergazomenoiController {
                     company = null;
                 }
             }
-            
+
             // ✅ Extract company contact info
             const companyEmail = company?.email || null;
             const companyPhone = company?.thlefono || null;
@@ -1108,6 +1107,71 @@ class ergazomenoiController {
                 }
             }
 
+            ypokatasthmata = await YpokatasthmataModel.findOne({ companykod_object: sessionCompanyInUse, kodikos: savedErgazomenos.ypokatasthma }).lean();
+
+            // =====================================================================
+            // ✅ CONDITIONAL E3 XML GENERATION
+            // =====================================================================
+            
+            let e3XmlData = null;
+            
+            if (filesToUpdate?.e3_anaggelia_proslhpshs === true) {  // ✅ CORRECT PATH!
+                console.log('✅ [E3-XML] Generation requested...');
+                
+                try {
+                    const { generateE3XML } = require('../../utils/xmlGenerators/e3Generator');
+                    const { uploadBufferToS3 } = require('../../utils/s3Helper');
+                    
+                    // ✅ Generate XML string
+                    const xmlString = await generateE3XML(savedErgazomenos, company, ypokatasthmata);
+                    
+                    // ✅ Create S3 key (naming convention)
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                    const afm = savedErgazomenos.afm || 'UNKNOWN';
+                    const s3Key = `erganh/e3/${afm}/E3N_${afm}_${timestamp}.xml`;
+                    
+                    // ✅ Upload to S3
+                    const xmlBuffer = Buffer.from(xmlString, 'utf-8');
+                    const uploadResult = await uploadBufferToS3(
+                        xmlBuffer,
+                        s3Key,
+                        'application/xml'
+                    );
+                    
+                    // ✅ Save S3 key to employee document
+                    savedErgazomenos.e3_xml_path = s3Key; // ⚠️ Προσθήκη στο schema!
+                    await savedErgazomenos.save();
+                    
+                    console.log(`✅ [E3-XML] Generated & uploaded: ${s3Key}`);
+                    
+                    // ✅ Generate presigned download URL (10 min expiration)
+                    const { generatePresignedUrl } = require('../../utils/s3Helper');
+                    const downloadUrl = await generatePresignedUrl(s3Key, 600);
+                    
+                    e3XmlData = {
+                        success: true,
+                        s3Key: s3Key,
+                        downloadUrl: downloadUrl,
+                        filename: `E3N_${afm}_${timestamp}.xml`
+                    };
+                    
+                } catch (e3Error) {
+                    console.error('❌ [E3-XML] Generation failed:', e3Error.message);
+                    console.error('Stack:', e3Error.stack);
+                    
+                    e3XmlData = {
+                        success: false,
+                        error: e3Error.message
+                    };
+                }
+            } else {
+                console.log('⏭️  [E3-XML] Generation skipped (checkbox not checked)');
+            }
+
+            // =====================================================================
+            // ✅ FINAL RESPONSE (with E3 data if generated)
+            // =====================================================================
+
             return res.status(201).json({ 
                 success: true,
                 message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',
@@ -1116,32 +1180,33 @@ class ergazomenoiController {
                     kodikos: savedErgazomenos.kodikos,
                     eponymo: savedErgazomenos.eponymo,
                     onoma: savedErgazomenos.onoma,
-                    email: savedErgazomenos.email,           // ✅ ADD employee email
-                    fylo: savedErgazomenos.fylo,             // ✅ ADD gender
-                    yphkoothta: savedErgazomenos.yphkoothta, // ✅ ADD nationality
+                    email: savedErgazomenos.email,
+                    fylo: savedErgazomenos.fylo,
+                    yphkoothta: savedErgazomenos.yphkoothta,
                     arxeio_apodoxhs_oron_atomikhs_symbashs_path: savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
                     arxeio_apodoxhs_oysiodon_oron_path: savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
                     arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
-                    arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
+                    arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path,
+                    e3_xml_path: savedErgazomenos.e3_xml_path
                 },
                 pdfResults: pdfResults,
                 contractPdf: contractPdfData,
-                companyEmail: companyEmail,      // ✅ NEW
-                companyPhone: companyPhone,      // ✅ NEW
-                companyName: companyName,        // ✅ NEW
-                companyType: companyType,        // ✅ NEW!
+                e3XmlResult: e3XmlData,
+                companyEmail: companyEmail,
+                companyPhone: companyPhone,
+                companyName: companyName,
+                companyType: companyType,
                 redirectUrl: "/ergazomenoi/ergazomenoi" 
             });
+            
         } catch (error) {
             console.log("Σφάλμα κατά τη δημιουργία απάντησης:", error);
             return res.status(500).json({ 
                 success: false, 
                 errorMessage: "Σφάλμα κατά την ολοκλήρωση" 
             });
-        }        
-        
-        
+        }
     }
 
     static getOrariaAnaErgazomeno = async (req, res) => {
