@@ -28,6 +28,11 @@ router.get('/symbaseis/stoixeiaSymbaseon',      symbaseisController.listStoixeia
  */
 router.post('/send-contract-email', async (req, res) => {
     try {
+        // ✅ DEBUG: Log ΟΛΟΚΛΗΡΟ το request body
+        console.log('\n🔍 [API] Full request body:');
+        console.log(JSON.stringify(req.body, null, 2));
+        console.log();
+
         const { 
             email,           // Employee email
             pdfUrl,          // PDF URL path OR S3 key
