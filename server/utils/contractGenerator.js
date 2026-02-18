@@ -119,6 +119,39 @@ const numbersToWords = (n) => {
         (n % 1000000 ? ' ' + numbersToWords(n % 1000000) : '');
 };
 
+const daysToWords = (n) => {
+    const ones = ['', 'μία', 'δύο', 'τρεις', 'τέσσερεις', 'πέντε', 'έξι', 'επτά', 'οκτώ', 'εννέα', 'δέκα', 
+        'έντεκα', 'δώδεκα', 'δεκατρείς', 'δεκατέσσερεις', 'δεκαπέντε', 'δεκαέξι', 'δεκαεπτά', 'δεκαοκτώ', 'δεκαεννέα'];
+    const tens = ['', '', 'είκοσι', 'τριάντα', 'σαράντα', 'πενήντα', 'εξήντα', 'εβδομήντα', 'ογδόντα', 'ενενήντα'];
+    
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+    
+    if (n < 1000) {
+        const hundreds = Math.floor(n / 100);
+        const remainder = n % 100;
+        const hundredsText = 
+        hundreds === 1 ? 'εκατό' + (remainder ? 'ν' : '') :
+        hundreds === 2 ? 'διακόσια' :
+        hundreds === 3 ? 'τριακόσια' :
+        hundreds === 4 ? 'τετρακόσια' :
+        hundreds === 5 ? 'πεντακόσια' :
+        hundreds === 6 ? 'εξακόσια' :
+        hundreds === 7 ? 'επτακόσια' :
+        hundreds === 8 ? 'οκτακόσια' :
+        hundreds === 9 ? 'εννιακόσια' : '';
+        return hundredsText + (remainder ? ' ' + daysToWords(remainder) : '');
+    }
+
+    if (n < 1000000) {
+        return daysToWords(Math.floor(n / 1000)) + ' χιλιάδες' + 
+             (n % 1000 ? ' ' + daysToWords(n % 1000) : '');
+    }
+  
+    return daysToWords(Math.floor(n / 1000000)) + ' εκατομμύρια' + 
+        (n % 1000000 ? ' ' + daysToWords(n % 1000000) : '');
+};
+
 const numberToText = (num, type = 'money') => {
     const whole = Math.floor(num); 
     const decimal = Math.round((num - whole) * 100); 
@@ -130,6 +163,24 @@ const numberToText = (num, type = 'money') => {
             return decimalText 
                 ? `${wholeText} ευρώ και ${decimalText} λεπτά` 
                 : `${wholeText} ευρώ`;
+        case 'time':
+            return decimalText 
+                ? `${wholeText} ώρες και ${decimalText} λεπτά` 
+                : `${wholeText} ώρες`;
+        default:
+            return decimalText 
+                ? `${wholeText} και ${decimalText}` 
+                : `${wholeText}`;
+    }
+};
+
+const daysToText = (num, type = 'money') => {
+    const whole = Math.floor(num); 
+    const decimal = Math.round((num - whole) * 100); 
+    let wholeText = daysToWords(whole);
+    let decimalText = decimal > 0 ? daysToWords(decimal) : '';
+
+    switch(type) {
         case 'time':
             return decimalText 
                 ? `${wholeText} ώρες και ${decimalText} λεπτά` 
@@ -322,10 +373,6 @@ async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) 
         return false;
     }
 }
-
-
-
-
 
 /**
  * Δημιουργεί placeholders για όλα τα templates μιας κατηγορίας
@@ -525,8 +572,8 @@ async function generateContractPDF(ergazomenos, userContext) {
             diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
         }
         
-        const hmeres_lektika = numberToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');
-        const ores_lektika = numberToText(parseInt(ergazomenos.ores_ergasias_ebdomadas || 0), '');
+        const hmeres_lektika = daysToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');
+        const ores_lektika = daysToText(parseInt(ergazomenos.ores_ergasias_ebdomadas || 0), '');
         const currentYear = new Date().getFullYear();
 
         const data = {

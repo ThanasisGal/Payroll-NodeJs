@@ -634,8 +634,7 @@ class ergazomenoiController {
             diathesimothta: formData.diathesimothta,
             enarxh_diathesimothtas: formData.enarxh_diathesimothtas || null,
             lhxh_diathesimothtas: formData.lhxh_diathesimothtas || null,
-            foreas_kyrias_asfalishs: formData.foreas_kyrias_asfalishs_stathera,
-            foreas_epikoyrikhs_asfalishs: formData.foreas_epikoyrikhs_asfalishs_stathera,
+            foreas_epikoyrikhs_asfalishs: formData.foreas_epikoyrikhs_asfalishs || [],
             kad_efka: formData.kad_efka_stathera,
             eidikothta_efka: formData.eidikothta_efka_stathera,
             kpk_efka: formData.kpk_efka_stathera,
@@ -1080,7 +1079,7 @@ class ergazomenoiController {
         try {
             // ✅ Get company data for email
             let company = req.session?.companyData || null;
-            let ypokatasthmata = "";
+            let ypokatasthmata = null;
 
             if (!company && sessionCompanyInUse) {
                 try {
@@ -1092,6 +1091,7 @@ class ergazomenoiController {
             }
 
             // ✅ Extract company contact info
+            const companyTeam = company?.email || null;
             const companyEmail = company?.email || null;
             const companyPhone = company?.thlefono || null;
             const companyName = company ? `${company.eponymia || ''} ${company.firstname || ''}`.trim() : null;
@@ -1107,7 +1107,20 @@ class ergazomenoiController {
                 }
             }
 
-            ypokatasthmata = await YpokatasthmataModel.findOne({ companykod_object: sessionCompanyInUse, kodikos: savedErgazomenos.ypokatasthma }).lean();
+            // ✅ Get ypokatasthmata data
+            try {
+                ypokatasthmata = await YpokatasthmataModel.findOne({ 
+                    companykod_object: sessionCompanyInUse, 
+                    kodikos: savedErgazomenos.ypokatasthma 
+                }).lean();
+                
+                if (!ypokatasthmata) {
+                    console.warn('⚠️  [BACKEND] No ypokatasthmata found for:', savedErgazomenos.ypokatasthma);
+                }
+            } catch (error) {
+                console.error('❌ [BACKEND] Error fetching ypokatasthmata:', error.message);
+                ypokatasthmata = null;
+            }
 
             // =====================================================================
             // ✅ CONDITIONAL E3 XML GENERATION
@@ -1115,49 +1128,65 @@ class ergazomenoiController {
             
             let e3XmlData = null;
             
-            if (filesToUpdate?.e3_anaggelia_proslhpshs === true) {  // ✅ CORRECT PATH!
-                console.log('✅ [E3-XML] Generation requested...');
+            if (filesToUpdate?.e3_anaggelia_proslhpshs === true) {
+                console.log('📝 [E3-XML] Generation requested...');
                 
                 try {
                     const { generateE3XML } = require('../../utils/xmlGenerators/e3Generator');
-                    const { uploadBufferToS3 } = require('../../utils/s3Helper');
                     
-                    // ✅ Generate XML string
-                    const xmlString = await generateE3XML(savedErgazomenos, company, ypokatasthmata);
-                    
-                    // ✅ Create S3 key (naming convention)
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                    const afm = savedErgazomenos.afm || 'UNKNOWN';
-                    const s3Key = `erganh/e3/${afm}/E3N_${afm}_${timestamp}.xml`;
-                    
-                    // ✅ Upload to S3
-                    const xmlBuffer = Buffer.from(xmlString, 'utf-8');
-                    const uploadResult = await uploadBufferToS3(
-                        xmlBuffer,
-                        s3Key,
-                        'application/xml'
+                    // ✅ Generate XML (returns object with xml + storage info)
+                    const xmlResult = await generateE3XML(
+                        savedErgazomenos, 
+                        company, 
+                        ypokatasthmata
                     );
                     
-                    // ✅ Save S3 key to employee document
-                    savedErgazomenos.e3_xml_path = s3Key; // ⚠️ Προσθήκη στο schema!
-                    await savedErgazomenos.save();
+                    console.log('✅ [E3-XML] Generated successfully');
+                    console.log('   Saved to:', xmlResult.s3Url || 'NOT SAVED');
+                    console.log('   Filename:', xmlResult.filename);
                     
-                    console.log(`✅ [E3-XML] Generated & uploaded: ${s3Key}`);
+                    // ✅ Save S3 key to employee record (if saved successfully)
+                    if (xmlResult.s3Key) {
+                        savedErgazomenos.e3_xml_path = xmlResult.s3Key;
+                        await savedErgazomenos.save();
+                        console.log('✅ [E3-XML] Path saved to employee record');
+                    }
                     
                     // ✅ Generate presigned download URL (10 min expiration)
-                    const { generatePresignedUrl } = require('../../utils/s3Helper');
-                    const downloadUrl = await generatePresignedUrl(s3Key, 600);
-                    
-                    e3XmlData = {
-                        success: true,
-                        s3Key: s3Key,
-                        downloadUrl: downloadUrl,
-                        filename: `E3N_${afm}_${timestamp}.xml`
-                    };
+                    if (xmlResult.s3Key) {
+                        try {
+                            const { generatePresignedUrl } = require('../../utils/s3Helper');
+                            const downloadUrl = await generatePresignedUrl(xmlResult.s3Key, 600);
+                            
+                            e3XmlData = {
+                                success: true,
+                                s3Key: xmlResult.s3Key,
+                                downloadUrl: downloadUrl,
+                                filename: xmlResult.filename
+                            };
+                        } catch (urlError) {
+                            console.error('❌ [E3-XML] Failed to generate presigned URL:', urlError.message);
+                            
+                            // Still return success but without download URL
+                            e3XmlData = {
+                                success: true,
+                                s3Key: xmlResult.s3Key,
+                                downloadUrl: null,
+                                filename: xmlResult.filename,
+                                urlError: urlError.message
+                            };
+                        }
+                    } else {
+                        // XML generated but not saved
+                        e3XmlData = {
+                            success: false,
+                            error: xmlResult.saveError || 'XML not saved'
+                        };
+                    }
                     
                 } catch (e3Error) {
                     console.error('❌ [E3-XML] Generation failed:', e3Error.message);
-                    console.error('Stack:', e3Error.stack);
+                    console.error('   Stack:', e3Error.stack);
                     
                     e3XmlData = {
                         success: false,
@@ -1171,7 +1200,7 @@ class ergazomenoiController {
             // =====================================================================
             // ✅ FINAL RESPONSE (with E3 data if generated)
             // =====================================================================
-
+            
             return res.status(201).json({ 
                 success: true,
                 message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',
@@ -1188,11 +1217,11 @@ class ergazomenoiController {
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
                     arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
                     arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path,
-                    e3_xml_path: savedErgazomenos.e3_xml_path
+                    e3_xml_path: savedErgazomenos.e3_xml_path  // ✅ NEW!
                 },
                 pdfResults: pdfResults,
                 contractPdf: contractPdfData,
-                e3XmlResult: e3XmlData,
+                e3XmlData: e3XmlData,  // ✅ NEW!
                 companyEmail: companyEmail,
                 companyPhone: companyPhone,
                 companyName: companyName,

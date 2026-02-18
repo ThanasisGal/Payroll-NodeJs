@@ -112,7 +112,7 @@ const { Schema: _Schema, model } = require("mongoose");
         lhxh_diathesimothtas: { type: Date },
 
         foreas_kyrias_asfalishs: { type: String, trim: true },
-        foreas_epikoyrikhs_asfalishs: { type: String, trim: true },
+        foreas_epikoyrikhs_asfalishs: [{ type: String, trim: true }],
         kad_efka: { type: String, trim: true },
         eidikothta_efka: { type: String, trim: true },
         kpk_efka: { type: String, trim: true },
@@ -288,6 +288,7 @@ const { Schema: _Schema, model } = require("mongoose");
         arxeio_apodoxhs_oysiodon_oron_path: { type: String, default: null, trim: true },
         arxeio_apodoxhs_oron_atomikhs_symbashs_path: { type: String, default: null, trim: true },
         arxeio_symbashs_daneismoy_path: { type: String, default: null, trim: true },
+        e3_xml_path: { type: String, default: null, index: true },
         bibliario_anhlikoy_base64: { type: String, default: null },
         arxeio_nomimopoihtikon_eggrafon_base64: { type: String, default: null },
         arxeio_apodoxhs_oysiodon_oron_base64: { type: String, default: null },

@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 {
     "name": "payroll_nodejs",
     "version": "1.0.31",
@@ -71,3 +72,79 @@
         "terser": "^5.36.0"
     }
 }
+=======
+{
+    "name": "payroll_nodejs",
+    "version": "1.0.31",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "cross-env NODE_ENV=development nodemon app.js",
+        "start": "cross-env NODE_ENV=production node app.js",
+        "postinstall": "npx playwright install --with-deps",
+        "css:minify": "cleancss --inline none -o public/css/main.min.css public/css/main.css",
+        "css:upload": "aws s3 cp public/css/main.min.css s3://employee-certificates-webpayrollsolutions-central/assets/own/css/main.min.css --content-type text/css --cache-control max-age=31536000 --region eu-central-1",
+        "css:deploy": "npm run css:minify && npm run css:upload"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "dependencies": {
+        "@aws-sdk/client-cloudfront": "^3.992.0",
+        "@aws-sdk/client-s3": "^3.992.0",
+        "@aws-sdk/s3-request-presigner": "^3.992.0",
+        "@pdf-lib/fontkit": "1.1.1",
+        "bcrypt": "^6.0.0",
+        "choices.js": "11.1.0",
+        "chromedriver": "^134.0.3",
+        "connect-mongo": "^5.1.0",
+        "cookie-parser": "^1.4.7",
+        "cors": "2.8.5",
+        "docxtemplater": "^3.67.6",
+        "dotenv": "16.5.0",
+        "ejs": "3.1.10",
+        "exceljs": "4.4.0",
+        "express": "^4.22.1",
+        "express-ejs-layouts": "2.5.1",
+        "express-flash-message": "^3.0.2",
+        "express-rate-limit": "^8.1.0",
+        "express-session": "^1.18.2",
+        "form-data": "^4.0.4",
+        "fs-extra": "11.3.0",
+        "geoip-lite": "^1.4.10",
+        "helmet": "^8.1.0",
+        "jquery": "^3.7.1",
+        "jsonwebtoken": "9.0.2",
+        "jwt-decode": "4.0.0",
+        "mathjs": "14.4.0",
+        "method-override": "3.0.0",
+        "mongoose": "8.13.2",
+        "multer": "^2.0.2",
+        "nodemailer": "^7.0.10",
+        "pdf-lib": "1.17.1",
+        "pdfjs-dist": "4.8.69",
+        "pdfkit": "0.17.0",
+        "pizzip": "3.1.8",
+        "playwright": "^1.58.2",
+        "qrcode": "1.5.4",
+        "selenium-webdriver": "^4.30.0",
+        "sweetalert2": "11.4.8",
+        "winston": "3.17.0",
+        "xmlbuilder": "15.1.1"
+    },
+    "overrides": {
+        "unzipper": "^0.12.3",
+        "bluebird": "^3.7.2",
+        "fast-xml-parser": "5.3.6"
+    },
+    "devDependencies": {
+        "@types/node": "^22.5.5",
+        "clean-css-cli": "^5.6.3",
+        "cross-env": "^10.0.0",
+        "nodemon": "^3.0.1",
+        "terser": "^5.36.0"
+    }
+}
+
+>>>>>>> Stashed changes

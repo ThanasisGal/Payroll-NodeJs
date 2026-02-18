@@ -556,6 +556,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 const successfulPdfs = pdfResults.filter(r => r.success);
                 const failedPdfs = pdfResults.filter(r => !r.success);
                 
+                // ✅ CHECK: Was E3 XML generated?
+                const e3XmlData = data?.e3XmlData || null;
+                const hasE3Xml = e3XmlData && e3XmlData.success === true;
+                
                 // ✅ Clear in-memory PDFs (no longer needed)
                 if (hadPdfs && window.pdfUploadModule.clearAllFiles) {
                     window.pdfUploadModule.clearAllFiles();
@@ -600,23 +604,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         showContractPdfModal(
                             data.contractPdf.url, 
-                            data.contractPdf.s3Key,  // ✅ Pass s3Key
+                            data.contractPdf.s3Key,
                             data.redirectUrl || "/ergazomenoi/ergazomenoi",
                             employeeName,
-                            companyData
+                            companyData,
+                            e3XmlData  // ✅ PASS E3 XML DATA!
                         );
                     } else {
-                        // ✅ No PDF preview - normal success
+                        // ✅ No PDF preview - show success with E3 XML download option
+                        const e3XmlHtml = hasE3Xml 
+                            ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
+                               <a href="${e3XmlData.downloadUrl}" 
+                                  download="${e3XmlData.filename}"
+                                  class="btn btn-sm btn-outline-primary mt-2">
+                                  <i class="bi bi-download"></i> Λήψη E3 XML
+                               </a>`
+                            : '';
+                        
                         await Swal.fire({
                             backdrop: false,
                             allowOutsideClick: false,
                             icon: "success",
                             title: "Επιτυχής καταχώριση!",
-                            html: successfulPdfs.length > 0
-                                ? `<p>Ο εργαζόμενος αποθηκεύτηκε!</p><p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
-                                : "<p>Ο εργαζόμενος αποθηκεύτηκε επιτυχώς!</p>",
-                            timer: 1500,
-                            showConfirmButton: false,
+                            html: `
+                                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
+                                ${successfulPdfs.length > 0 
+                                    ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>` 
+                                    : ''}
+                                ${e3XmlHtml}
+                            `,
+                            timer: hasE3Xml ? null : 1500,
+                            showConfirmButton: hasE3Xml,
+                            confirmButtonText: 'OK',
                             customClass: {
                                 confirmButton: "class-success custom-confirm-button custom-swal-button",
                                 title: "custom-title",
@@ -629,6 +648,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     // ⚠️ Some PDFs failed to save
                     const failedTypes = failedPdfs.map(f => f.documentType).join(', ');
+                    
+                    const e3XmlHtml = hasE3Xml 
+                        ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
+                           <a href="${e3XmlData.downloadUrl}" 
+                              download="${e3XmlData.filename}"
+                              class="btn btn-sm btn-outline-primary mt-2">
+                              <i class="bi bi-download"></i> Λήψη E3 XML
+                           </a>`
+                        : '';
                     
                     await Swal.fire({
                         backdrop: false,
@@ -643,6 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <p style="color: #999; font-size: 0.85rem; margin-top: 10px;">
                                 Μπορείτε να τα ανεβάσετε αργότερα από την επεξεργασία.
                             </p>
+                            ${e3XmlHtml}
                         `,
                         confirmButtonText: 'OK',
                         customClass: {
@@ -710,7 +739,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // PDF CONTRACT PREVIEW MODAL
     // ============================================================================
 
-    function showContractPdfModal(pdfUrl, s3Key, redirectUrl, employeeName = 'UNKNOWN', companyData = {}) {
+    function showContractPdfModal(pdfUrl, s3Key, redirectUrl, employeeName = 'UNKNOWN', companyData = {}, e3XmlData = null) {
         const modal = document.getElementById('pdfPreviewContractModal');
         const iframe = document.getElementById('pdfPreviewIframe');
         const loading = document.getElementById('pdfPreviewLoading');
@@ -811,7 +840,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const requestBody = {
                     email: employeeEmail,
-                    pdfUrl: s3Key,  // ✅ CORRECT - raw S3 key
+                    pdfUrl: s3Key,
                     employeeName: employeeName,
                     fylo: fyloValue,
                     yphkoothta: yphkoothtaValue,
@@ -871,6 +900,28 @@ document.addEventListener("DOMContentLoaded", () => {
         if (skipBtn) skipBtn.onclick = closeModal;
         if (downloadBtn) downloadBtn.onclick = downloadAndClose;
         if (emailBtn) emailBtn.onclick = downloadAndSendEmail;
+        
+        // ✅ Add E3 XML download button if available
+        if (e3XmlData && e3XmlData.success && e3XmlData.downloadUrl) {
+            const e3Container = document.createElement('div');
+            e3Container.className = 'e3-xml-download-container mt-3 pt-3 border-top';
+            e3Container.innerHTML = `
+                <p class="text-success mb-2">
+                    <i class="bi bi-file-earmark-code"></i> Αρχείο E3 XML για ΕΡΓΑΝΗ
+                </p>
+                <a href="${e3XmlData.downloadUrl}" 
+                   download="${e3XmlData.filename}"
+                   class="btn btn-outline-success btn-sm">
+                   <i class="bi bi-download"></i> Λήψη ${e3XmlData.filename}
+                </a>
+            `;
+            
+            // Find modal body and insert before buttons
+            const modalBody = modal.querySelector('.modal-body') || modal.querySelector('.pdf-preview-container');
+            if (modalBody) {
+                modalBody.appendChild(e3Container);
+            }
+        }
         
         // ✅ ESC key to close
         const escHandler = (e) => {
