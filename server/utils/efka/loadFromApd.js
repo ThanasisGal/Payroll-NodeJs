@@ -2,6 +2,24 @@
 const { chromium } = require('playwright');
 const { createSession } = require('./efkaSessionStore');
 
+let __sharedBrowserPromise = null;
+
+async function getSharedBrowser({ slowMo }) {
+  if (!__sharedBrowserPromise) {
+    __sharedBrowserPromise = chromium.launch({
+      headless: false,
+      slowMo,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    });
+  }
+  return __sharedBrowserPromise;
+}
+
 const START_URL = 'https://www.e-efka.gov.gr/el/ilektronikes-ypiresies-%CE%BF';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const DEBUG = String(process.env.EFKA_DEBUG || '').toLowerCase() === 'true';
@@ -27,16 +45,7 @@ async function loadFromApd(opts = {}) {
   try {
     log('Launching...', { NODE_ENV, headless, slowMo, keepSession });
 
-    browser = await chromium.launch({
-      headless: false,
-      slowMo,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
+    browser = await getSharedBrowser({ slowMo });
 
     context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
@@ -89,7 +98,7 @@ async function loadFromApd(opts = {}) {
     if (!keepSession) {
       try { if (page && !page.isClosed()) await page.close(); } catch {}
       try { if (context) await context.close(); } catch {}
-      try { if (browser) await browser.close(); } catch {}
+      // try { if (browser) await browser.close(); } catch {}
     }
   }
 }
