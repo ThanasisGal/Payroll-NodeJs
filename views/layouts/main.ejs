@@ -53,7 +53,7 @@
         class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
 
         <div class="loader-container">
-            <div class="loader"></div>
+            <div id="appLoader" class="loader"></div>
             <div class="loader-text">Παρακαλώ περιμένετε...</div>
         </div>
 
@@ -126,5 +126,151 @@
                 return null;
             };
         </script>
+
+        <!-- ============================================================================
+            SOCKET.IO CLIENT SETUP (Environment-Aware + CSP-Compliant)
+            ============================================================================ -->
+
+        <!-- ✅ Load Socket.io client library (external script - no nonce needed) -->
+        <script src="/socket.io/socket.io.js"></script>
+
+        <!-- ✅ Initialize Socket.io connection (inline script - REQUIRES nonce!) -->
+        <script nonce="<%= nonce %>">
+        (function() {
+            'use strict';
+            
+            // ================================================================
+            // ✅ DETECT ENVIRONMENT
+            // ================================================================
+            const hostname = window.location.hostname;
+            const isDev = hostname === 'localhost' || 
+                        hostname === '127.0.0.1' || 
+                        hostname.startsWith('192.168.');
+            
+            // ================================================================
+            // ✅ BUILD SOCKET.IO CONNECTION URL
+            // ================================================================
+            const socketUrl = isDev 
+                ? `http://${hostname}:${window.location.port || 5000}`
+                : window.location.origin;
+            
+            console.log('\n🔧 ════════════════════════════════════════════════════════');
+            console.log('🔧 [SOCKET] Initializing Socket.io connection');
+            console.log('🔧 ════════════════════════════════════════════════════════');
+            console.log('   Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
+            console.log('   Server URL:', socketUrl);
+            console.log('   Path:', '/socket.io/');
+            console.log('🔧 ════════════════════════════════════════════════════════\n');
+            
+            // ================================================================
+            // ✅ INITIALIZE SOCKET.IO (Global variable)
+            // ================================================================
+            window.socket = io(socketUrl, {
+                path: '/socket.io/',
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                reconnectionAttempts: 5,
+                timeout: 20000,
+                autoConnect: true
+            });
+            
+            // ================================================================
+            // ✅ CONNECTION SUCCESSFUL
+            // ================================================================
+            socket.on('connect', function() {
+                console.log('\n✅ ════════════════════════════════════════════════════════');
+                console.log('✅ [SOCKET] Connected to server');
+                console.log('✅ ════════════════════════════════════════════════════════');
+                console.log('   Socket ID:', socket.id);
+                console.log('   Transport:', socket.io.engine.transport.name);
+                console.log('   Connected:', socket.connected);
+                console.log('✅ ════════════════════════════════════════════════════════\n');
+                
+                // ✅ Join user-specific room (if logged in)
+                const userId = '<%= locals.userId || "" %>';
+                if (userId && userId.trim() !== '') {
+                    socket.emit('join', userId);
+                    console.log('📡 [SOCKET] Joining user room:', userId);
+                }
+            });
+            
+            // ================================================================
+            // ✅ JOINED ROOM CONFIRMATION
+            // ================================================================
+            socket.on('joined', function(data) {
+                console.log('✅ [SOCKET] Joined room successfully:', data);
+            });
+            
+            // ================================================================
+            // ✅ DISCONNECTED
+            // ================================================================
+            socket.on('disconnect', function(reason) {
+                console.log('\n❌ ════════════════════════════════════════════════════════');
+                console.log('❌ [SOCKET] Disconnected from server');
+                console.log('❌ ════════════════════════════════════════════════════════');
+                console.log('   Reason:', reason);
+                console.log('   Will reconnect:', socket.io.reconnection());
+                console.log('❌ ════════════════════════════════════════════════════════\n');
+            });
+            
+            // ================================================================
+            // ✅ CONNECTION ERROR
+            // ================================================================
+            socket.on('connect_error', function(error) {
+                console.error('\n❌ ════════════════════════════════════════════════════════');
+                console.error('❌ [SOCKET] Connection error');
+                console.error('❌ ════════════════════════════════════════════════════════');
+                console.error('   Error:', error.message);
+                console.error('   Type:', error.type);
+                console.error('❌ ════════════════════════════════════════════════════════\n');
+            });
+            
+            // ================================================================
+            // ✅ RECONNECTION HANDLERS
+            // ================================================================
+            socket.on('reconnect', function(attemptNumber) {
+                console.log('🔄 [SOCKET] Reconnected successfully after', attemptNumber, 'attempts');
+            });
+            
+            socket.on('reconnect_attempt', function(attemptNumber) {
+                console.log('🔄 [SOCKET] Reconnection attempt:', attemptNumber);
+            });
+            
+            socket.on('reconnect_error', function(error) {
+                console.error('❌ [SOCKET] Reconnection error:', error.message);
+            });
+            
+            socket.on('reconnect_failed', function() {
+                console.error('❌ [SOCKET] Reconnection failed (max attempts reached)');
+            });
+            
+            // ================================================================
+            // ✅ PONG HANDLER (for testing)
+            // ================================================================
+            socket.on('pong', function(data) {
+                console.log('✅ [SOCKET] Pong received:', data);
+            });
+            
+        })();
+        </script>
+
+        <script  nonce="<%= nonce %>">
+            function showLoader(text) {
+                const el = document.getElementById('appLoader');
+                if (!el) return;
+                const t = el.querySelector('.loader-text');
+                if (t && text) t.textContent = text;
+                el.style.display = 'flex';
+            }
+
+            function hideLoader() {
+                const el = document.getElementById('appLoader');
+                if (!el) return;
+                el.style.display = 'none';
+            }
+        </script>
+
     </body>
 </html>

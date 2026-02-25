@@ -30,37 +30,41 @@
 	});
 	const PoleisModel = model("Poleis", PoleisSchema);
 	
-	const NomikesMorfesSchema = new Schema({
-		kodikos: { type: String, unique: true },
-		perigrafh: { type: String, trim: true },
-	});
+	const NomikesMorfesSchema = new Schema(
+		{
+			kodikos: { type: String, unique: true },
+			perigrafh: { type: String, trim: true },
+		}
+	);
 	const NomikesMorfesModel = model("NomikesMorfes", NomikesMorfesSchema);
 	
-	const TypoiDaneismoySchema = new Schema({
-		kodikos: { type: String, unique: true },
-		perigrafh: { type: String, trim: true },
-	},
+	const TypoiDaneismoySchema = new Schema(
 		{
-		collection: "typoi_daneismoy"
+			kodikos: { type: String, unique: true },
+			perigrafh: { type: String, trim: true },
+		},
+		{
+			collection: "typoi_daneismoy"
 		}
 	);
 	const TypoiDaneismoyModel = model("TypoiDaneismoy", TypoiDaneismoySchema);
 	
-	const PararthmataEfkaSchema = new Schema({
-		kodikos: { type: String, unique: true },
-		perigrafh: { type: String, trim: true },
-		palios_kodikos: { type: String, trim: true },
-		odos: { type: String, trim: true },
-		arithmos: { type: String, trim: true },
-		tk: { type: String, trim: true },
-		polh: { type: String, trim: true },
-		thlefono1: { type: String, trim: true },
-		thlefono2: { type: String, trim: true },
-		thlefono3: { type: String, trim: true },
-		email: { type: String, trim: true },
+	const PararthmataEfkaSchema = new Schema(
+		{
+			kodikos: { type: String, unique: true },
+			perigrafh: { type: String, trim: true },
+			palios_kodikos: { type: String, trim: true },
+			odos: { type: String, trim: true },
+			arithmos: { type: String, trim: true },
+			tk: { type: String, trim: true },
+			polh: { type: String, trim: true },
+			thlefono1: { type: String, trim: true },
+			thlefono2: { type: String, trim: true },
+			thlefono3: { type: String, trim: true },
+			email: { type: String, trim: true },
 		},
 		{
-		collection: "pararthmata_efka"
+			collection: "pararthmata_efka"
 		}
 	);
 	const PararthmataEfkaModel = model("PararthmataEfka", PararthmataEfkaSchema);
@@ -222,10 +226,15 @@
 	});
 	const IdiothtesModel = model("Idiothtes", IdiothtesSchema);
 	
-	const TypoiTaytothtonSchema = new Schema({
-		kodikos: { type: String, unique: true },
-		perigrafh: { type: String, trim: true },
-	});
+	const TypoiTaytothtonSchema = new Schema(
+		{
+			kodikos: { type: String, unique: true },
+			perigrafh: { type: String, trim: true },
+		},
+		{
+			collection: "Typoi_Taytothton"
+		}
+	);
 	const TypoiTaytothtonModel = model("TypoiTaytothton", TypoiTaytothtonSchema);
 	
 	const KrathseisSchema = new Schema({
@@ -714,12 +723,13 @@
 	);
 	const ForeasEpikoyrikhsAsfalishsModel = model("ForeasEpikoyrikhsAsfalishs", ForeasEpikoyrikhsAsfalishsSchema);
 
-	const ApodoxhOysiodonOronSchema = new Schema({
-		kodikos: { type: String, unique: true, index: true},
-		perigrafh: { type: String, trim: true },
+	const ApodoxhOysiodonOronSchema = new Schema(
+		{
+			kodikos: { type: String, unique: true, index: true},
+			perigrafh: { type: String, trim: true },
 		},
 		{
-		collection: "oysiodeis_oroi"
+			collection: "oysiodeis_oroi"
 		}
 	);
 	const ApodoxhOysiodonOronModel = model("ApodoxhOysiodonOron", ApodoxhOysiodonOronSchema);

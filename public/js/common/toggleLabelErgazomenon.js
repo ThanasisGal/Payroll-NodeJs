@@ -244,8 +244,6 @@ function toggleCheckboxState(checkboxId, isChecked) {
             break;
         case "topos_ergasias":
             label.textContent = isChecked ? "ΑΛΛΟ" : "ΠΑΡΑΡΤΗΜΑ ΕΡΓΟΔΟΤΗ";
-            document.getElementById("topos_ergasias_parathrhseis").value = null;
-            setFieldsDisabled(["topos_ergasias_parathrhseis"], ! isChecked);
             break;
         case "afora_dokimastikh_periodo":
             label.textContent = isChecked ? "ΝΑΙ" : "ΟΧΙ";

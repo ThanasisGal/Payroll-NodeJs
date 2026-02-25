@@ -1,6 +1,6 @@
 {
     "name": "payroll_nodejs",
-    "version": "1.0.31",
+    "version": "1.0.32",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -54,6 +54,7 @@
         "playwright": "^1.58.2",
         "qrcode": "1.5.4",
         "selenium-webdriver": "^4.30.0",
+        "socket.io": "^4.8.3",
         "sweetalert2": "11.4.8",
         "winston": "3.17.0",
         "xmlbuilder": "15.1.1"

@@ -36,6 +36,7 @@ const dropdownRoutes = require("./server/routes/dropdownRoutes");
 const apiRoutes = require("./server/routes/apiRoutes");
 const adminRoutes = require('./server/routes/adminRoutes');
 const sessionRoutes = require("./server/routes/sessionRoute");
+const efkaRoutes = require("./server/routes/efkaRoutes");
 require('./server/config/aws');
 
 const getSessionVars = require("./server/middlewares/session-variables");
@@ -224,6 +225,17 @@ if (!mongoUrl) {
 
 app.use(session(sessionOpts));
 
+// ============================================================================
+// ✅ MIDDLEWARE: Track last activity time
+// ============================================================================
+app.use((req, res, next) => {
+    if (req.session && req.session.userId) {
+        // ✅ Update last activity timestamp on EVERY request
+        req.session.lastActivity = Date.now();
+    }
+    next();
+});
+
 logger.info(`Sessions: ${mongoUrl ? "MongoStore" : "MemoryStore"} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`);
 
 app.use(flash({ sessionKeyName: "flashMessage" }));
@@ -254,46 +266,64 @@ app.use((req, res, next) => {
 app.get("/remaining-time", (req, res) => {
     const now = Date.now();
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // ✅ AUTHENTICATED USER
+    // ═══════════════════════════════════════════════════════════════════════
     if (req.session && req.session.userId) {
-        const last = req.session.lastActivity || now;
-        const remaining = Math.max(0, 1000 * 60 * diarkeia_session - (now - last));
+        // ✅ Use INACTIVITY_TIMEOUT (60 min) instead of DIARKEIA_SESSION (720 min)
+        const INACTIVITY_TIMEOUT = Number(process.env.INACTIVITY_TIMEOUT || 60) * 60 * 1000;
+        
+        const lastActivity = req.session.lastActivity || now;
+        const timeSinceLastActivity = now - lastActivity;
+        const remaining = Math.max(0, INACTIVITY_TIMEOUT - timeSinceLastActivity);
 
         return res.json({ 
-            remainingTime: remaining,
+            remainingTime: remaining,  // ✅ 60 λεπτά inactivity countdown
             sessionID: req.sessionID,
-            userType: 'authenticated'
+            userType: 'authenticated',
+            lastActivity: lastActivity,
+            inactivityTimeout: INACTIVITY_TIMEOUT
         });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ✅ NO SESSION (Error)
+    // ═══════════════════════════════════════════════════════════════════════
     if (!req.session) {
         return res.status(500).json({ 
             error: 'Session middleware error',
-            remainingTime: 0 
+            remainingTime: 0,
+            userType: 'anonymous'
         });
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ✅ ANONYMOUS USER (Grace Period)
+    // ═══════════════════════════════════════════════════════════════════════
     if (!req.session.anonymousStartTime) {
         req.session.anonymousStartTime = now;
     }
 
     const anonymousStart = req.session.anonymousStartTime;
     const anonymousElapsed = now - anonymousStart;
-    const anonymousRemaining = Math.max(0, 1000 * 60 * grace_period - anonymousElapsed);
+    const GRACE_PERIOD_MS = Number(process.env.GRACE_PERIOD || grace_period || 5) * 60 * 1000;
+    const anonymousRemaining = Math.max(0, GRACE_PERIOD_MS - anonymousElapsed);
 
     if (anonymousRemaining <= 0) {
         return res.status(401).json({ 
             error: 'Grace period expired',
             remainingTime: 0,
             userType: 'anonymous',
+            gracePeriod: true,
             message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
         });
     }
 
-    return res.json({ 
-        remainingTime: anonymousRemaining,
-        sessionID: req.sessionID,
+    return res.json({
+        remainingTime: anonymousRemaining,  // ✅ 5 λεπτά grace period
         userType: 'anonymous',
-        gracePeriod: true
+        gracePeriod: true,
+        sessionID: req.sessionID
     });
 });
 
@@ -311,36 +341,70 @@ function isAuthenticated(req, res, next) {
 
 app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
     try {
+        // ═══════════════════════════════════════════════════════════════════════
+        // ✅ GET INACTIVITY TIMEOUT (60 min) - NOT full session (720 min)
+        // ═══════════════════════════════════════════════════════════════════════
+        const INACTIVITY_TIMEOUT = Number(process.env.INACTIVITY_TIMEOUT || 60) * 60 * 1000;  // 60 λεπτά
+        const GRACE_PERIOD_MS = Number(process.env.GRACE_PERIOD || grace_period || 5) * 60 * 1000;  // 5 λεπτά
+        
         const now = Date.now();
         const lastActivity = req.session.lastActivity || now;
-        const remainingMs = Math.max(0, 1000 * 60 * diarkeia_session - (now - lastActivity));
-        const remainingMinutes = Math.floor(remainingMs / 60000);
+        const timeSinceLastActivity = now - lastActivity;
+        const remainingMs = Math.max(0, INACTIVITY_TIMEOUT - timeSinceLastActivity);
         
-        const GRACE_PERIOD_MINUTES = grace_period;
+        logger.info('[SESSION REFRESH] Request received', {
+            userId: req.session.userId,
+            timeSinceLastActivity: Math.floor(timeSinceLastActivity / 60000) + ' min',
+            remainingMs: Math.floor(remainingMs / 60000) + ' min'
+        });
         
-        if (remainingMinutes > GRACE_PERIOD_MINUTES) {
+        // ═══════════════════════════════════════════════════════════════════════
+        // ✅ CHECK: If remaining time > grace period → ALLOW REFRESH
+        // ═══════════════════════════════════════════════════════════════════════
+        if (remainingMs > GRACE_PERIOD_MS) {
+            // ✅ REFRESH: Update last activity
             req.session.lastActivity = now;
+            
+            // ✅ Touch session (triggers rolling update in MongoDB)
+            req.session.touch();
             
             req.session.save((err) => {
                 if (err) {
-                    logger.error('Session save error:', err);
+                    logger.error('[SESSION REFRESH] Save error:', err);
                     return res.status(500).json({ 
                         success: false, 
+                        refreshed: false,
                         error: 'Session refresh failed' 
                     });
                 }
                 
-                const newRemainingMs = 1000 * 60 * diarkeia_session;
+                // ✅ Reset to full INACTIVITY_TIMEOUT (60 min)
+                const newRemainingMs = INACTIVITY_TIMEOUT;
+                
+                logger.info('[SESSION REFRESH] ✅ Session refreshed', {
+                    userId: req.session.userId,
+                    newRemaining: Math.floor(newRemainingMs / 60000) + ' min'
+                });
                 
                 return res.json({
                     success: true,
                     refreshed: true,
                     remainingTime: formatTime(newRemainingMs),
-                    remainingMs: newRemainingMs,
-                    message: 'Session refreshed to 60:00'
+                    remainingMs: newRemainingMs,  // ✅ 60 λεπτά
+                    gracePeriod: false,
+                    message: 'Session refreshed successfully'
                 });
             });
+            
         } else {
+            // ═══════════════════════════════════════════════════════════════════
+            // ✅ GRACE PERIOD: Less than 5 min remaining → DON'T REFRESH
+            // ═══════════════════════════════════════════════════════════════════
+            logger.warn('[SESSION REFRESH] ⚠️ Grace period active - refresh denied', {
+                userId: req.session.userId,
+                remaining: Math.floor(remainingMs / 60000) + ' min'
+            });
+            
             return res.json({
                 success: true,
                 refreshed: false,
@@ -350,10 +414,12 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                 message: 'Grace period active - session NOT refreshed'
             });
         }
+        
     } catch (error) {
-        logger.error('Session refresh error:', error);
+        logger.error('[SESSION REFRESH] ❌ Error:', error);
         res.status(500).json({ 
-            success: false, 
+            success: false,
+            refreshed: false,
             error: 'Server error' 
         });
     }
@@ -671,6 +737,7 @@ app.use(
     isProd ? geoGuard : (req, res, next) => next()
 );
 
+app.use('/api', efkaRoutes);
 app.use('/api', apiRoutes);
 app.use("/api/dropdown", dropdownRoutes);
 app.use("/", usersRoute);
@@ -755,6 +822,36 @@ async function initializeTextCacheSystem() {
 /*                                 Εκκίνηση                                   */
 /* -------------------------------------------------------------------------- */
 
+// async function startServer() {
+//     try {
+//         // Wait for MongoDB
+//         const mongoose = require('mongoose');
+//         if (mongoose.connection.readyState !== 1) {
+//             logger.info('⏳ Waiting for MongoDB connection...');
+//             await new Promise((resolve) => {
+//                 mongoose.connection.once('open', resolve);
+//             });
+//         }
+
+//         // ✅ Initialize Text Cache System
+//         await initializeTextCacheSystem();
+
+//         // Start server
+//         app.listen(port, "0.0.0.0", () => {
+//             logger.info('\n' + '='.repeat(70));
+//             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
+//             logger.info('='.repeat(70));
+//             logger.info(`📍 URL: http://${host}:${port}`);
+//             logger.info(`🌍 Environment: ${node_env}`);
+//             logger.info('='.repeat(70) + '\n');
+//         });
+
+//     } catch (error) {
+//         logger.error('❌ Failed to start server:', error);
+//         process.exit(1);
+//     }
+// }
+
 async function startServer() {
     try {
         // Wait for MongoDB
@@ -769,13 +866,29 @@ async function startServer() {
         // ✅ Initialize Text Cache System
         await initializeTextCacheSystem();
 
-        // Start server
-        app.listen(port, "0.0.0.0", () => {
+        // ============================================================================
+        // ✅ CREATE HTTP SERVER (Required for Socket.io)
+        // ============================================================================
+        const http = require('http');
+        const server = http.createServer(app);
+
+        // ============================================================================
+        // ✅ INITIALIZE SOCKET.IO
+        // ============================================================================
+        const { initializeSocket } = require('./server/socket');
+        initializeSocket(server);
+
+        // ============================================================================
+        // ✅ START SERVER (changed from app.listen to server.listen)
+        // ============================================================================
+        server.listen(port, "0.0.0.0", () => {
             logger.info('\n' + '='.repeat(70));
             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
             logger.info('='.repeat(70));
-            logger.info(`📍 URL: http://${host}:${port}`);
+            logger.info(`📍 HTTP URL: http://${host}:${port}`);
+            logger.info(`📍 Socket.io URL: ws://${host}:${port}/socket.io/`);
             logger.info(`🌍 Environment: ${node_env}`);
+            logger.info(`🔌 Socket.io: ENABLED`);
             logger.info('='.repeat(70) + '\n');
         });
 

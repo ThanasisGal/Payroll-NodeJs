@@ -644,6 +644,7 @@ declare -a symbaseis=(
 declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/getFieldValues.js"
     "public/js/ergazomenoi/genika/selectRowInTable.js"
+    "public/js/ergazomenoi/genika/loadDataFromEfka.js"
     "public/js/ergazomenoi/genika/putInputValuesToHiddenValues.js"
     "public/js/ergazomenoi/genika/calcProyphresia.js"
     "public/js/ergazomenoi/genika/toggleDisabledSelectViaCheckbox.js"

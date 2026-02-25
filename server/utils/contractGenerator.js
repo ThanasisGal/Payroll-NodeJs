@@ -6,9 +6,6 @@
  * Δημιουργεί PDF σύμβασης για έναν εργαζόμενο
  * Καλείται από το postErgazomenoiForm μετά την αποθήκευση
  * 
- * ✅ FIXED: Table rendered as formatted text (NOT array loops)
- * ✅ FIXED: All placeholders validated
- * ✅ FIXED: Safe dynamic placeholder generation
  */
 
 const PizZip = require("pizzip");
@@ -494,27 +491,55 @@ async function generateContractPDF(ergazomenos, userContext) {
         
         let categoryParts = {};
         let _COMBINED_TEXT = "";
-        
-        if (ergazomenos.eidikh_kathgoria_ergazomenoy && userContext) {
+
+        // ✅ Determine which category to load
+        const categoryToLoad = ergazomenos.eidikh_kathgoria_ergazomenoy || "0000";  // Default fallback
+        const isDefaultCategory = categoryToLoad === "0000";
+
+        if (userContext) {
             try {
+                console.log(`📂 [CONTRACT] Loading category: ${categoryToLoad}${isDefaultCategory ? ' (Γενικοί Όροι - Default)' : ''}`);
+                
                 const templates = loadTextsByCategory(
                     userContext.team,
                     userContext.companyFolder,
                     CATEGORIES.SYMBASH,
-                    ergazomenos.eidikh_kathgoria_ergazomenoy
+                    categoryToLoad
                 );
 
                 categoryParts = templates || {};
                 
                 if (Object.keys(templates).length > 0) {
                     _COMBINED_TEXT = combineTexts(templates);
+                    console.log(`✅ [CONTRACT] Loaded ${Object.keys(templates).length} templates`);
                 } else {
-                    console.warn(`⚠️ No templates found for category ${ergazomenos.eidikh_kathgoria_ergazomenoy}`);
+                    console.warn(`⚠️ [CONTRACT] No templates found for category ${categoryToLoad}`);
+                    
+                    // ✅ If selected category is empty BUT not 0000, try 0000 as final fallback
+                    if (categoryToLoad !== "0000") {
+                        console.log(`🔄 [CONTRACT] Falling back to Γενικοί Όροι (0000)...`);
+                        
+                        const fallbackTemplates = loadTextsByCategory(
+                            userContext.team,
+                            userContext.companyFolder,
+                            CATEGORIES.SYMBASH,
+                            "0000"
+                        );
+                        
+                        if (fallbackTemplates && Object.keys(fallbackTemplates).length > 0) {
+                            categoryParts = fallbackTemplates;
+                            _COMBINED_TEXT = combineTexts(fallbackTemplates);
+                            console.log(`✅ [CONTRACT] Fallback loaded ${Object.keys(fallbackTemplates).length} templates`);
+                        }
+                    }
                 }
             } catch (error) {
-                console.error('❌ Error loading dynamic texts:', error);
+                console.error('❌ [CONTRACT] Error loading dynamic texts:', error);
                 categoryParts = {};
+                _COMBINED_TEXT = "";
             }
+        } else {
+            console.warn('⚠️ [CONTRACT] No userContext provided, skipping dynamic texts');
         }
         
         let epoxikothta = "";
@@ -711,8 +736,20 @@ async function generateContractPDF(ergazomenos, userContext) {
         const doc = new Docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
+            // ✅ FIX: Replace undefined placeholders with empty string
+            nullGetter: function(part) {
+                // Return empty string for ANY undefined/null/missing placeholder
+                if (!part.module) {
+                    return "";
+                }
+                // For loop/table items that don't exist
+                if (part.value == null) {
+                    return "";
+                }
+                return "";
+            }
         });
-        
+
         doc.render(data);
         
         const timestamp = Date.now();

@@ -14,7 +14,7 @@ const sessionOpts = {
                 mongoUrl,
                 ttl: 60 * diarkeia_session,
                 autoRemove: 'native',
-                touchAfter: 24 * 3600,
+                touchAfter: 60 * 10,
             })
         : undefined,
     cookie: {

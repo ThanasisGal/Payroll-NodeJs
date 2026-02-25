@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { ObjectId } = require('mongodb');
 const fs = require("fs-extra");
+const logger = require('../../utils/logger');
 
 const Models_A = require("../../models/stathera_arxeia");
 const Models_B = require("../../models/privileges");
@@ -18,6 +19,7 @@ const   { UserPrivilegesModel } = Models_B;
 
 const   {   CompaniesModel,
             YpokatasthmataModel,
+            PasswordsModel,
             NomimoiEkprosopoiModel
         } = Models_C;
 
@@ -634,6 +636,7 @@ class ergazomenoiController {
             diathesimothta: formData.diathesimothta,
             enarxh_diathesimothtas: formData.enarxh_diathesimothtas || null,
             lhxh_diathesimothtas: formData.lhxh_diathesimothtas || null,
+            foreas_kyrias_asfalishs: formData.foreas_kyrias_asfalishs_stathera,
             foreas_epikoyrikhs_asfalishs: formData.foreas_epikoyrikhs_asfalishs || [],
             kad_efka: formData.kad_efka_stathera,
             eidikothta_efka: formData.eidikothta_efka_stathera,
@@ -783,6 +786,7 @@ class ergazomenoiController {
         newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
         newErgazomenos.mhniaia_repo = formData.mhniaia_repo;
         newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
+        newErgazomenos.oysiodeis_oroi = formData.oysiodeis_oroi_stathera || '0';
         newErgazomenos.oros_sth_symbash_n_3986_2011 = formData.oros_sth_symbash_n_3986_2011;
         newErgazomenos.kataggelia_katopin_eggrafhs_proeidopoihshs = formData.kataggelia_katopin_eggrafhs_proeidopoihshs;
         newErgazomenos.hmeromhnia_eggrafhs_proeidopoihshs = formData.hmeromhnia_eggrafhs_proeidopoihshs || null;
@@ -1125,12 +1129,26 @@ class ergazomenoiController {
             // =====================================================================
             // ✅ CONDITIONAL E3 XML GENERATION
             // =====================================================================
-            
+
             let e3XmlData = null;
-            
+
+            // ✅ DEBUG: Log received data BEFORE if statement
+            logger.debug('E3 Generation block reached', {
+                module: 'E3-XML-DEBUG',
+                filesToUpdate: filesToUpdate,
+                e3_flag: filesToUpdate?.e3_anaggelia_proslhpshs,
+                e3_flag_type: typeof filesToUpdate?.e3_anaggelia_proslhpshs,
+                e3_flag_strict_check: filesToUpdate?.e3_anaggelia_proslhpshs === true
+            });
+
             if (filesToUpdate?.e3_anaggelia_proslhpshs === true) {
-                console.log('📝 [E3-XML] Generation requested...');
-                
+                logger.info('E3 XML generation requested', {
+                    module: 'E3-XML',
+                    employee_kod: savedErgazomenos.kodikos,
+                    employee_afm: savedErgazomenos.afm,
+                    company: company?.eponymia || 'N/A'
+                });
+
                 try {
                     const { generateE3XML } = require('../../utils/xmlGenerators/e3Generator');
                     
@@ -1141,9 +1159,12 @@ class ergazomenoiController {
                         ypokatasthmata
                     );
                     
-                    console.log('✅ [E3-XML] Generated successfully');
-                    console.log('   Saved to:', xmlResult.s3Url || 'NOT SAVED');
-                    console.log('   Filename:', xmlResult.filename);
+                    logger.info('E3 XML generated successfully', {
+                        module: 'E3-XML',
+                        s3_key: xmlResult.s3Key,
+                        filename: xmlResult.filename,
+                        s3_url: xmlResult.s3Url
+                    });
                     
                     // ✅ Save S3 key to employee record (if saved successfully)
                     if (xmlResult.s3Key) {
@@ -1154,39 +1175,86 @@ class ergazomenoiController {
                     
                     // ✅ Generate presigned download URL (10 min expiration)
                     if (xmlResult.s3Key) {
+
+                        // ✅ Helper once (used in both try/catch)
+                        const toRelativeUploadsPath = (p) => {
+                            if (!p) return null;
+
+                            // URL → pathname
+                            if (p.startsWith('http://') || p.startsWith('https://')) {
+                                p = new URL(p).pathname;
+                            }
+
+                            // file:/// → filesystem
+                            if (p.startsWith('file:///')) {
+                                p = p.replace('file:///', '/');
+                            }
+
+                            // normalize slashes
+                            p = p.replace(/\\/g, '/');
+
+                            // keep only "uploads/..."
+                            const idx = p.indexOf('/uploads/');
+                            if (idx !== -1) return p.slice(idx + 1);     // -> "uploads/..."
+                            if (p.startsWith('/uploads/')) return p.slice(1);
+                            if (p.startsWith('uploads/')) return p;
+
+                            return null;
+                        };
+
+                        const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
+
                         try {
                             const { generatePresignedUrl } = require('../../utils/s3Helper');
                             const downloadUrl = await generatePresignedUrl(xmlResult.s3Key, 600);
-                            
+
                             e3XmlData = {
                                 success: true,
                                 s3Key: xmlResult.s3Key,
-                                downloadUrl: downloadUrl,
-                                filename: xmlResult.filename
+                                downloadUrl,
+                                filename: xmlResult.filename,
+                                relativePath
                             };
+
+                            logger.info('[E3PATH] generated', {
+                                filename: e3XmlData.filename,
+                                relativePath: e3XmlData.relativePath
+                            });
+
                         } catch (urlError) {
-                            console.error('❌ [E3-XML] Failed to generate presigned URL:', urlError.message);
-                            
-                            // Still return success but without download URL
+
                             e3XmlData = {
                                 success: true,
                                 s3Key: xmlResult.s3Key,
                                 downloadUrl: null,
                                 filename: xmlResult.filename,
+                                relativePath,
                                 urlError: urlError.message
                             };
+
+                            logger.warn('[E3PATH] generated WITHOUT presigned URL', {
+                                filename: e3XmlData.filename,
+                                relativePath: e3XmlData.relativePath,
+                                urlError: urlError.message
+                            });
                         }
+
                     } else {
-                        // XML generated but not saved
+                        logger.warn('[E3PATH] xml generated but NOT saved', {
+                            saveError: xmlResult.saveError
+                        });
+
                         e3XmlData = {
                             success: false,
                             error: xmlResult.saveError || 'XML not saved'
                         };
                     }
-                    
                 } catch (e3Error) {
-                    console.error('❌ [E3-XML] Generation failed:', e3Error.message);
-                    console.error('   Stack:', e3Error.stack);
+                    logger.error('E3 XML generation failed', {
+                        module: 'E3-XML',
+                        error: e3Error.message,
+                        stack: e3Error.stack
+                    });
                     
                     e3XmlData = {
                         success: false,
@@ -1194,7 +1262,10 @@ class ergazomenoiController {
                     };
                 }
             } else {
-                console.log('⏭️  [E3-XML] Generation skipped (checkbox not checked)');
+                logger.info('E3 XML generation skipped (checkbox not checked)', {
+                    module: 'E3-XML',
+                    checkbox_value: filesToUpdate?.e3_anaggelia_proslhpshs
+                });
             }
 
             // =====================================================================
@@ -1226,7 +1297,8 @@ class ergazomenoiController {
                 companyPhone: companyPhone,
                 companyName: companyName,
                 companyType: companyType,
-                redirectUrl: "/ergazomenoi/ergazomenoi" 
+                redirectUrl: "/ergazomenoi/ergazomenoi",
+                waitingForPdfConfirmation: true
             });
             
         } catch (error) {
@@ -1237,6 +1309,149 @@ class ergazomenoiController {
             });
         }
     }
+
+    // ======================================================================
+    // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
+    // Uses Playwright uploader that requires a local file path.
+    // ======================================================================
+    static uploadE3ToErganh = async (req, res) => {
+    const path = require('path');
+    const fs = require('fs-extra');
+
+    try {
+        const { ergazomenosId, s3Url } = req.body;
+
+        if (!ergazomenosId || !s3Url) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing ergazomenosId or s3Url'
+        });
+        }
+
+        const sessionCompanyInUse = req.session.companyInUse;
+        const sessionUserId = req.session.userId;
+
+        // ------------------------------------------------------------------
+        // ✅ 1) Resolve local XML path (supports relativePath uploads/...)
+        // ------------------------------------------------------------------
+        const cwd = process.cwd();
+        let localXmlPath = s3Url;
+
+        // If frontend sends "uploads/..." treat as relative to cwd
+        if (!path.isAbsolute(localXmlPath) && !localXmlPath.startsWith('file:///') && !localXmlPath.startsWith('http')) {
+        localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+        }
+
+        // file:/// -> absolute
+        if (localXmlPath.startsWith('file:///')) {
+        localXmlPath = localXmlPath.replace('file:///', '/');
+        }
+
+        localXmlPath = path.resolve(path.normalize(localXmlPath));
+
+        // ------------------------------------------------------------------
+        // ✅ 2) Ensure file exists
+        // ------------------------------------------------------------------
+        const exists = await fs.pathExists(localXmlPath);
+        if (!exists) {
+        return res.status(404).json({
+            success: false,
+            message: `XML file not found: ${path.basename(localXmlPath)}`,
+            localXmlPath
+        });
+        }
+
+        const stats = await fs.stat(localXmlPath);
+        if (!stats.size) {
+        return res.status(400).json({
+            success: false,
+            message: 'XML file is empty',
+            localXmlPath
+        });
+        }
+
+        // ------------------------------------------------------------------
+        // ✅ 3) Load ERGANH credentials from PasswordsModel
+        // ------------------------------------------------------------------
+        const Models_C = require("../../../models/companies"); // ⚠️ βεβαιώσου ότι το path είναι σωστό
+        const { PasswordsModel } = Models_C;
+
+        const passwordsData = await PasswordsModel
+        .findOne({ companykod_object: sessionCompanyInUse, kodikos: "0002" })
+        .lean();
+
+        const erganhUsername = passwordsData?.username;
+        const erganhPassword = passwordsData?.password;
+
+        if (!erganhUsername || !erganhPassword) {
+        return res.status(400).json({
+            success: false,
+            message: 'Missing ERGANH credentials for this company (PasswordsModel kodikos=0002)'
+        });
+        }
+
+        // ------------------------------------------------------------------
+        // ✅ 4) Run uploader (BLOCKING)
+        // ------------------------------------------------------------------
+        const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
+
+        const uploadResult = await uploadE3ToErganh(
+        sessionCompanyInUse,
+        localXmlPath,
+        sessionUserId,
+        { username: erganhUsername, password: erganhPassword }
+        );
+
+        // ------------------------------------------------------------------
+        // ✅ 5) Save protocol OR errors to DB
+        // ------------------------------------------------------------------
+        if (uploadResult?.success && uploadResult?.protocol) {
+        ErgazomenoiModel.findByIdAndUpdate(
+            ergazomenosId,
+            {
+            erganh_e3_protocol: uploadResult.protocol,
+            erganh_e3_upload_date: new Date(),
+            erganh_e3_screenshot: uploadResult.screenshot
+            }
+        ).catch(() => {});
+        } else if (uploadResult?.messages?.length) {
+        ErgazomenoiModel.findByIdAndUpdate(
+            ergazomenosId,
+            {
+            erganh_e3_errors: uploadResult.messages,
+            erganh_e3_error_date: new Date(),
+            erganh_e3_screenshot: uploadResult.screenshot
+            }
+        ).catch(() => {});
+        }
+
+        // ------------------------------------------------------------------
+        // ✅ 6) Return result to frontend for SweetAlert2
+        // ------------------------------------------------------------------
+        return res.status(200).json({
+        success: !!uploadResult?.success,
+        protocol: uploadResult?.protocol || null,
+        screenshot: uploadResult?.screenshot || null,
+        messages: uploadResult?.messages || [],
+        error: uploadResult?.error || null,
+        message: uploadResult?.success
+            ? 'Η υποβολή ολοκληρώθηκε.'
+            : 'Η υποβολή απέτυχε. Δες τα μηνύματα.'
+        });
+
+    } catch (error) {
+        logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
+        error: error.message,
+        stack: error.stack
+        });
+
+        return res.status(500).json({
+        success: false,
+        message: 'Failed to upload to ERGANH',
+        error: error.message
+        });
+    }
+    };
 
     static getOrariaAnaErgazomeno = async (req, res) => {
         try {
@@ -1861,3 +2076,4 @@ class ergazomenoiController {
 module.exports = ergazomenoiController;
 module.exports.getErgazomenosById = ergazomenoiController.getErgazomenosById;
 module.exports.getAllErgazomenoiWithUrls = ergazomenoiController.getAllErgazomenoiWithUrls;
+module.exports.uploadE3ToErganh = ergazomenoiController.uploadE3ToErganh;

@@ -273,6 +273,7 @@ const { Schema: _Schema, model } = require("mongoose");
         mhniaia_repo: { type: Number, default: 0 },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
+        oysiodeis_oroi: { type: String, trim: true },
         kataggelia_katopin_eggrafhs_proeidopoihshs: { type: Boolean, default: false },
         hmeromhnia_eggrafhs_proeidopoihshs: { type: Date },
         omadikh_apolysh: { type: Boolean, default: false },

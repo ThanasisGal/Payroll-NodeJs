@@ -209,6 +209,7 @@ router.post("/ergazomenoi/ergazomenoi/istoriko/: kod", checkAuth, ergazomenoiCon
 router.delete("/ergazomenoi/ergazomenoi/delete/:id", checkAuth, ergazomenoiController.deleteErgazomenoi);
 router.get("/ergazomenoi/ergazomenoi/search", checkAuth, ergazomenoiController.searchGetErgazomenoi);
 router.post("/ergazomenoi/ergazomenoi/search", ergazomenoiController.searchPostErgazomenoi);
+router.post("/ergazomenoi/ergazomenoi/upload-e3-to-erganh", checkAuth, ergazomenoiController.uploadE3ToErganh);
 
 // ============================================================================
 // ERGAZOMENOI - PROGRAMMATA ROUTES

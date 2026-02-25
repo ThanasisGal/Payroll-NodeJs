@@ -176,17 +176,22 @@ const NomimoiEkprosopoiSchema = new Schema(
 );
 const NomimoiEkprosopoiModel = model("NomimoiEkprosopoi", NomimoiEkprosopoiSchema);
 
-const PasswordsSchema = new Schema({
-    team: { type: String, trim: true }, // Το team από το CompaniesModel
-    companykod_object: { type: String, trim: true }, // Το company_id από το CompaniesModel
-    companykod: { type: String, trim: true }, // Το kod από το CompaniesModel
-    kodikos: { type: String, trim: true, length: 4 }, // Ο κωδικός του κωδικού πρόσβασης (αα / εταιρεία)
-    perigrafh: { type: String, trim: true },
-    username: { type: String, trim: true },
-    password: { type: String, trim: true },
-    createdAt: { type: Date, default: Date.now() },
-    updatedAt: { type: Date, default: Date.now() },
-});
+const PasswordsSchema = new Schema(
+    {
+        team: { type: String, trim: true }, // Το team από το CompaniesModel
+        companykod_object: { type: String, trim: true }, // Το company_id από το CompaniesModel
+        companykod: { type: String, trim: true }, // Το kod από το CompaniesModel
+        kodikos: { type: String, trim: true, length: 4 }, // Ο κωδικός του κωδικού πρόσβασης (αα / εταιρεία)
+        perigrafh: { type: String, trim: true },
+        username: { type: String, trim: true },
+        password: { type: String, trim: true },
+        createdAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() },
+    },
+    { 
+        collection: "Passwords"
+    }
+);
 const PasswordsModel = model("Passwords", PasswordsSchema);
 
 const AntistoixiseisSchema = new Schema({

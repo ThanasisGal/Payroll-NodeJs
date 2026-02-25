@@ -4,7 +4,7 @@
     </div>
 
     <div class="row form-group g-0 header-row">
-        <div class="col-1 right-align-header">
+        <div class="col-0-75 right-align-header">
             <label for="eponymo" class="col-form-label label-font-size field-required cblack">
             Επώνυμο &nbsp;
             </label>
@@ -22,7 +22,7 @@
             <input type="text" name="onoma" id="onoma" class="form-control input-contents display-value" value="" autocomplete="off" />
         </div>
 
-        <div class="col-1 right-align-header">
+        <div class="col-0-75 right-align-header">
             <label for="afm" class="col-form-label label-font-size field-required cblack">
             ΑΦΜ &nbsp;
             </label>
@@ -38,6 +38,24 @@
         </div>
         <div class="col-1-76">
             <input type="text" name="amka" id="amka_ergazomenoy" class="form-control input-contents amka-input display-value" autocomplete="off" value="" maxlength="11" pattern="[0-9]{1,}" />
+        </div>
+
+        <div class="col-0-56">
+            <span 
+                class="d-inline-block" 
+                tabindex="0"
+                data-bs-toggle="tooltip" 
+                data-bs-placement="top"
+                title="Ευρεση - Λήψη Στοιχείων Εργαζομένων με το Α.Μ.Κ.Α.">
+                
+                <button
+                    id="downloadBtn"
+                    type="button"
+                    class="btn btn-brown ml-1 buttons-content"
+                    disabled>
+                    <i class="bi bi-cloud-download"></i>
+                </button>
+            </span>
         </div>
 
         <div class="col"></div>

@@ -259,7 +259,7 @@
 
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
-    window.__CONFIG__ = <%- JSON.stringify(CONFIG) %>;
+    window.__CONFIG__ = "<%- JSON.stringify(CONFIG) %>";
 </script>
 
 <script src="<%= script('common/blockInvalidClick') %>"></script>

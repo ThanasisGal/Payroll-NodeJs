@@ -54,6 +54,7 @@ window.validateAMKA = validateAMKA;
 
 // --- binding για ΦΥΛΟ (mutual exclusive) + γέμισμα Ημ/νίας Γέννησης ---
 document.addEventListener('DOMContentLoaded', () => {
+  const actionBtn = document.getElementById('downloadBtn');
   // Πιθανές είσοδοι ΑΜΚΑ
   const amkaInputs = Array.from(document.querySelectorAll(
     '#amka_ergazomenoy, #amka_antikatastath, #amka, input[id*="amka" i], input[name*="amka" i]'
@@ -143,6 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     }
+    // Enable / Disable button ανάλογα με εγκυρότητα
+    if (actionBtn) {
+      actionBtn.disabled = !(res && res.ok);
+    }    
   };
 
   const updateFromInput = (inp) => {

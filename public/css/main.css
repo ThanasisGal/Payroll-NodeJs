@@ -7987,3 +7987,74 @@ body.upload-templates-page .progress-fill {
     margin-right: 8px;
     color: #4a6b52;  /* ✅ Χρώμα φόρμας */
 }
+
+/**
+ * ============================================================================
+ * Custom Toast Notifications for Socket.io Events
+ * ============================================================================
+ */
+
+/* Toast Popup Container */
+.swal-toast-popup {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.95rem;
+    padding: 1rem 1.25rem !important;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-width: 400px;
+}
+
+/* Toast Title */
+.swal-toast-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Success Toast */
+.swal-toast-success {
+    border-left: 4px solid #28a745;
+}
+
+/* Error Toast */
+.swal-toast-error {
+    border-left: 4px solid #dc3545;
+}
+
+/* Confirm Button */
+.swal-toast-confirm-btn {
+    font-size: 0.9rem;
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Timer Progress Bar */
+.swal2-toast .swal2-timer-progress-bar {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* Icon Styling */
+.swal2-toast .swal2-icon {
+    width: 2rem;
+    height: 2rem;
+    margin: 0 0.75rem 0 0;
+}
+
+/* Content Text */
+.swal2-toast .swal2-html-container {
+    margin: 0;
+    padding: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Close Button */
+.swal2-toast .swal2-close {
+    font-size: 1.5rem;
+    color: #999;
+}
+
+.swal2-toast .swal2-close:hover {
+    color: #333;
+}
