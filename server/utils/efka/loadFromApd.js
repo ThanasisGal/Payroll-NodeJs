@@ -44,6 +44,13 @@ async function loadFromApd(opts = {}) {
       timezoneId: 'Europe/Athens',
     });
 
+    // PERF: block heavy resources (images/fonts/media) — huge win on EC2
+    await context.route('**/*', (route) => {
+      const rt = route.request().resourceType();
+      if (rt === 'image' || rt === 'font' || rt === 'media') return route.abort();
+      return route.continue();
+    });
+
     page = await context.newPage();
 
     await page.goto(START_URL, { waitUntil: 'domcontentloaded' });
