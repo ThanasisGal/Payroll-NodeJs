@@ -401,49 +401,6 @@ async function continueApd(sessionId, opts = {}) {
 			} else {
 				await ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs);
 			}
-
-			//   mark('ΒΗΜΑ 11: submissionTable -> Συμπλήρωση');
-
-			//   await apdPage.waitForSelector('#submissionTable_data', { timeout: timeoutMs });
-
-			//   const tableRows = apdPage.locator('#submissionTable_data > tr');
-			//   const n = await tableRows.count();
-			//   if (!n) throw new Error('Δεν υπάρχουν γραμμές στο submissionTable_data.');
-
-			//   const candidateIdxs = [];
-			//   for (let i = 0; i < n; i++) {
-			//     const statusText = normalizeText(await tableRows.nth(i).locator('td').nth(3).innerText().catch(() => ''));
-			//     if (/ΣΕ\s+ΚΑΤΑΧΩΡΗΣΗ\s+ΣΤΟΙΧΕΙΩΝ/i.test(statusText)) candidateIdxs.push(i);
-			//   }
-			//   const scanIdxs = candidateIdxs.length ? candidateIdxs : [...Array(n).keys()];
-
-			//   let bestIdx = scanIdxs[0] ?? 0;
-			//   let bestFrom = null;
-			//   let bestTo = null;
-
-			//   for (const i of scanIdxs) {
-			//     const row = tableRows.nth(i);
-			//     const periodText = normalizeText(await row.locator('td').nth(2).innerText().catch(() => ''));
-			//     const parts = periodText.split(/-|–|—/).map(x => x.trim());
-			//     if (parts.length !== 2) continue;
-
-			//     const from = parseMY(parts[0]);
-			//     const to = parseMY(parts[1]);
-			//     if (!from || !to) continue;
-
-			//     if (bestFrom === null || cmpMY(to, bestTo) > 0 || (cmpMY(to, bestTo) === 0 && cmpMY(from, bestFrom) > 0)) {
-			//       bestIdx = i;
-			//       bestFrom = from;
-			//       bestTo = to;
-			//     }
-			//   }
-
-			//   const bestRow = tableRows.nth(bestIdx);
-			//   const fillLink = bestRow.locator('td').nth(4).locator('a:has-text("Συμπλήρωση")').first();
-			//   await waitVisible(fillLink, timeoutMs);
-			//   await fillLink.click();
-
-			//   await apdPage.waitForSelector('input#ama', { timeout: timeoutMs });
 		}
 
 		mark('ΒΗΜΑ 11: submissionTable -> Συμπλήρωση');

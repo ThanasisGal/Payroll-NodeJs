@@ -52,8 +52,8 @@
         data-context="<%= typeof context !== 'undefined' ? context : '' %>"
         class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
 
-        <div class="loader-container">
-            <div id="appLoader" class="loader"></div>
+        <div id="appLoader" class="loader-container">
+            <div class="loader"></div>
             <div class="loader-text">Παρακαλώ περιμένετε...</div>
         </div>
 
@@ -260,14 +260,23 @@
             function showLoader(text) {
                 const el = document.getElementById('appLoader');
                 if (!el) return;
+
                 const t = el.querySelector('.loader-text');
                 if (t && text) t.textContent = text;
+
+                el.classList.remove('is-hidden');
+                el.classList.add('visible');
+
                 el.style.display = 'flex';
             }
 
             function hideLoader() {
                 const el = document.getElementById('appLoader');
                 if (!el) return;
+
+                el.classList.remove('visible');
+                el.classList.add('is-hidden');
+
                 el.style.display = 'none';
             }
         </script>

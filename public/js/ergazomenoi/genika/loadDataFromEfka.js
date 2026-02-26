@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   // CSRF από meta
   let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || null;
+  const loader = document.querySelector(".loader-container");
 
   // Κρατάμε sessionId για συνέχεια
   let efkaSessionId = null;
@@ -56,7 +57,10 @@ async function efkaOpen() {
   const btn = document.getElementById('downloadBtn');
   if (!btn) return;
 
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     try {
       btn.disabled = true;
       showLoader('Γίνεται ανάκτηση από ΕΦΚΑ...');
