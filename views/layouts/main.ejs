@@ -1,285 +1,571 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title><%= locals.title %></title>
-        <meta name="description" content="<%= locals.description %>" />
-        <meta name="csrf-token" content="<%= csrfToken %>">
-        <meta name="app-root" content="/mainapp">
-        
-        <!-- Επιτρέπεται από strict CSP μέσω nonce -->
-        <script nonce="<%= nonce %>">
-            (function() {
-                let ua = navigator.userAgent;
-                let htmlTag = document.documentElement;
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-                if (ua.indexOf("Firefox") > -1) {
-                    htmlTag.classList.add("firefox");
-                } else if (ua.indexOf("Edg") > -1) {
-                    htmlTag.classList.add("edge");
-                } else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) {
-                    htmlTag.classList.add("chrome");
-                } else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) {
-                    htmlTag.classList.add("safari");
-                }
-            })();
-        </script>
+		<title><%= locals.title %></title>
+		<meta name="description" content="<%= locals.description %>" />
+		<meta name="csrf-token" content="<%= csrfToken %>">
+		<meta name="app-root" content="/mainapp">
 
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
+		<script nonce="<%= nonce %>">
+			(function () {
+				const ua = navigator.userAgent;
+				const htmlTag = document.documentElement;
 
-        <!-- Προαιρετικά: preconnect για Google Fonts -->
-        <!-- <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /> -->
+				if (ua.indexOf("Firefox") > -1) htmlTag.classList.add("firefox");
+				else if (ua.indexOf("Edg") > -1) htmlTag.classList.add("edge");
+				else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) htmlTag.classList.add("chrome");
+				else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) htmlTag.classList.add("safari");
+			})();
+		</script>
 
-        <link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
-        <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
-        <link rel="icon" href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico" type="image/x-icon" />
-        <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-        <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
 
-        <!-- Το κύριο CSS -->
-        <!-- <link rel="stylesheet" href="/static/css/main.css" /> -->
-        <!-- <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/main.css" /> -->
-         <link rel="stylesheet" href="<%= css('main') %>">
-        <link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
-    </head>
+		<link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
+		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
+		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
+		<link rel="icon" href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico" type="image/x-icon" />
+		<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
-    <body
-        data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>"
-        data-context="<%= typeof context !== 'undefined' ? context : '' %>"
-        class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+		<link rel="stylesheet" href="<%= css('main') %>">
+		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
+	</head>
 
-        <div id="appLoader" class="loader-container">
-            <div class="loader"></div>
-            <div class="loader-text">Παρακαλώ περιμένετε...</div>
-        </div>
+	<body
+		data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>"
+		data-context="<%= typeof context !== 'undefined' ? context : '' %>"
+		class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"
+	>
 
-        <%- include('../partials/header.ejs') %>
-        <div class="container-fluid container-scroll">
-            <div class="row">
-                <%- include('../partials/sidebar.ejs') %>
+		<!-- APP LOADER (BEM) -->
+		<div id="appLoader" class="app-loader">
+			<div class="app-loader__box">
+				<div class="app-loader__row">
+				<div class="app-loader__spinner"></div>
+					
+				<div class="app-loader__textwrap">
+					<div id="appLoaderTitle" class="app-loader__title">Παρακαλώ περιμένετε...</div>
+					<div id="appLoaderStep" class="app-loader__step"></div>
+				</div>
+				</div>
 
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent"><%- body %></main>
-            </div>
+				<div class="app-progress">
+					<div id="appLoaderProgressFill" class="app-progress__fill"></div>
+				</div>
 
-            <%- include('../partials/footer.ejs') %>
-        </div>
+				<div id="appLoaderProgressText" class="app-loader__meta">0%</div>
+			</div>
+		</div>
 
-        <% const isProduction = NODE_ENV === 'production'; %>
-        <script nonce="<%= nonce %>">
-            window.RUNTIME_ENV = "<%= NODE_ENV %>";
-        </script>
+		<!-- APP LOADER (SIMPLE / GENERIC DELAYS) -->
+		<div class="app-loader app-loader--simple" data-loader="simple">
+			<div class="app-loader__box">
+				<div class="app-loader__row">
+					<div class="app-loader__spinner"></div>
 
-        <script src="<%= script('common/logger') %>"></script>
-        <script src="<%= script('utils/tree') %>"></script>
-        <script src="<%= script('utils/miscProgs') %>"></script>
-        <script src="<%= script('common/getCompanyDescription') %>"></script>
-        <script src="<%= script('common/getXrhsh') %>"></script>
-        <script src="<%= script('common/getPeriod') %>"></script>
-        <script src="<%= script('common/getAppDate') %>"></script>
-        <script src="<%= script('common/getUser') %>"></script>
-        <script src="<%= script('common/navTabs') %>"></script>
-        <script src="<%= script('common/getUserRole') %>"></script>
-        <script src="<%= script('common/moveByEnter') %>"></script>
-        <script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
-        <script src="<%= script('common/tooltipsForButtons') %>"></script>
-        <script src="<%= script('common/input_auto_select') %>"></script>
-        <script src="<%= script('dates/convertDateToISO') %>"></script>
-        
-        <script nonce="<%= nonce %>">
-            window.addEventListener("load", function () {
-                const el = document.querySelector(".loader-container");
-                if (!el) return;
-                el.classList.remove("visible");
-                el.classList.add("is-hidden");
-                // προαιρετικά
-                // el.style.setProperty('display','none','important');
-            }, { once: true });
-        </script>
+					<div class="app-loader__textwrap">
+						<div class="app-loader__title">Παρακαλώ περιμένετε...</div>
+						<div class="app-loader__meta">Εκτέλεση διαδικασίας...</div>
+					</div>
+				</div>
+			</div>
+		</div>    
 
-        <!-- Εξωτερικά vendor scripts με nonce -->
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
-        <script type="module" src="<%= script('app') %>"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
-        <script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
-        <script src="<%= script('common/deviceSwitcher') %>" defer></script>
+		<%- include('../partials/header.ejs') %>
 
-        <script nonce="<%= nonce %>">
-            // 🔑 Global CSRF helper
-            window.getCSRFToken = function() {
-                // 1. Από meta tag
-                const meta = document.querySelector('meta[name="csrf-token"]');
-                if (meta) return meta.getAttribute('content');
-                
-                // 2. Από hidden input (fallback)
-                const input = document.querySelector('input[name="_csrf"]');
-                if (input) return input.value;
-                
-                console.warn('⚠️ CSRF token not found!');
-                return null;
-            };
-        </script>
+		<div class="container-fluid container-scroll">
+			<div class="row">
+				<%- include('../partials/sidebar.ejs') %>
+				<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">
+					<%- body %>
+				</main>
+			</div>
 
-        <!-- ============================================================================
-            SOCKET.IO CLIENT SETUP (Environment-Aware + CSP-Compliant)
-            ============================================================================ -->
+			<%- include('../partials/footer.ejs') %>
+		</div>
 
-        <!-- ✅ Load Socket.io client library (external script - no nonce needed) -->
-        <script src="/socket.io/socket.io.js"></script>
+		<% const isProduction = NODE_ENV === 'production'; %>
+	
+		<script nonce="<%= nonce %>">
+			window.RUNTIME_ENV = "<%= NODE_ENV %>";
+		</script>
 
-        <!-- ✅ Initialize Socket.io connection (inline script - REQUIRES nonce!) -->
-        <script nonce="<%= nonce %>">
-        (function() {
-            'use strict';
-            
-            // ================================================================
-            // ✅ DETECT ENVIRONMENT
-            // ================================================================
-            const hostname = window.location.hostname;
-            const isDev = hostname === 'localhost' || 
-                        hostname === '127.0.0.1' || 
-                        hostname.startsWith('192.168.');
-            
-            // ================================================================
-            // ✅ BUILD SOCKET.IO CONNECTION URL
-            // ================================================================
-            const socketUrl = isDev 
-                ? `http://${hostname}:${window.location.port || 5000}`
-                : window.location.origin;
-            
-            console.log('\n🔧 ════════════════════════════════════════════════════════');
-            console.log('🔧 [SOCKET] Initializing Socket.io connection');
-            console.log('🔧 ════════════════════════════════════════════════════════');
-            console.log('   Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
-            console.log('   Server URL:', socketUrl);
-            console.log('   Path:', '/socket.io/');
-            console.log('🔧 ════════════════════════════════════════════════════════\n');
-            
-            // ================================================================
-            // ✅ INITIALIZE SOCKET.IO (Global variable)
-            // ================================================================
-            window.socket = io(socketUrl, {
-                path: '/socket.io/',
-                transports: ['websocket', 'polling'],
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionDelayMax: 5000,
-                reconnectionAttempts: 5,
-                timeout: 20000,
-                autoConnect: true
-            });
-            
-            // ================================================================
-            // ✅ CONNECTION SUCCESSFUL
-            // ================================================================
-            socket.on('connect', function() {
-                console.log('\n✅ ════════════════════════════════════════════════════════');
-                console.log('✅ [SOCKET] Connected to server');
-                console.log('✅ ════════════════════════════════════════════════════════');
-                console.log('   Socket ID:', socket.id);
-                console.log('   Transport:', socket.io.engine.transport.name);
-                console.log('   Connected:', socket.connected);
-                console.log('✅ ════════════════════════════════════════════════════════\n');
-                
-                // ✅ Join user-specific room (if logged in)
-                const userId = '<%= locals.userId || "" %>';
-                if (userId && userId.trim() !== '') {
-                    socket.emit('join', userId);
-                    console.log('📡 [SOCKET] Joining user room:', userId);
-                }
-            });
-            
-            // ================================================================
-            // ✅ JOINED ROOM CONFIRMATION
-            // ================================================================
-            socket.on('joined', function(data) {
-                console.log('✅ [SOCKET] Joined room successfully:', data);
-            });
-            
-            // ================================================================
-            // ✅ DISCONNECTED
-            // ================================================================
-            socket.on('disconnect', function(reason) {
-                console.log('\n❌ ════════════════════════════════════════════════════════');
-                console.log('❌ [SOCKET] Disconnected from server');
-                console.log('❌ ════════════════════════════════════════════════════════');
-                console.log('   Reason:', reason);
-                console.log('   Will reconnect:', socket.io.reconnection());
-                console.log('❌ ════════════════════════════════════════════════════════\n');
-            });
-            
-            // ================================================================
-            // ✅ CONNECTION ERROR
-            // ================================================================
-            socket.on('connect_error', function(error) {
-                console.error('\n❌ ════════════════════════════════════════════════════════');
-                console.error('❌ [SOCKET] Connection error');
-                console.error('❌ ════════════════════════════════════════════════════════');
-                console.error('   Error:', error.message);
-                console.error('   Type:', error.type);
-                console.error('❌ ════════════════════════════════════════════════════════\n');
-            });
-            
-            // ================================================================
-            // ✅ RECONNECTION HANDLERS
-            // ================================================================
-            socket.on('reconnect', function(attemptNumber) {
-                console.log('🔄 [SOCKET] Reconnected successfully after', attemptNumber, 'attempts');
-            });
-            
-            socket.on('reconnect_attempt', function(attemptNumber) {
-                console.log('🔄 [SOCKET] Reconnection attempt:', attemptNumber);
-            });
-            
-            socket.on('reconnect_error', function(error) {
-                console.error('❌ [SOCKET] Reconnection error:', error.message);
-            });
-            
-            socket.on('reconnect_failed', function() {
-                console.error('❌ [SOCKET] Reconnection failed (max attempts reached)');
-            });
-            
-            // ================================================================
-            // ✅ PONG HANDLER (for testing)
-            // ================================================================
-            socket.on('pong', function(data) {
-                console.log('✅ [SOCKET] Pong received:', data);
-            });
-            
-        })();
-        </script>
+		<script src="<%= script('common/logger') %>"></script>
+		<script src="<%= script('utils/tree') %>"></script>
+		<script src="<%= script('utils/miscProgs') %>"></script>
+		<script src="<%= script('common/getCompanyDescription') %>"></script>
+		<script src="<%= script('common/getXrhsh') %>"></script>
+		<script src="<%= script('common/getPeriod') %>"></script>
+		<script src="<%= script('common/getAppDate') %>"></script>
+		<script src="<%= script('common/getUser') %>"></script>
+		<script src="<%= script('common/navTabs') %>"></script>
+		<script src="<%= script('common/getUserRole') %>"></script>
+		<script src="<%= script('common/moveByEnter') %>"></script>
+		<script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
+		<script src="<%= script('common/tooltipsForButtons') %>"></script>
+		<script src="<%= script('common/input_auto_select') %>"></script>
+		<script src="<%= script('dates/convertDateToISO') %>"></script>
 
-        <script  nonce="<%= nonce %>">
-            function showLoader(text) {
-                const el = document.getElementById('appLoader');
-                if (!el) return;
+		<!-- Vendors -->
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
+		<script type="module" src="<%= script('app') %>"></script>
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
+		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
+		<script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
+		<script src="<%= script('common/deviceSwitcher') %>" defer></script>
 
-                const t = el.querySelector('.loader-text');
-                if (t && text) t.textContent = text;
+		<script nonce="<%= nonce %>">
+			window.getCSRFToken = function () {
+				const meta = document.querySelector('meta[name="csrf-token"]');
+				if (meta) return meta.getAttribute('content');
 
-                el.classList.remove('is-hidden');
-                el.classList.add('visible');
+				const input = document.querySelector('input[name="_csrf"]');
+				if (input) return input.value;
 
-                el.style.display = 'flex';
-            }
+				console.warn('⚠️ CSRF token not found!');
+				return null;
+			};
+		</script>
 
-            function hideLoader() {
-                const el = document.getElementById('appLoader');
-                if (!el) return;
+		<!-- =========================================================
+			APP LOADER API + Smooth Progress (FIXED)
+			========================================================= -->
+		<script nonce="<%= nonce %>">
+			(function () {
+				const el = () => document.getElementById('appLoader');
+				const titleEl = () => document.getElementById('appLoaderTitle');
+				const stepEl = () => document.getElementById('appLoaderStep');
+				const fillEl = () => document.getElementById('appLoaderProgressFill');
+				const textEl = () => document.getElementById('appLoaderProgressText');
 
-                el.classList.remove('visible');
-                el.classList.add('is-hidden');
+				// let timer = null;
+				// let value = 0;
+				// let target = 0;
+				// let cap = 90;
+				// let startedAt = 0;
 
-                el.style.display = 'none';
-            }
-        </script>
+				let rafId = null;
+				let value = 0;
+				let target = 0;
+				let cap = 90;
+				let startedAt = 0;
+				let lastTs = 0;
 
-    </body>
+				// ✅ κρατάει ΜΟΝΙΜΑ το "Βήμα x/y: μήνυμα" που έρχεται από emitProgress,
+				// ώστε να μην το σβήνει το smooth loop
+				let suffixText = '';
+
+				function buildMeta(percentNumber) {
+					const pct = Math.round(Math.max(0, Math.min(100, Number(percentNumber) || 0)));
+					return `${pct}%${suffixText ? ' • ' + suffixText : ''}`;
+				}
+
+				function setProgress(p) {
+					const clamped = Math.max(0, Math.min(100, Number(p) || 0));
+					const fill = fillEl();
+					const text = textEl();
+
+					if (fill) fill.style.width = clamped + '%';
+					if (text) text.textContent = buildMeta(clamped);
+				}
+
+				function startSmooth() {
+					stopSmooth();
+
+					value = 0;
+					target = 0;
+					cap = 90;
+
+					startedAt = performance.now();
+					lastTs = startedAt;
+
+					setProgress(0);
+
+					const SPEED_PER_SEC = 2.4; // ~0.6 ανά 250ms όπως πριν (0.6 / 0.25 = 2.4)
+
+					const tick = (now) => {
+						const root = el();
+
+						// Αν δεν υπάρχει ή δεν είναι visible, σταμάτα τελείως (μην καίει CPU)
+						if (!root || !root.classList.contains('is-visible')) {
+							rafId = null;
+							return;
+						}
+
+						const dt = Math.max(0, (now - lastTs) / 1000); // seconds
+						lastTs = now;
+
+						const elapsed = (now - startedAt) / 1000;
+						const dynamicCap = Math.min(95, cap + Math.floor(elapsed / 10) * 2);
+
+						// “smooth” αύξηση προς το dynamicCap, αλλά ποτέ κάτω από target
+						const next = Math.max(
+							target,
+							Math.min(dynamicCap, value + SPEED_PER_SEC * dt)
+						);
+
+						if (next > value) {
+							value = next;
+							setProgress(value); // γράφει % + suffixText
+						}
+
+						rafId = requestAnimationFrame(tick);
+					};
+
+					rafId = requestAnimationFrame(tick);
+				}
+
+				function stopSmooth() {
+					if (rafId) cancelAnimationFrame(rafId);
+					rafId = null;
+				}
+
+				window.showLoader = function (text) {
+					const root = el();
+					if (!root) return;
+
+					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+
+					root.classList.add('is-visible');
+					startSmooth();
+				};
+
+				window.hideLoader = function () {
+					const root = el();
+					if (!root) return;
+
+					stopSmooth();
+					root.classList.remove('is-visible');
+
+					value = 0;
+					target = 0;
+					cap = 90;
+					suffixText = '';
+
+					if (stepEl()) stepEl().textContent = '';
+					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+					setProgress(0);
+				};
+
+				// ✅ percent + message + step/totalSteps
+				window.applyServerProgress = function (percent, message, step, totalSteps) {
+					const root = el();
+					if (root && !root.classList.contains('is-visible')) {
+						window.showLoader(message || 'Εκτελείται διαδικασία...');
+					}
+
+					const p = Math.max(0, Math.min(100, Number(percent) || 0));
+
+					// Title (πάνω γραμμή)
+					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+
+					// Step line (δεύτερη γραμμή)
+					const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
+					if (stepEl()) stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
+
+					// ✅ Αυτό είναι που θα εμφανίζεται ΔΙΠΛΑ στο % (στο meta)
+					if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
+					else if (hasStep)      suffixText = `Βήμα ${step}/${totalSteps}`;
+					else if (message)      suffixText = String(message);
+					else                   suffixText = '';
+
+					// Fill bar πάει κανονικά στον server percent
+					if (fillEl()) fillEl().style.width = p + '%';
+
+					// Update smooth targets
+					target = Math.max(target, p);
+					cap = Math.max(cap, Math.min(99, target));
+					value = Math.min(value, target);
+
+					// γράψε άμεσα το meta με το τρέχον smooth value (όχι να “πηδάει”)
+					setProgress(value);
+				};
+
+				window.finishProgressDone = function (message) {
+					// στο τέλος δείχνει 100% + suffix
+					window.applyServerProgress(100, message || 'Ολοκληρώθηκε', 0, 0);
+					setTimeout(() => window.hideLoader(), 600);
+				};
+
+				window.finishProgressError = function (message) {
+					const msg = message || 'Σφάλμα';
+					if (titleEl()) titleEl().textContent = `⚠️ ${msg}`;
+
+					// στο error κράτα το meta ως έχει αλλά βάλε suffix error
+					suffixText = `⚠️ ${msg}`;
+					setProgress(value);
+
+					setTimeout(() => window.hideLoader(), 1500);
+				};
+			})();
+		</script>
+
+		<!-- =========================================================
+			SOCKET.IO CLIENT SETUP
+			========================================================= -->
+		<script src="/socket.io/socket.io.js"></script>
+
+		<script nonce="<%= nonce %>">
+			(function () {
+				'use strict';
+
+				const hostname = window.location.hostname;
+				const isDev =
+				hostname === 'localhost' ||
+				hostname === '127.0.0.1' ||
+				hostname.startsWith('192.168.');
+
+				const socketUrl = isDev
+					? `http://${hostname}:${window.location.port || 5000}`
+					: window.location.origin;
+
+				window.socket = io(socketUrl, {
+					path: '/socket.io/',
+					transports: ['websocket', 'polling'],
+					reconnection: true,
+					reconnectionDelay: 1000,
+					reconnectionDelayMax: 5000,
+					reconnectionAttempts: 5,
+					timeout: 20000,
+					autoConnect: true
+				});
+
+				const socket = window.socket;
+
+				socket.on('connect', function () {
+					const userId = '<%= locals.userId || "" %>';
+					if (userId && userId.trim() !== '') {
+						socket.emit('join', userId);
+					}
+				});
+
+				// EFKA progress events (percent + message + step/totalSteps)
+				socket.on('efka:progress', function (data) {
+					console.log("PROGRESS FROM SERVER:", data);
+					window.applyServerProgress(
+						data?.percent,
+						data?.message,
+						data?.step,
+						data?.totalSteps
+					);
+				});
+
+				socket.on('efka:done', function (data) {
+					window.finishProgressDone(data?.message);
+				});
+
+				socket.on('efka:error', function (data) {
+					window.finishProgressError(data?.message);
+				});
+			})();
+		</script>
+
+		<script nonce="<%= nonce %>">
+			(function () {
+				const efkaRoot = () => document.getElementById('appLoader');
+				const simpleRoot = () => document.querySelector('.app-loader--simple[data-loader="simple"]');
+
+				function setSimpleText(text) {
+					const root = simpleRoot();
+					if (!root) return;
+
+					// ✅ title ΠΑΝΤΑ σταθερό
+					const title = root.querySelector('.app-loader__title');
+					if (title) title.textContent = 'Παρακαλώ περιμένετε...';
+
+					// ✅ meta αλλάζει ανά περίπτωση
+					const meta = root.querySelector('.app-loader__meta');
+					if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
+				}
+
+				function showSimple(text) {
+					// Αν τρέχει EFKA loader, ΜΗΝ δείχνεις simple
+					const efka = efkaRoot();
+					if (efka && efka.classList.contains('is-visible')) return;
+
+					const root = simpleRoot();
+					if (!root) return;
+					setSimpleText(text);
+					root.classList.add('is-visible');
+				}
+
+				function hideSimple() {
+					const root = simpleRoot();
+					if (!root) return;
+					root.classList.remove('is-visible');
+				}
+
+				let pendingTimer = null;
+				let activeCount = 0;
+				let shownAt = 0;
+
+				const DEFAULT_DELAY = 250;     // anti-flicker: δείξε μόνο αν αργήσει > 250ms
+				const MIN_VISIBLE = 200;       // αν εμφανιστεί, κράτα το τουλάχιστον 200ms
+
+				window.AppLoader = {
+					begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
+						activeCount++;
+
+						// αν ήδη φαίνεται, απλά ανανέωσε text
+						const root = simpleRoot();
+						if (root && root.classList.contains('is-visible')) {
+							setSimpleText(text);
+							return;
+						}
+
+						// ξεκίνα timer για anti-flicker
+						if (pendingTimer) clearTimeout(pendingTimer);
+						pendingTimer = setTimeout(() => {
+							pendingTimer = null;
+							// εμφάνιση μόνο αν ακόμη τρέχει κάτι
+							if (activeCount > 0) {
+								shownAt = Date.now();
+								showSimple(text);
+							}
+						}, delayMs);
+					},
+
+					end() {
+						activeCount = Math.max(0, activeCount - 1);
+
+						// αν υπάρχουν κι άλλα σε εξέλιξη, μην κλείνεις
+						if (activeCount > 0) return;
+
+						// σταμάτα πιθανό pending show
+						if (pendingTimer) {
+							clearTimeout(pendingTimer);
+							pendingTimer = null;
+						}
+
+						// αν δεν εμφανίστηκε ποτέ, τέλος
+						const root = simpleRoot();
+						if (!root || !root.classList.contains('is-visible')) return;
+
+						// κράτα το λίγο για να μην “αναβοσβήνει”
+						const elapsed = Date.now() - shownAt;
+						const wait = Math.max(0, MIN_VISIBLE - elapsed);
+						setTimeout(() => hideSimple(), wait);
+					},
+
+					// helper για promises
+					wrap(promise, text, delayMs = DEFAULT_DELAY) {
+						this.begin(text, delayMs);
+						return Promise.resolve(promise).finally(() => this.end());
+					},
+
+					// manual (αν ποτέ το χρειαστώ)
+					show(text) { shownAt = Date.now(); showSimple(text); },
+					hide() { activeCount = 0; if (pendingTimer) clearTimeout(pendingTimer); pendingTimer = null; hideSimple(); }
+				};
+
+				// reset σε back/forward cache
+				window.addEventListener('pageshow', () => window.AppLoader.hide());
+			})();
+		</script>
+
+		<script nonce="<%= nonce %>">
+			(function () {
+				if (!window.fetch) return;
+
+				const _fetch = window.fetch.bind(window);
+
+				window.fetch = function (input, init) {
+					// opt-out: init?.skipLoader === true
+					if (init && init.skipLoader) return _fetch(input, init);
+
+					// προαιρετικά: δες URL για καλύτερο text
+					const url = (typeof input === 'string') ? input : (input && input.url) ? input.url : '';
+					const txt = 'Παρακαλώ περιμένετε...';
+
+					window.AppLoader.begin(txt, 200);
+
+					return _fetch(input, init)
+					.finally(() => window.AppLoader.end());
+				};
+			})();
+		</script>
+
+		<script nonce="<%= nonce %>">
+			(function () {
+				if (!window.XMLHttpRequest) return;
+
+				const XHR = window.XMLHttpRequest;
+				const _open = XHR.prototype.open;
+				const _send = XHR.prototype.send;
+
+				XHR.prototype.open = function (method, url) {
+					this.__loader_url = url;
+					return _open.apply(this, arguments);
+				};
+
+				XHR.prototype.send = function () {
+					// opt-out: set xhr.__skipLoader = true πριν το send (αν ποτέ χρειαστεί)
+					if (!this.__skipLoader) {
+						window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+
+						const done = () => {
+							this.removeEventListener('loadend', done);
+							this.removeEventListener('error', done);
+							this.removeEventListener('abort', done);
+							window.AppLoader.end();
+						};
+
+						this.addEventListener('loadend', done);
+						this.addEventListener('error', done);
+						this.addEventListener('abort', done);
+					}
+
+					return _send.apply(this, arguments);
+				};
+			})();
+		</script>
+
+		<script nonce="<%= nonce %>">
+			(function () {
+				// Links: μόνο same-tab navigations
+				document.addEventListener('click', function (e) {
+					const a = e.target.closest && e.target.closest('a[href]');
+					if (!a) return;
+
+					// ignore new tab / modifiers
+					if (a.target && a.target !== '_self') return;
+					if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+					const href = a.getAttribute('href') || '';
+					if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+
+					// same origin only
+					try {
+						const u = new URL(href, window.location.href);
+						if (u.origin !== window.location.origin) return;
+					} catch { return; }
+
+					// anti-flicker: αν γίνει γρήγορα, δεν θα προλάβει να δείξει
+					window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+					// δεν κάνουμε end — θα φύγει η σελίδα. Αν δεν φύγει, το pageshow reset το καθαρίζει.
+				}, true);
+
+				// Full page submits
+				document.addEventListener('submit', function (e) {
+					const form = e.target;
+					if (!(form instanceof HTMLFormElement)) return;
+
+					if (form.hasAttribute('data-no-loader')) return;
+					if (form.target && form.target !== '' && form.target !== '_self') return;
+					if (form.checkValidity && !form.checkValidity()) return;
+
+					const msg = form.getAttribute('data-loader-text') || 'Εκτέλεση διαδικασίας...';
+					window.AppLoader.begin(msg, 250);
+				}, true);
+			})();
+		</script>
+
+	</body>
 </html>

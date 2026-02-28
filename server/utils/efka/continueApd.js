@@ -50,11 +50,11 @@ async function safeCount(locator) {
 }
 
 async function maybeWaitDom(page, timeoutMs) {
-  	try { await page.waitForLoadState('domcontentloaded', { timeout: timeoutMs }); } catch {}
+	try { await page.waitForLoadState('domcontentloaded', { timeout: timeoutMs }); } catch {}
 }
 
 async function waitVisible(locator, timeoutMs) {
-  	await locator.waitFor({ state: 'visible', timeout: timeoutMs });
+	await locator.waitFor({ state: 'visible', timeout: timeoutMs });
 }
 
 async function clickSoftNav(page, locator, timeoutMs) {
@@ -67,14 +67,27 @@ async function clickSoftNav(page, locator, timeoutMs) {
 }
 
 /**
+ * PrimeFaces: περίμενε να αδειάσει η AJAX queue.
+ */
+async function waitPrimefacesIdle(page, timeoutMs) {
+	await page.waitForFunction(() => {
+		try {
+			// eslint-disable-next-line no-undef
+			if (window.PrimeFaces && PrimeFaces.ajax && PrimeFaces.ajax.Queue && typeof PrimeFaces.ajax.Queue.isEmpty === 'function') {
+				return PrimeFaces.ajax.Queue.isEmpty();
+			}
+		} catch {}
+		return true;
+	}, { timeout: timeoutMs }).catch(() => {});
+}
+
+/**
  * ✅ ΣΤΑΘΕΡΟ click στο "Ναι" PrimeFaces ConfirmDialog.
  * Προσπαθεί πρώτα με widgetVar (PF('<name>')), αλλιώς fallback σε DOM search.
  */
 async function clickPrimefacesConfirmYes(apdPage, timeoutMs, widgetVar = 'backConfirmation') {
-	// 1) Περίμενε να υπάρχει και να είναι visible το widget (PF(widgetVar).jq)
 	await apdPage.waitForFunction((w) => {
 		try {
-			// PrimeFaces global
 			// eslint-disable-next-line no-undef
 			const dlg = window.PF ? window.PF(w) : null;
 			if (!dlg || !dlg.jq) return false;
@@ -84,20 +97,18 @@ async function clickPrimefacesConfirmYes(apdPage, timeoutMs, widgetVar = 'backCo
 		}
 	}, widgetVar, { timeout: timeoutMs });
 
-	// 2) Κάνε click στο "Ναι" ΜΕΣΑ από το widget (πιο reliable από selectors)
 	const clicked = await apdPage.evaluate((w) => {
 		try {
 			// eslint-disable-next-line no-undef
 			const dlg = window.PF ? window.PF(w) : null;
 			if (!dlg || !dlg.jq) return false;
 
-			// Βρες κουμπί που το text του (span) είναι "Ναι"
 			const root = dlg.jq[0];
 			if (!root) return false;
 
 			const buttons = Array.from(root.querySelectorAll('button'));
 			const yes = buttons.find(b => (b.textContent || '').replace(/\s+/g, ' ').trim() === 'Ναι')
-					|| buttons.find(b => (b.textContent || '').includes('Ναι'));
+				|| buttons.find(b => (b.textContent || '').includes('Ναι'));
 
 			if (!yes) return false;
 
@@ -110,12 +121,11 @@ async function clickPrimefacesConfirmYes(apdPage, timeoutMs, widgetVar = 'backCo
 	}, widgetVar);
 
 	if (clicked) {
-		// 3) Περίμενε να κλείσει (hidden) το ίδιο widget
 		await apdPage.waitForFunction((w) => {
 			try {
 				// eslint-disable-next-line no-undef
 				const dlg = window.PF ? window.PF(w) : null;
-				if (!dlg || !dlg.jq) return true; // αν εξαφανίστηκε, οκ
+				if (!dlg || !dlg.jq) return true;
 				return !dlg.jq.is(':visible');
 			} catch {
 				return true;
@@ -124,13 +134,12 @@ async function clickPrimefacesConfirmYes(apdPage, timeoutMs, widgetVar = 'backCo
 		return true;
 	}
 
-	// 4) Fallback: ψάξε οποιοδήποτε visible confirm-dialog και πάτα "Ναι"
 	const fallbackClicked = await apdPage.evaluate(() => {
 		const visibles = Array.from(document.querySelectorAll('.ui-confirm-dialog.ui-dialog'))
-		.filter(d => {
-			const style = window.getComputedStyle(d);
-			return style && style.display !== 'none' && style.visibility !== 'hidden' && d.offsetParent !== null;
-		});
+			.filter(d => {
+				const style = window.getComputedStyle(d);
+				return style && style.display !== 'none' && style.visibility !== 'hidden' && d.offsetParent !== null;
+			});
 
 		for (const d of visibles) {
 			const btn = Array.from(d.querySelectorAll('button'))
@@ -147,8 +156,6 @@ async function clickPrimefacesConfirmYes(apdPage, timeoutMs, widgetVar = 'backCo
 
 /**
  * Dialog2 flow (δημιουργία περιόδου / συμπληρωματική) — ΧΩΡΙΣ navigation.
- * Τρέχει ΜΟΝΟ αν τα σχετικά στοιχεία υπάρχουν στη σελίδα που είσαι ήδη.
- * Επιστρέφει true αν έγινε προσπάθεια (ή/και ολοκλήρωση), false αν δεν βρέθηκαν στοιχεία dialog2 flow.
  */
 async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 	const openDialogLink = apdPage.locator('a:has-text("Δημιουργία Περιόδου Υποβολής")').first();
@@ -167,15 +174,12 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 	let periodToStr = null;
 
 	if (hasRecords) {
-		// 1) Θέλουμε την ΠΡΩΤΗ γραμμή με Κατάσταση = ΥΠΟΒΟΛΗ
 		let targetRowIndex = -1;
 		let targetFrom = null;
 		let targetTo = null;
 
 		for (let i = 0; i < rowCount; i++) {
 			const row = submissionRows.nth(i);
-
-			// Κατάσταση = 4η στήλη (td.nth(3)) — ίδιο pattern με το submissionTable flow που έχεις πιο κάτω
 			const statusText = normalizeText(
 				await row.locator('td').nth(3).innerText().catch(() => '')
 			);
@@ -183,7 +187,6 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 			const statusExact = statusText.replace(/\s+/g, ' ').trim().toUpperCase();
 			if (statusExact !== 'ΥΠΟΒΟΛΗ') continue;
 
-			// Περίοδος = 3η στήλη (td.nth(2)) τύπου "mm/yyyy - mm/yyyy"
 			const periodText = normalizeText(
 				await row.locator('td').nth(2).innerText().catch(() => '')
 			);
@@ -198,10 +201,9 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 			targetRowIndex = i;
 			targetFrom = from;
 			targetTo = to;
-			break; // <-- ΠΡΩΤΗ ΥΠΟΒΟΛΗ
+			break;
 		}
 
-		// 2) Αν δεν βρέθηκε ΥΠΟΒΟΛΗ, fallback: προηγούμενος μήνας από σήμερα (π.χ. 25/02/2026 -> 01/2026)
 		if (targetRowIndex === -1) {
 			const pm = prevMonthMY(new Date());
 			periodFromStr = fmtMY(pm);
@@ -211,7 +213,6 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 			periodFromStr = fmtMY(targetFrom);
 			periodToStr = fmtMY(targetTo);
 
-			// (προαιρετικά αλλά χρήσιμο) select τη γραμμή που βρήκες
 			const targetRow = submissionRows.nth(targetRowIndex);
 			const safeTd = targetRow.locator('td').filter({ hasNot: apdPage.locator('a') }).first();
 			await safeTd.scrollIntoViewIfNeeded();
@@ -239,7 +240,6 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 	const statementValue = hasRecords ? '04' : '01';
 	await apdPage.selectOption('select#openPeriodForm\\:statementTypeDlg', { value: statementValue });
 
-	// if (hasRecords && periodFromStr && periodToStr) {
 	if (periodFromStr && periodToStr) {
 		await waitVisible(fromInput, timeoutMs);
 		await waitVisible(toInput, timeoutMs);
@@ -303,9 +303,18 @@ async function ensureSupplementalPeriodViaDialog2(apdPage, timeoutMs) {
 
 /**
  * Συνέχεια στο ίδιο APD tab/session.
- * ΧΩΡΙΣ navigation σε submissions.xhtml.
  */
 async function continueApd(sessionId, opts = {}) {
+	const TOTAL_STEPS = 9;
+
+	const emitProgress = (step, percent, message) => {
+		if (typeof opts.onProgress === 'function') {
+			try {
+				opts.onProgress({ step, totalSteps: TOTAL_STEPS, percent, message });
+			} catch {}
+		}
+	};
+
 	const t0 = Date.now();
 	const mark = (msg) => log(`${msg} (+${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 
@@ -313,12 +322,11 @@ async function continueApd(sessionId, opts = {}) {
 	if (!s || !s.apdPage) return { success: false, error: 'Invalid/expired sessionId' };
 
 	const apdPage = s.apdPage;
-	// const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 15000;
 	const isDocker = String(process.env.DOCKER || '').toLowerCase() === 'true';
 	const timeoutMs = typeof opts.timeoutMs === 'number'
 		? opts.timeoutMs
 		: (isDocker ? 60000 : 15000);
-	
+
 	const waitForSelector = typeof opts.waitForSelector === 'string' ? opts.waitForSelector : null;
 	const closeAfter = !!opts.closeAfter;
 
@@ -328,6 +336,7 @@ async function continueApd(sessionId, opts = {}) {
 			return { success: false, error: 'Session page closed' };
 		}
 
+		emitProgress(1, 5, 'Σύνδεση στο περιβάλλον ΕΦΚΑ...');
 		await maybeWaitDom(apdPage, timeoutMs);
 		if (waitForSelector) await apdPage.waitForSelector(waitForSelector, { timeout: timeoutMs });
 
@@ -358,6 +367,8 @@ async function continueApd(sessionId, opts = {}) {
 			await clickSoftNav(apdPage, loginBtn, timeoutMs);
 		}
 
+		emitProgress(2, 20, 'Είσοδος ολοκληρώθηκε');
+
 		// Consent (conditional)
 		const consentBtn = apdPage.locator('#btn-submit');
 		if (await safeCount(consentBtn)) {
@@ -369,8 +380,7 @@ async function continueApd(sessionId, opts = {}) {
 		}
 
 		// Role + AME (conditional)
-		mark('ΒΗΜΑ 8: role/AME (αν υπάρχει)');
-
+		mark('ΒΗΜΑ: role/AME (αν υπάρχει)');
 		const roleSelect = apdPage.locator('select#role[name="role"]');
 		if (await safeCount(roleSelect)) {
 			await waitVisible(roleSelect, timeoutMs);
@@ -387,10 +397,12 @@ async function continueApd(sessionId, opts = {}) {
 			await clickSoftNav(apdPage, submitRole, timeoutMs);
 		}
 
+		emitProgress(3, 35, 'Φόρτωση περιόδων υποβολής');
+
 		// Αν είμαστε ήδη σε apdCommon (υπάρχει input#ama) παραλείπουμε submissions flow
 		const amaInput = apdPage.locator('input#ama');
 		if (!(await safeCount(amaInput))) {
-			mark('ΒΗΜΑ 9-10: dialog2 (χωρίς navigation)');
+			mark('dialog2 (χωρίς navigation)');
 
 			const hasSubmissionTable = (await safeCount(apdPage.locator('#submissionTable_data'))) > 0;
 			if (hasSubmissionTable) {
@@ -403,8 +415,6 @@ async function continueApd(sessionId, opts = {}) {
 			}
 		}
 
-		mark('ΒΗΜΑ 11: submissionTable -> Συμπλήρωση');
-
 		// Περιμένουμε είτε να εμφανιστεί ο πίνακας υποβολών, είτε να έχουμε ήδη πάει στο apdCommon (input#ama)
 		await Promise.race([
 			apdPage.waitForSelector('#submissionTable_data', { timeout: timeoutMs, state: 'attached' }),
@@ -414,7 +424,6 @@ async function continueApd(sessionId, opts = {}) {
 		// Αν είμαστε ήδη στο apdCommon, δεν χρειάζεται να πατήσουμε "Συμπλήρωση"
 		const hasAmaAlready = (await apdPage.locator('input#ama').count().catch(() => 0)) > 0;
 		if (!hasAmaAlready) {
-			// Τώρα περιμένουμε να γίνει usable το table
 			await apdPage.waitForSelector('#submissionTable_data', { timeout: timeoutMs, state: 'visible' }).catch(() => {});
 
 			const tableRows = apdPage.locator('#submissionTable_data > tr');
@@ -431,6 +440,8 @@ async function continueApd(sessionId, opts = {}) {
 			let bestIdx = scanIdxs[0] ?? 0;
 			let bestFrom = null;
 			let bestTo = null;
+
+			emitProgress(4, 50, 'Άνοιγμα περιόδου υποβολής');
 
 			for (const i of scanIdxs) {
 				const row = tableRows.nth(i);
@@ -454,12 +465,11 @@ async function continueApd(sessionId, opts = {}) {
 			await waitVisible(fillLink, timeoutMs);
 			await fillLink.click();
 
-			// Μετά το "Συμπλήρωση" πρέπει να μπούμε στο apdCommon
 			await apdPage.waitForSelector('input#ama', { timeout: timeoutMs });
 		}
 
 		// apdCommon -> άνοιγμα amaLOV
-		mark('ΒΗΜΑ 12: apdCommon -> άνοιγμα amaLOV');
+		mark('apdCommon -> άνοιγμα amaLOV');
 
 		const amaRowButton = apdPage
 			.locator('input#ama')
@@ -471,8 +481,9 @@ async function continueApd(sessionId, opts = {}) {
 
 		await waitVisible(amaSearchBtn, timeoutMs);
 		await amaSearchBtn.click();
-
 		await apdPage.waitForSelector('form#amaLOVForm', { timeout: timeoutMs });
+
+		emitProgress(5, 65, 'Άνοιγμα αναζήτησης εργαζόμενου');
 
 		// amaLOV -> αναζήτηση με ΑΜΚΑ
 		mark('amaLOV: αναζήτηση με ΑΜΚΑ');
@@ -480,9 +491,9 @@ async function continueApd(sessionId, opts = {}) {
 		const amka = ensureDigits(opts?.amka);
 		if (!amka) throw new Error('Missing/invalid opts.amka');
 
-		const amaTimeout = Math.min(timeoutMs, 12000);
+		const amaTimeout = Math.max(25000, Math.min(timeoutMs, 60000));
 		const amkaFilterSel = '#amaLOVForm\\:amkaFilter';
-		const tbodySel = '#amaLOVForm\\:j_idt423_data';
+		const tbodySel = '#amaLOVForm\\:j_idt413_data';
 
 		const amkaFilter = apdPage.locator(amkaFilterSel);
 		await amkaFilter.waitFor({ state: 'visible', timeout: amaTimeout });
@@ -496,28 +507,56 @@ async function continueApd(sessionId, opts = {}) {
 			}
 		}
 
+		// ✅ πιο “σίγουρο” input + events
+		await amkaFilter.click({ timeout: amaTimeout }).catch(() => {});
 		await amkaFilter.fill(amka);
 		await amkaFilter.dispatchEvent('input').catch(() => {});
 		await amkaFilter.dispatchEvent('change').catch(() => {});
+		await amkaFilter.press('Enter').catch(() => {});
 		await amkaFilter.press('Tab').catch(() => {});
 
 		await apdPage.waitForSelector(tbodySel, { timeout: amaTimeout });
 
-		const searchBtn = apdPage.locator('#amaLOVForm button:has-text("Αναζήτηση")').first();
+		emitProgress(6, 75, 'Αναζήτηση εργαζόμενου στον ΕΦΚΑ');
+
+		// Click search
+		const searchBtn = apdPage.locator('#amaLOVForm\\:j_idt410');
 		await searchBtn.waitFor({ state: 'visible', timeout: amaTimeout });
-		await searchBtn.click();
+		await searchBtn.scrollIntoViewIfNeeded();
 
-		const resultRow = apdPage.locator(`${tbodySel} > tr:not(.ui-datatable-empty-message)`).first();
-		await resultRow.waitFor({ state: 'visible', timeout: amaTimeout });
+		await searchBtn.click({ force: true });
 
-		// amaLOV -> διάβασε 1η γραμμή + click "Επιλογή"
+		// ✅ περίμενε να τελειώσει το PrimeFaces ajax
+		await waitPrimefacesIdle(apdPage, amaTimeout);
+
+		// ✅ περίμενε είτε αποτέλεσμα είτε empty message
+		const rowsLocator = apdPage.locator(`${tbodySel} > tr`);
+		await rowsLocator.first().waitFor({ state: 'attached', timeout: amaTimeout });
+
+		const emptyRow = apdPage.locator(`${tbodySel} > tr.ui-datatable-empty-message`).first();
+		const hasEmpty = await emptyRow.count().then(c => c > 0).catch(() => false);
+
+		emitProgress(7, 88, 'Ανάκτηση στοιχείων');
+
+		if (hasEmpty) {
+			const emptyText = normalizeText(await emptyRow.innerText().catch(() => 'Δεν βρέθηκαν αποτελέσματα.'));
+			throw new Error(`0 αποτελέσματα στο amaLOV για ΑΜΚΑ ${amka}. ${emptyText}`);
+		}
+
+		// κανονικές γραμμές (όχι empty message)
 		const resultRows = apdPage.locator(`${tbodySel} > tr:not(.ui-datatable-empty-message)`);
 		const resCount = await resultRows.count().catch(() => 0);
 
-		if (resCount < 1) throw new Error('Δεν βρέθηκε εγγραφή στο amaLOV grid.');
+		if (resCount < 1) {
+			// fallback: μήπως υπάρχει empty row χωρίς class;
+			const raw = normalizeText(await rowsLocator.first().innerText().catch(() => ''));
+			throw new Error(`0 αποτελέσματα στο amaLOV για ΑΜΚΑ ${amka}. ${raw || 'Δεν βρέθηκε εγγραφή.'}`);
+		}
 		if (resCount > 1) err('Προσοχή: Βρέθηκαν >1 εγγραφές στο amaLOV grid. Θα ληφθεί η 1η.');
 
 		const row = resultRows.first();
+		await row.waitFor({ state: 'visible', timeout: amaTimeout });
+
 		const tds = row.locator('td');
 
 		const amaText       = normalizeText(await tds.nth(0).innerText().catch(() => ''));
@@ -540,9 +579,7 @@ async function continueApd(sessionId, opts = {}) {
 
 		await apdPage.locator('.ui-dialog:has(#amaLOVForm)').waitFor({ state: 'hidden', timeout: timeoutMs });
 
-		// =========================================================
-		// ✅ Επιστροφή (click στο κουμπί του #topBar)
-		// =========================================================
+		// Επιστροφή
 		await apdPage.waitForSelector('#topBar', { timeout: timeoutMs });
 
 		const found = await apdPage.evaluate(() => {
@@ -560,42 +597,30 @@ async function continueApd(sessionId, opts = {}) {
 
 		if (!found) throw new Error('Δεν βρέθηκε κουμπί "Επιστροφή" μέσα στο #topBar');
 
-		// =========================================================
-		// ✅ ConfirmDialog -> click "Ναι" (ΣΤΑΘΕΡΑ μέσω PF('backConfirmation'))
-		// =========================================================
+		emitProgress(8, 95, 'Επεξεργασία δεδομένων');
+
+		// ConfirmDialog -> click "Ναι"
 		await clickPrimefacesConfirmYes(apdPage, timeoutMs, 'backConfirmation');
 
-		// =========================================================
-		// Μετά το "Ναι" (επιστροφή) -> submissions.xhtml:
-		// επίλεξε 1η γραμμή (κλικ στην 4η στήλη), πάτα "Ακύρωση Περιόδου Υποβολής",
-		// στο modal πάτα "Ναι" και κλείσε browser/session
-		// =========================================================
-
-		// περίμενε να είμαστε όντως πίσω στο submissions.xhtml
+		// πίσω στο submissions.xhtml
 		await apdPage.waitForSelector('#submissionTable_data', { timeout: timeoutMs });
 
-		// 1) Κλικ στην 4η στήλη της 1ης γραμμής (Κατάσταση)
+		// select 1η γραμμή
 		const firstRow = apdPage.locator('#submissionTable_data > tr').first();
 		await firstRow.waitFor({ state: 'visible', timeout: timeoutMs });
 
-		// 4η στήλη = td:nth-child(4)
 		const statusCell = firstRow.locator('td:nth-child(4)');
 		await statusCell.scrollIntoViewIfNeeded();
 		await statusCell.click({ force: true });
 
-		// (PrimeFaces DataTable selection) βοήθα λίγο να “γράψει” selection
-		// Κάποιες φορές χρειάζεται κλικ στο ίδιο το row για να γίνει aria-selected=true
 		await firstRow.click({ force: true }).catch(() => {});
 
-		// 2) Κλικ στο "Ακύρωση Περιόδου Υποβολής"
-		const cancelLink = apdPage.locator(
-			'#cancelPeriodLink, a:has-text("Ακύρωση Περιόδου Υποβολής")'
-		).first();
-
+		// Ακύρωση Περιόδου Υποβολής
+		const cancelLink = apdPage.locator('#cancelPeriodLink, a:has-text("Ακύρωση Περιόδου Υποβολής")').first();
 		await cancelLink.waitFor({ state: 'visible', timeout: timeoutMs });
 		await cancelLink.click({ force: true });
 
-		// 3) Modal "Ακύρωση Υποβολής" -> πάτα "Ναι"
+		// Modal -> "Ναι"
 		const cancelConfirm = apdPage
 			.locator('.ui-confirm-dialog.ui-dialog')
 			.filter({ hasText: 'Είστε βέβαιοι ότι θέλετε να ακυρώσετε την επιλεγμένη υποβολή' })
@@ -607,7 +632,8 @@ async function continueApd(sessionId, opts = {}) {
 		await cancelYesBtn.waitFor({ state: 'visible', timeout: timeoutMs });
 		await cancelYesBtn.click({ force: true });
 
-		// περίμενε να κλείσει
+		emitProgress(9, 100, 'Ολοκληρώθηκε');
+
 		await cancelConfirm.waitFor({ state: 'hidden', timeout: timeoutMs }).catch(() => {});
 
 		const url = apdPage.url();
@@ -632,6 +658,12 @@ async function continueApd(sessionId, opts = {}) {
 			},
 		};
 	} catch (e) {
+		if (typeof opts.onProgress === 'function') {
+			try {
+				opts.onProgress({ step: 0, totalSteps: TOTAL_STEPS, percent: 0, message: `Σφάλμα: ${e?.message || e}` });
+			} catch {}
+		}
+
 		err('continueApd failed:', e?.message || e);
 		return { success: false, error: e?.message || String(e) };
 	} finally {

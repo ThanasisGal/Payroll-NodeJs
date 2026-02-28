@@ -3,6 +3,9 @@
 .env
 .env.production
 .aws/
+.prettierrc
+.prettierignore
+.vscode/
 
 # Παραγόμενα αρχεία και φακέλοι
 public/json/*.json
