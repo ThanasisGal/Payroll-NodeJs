@@ -1,5 +1,5 @@
 :root {
-  --aaa: #212529;
+  --aaa: #4da3ff;
   --dark: #292c4f;
   --info: #0dcaf0;
   --light: #adb5bd;
@@ -8057,4 +8057,261 @@ body.upload-templates-page .progress-fill {
 
 .swal2-toast .swal2-close:hover {
     color: #333;
+}
+
+/* =========================
+   APP LOADER (overlay)
+   ========================= */
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  display: none;            /* default hidden */
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 24px;
+
+  /* ήπιο background */
+  background: radial-gradient(1200px 600px at 50% 40%,
+    rgba(25, 32, 45, 0.72),
+    rgba(12, 14, 18, 0.78)
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.app-loader.is-visible {
+  display: flex;
+}
+
+/* container */
+.app-loader__box {
+  width: min(560px, 92vw);
+  border-radius: 18px;
+  padding: 18px 18px 14px 18px;
+
+  background: rgba(20, 24, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+}
+
+/* top row: spinner + texts */
+.app-loader__row {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+/* text wrapper */
+.app-loader__textwrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ========================================
+   NEW HOURGLASS SPINNER (
+   ======================================== */
+
+.app-loader__spinner {
+  --c1: #673b14;
+  --c2: #bdde9ad9;
+
+  width: 55px;   /* ✅ πλάτος */
+  height: 92px;  /* ✅ ύψος */
+
+  border-top: 4px solid var(--c1);
+  border-bottom: 4px solid var(--c1);
+
+  background: linear-gradient(
+      90deg,
+      var(--c1) 2px,
+      var(--c2) 0 5px,
+      var(--c1) 0
+    )
+    50%/8px 10px no-repeat;
+
+  display: grid;
+  overflow: hidden;
+  border-radius: 14px;
+
+  animation: l5-0 3.5s infinite linear;
+}
+
+.app-loader__spinner::before,
+.app-loader__spinner::after {
+  content: "";
+  grid-area: 1/1;
+
+  width: 65%; /* ✅ πιο στενή “κλεψύδρα” μέσα */
+  height: calc(50% - 6px);
+  margin: 0 auto;
+
+  border: 3px solid var(--c1);
+  border-top: 0;
+  box-sizing: content-box;
+  border-radius: 0 0 40% 40%;
+
+  -webkit-mask: linear-gradient(#000 0 0) bottom/6px 3px no-repeat,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: destination-out;
+
+  mask-composite: exclude;
+  mask: linear-gradient(#000 0 0) bottom/6px 3px no-repeat,
+    linear-gradient(#000 0 0);
+
+  background: linear-gradient(var(--d, 0deg), var(--c2) 50%, #0000 0) bottom /
+      100% 205%,
+    linear-gradient(var(--c2) 0 0) center/0 100%;
+
+  background-repeat: no-repeat;
+
+  animation: inherit;
+  animation-name: l5-1;
+}
+
+.app-loader__spinner::after {
+  transform-origin: 50% calc(100% + 3px);
+  transform: scaleY(-1);
+  --s: 4px;
+  --d: 180deg;
+}
+
+/* keyframes (your loader animation) */
+@keyframes l5-0 {
+  80% { transform: rotate(0); }
+  100% { transform: rotate(0.5turn); }
+}
+
+@keyframes l5-1 {
+  10%, 70% {
+    background-size: 100% 205%, var(--s, 0) 100%;
+  }
+  70%, 100% {
+    background-position: top, center;
+  }
+}
+
+/* title */
+.app-loader__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #eaf2ff;
+  letter-spacing: 0.2px;
+
+  /* nice truncation */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* step line (Βήμα X/Y) */
+.app-loader__step {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(234, 242, 255, 0.78);
+}
+
+/* bottom meta line (π.χ. 41% • Βήμα 6/9: ...) */
+.app-loader__meta {
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(234, 242, 255, 0.88);
+
+  /* nice wrap without breaking UI */
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* optional hint (αν το χρησιμοποιείς) */
+.app-loader__hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: rgba(234, 242, 255, 0.88);
+}
+
+/* =========================
+   PROGRESS BAR (shimmer)
+   ========================= */
+
+.app-progress {
+  margin-top: 12px;
+  height: 8px; /* λίγο πιο κομψό από 10px */
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.app-progress__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 6px;
+
+  background: linear-gradient(
+    90deg,
+    #8b5a2b,
+    #bdde9a
+  );
+
+  transition: width 0.35s ease;
+}
+
+/* =========================
+   (optional) reduce motion
+   ========================= */
+@media (prefers-reduced-motion: reduce) {
+  .app-loader__spinner::after { animation: none; }
+  .app-progress__fill { animation: none; transition: width 0.2s linear; }
+}
+
+/* SIMPLE loader: χωρίς progress bar & χωρίς step line */
+.app-loader--simple .app-progress,
+.app-loader--simple .app-loader__step {
+  display: none;
+}
+
+.app-loader--simple .app-loader__meta {
+  margin-top: 6px;
+  opacity: 0.85;
+}
+
+/* =========================
+   SIMPLE LOADER STYLE
+   ========================= */
+
+.app-loader--simple {
+  /* background: rgba(240, 240, 240, 0.55); */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* το box γίνεται διάφανο και shrink-to-content */
+.app-loader--simple .app-loader__box {
+  width: auto;                 /* όχι fixed width */
+  max-width: none;
+  padding: 16px 20px;
+  background: transparent;     /* διάφανο */
+  border: none;
+  box-shadow: none;
+  display: inline-flex;        /* shrink to content */
+  align-items: center;
+}
+
+/* row επίσης shrink */
+.app-loader--simple .app-loader__row {
+  width: auto;
+}
+
+/* τίτλος χωρίς truncate */
+.app-loader--simple .app-loader__title {
+  white-space: nowrap;
+  color: #000;
+}
+
+/* meta λίγο πιο soft */
+.app-loader--simple .app-loader__meta {
+  color: #000;
+  opacity: 1;
 }
