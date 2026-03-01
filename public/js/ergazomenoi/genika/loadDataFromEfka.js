@@ -1,135 +1,141 @@
-document.addEventListener("DOMContentLoaded", () => {
-	// CSRF από meta
-	let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || null;
-	const loader = document.querySelector(".loader-container");
+document.addEventListener('DOMContentLoaded', () => {
+    // CSRF από meta
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || null;
+    const loader = document.querySelector('.loader-container');
 
-	// Κρατάμε sessionId για συνέχεια
-	let efkaSessionId = null;
+    // Κρατάμε sessionId για συνέχεια
+    let efkaSessionId = null;
 
-	async function postJson(url, body) {
-		if (!csrfToken) throw new Error('Missing CSRF token meta tag');
-		
-		const r = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-csrf-token': csrfToken,
-			},
-			credentials: 'same-origin',
-			body: JSON.stringify(body || {}),
-		});
+    async function postJson(url, body) {
+        if (!csrfToken) throw new Error('Missing CSRF token meta tag');
 
-		const j = await r.json().catch(() => ({}));
-		if (!r.ok || !j.success) {
-			throw new Error(j.error || `Request failed: ${r.status}`);
-		}
-		return j;
-	}
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-csrf-token': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(body || {})
+        });
 
-	// 1) Καλεί server να ανοίξει EFKA -> επιστρέφει sessionId
-	async function efkaOpen() {
-		const r = await fetch('/api/efka/apd/open', {
-			method: 'POST',
-			headers: {
-			'Content-Type': 'application/json',
-			'x-csrf-token': csrfToken
-			},
-			credentials: 'same-origin',
-			body: JSON.stringify({
-				keepSession: true,   // ✅ αυτό λείπει
-				ttlMs: 10 * 60 * 1000
-			})
-		});
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.success) {
+            throw new Error(j.error || `Request failed: ${r.status}`);
+        }
+        return j;
+    }
 
-		const j = await r.json();
-		if (!r.ok || !j.success) throw new Error(j.error || 'open failed');
+    // 1) Καλεί server να ανοίξει EFKA -> επιστρέφει sessionId
+    async function efkaOpen() {
+        const r = await fetch('/api/efka/apd/open', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-csrf-token': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                keepSession: true, // ✅ αυτό λείπει
+                ttlMs: 10 * 60 * 1000
+            })
+        });
 
-		efkaSessionId = j.sessionId;   // τώρα θα είναι string
-		return j;
-	}
-	// 2) Συνέχεια (στο Βήμα 6 θα βάλουμε πραγματικές ενέργειες)
-	async function efkaContinue() {
-		if (!efkaSessionId) throw new Error('Missing efkaSessionId');
-		return postJson('/api/efka/apd/continue', { sessionId: efkaSessionId });
-	}
+        const j = await r.json();
+        if (!r.ok || !j.success) throw new Error(j.error || 'open failed');
 
-	// === εδώ δένουμε το downloadBtn ===
-	const btn = document.getElementById('downloadBtn');
-	if (!btn) return;
+        efkaSessionId = j.sessionId; // τώρα θα είναι string
+        return j;
+    }
+    // 2) Συνέχεια (στο Βήμα 6 θα βάλουμε πραγματικές ενέργειες)
+    async function efkaContinue() {
+        if (!efkaSessionId) throw new Error('Missing efkaSessionId');
+        return postJson('/api/efka/apd/continue', { sessionId: efkaSessionId });
+    }
 
-	btn.addEventListener('click', async (e) => {
-		e.preventDefault();
-		e.stopPropagation();
-		
-		try {
-			btn.disabled = true;
-			showLoader('Γίνεται ανάκτηση από ΕΦΚΑ...');
+    // === εδώ δένουμε το downloadBtn ===
+    const btn = document.getElementById('downloadBtn');
+    if (!btn) return;
 
-			// 🔹 ΠΑΡΕ ΤΟ AMKA ΑΠΟ ΤΟ INPUT
-			const amka = document.getElementById('amka_ergazomenoy')?.value?.trim();
+    btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-			if (!amka) {
-				throw new Error('Δεν υπάρχει ΑΜΚΑ');
-			}
+        try {
+            btn.disabled = true;
+            showLoader('Γίνεται ανάκτηση από ΕΦΚΑ...');
 
-			// (A) άνοιγμα EFKA session
-			const openRes = await efkaOpen();
-			console.log('EFKA open:', openRes);
+            // 🔹 ΠΑΡΕ ΤΟ AMKA ΑΠΟ ΤΟ INPUT
+            const amka = document.getElementById('amka_ergazomenoy')?.value?.trim();
 
-			// (B) συνέχεια + στείλε και το AMKA
-			const contRes = await postJson('/api/efka/apd/continue', {
-				sessionId: efkaSessionId,
-				amka: amka   // ✅ ΕΔΩ ΤΟ ΠΕΡΝΑΜΕ
-			});
+            if (!amka) {
+                throw new Error('Δεν υπάρχει ΑΜΚΑ');
+            }
 
-			console.log('EFKA continue:', contRes);
+            // (A) άνοιγμα EFKA session
+            const openRes = await efkaOpen();
+            console.log('EFKA open:', openRes);
 
-			// === Γέμισε τα πεδία της φόρμας από τα στοιχεία που επέστρεψε ο server ===
-			const p = contRes.person;
-			if (p) {
-				// 1η στήλη -> ama1
-				const ama1El = document.getElementById('ama_01');
-				if (ama1El) ama1El.value = p.ama1 || '';
+            // (B) συνέχεια + στείλε και το AMKA
+            const contRes = await postJson('/api/efka/apd/continue', {
+                sessionId: efkaSessionId,
+                amka: amka // ✅ ΕΔΩ ΤΟ ΠΕΡΝΑΜΕ
+            });
 
-				// 4η -> επώνυμο
-				const eponymoEl = document.getElementById('eponymo');
-				if (eponymoEl) {
-				    eponymoEl.value = p.eponymo || '';
-    				eponymoEl.dispatchEvent(new Event('input', { bubbles: true }));
-				}
+            console.log('EFKA continue:', contRes);
 
-				// 5η -> όνομα
-				const onomaEl = document.getElementById('onoma');
-				if (onomaEl) {
-				    onomaEl.value = p.onoma || '';
-    				onomaEl.dispatchEvent(new Event('input', { bubbles: true }));
-				}
+            // === Γέμισε τα πεδία της φόρμας από τα στοιχεία που επέστρεψε ο server ===
+            const p = contRes.person;
+            if (p) {
+                // 1η στήλη -> ama1
+                const ama1El = document.getElementById('ama_01');
+                if (ama1El) ama1El.value = p.ama1 || '';
 
-				// 3η -> ΑΦΜ
-				const afmEl = document.getElementById('afm_ergazomenoy');
-				if (afmEl) {
-				    afmEl.value = p.afm || '';
-    				afmEl.dispatchEvent(new Event('input', { bubbles: true }));
-				}
+                // 4η -> επώνυμο
+                const eponymoEl = document.getElementById('eponymo');
+                const eponymoElHidden = document.getElementById('eponymoHidden');
+                if (eponymoEl) {
+                    eponymoEl.value = p.eponymo || '';
+                    eponymoElHidden.value = p.eponymo || '';
+                    eponymoEl.dispatchEvent(new Event('input', { bubbles: true }));
+                }
 
-				// 6η -> πατρώνυμο
-				const patronymoEl = document.getElementById('patronymo');
-				if (patronymoEl) patronymoEl.value = p.patronymo || '';
+                // 5η -> όνομα
+                const onomaEl = document.getElementById('onoma');
+                const onomaElHidden = document.getElementById('onomaHidden');
+                if (onomaEl) {
+                    onomaEl.value = p.onoma || '';
+                    onomaElHidden.value = p.onoma || '';
+                    onomaEl.dispatchEvent(new Event('input', { bubbles: true }));
+                }
 
-				// 7η -> μητρώνυμο
-				const mhtronymoEl = document.getElementById('mhtronymo');
-				if (mhtronymoEl) mhtronymoEl.value = p.mhtronymo || '';
+                // 3η -> ΑΦΜ
+                const afmEl = document.getElementById('afm_ergazomenoy');
+                const afmElHidden = document.getElementById('afm_ergazomenoyHidden');
+                if (afmEl) {
+                    afmEl.value = p.afm || '';
+                    afmElHidden.value = p.afm || '';
+                    afmEl.dispatchEvent(new Event('input', { bubbles: true }));
+                }
 
-				// 9η -> ΠΑΛΙΟΣ => false, αλλιώς true
-				const paliosNeosEl = document.getElementById('palios_neos');
-				if (paliosNeosEl) paliosNeosEl.checked = !!p.palios_neos;
-			}    
-		} catch (e) {
-			console.error(e);
-			alert('Σφάλμα: ' + (e?.message || e));
-		} finally {
-			hideLoader();
-			btn.disabled = false;
-		}
-	});
+                // 6η -> πατρώνυμο
+                const patronymoEl = document.getElementById('patronymo');
+                if (patronymoEl) patronymoEl.value = p.patronymo || '';
+
+                // 7η -> μητρώνυμο
+                const mhtronymoEl = document.getElementById('mhtronymo');
+                if (mhtronymoEl) mhtronymoEl.value = p.mhtronymo || '';
+
+                // 9η -> ΠΑΛΙΟΣ => false, αλλιώς true
+                const paliosNeosEl = document.getElementById('palios_neos');
+                if (paliosNeosEl) paliosNeosEl.checked = !!p.palios_neos;
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Σφάλμα: ' + (e?.message || e));
+        } finally {
+            hideLoader();
+            btn.disabled = false;
+        }
+    });
 });
