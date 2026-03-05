@@ -534,7 +534,7 @@ declare -a common_files=(
     "public/js/common/clearSelectsSymbaseon.js"
     "public/js/common/convertNumbers.js"
     "public/js/common/countdown.js"
-    "public/js/common/createNavTree.js"csrfFetchPatch
+    "public/js/common/createNavTree.js"
     "public/js/common/csrfFetchPatch.js"
     "public/js/common/deviceSwitcher.js"
     "public/js/common/expandIcons.js"
