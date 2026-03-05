@@ -1,12 +1,12 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
-const fs = require("fs-extra");
+const fs = require('fs-extra');
 
-const Models_A = require("../../models/param");
-const Models_B = require("../../models/privileges");
-const Models_C = require("../../models/companies");
-const UserModel = require("../../models/userModel");
-const Models = require("../../models/stathera_arxeia");
+const Models_A = require('../../models/param');
+const Models_B = require('../../models/privileges');
+const Models_C = require('../../models/companies');
+const UserModel = require('../../models/userModel');
+const Models = require('../../models/stathera_arxeia');
 
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -23,25 +23,30 @@ const {
     IatrosErgasiasModel,
     LogisthsModel,
     EmmesosErgodothsModel,
-    DiadoxosErgodothsModel,
+    DiadoxosErgodothsModel
 } = Models;
 
-
-let redir, sTerm = "";
+let redir,
+    sTerm = '';
 
 // OS check
-const isWindows = process.platform === "win32";
+const isWindows = process.platform === 'win32';
 
 /* ---------------------------- helpers ---------------------------------- */
-const normalizeStr = (v) => String(v ?? "").trim();
+const normalizeStr = (v) => String(v ?? '').trim();
 const normalizeUpper = (v) => normalizeStr(v).toUpperCase();
 
 const stampsDir = (team) =>
     isWindows
-        ? path.join("C:\\Payroll-NodeJs\\public\\stamps\\teams", team)
-        : path.join("/home/ubuntu/Payroll-NodeJs/public/stamps/teams", team);
+        ? path.join('C:\\Payroll-NodeJs\\public\\stamps\\teams', team)
+        : path.join('/home/ubuntu/Payroll-NodeJs/public/stamps/teams', team);
 
-async function renameAndMoveImage(originalPath, companyId, { eponymia, fatherName, firstName }, team) {
+async function renameAndMoveImage(
+    originalPath,
+    companyId,
+    { eponymia, fatherName, firstName },
+    team
+) {
     const dir = stampsDir(team);
     await fs.mkdir(dir, { recursive: true });
     const newName = `${companyId}_${normalizeStr(eponymia)}_${normalizeStr(fatherName).substring(0, 3)}_${normalizeStr(firstName)}_sfragida.png`;
@@ -53,7 +58,11 @@ async function renameAndMoveImage(originalPath, companyId, { eponymia, fatherNam
 async function upsertSafe(Model, filter, set, setOnInsert = {}, options = {}) {
     const baseOpts = { upsert: true, new: true, setDefaultsOnInsert: true, ...options };
     try {
-        return await Model.findOneAndUpdate(filter, { $set: set, $setOnInsert: setOnInsert }, baseOpts).exec();
+        return await Model.findOneAndUpdate(
+            filter,
+            { $set: set, $setOnInsert: setOnInsert },
+            baseOpts
+        ).exec();
     } catch (e) {
         // handle race: second writer may see E11000
         if (e?.code === 11000) {
@@ -66,12 +75,12 @@ async function upsertSafe(Model, filter, set, setOnInsert = {}, options = {}) {
 /* -------------------------- controller --------------------------------- */
 class companiesController {
     static mainAppForm = async (req, res) => {
-        const locals = { title: "Payroll", description: "Web Payroll Solutions" };
-        res.render("mainapp", { locals });
+        const locals = { title: 'Payroll', description: 'Web Payroll Solutions' };
+        res.render('mainapp', { locals });
     };
 
     static mainCompaniesForm = async (req, res) => {
-        const locals = { title: "Εταιρείες", description: "Web Payroll Solutions" };
+        const locals = { title: 'Εταιρείες', description: 'Web Payroll Solutions' };
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
@@ -81,15 +90,21 @@ class companiesController {
         const page = Math.max(Number(req.query.page) || 1, 1);
 
         if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
-        const userId   = ObjectId.createFromHexString(sessionUserId);
+        const userId = ObjectId.createFromHexString(sessionUserId);
 
         try {
-            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'Companies'
+            }).lean();
 
             // const userId = new ObjectId(sessionUserId);
             const matchBase = { team: sessionUserTeam, users: userId };
 
-            const countResults = await CompaniesModel.aggregate([{ $match: matchBase }, { $count: "total" }]).exec();
+            const countResults = await CompaniesModel.aggregate([
+                { $match: matchBase },
+                { $count: 'total' }
+            ]).exec();
             const totalRecords = countResults[0]?.total || 0;
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
             const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
@@ -97,31 +112,38 @@ class companiesController {
             const company = await CompaniesModel.aggregate([
                 { $match: matchBase },
                 { $match: { anenergh: false } },
-                { $lookup: { from: "users", localField: "users", foreignField: "_id", as: "userData" } },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'users',
+                        foreignField: '_id',
+                        as: 'userData'
+                    }
+                },
                 { $sort: { eponymia: 1, onoma: 1 } },
                 { $skip: skipRecords },
-                { $limit: perPage },
+                { $limit: perPage }
             ]).exec();
 
-            res.render("companies/genikastoixeia/companies", {
+            res.render('companies/genikastoixeia/companies', {
                 userPrivileges: userPrivileges?.privileges || {},
                 locals,
                 company,
                 current: page,
                 pages: totalPages,
-                perx,                       // <-- για το UI πολλαπλασιαστή
-                basePer,                    // (προαιρετικό, αν το δείχνεις)
-                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
-                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
+                perx, // <-- για το UI πολλαπλασιαστή
+                basePer, // (προαιρετικό, αν το δείχνεις)
+                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
     static searchPostCompanies = async (req, res) => {
-        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll Solutions" };
+        const locals = { title: 'Αναζήτηση Εταιρειών', description: 'Web Payroll Solutions' };
 
         try {
             const searchTerm = normalizeStr(req.body.searchTerm);
@@ -130,22 +152,25 @@ class companiesController {
             const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
             const page = Math.max(Number(req.query.page) || 1, 1);
 
-            sTerm = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, "");
+            sTerm = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, '');
 
-            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'Companies'
+            }).lean();
 
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
-            const userId   = ObjectId.createFromHexString(sessionUserId);
+            const userId = ObjectId.createFromHexString(sessionUserId);
 
             const countResults = await CompaniesModel.aggregate([
                 { $match: { team: sessionUserTeam, users: userId } },
-                { $count: "total" },
+                { $count: 'total' }
             ]).exec();
             const totalRecords = countResults[0]?.total || 0;
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
             const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            const re = new RegExp(searchTerm, "i");
+            const re = new RegExp(searchTerm, 'i');
             const companyFilteredRecs = await CompaniesModel.find({
                 $or: [
                     { kod: { $regex: re } },
@@ -153,62 +178,65 @@ class companiesController {
                     { firstname: { $regex: re } },
                     { fathername: { $regex: re } },
                     { activity: { $regex: re } },
-                    { afm: { $regex: re } },
-                ],
+                    { afm: { $regex: re } }
+                ]
             })
-            .skip(skipRecords)
-            .limit(perPage)
-            .lean();
+                .skip(skipRecords)
+                .limit(perPage)
+                .lean();
 
             const highlight = companiesController.highlightText;
             const highlightedRecords = companyFilteredRecs.map((r) => ({
                 ...r,
-                kod: highlight(r.kod || "", searchTerm),
-                eponymia: highlight(r.eponymia || "", searchTerm),
-                firstname: highlight(r.firstname || "", searchTerm),
-                fathername: highlight(r.fathername || "", searchTerm),
-                activity: highlight(r.activity || "", searchTerm),
-                afm: highlight(r.afm || "", searchTerm),
+                kod: highlight(r.kod || '', searchTerm),
+                eponymia: highlight(r.eponymia || '', searchTerm),
+                firstname: highlight(r.firstname || '', searchTerm),
+                fathername: highlight(r.fathername || '', searchTerm),
+                activity: highlight(r.activity || '', searchTerm),
+                afm: highlight(r.afm || '', searchTerm)
             }));
 
-            res.render("companies/genikastoixeia/search", {
+            res.render('companies/genikastoixeia/search', {
                 companyFilteredRecs: highlightedRecords,
                 locals,
                 current: page,
                 pages: totalPages,
                 sTerm: searchTerm,
-                userPrivileges,
+                userPrivileges
             });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
     static searchGetCompanies = async (req, res) => {
-        const locals = { title: "Αναζήτηση Εταιρειών", description: "Web Payroll Solutions" };
+        const locals = { title: 'Αναζήτηση Εταιρειών', description: 'Web Payroll Solutions' };
 
         try {
-            const searchTerm = normalizeStr(req.body?.searchTerm || "");
+            const searchTerm = normalizeStr(req.body?.searchTerm || '');
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
             const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
             const page = Math.max(Number(req.query.page) || 1, 1);
 
-            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Companies" }).lean();
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'Companies'
+            }).lean();
 
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
-            const userId   = ObjectId.createFromHexString(sessionUserId);
+            const userId = ObjectId.createFromHexString(sessionUserId);
 
             const countResults = await CompaniesModel.aggregate([
                 { $match: { team: sessionUserTeam, users: userId } },
-                { $count: "total" },
+                { $count: 'total' }
             ]).exec();
             const totalRecords = countResults[0]?.total || 0;
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
             const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            const re = new RegExp(searchTerm, "i");
+            const re = new RegExp(searchTerm, 'i');
             const companyFilteredRecs = await CompaniesModel.find({
                 $or: [
                     { kod: { $regex: re } },
@@ -216,45 +244,51 @@ class companiesController {
                     { firstname: { $regex: re } },
                     { fathername: { $regex: re } },
                     { activity: { $regex: re } },
-                    { afm: { $regex: re } },
-                ],
+                    { afm: { $regex: re } }
+                ]
             })
-            .skip(skipRecords)
-            .limit(perPage)
-            .lean();
+                .skip(skipRecords)
+                .limit(perPage)
+                .lean();
 
             const highlight = companiesController.highlightText;
             const highlightedRecords = companyFilteredRecs.map((r) => ({
                 ...r,
-                kod: highlight(r.kod || "", searchTerm),
-                eponymia: highlight(r.eponymia || "", searchTerm),
-                firstname: highlight(r.firstname || "", searchTerm),
-                fathername: highlight(r.fathername || "", searchTerm),
-                activity: highlight(r.activity || "", searchTerm),
-                afm: highlight(r.afm || "", searchTerm),
+                kod: highlight(r.kod || '', searchTerm),
+                eponymia: highlight(r.eponymia || '', searchTerm),
+                firstname: highlight(r.firstname || '', searchTerm),
+                fathername: highlight(r.fathername || '', searchTerm),
+                activity: highlight(r.activity || '', searchTerm),
+                afm: highlight(r.afm || '', searchTerm)
             }));
 
-            res.render("companies/genikastoixeia/search", {
+            res.render('companies/genikastoixeia/search', {
                 companyFilteredRecs: highlightedRecords,
                 locals,
                 current: page,
                 pages: totalPages,
-                userPrivileges,
+                userPrivileges
             });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
     static addCompanyForm = async (req, res) => {
-        const locals = { title: "Προσθήκη Νέας Εταιρείας", description: "Web Payroll Solutions" };
+        const locals = { title: 'Προσθήκη Νέας Εταιρείας', description: 'Web Payroll Solutions' };
         try {
-            const data = await PerifereiesModel.find().sort("kodikos");
-            res.render("companies/genikastoixeia/add", { locals, data, mode: "add", context: "company", rec: {} });
+            const data = await PerifereiesModel.find().sort('kodikos');
+            res.render('companies/genikastoixeia/add', {
+                locals,
+                data,
+                mode: 'add',
+                context: 'company',
+                rec: {}
+            });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
@@ -265,7 +299,7 @@ class companiesController {
             if (doc) return res.json(doc);
             return res.json(null);
         } catch (err) {
-            res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
+            res.status(500).send('Σφάλμα κατά την αναζήτηση στη βάση δεδομένων');
         }
     };
 
@@ -280,14 +314,17 @@ class companiesController {
 
         try {
             // produce next kod
-            const lastRecord = await CompaniesModel.find({ team: sessionUserTeam }).sort({ _id: -1 }).limit(1).lean();
+            const lastRecord = await CompaniesModel.find({ team: sessionUserTeam })
+                .sort({ _id: -1 })
+                .limit(1)
+                .lean();
             let kodValue = lastRecord[0]?.kod ? parseInt(lastRecord[0].kod, 10) : 0;
             const aa_kod = (isNaN(kodValue) ? 0 : kodValue) + 1;
 
             const newCompany = new CompaniesModel({
                 team: sessionUserTeam,
                 user_id: sessionUserId,
-                kod: aa_kod.toString().padStart(4, "0"),
+                kod: aa_kod.toString().padStart(4, '0'),
                 eponymia: formData.eponymia,
                 firstname: formData.firstName,
                 fathername: formData.fatherName,
@@ -332,11 +369,12 @@ class companiesController {
                 oikodomika: formData.oikodomika,
                 doropasxa_apd: formData.doropasxa_apd,
                 doroxrist_apd: formData.doroxrist_apd,
-                ypologismos_epi_pragmatikoy_oromisthioy: formData.ypologismos_epi_pragmatikoy_oromisthioy,
+                ypologismos_epi_pragmatikoy_oromisthioy:
+                    formData.ypologismos_epi_pragmatikoy_oromisthioy,
                 apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
                 keimeno_exoflhshs: formData.keimeno_exoflhshs,
                 users: formData.selectedUsers,
-                sfragida: formData.sfragida,
+                sfragida: formData.sfragida
             });
 
             // upserts for related entities (race-safe)
@@ -357,7 +395,7 @@ class companiesController {
                         ores: formData.ores_ta,
                         ap_katatheshs: formData.ap_katatheshs_ta,
                         hmnia_katatheshs: formData.hmnia_katatheshs_ta,
-                        isxyei_eos: formData.isxyei_eos_ta,
+                        isxyei_eos: formData.isxyei_eos_ta
                     },
                     { team, kodikos: kod }
                 );
@@ -378,7 +416,7 @@ class companiesController {
                         ores: formData.ores_ia,
                         ap_katatheshs: formData.ap_katatheshs_ia,
                         hmnia_katatheshs: formData.hmnia_katatheshs_ia,
-                        isxyei_eos: formData.isxyei_eos_ia,
+                        isxyei_eos: formData.isxyei_eos_ia
                     },
                     { team, kodikos: kod }
                 );
@@ -398,7 +436,7 @@ class companiesController {
                         thlefono: formData.thlefono_lo,
                         doy: formData.doy_logisths,
                         arithmos_adeias: formData.arithmos_adeias_lo,
-                        kathgoria_adeias: formData.kathgoria_adeias_lo,
+                        kathgoria_adeias: formData.kathgoria_adeias_lo
                     },
                     { team, kodikos: kod }
                 );
@@ -422,7 +460,7 @@ class companiesController {
                         drasthriothta: formData.drasthriothta_em_erg,
                         email: formData.email_em_erg,
                         daneismosApo: formData.daneismos_epa_apo_em_erg,
-                        daneismosEos: formData.daneismos_epa_eos_em_erg,
+                        daneismosEos: formData.daneismos_epa_eos_em_erg
                     },
                     { team, kodikos: kod }
                 );
@@ -443,7 +481,7 @@ class companiesController {
                         titlos: formData.titlos_diad_erg,
                         nomikhMorfh: formData.nomikhmorfh_diadoxosErgodoths,
                         drasthriothta: formData.drasthriothta_diad_erg,
-                        email: formData.email_diad_erg,
+                        email: formData.email_diad_erg
                     },
                     { team, kodikos: kod }
                 );
@@ -453,30 +491,45 @@ class companiesController {
             const companyId = savedCompany._id.toString();
 
             // handle stamp
-            const originalPath = isWindows ? "C:\\stamps\\sfragida.png" : "/home/ubuntu/stamps/sfragida.png";
-            let imagePath = "";
-            if (formData.sfragida && normalizeStr(formData.sfragida) !== "") {
-                const formDataValues = { eponymia: formData.eponymia, fatherName: formData.fatherName, firstName: formData.firstName };
+            const originalPath = isWindows
+                ? 'C:\\stamps\\sfragida.png'
+                : '/home/ubuntu/stamps/sfragida.png';
+            let imagePath = '';
+            if (formData.sfragida && normalizeStr(formData.sfragida) !== '') {
+                const formDataValues = {
+                    eponymia: formData.eponymia,
+                    fatherName: formData.fatherName,
+                    firstName: formData.firstName
+                };
                 try {
-                    imagePath = await renameAndMoveImage(originalPath, companyId, formDataValues, sessionUserTeam);
+                    imagePath = await renameAndMoveImage(
+                        originalPath,
+                        companyId,
+                        formDataValues,
+                        sessionUserTeam
+                    );
                 } catch (_) {
-                    imagePath = "";
+                    imagePath = '';
                 }
             }
 
             if (imagePath) {
-                await CompaniesModel.findByIdAndUpdate(companyId, { $set: { imagePath } }, { new: true }).exec();
+                await CompaniesModel.findByIdAndUpdate(
+                    companyId,
+                    { $set: { imagePath } },
+                    { new: true }
+                ).exec();
             }
 
-            return res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
+            return res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {
             console.error(error);
-            return res.status(500).json({ success: false, message: "Σφάλμα δημιουργίας" });
+            return res.status(500).json({ success: false, message: 'Σφάλμα δημιουργίας' });
         }
     };
 
     static choiseCompanies = async (req, res) => {
-        const locals = { title: "Payroll", description: "Web Payroll Solutions" };
+        const locals = { title: 'Payroll', description: 'Web Payroll Solutions' };
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
 
@@ -485,88 +538,112 @@ class companiesController {
             const parameter = await ParamModel.findOne({ usrId: sessionUserId }).lean();
 
             if (!parameter) {
-                await new ParamModel({ usrId: sessionUserId, usrTeam: sessionUserTeam, companyId: req.params.id, usedPeriod: "", usedYear: "", appDate: "" }).save();
+                await new ParamModel({
+                    usrId: sessionUserId,
+                    usrTeam: sessionUserTeam,
+                    companyId: req.params.id,
+                    usedPeriod: '',
+                    usedYear: '',
+                    appDate: ''
+                }).save();
             } else {
                 await ParamModel.findByIdAndUpdate(parameter._id, {
-                        usrId: sessionUserId,
-                        usrTeam: sessionUserTeam,
-                        companyId: req.params.id,
-                        usedPeriod: parameter.usedPeriod,
-                        usedYear: parameter.usedYear,
-                        appDate: parameter.appDate,
+                    usrId: sessionUserId,
+                    usrTeam: sessionUserTeam,
+                    companyId: req.params.id,
+                    usedPeriod: parameter.usedPeriod,
+                    usedYear: parameter.usedYear,
+                    appDate: parameter.appDate
                 }).exec();
             }
 
             req.session.companyInUse = req.params.id;
             req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`;
-            redir = "mainapp";
+            redir = 'mainapp';
         } catch (error) {
-            await res.flash("warning", "Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή");
-            redir = "companies/companies/genikastoixeia";
+            await res.flash(
+                'warning',
+                'Αδυναμία Επιλογής Εταιρείας. Επικοινωνείστε με τον Διαχειριστή'
+            );
+            redir = 'companies/companies/genikastoixeia';
         }
 
-        res.render(redir, { bodyClass: "home-bg-cdn", locals });
+        res.render(redir, { bodyClass: 'home-bg-cdn', locals });
     };
 
     static editCompanyForm = async (req, res) => {
-        const locals = { title: "Διόρθωση Εταιρείας", description: "Web Payroll Solutions" };
+        const locals = { title: 'Διόρθωση Εταιρείας', description: 'Web Payroll Solutions' };
 
         try {
-            const [perifereies, nomikes_morfes, pararthmata_efka, doys, tameia] = await Promise.all([
-                PerifereiesModel.find().sort("perigrafh"),
-                NomikesMorfesModel.find().sort("perigrafh"),
-                PararthmataEfkaModel.find().sort("perigrafh"),
-                DoyModel.find().sort("perigrafh"),
-                TameiaModel.find().sort("perigrafh"),
-            ]);
+            const [perifereies, nomikes_morfes, pararthmata_efka, doys, tameia] = await Promise.all(
+                [
+                    PerifereiesModel.find().sort('perigrafh'),
+                    NomikesMorfesModel.find().sort('perigrafh'),
+                    PararthmataEfkaModel.find().sort('perigrafh'),
+                    DoyModel.find().sort('perigrafh'),
+                    TameiaModel.find().sort('perigrafh')
+                ]
+            );
 
             const companyId = req.params.id;
             const companyData = await CompaniesModel.findById(companyId).lean();
 
-            for (let i = 1; i <= 6; i++) companyData[`koddrast${i}`] = companyData[`kad${i}`] || "";
-            companyData.nomikhmorfh_stathera = companyData.nomikh_morfh || "";
-            companyData.pararthmaefka_stathera = companyData.pararthma_efka || "";
-            companyData.doy_stathera = companyData.doy_company || "";
-            for (let i = 1; i <= 4; i++) companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || "";
+            for (let i = 1; i <= 6; i++) companyData[`koddrast${i}`] = companyData[`kad${i}`] || '';
+            companyData.nomikhmorfh_stathera = companyData.nomikh_morfh || '';
+            companyData.pararthmaefka_stathera = companyData.pararthma_efka || '';
+            companyData.doy_stathera = companyData.doy_company || '';
+            for (let i = 1; i <= 4; i++)
+                companyData[`kodikos_tameioy${i}`] = companyData[`tameio${i}`] || '';
 
-            const logisthsData = await LogisthsModel.findOne({ kodikos: companyData.logisths }).lean();
-            companyData.doy_logisths = logisthsData?.doy || "";
+            const logisthsData = await LogisthsModel.findOne({
+                kodikos: companyData.logisths
+            }).lean();
+            companyData.doy_logisths = logisthsData?.doy || '';
 
-            const emmesosErgodothsData = await EmmesosErgodothsModel.findOne({ kodikos: companyData.emmesos_ergodoths }).lean();
-            companyData.nomikhmorfh_emmesoyErgodoth = emmesosErgodothsData?.nomikhMorfh || "";
+            const emmesosErgodothsData = await EmmesosErgodothsModel.findOne({
+                kodikos: companyData.emmesos_ergodoths
+            }).lean();
+            companyData.nomikhmorfh_emmesoyErgodoth = emmesosErgodothsData?.nomikhMorfh || '';
 
-            const diadoxosErgodothsData = await DiadoxosErgodothsModel.findOne({ kodikos: companyData.diadoxos_ergodoths }).lean();
-            companyData.nomikhmorfh_diadoxoyErgodoth = diadoxosErgodothsData?.nomikhMorfh || "";
+            const diadoxosErgodothsData = await DiadoxosErgodothsModel.findOne({
+                kodikos: companyData.diadoxos_ergodoths
+            }).lean();
+            companyData.nomikhmorfh_diadoxoyErgodoth = diadoxosErgodothsData?.nomikhMorfh || '';
 
-            const mimeType = companyData.sfragida ? companyData.sfragida.split(";")[0].split(":")[1] : "";
+            const mimeType = companyData.sfragida
+                ? companyData.sfragida.split(';')[0].split(':')[1]
+                : '';
 
-            res.render("companies/genikastoixeia/edit", {
+            res.render('companies/genikastoixeia/edit', {
                 locals,
                 perifereies,
                 nomikes_morfes,
                 pararthmata_efka,
                 doys,
                 tameia,
-                mode: "edit",
-                context: "company",
+                mode: 'edit',
+                context: 'company',
                 company: companyData,
                 rec: companyData,
-                mimeType,
+                mimeType
             });
         } catch (err) {
-            console.error("editCompanyForm error →", err);
-            res.status(500).send("Σφάλμα κατά τη φόρτωση δεδομένων.");
+            console.error('editCompanyForm error →', err);
+            res.status(500).send('Σφάλμα κατά τη φόρτωση δεδομένων.');
         }
     };
 
     static getCompanyKads = async (req, res) => {
         try {
             const companyId = req.params.companyId;
-            const companyData = await CompaniesModel.findById(companyId, "kad1 kad2 kad3 kad4 kad5 kad6").lean();
+            const companyData = await CompaniesModel.findById(
+                companyId,
+                'kad1 kad2 kad3 kad4 kad5 kad6'
+            ).lean();
             res.json(companyData);
         } catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Σφάλμα κατά την ανάκτηση των ΚΑΔ" });
+            res.status(500).json({ message: 'Σφάλμα κατά την ανάκτηση των ΚΑΔ' });
         }
     };
 
@@ -577,7 +654,7 @@ class companiesController {
             res.json(results);
         } catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Σφάλμα κατά την ανάκτηση των ΚΑΔ" });
+            res.status(500).json({ message: 'Σφάλμα κατά την ανάκτηση των ΚΑΔ' });
         }
     };
 
@@ -588,14 +665,14 @@ class companiesController {
             res.json(companyData);
         } catch (error) {
             console.error(error);
-            res.status(500).json({ message: "Σφάλμα κατά την ανάκτηση των λογιστών" });
+            res.status(500).json({ message: 'Σφάλμα κατά την ανάκτηση των λογιστών' });
         }
     };
 
     static populateCompanyUsers = async (req, res) => {
         try {
             const companyId = req.params.companyId;
-            const companyUsers = await CompaniesModel.findById(companyId).populate("users");
+            const companyUsers = await CompaniesModel.findById(companyId).populate('users');
             res.json(companyUsers);
         } catch (error) {
             res.json(null);
@@ -626,21 +703,31 @@ class companiesController {
         const formDataValues = {
             eponymia: normalizeStr(formData.eponymia),
             fatherName: normalizeStr(formData.fatherName).substring(0, 3),
-            firstName: normalizeStr(formData.firstName),
+            firstName: normalizeStr(formData.firstName)
         };
 
-        const originalPath = isWindows ? "C:\\stamps\\sfragida.png" : "/home/ubuntu/stamps/sfragida.png";
-        let imagePath = "";
+        const originalPath = isWindows
+            ? 'C:\\stamps\\sfragida.png'
+            : '/home/ubuntu/stamps/sfragida.png';
+        let imagePath = '';
         if (formData.sfragida) {
             try {
-                imagePath = await renameAndMoveImage(originalPath, companyId, formDataValues, sessionUserTeam);
+                imagePath = await renameAndMoveImage(
+                    originalPath,
+                    companyId,
+                    formDataValues,
+                    sessionUserTeam
+                );
             } catch (_) {
-                imagePath = "";
+                imagePath = '';
             }
         }
 
         if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
-            return res.json({ success: false, message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (τουλάχιστον 1), <strong> στη σελίδα Διάφορα</strong>, που θα έχουν πρόσβαση στην εταιρεία` });
+            return res.json({
+                success: false,
+                message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (τουλάχιστον 1), <strong> στη σελίδα Διάφορα</strong>, που θα έχουν πρόσβαση στην εταιρεία`
+            });
         }
 
         const filteredDataCompany = {
@@ -688,19 +775,24 @@ class companiesController {
             oikodomika: formData.oikodomika,
             doropasxa_apd: formData.doropasxa_apd,
             doroxrist_apd: formData.doroxrist_apd,
-            ypologismos_epi_pragmatikoy_oromisthioy: formData.ypologismos_epi_pragmatikoy_oromisthioy,
+            ypologismos_epi_pragmatikoy_oromisthioy:
+                formData.ypologismos_epi_pragmatikoy_oromisthioy,
             apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
             keimeno_exoflhshs: formData.keimeno_exoflhshs,
             users: formData.selectedUsers,
             sfragida: formData.sfragida,
-            ...(imagePath ? { imagePath } : {}),
+            ...(imagePath ? { imagePath } : {})
         };
 
         try {
-            await CompaniesModel.findByIdAndUpdate(companyId, { $set: filteredDataCompany }, { new: true }).exec();
+            await CompaniesModel.findByIdAndUpdate(
+                companyId,
+                { $set: filteredDataCompany },
+                { new: true }
+            ).exec();
         } catch (error) {
             console.error(error);
-            return res.status(500).json({ success: false, message: "Σφάλμα ενημέρωσης εταιρείας" });
+            return res.status(500).json({ success: false, message: 'Σφάλμα ενημέρωσης εταιρείας' });
         }
 
         // related upserts (race-safe)
@@ -723,7 +815,7 @@ class companiesController {
                         ores: formData.ores_ta,
                         ap_katatheshs: formData.ap_katatheshs_ta,
                         hmnia_katatheshs: formData.hmnia_katatheshs_ta,
-                        isxyei_eos: formData.isxyei_eos_ta,
+                        isxyei_eos: formData.isxyei_eos_ta
                     },
                     { team, kodikos: kod }
                 )
@@ -745,8 +837,8 @@ class companiesController {
                         ores: formData.ores_ia,
                         ap_katatheshs: formData.ap_katatheshs_ia,
                         hmnia_katatheshs: formData.hmnia_katatheshs_ia,
-                        isxyei_eos: formData.isxyei_eos_ia,
-                    },    
+                        isxyei_eos: formData.isxyei_eos_ia
+                    },
                     { team, kodikos: kod }
                 )
             );
@@ -766,7 +858,7 @@ class companiesController {
                         thlefono: formData.thlefono_lo,
                         doy: formData.doy_logisths,
                         arithmos_adeias: formData.arithmos_adeias_lo,
-                        kathgoria_adeias: formData.kathgoria_adeias_lo,
+                        kathgoria_adeias: formData.kathgoria_adeias_lo
                     },
                     { team, kodikos: kod }
                 )
@@ -790,7 +882,7 @@ class companiesController {
                         drasthriothta: formData.drasthriothta_em_erg,
                         email: formData.email_em_erg,
                         daneismosApo: formData.daneismos_epa_apo_em_erg,
-                        daneismosEos: formData.daneismos_epa_eos_em_erg,
+                        daneismosEos: formData.daneismos_epa_eos_em_erg
                     },
                     { team, kodikos: kod }
                 )
@@ -812,7 +904,7 @@ class companiesController {
                         titlos: formData.titlos_diad_erg,
                         nomikhMorfh: formData.nomikhmorfh_diadoxoyErgodoth,
                         drasthriothta: formData.drasthriothta_diad_erg,
-                        email: formData.email_diad_erg,
+                        email: formData.email_diad_erg
                     },
                     { team, kodikos: kod }
                 )
@@ -821,35 +913,28 @@ class companiesController {
 
         try {
             await Promise.all(upserts);
-            return res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
+            return res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {
             console.error(error);
-            return res.status(500).json({ success: false, message: "Σφάλμα ενημέρωσης" });
+            return res.status(500).json({ success: false, message: 'Σφάλμα ενημέρωσης' });
         }
     };
 
     static deleteCompany = async (req, res) => {
         try {
             await CompaniesModel.deleteOne({ _id: req.params.id });
-            res.json({ success: true, redirectUrl: "/companies/genikastoixeia" });
+            res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {
-            res.status(500).json({ success: false, message: "Σφάλμα διαγραφής" });
+            res.status(500).json({ success: false, message: 'Σφάλμα διαγραφής' });
         }
-  
-
-
-
-
-
-
     };
 
-    static highlightText(text = "", term = "") {
+    static highlightText(text = '', term = '') {
         const highlightStartTag = "<span class='highlight'>";
-        const highlightEndTag = "</span>";
-        const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const highlightEndTag = '</span>';
+        const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (!safe) return text;
-        const regex = new RegExp(`(${safe})`, "gi");
+        const regex = new RegExp(`(${safe})`, 'gi');
         return String(text).replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
     }
 }

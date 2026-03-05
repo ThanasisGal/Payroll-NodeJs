@@ -1,17 +1,15 @@
-const logger = require("../../server/utils/logger");
+const logger = require('../../server/utils/logger');
 
-const Models_A = require("../models/param");
-const UserModel = require("../models/userModel");
-const Models_C = require("../models/companies");
-const Models = require("../models/stathera_arxeia");
+const Models_A = require('../models/param');
+const UserModel = require('../models/userModel');
+const Models_C = require('../models/companies');
+const Models = require('../models/stathera_arxeia');
 
 const { ParamModel } = Models_A;
 
 const { CompaniesModel } = Models_C;
 
-const { XrhseisModel,
-        PeriodsModel
-      } = Models;
+const { XrhseisModel, PeriodsModel } = Models;
 
 const threeSpaces = '\u00A0'.repeat(3);
 
@@ -20,20 +18,20 @@ var redir;
 class mainAppController {
     static getMainAppForm = async (req, res) => {
         const locals = {
-            title: "Payroll",
-            description: "Web Payroll Solutions",
+            title: 'Payroll',
+            description: 'Web Payroll Solutions'
         };
-        res.render("mainapp", {
+        res.render('mainapp', {
             locals,
-            bodyClass: 'home-bg-cdn',
+            bodyClass: 'home-bg-cdn'
         });
     };
 
     static getCompanyDescription = async (req, res) => {
         try {
             // Έλεγχος authentication
-            if (! req.session || !req.session.companyInUse) {
-                return res.json({ 
+            if (!req.session || !req.session.companyInUse) {
+                return res.json({
                     success: true,
                     newCompanyDescription: '',
                     message: 'No company selected'
@@ -41,10 +39,10 @@ class mainAppController {
             }
 
             // ✅ ΔΙΟΡΘΩΣΗ: findById δέχεται μόνο το ID, όχι object
-            const company = await CompaniesModel.findById(req. session.companyInUse);
+            const company = await CompaniesModel.findById(req.session.companyInUse);
 
             if (!company) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     newCompanyDescription: '',
                     message: 'Company not found'
@@ -53,19 +51,18 @@ class mainAppController {
 
             // Δημιουργία της περιγραφής
             // const threeSpaces = "   "; // ή "\u00A0\u00A0\u00A0" για non-breaking spaces
-            const description = `${company.kod || ''}${threeSpaces}${company.eponymia || ''} ${company.firstname || ''}`;
+            const description = `${company.kod || ''}${threeSpaces}${company.eponymia.trim() || ''} ${company.firstname.trim() || ''}`;
 
             // ✅ ΔΙΟΡΘΩΣΗ: Επιστροφή σωστού JSON object
-            return res.json({ 
+            return res.json({
                 success: true,
-                newCompanyDescription: description. trim()
+                newCompanyDescription: description
             });
-
         } catch (error) {
-            console.error("Error fetching company description:", error);
-            
+            console.error('Error fetching company description:', error);
+
             // ✅ ΔΙΟΡΘΩΣΗ: Επιστροφή σωστού error JSON
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 newCompanyDescription: ''
@@ -77,7 +74,7 @@ class mainAppController {
         try {
             // ✅ Έλεγχος authentication
             if (!req.session || !req.session.userId) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     yearInUse: '',
                     message: 'No year selected'
@@ -88,7 +85,7 @@ class mainAppController {
 
             // ✅ Έλεγχος cache στο session
             if (req.session.yearInUse) {
-                return res. json({ 
+                return res.json({
                     success: true,
                     cached: true,
                     yearInUse: req.session.yearInUse
@@ -99,7 +96,7 @@ class mainAppController {
             const parameter = await ParamModel.findOne({ usrId: sessionUserId });
 
             if (!parameter || !parameter.usedYear) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     yearInUse: '',
                     message: 'No year configured'
@@ -110,23 +107,22 @@ class mainAppController {
             req.session.yearInUse = parameter.usedYear;
 
             // ✅ Επιστροφή σωστού JSON object
-            return res.json({ 
+            return res.json({
                 success: true,
                 cached: false,
                 yearInUse: parameter.usedYear
             });
-
         } catch (error) {
-            console.error("Error fetching year in use:", error);
-            
+            console.error('Error fetching year in use:', error);
+
             // ✅ Επιστροφή error JSON (όχι κενό!)
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 yearInUse: ''
             });
         }
-    };    
+    };
 
     static getAllUsers = async (req, res) => {
         try {
@@ -159,11 +155,11 @@ class mainAppController {
 
     static getYearsForm = async (req, res) => {
         const locals = {
-            title: "Αλλαγή Χρήσης",
-            description: "Web Payroll Solutions",
+            title: 'Αλλαγή Χρήσης',
+            description: 'Web Payroll Solutions'
         };
-        res.render("dates/yearInUse", {
-            locals,
+        res.render('dates/yearInUse', {
+            locals
         });
     };
 
@@ -171,7 +167,7 @@ class mainAppController {
         try {
             // ✅ Έλεγχος authentication
             if (!req.session || !req.session.userId) {
-                return res.status(401).json({ 
+                return res.status(401).json({
                     error: 'Not authenticated',
                     xrhseis: []
                 });
@@ -181,15 +177,15 @@ class mainAppController {
             const parameter = await ParamModel.findOne({ usrId: req.session.userId });
 
             if (!parameter) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     xrhseis: [],
                     message: 'No user parameters found'
                 });
             }
 
-            if (! parameter.usedYear || parameter. usedYear.length === 0) {
-                return res.json({ 
+            if (!parameter.usedYear || parameter.usedYear.length === 0) {
+                return res.json({
                     success: true,
                     xrhseis: [],
                     message: 'No year selected'
@@ -197,35 +193,30 @@ class mainAppController {
             }
 
             // ✅ Fetch periods for the selected year
-            const xrhseis = await XrhseisModel
-                .find()
-                .select('etos')
-                .sort({etos: -1})
-                .lean();  // ✅ Faster query
+            const xrhseis = await XrhseisModel.find().select('etos').sort({ etos: -1 }).lean(); // ✅ Faster query
 
             // ✅ Return proper JSON response
-            return res.json({ 
+            return res.json({
                 success: true,
                 xrhseis: xrhseis || [],
                 count: xrhseis.length
             });
-
         } catch (error) {
-            console.error("Error fetching xrhseis:", error);
-            
+            console.error('Error fetching xrhseis:', error);
+
             // ✅ Return proper error JSON (not empty!)
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 xrhseis: []
             });
         }
-    };    
-    
+    };
+
     static changeYear = async (req, res) => {
         try {
             const sessionUserId = req.session.userId;
-            const sessionUserTeam = req. session.userTeam;
+            const sessionUserTeam = req.session.userTeam;
             const sessionCompanyInUse = req.session.companyInUse;
             const sessionPeriodInUse = req.session.periodInUse;
             const sessionPeriodInUseDescr = req.session.periodInUseDescr;
@@ -234,7 +225,7 @@ class mainAppController {
 
             // ✅ Validation
             if (!newYear) {
-                return res.redirect("/dates/changeYear");
+                return res.redirect('/dates/changeYear');
             }
 
             // ✅ Fetch current parameters
@@ -254,7 +245,7 @@ class mainAppController {
                 await newParameters.save();
             } else {
                 // ✅ Update only the year field
-                await ParamModel. findByIdAndUpdate(parameter._id, {
+                await ParamModel.findByIdAndUpdate(parameter._id, {
                     usedYear: newYear
                 });
             }
@@ -264,27 +255,26 @@ class mainAppController {
 
             // ✅ Save session before redirect
             await new Promise((resolve, reject) => {
-                req. session.save((err) => {
+                req.session.save((err) => {
                     if (err) reject(err);
                     else resolve();
                 });
             });
 
-            return res.redirect("/mainapp");
-
+            return res.redirect('/mainapp');
         } catch (error) {
-            console.error("Error changing year:", error);
-            return res.redirect("/yearInUse");
+            console.error('Error changing year:', error);
+            return res.redirect('/yearInUse');
         }
     };
 
     static getPeriodsForm = async (req, res) => {
         const locals = {
-            title: "Περίοδος Εργασίας",
-            description: "Web Payroll Solutions",
+            title: 'Περίοδος Εργασίας',
+            description: 'Web Payroll Solutions'
         };
-        res.render("dates/periods", {
-            locals,
+        res.render('dates/periods', {
+            locals
         });
     };
 
@@ -292,7 +282,7 @@ class mainAppController {
         try {
             // ✅ Έλεγχος authentication
             if (!req.session || !req.session.userId) {
-                return res.status(401).json({ 
+                return res.status(401).json({
                     error: 'Not authenticated',
                     periodoi: []
                 });
@@ -302,15 +292,15 @@ class mainAppController {
             const parameter = await ParamModel.findOne({ usrId: req.session.userId });
 
             if (!parameter) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     periodoi: [],
                     message: 'No user parameters found'
                 });
             }
 
-            if (! parameter.usedYear || parameter. usedYear.length === 0) {
-                return res.json({ 
+            if (!parameter.usedYear || parameter.usedYear.length === 0) {
+                return res.json({
                     success: true,
                     periodoi: [],
                     message: 'No year selected'
@@ -318,37 +308,35 @@ class mainAppController {
             }
 
             // ✅ Fetch periods for the selected year
-            const periodoi = await PeriodsModel
-                .find({ xrhsh: parameter.usedYear })
+            const periodoi = await PeriodsModel.find({ xrhsh: parameter.usedYear })
                 .select('kodikos perigrafh')
                 .sort('kodikos')
-                .lean();  // ✅ Faster query
+                .lean(); // ✅ Faster query
 
             // ✅ Return proper JSON response
-            return res.json({ 
+            return res.json({
                 success: true,
                 periodoi: periodoi || [],
                 year: parameter.usedYear,
                 count: periodoi.length
             });
-
         } catch (error) {
-            console.error("Error fetching periods:", error);
-            
+            console.error('Error fetching periods:', error);
+
             // ✅ Return proper error JSON (not empty!)
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 periodoi: []
             });
         }
-    };    
+    };
 
     static getPeriodInUse = async (req, res) => {
         try {
             // ✅ Έλεγχος authentication
             if (!req.session || !req.session.userId) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     periodInUse: '',
                     message: 'No period selected'
@@ -359,7 +347,7 @@ class mainAppController {
 
             // ✅ Έλεγχος cache στο session
             if (req.session.periodInUse) {
-                return res. json({ 
+                return res.json({
                     success: true,
                     cached: true,
                     periodInUse: req.session.periodInUse,
@@ -370,9 +358,9 @@ class mainAppController {
             // ✅ Fetch από DB
             const parameter = await ParamModel.findOne({ usrId: sessionUserId });
             console.log(`Parameter fetched: ${JSON.stringify(parameter)}`);
-            
+
             if (!parameter || !parameter.usedPeriod) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     periodInUse: '',
                     periodInUseDescr: '',
@@ -385,55 +373,54 @@ class mainAppController {
             req.session.periodInUseDescr = parameter.usedPeriodDescr;
 
             // ✅ Επιστροφή σωστού JSON object
-            return res.json({ 
+            return res.json({
                 success: true,
                 cached: false,
                 periodInUse: parameter.usedPeriod,
                 periodInUseDescr: parameter.usedPeriodDescr
             });
-
         } catch (error) {
-            console.error("Error fetching period in use:", error);
-            
+            console.error('Error fetching period in use:', error);
+
             // ✅ Επιστροφή error JSON (όχι κενό!)
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 periodInUse: '',
                 periodInUseDescr: ''
             });
         }
-    };    
+    };
 
     static changePeriod = async (req, res) => {
         try {
             const sessionUserId = req.session.userId;
-            const sessionUserTeam = req. session.userTeam;
+            const sessionUserTeam = req.session.userTeam;
             const sessionCompanyInUse = req.session.companyInUse;
-            const sessionYearInUse = req.session. yearInUse;
-            const sessionAppDate = req.session. appDate;
+            const sessionYearInUse = req.session.yearInUse;
+            const sessionAppDate = req.session.appDate;
             const newPeriod = req.body.periodoi;
 
             // ✅ Validation
             if (!newPeriod) {
-                return res.redirect("/mainapp");
+                return res.redirect('/mainapp');
             }
 
             // ✅ Fetch current parameters
             const parameter = await ParamModel.findOne({ usrId: sessionUserId });
-            
+
             if (!parameter) {
-                return res.redirect("/mainapp");
+                return res.redirect('/mainapp');
             }
 
             // ✅ Fetch period details
             const periodoi = await PeriodsModel.findOne({
-                xrhsh: parameter. usedYear, 
+                xrhsh: parameter.usedYear,
                 kodikos: newPeriod
             });
 
             if (!periodoi) {
-                return res.redirect("/mainapp");
+                return res.redirect('/mainapp');
             }
 
             const newPeriodDescr = periodoi.perigrafh;
@@ -450,42 +437,41 @@ class mainAppController {
 
             // ✅ Save session before redirect
             await new Promise((resolve, reject) => {
-                req. session.save((err) => {
+                req.session.save((err) => {
                     if (err) reject(err);
                     else resolve();
                 });
             });
 
-            return res.redirect("/mainapp");
-
+            return res.redirect('/mainapp');
         } catch (error) {
-            console.error("Error changing period:", error);
-            return res.redirect("/mainapp");
+            console.error('Error changing period:', error);
+            return res.redirect('/mainapp');
         }
     };
 
     static getAppDateForm = async (req, res) => {
         const locals = {
-            title: "Ημ/νία Εφαρμογής",
-            description: "Web Payroll Solutions",
+            title: 'Ημ/νία Εφαρμογής',
+            description: 'Web Payroll Solutions'
         };
-        res.render("dates/appDate", {
-            locals,
+        res.render('dates/appDate', {
+            locals
         });
     };
 
     static changeAppDate = async (req, res) => {
         try {
             const sessionUserId = req.session.userId;
-            const sessionUserTeam = req. session.userTeam;
+            const sessionUserTeam = req.session.userTeam;
             const sessionCompanyInUse = req.session.companyInUse;
-            const sessionYearInUse = req.session. yearInUse;
+            const sessionYearInUse = req.session.yearInUse;
             const sessionPeriodInUse = req.session.periodInUse;
-            const sessionPeriodInUseDescr = req. session.periodInUseDescr;
-            const newAppDate = req. body.appHmeromhnia;
+            const sessionPeriodInUseDescr = req.session.periodInUseDescr;
+            const newAppDate = req.body.appHmeromhnia;
 
             if (!newAppDate) {
-                return res.redirect("/mainapp");
+                return res.redirect('/mainapp');
             }
 
             const parameter = await ParamModel.findOne({ usrId: sessionUserId });
@@ -508,7 +494,7 @@ class mainAppController {
             }
 
             req.session.appDate = newAppDate;
-            
+
             // Αποθήκευσε το session
             await new Promise((resolve, reject) => {
                 req.session.save((err) => {
@@ -518,12 +504,11 @@ class mainAppController {
             });
 
             // await res.flash("success", "Επιτυχής Αλλαγή Ημερομηνίας Εφαρμογής");
-            return res.redirect("/mainapp");
-            
+            return res.redirect('/mainapp');
         } catch (error) {
-            console.error("Error changing app date:", error);
+            console.error('Error changing app date:', error);
             // await res.flash("error", "Αδυναμία Αλλαγής Ημερομηνίας Εφαρμογής");
-            return res.redirect("/companies/companies/genikastoixeia");
+            return res.redirect('/companies/companies/genikastoixeia');
         }
     };
 
@@ -543,8 +528,8 @@ class mainAppController {
     static getAppDateInUse = async (req, res) => {
         try {
             // ✅ Έλεγχος authentication
-            if (! req.session || !req.session.userId) {
-                return res.json({ 
+            if (!req.session || !req.session.userId) {
+                return res.json({
                     success: true,
                     appDate: ''
                 });
@@ -554,7 +539,7 @@ class mainAppController {
 
             // ✅ Έλεγχος cache στο session
             if (req.session.appDate) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     cached: true,
                     appDate: req.session.appDate
@@ -565,7 +550,7 @@ class mainAppController {
             const parameter = await ParamModel.findOne({ usrId: sessionUserId });
 
             if (!parameter || !parameter.appDate) {
-                return res.json({ 
+                return res.json({
                     success: true,
                     appDate: '',
                     message: 'No app date configured'
@@ -576,23 +561,22 @@ class mainAppController {
             req.session.appDate = parameter.appDate;
 
             // ✅ Επιστροφή σωστού JSON object
-            return res.json({ 
+            return res.json({
                 success: true,
                 cached: false,
                 appDate: parameter.appDate
             });
-
         } catch (error) {
-            console.error("Error fetching app date:", error);
-            
+            console.error('Error fetching app date:', error);
+
             // ✅ Επιστροφή error JSON (όχι κενό!)
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: 'Internal server error',
                 message: error.message,
                 appDate: ''
             });
         }
     };
-};
+}
 
 module.exports = mainAppController;

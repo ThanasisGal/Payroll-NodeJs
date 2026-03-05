@@ -1,571 +1,637 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-		<title><%= locals.title %></title>
-		<meta name="description" content="<%= locals.description %>" />
-		<meta name="csrf-token" content="<%= csrfToken %>">
-		<meta name="app-root" content="/mainapp">
+        <title><%= locals.title %></title>
+        <meta name="description" content="<%= locals.description %>" />
+        <meta name="csrf-token" content="<%= csrfToken %>" />
+        <meta name="app-root" content="/mainapp" />
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				const ua = navigator.userAgent;
-				const htmlTag = document.documentElement;
+        <script nonce="<%= nonce %>">
+            (function () {
+                const ua = navigator.userAgent;
+                const htmlTag = document.documentElement;
 
-				if (ua.indexOf("Firefox") > -1) htmlTag.classList.add("firefox");
-				else if (ua.indexOf("Edg") > -1) htmlTag.classList.add("edge");
-				else if (ua.indexOf("Chrome") > -1 && ua.indexOf("Edg") === -1) htmlTag.classList.add("chrome");
-				else if (ua.indexOf("Safari") > -1 && ua.indexOf("Chrome") === -1) htmlTag.classList.add("safari");
-			})();
-		</script>
+                if (ua.indexOf('Firefox') > -1) htmlTag.classList.add('firefox');
+                else if (ua.indexOf('Edg') > -1) htmlTag.classList.add('edge');
+                else if (ua.indexOf('Chrome') > -1 && ua.indexOf('Edg') === -1)
+                    htmlTag.classList.add('chrome');
+                else if (ua.indexOf('Safari') > -1 && ua.indexOf('Chrome') === -1)
+                    htmlTag.classList.add('safari');
+            })();
+        </script>
 
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
 
-		<link href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css" rel="stylesheet">
-		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css">
-		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css" />
-		<link rel="icon" href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico" type="image/x-icon" />
-		<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-		<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+        <link
+            href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css"
+            rel="stylesheet"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css"
+        />
+        <link
+            rel="icon"
+            href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico"
+            type="image/x-icon"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
 
-		<link rel="stylesheet" href="<%= css('main') %>">
-		<link rel="stylesheet" href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css" />
-	</head>
+        <link rel="stylesheet" href="<%= css('main') %>" />
+        <link
+            rel="stylesheet"
+            href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css"
+        />
+    </head>
 
-	<body
-		data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>"
-		data-context="<%= typeof context !== 'undefined' ? context : '' %>"
-		class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"
-	>
+    <body
+        data-mode="<%= typeof mode !== 'undefined' ? mode : '' %>"
+        data-context="<%= typeof context !== 'undefined' ? context : '' %>"
+        class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>"
+    >
+        <!-- APP LOADER (BEM) -->
+        <div id="appLoader" class="app-loader">
+            <div class="app-loader__box">
+                <div class="app-loader__row">
+                    <div class="app-loader__spinner"></div>
 
-		<!-- APP LOADER (BEM) -->
-		<div id="appLoader" class="app-loader">
-			<div class="app-loader__box">
-				<div class="app-loader__row">
-				<div class="app-loader__spinner"></div>
-					
-				<div class="app-loader__textwrap">
-					<div id="appLoaderTitle" class="app-loader__title">Παρακαλώ περιμένετε...</div>
-					<div id="appLoaderStep" class="app-loader__step"></div>
-				</div>
-				</div>
+                    <div class="app-loader__textwrap">
+                        <div id="appLoaderTitle" class="app-loader__title">
+                            Παρακαλώ περιμένετε...
+                        </div>
+                        <div id="appLoaderStep" class="app-loader__step"></div>
+                    </div>
+                </div>
 
-				<div class="app-progress">
-					<div id="appLoaderProgressFill" class="app-progress__fill"></div>
-				</div>
+                <div class="app-progress">
+                    <div id="appLoaderProgressFill" class="app-progress__fill"></div>
+                </div>
 
-				<div id="appLoaderProgressText" class="app-loader__meta">0%</div>
-			</div>
-		</div>
+                <div id="appLoaderProgressText" class="app-loader__meta">0%</div>
+            </div>
+        </div>
 
-		<!-- APP LOADER (SIMPLE / GENERIC DELAYS) -->
-		<div class="app-loader app-loader--simple" data-loader="simple">
-			<div class="app-loader__box">
-				<div class="app-loader__row">
-					<div class="app-loader__spinner"></div>
+        <!-- APP LOADER (SIMPLE / GENERIC DELAYS) -->
+        <div class="app-loader app-loader--simple" data-loader="simple">
+            <div class="app-loader__box">
+                <div class="app-loader__row">
+                    <div class="app-loader__spinner"></div>
 
-					<div class="app-loader__textwrap">
-						<div class="app-loader__title">Παρακαλώ περιμένετε...</div>
-						<div class="app-loader__meta">Εκτέλεση διαδικασίας...</div>
-					</div>
-				</div>
-			</div>
-		</div>    
+                    <div class="app-loader__textwrap">
+                        <div class="app-loader__title">Παρακαλώ περιμένετε...</div>
+                        <div class="app-loader__meta">Εκτέλεση διαδικασίας...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-		<%- include('../partials/header.ejs') %>
+        <%- include('../partials/header.ejs') %>
 
-		<div class="container-fluid container-scroll">
-			<div class="row">
-				<%- include('../partials/sidebar.ejs') %>
-				<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">
-					<%- body %>
-				</main>
-			</div>
+        <div class="container-fluid container-scroll">
+            <div class="row">
+                <%- include('../partials/sidebar.ejs') %>
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent">
+                    <%- body %>
+                </main>
+            </div>
 
-			<%- include('../partials/footer.ejs') %>
-		</div>
+            <%- include('../partials/footer.ejs') %>
+        </div>
 
-		<% const isProduction = NODE_ENV === 'production'; %>
-	
-		<script nonce="<%= nonce %>">
-			window.RUNTIME_ENV = "<%= NODE_ENV %>";
-		</script>
+        <% const isProduction = NODE_ENV === 'production'; %>
 
-		<script src="<%= script('common/logger') %>"></script>
-		<script src="<%= script('utils/tree') %>"></script>
-		<script src="<%= script('utils/miscProgs') %>"></script>
-		<script src="<%= script('common/getCompanyDescription') %>"></script>
-		<script src="<%= script('common/getXrhsh') %>"></script>
-		<script src="<%= script('common/getPeriod') %>"></script>
-		<script src="<%= script('common/getAppDate') %>"></script>
-		<script src="<%= script('common/getUser') %>"></script>
-		<script src="<%= script('common/navTabs') %>"></script>
-		<script src="<%= script('common/getUserRole') %>"></script>
-		<script src="<%= script('common/moveByEnter') %>"></script>
-		<script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
-		<script src="<%= script('common/tooltipsForButtons') %>"></script>
-		<script src="<%= script('common/input_auto_select') %>"></script>
-		<script src="<%= script('dates/convertDateToISO') %>"></script>
+        <script nonce="<%= nonce %>">
+            window.RUNTIME_ENV = '<%= NODE_ENV %>';
+        </script>
 
-		<!-- Vendors -->
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
-		<script type="module" src="<%= script('app') %>"></script>
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
-		<script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
-		<script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
-		<script src="<%= script('common/deviceSwitcher') %>" defer></script>
+        <script src="<%= script('common/csrfFetchPatch') %>"></script>
+        <script src="<%= script('common/logger') %>"></script>
+        <script src="<%= script('utils/tree') %>"></script>
+        <script src="<%= script('utils/miscProgs') %>"></script>
+        <script src="<%= script('common/getCompanyDescription') %>"></script>
+        <script src="<%= script('common/getXrhsh') %>"></script>
+        <script src="<%= script('common/getPeriod') %>"></script>
+        <script src="<%= script('common/getAppDate') %>"></script>
+        <script src="<%= script('common/getUser') %>"></script>
+        <script src="<%= script('common/navTabs') %>"></script>
+        <script src="<%= script('common/getUserRole') %>"></script>
+        <script src="<%= script('common/moveByEnter') %>"></script>
+        <script src="<%= script('common/changeFontSizeSelectDropdownMenu') %>"></script>
+        <script src="<%= script('common/tooltipsForButtons') %>"></script>
+        <script src="<%= script('common/input_auto_select') %>"></script>
+        <script src="<%= script('dates/convertDateToISO') %>"></script>
 
-		<script nonce="<%= nonce %>">
-			window.getCSRFToken = function () {
-				const meta = document.querySelector('meta[name="csrf-token"]');
-				if (meta) return meta.getAttribute('content');
+        <!-- Vendors -->
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
+        <script type="module" src="<%= script('app') %>"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
+        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
+        <script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
+        <script src="<%= script('common/deviceSwitcher') %>" defer></script>
 
-				const input = document.querySelector('input[name="_csrf"]');
-				if (input) return input.value;
+        <script nonce="<%= nonce %>">
+            window.getCSRFToken = function () {
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                if (meta) return meta.getAttribute('content');
 
-				console.warn('⚠️ CSRF token not found!');
-				return null;
-			};
-		</script>
+                const input = document.querySelector('input[name="_csrf"]');
+                if (input) return input.value;
 
-		<!-- =========================================================
+                console.warn('⚠️ CSRF token not found!');
+                return null;
+            };
+        </script>
+
+        <!-- =========================================================
 			APP LOADER API + Smooth Progress (FIXED)
 			========================================================= -->
-		<script nonce="<%= nonce %>">
-			(function () {
-				const el = () => document.getElementById('appLoader');
-				const titleEl = () => document.getElementById('appLoaderTitle');
-				const stepEl = () => document.getElementById('appLoaderStep');
-				const fillEl = () => document.getElementById('appLoaderProgressFill');
-				const textEl = () => document.getElementById('appLoaderProgressText');
+        <script nonce="<%= nonce %>">
+            (function () {
+                const el = () => document.getElementById('appLoader');
+                const titleEl = () => document.getElementById('appLoaderTitle');
+                const stepEl = () => document.getElementById('appLoaderStep');
+                const fillEl = () => document.getElementById('appLoaderProgressFill');
+                const textEl = () => document.getElementById('appLoaderProgressText');
 
-				// let timer = null;
-				// let value = 0;
-				// let target = 0;
-				// let cap = 90;
-				// let startedAt = 0;
+                // let timer = null;
+                // let value = 0;
+                // let target = 0;
+                // let cap = 90;
+                // let startedAt = 0;
 
-				let rafId = null;
-				let value = 0;
-				let target = 0;
-				let cap = 90;
-				let startedAt = 0;
-				let lastTs = 0;
+                let rafId = null;
+                let value = 0;
+                let target = 0;
+                let cap = 90;
+                let startedAt = 0;
+                let lastTs = 0;
 
-				// ✅ κρατάει ΜΟΝΙΜΑ το "Βήμα x/y: μήνυμα" που έρχεται από emitProgress,
-				// ώστε να μην το σβήνει το smooth loop
-				let suffixText = '';
+                // ✅ κρατάει ΜΟΝΙΜΑ το "Βήμα x/y: μήνυμα" που έρχεται από emitProgress,
+                // ώστε να μην το σβήνει το smooth loop
+                let suffixText = '';
 
-				function buildMeta(percentNumber) {
-					const pct = Math.round(Math.max(0, Math.min(100, Number(percentNumber) || 0)));
-					return `${pct}%${suffixText ? ' • ' + suffixText : ''}`;
-				}
+                function buildMeta(percentNumber) {
+                    const pct = Math.round(Math.max(0, Math.min(100, Number(percentNumber) || 0)));
+                    return `${pct}%${suffixText ? ' • ' + suffixText : ''}`;
+                }
 
-				function setProgress(p) {
-					const clamped = Math.max(0, Math.min(100, Number(p) || 0));
-					const fill = fillEl();
-					const text = textEl();
+                function setProgress(p) {
+                    const clamped = Math.max(0, Math.min(100, Number(p) || 0));
+                    const fill = fillEl();
+                    const text = textEl();
 
-					if (fill) fill.style.width = clamped + '%';
-					if (text) text.textContent = buildMeta(clamped);
-				}
+                    if (fill) fill.style.width = clamped + '%';
+                    if (text) text.textContent = buildMeta(clamped);
+                }
 
-				function startSmooth() {
-					stopSmooth();
+                function startSmooth() {
+                    stopSmooth();
 
-					value = 0;
-					target = 0;
-					cap = 90;
+                    value = 0;
+                    target = 0;
+                    cap = 90;
 
-					startedAt = performance.now();
-					lastTs = startedAt;
+                    startedAt = performance.now();
+                    lastTs = startedAt;
 
-					setProgress(0);
+                    setProgress(0);
 
-					const SPEED_PER_SEC = 2.4; // ~0.6 ανά 250ms όπως πριν (0.6 / 0.25 = 2.4)
+                    const SPEED_PER_SEC = 2.4; // ~0.6 ανά 250ms όπως πριν (0.6 / 0.25 = 2.4)
 
-					const tick = (now) => {
-						const root = el();
+                    const tick = (now) => {
+                        const root = el();
 
-						// Αν δεν υπάρχει ή δεν είναι visible, σταμάτα τελείως (μην καίει CPU)
-						if (!root || !root.classList.contains('is-visible')) {
-							rafId = null;
-							return;
-						}
+                        // Αν δεν υπάρχει ή δεν είναι visible, σταμάτα τελείως (μην καίει CPU)
+                        if (!root || !root.classList.contains('is-visible')) {
+                            rafId = null;
+                            return;
+                        }
 
-						const dt = Math.max(0, (now - lastTs) / 1000); // seconds
-						lastTs = now;
+                        const dt = Math.max(0, (now - lastTs) / 1000); // seconds
+                        lastTs = now;
 
-						const elapsed = (now - startedAt) / 1000;
-						const dynamicCap = Math.min(95, cap + Math.floor(elapsed / 10) * 2);
+                        const elapsed = (now - startedAt) / 1000;
+                        const dynamicCap = Math.min(95, cap + Math.floor(elapsed / 10) * 2);
 
-						// “smooth” αύξηση προς το dynamicCap, αλλά ποτέ κάτω από target
-						const next = Math.max(
-							target,
-							Math.min(dynamicCap, value + SPEED_PER_SEC * dt)
-						);
+                        // “smooth” αύξηση προς το dynamicCap, αλλά ποτέ κάτω από target
+                        const next = Math.max(
+                            target,
+                            Math.min(dynamicCap, value + SPEED_PER_SEC * dt)
+                        );
 
-						if (next > value) {
-							value = next;
-							setProgress(value); // γράφει % + suffixText
-						}
+                        if (next > value) {
+                            value = next;
+                            setProgress(value); // γράφει % + suffixText
+                        }
 
-						rafId = requestAnimationFrame(tick);
-					};
+                        rafId = requestAnimationFrame(tick);
+                    };
 
-					rafId = requestAnimationFrame(tick);
-				}
+                    rafId = requestAnimationFrame(tick);
+                }
 
-				function stopSmooth() {
-					if (rafId) cancelAnimationFrame(rafId);
-					rafId = null;
-				}
+                function stopSmooth() {
+                    if (rafId) cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
 
-				window.showLoader = function (text) {
-					const root = el();
-					if (!root) return;
+                window.showLoader = function (text) {
+                    const root = el();
+                    if (!root) return;
 
-					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+                    if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
-					root.classList.add('is-visible');
-					startSmooth();
-				};
+                    root.classList.add('is-visible');
+                    startSmooth();
+                };
 
-				window.hideLoader = function () {
-					const root = el();
-					if (!root) return;
+                window.hideLoader = function () {
+                    const root = el();
+                    if (!root) return;
 
-					stopSmooth();
-					root.classList.remove('is-visible');
+                    stopSmooth();
+                    root.classList.remove('is-visible');
 
-					value = 0;
-					target = 0;
-					cap = 90;
-					suffixText = '';
+                    value = 0;
+                    target = 0;
+                    cap = 90;
+                    suffixText = '';
 
-					if (stepEl()) stepEl().textContent = '';
-					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
-					setProgress(0);
-				};
+                    if (stepEl()) stepEl().textContent = '';
+                    if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+                    setProgress(0);
+                };
 
-				// ✅ percent + message + step/totalSteps
-				window.applyServerProgress = function (percent, message, step, totalSteps) {
-					const root = el();
-					if (root && !root.classList.contains('is-visible')) {
-						window.showLoader(message || 'Εκτελείται διαδικασία...');
-					}
+                // ✅ percent + message + step/totalSteps
+                window.applyServerProgress = function (percent, message, step, totalSteps) {
+                    const root = el();
+                    if (root && !root.classList.contains('is-visible')) {
+                        window.showLoader(message || 'Εκτελείται διαδικασία...');
+                    }
 
-					const p = Math.max(0, Math.min(100, Number(percent) || 0));
+                    const p = Math.max(0, Math.min(100, Number(percent) || 0));
 
-					// Title (πάνω γραμμή)
-					if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+                    // Title (πάνω γραμμή)
+                    if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
-					// Step line (δεύτερη γραμμή)
-					const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
-					if (stepEl()) stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
+                    // Step line (δεύτερη γραμμή)
+                    const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
+                    if (stepEl())
+                        stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
 
-					// ✅ Αυτό είναι που θα εμφανίζεται ΔΙΠΛΑ στο % (στο meta)
-					if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
-					else if (hasStep)      suffixText = `Βήμα ${step}/${totalSteps}`;
-					else if (message)      suffixText = String(message);
-					else                   suffixText = '';
+                    // ✅ Αυτό είναι που θα εμφανίζεται ΔΙΠΛΑ στο % (στο meta)
+                    if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
+                    else if (hasStep) suffixText = `Βήμα ${step}/${totalSteps}`;
+                    else if (message) suffixText = String(message);
+                    else suffixText = '';
 
-					// Fill bar πάει κανονικά στον server percent
-					if (fillEl()) fillEl().style.width = p + '%';
+                    // Fill bar πάει κανονικά στον server percent
+                    if (fillEl()) fillEl().style.width = p + '%';
 
-					// Update smooth targets
-					target = Math.max(target, p);
-					cap = Math.max(cap, Math.min(99, target));
-					value = Math.min(value, target);
+                    // Update smooth targets
+                    target = Math.max(target, p);
+                    cap = Math.max(cap, Math.min(99, target));
+                    value = Math.min(value, target);
 
-					// γράψε άμεσα το meta με το τρέχον smooth value (όχι να “πηδάει”)
-					setProgress(value);
-				};
+                    // γράψε άμεσα το meta με το τρέχον smooth value (όχι να “πηδάει”)
+                    setProgress(value);
+                };
 
-				window.finishProgressDone = function (message) {
-					// στο τέλος δείχνει 100% + suffix
-					window.applyServerProgress(100, message || 'Ολοκληρώθηκε', 0, 0);
-					setTimeout(() => window.hideLoader(), 600);
-				};
+                window.finishProgressDone = function (message) {
+                    // στο τέλος δείχνει 100% + suffix
+                    window.applyServerProgress(100, message || 'Ολοκληρώθηκε', 0, 0);
+                    setTimeout(() => window.hideLoader(), 600);
+                };
 
-				window.finishProgressError = function (message) {
-					const msg = message || 'Σφάλμα';
-					if (titleEl()) titleEl().textContent = `⚠️ ${msg}`;
+                window.finishProgressError = function (message) {
+                    const msg = message || 'Σφάλμα';
+                    if (titleEl()) titleEl().textContent = `⚠️ ${msg}`;
 
-					// στο error κράτα το meta ως έχει αλλά βάλε suffix error
-					suffixText = `⚠️ ${msg}`;
-					setProgress(value);
+                    // στο error κράτα το meta ως έχει αλλά βάλε suffix error
+                    suffixText = `⚠️ ${msg}`;
+                    setProgress(value);
 
-					setTimeout(() => window.hideLoader(), 1500);
-				};
-			})();
-		</script>
+                    setTimeout(() => window.hideLoader(), 1500);
+                };
+            })();
+        </script>
 
-		<!-- =========================================================
+        <!-- =========================================================
 			SOCKET.IO CLIENT SETUP
 			========================================================= -->
-		<script src="/socket.io/socket.io.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				'use strict';
+        <script nonce="<%= nonce %>">
+            (function () {
+                'use strict';
 
-				const hostname = window.location.hostname;
-				const isDev =
-				hostname === 'localhost' ||
-				hostname === '127.0.0.1' ||
-				hostname.startsWith('192.168.');
+                const hostname = window.location.hostname;
+                const isDev =
+                    hostname === 'localhost' ||
+                    hostname === '127.0.0.1' ||
+                    hostname.startsWith('192.168.');
 
-				const socketUrl = isDev
-					? `http://${hostname}:${window.location.port || 5000}`
-					: window.location.origin;
+                const socketUrl = isDev
+                    ? `http://${hostname}:${window.location.port || 5000}`
+                    : window.location.origin;
 
-				window.socket = io(socketUrl, {
-					path: '/socket.io/',
-					transports: ['websocket', 'polling'],
-					reconnection: true,
-					reconnectionDelay: 1000,
-					reconnectionDelayMax: 5000,
-					reconnectionAttempts: 5,
-					timeout: 20000,
-					autoConnect: true
-				});
+                window.socket = io(socketUrl, {
+                    path: '/socket.io/',
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    reconnectionAttempts: 5,
+                    timeout: 20000,
+                    autoConnect: true
+                });
 
-				const socket = window.socket;
+                const socket = window.socket;
 
-				socket.on('connect', function () {
-					const userId = '<%= locals.userId || "" %>';
-					if (userId && userId.trim() !== '') {
-						socket.emit('join', userId);
-					}
-				});
+                socket.on('connect', function () {
+                    const userId = '<%= locals.userId || "" %>';
+                    if (userId && userId.trim() !== '') {
+                        socket.emit('join', userId);
+                    }
+                });
 
-				// EFKA progress events (percent + message + step/totalSteps)
-				socket.on('efka:progress', function (data) {
-					console.log("PROGRESS FROM SERVER:", data);
-					window.applyServerProgress(
-						data?.percent,
-						data?.message,
-						data?.step,
-						data?.totalSteps
-					);
-				});
+                // EFKA progress events (percent + message + step/totalSteps)
+                socket.on('efka:progress', function (data) {
+                    console.log('PROGRESS FROM SERVER:', data);
+                    window.applyServerProgress(
+                        data?.percent,
+                        data?.message,
+                        data?.step,
+                        data?.totalSteps
+                    );
+                });
 
-				socket.on('efka:done', function (data) {
-					window.finishProgressDone(data?.message);
-				});
+                socket.on('efka:done', function (data) {
+                    window.finishProgressDone(data?.message);
+                });
 
-				socket.on('efka:error', function (data) {
-					window.finishProgressError(data?.message);
-				});
-			})();
-		</script>
+                socket.on('efka:error', function (data) {
+                    window.finishProgressError(data?.message);
+                });
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				const efkaRoot = () => document.getElementById('appLoader');
-				const simpleRoot = () => document.querySelector('.app-loader--simple[data-loader="simple"]');
+                // ERGANH progress events (percent + message + step/totalSteps)
+                socket.on('erganh:progress', function (data) {
+                    window.applyServerProgress(
+                        data?.percent,
+                        data?.message,
+                        data?.step,
+                        data?.totalSteps
+                    );
+                });
 
-				function setSimpleText(text) {
-					const root = simpleRoot();
-					if (!root) return;
+                socket.on('erganh:done', function (data) {
+                    // ✅ Να εξαφανίζεται πριν από το Swal: θα το κάνει και το uploadToErganh(),
+                    // αλλά το κρατάμε σαν safety net.
+                    window.finishProgressDone(data?.message || 'Ολοκληρώθηκε');
+                });
 
-					// ✅ title ΠΑΝΤΑ σταθερό
-					const title = root.querySelector('.app-loader__title');
-					if (title) title.textContent = 'Παρακαλώ περιμένετε...';
+                socket.on('erganh:error', function (data) {
+                    window.finishProgressError(data?.message || 'Σφάλμα');
+                });
+            })();
+        </script>
 
-					// ✅ meta αλλάζει ανά περίπτωση
-					const meta = root.querySelector('.app-loader__meta');
-					if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
-				}
+        <script nonce="<%= nonce %>">
+            (function () {
+                const efkaRoot = () => document.getElementById('appLoader');
+                const simpleRoot = () =>
+                    document.querySelector('.app-loader--simple[data-loader="simple"]');
 
-				function showSimple(text) {
-					// Αν τρέχει EFKA loader, ΜΗΝ δείχνεις simple
-					const efka = efkaRoot();
-					if (efka && efka.classList.contains('is-visible')) return;
+                function setSimpleText(text) {
+                    const root = simpleRoot();
+                    if (!root) return;
 
-					const root = simpleRoot();
-					if (!root) return;
-					setSimpleText(text);
-					root.classList.add('is-visible');
-				}
+                    // ✅ title ΠΑΝΤΑ σταθερό
+                    const title = root.querySelector('.app-loader__title');
+                    if (title) title.textContent = 'Παρακαλώ περιμένετε...';
 
-				function hideSimple() {
-					const root = simpleRoot();
-					if (!root) return;
-					root.classList.remove('is-visible');
-				}
+                    // ✅ meta αλλάζει ανά περίπτωση
+                    const meta = root.querySelector('.app-loader__meta');
+                    if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
+                }
 
-				let pendingTimer = null;
-				let activeCount = 0;
-				let shownAt = 0;
+                function showSimple(text) {
+                    // Αν τρέχει EFKA loader, ΜΗΝ δείχνεις simple
+                    const efka = efkaRoot();
+                    if (efka && efka.classList.contains('is-visible')) return;
 
-				const DEFAULT_DELAY = 250;     // anti-flicker: δείξε μόνο αν αργήσει > 250ms
-				const MIN_VISIBLE = 200;       // αν εμφανιστεί, κράτα το τουλάχιστον 200ms
+                    const root = simpleRoot();
+                    if (!root) return;
+                    setSimpleText(text);
+                    root.classList.add('is-visible');
+                }
 
-				window.AppLoader = {
-					begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
-						activeCount++;
+                function hideSimple() {
+                    const root = simpleRoot();
+                    if (!root) return;
+                    root.classList.remove('is-visible');
+                }
 
-						// αν ήδη φαίνεται, απλά ανανέωσε text
-						const root = simpleRoot();
-						if (root && root.classList.contains('is-visible')) {
-							setSimpleText(text);
-							return;
-						}
+                let pendingTimer = null;
+                let activeCount = 0;
+                let shownAt = 0;
 
-						// ξεκίνα timer για anti-flicker
-						if (pendingTimer) clearTimeout(pendingTimer);
-						pendingTimer = setTimeout(() => {
-							pendingTimer = null;
-							// εμφάνιση μόνο αν ακόμη τρέχει κάτι
-							if (activeCount > 0) {
-								shownAt = Date.now();
-								showSimple(text);
-							}
-						}, delayMs);
-					},
+                const DEFAULT_DELAY = 250; // anti-flicker: δείξε μόνο αν αργήσει > 250ms
+                const MIN_VISIBLE = 200; // αν εμφανιστεί, κράτα το τουλάχιστον 200ms
 
-					end() {
-						activeCount = Math.max(0, activeCount - 1);
+                window.AppLoader = {
+                    begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
+                        activeCount++;
 
-						// αν υπάρχουν κι άλλα σε εξέλιξη, μην κλείνεις
-						if (activeCount > 0) return;
+                        // αν ήδη φαίνεται, απλά ανανέωσε text
+                        const root = simpleRoot();
+                        if (root && root.classList.contains('is-visible')) {
+                            setSimpleText(text);
+                            return;
+                        }
 
-						// σταμάτα πιθανό pending show
-						if (pendingTimer) {
-							clearTimeout(pendingTimer);
-							pendingTimer = null;
-						}
+                        // ξεκίνα timer για anti-flicker
+                        if (pendingTimer) clearTimeout(pendingTimer);
+                        pendingTimer = setTimeout(() => {
+                            pendingTimer = null;
+                            // εμφάνιση μόνο αν ακόμη τρέχει κάτι
+                            if (activeCount > 0) {
+                                shownAt = Date.now();
+                                showSimple(text);
+                            }
+                        }, delayMs);
+                    },
 
-						// αν δεν εμφανίστηκε ποτέ, τέλος
-						const root = simpleRoot();
-						if (!root || !root.classList.contains('is-visible')) return;
+                    end() {
+                        activeCount = Math.max(0, activeCount - 1);
 
-						// κράτα το λίγο για να μην “αναβοσβήνει”
-						const elapsed = Date.now() - shownAt;
-						const wait = Math.max(0, MIN_VISIBLE - elapsed);
-						setTimeout(() => hideSimple(), wait);
-					},
+                        // αν υπάρχουν κι άλλα σε εξέλιξη, μην κλείνεις
+                        if (activeCount > 0) return;
 
-					// helper για promises
-					wrap(promise, text, delayMs = DEFAULT_DELAY) {
-						this.begin(text, delayMs);
-						return Promise.resolve(promise).finally(() => this.end());
-					},
+                        // σταμάτα πιθανό pending show
+                        if (pendingTimer) {
+                            clearTimeout(pendingTimer);
+                            pendingTimer = null;
+                        }
 
-					// manual (αν ποτέ το χρειαστώ)
-					show(text) { shownAt = Date.now(); showSimple(text); },
-					hide() { activeCount = 0; if (pendingTimer) clearTimeout(pendingTimer); pendingTimer = null; hideSimple(); }
-				};
+                        // αν δεν εμφανίστηκε ποτέ, τέλος
+                        const root = simpleRoot();
+                        if (!root || !root.classList.contains('is-visible')) return;
 
-				// reset σε back/forward cache
-				window.addEventListener('pageshow', () => window.AppLoader.hide());
-			})();
-		</script>
+                        // κράτα το λίγο για να μην “αναβοσβήνει”
+                        const elapsed = Date.now() - shownAt;
+                        const wait = Math.max(0, MIN_VISIBLE - elapsed);
+                        setTimeout(() => hideSimple(), wait);
+                    },
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				if (!window.fetch) return;
+                    // helper για promises
+                    wrap(promise, text, delayMs = DEFAULT_DELAY) {
+                        this.begin(text, delayMs);
+                        return Promise.resolve(promise).finally(() => this.end());
+                    },
 
-				const _fetch = window.fetch.bind(window);
+                    // manual (αν ποτέ το χρειαστώ)
+                    show(text) {
+                        shownAt = Date.now();
+                        showSimple(text);
+                    },
+                    hide() {
+                        activeCount = 0;
+                        if (pendingTimer) clearTimeout(pendingTimer);
+                        pendingTimer = null;
+                        hideSimple();
+                    }
+                };
 
-				window.fetch = function (input, init) {
-					// opt-out: init?.skipLoader === true
-					if (init && init.skipLoader) return _fetch(input, init);
+                // reset σε back/forward cache
+                window.addEventListener('pageshow', () => window.AppLoader.hide());
+            })();
+        </script>
 
-					// προαιρετικά: δες URL για καλύτερο text
-					const url = (typeof input === 'string') ? input : (input && input.url) ? input.url : '';
-					const txt = 'Παρακαλώ περιμένετε...';
+        <script nonce="<%= nonce %>">
+            (function () {
+                if (!window.fetch) return;
 
-					window.AppLoader.begin(txt, 200);
+                const _fetch = window.fetch.bind(window);
 
-					return _fetch(input, init)
-					.finally(() => window.AppLoader.end());
-				};
-			})();
-		</script>
+                window.fetch = function (input, init) {
+                    // opt-out: init?.skipLoader === true
+                    if (init && init.skipLoader) return _fetch(input, init);
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				if (!window.XMLHttpRequest) return;
+                    // προαιρετικά: δες URL για καλύτερο text
+                    const url =
+                        typeof input === 'string' ? input : input && input.url ? input.url : '';
+                    const txt = 'Παρακαλώ περιμένετε...';
 
-				const XHR = window.XMLHttpRequest;
-				const _open = XHR.prototype.open;
-				const _send = XHR.prototype.send;
+                    window.AppLoader.begin(txt, 200);
 
-				XHR.prototype.open = function (method, url) {
-					this.__loader_url = url;
-					return _open.apply(this, arguments);
-				};
+                    return _fetch(input, init).finally(() => window.AppLoader.end());
+                };
+            })();
+        </script>
 
-				XHR.prototype.send = function () {
-					// opt-out: set xhr.__skipLoader = true πριν το send (αν ποτέ χρειαστεί)
-					if (!this.__skipLoader) {
-						window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+        <script nonce="<%= nonce %>">
+            (function () {
+                if (!window.XMLHttpRequest) return;
 
-						const done = () => {
-							this.removeEventListener('loadend', done);
-							this.removeEventListener('error', done);
-							this.removeEventListener('abort', done);
-							window.AppLoader.end();
-						};
+                const XHR = window.XMLHttpRequest;
+                const _open = XHR.prototype.open;
+                const _send = XHR.prototype.send;
 
-						this.addEventListener('loadend', done);
-						this.addEventListener('error', done);
-						this.addEventListener('abort', done);
-					}
+                XHR.prototype.open = function (method, url) {
+                    this.__loader_url = url;
+                    return _open.apply(this, arguments);
+                };
 
-					return _send.apply(this, arguments);
-				};
-			})();
-		</script>
+                XHR.prototype.send = function () {
+                    // opt-out: set xhr.__skipLoader = true πριν το send (αν ποτέ χρειαστεί)
+                    if (!this.__skipLoader) {
+                        window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
 
-		<script nonce="<%= nonce %>">
-			(function () {
-				// Links: μόνο same-tab navigations
-				document.addEventListener('click', function (e) {
-					const a = e.target.closest && e.target.closest('a[href]');
-					if (!a) return;
+                        const done = () => {
+                            this.removeEventListener('loadend', done);
+                            this.removeEventListener('error', done);
+                            this.removeEventListener('abort', done);
+                            window.AppLoader.end();
+                        };
 
-					// ignore new tab / modifiers
-					if (a.target && a.target !== '_self') return;
-					if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                        this.addEventListener('loadend', done);
+                        this.addEventListener('error', done);
+                        this.addEventListener('abort', done);
+                    }
 
-					const href = a.getAttribute('href') || '';
-					if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+                    return _send.apply(this, arguments);
+                };
+            })();
+        </script>
 
-					// same origin only
-					try {
-						const u = new URL(href, window.location.href);
-						if (u.origin !== window.location.origin) return;
-					} catch { return; }
+        <script nonce="<%= nonce %>">
+            (function () {
+                // Links: μόνο same-tab navigations
+                document.addEventListener(
+                    'click',
+                    function (e) {
+                        const a = e.target.closest && e.target.closest('a[href]');
+                        if (!a) return;
 
-					// anti-flicker: αν γίνει γρήγορα, δεν θα προλάβει να δείξει
-					window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
-					// δεν κάνουμε end — θα φύγει η σελίδα. Αν δεν φύγει, το pageshow reset το καθαρίζει.
-				}, true);
+                        // ignore new tab / modifiers
+                        if (a.target && a.target !== '_self') return;
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
-				// Full page submits
-				document.addEventListener('submit', function (e) {
-					const form = e.target;
-					if (!(form instanceof HTMLFormElement)) return;
+                        const href = a.getAttribute('href') || '';
+                        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
 
-					if (form.hasAttribute('data-no-loader')) return;
-					if (form.target && form.target !== '' && form.target !== '_self') return;
-					if (form.checkValidity && !form.checkValidity()) return;
+                        // same origin only
+                        try {
+                            const u = new URL(href, window.location.href);
+                            if (u.origin !== window.location.origin) return;
+                        } catch {
+                            return;
+                        }
 
-					const msg = form.getAttribute('data-loader-text') || 'Εκτέλεση διαδικασίας...';
-					window.AppLoader.begin(msg, 250);
-				}, true);
-			})();
-		</script>
+                        // anti-flicker: αν γίνει γρήγορα, δεν θα προλάβει να δείξει
+                        window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+                        // δεν κάνουμε end — θα φύγει η σελίδα. Αν δεν φύγει, το pageshow reset το καθαρίζει.
+                    },
+                    true
+                );
 
-	</body>
+                // Full page submits
+                document.addEventListener(
+                    'submit',
+                    function (e) {
+                        const form = e.target;
+                        if (!(form instanceof HTMLFormElement)) return;
+
+                        if (form.hasAttribute('data-no-loader')) return;
+                        if (form.target && form.target !== '' && form.target !== '_self') return;
+                        if (form.checkValidity && !form.checkValidity()) return;
+
+                        const msg =
+                            form.getAttribute('data-loader-text') || 'Εκτέλεση διαδικασίας...';
+                        window.AppLoader.begin(msg, 250);
+                    },
+                    true
+                );
+            })();
+        </script>
+    </body>
 </html>

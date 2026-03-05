@@ -1,9 +1,10 @@
 // public\js\ergazomenoi\genika\getFieldValues.js
 
-document.addEventListener("DOMContentLoaded", () => {
-    const isEmpty = v => !String(v ?? "").trim();
-    const isEmptyArray = v => !Array.isArray(v) || v.length === 0;
-    let message = "";
+document.addEventListener('DOMContentLoaded', () => {
+    const isEmpty = (v) => !String(v ?? '').trim();
+    const isEmptyArray = (v) => !Array.isArray(v) || v.length === 0;
+    let message = '';
+    let erganiUploadInProgress = false;
 
     async function handleFormSubmit(event) {
         event.preventDefault();
@@ -11,48 +12,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const formData = {};
         const filePromises = [];
-        const sections = document.querySelectorAll(".card-body");
+        const sections = document.querySelectorAll('.card-body');
 
         // =========================================================================
         // COLLECT FORM DATA
         // =========================================================================
-        
+
         sections.forEach((section) => {
-            const inputs = section.querySelectorAll("input, select, textarea");
+            const inputs = section.querySelectorAll('input, select, textarea');
             inputs.forEach((input) => {
                 // =====================================================================
                 // ✅ INPUT HANDLING
                 // =====================================================================
-                if (input.tagName === "INPUT") {
-                    
+                if (input.tagName === 'INPUT') {
                     // ✅ 1. CHECKBOX (πρώτο, γιατί έχει priority)
-                    if (input.type === "checkbox") {
+                    if (input.type === 'checkbox') {
                         formData[input.name] = input.checked === true;
-                    } 
-                    
-                    // ✅ 2. HIDDEN BOOLEAN (δεύτερο)
-                    else if (input.type === "hidden" && (input.value === "true" || input.value === "false")) {
-                        formData[input.name] = input.value === "true";
                     }
-                    
+
+                    // ✅ 2. HIDDEN BOOLEAN (δεύτερο)
+                    else if (
+                        input.type === 'hidden' &&
+                        (input.value === 'true' || input.value === 'false')
+                    ) {
+                        formData[input.name] = input.value === 'true';
+                    }
+
                     // ✅ 3. DATE (κενό)
-                    else if (input.type === "date") {
-                        formData[input.name] = input.value === "" ? null : input.value;
-                    } 
-                    
+                    else if (input.type === 'date') {
+                        formData[input.name] = input.value === '' ? null : input.value;
+                    }
+
                     // ✅ 4. TIME (κενό)
-                    else if (input.type === "time") {
-                        formData[input.name] = input.value === "" ? null : input.value;
-                    } 
-                    
+                    else if (input.type === 'time') {
+                        formData[input.name] = input.value === '' ? null : input.value;
+                    }
+
                     // ✅ 5. NUMBER
-                    else if (input.type === "number") {
+                    else if (input.type === 'number') {
                         const parsed = parseFloat(input.value);
                         formData[input.name] = isNaN(parsed) ? 0 : parsed;
-                    } 
-                    
+                    }
+
                     // ✅ 6. FILE
-                    else if (input.type === "file" && input.files.length > 0) {
+                    else if (input.type === 'file' && input.files.length > 0) {
                         const filePromise = new Promise((resolve, reject) => {
                             const reader = new FileReader();
                             reader.onload = function (e) {
@@ -63,41 +66,46 @@ document.addEventListener("DOMContentLoaded", () => {
                             reader.readAsDataURL(input.files[0]);
                         });
                         filePromises.push(filePromise);
-                    } 
-                    
+                    }
+
                     // ✅ 7. READONLY/DISABLED (τελευταίο fallback)
-                    else if (input.hasAttribute("readonly") || input.hasAttribute("disabled")) {
+                    else if (input.hasAttribute('readonly') || input.hasAttribute('disabled')) {
                         // Ειδική περίπτωση: αν είναι number, parse το
-                        if (input.type === "number") {
+                        if (input.type === 'number') {
                             const parsed = parseFloat(input.value);
                             formData[input.name] = isNaN(parsed) ? 0 : parsed;
                         } else {
                             formData[input.name] = input.value;
                         }
-                    } 
-                    
+                    }
+
                     // ✅ 8. DEFAULT (κανονικό input)
                     else {
                         formData[input.name] = input.value;
                     }
-                } 
-                
+                }
+
                 // =====================================================================
                 // ✅ TEXTAREA HANDLING
                 // =====================================================================
-                else if (input.tagName === "TEXTAREA") {
+                else if (input.tagName === 'TEXTAREA') {
                     formData[input.name] = input.value;
-                } 
-                
+                }
+
                 // =====================================================================
                 // ✅ SELECT HANDLING
                 // =====================================================================
-                else if (input.tagName === "SELECT") {
+                else if (input.tagName === 'SELECT') {
                     if (input.multiple) {
-                        const selectedOptions = Array.from(input.selectedOptions).map(option => option.value);
+                        const selectedOptions = Array.from(input.selectedOptions).map(
+                            (option) => option.value
+                        );
                         formData[input.name] = selectedOptions.length > 0 ? selectedOptions : [];
                     } else {
-                        formData[input.name] = input.selectedIndex === -1 ? null : input.options[input.selectedIndex].value;
+                        formData[input.name] =
+                            input.selectedIndex === -1
+                                ? null
+                                : input.options[input.selectedIndex].value;
                     }
                 }
             });
@@ -109,11 +117,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Map document types to form field names
         const pdfMappings = {
-            'arxeio_symbashs': 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
-            'oysiodeis_oroi': 'arxeio_apodoxhs_oysiodon_oron_base64',
-            'anhlikoi': 'bibliario_anhlikoy_base64',
-            'allodapoi': 'arxeio_nomimopoihtikon_eggrafon_base64',
-            'symbash_daneismoy': 'arxeio_symbashs_daneismoy_base64'
+            arxeio_symbashs: 'arxeio_apodoxhs_oron_atomikhs_symbashs_base64',
+            oysiodeis_oroi: 'arxeio_apodoxhs_oysiodon_oron_base64',
+            anhlikoi: 'bibliario_anhlikoy_base64',
+            allodapoi: 'arxeio_nomimopoihtikon_eggrafon_base64',
+            symbash_daneismoy: 'arxeio_symbashs_daneismoy_base64'
         };
 
         // ✅ PRIMARY: Get files from pdfUploadModule (selectedFiles)
@@ -121,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
             for (const [documentType, base64Field] of Object.entries(pdfMappings)) {
                 try {
                     const base64Data = await window.pdfUploadModule.getFileAsBase64(documentType);
-                    
+
                     if (base64Data) {
                         formData[base64Field] = base64Data;
                     }
@@ -139,36 +147,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Only use if field is still empty
                 if (!formData[base64Field] && window.pdfPreviewModule.hasFile(documentType)) {
                     try {
-                        const base64Data = await window.pdfPreviewModule.getFileAsBase64(documentType);
-                        
+                        const base64Data =
+                            await window.pdfPreviewModule.getFileAsBase64(documentType);
+
                         if (base64Data) {
                             formData[base64Field] = base64Data;
                         }
                     } catch (error) {
-                        console.error(`❌ Failed to convert ${documentType} from preview module:`, error);
+                        console.error(
+                            `❌ Failed to convert ${documentType} from preview module:`,
+                            error
+                        );
                     }
                 }
             }
         }
 
-        // console.log("📦 Συλλεγμένα δεδομένα φόρμας:", formData);
+        console.log('📦 Συλλεγμένα δεδομένα φόρμας:', formData);
 
         try {
             await Promise.all(filePromises);
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
             // =========================================================================
             // VALIDATION
             // =========================================================================
-            
+
             // Ορισμός critical fields
             const CRITICAL_FIELDS = {
-                'email': '⚠️ Emai Εργαζόμενου/ης',
-                'karta_ergasias': '⚠️ Κάρτα Εργασίας',
-                'evelikth_proselefsh': '⚠️ Ευέλικτη Προσέλευση (λεπτά)',
-                'systatiko_shmeioma': '⚠️ Τοποθέτηση με Συστατικό Σημείωμα',
-                'topothethsh_me_programma': '⚠️ Τοποθέτηση με Πρόγραμμα',
+                email: '⚠️ Emai Εργαζόμενου/ης',
+                karta_ergasias: '⚠️ Κάρτα Εργασίας',
+                evelikth_proselefsh: '⚠️ Ευέλικτη Προσέλευση (λεπτά)',
+                systatiko_shmeioma: '⚠️ Τοποθέτηση με Συστατικό Σημείωμα',
+                topothethsh_me_programma: '⚠️ Τοποθέτηση με Πρόγραμμα'
             };
 
             const errors = [];
@@ -218,7 +230,10 @@ document.addEventListener("DOMContentLoaded", () => {
             addError('hmeromhnia_proslhpshs', 'Ημ/νία Πρόσληψης');
             addError('ores_ergasias_ebdomadas', 'Ώρες Εβδ/διαίας Εργασίας');
             addError('ora_enarxhs_proths_foras', 'Ώρα Έναρξης την 1η Ημέρα');
-            addError('ora_apoxorhshs_proths_foras', 'Ώρα Αποχώρησης από την Εργασία (κατά την 1η ημέρα πρόσληψης)');
+            addError(
+                'ora_apoxorhshs_proths_foras',
+                'Ώρα Αποχώρησης από την Εργασία (κατά την 1η ημέρα πρόσληψης)'
+            );
             addError('eidikothta_erganh_stathera', 'Ειδικότητα ΕΡΓΑΝΗ');
             addError('proyphresia_se_eth', 'Έτη Προϋπηρεσίας');
             addError('pragmatikosMisthos', 'Πραγματικός Μισθός');
@@ -241,21 +256,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (evelikthField.hasAttribute('disabled') || evelikthField.disabled) {
                     addError('karta_ergasias', 'Κάρτα Εργασίας');
                 } else {
-                    if (formData.evelikth_proselefsh === "0" || formData.evelikth_proselefsh === 0 || isEmpty(formData.evelikth_proselefsh)) {
+                    if (
+                        formData.evelikth_proselefsh === '0' ||
+                        formData.evelikth_proselefsh === 0 ||
+                        isEmpty(formData.evelikth_proselefsh)
+                    ) {
                         addError('evelikth_proselefsh', 'Ευέλικτη Προσέλευση (λεπτά)');
                     }
                 }
             }
 
             if (errors.length) {
-                const hasNonCriticalErrors = errors.some(error => !error.critical);
-                
+                const hasNonCriticalErrors = errors.some((error) => !error.critical);
+
                 if (hasNonCriticalErrors) {
-                    const errorItems = errors.map((error, index) => {
-                        const cssClass = error.critical ? 'error-item error-critical' : 'error-item';
-                        return `<div class="${cssClass}"><strong>${index + 1}</strong>.${error.text}</div>`;
-                    }).join('');
-                    
+                    const errorItems = errors
+                        .map((error, index) => {
+                            const cssClass = error.critical
+                                ? 'error-item error-critical'
+                                : 'error-item';
+                            return `<div class="${cssClass}"><strong>${index + 1}</strong>.${error.text}</div>`;
+                        })
+                        .join('');
+
                     const gridHTML = `
                         <div class="error-grid-container">
                             <div class="error-grid">${errorItems}</div>
@@ -265,27 +288,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
-                        icon: "warning",
-                        title: "ΠΡΟΣΟΧΗ !!!",
+                        icon: 'warning',
+                        title: 'ΠΡΟΣΟΧΗ !!!',
                         html: `<p class="error-header">Τα παρακάτω ${errors.length} πεδία είναι υποχρεωτικά για την πρόσληψη:</p>
                         <p class="warning-header">Τα πεδία με το εικονίδιο ⚠️ είναι προειδοποιητικά και μόνο για επανέλεγχο</p>${gridHTML}`,
                         heightAuto: true,
-                        confirmButtonText: "Κλείσιμο",
+                        confirmButtonText: 'Κλείσιμο',
                         customClass: {
-                            confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                            title: "custom-title",
-                            popup: "custom-swal-popup",
-                            htmlContainer: "custom-html-container",
-                        },
+                            confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup',
+                            htmlContainer: 'custom-html-container'
+                        }
                     });
-                    // return;
+                    return;
                 }
             }
 
             // =========================================================================
             // ΕΡΓΑΝΗ FILES SELECTION
             // =========================================================================
-            
+
             const result = await Swal.fire({
                 backdrop: false,
                 allowOutsideClick: false,
@@ -321,30 +344,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 focusConfirm: false,
                 preConfirm: () => {
                     const filesToUpdate = {
-                        e3_anaggelia_proslhpshs: document.getElementById('e3_anaggelia_proslhpshs').checked,
+                        e3_anaggelia_proslhpshs:
+                            document.getElementById('e3_anaggelia_proslhpshs').checked,
                         schedules: document.getElementById('schedules').checked,
                         history: document.getElementById('history').checked
                     };
-                    
+
                     // ✅ DEBUG: Log checkbox values
                     console.log('🔍 [FRONTEND] Checkboxes:', {
                         e3_checkbox_element: document.getElementById('e3_anaggelia_proslhpshs'),
                         e3_checked: document.getElementById('e3_anaggelia_proslhpshs')?.checked,
                         filesToUpdate: filesToUpdate
                     });
-                    
+
                     return filesToUpdate;
                 },
                 confirmButtonText: 'Ενημέρωση',
                 cancelButtonText: 'Ακύρωση',
                 showCancelButton: true,
                 customClass: {
-                    confirmButton: "class-info custom-confirm-button custom-swal-button",
-                    cancelButton: "class-secondary custom-cancel-button custom-swal-button",
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                    cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
                     title: 'custom-title',
-                    popup: "custom-swal-popup",
-                    htmlContainer: 'custom-html-container',
-                },
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container'
+                }
             });
 
             // ✅ Έλεγχος αν ο χρήστης πάτησε "Ακύρωση"
@@ -355,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // =========================================================================
             // POST REQUEST
             // =========================================================================
-            
+
             const payload = {
                 formData: formData,
                 filesToUpdate: result.value
@@ -435,42 +459,42 @@ document.addEventListener("DOMContentLoaded", () => {
                     { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
                     { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
                 ];
-                
+
                 let currentStepIndex = 0;
-                
+
                 function updateProgress() {
                     if (currentStepIndex >= steps.length) return;
-                    
+
                     const step = steps[currentStepIndex];
                     const progressBar = document.getElementById('pdf-progress-bar');
                     const progressText = document.getElementById('progress-step-text');
-                    
+
                     if (progressBar && progressText) {
                         progressBar.style.width = `${step.percent}%`;
                         progressBar.textContent = `${step.percent}%`;
                         progressBar.setAttribute('aria-valuenow', step.percent);
                         progressText.textContent = step.text;
                     }
-                    
+
                     currentStepIndex++;
-                    
+
                     if (currentStepIndex < steps.length) {
                         setTimeout(updateProgress, step.duration);
                     }
                 }
-                
+
                 // Start animation
                 setTimeout(updateProgress, 500);
             }
 
-            const response = await fetch("/ergazomenoi/ergazomenoi/add", {
-                method: "POST",
+            const response = await fetch('/ergazomenoi/ergazomenoi/add', {
+                method: 'POST',
                 headers: {
-                    "Content-Type": "application/json",
-                    "CSRF-Token": csrfToken,
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
                 },
-                credentials: "include",
-                body: JSON.stringify(payload),
+                credentials: 'include',
+                body: JSON.stringify(payload)
             });
 
             // ============================================================================
@@ -481,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
 
             // Wait minimum 3 seconds so user can see the progress animation
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise((resolve) => setTimeout(resolve, 3000));
 
             // Smoothly transition to 100%
             const progressBar = document.getElementById('pdf-progress-bar');
@@ -494,9 +518,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 progressBar.classList.remove('progress-bar-animated');
                 progressBar.setAttribute('aria-valuenow', 100);
                 progressText.textContent = 'Ολοκλήρωση...';
-                
+
                 // Show completion message for 1 second
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise((resolve) => setTimeout(resolve, 1000));
             }
             // Close progress modal smoothly
             Swal.close();
@@ -513,9 +537,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 2) 3xx without auto-follow (rare)
             if (response.status >= 300 && response.status < 400) {
-                const loc = response.headers.get("Location") || response.headers.get("location");
+                const loc = response.headers.get('Location') || response.headers.get('location');
                 if (loc) {
-                    const abs = loc.startsWith("http") ? loc : new URL(loc, window.location.origin).toString();
+                    const abs = loc.startsWith('http')
+                        ? loc
+                        : new URL(loc, window.location.origin).toString();
                     window.location.href = abs;
                     return;
                 }
@@ -524,7 +550,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // 3) CSRF/Forbidden
             if (response.status === 403) {
-                throw new Error("CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.");
+                throw new Error('CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.');
             }
 
             // 4) 204 No Content
@@ -533,64 +559,64 @@ document.addEventListener("DOMContentLoaded", () => {
                     await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
-                        icon: "warning",
-                        title: "Ο εργαζόμενος αποθηκεύτηκε",
+                        icon: 'warning',
+                        title: 'Ο εργαζόμενος αποθηκεύτηκε',
                         html: `<p><strong>Αλλά το PDF δεν ανέβηκε!</strong></p>
                             <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
                                 Ο server επέστρεψε 204 No Content χωρίς ID εργαζόμενου.
                             </p>`,
                         confirmButtonText: 'OK',
                         customClass: {
-                            confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                            title: "custom-title",
-                            popup: "custom-swal-popup",
-                        },
-                    }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                            confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup'
+                        }
+                    }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 } else {
                     await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
-                        icon: "success",
-                        title: "Επιτυχής καταχώριση!",
+                        icon: 'success',
+                        title: 'Επιτυχής καταχώριση!',
                         timer: 1200,
                         showConfirmButton: false,
                         customClass: {
-                            confirmButton: "class-success custom-confirm-button custom-swal-button",
-                            title: "custom-title",
-                            popup: "custom-swal-popup",
-                        },
-                    }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                            confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup'
+                        }
+                    }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 }
                 return;
             }
 
             // 5) ✅ JSON RESPONSE (MAIN SUCCESS PATH)
-            const ct = response.headers.get("content-type") || "";
-            if (ct.includes("application/json")) {
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
                 const data = await response.json();
-                message = data?.errorMessage || "";
-                
+                message = data?.errorMessage || '';
+
                 if (!response.ok || !data?.success) {
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
-                
+
                 // ✅ CHECK: Did we send PDFs?
                 const hadPdfs = window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload();
-                
+
                 // ✅ CHECK: Did backend save the PDFs?
                 const pdfResults = data?.pdfResults || [];
-                const successfulPdfs = pdfResults.filter(r => r.success);
-                const failedPdfs = pdfResults.filter(r => !r.success);
-                
+                const successfulPdfs = pdfResults.filter((r) => r.success);
+                const failedPdfs = pdfResults.filter((r) => !r.success);
+
                 // ✅ CHECK: Was E3 XML generated?
                 const e3XmlData = data?.e3XmlData || null;
                 const hasE3Xml = e3XmlData && e3XmlData.success === true;
-                
+
                 // ✅ Clear in-memory PDFs (no longer needed)
                 if (hadPdfs && window.pdfUploadModule.clearAllFiles) {
                     window.pdfUploadModule.clearAllFiles();
                 }
-                
+
                 // ✅ Success/Warning Messages
                 if (failedPdfs.length === 0) {
                     // ✅ Check: Does response have contract PDF preview?
@@ -599,7 +625,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (!data.contractPdf.s3Key) {
                             console.error('❌ [FRONTEND] Missing s3Key in backend response!');
                             console.error('   contractPdf:', data.contractPdf);
-                            
+
                             // ✅ Fallback: Show alert without email button
                             await Swal.fire({
                                 backdrop: false,
@@ -611,14 +637,17 @@ document.addEventListener("DOMContentLoaded", () => {
                                 `,
                                 confirmButtonText: 'OK'
                             }).then(() => {
-                                window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+                                window.location.href =
+                                    data.redirectUrl || '/ergazomenoi/ergazomenoi';
                             });
-                            
+
                             return;
                         }
-                        
+
                         // ✅ Get employee name from form data
-                        const employeeName = `${formData.eponymoHidden || ''} ${formData.onomaHidden || ''}`.trim() || 'UNKNOWN';
+                        const employeeName =
+                            `${formData.eponymoHidden || ''} ${formData.onomaHidden || ''}`.trim() ||
+                            'UNKNOWN';
 
                         // ✅ Get company data from response
                         const companyData = {
@@ -632,27 +661,26 @@ document.addEventListener("DOMContentLoaded", () => {
                         // ✅ SHOW MODAL (STEP 1) - User downloads/emails PDF
                         // =====================================================================
                         console.log('📄 Opening PDF modal...');
-                        
+
                         await showContractPdfModalAndWait(
-                            data.contractPdf.url, 
+                            data.contractPdf.url,
                             data.contractPdf.s3Key,
-                            data.redirectUrl || "/ergazomenoi/ergazomenoi",
+                            data.redirectUrl || '/ergazomenoi/ergazomenoi',
                             employeeName,
                             companyData,
                             e3XmlData,
-                            data.data?._id  // ✅ Pass ergazomenos ID for ERGANH upload
+                            data.data?._id // ✅ Pass ergazomenos ID for ERGANH upload
                         );
-                        
+
                         // =====================================================================
                         // ✅ AFTER MODAL CLOSES (STEP 2) - Upload to ERGANH happens automatically
                         // (handled inside showContractPdfModalAndWait function)
                         // =====================================================================
-                        
                     } else {
                         // =====================================================================
                         // ✅ NO PDF PREVIEW - Show success with E3 XML download
                         // =====================================================================
-                        const e3XmlHtml = hasE3Xml 
+                        const e3XmlHtml = hasE3Xml
                             ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
                             <a href="${e3XmlData.downloadUrl}" 
                                 download="${e3XmlData.filename}"
@@ -660,43 +688,46 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <i class="bi bi-download"></i> Λήψη E3 XML
                             </a>`
                             : '';
-                        
+
                         await Swal.fire({
                             backdrop: false,
                             allowOutsideClick: false,
-                            icon: "success",
-                            title: "Επιτυχής καταχώριση!",
+                            icon: 'success',
+                            title: 'Επιτυχής καταχώριση!',
                             html: `
                                 <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
-                                ${successfulPdfs.length > 0 
-                                    ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>` 
-                                    : ''}
+                                ${
+                                    successfulPdfs.length > 0
+                                        ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
+                                        : ''
+                                }
                                 ${e3XmlHtml}
                             `,
                             timer: hasE3Xml ? null : 1500,
                             showConfirmButton: hasE3Xml,
                             confirmButtonText: 'OK',
                             customClass: {
-                                confirmButton: "class-success custom-confirm-button custom-swal-button",
-                                title: "custom-title",
-                                popup: "custom-swal-popup",
-                            },
+                                confirmButton:
+                                    'class-success custom-confirm-button custom-swal-button',
+                                title: 'custom-title',
+                                popup: 'custom-swal-popup'
+                            }
                         });
-                        
+
                         // ✅ UPLOAD TO ERGANH (if E3 XML exists) - then redirect
                         if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
                             await uploadToErganh(data.data._id, e3XmlData.s3Url);
                         }
-                        
-                        window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
+
+                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                     }
                 } else {
                     // =====================================================================
                     // ⚠️ SOME PDFs FAILED TO SAVE
                     // =====================================================================
-                    const failedTypes = failedPdfs.map(f => f.documentType).join(', ');
+                    const failedTypes = failedPdfs.map((f) => f.documentType).join(', ');
 
-                    const e3XmlHtml = hasE3Xml 
+                    const e3XmlHtml = hasE3Xml
                         ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
                         <a href="${e3XmlData.downloadUrl}" 
                             download="${e3XmlData.filename}"
@@ -704,12 +735,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             <i class="bi bi-download"></i> Λήψη E3 XML
                         </a>`
                         : '';
-                
+
                     await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
-                        icon: "warning",
-                        title: "Ο εργαζόμενος αποθηκεύτηκε",
+                        icon: 'warning',
+                        title: 'Ο εργαζόμενος αποθηκεύτηκε',
                         html: `
                             <p><strong>Αλλά ${failedPdfs.length} PDF απέτυχαν!</strong></p>
                             <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
@@ -722,19 +753,19 @@ document.addEventListener("DOMContentLoaded", () => {
                         `,
                         confirmButtonText: 'OK',
                         customClass: {
-                            confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                            title: "custom-title",
-                            popup: "custom-swal-popup",
-                        },
+                            confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup'
+                        }
                     });
-                    
+
                     // ✅ UPLOAD TO ERGANH (if E3 XML exists) - then redirect
                     if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
                         await uploadToErganh(data.data._id, e3XmlData.s3Url);
                     }
-                    
-                    window.location.href = data.redirectUrl || "/ergazomenoi/ergazomenoi";
-                }               
+
+                    window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                }
                 return;
             }
 
@@ -743,54 +774,61 @@ document.addEventListener("DOMContentLoaded", () => {
                 await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
-                    icon: "success",
-                    title: "Επιτυχής καταχώριση!",
+                    icon: 'success',
+                    title: 'Επιτυχής καταχώριση!',
                     timer: 1200,
                     showConfirmButton: false,
                     customClass: {
-                        confirmButton: "class-success custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
-                }).then(() => window.location.href = "/ergazomenoi/ergazomenoi");
+                        confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup'
+                    }
+                }).then(() => (window.location.href = '/ergazomenoi/ergazomenoi'));
                 return;
             }
 
             // 7) HTTP Error
             throw new Error(`HTTP error ${response.status}`);
-
         } catch (err) {
             console.error('❌ Form submission error:', err);
-            
+
             await Swal.fire({
                 backdrop: false,
                 allowOutsideClick: false,
-                icon: "error",
-                title: "Αποτυχία αποθήκευσης",
+                icon: 'error',
+                title: 'Αποτυχία αποθήκευσης',
                 timer: 5200,
                 text: String(message || err),
                 showConfirmButton: true,
-                confirmButtonText: "Κλείσιμο",
+                confirmButtonText: 'Κλείσιμο',
                 customClass: {
-                    confirmButton: "class-error custom-confirm-button custom-swal-button",
-                    title: "custom-title",
-                    popup: "custom-swal-popup",
-                },
+                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
             });
         }
     }
 
-    const buttons = document.querySelectorAll(".submitButton");
+    const buttons = document.querySelectorAll('.submitButton');
 
     buttons.forEach((button) => {
-        button.addEventListener("click", handleFormSubmit);
+        button.addEventListener('click', handleFormSubmit);
     });
 
     // ============================================================================
     // ✅ PDF CONTRACT PREVIEW MODAL (WITH ERGANH UPLOAD AFTER MANUAL CLOSE)
     // ============================================================================
 
-    async function showContractPdfModalAndWait(pdfUrl, s3Key, redirectUrl, employeeName = 'UNKNOWN', companyData = {}, e3XmlData = null, ergazomenosId = null) {
+    async function showContractPdfModalAndWait(
+        pdfUrl,
+        s3Key,
+        redirectUrl,
+        employeeName = 'UNKNOWN',
+        companyData = {},
+        e3XmlData = null,
+        ergazomenosId = null
+    ) {
         return new Promise((resolve) => {
             const modal = document.getElementById('pdfPreviewContractModal');
             const iframe = document.getElementById('pdfPreviewIframe');
@@ -799,18 +837,19 @@ document.addEventListener("DOMContentLoaded", () => {
             const skipBtn = document.getElementById('skipPdfDownload');
             const downloadBtn = document.getElementById('downloadAndContinue');
             const emailBtn = document.getElementById('downloadAndEmail');
-            
+
             if (!modal || !iframe) {
                 console.error('❌ PDF preview modal elements not found!');
                 resolve(); // Resolve immediately
                 window.location.href = redirectUrl;
                 return;
             }
-            
+
             // ✅ Check if email exists in form
-            const emailInput = document.getElementById('email') || document.querySelector('input[name="email"]');
+            const emailInput =
+                document.getElementById('email') || document.querySelector('input[name="email"]');
             const employeeEmail = emailInput?.value?.trim() || '';
-            
+
             // ✅ Enable/disable email button based on email presence
             if (emailBtn) {
                 if (employeeEmail && employeeEmail.includes('@')) {
@@ -821,24 +860,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     emailBtn.title = 'Δεν υπάρχει email εργαζόμενου';
                 }
             }
-            
+
             // ✅ Show modal
             modal.classList.remove('hidden');
-            
+
             if (loading) {
                 loading.classList.remove('hidden');
             }
-            
+
             // ✅ Load PDF
             iframe.src = pdfUrl;
-            
+
             // ✅ Hide loading spinner when iframe loads
             iframe.onload = () => {
                 if (loading) {
                     loading.classList.add('hidden');
                 }
             };
-            
+
             // ✅ Handle error
             iframe.onerror = (error) => {
                 console.error('❌ PDF loading error:', error);
@@ -846,7 +885,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     loading.innerHTML = '<p class="text-danger">❌ Αποτυχία φόρτωσης PDF</p>';
                 }
             };
-            
+
             const closeModal = async () => {
                 modal.classList.add('hidden');
                 iframe.src = '';
@@ -869,14 +908,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // ✅ Στέλνουμε στο backend ΜΟΝΟ string path/url
                 const s3UrlToSend =
-                    e3XmlData?.relativePath ||
-                    e3XmlData?.s3Url ||
-                    e3XmlData?.downloadUrl ||
-                    null;
+                    e3XmlData?.relativePath || e3XmlData?.s3Url || e3XmlData?.downloadUrl || null;
 
                 if (!s3UrlToSend || typeof s3UrlToSend !== 'string') {
                     console.error('[E3PATH] Missing/invalid s3UrlToSend', s3UrlToSend);
-                        await Swal.fire({
+                    await Swal.fire({
                         icon: 'error',
                         title: 'ΕΡΓΑΝΗ ΙΙ',
                         text: 'Δεν βρέθηκε το path του XML για αποστολή.',
@@ -924,7 +960,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const downloadAndContinue = () => {
                 console.log('📥 Download initiated (modal stays open)');
                 window.open(pdfUrl, '_blank');
-                
+
                 // ✅ Show toast notification
                 Swal.fire({
                     toast: true,
@@ -936,11 +972,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     timer: 3000,
                     timerProgressBar: true
                 });
-                
+
                 // ❌ ΔΕΝ κλείνουμε το modal αυτόματα!
                 // Ο χρήστης θα το κλείσει χειροκίνητα όταν τελειώσει
             };
-            
+
             // =====================================================================
             // ✅ DOWNLOAD + EMAIL HANDLER (DOES NOT AUTO-CLOSE)
             // =====================================================================
@@ -955,25 +991,31 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                     return;
                 }
-                
+
                 // Download PDF
                 console.log('📥 Download + Email initiated');
                 window.open(pdfUrl, '_blank');
-                
+
                 // Show loading
                 emailBtn.disabled = true;
                 const originalBtnHtml = emailBtn.innerHTML;
-                emailBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Αποστολή...';
-                
+                emailBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm"></span> Αποστολή...';
+
                 try {
                     // ✅ Send email request
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
-                    
+                    const csrfToken =
+                        document.querySelector('meta[name="csrf-token"]')?.content || '';
+
                     // ✅ Get form data for email
-                    const fyloInput = document.getElementById('fylo') || document.querySelector('input[name="fylo"]');
+                    const fyloInput =
+                        document.getElementById('fylo') ||
+                        document.querySelector('input[name="fylo"]');
                     const fyloValue = fyloInput?.value === 'true' || fyloInput?.checked === true;
 
-                    const yphkoothtaInput = document.getElementById('yphkoothta_stathera') || document.querySelector('select[name="yphkoothta_stathera"]');
+                    const yphkoothtaInput =
+                        document.getElementById('yphkoothta_stathera') ||
+                        document.querySelector('select[name="yphkoothta_stathera"]');
                     const yphkoothtaValue = yphkoothtaInput?.value || '048';
 
                     const requestBody = {
@@ -999,7 +1041,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
 
                     const data = await response.json();
-                    
+
                     if (response.ok && data.success) {
                         await Swal.fire({
                             toast: true,
@@ -1010,21 +1052,19 @@ document.addEventListener("DOMContentLoaded", () => {
                             timer: 3000,
                             timerProgressBar: true
                         });
-                        
+
                         // ✅ Restore button but keep modal open
                         emailBtn.disabled = false;
                         emailBtn.innerHTML = originalBtnHtml;
-                        
+
                         // ❌ ΔΕΝ κλείνουμε το modal!
                         // Ο χρήστης θα το κλείσει χειροκίνητα
-                        
                     } else {
                         throw new Error(data.message || 'Email failed');
                     }
-                    
                 } catch (error) {
                     console.error('❌ Email error:', error);
-                    
+
                     await Swal.fire({
                         backdrop: false,
                         icon: 'error',
@@ -1032,21 +1072,21 @@ document.addEventListener("DOMContentLoaded", () => {
                         text: String(error.message || error),
                         confirmButtonText: 'OK'
                     });
-                    
+
                     // Restore button
                     emailBtn.disabled = false;
                     emailBtn.innerHTML = originalBtnHtml;
                 }
             };
-            
+
             // =====================================================================
             // ✅ EVENT LISTENERS
             // =====================================================================
             if (closeBtn) closeBtn.onclick = closeModal;
             if (skipBtn) skipBtn.onclick = closeModal;
-            if (downloadBtn) downloadBtn.onclick = downloadAndContinue;  // ✅ CHANGED!
+            if (downloadBtn) downloadBtn.onclick = downloadAndContinue; // ✅ CHANGED!
             if (emailBtn) emailBtn.onclick = downloadAndSendEmail;
-            
+
             // =====================================================================
             // ✅ ADD E3 XML DOWNLOAD BUTTON (if available)
             // =====================================================================
@@ -1056,7 +1096,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (existingE3Container) {
                     existingE3Container.remove(); // Remove old one
                 }
-                
+
                 const e3Container = document.createElement('div');
                 e3Container.className = 'e3-xml-download-container mt-3 pt-3 border-top';
                 e3Container.innerHTML = `
@@ -1069,14 +1109,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="bi bi-download"></i> Λήψη ${e3XmlData.filename}
                     </a>
                 `;
-                
+
                 // Find modal body and insert before buttons
-                const modalBody = modal.querySelector('.modal-body') || modal.querySelector('.pdf-preview-container');
+                const modalBody =
+                    modal.querySelector('.modal-body') ||
+                    modal.querySelector('.pdf-preview-container');
                 if (modalBody) {
                     modalBody.appendChild(e3Container);
                 }
             }
-            
+
             // =====================================================================
             // ✅ ESC KEY TO CLOSE
             // =====================================================================
@@ -1092,98 +1134,179 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ============================================================================
     // ✅ HELPER FUNCTION: Upload to ERGANH (PROD S3 + DEV local)
+    // Shows smooth progress loader steps via socket.io events (erganh:progress)
+    // and hides loader immediately before Swal.
     // ============================================================================
     async function uploadToErganh(ergazomenosId, s3Url) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         // ✅ Safety
         if (!s3Url || typeof s3Url !== 'string') {
             throw new Error('uploadToErganh: s3Url must be a string');
         }
 
-        const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-e3-to-erganh', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'CSRF-Token': csrfToken
-            },
-            credentials: 'include',
-            body: JSON.stringify({ ergazomenosId, s3Url })
-        });
+        if (erganiUploadInProgress) {
+            // ensure loader is not stuck
+            if (window.hideLoader) window.hideLoader();
 
-        let payload;
-        try {
-            payload = await uploadResponse.json();
-        } catch {
-            payload = { success: false, message: await uploadResponse.text() };
-        }
-
-        // ✅ HTTP errors
-        if (!uploadResponse.ok) {
             await Swal.fire({
-                icon: 'error',
-                title: 'Σφάλμα',
-                text: payload?.message || `HTTP ${uploadResponse.status}`,
+                icon: 'info',
+                title: 'ΕΡΓΑΝΗ',
+                text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
                 confirmButtonText: 'OK'
             });
-            throw new Error(payload?.message || `HTTP ${uploadResponse.status}`);
+
+            return {
+                success: false,
+                userMessage: 'Upload already in progress',
+                errorDetails: '',
+                messages: []
+            };
         }
 
-        // ✅ SUCCESS
-        if (payload.success) {
-            const protoHtml = payload.protocol
-            ? `<div style="margin-top:8px;">Πρωτόκολλο: <b>${payload.protocol}</b></div>`
-            : '';
+        erganiUploadInProgress = true;
 
-            // ✅ Κλείνουμε το loading και δείχνουμε success — ΠΕΡΙΜΕΝΟΥΜΕ OK
+        const escapeHtml = (s) =>
+            String(s ?? '').replace(
+                /[<>&"]/g,
+                (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]
+            );
+
+        const modalBoxStyle = `
+      text-align:left;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+      line-height:1.35;
+      max-height:320px;
+      overflow:auto;
+      padding:10px 12px;
+      border:1px solid rgba(0,0,0,.10);
+      border-radius:10px;
+      background:#fff;
+      font-size:13px;
+    `;
+
+        try {
+            // ✅ Start loader immediately (socket will continue updating steps)
+            if (window.applyServerProgress) {
+                window.applyServerProgress(0, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ', 1, 4);
+            } else if (window.showLoader) {
+                window.showLoader('Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
+            }
+
+            const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-e3-to-erganh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // κρατάμε το δικό σου header· αν έχεις το csrfFetchPatch θα στείλει και csrf-token/x-csrf-token
+                    'CSRF-Token': csrfToken
+                },
+                credentials: 'include',
+                body: JSON.stringify({ ergazomenosId, s3Url })
+            });
+
+            let payload;
+            try {
+                payload = await uploadResponse.json();
+            } catch {
+                payload = { success: false, userMessage: await uploadResponse.text() };
+            }
+
+            // ✅ HTTP errors (500 κλπ) -> δείξε και γύρνα controlled fail
+            if (!uploadResponse.ok) {
+                const msg =
+                    payload?.userMessage ||
+                    payload?.message ||
+                    payload?.errorDetails ||
+                    payload?.error ||
+                    `HTTP ${uploadResponse.status}`;
+
+                // ✅ Hide loader immediately before Swal
+                if (window.hideLoader) window.hideLoader();
+
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    html: `<div style="${modalBoxStyle}">${escapeHtml(msg)}</div>`,
+                    width: 580,
+                    confirmButtonText: 'OK'
+                });
+
+                return {
+                    success: false,
+                    userMessage: msg,
+                    errorDetails: payload?.errorDetails || payload?.error || '',
+                    messages: Array.isArray(payload?.messages) ? payload.messages : []
+                };
+            }
+
+            // Normalize
+            const userMessage = payload?.userMessage || payload?.message || '';
+            const errorDetails = payload?.errorDetails || payload?.error || '';
+            const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+
+            // ✅ SUCCESS (show modal text too, nicely wrapped)
+            if (payload.success) {
+                const modalText = payload?.errorDetails || '';
+                const userMsg = payload?.userMessage || 'Επιτυχής Προσωρινή Αποθήκευση';
+
+                // ✅ Hide loader immediately before Swal
+                if (window.hideLoader) window.hideLoader();
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'ΕΡΓΑΝΗ ΙΙ',
+                    width: 580,
+                    html: `
+                  <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
+                  ${modalText ? `<div style="${modalBoxStyle}">${escapeHtml(modalText)}</div>` : ''}
+                `,
+                    confirmButtonText: 'OK'
+                });
+
+                return payload;
+            }
+
+            // ✅ FAIL (controlled)
+            const all = [errorDetails, userMessage, ...messages].filter(Boolean);
+
+            const html = all.length
+                ? `<div style="${modalBoxStyle}">${escapeHtml(all.join('\n\n'))}</div>`
+                : 'Η υποβολή απέτυχε χωρίς συγκεκριμένο μήνυμα.';
+
+            // ✅ Hide loader immediately before Swal
+            if (window.hideLoader) window.hideLoader();
+
             await Swal.fire({
-                icon: 'success',
-                title: 'ΕΡΓΑΝΗ ΙΙ',
-                html: `Η υποβολή ολοκληρώθηκε.${protoHtml}`,
+                icon: 'error',
+                title: 'Σφάλματα XML - Αποτυχία Υποβολής',
+                html,
+                width: 580,
                 confirmButtonText: 'OK'
             });
 
             return payload;
+        } finally {
+            // ✅ Safety: never leave loader stuck
+            if (window.hideLoader) window.hideLoader();
+            erganiUploadInProgress = false;
         }
-
-        // ✅ FAIL (show messages)
-        const messages = Array.isArray(payload.messages) ? payload.messages : [];
-        const extra = payload.error ? [payload.error] : [];
-        const serverMessage = payload.message ? [payload.message] : [];
-        const all = [...serverMessage, ...messages, ...extra].filter(Boolean);
-
-        const escapeHtml = (s) =>
-            String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
-
-        const html = all.length
-            ? `<div style="text-align:left;white-space:pre-wrap;max-height:360px;overflow:auto;">${all.map(escapeHtml).join('\n\n')}</div>`
-            : 'Η υποβολή απέτυχε χωρίς συγκεκριμένο μήνυμα.';
-
-        // ✅ Κλείνουμε το loading και δείχνουμε error — ΠΕΡΙΜΕΝΟΥΜΕ OK
-        await Swal.fire({
-            icon: 'error',
-            title: 'Σφάλματα XML / Υποβολής',
-            html,
-            width: 820,
-            confirmButtonText: 'OK'
-        });
-
-        return payload;
     }
 
     // ============================================================================
     // ✅ SOCKET.IO - ERGANH REAL-TIME STATUS UPDATES
     // ============================================================================
-    
+
     if (typeof socket !== 'undefined' && socket) {
         console.log('✅ [ERGANH] Socket.io event listeners initialized');
-        
+
         // ================================================================
         // ✅ ERGANH: UPLOAD STARTED
         // ================================================================
-        socket.on('erganh:started', function(data) {
+        socket.on('erganh:started', function (data) {
             console.log('📡 [ERGANH] Upload started:', data);
-            
+
             Swal.fire({
                 toast: true,
                 position: 'top-end',
@@ -1199,14 +1322,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
-        
+
         // ================================================================
         // ✅ ERGANH: PROGRESS UPDATE
         // ================================================================
-        socket.on('erganh:progress', function(data) {
+        socket.on('erganh:progress', function (data) {
             console.log('📡 [ERGANH] Progress:', data);
-            
-            // Define icons per step
+
             const stepIcons = {
                 credentials: 'info',
                 browser: 'info',
@@ -1215,9 +1337,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 uploading: 'info',
                 processing: 'info'
             };
-            
+
             const icon = stepIcons[data.step] || 'info';
-            
+
             Swal.fire({
                 toast: true,
                 position: 'top-end',
@@ -1233,29 +1355,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
-        
+
         // ================================================================
         // ✅ ERGANH: SUCCESS
         // ================================================================
-        socket.on('erganh:success', function(data) {
+        socket.on('erganh:success', function (data) {
             console.log('📡 [ERGANH] Success:', data);
-            
-            const protocolHtml = data.protocol 
+
+            const protocolHtml = data.protocol
                 ? `<p style="margin-top: 10px; font-size: 0.95rem;">
-                     <strong>Πρωτόκολλο:</strong> 
-                     <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
-                   </p>`
+                 <strong>Πρωτόκολλο:</strong> 
+                 <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
+               </p>`
                 : '';
-            
+
             Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'success',
                 title: '✅ ΕΡΓΑΝΗ ΙΙ - Επιτυχία',
                 html: `
-                    <p>${data.message || 'Επιτυχής αποστολή!'}</p>
-                    ${protocolHtml}
-                `,
+                <p>${data.message || 'Επιτυχής αποστολή!'}</p>
+                ${protocolHtml}
+            `,
                 showConfirmButton: true,
                 confirmButtonText: 'OK',
                 timer: 8000,
@@ -1266,28 +1388,31 @@ document.addEventListener("DOMContentLoaded", () => {
                     confirmButton: 'swal-toast-confirm-btn'
                 },
                 didOpen: (toast) => {
-                    // Pause timer on hover
                     toast.addEventListener('mouseenter', Swal.stopTimer);
                     toast.addEventListener('mouseleave', Swal.resumeTimer);
                 }
             });
         });
-        
+
         // ================================================================
         // ✅ ERGANH: ERROR
         // ================================================================
-        socket.on('erganh:error', function(data) {
+        socket.on('erganh:error', function (data) {
             console.error('📡 [ERGANH] Error:', data);
-            
+
             Swal.fire({
                 toast: true,
                 position: 'top-end',
                 icon: 'error',
                 title: '❌ ΕΡΓΑΝΗ ΙΙ - Αποτυχία',
                 html: `
-                    <p>${data.message || 'Η αποστολή απέτυχε'}</p>
-                    ${data.error ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>` : ''}
-                `,
+                <p>${data.message || 'Η αποστολή απέτυχε'}</p>
+                ${
+                    data.error
+                        ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>`
+                        : ''
+                }
+            `,
                 showConfirmButton: true,
                 confirmButtonText: 'Κλείσιμο',
                 timer: 10000,
@@ -1303,9 +1428,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
-        
     } else {
         console.warn('⚠️  [ERGANH] Socket.io not available - real-time updates disabled');
     }
-
 });

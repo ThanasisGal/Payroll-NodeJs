@@ -1,43 +1,37 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
-const fs = require("fs-extra");
+const fs = require('fs-extra');
 const logger = require('../../utils/logger');
 
-const Models_A = require("../../models/stathera_arxeia");
-const Models_B = require("../../models/privileges");
-const Models_C = require("../../models/companies");
-const Models_D = require("../../models/ergazomenoi");
-const Models_E = require("../../models/pdfDocument");
+const Models_A = require('../../models/stathera_arxeia');
+const Models_B = require('../../models/privileges');
+const Models_C = require('../../models/companies');
+const Models_D = require('../../models/ergazomenoi');
+const Models_E = require('../../models/pdfDocument');
 
-const   {   KrathseisModel,
-            PerifereiesModel,
-            GenikesParametroiModel,
-            ForologikesKlimakesModel
-        } = Models_A;
+const { KrathseisModel, PerifereiesModel, GenikesParametroiModel, ForologikesKlimakesModel } =
+    Models_A;
 
-const   { UserPrivilegesModel } = Models_B;
+const { UserPrivilegesModel } = Models_B;
 
-const   {   CompaniesModel,
-            YpokatasthmataModel,
-            PasswordsModel,
-            NomimoiEkprosopoiModel
-        } = Models_C;
+const { CompaniesModel, YpokatasthmataModel, PasswordsModel, NomimoiEkprosopoiModel } = Models_C;
 
-const   {   ErgazomenoiModel,
-            ProdhlomenaOrariaModel,
-            IstorikoProslhpseonAllagonModel,
-        } = Models_D;
+const { ErgazomenoiModel, ProdhlomenaOrariaModel, IstorikoProslhpseonAllagonModel } = Models_D;
 
-const   { pdfDocumentl } = Models_E;
+const { pdfDocumentl } = Models_E;
 
 // ✅ IMPORTS
 const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
 
-let nextPageSearchTerm = "";
+let nextPageSearchTerm = '';
 
-const fieldsStoixeionSymbashs = ['stoixeio_symbashs', 'poso_symbashs', 'poso_symbashs_basei_oron_ergasias'];
+const fieldsStoixeionSymbashs = [
+    'stoixeio_symbashs',
+    'poso_symbashs',
+    'poso_symbashs_basei_oron_ergasias'
+];
 const fieldsKrathseon = ['krathsh', 'ama_krathshs'];
 const fieldsKrathseis = ['krathsh'];
 // const checkboxFields = new Set(['repo', 'argia']); // Ορίζουμε ποια fields είναι checkboxes
@@ -79,10 +73,15 @@ function validateOrarioFields(formData) {
     return { valid: true };
 }
 
-class ergazomenoiController {
+// Server-side guards (in-memory)
+// Αν έχεις PM2 cluster / multiple instances, αυτό θέλει DB/Redis. Για single instance είναι ΟΚ.
+const erganiInflight = new Map(); // key -> true
+const erganiLastStart = new Map(); // key -> timestamp
+const ERGANI_COOLDOWN_MS = 60_000; // 60s, άλλαξέ το όπως θες
 
+class ergazomenoiController {
     static mainErgazomenoiForm = async (req, res) => {
-        const locals = { title: "Εργαζόμενοι", description: "Web Payroll Solutions" };
+        const locals = { title: 'Εργαζόμενοι', description: 'Web Payroll Solutions' };
 
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
@@ -92,65 +91,67 @@ class ergazomenoiController {
         const page = Math.max(Number(req.query.page) || 1, 1);
 
         if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
-        const userId   = ObjectId.createFromHexString(sessionUserId);
+        const userId = ObjectId.createFromHexString(sessionUserId);
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
-            const userPrivileges = await UserPrivilegesModel.findOne({ userId: sessionUserId, form: "Ergazomenoi" }).lean();
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'Ergazomenoi'
+            }).lean();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $match: {
-                        company_kod: companyId,
-                    },
+                        company_kod: companyId
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
-            const countResults = await ErgazomenoiModel.aggregate(
-                countPipeline
-            ).exec();
+            const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
 
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Aggregation query για την ανάκτηση δεδομένων
             const queryPipeline = [
                 { $match: { company_kod: companyId } },
                 { $skip: skipRecords },
-                { $limit: limitPerPage },
+                { $limit: limitPerPage }
             ];
 
-            const ergazomenoi = await ErgazomenoiModel.aggregate(
-                queryPipeline
-            ).exec();
+            const ergazomenoi = await ErgazomenoiModel.aggregate(queryPipeline).exec();
 
-            res.render("ergazomenoi/ergazomenoi/ergazomenoi", {
+            res.render('ergazomenoi/ergazomenoi/ergazomenoi', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 current: page,
                 pages: totalPages,
                 ergazomenoi,
-                perx,                       // <-- για το UI πολλαπλασιαστή
-                basePer,                    // (προαιρετικό, αν το δείχνεις)
-                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
-                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
+                perx, // <-- για το UI πολλαπλασιαστή
+                basePer, // (προαιρετικό, αν το δείχνεις)
+                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
     static editErgazomenoiForm = async (req, res) => {
         const locals = {
-        title: "Συντήρηση Στοιχείων Εργαζομένων",
-        description: "Web Payroll Solutions",
+            title: 'Συντήρηση Στοιχείων Εργαζομένων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
@@ -161,45 +162,65 @@ class ergazomenoiController {
             const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).exec();
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
-            const istorikoData = await IstorikoProslhpseonAllagonModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod })
-            const perifereies = await PerifereiesModel.find().sort("perigrafh");
-            const genikesParametroi = await GenikesParametroiModel.find().sort({ kodikos: 1 }).lean();
-            const orariaData = await ProdhlomenaOrariaModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod, hmeromhnia: { $gte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo), $lte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos) } }).sort({ hmeromhnia: 1 }).exec();
+            const istorikoData = await IstorikoProslhpseonAllagonModel.find({
+                team: userTeam,
+                company_kod: companyId,
+                kodikos: ergazomenoiKod
+            });
+            const perifereies = await PerifereiesModel.find().sort('perigrafh');
+            const genikesParametroi = await GenikesParametroiModel.find()
+                .sort({ kodikos: 1 })
+                .lean();
+            const orariaData = await ProdhlomenaOrariaModel.find({
+                team: userTeam,
+                company_kod: companyId,
+                kodikos: ergazomenoiKod,
+                hmeromhnia: {
+                    $gte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo),
+                    $lte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos)
+                }
+            })
+                .sort({ hmeromhnia: 1 })
+                .exec();
 
-            res.render("ergazomenoi/ergazomenoi/edit", {
+            res.render('ergazomenoi/ergazomenoi/edit', {
                 locals,
                 perifereies,
                 genikesParametroi,
                 istorikoData,
                 orariaData,
                 ergazomenoiData,
-                mode: "edit", 
-                context: "ergazomenoi", 
+                mode: 'edit',
+                context: 'ergazomenoi',
                 rec: {}
             });
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
     };
 
     static getIstorikoData = async (req, res) => {
         const locals = {
-        title: "Συντήρηση Στοιχείων Εργαζομένων",
-        description: "Web Payroll Solutions",
+            title: 'Συντήρηση Στοιχείων Εργαζομένων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-        const userTeam = req.session.userTeam;
-        const companyId = req.session.companyInUse;
+            const userTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
 
-        const ergazomenoiKod = req.params.kod;
-        const istorikoData = await IstorikoProslhpseonAllagonModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }).sort({aa_eggrafhs: 1});
-        
-        if (istorikoData) {
-            res.json(istorikoData);
-        }
+            const ergazomenoiKod = req.params.kod;
+            const istorikoData = await IstorikoProslhpseonAllagonModel.find({
+                team: userTeam,
+                company_kod: companyId,
+                kodikos: ergazomenoiKod
+            }).sort({ aa_eggrafhs: 1 });
+
+            if (istorikoData) {
+                res.json(istorikoData);
+            }
         } catch (err) {
-        res.status(500).send("Σφάλμα κατά την αναζήτηση στη βάση δεδομένων");
+            res.status(500).send('Σφάλμα κατά την αναζήτηση στη βάση δεδομένων');
         }
     };
 
@@ -209,51 +230,62 @@ class ergazomenoiController {
         const ergazomenoiKod = req.params.kod;
 
         try {
-        const updates = req.body.updates; // Παίρνουμε τις ενημερώσεις από το σώμα του αιτήματος
+            const updates = req.body.updates; // Παίρνουμε τις ενημερώσεις από το σώμα του αιτήματος
 
-        // Αποθήκευση και επεξεργασία των ενημερώσεων
-        for (const update of updates) {
-            const { _id, data } = update;
-            if (update.deleted) {
-            await IstorikoProslhpseonAllagonModel.findByIdAndDelete(_id);
-            } else {
-            // Ενημέρωση μόνο των συγκεκριμένων πεδίων
-            const updateData = {
-                hmeromhnia_proslhpshs: data.hmeromhnia_proslhpshs,
-                hmeromhnia_allaghs_symbashs: data.hmeromhnia_allaghs_symbashs,
-                hmeromhnia_lhxhs_symbashs: data.hmeromhnia_lhxhs_symbashs,
-                hmeromhnia_apoxorhshs: data.hmeromhnia_apoxorhshs
-            };
-            await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(_id, updateData, {new: true});
+            // Αποθήκευση και επεξεργασία των ενημερώσεων
+            for (const update of updates) {
+                const { _id, data } = update;
+                if (update.deleted) {
+                    await IstorikoProslhpseonAllagonModel.findByIdAndDelete(_id);
+                } else {
+                    // Ενημέρωση μόνο των συγκεκριμένων πεδίων
+                    const updateData = {
+                        hmeromhnia_proslhpshs: data.hmeromhnia_proslhpshs,
+                        hmeromhnia_allaghs_symbashs: data.hmeromhnia_allaghs_symbashs,
+                        hmeromhnia_lhxhs_symbashs: data.hmeromhnia_lhxhs_symbashs,
+                        hmeromhnia_apoxorhshs: data.hmeromhnia_apoxorhshs
+                    };
+                    await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(_id, updateData, {
+                        new: true
+                    });
+                }
             }
-        }
 
-        // Επαναρίθμηση του aa_eggrafhs
-        const allRecords = await IstorikoProslhpseonAllagonModel.find({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }).sort({_id: 1});
-        let counter = 1;
-        for (const record of allRecords) {
-            const aa_eggrafhs = counter.toString().padStart(4, '0');
-            await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(record._id, { aa_eggrafhs: aa_eggrafhs });
-            counter++;
-        }
+            // Επαναρίθμηση του aa_eggrafhs
+            const allRecords = await IstorikoProslhpseonAllagonModel.find({
+                team: userTeam,
+                company_kod: companyId,
+                kodikos: ergazomenoiKod
+            }).sort({ _id: 1 });
+            let counter = 1;
+            for (const record of allRecords) {
+                const aa_eggrafhs = counter.toString().padStart(4, '0');
+                await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(record._id, {
+                    aa_eggrafhs: aa_eggrafhs
+                });
+                counter++;
+            }
 
-        res.status(200).json({ message: "Το Ιστορικό ενημερώθηκε επιτυχώς" });
+            res.status(200).json({ message: 'Το Ιστορικό ενημερώθηκε επιτυχώς' });
         } catch (error) {
-        res.status(500).json({ message: "Σφάλμα κατά την ενημέρωση του Ιστορικού", error: error });
+            res.status(500).json({
+                message: 'Σφάλμα κατά την ενημέρωση του Ιστορικού',
+                error: error
+            });
         }
     };
 
     static searchPostErgazomenoi = async (req, res) => {
         const locals = {
-        title: "Αναζήτηση Εργαζομένων",
-        description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Εργαζομένων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             let searchTerm = req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, '');
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
 
@@ -263,27 +295,27 @@ class ergazomenoiController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Ergazomenoi",
+                form: 'Ergazomenoi'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
-                $match: {
-                    $or: [
-                    { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                    { eponymo: { $regex: new RegExp(sTerm, "i") } },
-                    { onoma: { $regex: new RegExp(sTerm, "i") } },
-                    { patronymo: { $regex: new RegExp(sTerm, "i") } },
-                    { afm: { $regex: new RegExp(sTerm, "i") } },
-                    { amka: { $regex: new RegExp(sTerm, "i") } },
-                    { adt: { $regex: new RegExp(sTerm, "i") } },
-                    ]
-                },
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { eponymo: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
+                            { patronymo: { $regex: new RegExp(sTerm, 'i') } },
+                            { afm: { $regex: new RegExp(sTerm, 'i') } },
+                            { amka: { $regex: new RegExp(sTerm, 'i') } },
+                            { adt: { $regex: new RegExp(sTerm, 'i') } }
+                        ]
+                    }
                 },
                 {
-                $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
@@ -291,33 +323,35 @@ class ergazomenoiController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-            
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
                 {
                     $match: {
                         $or: [
-                        { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                        { eponymo: { $regex: new RegExp(sTerm, "i") } },
-                        { onoma: { $regex: new RegExp(sTerm, "i") } },
-                        { patronymo: { $regex: new RegExp(sTerm, "i") } },
-                        { afm: { $regex: new RegExp(sTerm, "i") } },
-                        { amka: { $regex: new RegExp(sTerm, "i") } },
-                        { adt: { $regex: new RegExp(sTerm, "i") } },
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { eponymo: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
+                            { patronymo: { $regex: new RegExp(sTerm, 'i') } },
+                            { afm: { $regex: new RegExp(sTerm, 'i') } },
+                            { amka: { $regex: new RegExp(sTerm, 'i') } },
+                            { adt: { $regex: new RegExp(sTerm, 'i') } }
                         ]
                     }
                 },
                 {
                     $sort: {
-                        kodikos: 1,
-                    },
-                },
+                        kodikos: 1
+                    }
+                }
             ])
-            .skip(skipRecords)
-            .limit(limitPerPage);
-        
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
                 ...record,
@@ -327,10 +361,10 @@ class ergazomenoiController {
                 patronymo: this.highlightText(record.patronymo, sTerm),
                 afm: this.highlightText(record.afm, sTerm),
                 amka: this.highlightText(record.amka, sTerm),
-                adt: this.highlightText(record.adt, sTerm),
+                adt: this.highlightText(record.adt, sTerm)
             }));
 
-            res.render("ergazomenoi/ergazomenoi/search", {
+            res.render('ergazomenoi/ergazomenoi/search', {
                 userPrivileges,
                 ergazomenoiFilteredRecs: highlightedRecords,
                 locals,
@@ -338,21 +372,21 @@ class ergazomenoiController {
                 pages: totalPages,
                 sTerm: sTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
     };
 
     static searchGetErgazomenoi = async (req, res) => {
         const locals = {
-        title: "Αναζήτηση Εργαζομένων",
-        description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Εργαζομένων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            let searchTerm = nextPageSearchTerm      //req.body.searchTerm;
+            let searchTerm = nextPageSearchTerm; //req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
             const perPage = Number(process.env.EGGRAFES);
@@ -362,27 +396,27 @@ class ergazomenoiController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Ergazomenoi",
+                form: 'Ergazomenoi'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
-                $match: {
-                    $or: [
-                    { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                    { eponymo: { $regex: new RegExp(searchTerm, "i") } },
-                    { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                    { patronymo: { $regex: new RegExp(searchTerm, "i") } },
-                    { afm: { $regex: new RegExp(searchTerm, "i") } },
-                    { amka: { $regex: new RegExp(searchTerm, "i") } },
-                    { adt: { $regex: new RegExp(searchTerm, "i") } },
-                    ]
-                },
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { eponymo: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
+                            { patronymo: { $regex: new RegExp(searchTerm, 'i') } },
+                            { afm: { $regex: new RegExp(searchTerm, 'i') } },
+                            { amka: { $regex: new RegExp(searchTerm, 'i') } },
+                            { adt: { $regex: new RegExp(searchTerm, 'i') } }
+                        ]
+                    }
                 },
                 {
-                $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
@@ -390,30 +424,35 @@ class ergazomenoiController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
                 {
                     $match: {
                         $or: [
-                        { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                        { eponymo: { $regex: new RegExp(searchTerm, "i") } },
-                        { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                        { patronymo: { $regex: new RegExp(searchTerm, "i") } },
-                        { afm: { $regex: new RegExp(searchTerm, "i") } },
-                        { amka: { $regex: new RegExp(searchTerm, "i") } },
-                        { adt: { $regex: new RegExp(searchTerm, "i") } },
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { eponymo: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
+                            { patronymo: { $regex: new RegExp(searchTerm, 'i') } },
+                            { afm: { $regex: new RegExp(searchTerm, 'i') } },
+                            { amka: { $regex: new RegExp(searchTerm, 'i') } },
+                            { adt: { $regex: new RegExp(searchTerm, 'i') } }
                         ]
                     }
                 },
                 {
                     $sort: {
-                        kodikos: 1,
-                    },
-                },
-            ]).skip(skipRecords).limit(limitPerPage);
-        
+                        kodikos: 1
+                    }
+                }
+            ])
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = ergazomenoiFilteredRecs.map((record) => ({
                 ...record,
@@ -423,10 +462,10 @@ class ergazomenoiController {
                 patronymo: this.highlightText(record.patronymo, searchTerm),
                 afm: this.highlightText(record.afm, searchTerm),
                 amka: this.highlightText(record.amka, searchTerm),
-                adt: this.highlightText(record.adt, searchTerm),
+                adt: this.highlightText(record.adt, searchTerm)
             }));
-        
-            res.render("ergazomenoi/ergazomenoi/search", {
+
+            res.render('ergazomenoi/ergazomenoi/search', {
                 userPrivileges,
                 ergazomenoiFilteredRecs: highlightedRecords,
                 locals,
@@ -434,17 +473,17 @@ class ergazomenoiController {
                 pages: totalPages,
                 sTerm: searchTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
     };
 
     static addErgazomenoiForm = async (req, res) => {
         const locals = {
-        title: "Προσθήκη Νέου Εργαζόμενου",
-        description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέου Εργαζόμενου',
+            description: 'Web Payroll Solutions'
         };
 
         const sessionYearInUse = req.session.yearInUse;
@@ -453,28 +492,28 @@ class ergazomenoiController {
         try {
             const companyData = await CompaniesModel.findById(companyId).lean();
 
-            const data = await PerifereiesModel.find().sort("kodikos");
-            res.render("ergazomenoi/ergazomenoi/add", { 
+            const data = await PerifereiesModel.find().sort('kodikos');
+            res.render('ergazomenoi/ergazomenoi/add', {
                 locals,
                 companyData,
-                data, 
-                mode: "add", 
-                context: "ergazomenoi", 
+                data,
+                mode: 'add',
+                context: 'ergazomenoi',
                 sessionYearInUse,
                 csrfToken: res.locals.csrfToken,
-                nonce: res.locals.nonce,         
+                nonce: res.locals.nonce,
                 rec: {}
             });
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
     };
-    
+
     static checkAfmErgazomenoy = async (req, res) => {
         try {
             const { afm } = req.body;
 
-            const doc = await ErgazomenoiModel.findOne({ afm:  afm });
+            const doc = await ErgazomenoiModel.findOne({ afm: afm });
 
             if (doc) {
                 return res.json(doc);
@@ -482,7 +521,7 @@ class ergazomenoiController {
                 return res.json(null);
             }
         } catch (err) {
-            return res.status(500).json({ error: "Σφάλμα κατά την αναζήτηση στη βάση δεδομένων" });
+            return res.status(500).json({ error: 'Σφάλμα κατά την αναζήτηση στη βάση δεδομένων' });
         }
     };
 
@@ -491,15 +530,21 @@ class ergazomenoiController {
         const sessionCompanyInUse = req.session.companyInUse;
         const sessionUserId = req.session.userId;
 
-        let aa_kod = null, aa_eggr = null, kodikosValue = 0;
+        let aa_kod = null,
+            aa_eggr = null,
+            kodikosValue = 0;
 
         const { formData, filesToUpdate } = req.body;
 
         try {
-            const lastRecord = await ErgazomenoiModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse })
+            const lastRecord = await ErgazomenoiModel.find({
+                team: sessionUserTeam,
+                company_kod: sessionCompanyInUse
+            })
                 .sort({ _id: -1 })
                 .limit(1);
-            let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
+            let kodValue =
+                lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
             if (kodValue !== null) {
                 kodValue++;
             } else {
@@ -508,14 +553,21 @@ class ergazomenoiController {
             aa_kod = kodValue;
             kodikosValue = kodValue;
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
 
         try {
-            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({ team: sessionUserTeam, company_kod: sessionCompanyInUse, kodikos: kodikosValue })
+            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
+                team: sessionUserTeam,
+                company_kod: sessionCompanyInUse,
+                kodikos: kodikosValue
+            })
                 .sort({ _id: -1 })
                 .limit(1);
-            let aaValue = lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10) : null;
+            let aaValue =
+                lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs
+                    ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10)
+                    : null;
             if (aaValue !== null) {
                 aaValue++;
             } else {
@@ -523,7 +575,7 @@ class ergazomenoiController {
             }
             aa_eggr = aaValue;
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
 
         const days = 7;
@@ -547,7 +599,8 @@ class ergazomenoiController {
             typos_taytothtas: formData.taytothta_stathera,
             adt: formData.adt,
             hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs || null,
-            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy || null,
+            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy:
+                formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy || null,
             arxh_ekdoshs: formData.arxh_ekdoshs,
             hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs || null,
             topos_gennhshs: formData.topos_gennhshs,
@@ -598,7 +651,7 @@ class ergazomenoiController {
             topos_ergasias_parathrhseis: formData.topos_ergasias_parathrhseis,
             xronos_katabolhs_apodoxon: formData.xronos_katabolhs_apodoxon,
             efarmostea_sse: formData.efarmostea_sse,
-            efarmostea_sse_parathrhseis: formData.efarmostea_sse_parathrhseis || "",
+            efarmostea_sse_parathrhseis: formData.efarmostea_sse_parathrhseis || '',
 
             plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
             mh_problepsimo_programma: formData.mh_problepsimo_programma,
@@ -658,7 +711,8 @@ class ergazomenoiController {
             isxyei_eos_epidothshs: formData.isxyei_eos_epidothshs_stathera,
             meiosh_eisforon_mhteron: formData.meiosh_eisforon_mhteron_stathera,
             kodikos_meioshs_eisforon_mhteron: formData.kodikos_meioshs_eisforon_mhteron_stathera,
-            pososto_asfalismenoy_eisforon_mhteron: formData.pososto_asfalismenoy_eisforon_mhteron_stathera,
+            pososto_asfalismenoy_eisforon_mhteron:
+                formData.pososto_asfalismenoy_eisforon_mhteron_stathera,
             pososto_ergodoth_eisforon_mhteron: formData.pososto_ergodoth_eisforon_mhteron_stathera,
             isxyei_apo_eisforon_mhteron: formData.isxyei_apo_eisforon_mhteron_stathera || null,
             isxyei_eos_eisforon_mhteron: formData.isxyei_eos_eisforon_mhteron_stathera || null,
@@ -690,32 +744,32 @@ class ergazomenoiController {
 
             symbash: formData.symbash_stathera,
             kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
-            eidikothta_symbashs: formData.eidikothta_symbashs_stathera,
+            eidikothta_symbashs: formData.eidikothta_symbashs_stathera
         });
-        
+
         const fieldsWithHidden = new Set(['stoixeio_symbashs']);
         const numberFields = new Set(['poso_symbashs', 'poso_symbashs_basei_oron_ergasias']);
 
         for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
             const idNum = i.toString().padStart(2, '0');
-            
+
             // Σειρά fields ανά row
             const fieldsInOrder = [
                 'stoixeio_symbashs',
                 'poso_symbashs',
                 'poso_symbashs_basei_oron_ergasias'
             ];
-            
-            fieldsInOrder.forEach(fieldStoixeio => {
+
+            fieldsInOrder.forEach((fieldStoixeio) => {
                 const fieldName = `${fieldStoixeio}_${idNum}`;
-                
+
                 // Assign main field
-                if (numberFields. has(fieldStoixeio)) {
+                if (numberFields.has(fieldStoixeio)) {
                     newErgazomenos[fieldName] = formData[fieldName] || 0;
                 } else {
                     newErgazomenos[fieldName] = formData[fieldName] || null;
                 }
-                
+
                 // Assign hidden field (μόνο για stoixeio_symbashs)
                 if (fieldsWithHidden.has(fieldStoixeio)) {
                     const hiddenFieldName = `${fieldName}_hidden`;
@@ -725,7 +779,8 @@ class ergazomenoiController {
         }
 
         newErgazomenos.synolo_symbashs = formData.synolo_symbashs;
-        newErgazomenos.synolo_symbashs_basei_oron_ergasias = formData.synolo_symbashs_basei_oron_ergasias;
+        newErgazomenos.synolo_symbashs_basei_oron_ergasias =
+            formData.synolo_symbashs_basei_oron_ergasias;
         newErgazomenos.nomimosMisthos = formData.nomimosMisthos;
         newErgazomenos.nomimoHmeromisthio = formData.nomimoHmeromisthio;
         newErgazomenos.nomimoOromisthio = formData.nomimoOromisthio;
@@ -734,15 +789,12 @@ class ergazomenoiController {
         newErgazomenos.pragmatikoOromisthio = formData.pragmatikoOromisthio;
 
         // Ορισμός σειράς fields
-        const fieldsKrathseonInOrder = [
-            'krathsh',
-            'ama_krathshs'
-        ];
+        const fieldsKrathseonInOrder = ['krathsh', 'ama_krathshs'];
 
         for (let i = 1; i <= arithmosKrathseon; i++) {
-            const idNum = i < 10 ?  '0' + i : i;
-            
-            fieldsKrathseonInOrder.forEach(fieldKrathsh => {
+            const idNum = i < 10 ? '0' + i : i;
+
+            fieldsKrathseonInOrder.forEach((fieldKrathsh) => {
                 const fieldNameKrathshs = `${fieldKrathsh}_${idNum}`;
                 newErgazomenos[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
             });
@@ -752,19 +804,31 @@ class ergazomenoiController {
         newErgazomenos.astheneia_xoris_efka = formData.astheneia_xoris_efka || null;
         newErgazomenos.idiothta_sto_ergo_39 = formData.idiothta_sto_ergo_39 || null;
 
-        newErgazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia = formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia;
-        newErgazomenos.εidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia = formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
-        newErgazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia = formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia;
-        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia = formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || null;
-        newErgazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia = formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia;
-        newErgazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia = formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera;
-        newErgazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia = formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia;
-        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia = formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || null;
-        newErgazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh = formData.adeia_eisodoy_gia_epoxikh_apasxolhsh;
-        newErgazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh = formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh;
-        newErgazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh = formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
-        newErgazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh = formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
-            
+        newErgazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia =
+            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia;
+        newErgazomenos.εidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
+            formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
+        newErgazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
+            formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia;
+        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
+            formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || null;
+        newErgazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia =
+            formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia;
+        newErgazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
+            formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera;
+        newErgazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
+            formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia;
+        newErgazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia =
+            formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || null;
+        newErgazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh =
+            formData.adeia_eisodoy_gia_epoxikh_apasxolhsh;
+        newErgazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh =
+            formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh;
+        newErgazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh =
+            formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
+        newErgazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh =
+            formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null;
+
         newErgazomenos.epaggelmatikh_katartish = formData.epaggelmatikh_katartish;
         newErgazomenos.antikeimeno_katartishs = formData.antikeimeno_katartishs;
         newErgazomenos.thematiko_pedio = formData.thematiko_pedio_stathera;
@@ -782,20 +846,26 @@ class ergazomenoiController {
         newErgazomenos.allo_proson = formData.allo_proson;
 
         newErgazomenos.symfonhtheis_misthos_genikos = formData.symfonhtheis_misthos_genikos;
-        newErgazomenos.symfonhtheis_misthos_apasxolhseis = formData.symfonhtheis_misthos_apasxolhseis;
+        newErgazomenos.symfonhtheis_misthos_apasxolhseis =
+            formData.symfonhtheis_misthos_apasxolhseis;
         newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
         newErgazomenos.mhniaia_repo = formData.mhniaia_repo;
         newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
         newErgazomenos.oysiodeis_oroi = formData.oysiodeis_oroi_stathera || '0';
         newErgazomenos.oros_sth_symbash_n_3986_2011 = formData.oros_sth_symbash_n_3986_2011;
-        newErgazomenos.kataggelia_katopin_eggrafhs_proeidopoihshs = formData.kataggelia_katopin_eggrafhs_proeidopoihshs;
-        newErgazomenos.hmeromhnia_eggrafhs_proeidopoihshs = formData.hmeromhnia_eggrafhs_proeidopoihshs || null;
+        newErgazomenos.kataggelia_katopin_eggrafhs_proeidopoihshs =
+            formData.kataggelia_katopin_eggrafhs_proeidopoihshs;
+        newErgazomenos.hmeromhnia_eggrafhs_proeidopoihshs =
+            formData.hmeromhnia_eggrafhs_proeidopoihshs || null;
         newErgazomenos.omadikh_apolysh = formData.omadikh_apolysh;
-        newErgazomenos.arithmos_apofashs_gia_omadikh_apolysh = formData.arithmos_apofashs_gia_omadikh_apolysh;
-        newErgazomenos.hmeromhnia_apofashs_gia_omadikh_apolysh = formData.hmeromhnia_apofashs_gia_omadikh_apolysh || null;
+        newErgazomenos.arithmos_apofashs_gia_omadikh_apolysh =
+            formData.arithmos_apofashs_gia_omadikh_apolysh;
+        newErgazomenos.hmeromhnia_apofashs_gia_omadikh_apolysh =
+            formData.hmeromhnia_apofashs_gia_omadikh_apolysh || null;
         newErgazomenos.epidosh_me_dikastiko_epimelhth = formData.epidosh_me_dikastiko_epimelhth;
         newErgazomenos.hmeromhnia_epidoshs = formData.hmeromhnia_epidoshs || null;
-        newErgazomenos.hmeromhnia_katabolhs_ths_apozhmioshs = formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
+        newErgazomenos.hmeromhnia_katabolhs_ths_apozhmioshs =
+            formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
 
@@ -804,18 +874,18 @@ class ergazomenoiController {
         try {
             savedErgazomenos = await ErgazomenoiModel.create(newErgazomenos); // ✅ Αποθήκευση
         } catch (error) {
-            return res.status(500).json({ 
-                success: false, 
-                errorMessage: "Σφάλμα κατά τη αποθήκευση του εργαζόμενου" 
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Σφάλμα κατά τη αποθήκευση του εργαζόμενου'
             });
         }
 
         // ✅ Έλεγχος ότι το _id υπάρχει
-        if (! savedErgazomenos || ! savedErgazomenos._id) {
-            console.error("ΣΦΑΛΜΑ: Ο εργαζόμενος δημιουργήθηκε αλλά δεν έχει _id!");
-            return res.status(500).json({ 
-                success: false, 
-                errorMessage: "Εσωτερικό σφάλμα:  Δεν βρέθηκε ID εργαζόμενου" 
+        if (!savedErgazomenos || !savedErgazomenos._id) {
+            console.error('ΣΦΑΛΜΑ: Ο εργαζόμενος δημιουργήθηκε αλλά δεν έχει _id!');
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Εσωτερικό σφάλμα:  Δεν βρέθηκε ID εργαζόμενου'
             });
         }
 
@@ -826,23 +896,23 @@ class ergazomenoiController {
         const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 
         const pdfFieldMappings = {
-            'arxeio_apodoxhs_oron_atomikhs_symbashs_base64': {
+            arxeio_apodoxhs_oron_atomikhs_symbashs_base64: {
                 documentType: 'arxeio_symbashs',
                 dbField: 'arxeio_apodoxhs_oron_atomikhs_symbashs_path'
             },
-            'arxeio_apodoxhs_oysiodon_oron_base64': {
+            arxeio_apodoxhs_oysiodon_oron_base64: {
                 documentType: 'oysiodeis_oroi',
                 dbField: 'arxeio_apodoxhs_oysiodon_oron_path'
             },
-            'bibliario_anhlikoy_base64': {
+            bibliario_anhlikoy_base64: {
                 documentType: 'anhlikoi',
                 dbField: 'bibliario_anhlikoy_path'
             },
-            'arxeio_symbashs_daneismoy_base64': {
+            arxeio_symbashs_daneismoy_base64: {
                 documentType: 'symbash_daneismoy',
                 dbField: 'arxeio_symbashs_daneismoy_path'
             },
-            'arxeio_nomimopoihtikon_eggrafon_base64': {
+            arxeio_nomimopoihtikon_eggrafon_base64: {
                 documentType: 'allodapoi',
                 dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
             }
@@ -853,7 +923,7 @@ class ergazomenoiController {
 
         for (const [base64Field, mapping] of Object.entries(pdfFieldMappings)) {
             const base64Data = formData[base64Field];
-            
+
             if (base64Data && base64Data.startsWith('data:application/pdf;base64,')) {
                 try {
                     const s3Key = await savePdfFromBase64(
@@ -861,9 +931,9 @@ class ergazomenoiController {
                         mapping.documentType,
                         ergazomenosId
                     );
-                    
+
                     savedErgazomenos[mapping.dbField] = s3Key;
-                    
+
                     pdfResults.push({
                         documentType: mapping.documentType,
                         success: true,
@@ -892,8 +962,8 @@ class ergazomenoiController {
         }
 
         // ✅ Logging
-        const successCount = pdfResults.filter(r => r.success).length;
-        const failCount = pdfResults.filter(r => !r.success).length;
+        const successCount = pdfResults.filter((r) => r.success).length;
+        const failCount = pdfResults.filter((r) => !r.success).length;
 
         if (failCount > 0) {
             console.warn(`⚠️ Failed to upload ${failCount} PDFs`);
@@ -913,26 +983,25 @@ class ergazomenoiController {
 
         try {
             const userContext = await getUserContext(req);
-            
+
             const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
-            
+
             // ✅ Generate signed URL (10 minutes expiration)
             const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
-            
+
             // Save S3 key στο document
             savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path = contractS3Key;
             await savedErgazomenos.save();
-            
+
             contractPdfData = {
                 url: pdfUrl,
                 s3Key: contractS3Key,
                 showPreview: true
             };
-            
         } catch (pdfError) {
             console.error('⚠️ Error generating contract PDF:', pdfError);
             console.error('Stack:', pdfError.stack);
-            
+
             contractPdfData = {
                 error: 'PDF generation failed: ' + pdfError.message,
                 showPreview: false
@@ -965,9 +1034,9 @@ class ergazomenoiController {
                     adeia: false,
                     astheneia: false,
                     argia: formData[`argia_${i1}`] || false,
-                    perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
-                    kathgoria_adeias: "",
-                    ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
+                    perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
+                    kathgoria_adeias: '',
+                    ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4)
                 };
             }
 
@@ -977,16 +1046,16 @@ class ergazomenoiController {
 
             let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
             let i = 1;
-            
+
             while (currentDate <= toDate) {
                 let i1 = i < 10 ? '0' + i : i;
                 const newOrario = new ProdhlomenaOrariaModel(createOrarioData(i1));
                 promises.push(ProdhlomenaOrariaModel.create(newOrario));
-                
+
                 currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
                 i++;
             }
-            
+
             try {
                 await Promise.all(promises);
             } catch (error) {
@@ -1020,29 +1089,29 @@ class ergazomenoiController {
 
             symbash: formData.symbash_stathera,
             kathgoria_symbashs: formData.kathgoria_symbashs_stathera,
-            eidikothta_symbashs: formData.eidikothta_symbashs_stathera,
+            eidikothta_symbashs: formData.eidikothta_symbashs_stathera
         });
 
         for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
             const idNum = i.toString().padStart(2, '0');
-            
+
             // Σειρά fields ανά row
             const fieldsInOrder = [
                 'stoixeio_symbashs',
                 'poso_symbashs',
                 'poso_symbashs_basei_oron_ergasias'
             ];
-            
-            fieldsInOrder.forEach(fieldStoixeio => {
+
+            fieldsInOrder.forEach((fieldStoixeio) => {
                 const fieldName = `${fieldStoixeio}_${idNum}`;
-                
+
                 // Assign main field
-                if (numberFields. has(fieldStoixeio)) {
+                if (numberFields.has(fieldStoixeio)) {
                     newIstoriko[fieldName] = formData[fieldName] || 0;
                 } else {
                     newIstoriko[fieldName] = formData[fieldName] || null;
                 }
-                
+
                 // Assign hidden field (μόνο για stoixeio_symbashs)
                 if (fieldsWithHidden.has(fieldStoixeio)) {
                     const hiddenFieldName = `${fieldName}_hidden`;
@@ -1052,7 +1121,8 @@ class ergazomenoiController {
         }
 
         newIstoriko.synolo_symbashs = formData.synolo_symbashs;
-        newIstoriko.synolo_symbashs_basei_oron_ergasias = formData.synolo_symbashs_basei_oron_ergasias;
+        newIstoriko.synolo_symbashs_basei_oron_ergasias =
+            formData.synolo_symbashs_basei_oron_ergasias;
         newIstoriko.nomimosMisthos = formData.nomimosMisthos;
         newIstoriko.nomimoHmeromisthio = formData.nomimoHmeromisthio;
         newIstoriko.nomimoOromisthio = formData.nomimoOromisthio;
@@ -1060,7 +1130,7 @@ class ergazomenoiController {
         newIstoriko.pragmatikoHmeromisthio = formData.pragmatikoHmeromisthio;
         newIstoriko.pragmatikoOromisthio = formData.pragmatikoOromisthio;
 
-        fieldsKrathseon.forEach(fieldKrathsh => {
+        fieldsKrathseon.forEach((fieldKrathsh) => {
             for (let i = 1; i <= arithmosKrathseon; i++) {
                 const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
                 newIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
@@ -1073,10 +1143,10 @@ class ergazomenoiController {
         try {
             await IstorikoProslhpseonAllagonModel.create(newIstoriko);
         } catch (error) {
-            console.log("Σφάλμα κατά την αποθήκευση του ιστορικού:", error);
-            return res.status(500).json({ 
-                success: false, 
-                errorMessage: "Σφάλμα κατά την αποθήκευση του ιστορικού" 
+            console.log('Σφάλμα κατά την αποθήκευση του ιστορικού:', error);
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Σφάλμα κατά την αποθήκευση του ιστορικού'
             });
         }
 
@@ -1098,7 +1168,9 @@ class ergazomenoiController {
             const companyTeam = company?.email || null;
             const companyEmail = company?.email || null;
             const companyPhone = company?.thlefono || null;
-            const companyName = company ? `${company.eponymia || ''} ${company.firstname || ''}`.trim() : null;
+            const companyName = company
+                ? `${company.eponymia || ''} ${company.firstname || ''}`.trim()
+                : null;
 
             // ✅ Determine company type (ΕΤΑΙΡΕΙΑ vs ΕΠΙΧΕΙΡΗΣΗ)
             let companyType = 'ΕΠΙΧΕΙΡΗΣΗ'; // Default
@@ -1113,13 +1185,16 @@ class ergazomenoiController {
 
             // ✅ Get ypokatasthmata data
             try {
-                ypokatasthmata = await YpokatasthmataModel.findOne({ 
-                    companykod_object: sessionCompanyInUse, 
-                    kodikos: savedErgazomenos.ypokatasthma 
+                ypokatasthmata = await YpokatasthmataModel.findOne({
+                    companykod_object: sessionCompanyInUse,
+                    kodikos: savedErgazomenos.ypokatasthma
                 }).lean();
-                
+
                 if (!ypokatasthmata) {
-                    console.warn('⚠️  [BACKEND] No ypokatasthmata found for:', savedErgazomenos.ypokatasthma);
+                    console.warn(
+                        '⚠️  [BACKEND] No ypokatasthmata found for:',
+                        savedErgazomenos.ypokatasthma
+                    );
                 }
             } catch (error) {
                 console.error('❌ [BACKEND] Error fetching ypokatasthmata:', error.message);
@@ -1151,31 +1226,30 @@ class ergazomenoiController {
 
                 try {
                     const { generateE3XML } = require('../../utils/xmlGenerators/e3Generator');
-                    
+
                     // ✅ Generate XML (returns object with xml + storage info)
                     const xmlResult = await generateE3XML(
-                        savedErgazomenos, 
-                        company, 
+                        savedErgazomenos,
+                        company,
                         ypokatasthmata
                     );
-                    
+
                     logger.info('E3 XML generated successfully', {
                         module: 'E3-XML',
                         s3_key: xmlResult.s3Key,
                         filename: xmlResult.filename,
                         s3_url: xmlResult.s3Url
                     });
-                    
+
                     // ✅ Save S3 key to employee record (if saved successfully)
                     if (xmlResult.s3Key) {
                         savedErgazomenos.e3_xml_path = xmlResult.s3Key;
                         await savedErgazomenos.save();
                         console.log('✅ [E3-XML] Path saved to employee record');
                     }
-                    
+
                     // ✅ Generate presigned download URL (10 min expiration)
                     if (xmlResult.s3Key) {
-
                         // ✅ Helper once (used in both try/catch)
                         const toRelativeUploadsPath = (p) => {
                             if (!p) return null;
@@ -1195,7 +1269,7 @@ class ergazomenoiController {
 
                             // keep only "uploads/..."
                             const idx = p.indexOf('/uploads/');
-                            if (idx !== -1) return p.slice(idx + 1);     // -> "uploads/..."
+                            if (idx !== -1) return p.slice(idx + 1); // -> "uploads/..."
                             if (p.startsWith('/uploads/')) return p.slice(1);
                             if (p.startsWith('uploads/')) return p;
 
@@ -1220,9 +1294,7 @@ class ergazomenoiController {
                                 filename: e3XmlData.filename,
                                 relativePath: e3XmlData.relativePath
                             });
-
                         } catch (urlError) {
-
                             e3XmlData = {
                                 success: true,
                                 s3Key: xmlResult.s3Key,
@@ -1238,7 +1310,6 @@ class ergazomenoiController {
                                 urlError: urlError.message
                             });
                         }
-
                     } else {
                         logger.warn('[E3PATH] xml generated but NOT saved', {
                             saveError: xmlResult.saveError
@@ -1255,7 +1326,7 @@ class ergazomenoiController {
                         error: e3Error.message,
                         stack: e3Error.stack
                     });
-                    
+
                     e3XmlData = {
                         success: false,
                         error: e3Error.message
@@ -1271,8 +1342,8 @@ class ergazomenoiController {
             // =====================================================================
             // ✅ FINAL RESPONSE (with E3 data if generated)
             // =====================================================================
-            
-            return res.status(201).json({ 
+
+            return res.status(201).json({
                 success: true,
                 message: 'Εργαζόμενος δημιουργήθηκε επιτυχώς',
                 data: {
@@ -1283,211 +1354,328 @@ class ergazomenoiController {
                     email: savedErgazomenos.email,
                     fylo: savedErgazomenos.fylo,
                     yphkoothta: savedErgazomenos.yphkoothta,
-                    arxeio_apodoxhs_oron_atomikhs_symbashs_path: savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
-                    arxeio_apodoxhs_oysiodon_oron_path: savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
+                    arxeio_apodoxhs_oron_atomikhs_symbashs_path:
+                        savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
+                    arxeio_apodoxhs_oysiodon_oron_path:
+                        savedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
                     arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
-                    arxeio_nomimopoihtikon_eggrafon_path: savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path,
-                    e3_xml_path: savedErgazomenos.e3_xml_path  // ✅ NEW!
+                    arxeio_nomimopoihtikon_eggrafon_path:
+                        savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path,
+                    e3_xml_path: savedErgazomenos.e3_xml_path // ✅ NEW!
                 },
                 pdfResults: pdfResults,
                 contractPdf: contractPdfData,
-                e3XmlData: e3XmlData,  // ✅ NEW!
+                e3XmlData: e3XmlData, // ✅ NEW!
                 companyEmail: companyEmail,
                 companyPhone: companyPhone,
                 companyName: companyName,
                 companyType: companyType,
-                redirectUrl: "/ergazomenoi/ergazomenoi",
+                redirectUrl: '/ergazomenoi/ergazomenoi',
                 waitingForPdfConfirmation: true
             });
-            
         } catch (error) {
-            console.log("Σφάλμα κατά τη δημιουργία απάντησης:", error);
-            return res.status(500).json({ 
-                success: false, 
-                errorMessage: "Σφάλμα κατά την ολοκλήρωση" 
+            console.log('Σφάλμα κατά τη δημιουργία απάντησης:', error);
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Σφάλμα κατά την ολοκλήρωση'
             });
         }
-    }
+    };
 
     // ======================================================================
     // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
     // Uses Playwright uploader that requires a local file path.
     // ======================================================================
     static uploadE3ToErganh = async (req, res) => {
-    const path = require('path');
-    const fs = require('fs-extra');
+        const path = require('path');
+        const fs = require('fs-extra');
 
-    try {
-        const { ergazomenosId, s3Url } = req.body;
+        // ✅ Πάρε νωρίς αυτά για να φτιάξουμε σταθερό key
+        const sessionCompanyInUse = req.session?.companyInUse;
+        const sessionUserId = req.session?.userId;
 
-        if (!ergazomenosId || !s3Url) {
-        return res.status(400).json({
-            success: false,
-            message: 'Missing ergazomenosId or s3Url'
-        });
+        const { ergazomenosId, s3Url } = req.body || {};
+
+        // ✅ Σταθερό key για lock/cooldown
+        const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}`;
+
+        // ✅ Socket emitter (rooms: user_<userId>)
+        // ⚠️ Βεβαιώσου ότι το relative path είναι σωστό για το project σου
+        const { emitToUser } = require('../../socket');
+
+        function emitErganhStep(userId, step, message) {
+            const totalSteps = 4;
+            const percent = Math.round(((step - 1) / totalSteps) * 100); // 0,25,50,75
+
+            if (!userId) return;
+
+            emitToUser(userId, 'erganh:progress', {
+                percent,
+                message,
+                step,
+                totalSteps
+            });
         }
 
-        const sessionCompanyInUse = req.session.companyInUse;
-        const sessionUserId = req.session.userId;
-
-        // ------------------------------------------------------------------
-        // ✅ 1) Resolve local XML path (supports relativePath uploads/...)
-        // ------------------------------------------------------------------
-        const cwd = process.cwd();
-        let localXmlPath = s3Url;
-
-        // If frontend sends "uploads/..." treat as relative to cwd
-        if (!path.isAbsolute(localXmlPath) && !localXmlPath.startsWith('file:///') && !localXmlPath.startsWith('http')) {
-        localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
-        }
-
-        // file:/// -> absolute
-        if (localXmlPath.startsWith('file:///')) {
-        localXmlPath = localXmlPath.replace('file:///', '/');
-        }
-
-        localXmlPath = path.resolve(path.normalize(localXmlPath));
-
-        // ------------------------------------------------------------------
-        // ✅ 2) Ensure file exists
-        // ------------------------------------------------------------------
-        const exists = await fs.pathExists(localXmlPath);
-        if (!exists) {
-        return res.status(404).json({
-            success: false,
-            message: `XML file not found: ${path.basename(localXmlPath)}`,
-            localXmlPath
-        });
-        }
-
-        const stats = await fs.stat(localXmlPath);
-        if (!stats.size) {
-        return res.status(400).json({
-            success: false,
-            message: 'XML file is empty',
-            localXmlPath
-        });
-        }
-
-        // ------------------------------------------------------------------
-        // ✅ 3) Load ERGANH credentials from PasswordsModel
-        // ------------------------------------------------------------------
-        const Models_C = require("../../../models/companies"); // ⚠️ βεβαιώσου ότι το path είναι σωστό
-        const { PasswordsModel } = Models_C;
-
-        const passwordsData = await PasswordsModel
-        .findOne({ companykod_object: sessionCompanyInUse, kodikos: "0002" })
-        .lean();
-
-        const erganhUsername = passwordsData?.username;
-        const erganhPassword = passwordsData?.password;
-
-        if (!erganhUsername || !erganhPassword) {
-        return res.status(400).json({
-            success: false,
-            message: 'Missing ERGANH credentials for this company (PasswordsModel kodikos=0002)'
-        });
-        }
-
-        // ------------------------------------------------------------------
-        // ✅ 4) Run uploader (BLOCKING)
-        // ------------------------------------------------------------------
-        const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
-
-        const uploadResult = await uploadE3ToErganh(
-        sessionCompanyInUse,
-        localXmlPath,
-        sessionUserId,
-        { username: erganhUsername, password: erganhPassword }
-        );
-
-        // ------------------------------------------------------------------
-        // ✅ 5) Save protocol OR errors to DB
-        // ------------------------------------------------------------------
-        if (uploadResult?.success && uploadResult?.protocol) {
-        ErgazomenoiModel.findByIdAndUpdate(
-            ergazomenosId,
-            {
-            erganh_e3_protocol: uploadResult.protocol,
-            erganh_e3_upload_date: new Date(),
-            erganh_e3_screenshot: uploadResult.screenshot
+        try {
+            // ------------------------------------------------------------------
+            // ✅ 0) Basic validation
+            // ------------------------------------------------------------------
+            if (!ergazomenosId || !s3Url) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Λείπουν στοιχεία αιτήματος.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Λείπουν στοιχεία αιτήματος (εργαζόμενος / αρχείο).',
+                    errorDetails: 'Missing ergazomenosId or s3Url',
+                    messages: []
+                });
             }
-        ).catch(() => {});
-        } else if (uploadResult?.messages?.length) {
-        ErgazomenoiModel.findByIdAndUpdate(
-            ergazomenosId,
-            {
-            erganh_e3_errors: uploadResult.messages,
-            erganh_e3_error_date: new Date(),
-            erganh_e3_screenshot: uploadResult.screenshot
+
+            if (!sessionCompanyInUse) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Δεν έχει οριστεί εταιρεία στη συνεδρία.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Δεν έχει οριστεί εταιρεία στη συνεδρία (companyInUse).',
+                    errorDetails: 'Missing session.companyInUse',
+                    messages: []
+                });
             }
-        ).catch(() => {});
+
+            // ✅ Step 1: login entry (user sees loader immediately)
+            emitErganhStep(sessionUserId, 1, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
+
+            // ------------------------------------------------------------------
+            // ✅ 0.1) Cooldown (κόβει τα sequential 15+)
+            // ------------------------------------------------------------------
+            const now = Date.now();
+            const last = erganiLastStart.get(key) || 0;
+            const left = ERGANI_COOLDOWN_MS - (now - last);
+
+            if (left > 0) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Πολύ σύντομα επαναλαμβανόμενο αίτημα (cooldown).'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage:
+                        'Έγινε ήδη προσπάθεια πολύ πρόσφατα. Περιμένετε λίγο και ξαναδοκιμάστε.',
+                    errorDetails: `Cooldown active (${Math.ceil(left / 1000)}s left)`,
+                    messages: []
+                });
+            }
+
+            // ------------------------------------------------------------------
+            // ✅ 0.2) Concurrent lock (κόβει ταυτόχρονα)
+            // ------------------------------------------------------------------
+            if (erganiInflight.has(key)) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Υπάρχει ήδη υποβολή σε εξέλιξη.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Υπάρχει ήδη υποβολή σε εξέλιξη για αυτόν τον εργαζόμενο.',
+                    errorDetails: 'ERGANH upload inflight (server-side lock)',
+                    messages: []
+                });
+            }
+
+            // ✅ κλείδωσε + ξεκίνα cooldown timer
+            erganiInflight.set(key, true);
+            erganiLastStart.set(key, now);
+
+            // ✅ Step 2: preparation
+            emitErganhStep(sessionUserId, 2, 'Προετοιμασία Αποστολής');
+
+            // ------------------------------------------------------------------
+            // ✅ 1) Resolve local XML path (supports relativePath uploads/...)
+            // ------------------------------------------------------------------
+            const cwd = process.cwd();
+            let localXmlPath = s3Url;
+
+            if (
+                !path.isAbsolute(localXmlPath) &&
+                !localXmlPath.startsWith('file:///') &&
+                !localXmlPath.startsWith('http')
+            ) {
+                localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+            }
+
+            if (localXmlPath.startsWith('file:///')) {
+                localXmlPath = localXmlPath.replace('file:///', '/');
+            }
+
+            localXmlPath = path.resolve(path.normalize(localXmlPath));
+
+            // ------------------------------------------------------------------
+            // ✅ 2) Ensure file exists
+            // ------------------------------------------------------------------
+            const exists = await fs.pathExists(localXmlPath);
+            if (!exists) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Δεν βρέθηκε το XML αρχείο.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: `Δεν βρέθηκε το XML αρχείο: ${path.basename(localXmlPath)}`,
+                    errorDetails: `XML file not found: ${localXmlPath}`,
+                    messages: []
+                });
+            }
+
+            const stats = await fs.stat(localXmlPath);
+            if (!stats.size) {
+                emitToUser(sessionUserId, 'erganh:error', { message: 'Το XML αρχείο είναι κενό.' });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Το XML αρχείο είναι κενό.',
+                    errorDetails: `XML file is empty: ${localXmlPath}`,
+                    messages: []
+                });
+            }
+
+            // ------------------------------------------------------------------
+            // ✅ 3) Load ERGANH credentials from PasswordsModel
+            // ------------------------------------------------------------------
+            const passwordsData = await PasswordsModel.findOne({
+                companykod_object: sessionCompanyInUse,
+                kodikos: '0002'
+            }).lean();
+
+            const erganhUsername = passwordsData?.username;
+            const erganhPassword = passwordsData?.password;
+
+            if (!erganhUsername || !erganhPassword) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ για την εταιρεία.',
+                    errorDetails: 'Missing ERGANH credentials (PasswordsModel kodikos=0002)',
+                    messages: []
+                });
+            }
+
+            // ✅ Step 3: selecting file (client step wording)
+            emitErganhStep(sessionUserId, 3, 'Επιλογή XML αρχείου');
+
+            // ------------------------------------------------------------------
+            // ✅ 4) Run uploader (BLOCKING)
+            // ------------------------------------------------------------------
+            const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
+
+            // ✅ Step 4: sending/uploading
+            emitErganhStep(sessionUserId, 4, 'Αποστολή');
+
+            const uploadResult = await uploadE3ToErganh(
+                sessionCompanyInUse,
+                localXmlPath,
+                sessionUserId,
+                { username: erganhUsername, password: erganhPassword }
+            );
+
+            // ------------------------------------------------------------------
+            // ✅ 5) Save protocol OR errors to DB
+            // ------------------------------------------------------------------
+            if (uploadResult?.success && uploadResult?.protocol) {
+                ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+                    erganh_e3_protocol: uploadResult.protocol,
+                    erganh_e3_upload_date: new Date(),
+                    erganh_e3_screenshot: uploadResult.screenshot
+                }).catch(() => {});
+            } else if (uploadResult?.messages?.length) {
+                ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+                    erganh_e3_errors: uploadResult.messages,
+                    erganh_e3_error_date: new Date(),
+                    erganh_e3_screenshot: uploadResult.screenshot
+                }).catch(() => {});
+            }
+
+            // ------------------------------------------------------------------
+            // ✅ 6) Return result to frontend for SweetAlert2
+            // ------------------------------------------------------------------
+            emitToUser(sessionUserId, 'erganh:done', { message: 'Ολοκληρώθηκε' });
+
+            return res.status(200).json({
+                success: !!uploadResult?.success,
+                protocol: uploadResult?.protocol || null,
+                screenshot: uploadResult?.screenshot || null,
+
+                userMessage:
+                    uploadResult?.userMessage ||
+                    (uploadResult?.success
+                        ? 'Η υποβολή ολοκληρώθηκε. (Προσωρινή Αποθήκευση.)'
+                        : 'Η υποβολή απέτυχε.'),
+
+                errorDetails: uploadResult?.errorDetails || uploadResult?.error || '',
+                messages: uploadResult?.messages || []
+            });
+        } catch (error) {
+            logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
+                error: error.message,
+                stack: error.stack
+            });
+
+            emitToUser(sessionUserId, 'erganh:error', { message: 'Αποτυχία υποβολής στο ΕΡΓΑΝΗ' });
+
+            return res.status(500).json({
+                success: false,
+                userMessage: 'Failed to upload to ERGANH',
+                errorDetails: error.message,
+                messages: []
+            });
+        } finally {
+            // ✅ πάντα unlock
+            erganiInflight.delete(key);
         }
-
-        // ------------------------------------------------------------------
-        // ✅ 6) Return result to frontend for SweetAlert2
-        // ------------------------------------------------------------------
-        return res.status(200).json({
-        success: !!uploadResult?.success,
-        protocol: uploadResult?.protocol || null,
-        screenshot: uploadResult?.screenshot || null,
-        messages: uploadResult?.messages || [],
-        error: uploadResult?.error || null,
-        message: uploadResult?.success
-            ? 'Η υποβολή ολοκληρώθηκε.'
-            : 'Η υποβολή απέτυχε. Δες τα μηνύματα.'
-        });
-
-    } catch (error) {
-        logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
-        error: error.message,
-        stack: error.stack
-        });
-
-        return res.status(500).json({
-        success: false,
-        message: 'Failed to upload to ERGANH',
-        error: error.message
-        });
-    }
     };
 
     static getOrariaAnaErgazomeno = async (req, res) => {
         try {
-        const { team, company_kod, kodikos, hmeromhnia_allaghs_orarioy_apo, hmeromhnia_allaghs_orarioy_eos } = req.body;
-    
-        // Μετατροπή των ημερομηνιών σε αντικείμενα τύπου Date για MongoDB
-        const startDate = new Date(hmeromhnia_allaghs_orarioy_apo);
-        const endDate = new Date(hmeromhnia_allaghs_orarioy_eos);
-    
-        // Χρήση aggregate pipeline για να φιλτράρουμε τα ωράρια και να κάνουμε group ή άλλες λειτουργίες
-        const results = await ProdhlomenaOrariaModel.aggregate([
-            {
-            $match: {
-                team: team,
-                company_kod: company_kod,
-                kodikos: kodikos,
-                hmeromhnia: { $gte: startDate, $lte: endDate }
-            }
-            },
-            {
-            $sort: { hmeromhnia: 1 } 
-            },
-        // {
-            //   $group: {
-            //     _id: '$kodikos',  // Μπορείς να αλλάξεις το grouping field ανάλογα με την ανάγκη σου
-            //     totalHours: { $sum: '$hours' }, // Παράδειγμα ομαδοποίησης: Υπολογισμός συνολικών ωρών
-            //     details: { $push: '$$ROOT' }  // Προσθήκη όλων των εγγραφών στο πεδίο "details"
-            //   }
-            // }
-        ]);
-    
-        // Επιστροφή των αποτελεσμάτων στο frontend
-        res.status(200).json(results);
+            const {
+                team,
+                company_kod,
+                kodikos,
+                hmeromhnia_allaghs_orarioy_apo,
+                hmeromhnia_allaghs_orarioy_eos
+            } = req.body;
+
+            // Μετατροπή των ημερομηνιών σε αντικείμενα τύπου Date για MongoDB
+            const startDate = new Date(hmeromhnia_allaghs_orarioy_apo);
+            const endDate = new Date(hmeromhnia_allaghs_orarioy_eos);
+
+            // Χρήση aggregate pipeline για να φιλτράρουμε τα ωράρια και να κάνουμε group ή άλλες λειτουργίες
+            const results = await ProdhlomenaOrariaModel.aggregate([
+                {
+                    $match: {
+                        team: team,
+                        company_kod: company_kod,
+                        kodikos: kodikos,
+                        hmeromhnia: { $gte: startDate, $lte: endDate }
+                    }
+                },
+                {
+                    $sort: { hmeromhnia: 1 }
+                }
+                // {
+                //   $group: {
+                //     _id: '$kodikos',  // Μπορείς να αλλάξεις το grouping field ανάλογα με την ανάγκη σου
+                //     totalHours: { $sum: '$hours' }, // Παράδειγμα ομαδοποίησης: Υπολογισμός συνολικών ωρών
+                //     details: { $push: '$$ROOT' }  // Προσθήκη όλων των εγγραφών στο πεδίο "details"
+                //   }
+                // }
+            ]);
+
+            // Επιστροφή των αποτελεσμάτων στο frontend
+            res.status(200).json(results);
         } catch (error) {
-        console.error('Error fetching oraria with aggregation:', error);
-        res.status(500).json({ message: 'Σφάλμα κατά την λήψη των ωραρίων με aggregate.' });
+            console.error('Error fetching oraria with aggregation:', error);
+            res.status(500).json({ message: 'Σφάλμα κατά την λήψη των ωραρίων με aggregate.' });
         }
     };
 
@@ -1498,393 +1686,161 @@ class ergazomenoiController {
         const omadaErgasias = formData.team;
         const kodikosEtaireias = formData.company_kod;
         const kodikosErgazomenoy = formData.kodikosHidden;
-        let aa_eggr = null, recExist = false;
+        let aa_eggr = null,
+            recExist = false;
 
         try {
-        const existRecord = await IstorikoProslhpseonAllagonModel.findOne({
-            team: omadaErgasias,
-            company_kod: kodikosEtaireias,
-            kodikos: kodikosErgazomenoy,
-            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs ? new Date(formData.hmeromhnia_proslhpshs + 'T00:00:00.000+00:00') : null,
-            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs ? new Date(formData.hmeromhnia_allaghs_symbashs + 'T00:00:00.000+00:00') : null,
-            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs ? new Date(formData.hmeromhnia_lhxhs_symbashs + 'T00:00:00.000+00:00') : null,
-            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs ? new Date(formData.hmeromhnia_apoxorhshs + 'T00:00:00.000+00:00') : null
-        });
-        
-        recExist = existRecord ? true : false;
+            const existRecord = await IstorikoProslhpseonAllagonModel.findOne({
+                team: omadaErgasias,
+                company_kod: kodikosEtaireias,
+                kodikos: kodikosErgazomenoy,
+                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs
+                    ? new Date(formData.hmeromhnia_proslhpshs + 'T00:00:00.000+00:00')
+                    : null,
+                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs
+                    ? new Date(formData.hmeromhnia_allaghs_symbashs + 'T00:00:00.000+00:00')
+                    : null,
+                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs
+                    ? new Date(formData.hmeromhnia_lhxhs_symbashs + 'T00:00:00.000+00:00')
+                    : null,
+                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs
+                    ? new Date(formData.hmeromhnia_apoxorhshs + 'T00:00:00.000+00:00')
+                    : null
+            });
 
-        const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({ team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy })
-            .sort({ _id: -1 })
-            .limit(1);
-        let aaValue = lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10) : null;
-        if (aaValue !== null) {
-            aaValue++;
-        } else {
-            aaValue = 1;
-        }
-        aa_eggr = aaValue;
+            recExist = existRecord ? true : false;
+
+            const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
+                team: omadaErgasias,
+                company_kod: kodikosEtaireias,
+                kodikos: kodikosErgazomenoy
+            })
+                .sort({ _id: -1 })
+                .limit(1);
+            let aaValue =
+                lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs
+                    ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10)
+                    : null;
+            if (aaValue !== null) {
+                aaValue++;
+            } else {
+                aaValue = 1;
+            }
+            aa_eggr = aaValue;
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
 
         const filteredDataErgazomenoi = {
-        energos: formData.energos,
-        fylo: formData.fylo,
-        eponymo: formData.eponymoHidden,
-        onoma: formData.onomaHidden,
-        eponymo_patera: formData.eponymo_patera,
-        patronymo: formData.patronymo,
-        eponymo_mhteras: formData.eponymo_mhteras,
-        mhtronymo: formData.mhtronymo,
-        afm: formData.afm_ergazomenoyHidden,
-        doy: formData.doy,
-        typos_taytothtas: formData.typos_taytothtas,
-        adt: formData.adt,
-        hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
-        arxh_ekdoshs: formData.arxh_ekdoshs,
-        amka: formData.amka_ergazomenoyHidden,
-        hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
-        topos_gennhshs: formData.topos_gennhshs,
-        arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
-        yphkoothta: formData.yphkoothta,
-        odos: formData.odos,
-        arithmos: formData.arithmos,
-        tk: formData.tk,
-        thlefono: formData.thlefono,
-        perifereia: formData.perifereia,
-        nomos: formData.nomos,
-        dhmos: formData.dhmos,
-        polh: formData.polh,
-        email: formData.email,
-        hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-        hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-        hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-        hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-        hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-        hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
-        kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
-        sxesh_ergasias: formData.sxesh_ergasias,
-        apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
-        ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
-        ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
-        karta_ergasias: formData.karta_ergasias,
-        evelikth_proselefsh: formData.evelikth_proselefsh,
-        syggeneia: formData.syggeneia,
-        syggenikh_sxesh: formData.syggenikh_sxesh,
-        proyphresia_se_eth: formData.proyphresia_se_eth,
-        proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
-        proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
-        synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
-        synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
-        misthologiko_klimakio: formData.misthologiko_klimakio,
-        plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
-        dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
-        hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
-        ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
-        dialleima_se_lepta: formData.dialleima_se_lepta,
-        dialleima_entos_ektos_orarioy: formData.dialleima_entos_ektos_orarioy,
-        symbatikes_ores_ergasias: formData.symbatikes_ores_ergasias,
-        typos_orarioy: formData.typos_orarioy,
-        synexes_diakekomeno: formData.synexes_diakekomeno,
-        pshfiakh_organosh: formData.pshfiakh_organosh,
-        apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs,
-        asfalish_me_tekmarta: formData.asfalish_me_tekmarta,
-        asfalistikh_klash: formData.asfalistikh_klash,
-        epoxikos: formData.epoxikos,
-        tmhma: formData.tmhma,
-        eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
-        oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
-        arithmos_teknon: formData.arithmos_teknon,
-        ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
-        eidikothta: formData.eidikothta,
-        antikeimeno_ergasion: formData.antikeimeno_ergasion,
-        typos_ergazomenon: formData.typos_ergazomenon,
-        ypokatasthma: formData.ypokatasthma,
-        xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
-        eidikothta_erganh: formData.eidikothta_erganh,
-        kad_efka: formData.kad_efka,
-        eidikothta_efka: formData.eidikothta_efka,
-        kpk_efka: formData.kpk_efka,
-        kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
-        epa_efka: formData.epa_efka,
-        meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
-        epidothsh_eisforon_ergodoth: formData.epidothsh_eisforon_ergodoth,
-        diathesimothta: formData.diathesimothta,
-        enarxh_diathesimothtas: formData.enarxh_diathesimothtas,
-        lhxh_diathesimothtas: formData.lhxh_diathesimothtas,
-        palios_neos: formData.palios_neos,
-        amoibetai_me_sse: formData.amoibetai_me_sse,
-        trapeza: formData.trapeza,
-        iban: formData.iban,
-        arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
-        systatiko_shmeioma: formData.systatiko_shmeioma,
-        programma_dypa: formData.programma_dypa,
-        egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
-        hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos,
-        hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos,
-        antikatastash_ergazomenoy: formData.antikatastash_ergazomenoy,
-        afm_antikatastath: formData.afm_antikatastath,
-        amka_antikatastath: formData.amka_antikatastath,
-        epidoma_anergias: formData.epidoma_anergias,
-        dypa: formData.dypa,
-        thesh_eythynhs: formData.thesh_eythynhs,
-        eidikh_periptosh: formData.eidikh_periptosh,
-        kentro_kostoys_1: formData.kentro_kostoys_1,
-        pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1,
-        kentro_kostoys_2: formData.kentro_kostoys_2,
-        pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2,
-        kentro_kostoys_3: formData.kentro_kostoys_3,
-        pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3,
-        kentro_kostoys_4: formData.kentro_kostoys_4,
-        pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4,
-        symbash: formData.symbash,
-        kathgoria_symbashs: formData.kathgoria_symbashs,
-        eidikothta_symbashs: formData.eidikothta_symbashs,
-        synolo_symbashs: formData.synolo_symbashs,
-        synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
-        nomimosMisthos: formData.nomimosMisthos,
-        nomimoHmeromisthio: formData.nomimoHmeromisthio,
-        nomimoOromisthio: formData.nomimoOromisthio,
-        pragmatikosMisthos: formData.pragmatikosMisthos,
-        pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
-        pragmatikoOromisthio: formData.pragmatikoOromisthio,
-        krathsh_01: formData.krathsh_01,
-        ama_krathshs_01: formData.ama_krathshs_01,
-        krathsh_02: formData.krathsh_02,
-        ama_krathshs_02: formData.ama_krathshs_02,
-        krathsh_03: formData.krathsh_03,
-        ama_krathshs_03: formData.ama_krathshs_03,
-        krathsh_04: formData.krathsh_04,
-        ama_krathshs_04: formData.ama_krathshs_04,
-        krathsh_05: formData.krathsh_05,
-        ama_krathshs_05: formData.ama_krathshs_05,
-        krathsh_06: formData.krathsh_06,
-        ama_krathshs_06: formData.ama_krathshs_06,
-        krathsh_07: formData.krathsh_07,
-        ama_krathshs_07: formData.ama_krathshs_07,
-        hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy,
-        adeia_diamonhs_me_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
-        eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-        arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-        hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
-        adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-        eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-        arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-        hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia: formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
-        adeia_eisodoy_gia_epoxikh_apasxolhsh: formData.adeia_eisodoy_gia_epoxikh_apasxolhsh,
-        arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh,
-        apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
-        eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
-        epaggelmatikh_katartish: formData.epaggelmatikh_katartish,
-        antikeimeno_katartishs: formData.antikeimeno_katartishs,
-        thematiko_pedio: formData.thematiko_pedio,
-        thematikh_enothta: formData.thematikh_enothta,
-        foreas_katartishs: formData.foreas_katartishs,
-        katartish_apo: formData.katartish_apo,
-        katartish_eos: formData.katartish_eos,
-        diarkeia_se_ores: formData.diarkeia_se_ores,
-        etos_apokthshs: formData.etos_apokthshs,
-        allh_glossa_01: formData.allh_glossa_01,
-        allh_glossa_02: formData.allh_glossa_02,
-        allh_glossa_03: formData.allh_glossa_03,
-        allh_glossa_04: formData.allh_glossa_04,
-        gnosh_ypologiston: formData.gnosh_ypologiston,
-        allo_proson: formData.allo_proson,
-        oros_sth_symbash_n_3986_2011: formData.oros_sth_symbash_n_3986_2011,
-        kataggelia_katopin_eggrafhs_proeidopoihshs: formData.kataggelia_katopin_eggrafhs_proeidopoihshs,
-        hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs,
-        omadikh_apolysh: formData.omadikh_apolysh,
-        arithmos_apofashs_gia_omadikh_apolysh: formData.arithmos_apofashs_gia_omadikh_apolysh,
-        hmeromhnia_apofashs_gia_omadikh_apolysh: formData.hmeromhnia_apofashs_gia_omadikh_apolysh,
-        epidosh_me_dikastiko_epimelhth: formData.epidosh_me_dikastiko_epimelhth,
-        hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs,
-        hmeromhnia_katabolhs_ths_apozhmioshs: formData.hmeromhnia_katabolhs_ths_apozhmioshs,
-        shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
-        parathrhseis: formData.parathrhseis,
-        symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
-        symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
-        paketo_apodoxon: formData.paketo_apodoxon,
-        mhniaia_repo: formData.mhniaia_repo,
-        ypologismos_foroy: formData.ypologismos_foroy,
-        updatedAt: Date.now(),
-        };
-
-        fieldsStoixeionSymbashs.forEach(fieldStoixeio => {
-        for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-            const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
-            if (numberFields.has(fieldStoixeio)) {
-            filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
-            } else {
-            filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
-            }
-        }
-        });
-
-        fieldsKrathseon.forEach(fieldKrathsh => {
-        for (let i = 1; i <= arithmosKrathseon; i++) {
-            const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-            filteredDataErgazomenoi[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
-        }
-        });
-
-        // Τώρα μπορώ να χρησιμοποιήσω το filteredDataErgazomenoi στη $set: για ενημέρωση
-        try {
-        await ErgazomenoiModel.findOneAndUpdate(
-            { _id: ergazomenoiId },
-            { $set: filteredDataErgazomenoi },
-            { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
-        );
-        } catch (error) {
-        throw error;
-        }
-
-        // ============================ ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ =============================
-        function createOrarioData(i1) {
-        return {
-            team: formData.team,
-            company_kod: formData.company_kod,
-            kodikos: formData.kodikosHidden,
-            hmeromhnia: formData[`hmeromhnia_${i1}`],
-            kathgoria_ergasias: formData[`kathgoria_ergasias_${i1}`],
-            apo_ora_01: formData[`apo_ora_01_${i1}`],
-            eos_ora_01: formData[`eos_ora_01_${i1}`],
-            dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
-            dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
-            apo_ora_02: formData[`apo_ora_02_${i1}`],
-            eos_ora_02: formData[`eos_ora_02_${i1}`],
-            dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
-            dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
-            apo_ora_03: formData[`apo_ora_03_${i1}`],
-            eos_ora_03: formData[`eos_ora_03_${i1}`],
-            dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
-            dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
-            repo: formData[`repo_${i1}`] || false,
-            adeia: false,
-            astheneia: false,
-            argia: formData[`argia_${i1}`] || false,
-            perigrafh_argias: formData[`perigrafh_argias_${i1}`] || "",
-            kathgoria_adeias: "",
-            ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
-            ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`]).toFixed(4),
-            ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`]).toFixed(4),
-            ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`]).toFixed(4),
-            ores_yperergasias_nyxtas: parseFloat(formData[`night_overwork_hours_day_${i1}`]).toFixed(4),
-            ores_yperergasias_argion: parseFloat(formData[`holiday_overwork_hours_day_${i1}`]).toFixed(4),
-            ores_yperergasias_argion_nyxtas: parseFloat(formData[`night_holiday_overwork_hours_day_${i1}`]).toFixed(4),
-            ores_nominhs_yperorias: parseFloat(formData[`overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-            ores_nominhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-            ores_nominhs_yperorias_argion: parseFloat(formData[`holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-            ores_nominhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeNomimh_hours_day_${i1}`]).toFixed(4),
-            ores_paranomhs_yperorias: parseFloat(formData[`overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-            ores_paranomhs_yperorias_nyxtas: parseFloat(formData[`night_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-            ores_paranomhs_yperorias_argion: parseFloat(formData[`holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-            ores_paranomhs_yperorias_argion_nyxtas: parseFloat(formData[`night_holiday_overtimeParanomh_hours_day_${i1}`]).toFixed(4),
-        };
-        }
-        
-        let promises = [];
-        const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
-        const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
-        
-        let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
-        let i = 1;
-        
-        while (currentDate <= toDate) {
-        let i1 = i < 10 ? '0' + i : i;
-        const orarioData = createOrarioData(i1);
-        
-        // Χρησιμοποιούμε findOneAndUpdate για να ενημερώσουμε ή να δημιουργήσουμε εγγραφή
-        const updatePromise = ProdhlomenaOrariaModel.findOneAndUpdate(
-            {
-            team: orarioData.team,
-            company_kod: orarioData.company_kod,
-            kodikos: orarioData.kodikos,
-            hmeromhnia: orarioData.hmeromhnia,
-            },
-            {
-            $set: { 
-                // Ενημερώνουμε μόνο τα πεδία που πρέπει να αλλάζουν πάντα
-                kathgoria_ergasias: orarioData.kathgoria_ergasias,
-                apo_ora_01: orarioData.apo_ora_01,
-                eos_ora_01: orarioData.eos_ora_01,
-                dialleima_apo_ora_01: orarioData.dialleima_apo_ora_01,
-                dialleima_eos_ora_01: orarioData.dialleima_eos_ora_01,
-                apo_ora_02: orarioData.apo_ora_02,
-                eos_ora_02: orarioData.eos_ora_02,
-                dialleima_apo_ora_02: orarioData.dialleima_apo_ora_02,
-                dialleima_eos_ora_02: orarioData.dialleima_eos_ora_02,
-                apo_ora_03: orarioData.apo_ora_03,
-                eos_ora_03: orarioData.eos_ora_03,
-                dialleima_apo_ora_03: orarioData.dialleima_apo_ora_03,
-                dialleima_eos_ora_03: orarioData.dialleima_eos_ora_03,
-                repo: orarioData.repo,
-                adeia: orarioData.adeia,
-                astheneia: orarioData.astheneia,
-                argia: orarioData.argia,
-                perigrafh_argias: orarioData.perigrafh_argias,
-                kathgoria_adeias: orarioData.kathgoria_adeias,
-                ores_ergasias: orarioData.ores_ergasias,
-                ores_nyxtas: orarioData.ores_nyxtas,
-                ores_argion: orarioData.ores_argion,
-                ores_yperergasias: orarioData.ores_yperergasias,
-                ores_yperergasias_nyxtas: orarioData.ores_yperergasias_nyxtas,
-                ores_yperergasias_argion: orarioData.ores_yperergasias_argion,
-                ores_yperergasias_argion_nyxtas: orarioData.ores_yperergasias_argion_nyxtas,
-                ores_nominhs_yperorias: orarioData.ores_nominhs_yperorias,
-                ores_nominhs_yperorias_nyxtas: orarioData.ores_nominhs_yperorias_nyxtas,
-                ores_nominhs_yperorias_argion: orarioData.ores_nominhs_yperorias_argion,
-                ores_nominhs_yperorias_argion_nyxtas: orarioData.ores_nominhs_yperorias_argion_nyxtas,
-                ores_paranomhs_yperorias: orarioData.ores_paranomhs_yperorias,
-                ores_paranomhs_yperorias_nyxtas: orarioData.ores_paranomhs_yperorias_nyxtas,
-                ores_paranomhs_yperorias_argion: orarioData.ores_paranomhs_yperorias_argion,
-                ores_paranomhs_yperorias_argion_nyxtas: orarioData.ores_paranomhs_yperorias_argion_nyxtas,
-            },
-            $setOnInsert: {
-                // Τα πεδία που θα ρυθμιστούν μόνο κατά τη δημιουργία νέας εγγραφής
-                team: orarioData.team,
-                company_kod: orarioData.company_kod,
-                kodikos: orarioData.kodikos,
-                hmeromhnia: orarioData.hmeromhnia
-            }
-            },
-            { new: true, upsert: true } // Επιστρέφει το ενημερωμένο έγγραφο, και το δημιουργεί αν δεν υπάρχει
-        );
-        
-        promises.push(updatePromise);
-        
-        currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
-        i++;
-        }
-        
-        try {
-        await Promise.all(promises);
-        } catch (error) {
-        console.error('Σφάλμα κατά την ενημέρωση των οραρίων:', error);
-        }
-
-        // ============================ ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ =============================
-        // 
-        // Πεδία που ενημερώνονται μόνο κατά την εισαγωγή νέας εγγραφής του ΙΣΤΟΡΙΚΟΥ ΑΡΧΕΙΟΥ
-        if (!recExist) {
-        const filteredDataIstoriko = {
-            team: formData.team,
-            company_kod: formData.company_kod,
-            kodikos: formData.kodikosHidden,
-            aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
+            energos: formData.energos,
+            fylo: formData.fylo,
+            eponymo: formData.eponymoHidden,
+            onoma: formData.onomaHidden,
+            eponymo_patera: formData.eponymo_patera,
+            patronymo: formData.patronymo,
+            eponymo_mhteras: formData.eponymo_mhteras,
+            mhtronymo: formData.mhtronymo,
+            afm: formData.afm_ergazomenoyHidden,
+            doy: formData.doy,
+            typos_taytothtas: formData.typos_taytothtas,
+            adt: formData.adt,
+            hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
+            arxh_ekdoshs: formData.arxh_ekdoshs,
+            amka: formData.amka_ergazomenoyHidden,
+            hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
+            topos_gennhshs: formData.topos_gennhshs,
+            arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
+            yphkoothta: formData.yphkoothta,
+            odos: formData.odos,
+            arithmos: formData.arithmos,
+            tk: formData.tk,
+            thlefono: formData.thlefono,
+            perifereia: formData.perifereia,
+            nomos: formData.nomos,
+            dhmos: formData.dhmos,
+            polh: formData.polh,
+            email: formData.email,
             hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-            createdAt: Date.now(),
-        };
-        
-        // Πεδία που ενημερώνονται πάντα (και κατά την εισαγωγή νέας εγγραφής και κατά την διόρθωση)
-        const updateFieldsIstoriko = {
             hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
             hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
             hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
-            afora_proslhpsh: formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs ? true : false,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
+            sxesh_ergasias: formData.sxesh_ergasias,
+            apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
+            ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
+            ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
+            karta_ergasias: formData.karta_ergasias,
+            evelikth_proselefsh: formData.evelikth_proselefsh,
+            syggeneia: formData.syggeneia,
+            syggenikh_sxesh: formData.syggenikh_sxesh,
+            proyphresia_se_eth: formData.proyphresia_se_eth,
+            proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
+            proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
+            synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
+            synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
             misthologiko_klimakio: formData.misthologiko_klimakio,
+            plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
+            dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
+            hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
+            ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
+            dialleima_se_lepta: formData.dialleima_se_lepta,
+            dialleima_entos_ektos_orarioy: formData.dialleima_entos_ektos_orarioy,
+            symbatikes_ores_ergasias: formData.symbatikes_ores_ergasias,
+            typos_orarioy: formData.typos_orarioy,
+            synexes_diakekomeno: formData.synexes_diakekomeno,
+            pshfiakh_organosh: formData.pshfiakh_organosh,
+            apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs,
+            asfalish_me_tekmarta: formData.asfalish_me_tekmarta,
+            asfalistikh_klash: formData.asfalistikh_klash,
+            epoxikos: formData.epoxikos,
+            tmhma: formData.tmhma,
+            eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
+            oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
+            arithmos_teknon: formData.arithmos_teknon,
+            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
+            eidikothta: formData.eidikothta,
+            antikeimeno_ergasion: formData.antikeimeno_ergasion,
+            typos_ergazomenon: formData.typos_ergazomenon,
+            ypokatasthma: formData.ypokatasthma,
+            xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
+            eidikothta_erganh: formData.eidikothta_erganh,
+            kad_efka: formData.kad_efka,
+            eidikothta_efka: formData.eidikothta_efka,
+            kpk_efka: formData.kpk_efka,
+            kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
+            epa_efka: formData.epa_efka,
+            meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
+            epidothsh_eisforon_ergodoth: formData.epidothsh_eisforon_ergodoth,
+            diathesimothta: formData.diathesimothta,
+            enarxh_diathesimothtas: formData.enarxh_diathesimothtas,
+            lhxh_diathesimothtas: formData.lhxh_diathesimothtas,
+            palios_neos: formData.palios_neos,
+            amoibetai_me_sse: formData.amoibetai_me_sse,
+            trapeza: formData.trapeza,
+            iban: formData.iban,
+            arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
+            systatiko_shmeioma: formData.systatiko_shmeioma,
+            programma_dypa: formData.programma_dypa,
+            egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
+            hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos,
+            hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos,
+            antikatastash_ergazomenoy: formData.antikatastash_ergazomenoy,
+            afm_antikatastath: formData.afm_antikatastath,
+            amka_antikatastath: formData.amka_antikatastath,
+            epidoma_anergias: formData.epidoma_anergias,
+            dypa: formData.dypa,
+            thesh_eythynhs: formData.thesh_eythynhs,
+            eidikh_periptosh: formData.eidikh_periptosh,
+            kentro_kostoys_1: formData.kentro_kostoys_1,
+            pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1,
+            kentro_kostoys_2: formData.kentro_kostoys_2,
+            pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2,
+            kentro_kostoys_3: formData.kentro_kostoys_3,
+            pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3,
+            kentro_kostoys_4: formData.kentro_kostoys_4,
+            pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4,
             symbash: formData.symbash,
             kathgoria_symbashs: formData.kathgoria_symbashs,
             eidikothta_symbashs: formData.eidikothta_symbashs,
@@ -1896,45 +1852,337 @@ class ergazomenoiController {
             pragmatikosMisthos: formData.pragmatikosMisthos,
             pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
             pragmatikoOromisthio: formData.pragmatikoOromisthio,
-            updatedAt: Date.now(),
-        }
-        fieldsStoixeionSymbashs.forEach(fieldStoixeio => {
+            krathsh_01: formData.krathsh_01,
+            ama_krathshs_01: formData.ama_krathshs_01,
+            krathsh_02: formData.krathsh_02,
+            ama_krathshs_02: formData.ama_krathshs_02,
+            krathsh_03: formData.krathsh_03,
+            ama_krathshs_03: formData.ama_krathshs_03,
+            krathsh_04: formData.krathsh_04,
+            ama_krathshs_04: formData.ama_krathshs_04,
+            krathsh_05: formData.krathsh_05,
+            ama_krathshs_05: formData.ama_krathshs_05,
+            krathsh_06: formData.krathsh_06,
+            ama_krathshs_06: formData.ama_krathshs_06,
+            krathsh_07: formData.krathsh_07,
+            ama_krathshs_07: formData.ama_krathshs_07,
+            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy:
+                formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy,
+            adeia_diamonhs_me_amesh_prosbash_gia_ergasia:
+                formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
+            eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
+                formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+            arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
+                formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+            hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
+                formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+            adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia:
+                formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+            eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
+                formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+            arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
+                formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+            hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
+                formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+            adeia_eisodoy_gia_epoxikh_apasxolhsh: formData.adeia_eisodoy_gia_epoxikh_apasxolhsh,
+            arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh:
+                formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh,
+            apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh:
+                formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+            eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh:
+                formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+            epaggelmatikh_katartish: formData.epaggelmatikh_katartish,
+            antikeimeno_katartishs: formData.antikeimeno_katartishs,
+            thematiko_pedio: formData.thematiko_pedio,
+            thematikh_enothta: formData.thematikh_enothta,
+            foreas_katartishs: formData.foreas_katartishs,
+            katartish_apo: formData.katartish_apo,
+            katartish_eos: formData.katartish_eos,
+            diarkeia_se_ores: formData.diarkeia_se_ores,
+            etos_apokthshs: formData.etos_apokthshs,
+            allh_glossa_01: formData.allh_glossa_01,
+            allh_glossa_02: formData.allh_glossa_02,
+            allh_glossa_03: formData.allh_glossa_03,
+            allh_glossa_04: formData.allh_glossa_04,
+            gnosh_ypologiston: formData.gnosh_ypologiston,
+            allo_proson: formData.allo_proson,
+            oros_sth_symbash_n_3986_2011: formData.oros_sth_symbash_n_3986_2011,
+            kataggelia_katopin_eggrafhs_proeidopoihshs:
+                formData.kataggelia_katopin_eggrafhs_proeidopoihshs,
+            hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs,
+            omadikh_apolysh: formData.omadikh_apolysh,
+            arithmos_apofashs_gia_omadikh_apolysh: formData.arithmos_apofashs_gia_omadikh_apolysh,
+            hmeromhnia_apofashs_gia_omadikh_apolysh:
+                formData.hmeromhnia_apofashs_gia_omadikh_apolysh,
+            epidosh_me_dikastiko_epimelhth: formData.epidosh_me_dikastiko_epimelhth,
+            hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs,
+            hmeromhnia_katabolhs_ths_apozhmioshs: formData.hmeromhnia_katabolhs_ths_apozhmioshs,
+            shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
+            parathrhseis: formData.parathrhseis,
+            symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
+            symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
+            paketo_apodoxon: formData.paketo_apodoxon,
+            mhniaia_repo: formData.mhniaia_repo,
+            ypologismos_foroy: formData.ypologismos_foroy,
+            updatedAt: Date.now()
+        };
+
+        fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
             for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
-            const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
-            if (numberFields.has(fieldStoixeio)) {
-                updateFieldsIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
-            } else {
-                updateFieldsIstoriko[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;  // Χειρισμός άλλων τύπων πεδίων
-            }
+                const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+                if (numberFields.has(fieldStoixeio)) {
+                    filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                } else {
+                    filteredDataErgazomenoi[fieldNameStoixeioy] =
+                        formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                }
             }
         });
 
-        fieldsKrathseis.forEach(fieldKrathsh => {
+        fieldsKrathseon.forEach((fieldKrathsh) => {
             for (let i = 1; i <= arithmosKrathseon; i++) {
-            const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
-            updateFieldsIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                filteredDataErgazomenoi[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
             }
         });
 
-        try { 
-            await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
-            { 
-                team: formData.team,
-                company_kod: formData.company_kod,
-                kodikos: formData.kodikos
-            },
-            {
-                $set: updateFieldsIstoriko,
-                $setOnInsert: filteredDataIstoriko // Μόνο όταν δημιουργείται νέα εγγραφή
-            },
-            { new: true, upsert: true }
+        // Τώρα μπορώ να χρησιμοποιήσω το filteredDataErgazomenoi στη $set: για ενημέρωση
+        try {
+            await ErgazomenoiModel.findOneAndUpdate(
+                { _id: ergazomenoiId },
+                { $set: filteredDataErgazomenoi },
+                { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
             );
-            res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
         } catch (error) {
             throw error;
         }
+
+        // ============================ ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ =============================
+        function createOrarioData(i1) {
+            return {
+                team: formData.team,
+                company_kod: formData.company_kod,
+                kodikos: formData.kodikosHidden,
+                hmeromhnia: formData[`hmeromhnia_${i1}`],
+                kathgoria_ergasias: formData[`kathgoria_ergasias_${i1}`],
+                apo_ora_01: formData[`apo_ora_01_${i1}`],
+                eos_ora_01: formData[`eos_ora_01_${i1}`],
+                dialleima_apo_ora_01: formData[`dialleima_apo_ora_01_${i1}`],
+                dialleima_eos_ora_01: formData[`dialleima_eos_ora_01_${i1}`],
+                apo_ora_02: formData[`apo_ora_02_${i1}`],
+                eos_ora_02: formData[`eos_ora_02_${i1}`],
+                dialleima_apo_ora_02: formData[`dialleima_apo_ora_02_${i1}`],
+                dialleima_eos_ora_02: formData[`dialleima_eos_ora_02_${i1}`],
+                apo_ora_03: formData[`apo_ora_03_${i1}`],
+                eos_ora_03: formData[`eos_ora_03_${i1}`],
+                dialleima_apo_ora_03: formData[`dialleima_apo_ora_03_${i1}`],
+                dialleima_eos_ora_03: formData[`dialleima_eos_ora_03_${i1}`],
+                repo: formData[`repo_${i1}`] || false,
+                adeia: false,
+                astheneia: false,
+                argia: formData[`argia_${i1}`] || false,
+                perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
+                kathgoria_adeias: '',
+                ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
+                ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`]).toFixed(4),
+                ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`]).toFixed(4),
+                ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`]).toFixed(4),
+                ores_yperergasias_nyxtas: parseFloat(
+                    formData[`night_overwork_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_yperergasias_argion: parseFloat(
+                    formData[`holiday_overwork_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_yperergasias_argion_nyxtas: parseFloat(
+                    formData[`night_holiday_overwork_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_nominhs_yperorias: parseFloat(
+                    formData[`overtimeNomimh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_nominhs_yperorias_nyxtas: parseFloat(
+                    formData[`night_overtimeNomimh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_nominhs_yperorias_argion: parseFloat(
+                    formData[`holiday_overtimeNomimh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_nominhs_yperorias_argion_nyxtas: parseFloat(
+                    formData[`night_holiday_overtimeNomimh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_paranomhs_yperorias: parseFloat(
+                    formData[`overtimeParanomh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_paranomhs_yperorias_nyxtas: parseFloat(
+                    formData[`night_overtimeParanomh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_paranomhs_yperorias_argion: parseFloat(
+                    formData[`holiday_overtimeParanomh_hours_day_${i1}`]
+                ).toFixed(4),
+                ores_paranomhs_yperorias_argion_nyxtas: parseFloat(
+                    formData[`night_holiday_overtimeParanomh_hours_day_${i1}`]
+                ).toFixed(4)
+            };
+        }
+
+        let promises = [];
+        const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
+        const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
+
+        let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
+        let i = 1;
+
+        while (currentDate <= toDate) {
+            let i1 = i < 10 ? '0' + i : i;
+            const orarioData = createOrarioData(i1);
+
+            // Χρησιμοποιούμε findOneAndUpdate για να ενημερώσουμε ή να δημιουργήσουμε εγγραφή
+            const updatePromise = ProdhlomenaOrariaModel.findOneAndUpdate(
+                {
+                    team: orarioData.team,
+                    company_kod: orarioData.company_kod,
+                    kodikos: orarioData.kodikos,
+                    hmeromhnia: orarioData.hmeromhnia
+                },
+                {
+                    $set: {
+                        // Ενημερώνουμε μόνο τα πεδία που πρέπει να αλλάζουν πάντα
+                        kathgoria_ergasias: orarioData.kathgoria_ergasias,
+                        apo_ora_01: orarioData.apo_ora_01,
+                        eos_ora_01: orarioData.eos_ora_01,
+                        dialleima_apo_ora_01: orarioData.dialleima_apo_ora_01,
+                        dialleima_eos_ora_01: orarioData.dialleima_eos_ora_01,
+                        apo_ora_02: orarioData.apo_ora_02,
+                        eos_ora_02: orarioData.eos_ora_02,
+                        dialleima_apo_ora_02: orarioData.dialleima_apo_ora_02,
+                        dialleima_eos_ora_02: orarioData.dialleima_eos_ora_02,
+                        apo_ora_03: orarioData.apo_ora_03,
+                        eos_ora_03: orarioData.eos_ora_03,
+                        dialleima_apo_ora_03: orarioData.dialleima_apo_ora_03,
+                        dialleima_eos_ora_03: orarioData.dialleima_eos_ora_03,
+                        repo: orarioData.repo,
+                        adeia: orarioData.adeia,
+                        astheneia: orarioData.astheneia,
+                        argia: orarioData.argia,
+                        perigrafh_argias: orarioData.perigrafh_argias,
+                        kathgoria_adeias: orarioData.kathgoria_adeias,
+                        ores_ergasias: orarioData.ores_ergasias,
+                        ores_nyxtas: orarioData.ores_nyxtas,
+                        ores_argion: orarioData.ores_argion,
+                        ores_yperergasias: orarioData.ores_yperergasias,
+                        ores_yperergasias_nyxtas: orarioData.ores_yperergasias_nyxtas,
+                        ores_yperergasias_argion: orarioData.ores_yperergasias_argion,
+                        ores_yperergasias_argion_nyxtas: orarioData.ores_yperergasias_argion_nyxtas,
+                        ores_nominhs_yperorias: orarioData.ores_nominhs_yperorias,
+                        ores_nominhs_yperorias_nyxtas: orarioData.ores_nominhs_yperorias_nyxtas,
+                        ores_nominhs_yperorias_argion: orarioData.ores_nominhs_yperorias_argion,
+                        ores_nominhs_yperorias_argion_nyxtas:
+                            orarioData.ores_nominhs_yperorias_argion_nyxtas,
+                        ores_paranomhs_yperorias: orarioData.ores_paranomhs_yperorias,
+                        ores_paranomhs_yperorias_nyxtas: orarioData.ores_paranomhs_yperorias_nyxtas,
+                        ores_paranomhs_yperorias_argion: orarioData.ores_paranomhs_yperorias_argion,
+                        ores_paranomhs_yperorias_argion_nyxtas:
+                            orarioData.ores_paranomhs_yperorias_argion_nyxtas
+                    },
+                    $setOnInsert: {
+                        // Τα πεδία που θα ρυθμιστούν μόνο κατά τη δημιουργία νέας εγγραφής
+                        team: orarioData.team,
+                        company_kod: orarioData.company_kod,
+                        kodikos: orarioData.kodikos,
+                        hmeromhnia: orarioData.hmeromhnia
+                    }
+                },
+                { new: true, upsert: true } // Επιστρέφει το ενημερωμένο έγγραφο, και το δημιουργεί αν δεν υπάρχει
+            );
+
+            promises.push(updatePromise);
+
+            currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
+            i++;
+        }
+
+        try {
+            await Promise.all(promises);
+        } catch (error) {
+            console.error('Σφάλμα κατά την ενημέρωση των οραρίων:', error);
+        }
+
+        // ============================ ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ =============================
+        //
+        // Πεδία που ενημερώνονται μόνο κατά την εισαγωγή νέας εγγραφής του ΙΣΤΟΡΙΚΟΥ ΑΡΧΕΙΟΥ
+        if (!recExist) {
+            const filteredDataIstoriko = {
+                team: formData.team,
+                company_kod: formData.company_kod,
+                kodikos: formData.kodikosHidden,
+                aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
+                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
+                createdAt: Date.now()
+            };
+
+            // Πεδία που ενημερώνονται πάντα (και κατά την εισαγωγή νέας εγγραφής και κατά την διόρθωση)
+            const updateFieldsIstoriko = {
+                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
+                hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
+                hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
+                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
+                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+                afora_proslhpsh:
+                    formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs
+                        ? true
+                        : false,
+                kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
+                misthologiko_klimakio: formData.misthologiko_klimakio,
+                symbash: formData.symbash,
+                kathgoria_symbashs: formData.kathgoria_symbashs,
+                eidikothta_symbashs: formData.eidikothta_symbashs,
+                synolo_symbashs: formData.synolo_symbashs,
+                synolo_symbashs_basei_oron_ergasias: formData.synolo_symbashs_basei_oron_ergasias,
+                nomimosMisthos: formData.nomimosMisthos,
+                nomimoHmeromisthio: formData.nomimoHmeromisthio,
+                nomimoOromisthio: formData.nomimoOromisthio,
+                pragmatikosMisthos: formData.pragmatikosMisthos,
+                pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
+                pragmatikoOromisthio: formData.pragmatikoOromisthio,
+                updatedAt: Date.now()
+            };
+            fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
+                for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
+                    const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+                    if (numberFields.has(fieldStoixeio)) {
+                        updateFieldsIstoriko[fieldNameStoixeioy] =
+                            formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                    } else {
+                        updateFieldsIstoriko[fieldNameStoixeioy] =
+                            formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                    }
+                }
+            });
+
+            fieldsKrathseis.forEach((fieldKrathsh) => {
+                for (let i = 1; i <= arithmosKrathseon; i++) {
+                    const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
+                    updateFieldsIstoriko[fieldNameKrathshs] = formData[fieldNameKrathshs] || null;
+                }
+            });
+
+            try {
+                await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
+                    {
+                        team: formData.team,
+                        company_kod: formData.company_kod,
+                        kodikos: formData.kodikos
+                    },
+                    {
+                        $set: updateFieldsIstoriko,
+                        $setOnInsert: filteredDataIstoriko // Μόνο όταν δημιουργείται νέα εγγραφή
+                    },
+                    { new: true, upsert: true }
+                );
+                res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
+            } catch (error) {
+                throw error;
+            }
         } else {
-        res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+            res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
         }
     };
 
@@ -1950,16 +2198,16 @@ class ergazomenoiController {
             await IstorikoProslhpseonAllagonModel.deleteMany({
                 team: team,
                 company_kod: company,
-                kodikos: kodikos,
+                kodikos: kodikos
             });
-            
+
             await ProdhlomenaOrariaModel.deleteMany({
                 team: team,
                 company_kod: company,
-                kodikos: kodikos,
+                kodikos: kodikos
             });
-            
-            res.json({ success: true, redirectUrl: "/ergazomenoi/ergazomenoi" });
+
+            res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
         } catch (error) {
             throw error;
         }
@@ -1971,24 +2219,23 @@ class ergazomenoiController {
     static getErgazomenosById = async (req, res) => {
         try {
             const ergazomenosId = req.params.id;
-            
+
             const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId);
-            
+
             if (!ergazomenos) {
                 return res.status(404).json({
                     success: false,
                     message: 'Εργαζόμενος δεν βρέθηκε'
                 });
             }
-            
+
             // ✅ Add presigned URLs for PDFs
             const ergazomenosWithUrls = await addPdfUrlsToErgazomenos(ergazomenos);
-            
+
             return res.status(200).json({
                 success: true,
                 data: ergazomenosWithUrls
             });
-            
         } catch (error) {
             console.error('❌ Error fetching ergazomenos:', error);
             return res.status(500).json({
@@ -2004,19 +2251,18 @@ class ergazomenoiController {
     static getAllErgazomenoiWithUrls = async (req, res) => {
         try {
             const companyId = req.session.companyInUse;
-            
+
             const ergazomenoi = await ErgazomenoiModel.find({ company_kod: companyId });
-            
+
             // ✅ Add presigned URLs for all ergazomenoi
             const ergazomenoiWithUrls = await Promise.all(
-                ergazomenoi.map(erg => addPdfUrlsToErgazomenos(erg))
+                ergazomenoi.map((erg) => addPdfUrlsToErgazomenos(erg))
             );
-            
+
             return res.status(200).json({
                 success: true,
                 data: ergazomenoiWithUrls
             });
-            
         } catch (error) {
             console.error('❌ Error fetching ergazomenoi:', error);
             return res.status(500).json({
@@ -2029,44 +2275,42 @@ class ergazomenoiController {
     static forologikesKlimakes = async (req, res) => {
         try {
             const { xrhsh, kodikos } = req.body;
-            
+
             if (!xrhsh || !kodikos) {
                 return res.status(400).json({ success: false, message: 'Missing data' });
             }
-            
+
             // READ from ForologikesKlimakesModel
             const taxScale = await ForologikesKlimakesModel.findOne({ xrhsh, kodikos });
-            
+
             if (taxScale) {
                 return res.json({
                     success: true,
                     taxScale: {
-                        perigrafh: taxScale.perigrafh 
+                        perigrafh: taxScale.perigrafh
                     }
                 });
             } else {
                 return res.json({ success: false, taxScale: null });
             }
-            
         } catch (error) {
             console.error(error);
             return res.status(500).json({ success: false, message: 'Server error' });
         }
     };
 
-
     static escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Διαφυγή όλων των ειδικών χαρακτήρων
     }
-    
+
     static highlightText(text, term) {
-        if (!text) return ""; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
+        if (!text) return ''; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
         const highlightStartTag = "<span class='highlight'>";
-        const highlightEndTag = "</span>";
+        const highlightEndTag = '</span>';
 
         const escapedTerm = this.escapeRegExp(term);
-    
-        const regex = new RegExp(`(${escapedTerm})`, "gi");
+
+        const regex = new RegExp(`(${escapedTerm})`, 'gi');
         // const regex = new RegExp(`(${term})`, "gi");
         const highlightedText = text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
         return highlightedText;

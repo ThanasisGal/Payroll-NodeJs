@@ -10,8 +10,7 @@
 
                         <%- include('../../partials/_csrfField') %>
 
-                        <div
-                            class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1_5 overflow-hidden">
 
                             <div class="card-header p-2 height-rem-3_5">
                                 <label class="text-center w-100 headers-content"> Συντήρηση Στοιχείων Νομίμων Εκπροσώπων
@@ -495,7 +494,7 @@
                                     </a>
                                 </div>
                             </div>
-                        </div>
+                        <!-- </div> -->
                     </form>
                 </div>
             </section>
@@ -519,7 +518,7 @@
 
 <!-- Enabled/Disablet των ts ανάλογα με το checkbox -->
 <script nonce="<%= nonce %>" type="module">
-    import { bindCheckboxControlsSelect } from '<%= script('common / dependentSelectToggle') %>';
+    import { bindCheckboxControlsSelect } from "<%= script('common / dependentSelectToggle') %>";
 
     // Νομική μορφή
     bindCheckboxControlsSelect({

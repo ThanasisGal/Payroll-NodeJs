@@ -1,443 +1,567 @@
+// e3Uploader.js
+'use strict';
+
 const fs = require('fs-extra');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const DEBUG = String(process.env.ERGANH_DEBUG || '').toLowerCase() === 'false';
-
-function log(...a)  { console.log('[ERGANH]', ...a); }
-function warn(...a) { console.warn('[ERGANH][WARN]', ...a); }
-function err(...a)  { console.error('[ERGANH][ERROR]', ...a); }
-function dbg(...a)  { if (DEBUG) console.log('[ERGANH][DEBUG]', ...a); }
+const DEBUG = String(process.env.ERGANH_DEBUG || '').toLowerCase() === 'true';
+const HEADLESS = !DEBUG;
 
 const LOGIN_URL = 'https://eservices.yeka.gr/login.aspx';
+const UPLOAD_URL = 'https://eservices.yeka.gr/Anaggelies/AnaggeliesXML.aspx';
 
-const SEL_LOGIN_USERNAME   = '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName';
-const SEL_LOGIN_PASSWORD   = '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Password';
-const SEL_LOGIN_SUBMIT     = '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Login';
-const SEL_LOGIN_USE_ERGANI = '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UsePararthmaBox';
-const SEL_AFTER_LOGIN_ANCHOR = 'a.menu-dropdown:has-text("ΒΟΗΘΗΤΙΚΑ")';
+const TIMEOUTS = {
+    short: 5000,
+    medium: 12000,
+    long: 20000,
+    nav: 25000,
+    modalAppear: 20000,
 
-const SEL_COOKIE_CLOSE = 'button:has-text("Κλείσιμο"), a:has-text("Κλείσιμο")';
+    modalSettle: 5000, // ✅ NEW: wait 5s for modal body to populate
+    modalClose: 5000
+};
 
-const SEL_UPLOAD_PROCESS_SELECT = '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SKYpobolesList';
-const SEL_UPLOAD_FILE_INPUT     = '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_XMLFileUploader';
-const SEL_UPLOAD_SUBMIT_BTN     = '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_UploadFileButton';
+// Login inputs (fallbacks)
+const SEL_LOGIN_USERNAME_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName',
+    'input[type="text"][name*="UserName"]',
+    'input[type="text"][id*="UserName"]',
+    'input[type="text"][name*="Username"]',
+    'input[type="text"][id*="Username"]'
+].join(', ');
 
-// ---------------------------------------------------------------------
-// Adaptive timeout manager (starts moderate, grows if the site is slow)
-// ---------------------------------------------------------------------
-class AdaptiveTimeouts {
-  constructor() {
-    this.base = {
-      short: 15000,
-      medium: 30000,
-      long: 60000
-    };
-    this.mult = 1.0; // grows when we detect slowness
-  }
-  short()  { return Math.round(this.base.short  * this.mult); }
-  medium() { return Math.round(this.base.medium * this.mult); }
-  long()   { return Math.round(this.base.long   * this.mult); }
+const SEL_LOGIN_PASSWORD_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Password',
+    'input[type="password"][name*="Password"]',
+    'input[type="password"][id*="Password"]'
+].join(', ');
 
-  // If we hit timeout or detect slowness, increase multiplier slightly
-  bump(reason = 'slow') {
-    const before = this.mult;
-    this.mult = Math.min(2.5, this.mult + 0.25);
-    warn(`[TIMEOUTS] bump (${reason}) ${before} -> ${this.mult}`);
-  }
+const SEL_LOGIN_SUBMIT_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Login',
+    'input[type="submit"][value="Είσοδος"]',
+    'button:has-text("Είσοδος")',
+    'button[type="submit"]',
+    'input[type="submit"]'
+].join(', ');
+
+// Upload page selectors
+const SEL_UPLOAD_PROCESS_SELECT_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SKYpobolesList',
+    'select[id*="SKYpobolesList"]',
+    'select[id*="poboles"]',
+    'select[name*="SKYpobolesList"]',
+    'select[name*="poboles"]',
+    'select'
+].join(', ');
+
+const SEL_UPLOAD_FILE_INPUT_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_XMLFileUploader',
+    'input[type="file"][id*="XMLFileUploader"]',
+    'input[type="file"][name*="XMLFileUploader"]',
+    'input[type="file"][id*="XML"]',
+    'input[type="file"][name*="XML"]',
+    'input[type="file"]'
+].join(', ');
+
+const SEL_UPLOAD_SUBMIT_ANY = [
+    '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_UploadFileButton',
+    'input[type="submit"][id*="UploadFileButton"]',
+    'input[type="button"][id*="UploadFileButton"]',
+    'button[id*="UploadFileButton"]',
+    'button:has-text("Ενημέρωση")',
+    'input[type="submit"][value="Ενημέρωση"]',
+    'input[type="button"][value="Ενημέρωση"]'
+].join(', ');
+
+// Modal OK
+const SEL_MODAL_OK_ANY = [
+    '.swal2-confirm',
+    'button:has-text("OK")',
+    'button:has-text("ΟΚ")',
+    'button:has-text("Ok")',
+    'button:has-text("ok")',
+    'button:has-text("Οκ")',
+    'button:has-text("οκ")',
+    'input[type="button"][value="OK"]',
+    'input[type="submit"][value="OK"]',
+    'input[type="button"][value="ΟΚ"]',
+    'input[type="submit"][value="ΟΚ"]'
+].join(', ');
+
+function log(...a) {
+    console.log('[ERGANH]', ...a);
+}
+function warn(...a) {
+    console.warn('[ERGANH][WARN]', ...a);
+}
+function dbg(...a) {
+    if (DEBUG) console.log('[ERGANH][DEBUG]', ...a);
 }
 
-// ---------------------------------------------------------------------
-async function safeScreenshot(page, name) {
-  try {
-    const dir = path.join(process.cwd(), 'screenshots', 'erganh');
-    await fs.ensureDir(dir);
-    const file = path.join(dir, `${Date.now()}_${name}.png`);
-    await page.screenshot({ path: file, fullPage: true });
-    return file;
-  } catch {
-    return null;
-  }
+function cleanText(s) {
+    return String(s || '')
+        .replace(/\r/g, '')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
 }
 
-function isClosedTargetError(e) {
-  const m = String(e?.message || '');
-  return m.includes('Target page, context or browser has been closed') ||
-         m.includes('browser has been closed') ||
-         m.includes('has been closed');
+function normalizeForExactCompare(s) {
+    return (
+        String(s || '')
+            .replace(/\r/g, '')
+            .replace(/[’‘]/g, "'")
+            .replace(/[“”]/g, '"')
+            // ✅ collapse ALL whitespace (spaces, tabs, newlines) to single spaces
+            .replace(/\s+/g, ' ')
+            .trim()
+    );
 }
 
-async function closeCookieBannerIfAny(page) {
-  try {
-    const btn = page.locator(SEL_COOKIE_CLOSE).first();
-    if (await btn.count()) {
-      if (await btn.isVisible().catch(() => false)) {
-        await btn.click().catch(() => {});
-      }
-    }
-  } catch {}
+const SUCCESS_MODAL_TEXT_EXACT = normalizeForExactCompare(
+    [
+        'Ειδοποίηση',
+        'Το αρχείο διαβάστηκε με επιτυχία. Οι Αναγγελίες βρίσκονται πλέον',
+        "καταχωρημένες σε κατάσταση υποβολής 'Προσωρινή' και μπορείτε να τις",
+        'βρείτε στην Αναζήτηση Αναγγελιών για να τις υποβάλετε εξατομικευμένα.'
+    ].join('\n')
+);
+
+async function ensureScreensDir() {
+    await fs.ensureDir(path.join(process.cwd(), 'screenshots'));
 }
 
-async function isLoginPage(page) {
-  try {
-    const hasUser = await page.locator(SEL_LOGIN_USERNAME).count();
-    const hasPass = await page.locator(SEL_LOGIN_PASSWORD).count();
-    const hasBtn  = await page.locator(SEL_LOGIN_SUBMIT).count();
-    return !!(hasUser && hasPass && hasBtn);
-  } catch { return false; }
-}
-
-// Wait until either selector A or selector B appears (or timeout)
-async function waitForEither(page, selectorA, selectorB, timeoutMs) {
-  const start = Date.now();
-
-  while (Date.now() - start < timeoutMs) {
+async function snap(page, label) {
     try {
-      if (await page.locator(selectorA).count()) return 'A';
-      if (await page.locator(selectorB).count()) return 'B';
-    } catch {}
-    await page.waitForTimeout(250);
-  }
-  throw new Error(`waitForEither timeout: ${selectorA} OR ${selectorB}`);
-}
-
-// Detect “stuck” states (blank page or spinner too long)
-async function autoRecoverIfStuck(page, timeouts) {
-  try {
-    const url = page.url();
-    const bodyText = await page.locator('body').innerText().catch(() => '');
-    const looksBlank = !bodyText || bodyText.trim().length < 5;
-
-    if (looksBlank) {
-      warn('[RECOVER] Page looks blank -> reload');
-      timeouts.bump('blank');
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-      await page.waitForTimeout(400);
+        await ensureScreensDir();
+        const p = path.join(process.cwd(), 'screenshots', `${Date.now()}-${label}.png`);
+        await page.screenshot({ path: p, fullPage: true });
+        warn('[SCREENSHOT]', p);
+        return p;
+    } catch {
+        return null;
     }
+}
 
-    // if url is weird or about:blank
-    if (!url || url === 'about:blank') {
-      warn('[RECOVER] URL is about:blank -> goto login');
-      timeouts.bump('about:blank');
-      await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' }).catch(() => {});
-      await page.waitForTimeout(400);
+async function firstVisible(page, selector) {
+    const loc = page.locator(selector);
+    const c = await loc.count().catch(() => 0);
+    for (let i = 0; i < c; i++) {
+        const el = loc.nth(i);
+        if (await el.isVisible().catch(() => false)) return el;
     }
-  } catch {}
-}
-
-// ---------------------------------------------------------------------
-// Login that retries only if truly not logged in
-// ---------------------------------------------------------------------
-async function loginToErganh(page, creds, timeouts) {
-  const username = creds?.username;
-  const password = creds?.password;
-  if (!username || !password) throw new Error('Missing ERGANH credentials');
-
-  log('Opening login page...');
-  await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' });
-
-  await closeCookieBannerIfAny(page);
-
-  // Wait for either: login form OR already logged in anchor (if session reused)
-  const state = await waitForEither(page, SEL_LOGIN_USERNAME, SEL_AFTER_LOGIN_ANCHOR, timeouts.long())
-    .catch(e => { timeouts.bump('login-wait'); throw e; });
-
-  if (state === 'A') {
-    // We are on login form
-    await page.waitForSelector(SEL_LOGIN_USERNAME, { timeout: timeouts.medium() })
-      .catch(e => { timeouts.bump('username'); throw e; });
-
-    try {
-      const cb = page.locator(SEL_LOGIN_USE_ERGANI);
-      if (await cb.count()) {
-        if (!(await cb.isChecked())) await cb.check();
-      }
-    } catch {}
-
-    await page.fill(SEL_LOGIN_USERNAME, username);
-    await page.fill(SEL_LOGIN_PASSWORD, password);
-
-    log('Submitting login...');
-    await page.click(SEL_LOGIN_SUBMIT);
-
-    // After submit: wait for either success anchor OR still login form (failure)
-    const after = await waitForEither(page, SEL_AFTER_LOGIN_ANCHOR, SEL_LOGIN_USERNAME, timeouts.long())
-      .catch(e => { timeouts.bump('post-login'); throw e; });
-
-    if (after === 'B') {
-      // Still on login form -> credentials wrong or session rejected
-      await safeScreenshot(page, 'login_failed');
-      throw new Error('Login failed (still on login form after submit)');
-    }
-  }
-
-  // We have anchor now
-  await closeCookieBannerIfAny(page);
-  await safeScreenshot(page, 'after_login');
-  log('Login completed (anchor found).');
-}
-
-async function ensureLoggedIn(page, creds, timeouts) {
-  if (await isLoginPage(page)) {
-    warn('Detected login page -> re-login...');
-    await loginToErganh(page, creds, timeouts);
-  }
-}
-
-// ---------------------------------------------------------------------
-// Navigation (no repeated ensure between clicks to avoid flicker loops)
-// ---------------------------------------------------------------------
-async function navigateToUploadPage(page, creds, timeouts) {
-  await ensureLoggedIn(page, creds, timeouts);
-
-  log('Navigating: ΒΟΗΘΗΤΙΚΑ → Ομαδικές Υποβολές → Εισαγωγή Από Αρχείο');
-
-  const voithitika = page.locator('a.menu-dropdown:has-text("ΒΟΗΘΗΤΙΚΑ")').first();
-  await voithitika.waitFor({ timeout: timeouts.medium() })
-    .catch(e => { timeouts.bump('voithitika'); throw e; });
-  await voithitika.click();
-
-  await page.waitForTimeout(200);
-  await autoRecoverIfStuck(page, timeouts);
-
-  const omadikes = page.locator('a.menu-dropdown:has-text("Ομαδικές Υποβολές")').first();
-  await omadikes.waitFor({ timeout: timeouts.medium() })
-    .catch(e => { timeouts.bump('omadikes'); throw e; });
-  await omadikes.click();
-
-  await page.waitForTimeout(200);
-  await autoRecoverIfStuck(page, timeouts);
-
-  const eisagogi = page.locator('a[href*="AnaggeliesXML.aspx"]:has-text("Εισαγωγή Από Αρχείο")').first();
-  await eisagogi.waitFor({ timeout: timeouts.medium() })
-    .catch(e => { timeouts.bump('eisagogi'); throw e; });
-  await eisagogi.click();
-
-  await page.waitForLoadState('domcontentloaded', { timeout: timeouts.long() }).catch(() => {});
-  await page.waitForSelector(SEL_UPLOAD_PROCESS_SELECT, { timeout: timeouts.long() })
-    .catch(e => { timeouts.bump('upload-page'); throw e; });
-
-  await safeScreenshot(page, 'after_navigation');
-}
-
-// ---------------------------------------------------------------------
-// Modal "Ειδοποίηση" capture (bulletproof: title ancestor containing OK)
-// ---------------------------------------------------------------------
-async function captureEidopoiisiModal(page, timeouts) {
-  try {
-    const titleLoc = page.locator('text=Ειδοποίηση').first();
-    await titleLoc.waitFor({ timeout: timeouts.long() }).catch(() => null);
-    if (!(await titleLoc.count())) return null;
-
-    const box = titleLoc.locator(
-      'xpath=ancestor::div[.//button[contains(normalize-space(.),"OK")]]'
-    ).first();
-
-    let text = '';
-    if (await box.count()) {
-      text = (await box.innerText().catch(() => '')).trim();
-    } else {
-      text = (await page.locator('body').innerText().catch(() => '')).trim();
-    }
-
-    const okBtn = (await box.count())
-      ? box.locator('button:has-text("OK")').first()
-      : page.locator('button:has-text("OK")').first();
-
-    if (await okBtn.count()) await okBtn.click().catch(() => {});
-    else await page.keyboard.press('Enter').catch(() => {});
-
-    text = text.replace(/\s+\n/g, '\n').replace(/\n\s+/g, '\n').trim();
-    text = text.replace(/\n?OK\s*$/i, '').trim();
-
-    return text || null;
-  } catch {
     return null;
-  }
 }
 
-function extractProtocolFromText(text) {
-  if (!text) return null;
-  const patterns = [
-    /Αρ(?:ιθ)?\.?\s*Πρωτ(?:οκ)?[όο]λλ[οό]?\s*[:\-]?\s*([0-9A-Za-z\/\-\._]+)/i,
-    /Πρωτόκολλ[οό]\s*[:\-]?\s*([0-9A-Za-z\/\-\._]+)/i,
-    /Protocol\s*[:\-]?\s*([0-9A-Za-z\/\-\._]+)/i,
-  ];
-  for (const re of patterns) {
-    const m = text.match(re);
-    if (m && m[1]) return m[1].trim();
-  }
-  return null;
+async function isOnLoginForm(page) {
+    const u = await page
+        .locator(SEL_LOGIN_USERNAME_ANY)
+        .count()
+        .catch(() => 0);
+    const p = await page
+        .locator(SEL_LOGIN_PASSWORD_ANY)
+        .count()
+        .catch(() => 0);
+    return !!(u && p);
 }
 
-function looksLikeErrorText(text) {
-  if (!text) return false;
-  const t = text.toLowerCase();
-  return t.includes('σφάλμα') || t.includes('λάθος') || t.includes('αποτυχ') ||
-         t.includes('μη έγκυρ') || t.includes('δεν επιτρέπ') || t.includes('δεν βρέθηκε') ||
-         t.includes('error') || t.includes('invalid');
+async function isOnUploadPage(page) {
+    const dd = await page
+        .locator(SEL_UPLOAD_PROCESS_SELECT_ANY)
+        .count()
+        .catch(() => 0);
+    const fi = await page
+        .locator(SEL_UPLOAD_FILE_INPUT_ANY)
+        .count()
+        .catch(() => 0);
+    return !!(dd && fi);
 }
 
-async function collectResultInfo(page, timeouts) {
-  const messages = [];
-
-  const modalText = await captureEidopoiisiModal(page, timeouts);
-  if (modalText) {
-    log('Captured modal message:', modalText);
-    messages.push(modalText);
-  }
-
-  let bodyText = '';
-  try {
-    bodyText = await page.locator('body').innerText({ timeout: timeouts.medium() });
-  } catch {}
-
-  const uniq = Array.from(new Set(messages.map(m => m.trim()).filter(Boolean)));
-  const combined = (uniq.join('\n') + '\n' + (bodyText || '')).slice(0, 30000);
-
-  const protocol = extractProtocolFromText(combined);
-  const isSuccess = !!protocol;
-  const isError = looksLikeErrorText(combined) || uniq.some(m => m.includes('Ειδοποίηση'));
-
-  return { protocol: protocol || null, messages: uniq, isError, isSuccess };
+function classifyModalText(text) {
+    const normalized = normalizeForExactCompare(text);
+    return { ok: normalized === SUCCESS_MODAL_TEXT_EXACT };
 }
 
-// ---------------------------------------------------------------------
-// Upload flow
-// ---------------------------------------------------------------------
-async function uploadXml(page, xmlPath, creds, timeouts) {
-  await ensureLoggedIn(page, creds, timeouts);
-
-  if (!xmlPath) throw new Error('Missing xmlPath');
-  if (!(await fs.pathExists(xmlPath))) throw new Error(`File not found: ${xmlPath}`);
-
-  log('Starting XML upload...');
-
-  const dropdown = page.locator(SEL_UPLOAD_PROCESS_SELECT).first();
-  await dropdown.waitFor({ timeout: timeouts.long() })
-    .catch(e => { timeouts.bump('dropdown'); throw e; });
-
-  await dropdown.selectOption('213');
-  await page.waitForTimeout(250);
-
-  if (DEBUG) { console.log('[PAUSE] After selecting option 213'); await page.pause(); }
-
-  const fileInput = page.locator(SEL_UPLOAD_FILE_INPUT).first();
-  await fileInput.waitFor({ timeout: timeouts.long() })
-    .catch(e => { timeouts.bump('fileInput'); throw e; });
-
-  const dialogPromise = page.waitForEvent('dialog', { timeout: 15000 })
-    .then(async dialog => { dbg('Dialog:', dialog.message()); await dialog.accept(); })
-    .catch(() => {});
-
-  await fileInput.setInputFiles(xmlPath);
-  await dialogPromise;
-
-  await page.waitForTimeout(350);
-  await safeScreenshot(page, 'after_file_select');
-
-  if (DEBUG) { console.log('[PAUSE] After file selection'); await page.pause(); }
-
-  const submitBtn = page.locator(SEL_UPLOAD_SUBMIT_BTN).first();
-  await submitBtn.waitFor({ timeout: timeouts.long() })
-    .catch(e => { timeouts.bump('submitBtn'); throw e; });
-
-  await submitBtn.click();
-
-  await page.waitForLoadState('networkidle', { timeout: timeouts.long() }).catch(() => {});
-  await page.waitForTimeout(600);
-
-  await safeScreenshot(page, 'after_submit');
-
-  if (DEBUG) { console.log('[PAUSE] After clicking Ενημέρωση'); await page.pause(); }
-
-  return await collectResultInfo(page, timeouts);
+async function waitForOptionsOnSelect(selectLocator, timeoutMs) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        try {
+            const optCount = await selectLocator
+                .locator('option')
+                .count()
+                .catch(() => 0);
+            if (optCount >= 2) return true;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 200));
+    }
+    return false;
 }
 
-// ---------------------------------------------------------------------
-// MAIN export (self-healing + adaptive timeouts)
-// ---------------------------------------------------------------------
-async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null) {
-  const timeouts = new AdaptiveTimeouts();
+async function doLogin(page, creds) {
+    const username = creds?.username;
+    const password = creds?.password;
+    if (!username || !password) throw new Error('Missing ERGANH credentials');
 
-  let browser = null;
-  let context = null;
-  let page = null;
+    log('Goto login...');
+    await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUTS.nav });
 
-  const headless = !DEBUG;
-  const slowMo = DEBUG ? 250 : 0;
+    const user = await firstVisible(page, SEL_LOGIN_USERNAME_ANY);
+    const pass = await firstVisible(page, SEL_LOGIN_PASSWORD_ANY);
+    const submit = await firstVisible(page, SEL_LOGIN_SUBMIT_ANY);
 
-  const launchFresh = async () => {
-    try { if (page && !page.isClosed()) await page.close(); } catch {}
-    try { if (context) await context.close(); } catch {}
-    try { if (browser) await browser.close(); } catch {}
+    if (!user || !pass || !submit) {
+        const shot = await snap(page, 'login-missing-fields');
+        throw new Error(`Login fields not found. Screenshot: ${shot || 'N/A'}`);
+    }
 
-    log('Launching browser...', { headless });
+    await user.fill(username).catch(() => {});
+    await pass.fill(password).catch(() => {});
 
-    browser = await chromium.launch({
-      headless,
-      slowMo,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    for (let i = 0; i < 3; i++) {
+        const uVal = await user.inputValue().catch(() => '');
+        const pVal = await pass.inputValue().catch(() => '');
+        if (uVal && pVal) break;
+        await user.fill(username).catch(() => {});
+        await pass.fill(password).catch(() => {});
+        await page.waitForTimeout(150).catch(() => {});
+    }
 
-    context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    page = await context.newPage();
-  };
+    log('Submit login...');
+    await Promise.allSettled([
+        page.waitForLoadState('domcontentloaded', { timeout: TIMEOUTS.nav }).catch(() => {}),
+        submit.click({ timeout: TIMEOUTS.medium })
+    ]);
 
-  try {
-    await launchFresh();
+    await page.waitForTimeout(400).catch(() => {});
+}
 
-    // One run is usually enough; if the browser closes -> relaunch & retry once
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        log(`Attempt ${attempt}/2`);
-        await loginToErganh(page, creds, timeouts);
-        await navigateToUploadPage(page, creds, timeouts);
-        const result = await uploadXml(page, xmlPath, creds, timeouts);
+async function ensureOnUploadPage(page, creds) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        await page.goto(UPLOAD_URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUTS.nav });
+        await page.waitForTimeout(200).catch(() => {});
 
-        if (result.isSuccess) {
-          const shot = await safeScreenshot(page, 'final_success');
-          return { success: true, protocol: result.protocol, screenshot: shot, messages: result.messages || [] };
+        if (await isOnLoginForm(page)) {
+            log('Redirected to login, logging in...');
+            await doLogin(page, creds);
+            continue;
         }
 
-        const shot = await safeScreenshot(page, 'final_error');
+        const dd = page.locator(SEL_UPLOAD_PROCESS_SELECT_ANY).first();
+        const fi = page.locator(SEL_UPLOAD_FILE_INPUT_ANY).first();
+
+        await dd.waitFor({ state: 'visible', timeout: TIMEOUTS.long }).catch(() => {});
+        await fi.waitFor({ state: 'visible', timeout: TIMEOUTS.long }).catch(() => {});
+
+        if (await isOnUploadPage(page)) {
+            await waitForOptionsOnSelect(dd, TIMEOUTS.long);
+            log('On upload page (ready).');
+            return;
+        }
+
+        await page.waitForTimeout(700).catch(() => {});
+        if (await isOnUploadPage(page)) {
+            await waitForOptionsOnSelect(dd, TIMEOUTS.long);
+            log('On upload page (after short wait).');
+            return;
+        }
+    }
+
+    const shot = await snap(page, 'upload-page-not-reachable');
+    throw new Error(`Login/Upload page not reachable. Screenshot: ${shot || 'N/A'}`);
+}
+
+// ✅ fallback text when no modal: try to find likely error snippets on the page
+async function captureFallbackPageErrorText(page) {
+    try {
+        const t = cleanText(
+            await page.evaluate(() => {
+                const keywords = [
+                    'Σφάλμα',
+                    'Σφάλματα',
+                    'Η υποβολή απέτυχε',
+                    'Απέτυχε',
+                    'Για το ΑΦΜ',
+                    'Για τον ΑΦΜ',
+                    'Ημερομηνία',
+                    'δεν συμφων'
+                ];
+
+                const bodyText = document.body?.innerText || '';
+                const lines = bodyText
+                    .split('\n')
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+
+                const hits = [];
+                for (const line of lines) {
+                    if (keywords.some((k) => line.includes(k))) hits.push(line);
+                    if (hits.length >= 12) break;
+                }
+                return hits.join('\n');
+            })
+        );
+
+        return t;
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Robust modal capture:
+ * - Waits for ANY dialog/swal2 or keyword presence
+ * - ✅ NEW: waits extra 5s for modal content to fully populate
+ * - Extracts text from dialog while filtering noise ("x", "Επιλογή", "OK")
+ */
+async function captureModalTextAndClose(page) {
+    // 1) Wait for a VISIBLE OK button (this is modal-specific and won't match <option>)
+    const okBtn = await (async () => {
+        const loc = page.locator(SEL_MODAL_OK_ANY);
+        const start = Date.now();
+        while (Date.now() - start < TIMEOUTS.modalAppear) {
+            const c = await loc.count().catch(() => 0);
+            for (let i = 0; i < c; i++) {
+                const el = loc.nth(i);
+                if (await el.isVisible().catch(() => false)) return el;
+            }
+            await page.waitForTimeout(150).catch(() => {});
+        }
+        return null;
+    })();
+
+    if (!okBtn) return { text: '' };
+
+    // 2) Find the container that actually holds the dialog text.
+    // We climb ancestors until we find a "big" text block (heuristic).
+    let container = okBtn.locator('xpath=ancestor::div[1]').first();
+
+    for (let level = 1; level <= 14; level++) {
+        const anc = okBtn.locator(`xpath=ancestor::div[${level}]`).first();
+        const ancText = await anc.innerText().catch(() => '');
+        const t = cleanText(ancText);
+
+        // Heuristic: modal text in your screenshot is definitely > 40 chars
+        // and contains either "Ειδοποίηση" or "Σφάλματα" or "xsd" or "Για το ΑΦΜ"
+        const low = t.toLowerCase();
+        const looksLikeModal =
+            t.length > 40 &&
+            (t.includes('Ειδοποίηση') ||
+                t.includes('Σφάλματα') ||
+                low.includes('xsd') ||
+                t.includes('Για το ΑΦΜ') ||
+                t.includes('Για τον ΑΦΜ') ||
+                low.includes('pattern constraint'));
+
+        if (looksLikeModal) {
+            container = anc;
+            break;
+        }
+    }
+
+    // 3) Read text, and clean obvious noise
+    let text = cleanText(await container.innerText().catch(() => ''));
+
+    // remove isolated noise lines
+    text = text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .filter(
+            (l) => !['x', 'X', 'OK', 'Ok', 'ok', 'ΟΚ', 'Οκ', 'οκ', 'Επιλογή', 'επιλογή'].includes(l)
+        )
+        .join('\n');
+
+    // 4) Click OK fast (closing modal in <= ~1s)
+    await okBtn.click({ timeout: 1000, force: true }).catch(() => {});
+    await page.waitForTimeout(150).catch(() => {});
+
+    return { text };
+}
+
+async function uploadXml(page, xmlPath, creds) {
+    await ensureOnUploadPage(page, creds);
+
+    if (!xmlPath) throw new Error('Missing xmlPath');
+    if (!(await fs.pathExists(xmlPath))) throw new Error(`File not found: ${xmlPath}`);
+
+    const dropdown = page.locator(SEL_UPLOAD_PROCESS_SELECT_ANY).first();
+    const fileInput = page.locator(SEL_UPLOAD_FILE_INPUT_ANY).first();
+    const submitBtn = page.locator(SEL_UPLOAD_SUBMIT_ANY).first();
+
+    if (!(await dropdown.count().catch(() => 0))) {
+        const shot = await snap(page, 'process-dropdown-not-found');
+        throw new Error(`Process dropdown not found. Screenshot: ${shot || 'N/A'}`);
+    }
+    if (!(await fileInput.count().catch(() => 0))) {
+        const shot = await snap(page, 'fileInput-not-found');
+        throw new Error(`File input not found. Screenshot: ${shot || 'N/A'}`);
+    }
+    if (!(await submitBtn.count().catch(() => 0))) {
+        const shot = await snap(page, 'submit-not-found');
+        throw new Error(`Submit button not found. Screenshot: ${shot || 'N/A'}`);
+    }
+
+    await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
+    await waitForOptionsOnSelect(dropdown, TIMEOUTS.long);
+
+    let selected = false;
+    try {
+        await dropdown.selectOption({ value: '213' });
+        selected = true;
+    } catch {}
+    if (!selected) {
+        try {
+            await dropdown.selectOption('213');
+            selected = true;
+        } catch {}
+    }
+    if (!selected) {
+        const shot = await snap(page, 'process-select-failed');
+        throw new Error(`Could not select process 213. Screenshot: ${shot || 'N/A'}`);
+    }
+
+    await page.waitForTimeout(250).catch(() => {});
+    await fileInput.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
+
+    const dialogPromise = page
+        .waitForEvent('dialog', { timeout: TIMEOUTS.short })
+        .then(async (d) => {
+            dbg('Dialog:', d.message());
+            await d.accept();
+        })
+        .catch(() => {});
+
+    await fileInput.setInputFiles(xmlPath);
+    await dialogPromise;
+
+    await page.waitForTimeout(150).catch(() => {});
+    await submitBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
+
+    const modalPromise = captureModalTextAndClose(page);
+
+    await Promise.allSettled([
+        page.waitForLoadState('domcontentloaded', { timeout: TIMEOUTS.nav }).catch(() => {}),
+        submitBtn.click({ timeout: TIMEOUTS.medium })
+    ]);
+
+    const { text: modalText } = await modalPromise;
+
+    if (!modalText) {
+        const pageErr = await captureFallbackPageErrorText(page);
+        if (pageErr) return pageErr;
+    }
+
+    return modalText || '';
+}
+
+// ------------------------------ MAIN EXPORT ---------------------------------
+async function runOnce(companyId, xmlPath, userId, creds) {
+    let browser, context, page;
+
+    try {
+        log('Launching browser...', { headless: HEADLESS });
+        browser = await chromium.launch({
+            headless: HEADLESS,
+            slowMo: DEBUG ? 120 : 0,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+
+        page = await context.newPage();
+        page.setDefaultTimeout(TIMEOUTS.long);
+        page.setDefaultNavigationTimeout(TIMEOUTS.nav);
+
+        const modalText = cleanText(await uploadXml(page, xmlPath, creds));
+
+        log('[MODAL TEXT]', JSON.stringify(modalText));
+        log('[MODAL OK?]', normalizeForExactCompare(modalText) === SUCCESS_MODAL_TEXT_EXACT);
+
+        if (!modalText) {
+            const fallback = `Δεν ελήφθη απάντηση από το ΕΡΓΑΝΗ μέσα σε ${Math.round(
+                TIMEOUTS.modalAppear / 1000
+            )} δευτερόλεπτα.\n\nΗ υποβολή απέτυχε ή δεν εμφανίστηκε modal.`;
+            const shot = await snap(page, 'no-modal');
+            return {
+                success: false,
+                protocol: null,
+                userMessage: 'Η υποβολή απέτυχε.',
+                errorDetails: fallback,
+                error: fallback,
+                messages: [],
+                screenshot: shot
+            };
+        }
+
+        const verdict = classifyModalText(modalText);
+
+        if (verdict.ok) {
+            return {
+                success: true,
+                protocol: null,
+                userMessage: 'Επιτυχής Αποθήκευση (Προσωρινή)',
+                errorDetails: modalText,
+                messages: [],
+                screenshot: null
+            };
+        }
+
         return {
-          success: false,
-          protocol: result.protocol || null,
-          screenshot: shot,
-          error: (result.messages && result.messages.length) ? result.messages.join(' | ') : 'Upload failed',
-          messages: result.messages || []
+            success: false,
+            protocol: null,
+            userMessage: 'Η υποβολή απέτυχε.',
+            errorDetails: modalText,
+            error: modalText,
+            messages: [],
+            screenshot: null
         };
+    } catch (e) {
+        const msg = String(e?.message || e);
+        warn('Run failed:', msg);
+        const shot = page && !page.isClosed() ? await snap(page, 'final-fail') : null;
+        return {
+            success: false,
+            protocol: null,
+            userMessage: 'Αποτυχία επικοινωνίας με το ΕΡΓΑΝΗ. Δοκιμάστε ξανά.',
+            errorDetails: msg,
+            error: msg,
+            messages: [],
+            screenshot: shot
+        };
+    } finally {
+        try {
+            if (page && !page.isClosed()) await page.close();
+        } catch {}
+        try {
+            if (context) await context.close();
+        } catch {}
+        try {
+            if (browser) await browser.close();
+        } catch {}
+    }
+}
 
-      } catch (e) {
-        warn('Attempt failed:', e?.message || e);
+const inflightByCompany = new Map();
 
-        if (attempt >= 2) {
-          const shot = page ? await safeScreenshot(page, 'final_exception') : null;
-          return { success: false, protocol: null, screenshot: shot, error: e?.message || String(e), messages: [] };
-        }
-
-        // adaptive bump if looks like timeout/stuck
-        timeouts.bump('retry');
-
-        if (isClosedTargetError(e)) {
-          warn('Browser/page closed -> relaunch');
-          await launchFresh();
-        } else {
-          // soft reset to login
-          await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' }).catch(() => {});
-        }
-      }
+async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null) {
+    const key = String(companyId ?? 'default');
+    if (inflightByCompany.has(key)) {
+        warn('Upload already inflight for company:', key);
+        return await inflightByCompany.get(key);
     }
 
-    const shot = page ? await safeScreenshot(page, 'final_fallback') : null;
-    return { success: false, protocol: null, screenshot: shot, error: 'Unknown failure', messages: [] };
+    const p = (async () => {
+        try {
+            return await runOnce(companyId, xmlPath, userId, creds);
+        } finally {
+            inflightByCompany.delete(key);
+        }
+    })();
 
-  } finally {
-    try { if (page && !page.isClosed()) await page.close(); } catch {}
-    try { if (context) await context.close(); } catch {}
-    try { if (browser) await browser.close(); } catch {}
-  }
+    inflightByCompany.set(key, p);
+    return await p;
 }
 
 module.exports = { uploadE3ToErganh };

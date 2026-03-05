@@ -14,11 +14,11 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
         console.log('🔧 [E3-GENERATOR] Starting XML generation...');
         console.log('   Employee AFM:', ergazomenos.afm);
         console.log('   Company:', companyData?.eponymia || 'N/A');
-        
+
         // =====================================================================
         // ✅ VALIDATION: Required Fields
         // =====================================================================
-        
+
         const requiredFields = [
             { field: 'eponymo', label: 'Επώνυμο' },
             { field: 'onoma', label: 'Όνομα' },
@@ -29,57 +29,60 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             { field: 'amka', label: 'ΑΜΚΑ' },
             { field: 'hmeromhnia_proslhpshs', label: 'Ημ/νία Πρόσληψης' },
             { field: 'xronos_katabolhs_apodoxon', label: 'Χρόνος Καταβολής Αποδοχών' },
-            { field: 'adt', label: 'Χρόνος Καταβολής Αποδοχών' }
+            { field: 'adt', label: 'Τύπος Νομιμοποιητικού εγγράφου' }
         ];
-        
+
         const missingFields = requiredFields
             .filter(({ field }) => !ergazomenos[field])
             .map(({ label }) => label);
-        
+
         if (missingFields.length > 0) {
             throw new Error(`Λείπουν υποχρεωτικά πεδία: ${missingFields.join(', ')}`);
         }
-        
+
         // =====================================================================
         // ✅ PARSE EPIKOURIKI ASFALISH (from database field)
         // =====================================================================
-        
+
         let epikourikiSelections = [];
-        
+
         try {
             const epikourikiData = ergazomenos.foreas_epikoyrikhs_asfalishs;
-            
+
             if (epikourikiData) {
                 let parsed;
-                
+
                 if (typeof epikourikiData === 'string' && epikourikiData.trim() !== '') {
                     parsed = JSON.parse(epikourikiData);
                 } else if (Array.isArray(epikourikiData)) {
                     parsed = epikourikiData;
                 }
-                
+
                 if (Array.isArray(parsed)) {
                     epikourikiSelections = parsed
-                        .filter(item => item)
-                        .map(item => {
-                            const kodikos = typeof item === 'object' ? (item.kodikos || item.value) : item;
+                        .filter((item) => item)
+                        .map((item) => {
+                            const kodikos =
+                                typeof item === 'object' ? item.kodikos || item.value : item;
                             return {
                                 kodikos: String(kodikos).padStart(3, '0')
                             };
                         });
-                    
-                    console.log(`✅ [E3-GENERATOR] Found ${epikourikiSelections.length} epikouriki selections`);
+
+                    console.log(
+                        `✅ [E3-GENERATOR] Found ${epikourikiSelections.length} epikouriki selections`
+                    );
                 }
             }
         } catch (parseError) {
             console.error('❌ [E3-GENERATOR] Failed to parse epikouriki JSON:', parseError.message);
             epikourikiSelections = [];
         }
-        
+
         // =====================================================================
         // ✅ DOWNLOAD CONTRACT PDF FROM S3 & CONVERT TO BASE64
         // =====================================================================
-        
+
         let contractPdfBase64 = '';
         let foreignPdfBase64 = '';
         let youngPdfBase64 = '';
@@ -89,19 +92,23 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             if (ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path) {
                 try {
                     console.log('📥 [E3-GENERATOR] Downloading contract PDF from S3...');
-                    
+
                     const { downloadFileFromS3 } = require('../s3Helper');
                     const pdfBuffer = await downloadFileFromS3(
                         ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path
                     );
-                    
+
                     contractPdfBase64 = pdfBuffer.toString('base64');
-                    
+
                     console.log(`✅ [E3-GENERATOR] Contract PDF converted to base64`);
-                    console.log(`   Size: ${pdfBuffer.length} bytes → ${contractPdfBase64.length} chars`);
-                    
+                    console.log(
+                        `   Size: ${pdfBuffer.length} bytes → ${contractPdfBase64.length} chars`
+                    );
                 } catch (pdfError) {
-                    console.error('❌ [E3-GENERATOR] Failed to download contract PDF:', pdfError.message);
+                    console.error(
+                        '❌ [E3-GENERATOR] Failed to download contract PDF:',
+                        pdfError.message
+                    );
                 }
             }
         }
@@ -116,28 +123,34 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
                 foreignPdfBase64 = pdfBuffer.toString('base64');
                 console.log(`✅ [E3-GENERATOR] Foreign docs PDF: ${foreignPdfBase64.length} chars`);
             } catch (pdfError) {
-                console.error('❌ [E3-GENERATOR] Failed to download foreign docs PDF:', pdfError.message);
+                console.error(
+                    '❌ [E3-GENERATOR] Failed to download foreign docs PDF:',
+                    pdfError.message
+                );
             }
         }
-        
+
         // ΑΡΧΕΙΟ ΕΓΓΡΑΦΩΝ ΑΝΗΛΙΚΩΝ
         if (ergazomenos.bibliario_anhlikoy_path) {
             try {
                 const { downloadFileFromS3 } = require('../s3Helper');
-                const pdfBuffer = await downloadFileFromS3(
-                    ergazomenos.bibliario_anhlikoy_path
-                );
+                const pdfBuffer = await downloadFileFromS3(ergazomenos.bibliario_anhlikoy_path);
                 youngPdfBase64 = pdfBuffer.toString('base64');
-                console.log(`✅ [E3-GENERATOR] Young worker docs PDF: ${youngPdfBase64.length} chars`);
+                console.log(
+                    `✅ [E3-GENERATOR] Young worker docs PDF: ${youngPdfBase64.length} chars`
+                );
             } catch (pdfError) {
-                console.error('❌ [E3-GENERATOR] Failed to download young docs PDF:', pdfError.message);
+                console.error(
+                    '❌ [E3-GENERATOR] Failed to download young docs PDF:',
+                    pdfError.message
+                );
             }
         }
 
         // =====================================================================
         // ✅ FIELD MAPPING
         // =====================================================================
-        
+
         const xmlData = {
             // COMPANY DATA
             f_aa_pararthmatos: ypokatasthmataData?.kodikos || '00000',
@@ -145,9 +158,11 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_rel_date: '',
             f_ypiresia_sepe: ypokatasthmataData?.sepe_ergoy || '00000',
             f_ypiresia_oaed: ypokatasthmataData?.dypa_ergoy || '000000',
-            f_kad_pararthmatos: companyData?.kad6 ? companyData.kad6.split(".").slice(0, 2).join("") : '0000',
+            f_kad_pararthmatos: companyData?.kad6
+                ? companyData.kad6.split('.').slice(0, 2).join('')
+                : '0000',
             f_kallikratis_pararthmatos: ypokatasthmataData?.polh || '00000000',
-            
+
             // PERSONAL DATA
             f_eponymo: ergazomenos.eponymo.toUpperCase(),
             f_onoma: ergazomenos.onoma.toUpperCase(),
@@ -160,28 +175,44 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_ar_taytothtas: ergazomenos.adt || 'Α00000000',
             f_ekdousa_arxh: ergazomenos.arxh_ekdoshs || '',
             f_date_ekdosis: formatDateForErganh(ergazomenos.hmeromhnia_ekdoshs),
-            f_date_ekdosis_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy),
-            
+            f_date_ekdosis_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy
+            ),
+
             // RESIDENCE PERMITS
             f_res_permit_inst: ergazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? '1' : '0',
-            f_res_permit_inst_type: ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_inst_ar: ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_inst_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia),
-            
-            f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia ? '1' : '0',
-            f_res_permit_ap_type: ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_ap_ar: ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_ap_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia),
-            
+            f_res_permit_inst_type:
+                ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_ar:
+                ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia
+            ),
+
+            f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia
+                ? '1'
+                : '0',
+            f_res_permit_ap_type:
+                ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_ar:
+                ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia
+            ),
+
             f_res_permit_visa: ergazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh ? '1' : '0',
             f_res_permit_visa_ar: ergazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh || '',
-            f_res_permit_visa_from: formatDateForErganh(ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh),
-            f_res_permit_visa_to: formatDateForErganh(ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh),
-            
+            f_res_permit_visa_from: formatDateForErganh(
+                ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
+            f_res_permit_visa_to: formatDateForErganh(
+                ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
+
             // FAMILY STATUS
             f_marital_status: ergazomenos.oikogeneiakh_katastash || '0',
             f_arithmos_teknon: String(ergazomenos.arithmos_teknon || 0).padStart(2, '0'),
-            
+
             // TAX & INSURANCE
             f_afm: ergazomenos.afm,
             f_doy: ergazomenos.doy || '',
@@ -190,7 +221,7 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_code_anergias: ergazomenos.arithmos_deltioy_anergias || '',
             f_ar_vivliou_anilikou: ergazomenos.arithmos_bibliarioy_anhlikoy || '',
             f_epipedo_morfosis: ergazomenos.ekpaideytiko_epipedo || '1',
-            
+
             // EMPLOYMENT DATA
             f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
             f_proslipsitime: ergazomenos.ora_enarxhs_proths_foras || '08:00',
@@ -199,22 +230,30 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
             f_eidikothta_anal: ergazomenos.antikeimeno_ergasion || '',
             f_proipiresia: String(ergazomenos.proyphresia_se_eth || 0),
-            
+
             // SALARY DATA
-            f_apodoxes: formatCurrency(ergazomenos.pragmatikosMisthos || ergazomenos.synolo_symbashs || 0),
+            f_apodoxes: formatCurrency(
+                ergazomenos.pragmatikosMisthos || ergazomenos.synolo_symbashs || 0
+            ),
             f_hour_apodoxes: formatCurrency(ergazomenos.pragmatikoOromisthio || 0),
-            
+
             // CONTRACT TYPE
             f_sxeshapasxolisis: ergazomenos.sxesh_ergasias || '0',
-            f_orismenou_apo: ergazomenos.sxesh_ergasias === '1' ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs) : '',
-            f_orismenou_ews: ergazomenos.sxesh_ergasias === '1' ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs) : '',
-            
+            f_orismenou_apo:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs)
+                    : '',
+            f_orismenou_ews:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs)
+                    : '',
+
             // EMPLOYMENT STATUS
             f_kathestosapasxolisis: ergazomenos.kathestos_apasxolhshs || '0',
             f_xaraktirismos: ergazomenos.xarakthrismos_ergazomenon ? '1' : '0',
             f_special_case: ergazomenos.eidikh_periptosh || '',
             f_responsible_position: ergazomenos.thesh_eythynhs || '1',
-            
+
             // WORKING TIME ORGANIZATION
             f_working_time_digital_organization: ergazomenos.pshfiakh_organosh ? '1' : '0',
             f_full_employment_hours: formatWeekHours(ergazomenos.symbatikes_ores_ergasias || 40),
@@ -223,18 +262,18 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_working_card: ergazomenos.karta_ergasias ? '1' : '0',
             f_dialeimma_minutes: String(ergazomenos.dialleima_se_lepta || 30),
             f_dialeimma_entos_wrariou: ergazomenos.dialleima_entos_ektos_orarioy ? '1' : '0',
-            
+
             // ΔΥΠΑ PROGRAMS
             f_topothetisioaed: ergazomenos.topothethsh_me_programma ? '1' : '0',
             f_programaoaed: ergazomenos.programma_dypa || '',
             f_replaceprograma: ergazomenos.antikatastash_ergazomenoy ? '1' : '0',
             f_replaceprograma_afm: ergazomenos.afm_antikatastath || '',
             f_replaceprograma_amka: ergazomenos.amka_antikatastath || '',
-            
+
             // TRIAL PERIOD
             f_trial_period: ergazomenos.afora_dokimastikh_periodo ? '1' : '0',
             f_trial_date_to: formatDateForErganh(ergazomenos.hmnia_lhxhs_dokimastikhs_periodoy),
-            
+
             // ACCEPTANCE OF TERMS
             // f_basics_acceptance: ergazomenos.arxeio_apodoxhs_oysiodon_oron_path ? '0' : '1',
             f_basics_acceptance: ergazomenos.oysiodeis_oroi,
@@ -243,77 +282,86 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_comments: ergazomenos.parathrhseis || '',
             f_foreign_file: foreignPdfBase64,
             f_young_file: youngPdfBase64,
-                        
+
             // ADDITIONAL FIELDS
-            f_xronos_katavolis_apodoxon: ergazomenos.xronos_katabolhs_apodoxon || 'ΕΝΤΟΣ 20ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
+            f_xronos_katavolis_apodoxon:
+                ergazomenos.xronos_katabolhs_apodoxon ||
+                'ΕΝΤΟΣ 20ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
             f_ipoxreotiki_katartisi: ergazomenos.ypoxreotikh_ek_toy_nomoy_katartish ? '1' : '0',
             f_efarmoste_sillogiki_simbasi: ergazomenos.efarmostea_sse ? '1' : '0',
             f_efarmoste_sillogiki_simbasi_comments: ergazomenos.efarmostea_sse_parathrhseis || '',
-            
+
             // INSURANCE
             f_kyria_asfalisi: ergazomenos.foreas_kyrias_asfalishs,
             epikourikiSelections: epikourikiSelections,
             f_prosthetes_asfalistikes: ergazomenos.prosthetes_asfalistikes_apodoxes || '',
-            
+
             // NON-PREDICTABLE SCHEDULE
             f_mh_provlepsimo_programma: ergazomenos.mh_problepsimo_programma ? '1' : '0',
             f_paraggelia_hmeres_hours: ergazomenos.hmeres_ores_anaforas || '',
             f_paraggelia_min_notification: ergazomenos.eidopoihsh_prin_thn_anathesh || '',
             f_paraggelia_notes: ergazomenos.prothesmia_akyroshs_ths_anatheshs || '',
-            
+
             // WORKPLACE
-            f_topos_ergasias: ergazomenos.topos_ergasias === 'ΠΑΡΑΡΤΗΜΑ ΕΡΓΟΔΟΤΗ' ? '0' : '1',
-            f_topos_ergasias_comment: ergazomenos.topos_ergasias_parathrhseis || '',
+            f_topos_ergasias: ergazomenos.topos_ergasias ? '1' : '0',
+            f_topos_ergasias_comment: ergazomenos.topos_ergasias
+                ? ergazomenos.topos_ergasias_parathrhseis
+                : ''
         };
 
         // =====================================================================
         // ✅ BUILD XML
         // =====================================================================
-        
+
         const xml = buildE3XML(xmlData);
-        
+
         console.log('✅ [E3-GENERATOR] XML generated successfully');
         console.log('   XML length:', xml.length, 'bytes');
         console.log('   Contract PDF:', contractPdfBase64 ? 'YES' : 'NO');
         console.log('   Foreign docs:', foreignPdfBase64 ? 'YES' : 'NO');
         console.log('   Young docs:', youngPdfBase64 ? 'YES' : 'NO');
         console.log('   Epikouriki:', epikourikiSelections.length);
-        
+
         // =====================================================================
         // ✅ SAVE XML TO S3
         // =====================================================================
 
         try {
             const { uploadBufferToS3 } = require('../s3Helper');
-            
+
             const eponymoClean = ergazomenos.eponymo.toUpperCase().replace(/\s+/g, '_');
             const onomaClean = ergazomenos.onoma.toUpperCase().replace(/\s+/g, '_');
-            const dateStr = formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs).replace(/\//g, '-');
+            const dateStr = formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs).replace(
+                /\//g,
+                '-'
+            );
             const filename = `E3N_${eponymoClean}_${onomaClean}_${dateStr}.xml`;
-            
-            const companyNameClean = companyData?.eponymia 
+
+            const companyNameClean = companyData?.eponymia
                 ? companyData.eponymia.replace(/\s+/g, '_').substring(0, 50)
                 : 'UNKNOWN';
-            
+
             const s3Key = `xmls/${ergazomenos.team}/${companyData.kod}_${companyNameClean}/${filename}`;
-            
+
             console.log('💾 [E3-GENERATOR] Saving XML to:', s3Key);
-            
+
             const xmlBuffer = Buffer.from(xml, 'utf-8');
             const uploadResult = await uploadBufferToS3(xmlBuffer, s3Key, 'application/xml');
-            
-            console.log('✅ [E3-GENERATOR] XML saved:', uploadResult.s3Url || uploadResult.localPath);
-            
+
+            console.log(
+                '✅ [E3-GENERATOR] XML saved:',
+                uploadResult.s3Url || uploadResult.localPath
+            );
+
             return {
                 xml: xml,
                 s3Key: uploadResult.s3Key,
                 s3Url: uploadResult.s3Url || uploadResult.localPath,
                 filename: filename
             };
-            
         } catch (saveError) {
             console.error('❌ [E3-GENERATOR] Failed to save XML:', saveError.message);
-            
+
             return {
                 xml: xml,
                 s3Key: null,
@@ -321,7 +369,7 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
                 filename: null,
                 saveError: saveError.message
             };
-        }        
+        }
     } catch (error) {
         console.error('❌ [E3-GENERATOR] Error:', error.message);
         throw error;
@@ -333,19 +381,19 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
 // =========================================================================
 
 function formatDateForErganh(date) {
-  if (!date) return '';
-  const d = new Date(date);
-  if (isNaN(d.getTime())) return '';
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = String(d.getFullYear());
-  return `${day}/${month}/${year}`;
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = String(d.getFullYear());
+    return `${day}/${month}/${year}`;
 }
 
 function formatWeekHours(hours) {
-  const n = Number(String(hours).replace(',', '.'));
-  if (!Number.isFinite(n)) return '0,0';
-  return n.toFixed(1).replace('.', ','); // πάντα 1 δεκαδικό
+    const n = Number(String(hours).replace(',', '.'));
+    if (!Number.isFinite(n)) return '0,0';
+    return n.toFixed(1).replace('.', ','); // πάντα 1 δεκαδικό
 }
 function formatCurrency(amount) {
     if (!amount) return '0,00';
@@ -354,32 +402,35 @@ function formatCurrency(amount) {
 }
 
 function normalizeYphkoothta(val, fallback = '348') {
-  // Παίρνουμε μόνο ψηφία
-  const digits = String(val ?? '').replace(/\D/g, '');
-  // Αν δεν έχει τίποτα, χρησιμοποίησε fallback
-  const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
-  // Κόψε στα 3 (αν είναι μεγαλύτερο) και συμπλήρωσε με μηδενικά αριστερά
-  return base.slice(-3).padStart(3, '0');
+    // Παίρνουμε μόνο ψηφία
+    const digits = String(val ?? '').replace(/\D/g, '');
+    // Αν δεν έχει τίποτα, χρησιμοποίησε fallback
+    const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
+    // Κόψε στα 3 (αν είναι μεγαλύτερο) και συμπλήρωσε με μηδενικά αριστερά
+    return base.slice(-3).padStart(3, '0');
 }
 
 function indent(level) {
-  return '  '.repeat(level); // 2 spaces ανά επίπεδο
+    return '  '.repeat(level); // 2 spaces ανά επίπεδο
 }
 
 function buildEpikourikiXml(selections, level) {
-  if (!selections || selections.length === 0) return '';
+    if (!selections || selections.length === 0) return '';
 
-  const baseIndent = indent(level);
-  const childIndent = indent(level + 1);
-  const valueIndent = indent(level + 2);
+    const baseIndent = indent(level);
+    const childIndent = indent(level + 1);
+    const valueIndent = indent(level + 2);
 
-  const items = selections.map(item => `
+    const items = selections
+        .map(
+            (item) => `
 ${childIndent}<EpikourikiSelectionsE3N>
 ${valueIndent}<f_kod_epikourikis>${escapeXml(item.kodikos)}</f_kod_epikourikis>
 ${childIndent}</EpikourikiSelectionsE3N>`
-  ).join('');
+        )
+        .join('');
 
-  return `
+    return `
 ${baseIndent}<EpikourikiSelections>${items}
 ${baseIndent}</EpikourikiSelections>`;
 }

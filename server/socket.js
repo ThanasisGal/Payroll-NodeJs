@@ -148,4 +148,18 @@ function getIO() {
     return io;
 }
 
-module.exports = { initializeSocket, getIO };
+/**
+ * ✅ Emit to a specific user room (user_<userId>)
+ * @param {string|number} userId
+ * @param {string} event
+ * @param {any} payload
+ */
+function emitToUser(userId, event, payload) {
+    if (!io) return;
+    if (userId == null) return;
+
+    const roomName = `user_${String(userId)}`;
+    io.to(roomName).emit(event, payload);
+}
+
+module.exports = { initializeSocket, getIO, emitToUser };

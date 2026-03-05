@@ -121,10 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 6η -> πατρώνυμο
                 const patronymoEl = document.getElementById('patronymo');
                 if (patronymoEl) patronymoEl.value = p.patronymo || '';
+                patronymoEl.dispatchEvent(new Event('input', { bubbles: true }));
 
                 // 7η -> μητρώνυμο
                 const mhtronymoEl = document.getElementById('mhtronymo');
                 if (mhtronymoEl) mhtronymoEl.value = p.mhtronymo || '';
+                mhtronymoEl.dispatchEvent(new Event('input', { bubbles: true }));
 
                 // 9η -> ΠΑΛΙΟΣ => false, αλλιώς true
                 const paliosNeosEl = document.getElementById('palios_neos');
