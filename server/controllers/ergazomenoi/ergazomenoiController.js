@@ -7,7 +7,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 
-const { s3Client } = require('../../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
+const { s3Client } = require('../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const Models_A = require('../../models/stathera_arxeia');
