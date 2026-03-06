@@ -1172,20 +1172,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]
             );
 
-        const modalBoxStyle = `
-      text-align:left;
-      white-space:pre-wrap;
-      overflow-wrap:anywhere;
-      word-break:break-word;
-      line-height:1.35;
-      max-height:320px;
-      overflow:auto;
-      padding:10px 12px;
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:10px;
-      background:#fff;
-      font-size:13px;
+        // ✅ NEW: redact very long AWS query params + limit length
+        const redactSecrets = (s) => {
+            if (!s) return '';
+            let out = String(s);
+
+            // remove scary-long AWS params (keeps the rest readable)
+            out = out.replace(/X-Amz-Signature=[^&\s]+/gi, 'X-Amz-Signature=REDACTED');
+            out = out.replace(/X-Amz-Security-Token=[^&\s]+/gi, 'X-Amz-Security-Token=REDACTED');
+            out = out.replace(/X-Amz-Credential=[^&\s]+/gi, 'X-Amz-Credential=REDACTED');
+
+            // hard limit so swal never becomes “wall of text”
+            const MAX = 1200;
+            if (out.length > MAX)
+                out = out.slice(0, MAX) + `\n\n…(truncated, ${out.length - MAX} chars)`;
+            return out;
+        };
+
+        // ✅ NEW: build better error html (short + expandable details)
+        const buildErrorHtml = ({ userMessage, errorDetails, messages }) => {
+            const short = userMessage || 'Η υποβολή απέτυχε.';
+            const detailsParts = [
+                errorDetails,
+                ...(Array.isArray(messages) ? messages : [])
+            ].filter(Boolean);
+            const details = redactSecrets(detailsParts.join('\n\n'));
+
+            return `
+      <div style="text-align:left; line-height:1.4; font-size:14px;">
+        <div style="font-weight:600; margin-bottom:10px;">
+          ${escapeHtml(short)}
+        </div>
+
+        ${
+            details
+                ? `
+          <details style="margin-top:8px;">
+            <summary style="cursor:pointer;">Λεπτομέρειες (τεχνικό)</summary>
+            <pre style="
+              max-height:220px;
+              overflow:auto;
+              white-space:pre-wrap;
+              overflow-wrap:anywhere;
+              word-break:break-word;
+              padding:10px 12px;
+              border:1px solid rgba(0,0,0,.10);
+              border-radius:10px;
+              background:#fff;
+              font-size:12px;
+            ">${escapeHtml(details)}</pre>
+          </details>
+        `
+                : ''
+        }
+      </div>
     `;
+        };
 
         try {
             // ✅ Start loader immediately (socket will continue updating steps)
@@ -1199,7 +1241,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // κρατάμε το δικό σου header· αν έχεις το csrfFetchPatch θα στείλει και csrf-token/x-csrf-token
                     'CSRF-Token': csrfToken
                 },
                 credentials: 'include',
@@ -1213,29 +1254,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload = { success: false, userMessage: await uploadResponse.text() };
             }
 
-            // ✅ HTTP errors (500 κλπ) -> δείξε και γύρνα controlled fail
+            // ✅ HTTP errors (500 κλπ)
             if (!uploadResponse.ok) {
-                const msg =
+                const userMessage =
                     payload?.userMessage ||
                     payload?.message ||
                     payload?.errorDetails ||
                     payload?.error ||
                     `HTTP ${uploadResponse.status}`;
 
-                // ✅ Hide loader immediately before Swal
                 if (window.hideLoader) window.hideLoader();
 
                 await Swal.fire({
                     icon: 'error',
                     title: 'Σφάλμα',
-                    html: `<div style="${modalBoxStyle}">${escapeHtml(msg)}</div>`,
-                    width: 580,
+                    html: buildErrorHtml({
+                        userMessage,
+                        errorDetails: payload?.errorDetails || payload?.error || '',
+                        messages: Array.isArray(payload?.messages) ? payload.messages : []
+                    }),
+                    width: 700,
                     confirmButtonText: 'OK'
                 });
 
                 return {
                     success: false,
-                    userMessage: msg,
+                    userMessage,
                     errorDetails: payload?.errorDetails || payload?.error || '',
                     messages: Array.isArray(payload?.messages) ? payload.messages : []
                 };
@@ -1246,22 +1290,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const errorDetails = payload?.errorDetails || payload?.error || '';
             const messages = Array.isArray(payload?.messages) ? payload.messages : [];
 
-            // ✅ SUCCESS (show modal text too, nicely wrapped)
+            // ✅ SUCCESS
             if (payload.success) {
-                const modalText = payload?.errorDetails || '';
                 const userMsg = payload?.userMessage || 'Επιτυχής Προσωρινή Αποθήκευση';
 
-                // ✅ Hide loader immediately before Swal
                 if (window.hideLoader) window.hideLoader();
 
                 await Swal.fire({
                     icon: 'success',
                     title: 'ΕΡΓΑΝΗ ΙΙ',
-                    width: 580,
+                    width: 700,
                     html: `
-                  <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
-                  ${modalText ? `<div style="${modalBoxStyle}">${escapeHtml(modalText)}</div>` : ''}
-                `,
+            <div style="text-align:left;">
+              <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
+              ${
+                  payload?.protocol
+                      ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>`
+                      : ''
+              }
+            </div>
+          `,
                     confirmButtonText: 'OK'
                 });
 
@@ -1269,26 +1317,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // ✅ FAIL (controlled)
-            const all = [errorDetails, userMessage, ...messages].filter(Boolean);
-
-            const html = all.length
-                ? `<div style="${modalBoxStyle}">${escapeHtml(all.join('\n\n'))}</div>`
-                : 'Η υποβολή απέτυχε χωρίς συγκεκριμένο μήνυμα.';
-
-            // ✅ Hide loader immediately before Swal
             if (window.hideLoader) window.hideLoader();
 
             await Swal.fire({
                 icon: 'error',
                 title: 'Σφάλματα XML - Αποτυχία Υποβολής',
-                html,
-                width: 580,
+                html: buildErrorHtml({ userMessage, errorDetails, messages }),
+                width: 800,
                 confirmButtonText: 'OK'
             });
 
             return payload;
         } finally {
-            // ✅ Safety: never leave loader stuck
             if (window.hideLoader) window.hideLoader();
             erganiUploadInProgress = false;
         }

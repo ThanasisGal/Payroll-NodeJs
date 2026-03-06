@@ -1,7 +1,14 @@
 const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
+const path = require('path');
 const fs = require('fs-extra');
 const logger = require('../../utils/logger');
+const os = require('os');
+const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+
+const { s3Client } = require('../../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -39,6 +46,34 @@ const numberFields = new Set(['poso_symbashs', 'poso_symbashs_basei_oron_ergasia
 
 const arithmosStoixeionSymbashs = 15;
 const arithmosKrathseon = 7;
+
+function parseS3Uri(s3Uri) {
+    // s3://bucket/key
+    if (!s3Uri || typeof s3Uri !== 'string' || !s3Uri.startsWith('s3://')) return null;
+    const rest = s3Uri.slice('s3://'.length);
+    const slash = rest.indexOf('/');
+    if (slash <= 0) return null;
+    return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
+}
+
+async function downloadS3UriToTempFile(s3Uri, companyInUse) {
+    const parsed = parseS3Uri(s3Uri);
+    if (!parsed) throw new Error('Invalid s3:// URI');
+
+    const ext = path.extname(parsed.key) || '.xml';
+    const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+    const uniq = crypto.randomBytes(6).toString('hex');
+    const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+    const resp = await s3Client.send(
+        new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
+    );
+
+    if (!resp?.Body) throw new Error('S3 GetObject: empty body');
+
+    await pipeline(resp.Body, fs.createWriteStream(tempPath));
+    return tempPath;
+}
 
 // =========================================================================
 // ✅ HELPER FUNCTION: Validation για Ωράριο Εργασίας
@@ -1388,10 +1423,6 @@ class ergazomenoiController {
     // Uses Playwright uploader that requires a local file path.
     // ======================================================================
     static uploadE3ToErganh = async (req, res) => {
-        const path = require('path');
-        const fs = require('fs-extra');
-
-        // ✅ Πάρε νωρίς αυτά για να φτιάξουμε σταθερό key
         const sessionCompanyInUse = req.session?.companyInUse;
         const sessionUserId = req.session?.userId;
 
@@ -1401,12 +1432,12 @@ class ergazomenoiController {
         const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}`;
 
         // ✅ Socket emitter (rooms: user_<userId>)
-        // ⚠️ Βεβαιώσου ότι το relative path είναι σωστό για το project σου
         const { emitToUser } = require('../../socket');
 
         function emitErganhStep(userId, step, message) {
             const totalSteps = 4;
-            const percent = Math.round(((step - 1) / totalSteps) * 100); // 0,25,50,75
+            const percentByStep = { 1: 0, 2: 30, 3: 60, 4: 90 };
+            const percent = percentByStep[step] ?? 0;
 
             if (!userId) return;
 
@@ -1417,6 +1448,9 @@ class ergazomenoiController {
                 totalSteps
             });
         }
+
+        let localXmlPath = s3Url;
+        let tempDownloaded = false;
 
         try {
             // ------------------------------------------------------------------
@@ -1450,7 +1484,7 @@ class ergazomenoiController {
             emitErganhStep(sessionUserId, 1, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
 
             // ------------------------------------------------------------------
-            // ✅ 0.1) Cooldown (κόβει τα sequential 15+)
+            // ✅ 0.1) Cooldown
             // ------------------------------------------------------------------
             const now = Date.now();
             const last = erganiLastStart.get(key) || 0;
@@ -1470,7 +1504,7 @@ class ergazomenoiController {
             }
 
             // ------------------------------------------------------------------
-            // ✅ 0.2) Concurrent lock (κόβει ταυτόχρονα)
+            // ✅ 0.2) Concurrent lock
             // ------------------------------------------------------------------
             if (erganiInflight.has(key)) {
                 emitToUser(sessionUserId, 'erganh:error', {
@@ -1484,35 +1518,47 @@ class ergazomenoiController {
                 });
             }
 
-            // ✅ κλείδωσε + ξεκίνα cooldown timer
+            // ✅ lock + start cooldown timer
             erganiInflight.set(key, true);
             erganiLastStart.set(key, now);
 
-            // ✅ Step 2: preparation
-            emitErganhStep(sessionUserId, 2, 'Προετοιμασία Αποστολής');
-
             // ------------------------------------------------------------------
-            // ✅ 1) Resolve local XML path (supports relativePath uploads/...)
+            // ✅ 1) Resolve local XML path (DEV vs PROD)
             // ------------------------------------------------------------------
-            const cwd = process.cwd();
-            let localXmlPath = s3Url;
+            const prepMsg =
+                typeof s3Url === 'string' && s3Url.startsWith('s3://')
+                    ? 'Προετοιμασία Αποστολής (λήψη XML από S3)'
+                    : 'Προετοιμασία Αποστολής';
 
-            if (
-                !path.isAbsolute(localXmlPath) &&
-                !localXmlPath.startsWith('file:///') &&
-                !localXmlPath.startsWith('http')
-            ) {
-                localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+            emitErganhStep(sessionUserId, 2, prepMsg);
+
+            if (typeof s3Url === 'string' && s3Url.startsWith('s3://')) {
+                logger.info('[ERGANH-UPLOAD] S3 download start', { s3Url });
+
+                localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
+                tempDownloaded = true;
+
+                logger.info('[ERGANH-UPLOAD] S3 download ok', { localXmlPath });
+            } else {
+                const cwd = process.cwd();
+
+                if (
+                    !path.isAbsolute(localXmlPath) &&
+                    !localXmlPath.startsWith('file:///') &&
+                    !localXmlPath.startsWith('http')
+                ) {
+                    localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+                }
+
+                if (localXmlPath.startsWith('file:///')) {
+                    localXmlPath = localXmlPath.replace('file:///', '/');
+                }
+
+                localXmlPath = path.resolve(path.normalize(localXmlPath));
             }
 
-            if (localXmlPath.startsWith('file:///')) {
-                localXmlPath = localXmlPath.replace('file:///', '/');
-            }
-
-            localXmlPath = path.resolve(path.normalize(localXmlPath));
-
             // ------------------------------------------------------------------
-            // ✅ 2) Ensure file exists
+            // ✅ 2) Ensure file exists + non-empty
             // ------------------------------------------------------------------
             const exists = await fs.pathExists(localXmlPath);
             if (!exists) {
@@ -1538,8 +1584,10 @@ class ergazomenoiController {
                 });
             }
 
+            logger.info('[ERGANH-UPLOAD] Local XML ready', { localXmlPath, size: stats.size });
+
             // ------------------------------------------------------------------
-            // ✅ 3) Load ERGANH credentials from PasswordsModel
+            // ✅ 3) Load ERGANH credentials
             // ------------------------------------------------------------------
             const passwordsData = await PasswordsModel.findOne({
                 companykod_object: sessionCompanyInUse,
@@ -1561,7 +1609,7 @@ class ergazomenoiController {
                 });
             }
 
-            // ✅ Step 3: selecting file (client step wording)
+            // ✅ Step 3: selecting file
             emitErganhStep(sessionUserId, 3, 'Επιλογή XML αρχείου');
 
             // ------------------------------------------------------------------
@@ -1597,7 +1645,7 @@ class ergazomenoiController {
             }
 
             // ------------------------------------------------------------------
-            // ✅ 6) Return result to frontend for SweetAlert2
+            // ✅ 6) Return result to frontend
             // ------------------------------------------------------------------
             emitToUser(sessionUserId, 'erganh:done', { message: 'Ολοκληρώθηκε' });
 
@@ -1605,13 +1653,11 @@ class ergazomenoiController {
                 success: !!uploadResult?.success,
                 protocol: uploadResult?.protocol || null,
                 screenshot: uploadResult?.screenshot || null,
-
                 userMessage:
                     uploadResult?.userMessage ||
                     (uploadResult?.success
                         ? 'Η υποβολή ολοκληρώθηκε. (Προσωρινή Αποθήκευση.)'
                         : 'Η υποβολή απέτυχε.'),
-
                 errorDetails: uploadResult?.errorDetails || uploadResult?.error || '',
                 messages: uploadResult?.messages || []
             });
@@ -1630,7 +1676,12 @@ class ergazomenoiController {
                 messages: []
             });
         } finally {
-            // ✅ πάντα unlock
+            // ✅ cleanup temp file (only if downloaded from S3)
+            if (tempDownloaded && localXmlPath) {
+                fs.remove(localXmlPath).catch(() => {});
+            }
+
+            // ✅ always unlock
             erganiInflight.delete(key);
         }
     };
