@@ -602,7 +602,7 @@ app.use((req, res, next) => {
         return next();
     }
 
-    if (req.method === 'GET') {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         return next();
     }
 
