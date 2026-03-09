@@ -417,7 +417,7 @@ function convertHttpsToS3Uri(httpsUrl) {
     let match = httpsUrl.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
-        const key = decodeURIComponent(match[3]);
+        const key = match[3];
         return `s3://${bucket}/${key}`;
     }
 
@@ -425,7 +425,7 @@ function convertHttpsToS3Uri(httpsUrl) {
     match = httpsUrl.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
     if (match) {
         const bucket = match[2];
-        const key = decodeURIComponent(match[3]);
+        const key = match[3];
         return `s3://${bucket}/${key}`;
     }
 
@@ -433,7 +433,7 @@ function convertHttpsToS3Uri(httpsUrl) {
     match = httpsUrl.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
-        const key = decodeURIComponent(match[2]);
+        const key = match[2];
         return `s3://${bucket}/${key}`;
     }
 
