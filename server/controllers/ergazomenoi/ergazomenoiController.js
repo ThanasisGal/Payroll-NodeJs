@@ -1418,6 +1418,274 @@ class ergazomenoiController {
         }
     };
 
+    // // ======================================================================
+    // // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
+    // // Uses Playwright uploader that requires a local file path.
+    // // ======================================================================
+    // static uploadE3ToErganh = async (req, res) => {
+    //     const sessionCompanyInUse = req.session?.companyInUse;
+    //     const sessionUserId = req.session?.userId;
+
+    //     const { ergazomenosId, s3Url } = req.body || {};
+
+    //     // ✅ Σταθερό key για lock/cooldown
+    //     const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}`;
+
+    //     // ✅ Socket emitter (rooms: user_<userId>)
+    //     const { emitToUser } = require('../../socket');
+
+    //     function emitErganhStep(userId, step, message) {
+    //         const totalSteps = 4;
+    //         const percentByStep = { 1: 0, 2: 30, 3: 60, 4: 90 };
+    //         const percent = percentByStep[step] ?? 0;
+
+    //         if (!userId) return;
+
+    //         emitToUser(userId, 'erganh:progress', {
+    //             percent,
+    //             message,
+    //             step,
+    //             totalSteps
+    //         });
+    //     }
+
+    //     let localXmlPath = s3Url;
+    //     let tempDownloaded = false;
+
+    //     try {
+    //         // ------------------------------------------------------------------
+    //         // ✅ 0) Basic validation
+    //         // ------------------------------------------------------------------
+    //         if (!ergazomenosId || !s3Url) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Λείπουν στοιχεία αιτήματος.'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: 'Λείπουν στοιχεία αιτήματος (εργαζόμενος / αρχείο).',
+    //                 errorDetails: 'Missing ergazomenosId or s3Url',
+    //                 messages: []
+    //             });
+    //         }
+
+    //         if (!sessionCompanyInUse) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Δεν έχει οριστεί εταιρεία στη συνεδρία.'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: 'Δεν έχει οριστεί εταιρεία στη συνεδρία (companyInUse).',
+    //                 errorDetails: 'Missing session.companyInUse',
+    //                 messages: []
+    //             });
+    //         }
+
+    //         // ✅ Step 1: login entry (user sees loader immediately)
+    //         emitErganhStep(sessionUserId, 1, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 0.1) Cooldown
+    //         // ------------------------------------------------------------------
+    //         const now = Date.now();
+    //         const last = erganiLastStart.get(key) || 0;
+    //         const left = ERGANI_COOLDOWN_MS - (now - last);
+
+    //         if (left > 0) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Πολύ σύντομα επαναλαμβανόμενο αίτημα (cooldown).'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage:
+    //                     'Έγινε ήδη προσπάθεια πολύ πρόσφατα. Περιμένετε λίγο και ξαναδοκιμάστε.',
+    //                 errorDetails: `Cooldown active (${Math.ceil(left / 1000)}s left)`,
+    //                 messages: []
+    //             });
+    //         }
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 0.2) Concurrent lock
+    //         // ------------------------------------------------------------------
+    //         if (erganiInflight.has(key)) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Υπάρχει ήδη υποβολή σε εξέλιξη.'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: 'Υπάρχει ήδη υποβολή σε εξέλιξη για αυτόν τον εργαζόμενο.',
+    //                 errorDetails: 'ERGANH upload inflight (server-side lock)',
+    //                 messages: []
+    //             });
+    //         }
+
+    //         // ✅ lock + start cooldown timer
+    //         erganiInflight.set(key, true);
+    //         erganiLastStart.set(key, now);
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 1) Resolve local XML path (DEV vs PROD)
+    //         // ------------------------------------------------------------------
+    //         const prepMsg =
+    //             typeof s3Url === 'string' && s3Url.startsWith('s3://')
+    //                 ? 'Προετοιμασία Αποστολής (λήψη XML από S3)'
+    //                 : 'Προετοιμασία Αποστολής';
+
+    //         emitErganhStep(sessionUserId, 2, prepMsg);
+
+    //         if (typeof s3Url === 'string' && s3Url.startsWith('s3://')) {
+    //             logger.info('[ERGANH-UPLOAD] S3 download start', { s3Url });
+
+    //             localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
+    //             tempDownloaded = true;
+
+    //             logger.info('[ERGANH-UPLOAD] S3 download ok', { localXmlPath });
+    //         } else {
+    //             const cwd = process.cwd();
+
+    //             if (
+    //                 !path.isAbsolute(localXmlPath) &&
+    //                 !localXmlPath.startsWith('file:///') &&
+    //                 !localXmlPath.startsWith('http')
+    //             ) {
+    //                 localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+    //             }
+
+    //             if (localXmlPath.startsWith('file:///')) {
+    //                 localXmlPath = localXmlPath.replace('file:///', '/');
+    //             }
+
+    //             localXmlPath = path.resolve(path.normalize(localXmlPath));
+    //         }
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 2) Ensure file exists + non-empty
+    //         // ------------------------------------------------------------------
+    //         const exists = await fs.pathExists(localXmlPath);
+    //         if (!exists) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Δεν βρέθηκε το XML αρχείο.'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: `Δεν βρέθηκε το XML αρχείο: ${path.basename(localXmlPath)}`,
+    //                 errorDetails: `XML file not found: ${localXmlPath}`,
+    //                 messages: []
+    //             });
+    //         }
+
+    //         const stats = await fs.stat(localXmlPath);
+    //         if (!stats.size) {
+    //             emitToUser(sessionUserId, 'erganh:error', { message: 'Το XML αρχείο είναι κενό.' });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: 'Το XML αρχείο είναι κενό.',
+    //                 errorDetails: `XML file is empty: ${localXmlPath}`,
+    //                 messages: []
+    //             });
+    //         }
+
+    //         logger.info('[ERGANH-UPLOAD] Local XML ready', { localXmlPath, size: stats.size });
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 3) Load ERGANH credentials
+    //         // ------------------------------------------------------------------
+    //         const passwordsData = await PasswordsModel.findOne({
+    //             companykod_object: sessionCompanyInUse,
+    //             kodikos: '0002'
+    //         }).lean();
+
+    //         const erganhUsername = passwordsData?.username;
+    //         const erganhPassword = passwordsData?.password;
+
+    //         if (!erganhUsername || !erganhPassword) {
+    //             emitToUser(sessionUserId, 'erganh:error', {
+    //                 message: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ.'
+    //             });
+    //             return res.status(200).json({
+    //                 success: false,
+    //                 userMessage: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ για την εταιρεία.',
+    //                 errorDetails: 'Missing ERGANH credentials (PasswordsModel kodikos=0002)',
+    //                 messages: []
+    //             });
+    //         }
+
+    //         // ✅ Step 3: selecting file
+    //         emitErganhStep(sessionUserId, 3, 'Επιλογή XML αρχείου');
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 4) Run uploader (BLOCKING)
+    //         // ------------------------------------------------------------------
+    //         const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
+
+    //         // ✅ Step 4: sending/uploading
+    //         emitErganhStep(sessionUserId, 4, 'Αποστολή');
+
+    //         const uploadResult = await uploadE3ToErganh(
+    //             sessionCompanyInUse,
+    //             localXmlPath,
+    //             sessionUserId,
+    //             { username: erganhUsername, password: erganhPassword }
+    //         );
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 5) Save protocol OR errors to DB
+    //         // ------------------------------------------------------------------
+    //         if (uploadResult?.success && uploadResult?.protocol) {
+    //             ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+    //                 erganh_e3_protocol: uploadResult.protocol,
+    //                 erganh_e3_upload_date: new Date(),
+    //                 erganh_e3_screenshot: uploadResult.screenshot
+    //             }).catch(() => {});
+    //         } else if (uploadResult?.messages?.length) {
+    //             ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+    //                 erganh_e3_errors: uploadResult.messages,
+    //                 erganh_e3_error_date: new Date(),
+    //                 erganh_e3_screenshot: uploadResult.screenshot
+    //             }).catch(() => {});
+    //         }
+
+    //         // ------------------------------------------------------------------
+    //         // ✅ 6) Return result to frontend
+    //         // ------------------------------------------------------------------
+    //         emitToUser(sessionUserId, 'erganh:done', { message: 'Ολοκληρώθηκε' });
+
+    //         return res.status(200).json({
+    //             success: !!uploadResult?.success,
+    //             protocol: uploadResult?.protocol || null,
+    //             screenshot: uploadResult?.screenshot || null,
+    //             userMessage:
+    //                 uploadResult?.userMessage ||
+    //                 (uploadResult?.success
+    //                     ? 'Η υποβολή ολοκληρώθηκε. (Προσωρινή Αποθήκευση.)'
+    //                     : 'Η υποβολή απέτυχε.'),
+    //             errorDetails: uploadResult?.errorDetails || uploadResult?.error || '',
+    //             messages: uploadResult?.messages || []
+    //         });
+    //     } catch (error) {
+    //         logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
+    //             error: error.message,
+    //             stack: error.stack
+    //         });
+
+    //         emitToUser(sessionUserId, 'erganh:error', { message: 'Αποτυχία υποβολής στο ΕΡΓΑΝΗ' });
+
+    //         return res.status(500).json({
+    //             success: false,
+    //             userMessage: 'Failed to upload to ERGANH',
+    //             errorDetails: error.message,
+    //             messages: []
+    //         });
+    //     } finally {
+    //         // ✅ cleanup temp file (only if downloaded from S3)
+    //         if (tempDownloaded && localXmlPath) {
+    //             fs.remove(localXmlPath).catch(() => {});
+    //         }
+
+    //         // ✅ always unlock
+    //         erganiInflight.delete(key);
+    //     }
+    // };
+
     // ======================================================================
     // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
     // Uses Playwright uploader that requires a local file path.
@@ -1523,16 +1791,17 @@ class ergazomenoiController {
             erganiLastStart.set(key, now);
 
             // ------------------------------------------------------------------
-            // ✅ 1) Resolve local XML path (DEV vs PROD)
+            // ✅ 1) Resolve local XML path (DEV vs PROD) - ✅ FIXED
             // ------------------------------------------------------------------
             const prepMsg =
-                typeof s3Url === 'string' && s3Url.startsWith('s3://')
+                typeof s3Url === 'string' && isS3Url(s3Url)
                     ? 'Προετοιμασία Αποστολής (λήψη XML από S3)'
                     : 'Προετοιμασία Αποστολής';
 
             emitErganhStep(sessionUserId, 2, prepMsg);
 
-            if (typeof s3Url === 'string' && s3Url.startsWith('s3://')) {
+            // ✅ FIXED: Now supports both s3:// and HTTPS S3 URLs
+            if (typeof s3Url === 'string' && isS3Url(s3Url)) {
                 logger.info('[ERGANH-UPLOAD] S3 download start', { s3Url });
 
                 localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
