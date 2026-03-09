@@ -31,6 +31,7 @@ const { pdfDocumentl } = Models_E;
 const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
+const { generatePresignedUrl, downloadS3UriToTempFile, isS3Url } = require('../../utils/s3Helper');
 
 let nextPageSearchTerm = '';
 
@@ -56,24 +57,24 @@ function parseS3Uri(s3Uri) {
     return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
 }
 
-async function downloadS3UriToTempFile(s3Uri, companyInUse) {
-    const parsed = parseS3Uri(s3Uri);
-    if (!parsed) throw new Error('Invalid s3:// URI');
+// async function downloadS3UriToTempFile(s3Uri, companyInUse) {
+//     const parsed = parseS3Uri(s3Uri);
+//     if (!parsed) throw new Error('Invalid s3:// URI');
 
-    const ext = path.extname(parsed.key) || '.xml';
-    const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
-    const uniq = crypto.randomBytes(6).toString('hex');
-    const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+//     const ext = path.extname(parsed.key) || '.xml';
+//     const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+//     const uniq = crypto.randomBytes(6).toString('hex');
+//     const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
 
-    const resp = await s3Client.send(
-        new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
-    );
+//     const resp = await s3Client.send(
+//         new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
+//     );
 
-    if (!resp?.Body) throw new Error('S3 GetObject: empty body');
+//     if (!resp?.Body) throw new Error('S3 GetObject: empty body');
 
-    await pipeline(resp.Body, fs.createWriteStream(tempPath));
-    return tempPath;
-}
+//     await pipeline(resp.Body, fs.createWriteStream(tempPath));
+//     return tempPath;
+// }
 
 // =========================================================================
 // ✅ HELPER FUNCTION: Validation για Ωράριο Εργασίας
@@ -1012,7 +1013,7 @@ class ergazomenoiController {
         // ============================================================================
 
         const { generateContractPDF } = require('../../utils/contractGenerator');
-        const { generatePresignedUrl } = require('../../utils/s3Helper'); // ✅ FIXED!
+        // const { generatePresignedUrl } = require('../../utils/s3Helper'); // ✅ FIXED!
 
         let contractPdfData = null;
 
@@ -1314,7 +1315,7 @@ class ergazomenoiController {
                         const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
 
                         try {
-                            const { generatePresignedUrl } = require('../../utils/s3Helper');
+                            // const { generatePresignedUrl } = require('../../utils/s3Helper');
                             const downloadUrl = await generatePresignedUrl(xmlResult.s3Key, 600);
 
                             e3XmlData = {
