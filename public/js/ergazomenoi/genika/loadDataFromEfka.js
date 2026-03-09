@@ -74,15 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // (A) άνοιγμα EFKA session
             const openRes = await efkaOpen();
-            console.log('EFKA open:', openRes);
 
             // (B) συνέχεια + στείλε και το AMKA
             const contRes = await postJson('/api/efka/apd/continue', {
                 sessionId: efkaSessionId,
                 amka: amka // ✅ ΕΔΩ ΤΟ ΠΕΡΝΑΜΕ
             });
-
-            console.log('EFKA continue:', contRes);
 
             // === Γέμισε τα πεδία της φόρμας από τα στοιχεία που επέστρεψε ο server ===
             const p = contRes.person;
@@ -130,7 +127,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 9η -> ΠΑΛΙΟΣ => false, αλλιώς true
                 const paliosNeosEl = document.getElementById('palios_neos');
-                if (paliosNeosEl) paliosNeosEl.checked = !!p.palios_neos;
+                if (paliosNeosEl) {
+                    paliosNeosEl.checked = !!p.palios_neos;
+                    // ✅ Trigger το change event για να ενημερωθεί το label
+                    paliosNeosEl.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             }
         } catch (e) {
             console.error(e);
