@@ -409,12 +409,16 @@ function isS3Url(url) {
 
 /**
  * ✅ Convert HTTPS S3 URL to s3:// URI
+ * Removes query parameters (presigned URL params) before conversion
  * @param {string} httpsUrl - HTTPS S3 URL
  * @returns {string|null} s3:// URI or null if invalid
  */
 function convertHttpsToS3Uri(httpsUrl) {
+    // ✅ Remove query parameters (X-Amz-Algorithm, X-Amz-Credential, etc.)
+    const urlWithoutQuery = httpsUrl.split('?')[0];
+
     // Pattern 1: https://bucket.s3.region.amazonaws.com/key
-    let match = httpsUrl.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
+    let match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
         const key = match[3];
@@ -422,7 +426,7 @@ function convertHttpsToS3Uri(httpsUrl) {
     }
 
     // Pattern 2: https://s3.region.amazonaws.com/bucket/key
-    match = httpsUrl.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
+    match = urlWithoutQuery.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
     if (match) {
         const bucket = match[2];
         const key = match[3];
@@ -430,7 +434,7 @@ function convertHttpsToS3Uri(httpsUrl) {
     }
 
     // Pattern 3: https://bucket.s3.amazonaws.com/key (no region)
-    match = httpsUrl.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
+    match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
         const key = match[2];
