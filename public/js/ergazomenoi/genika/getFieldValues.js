@@ -925,13 +925,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     // ✅ Loader (blocking endpoint)
-                    Swal.fire({
-                        title: 'ΕΡΓΑΝΗ ΙΙ',
-                        text: 'Γίνεται αποστολή... Παρακαλώ περιμένετε.',
-                        allowOutsideClick: false,
-                        allowEscapeKey: false,
-                        didOpen: () => Swal.showLoading()
-                    });
+                    // Swal.fire({
+                    //     title: 'ΕΡΓΑΝΗ ΙΙ',
+                    //     text: 'Γίνεται αποστολή... Παρακαλώ περιμένετε.',
+                    //     allowOutsideClick: false,
+                    //     allowEscapeKey: false,
+                    //     didOpen: () => Swal.showLoading()
+                    // });
 
                     // ✅ Αυτό θα δείξει success/error Swal μέσα στη συνάρτηση
                     await uploadToErganh(ergazomenosId, s3UrlToSend);
@@ -1172,24 +1172,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]
             );
 
-        // ✅ NEW: redact very long AWS query params + limit length
         const redactSecrets = (s) => {
             if (!s) return '';
             let out = String(s);
-
-            // remove scary-long AWS params (keeps the rest readable)
             out = out.replace(/X-Amz-Signature=[^&\s]+/gi, 'X-Amz-Signature=REDACTED');
             out = out.replace(/X-Amz-Security-Token=[^&\s]+/gi, 'X-Amz-Security-Token=REDACTED');
             out = out.replace(/X-Amz-Credential=[^&\s]+/gi, 'X-Amz-Credential=REDACTED');
-
-            // hard limit so swal never becomes “wall of text”
             const MAX = 1200;
             if (out.length > MAX)
                 out = out.slice(0, MAX) + `\n\n…(truncated, ${out.length - MAX} chars)`;
             return out;
         };
 
-        // ✅ NEW: build better error html (short + expandable details)
         const buildErrorHtml = ({ userMessage, errorDetails, messages }) => {
             const short = userMessage || 'Η υποβολή απέτυχε.';
             const detailsParts = [
@@ -1203,12 +1197,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="font-weight:600; margin-bottom:10px;">
           ${escapeHtml(short)}
         </div>
-
         ${
             details
                 ? `
           <details style="margin-top:8px;">
-            <summary style="cursor:pointer;">Λεπτομέρειες (τεχνικό)</summary>
+            <summary style="cursor:pointer;">Λεπτομέρειες</summary>
             <pre style="
               max-height:220px;
               overflow:auto;
@@ -1230,12 +1223,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // ✅ Start loader immediately (socket will continue updating steps)
+            // ✅ Start progress bar loader ONLY (NO Swal popup!)
             if (window.applyServerProgress) {
                 window.applyServerProgress(0, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ', 1, 4);
             } else if (window.showLoader) {
                 window.showLoader('Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
             }
+
+            // ❌ REMOVED: No Swal.fire loading popup here!
 
             const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-e3-to-erganh', {
                 method: 'POST',
@@ -1254,7 +1249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload = { success: false, userMessage: await uploadResponse.text() };
             }
 
-            // ✅ HTTP errors (500 κλπ)
+            // ✅ HTTP errors
             if (!uploadResponse.ok) {
                 const userMessage =
                     payload?.userMessage ||
@@ -1285,7 +1280,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             }
 
-            // Normalize
             const userMessage = payload?.userMessage || payload?.message || '';
             const errorDetails = payload?.errorDetails || payload?.error || '';
             const messages = Array.isArray(payload?.messages) ? payload.messages : [];
@@ -1316,7 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return payload;
             }
 
-            // ✅ FAIL (controlled)
+            // ✅ FAIL
             if (window.hideLoader) window.hideLoader();
 
             await Swal.fire({
