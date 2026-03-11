@@ -517,6 +517,8 @@ class ergazomenoiController {
                 mode: 'add',
                 context: 'ergazomenoi',
                 sessionYearInUse,
+                companyInUse: req.session.companyInUse,
+                userTeam: req.session.userTeam,
                 csrfToken: res.locals.csrfToken,
                 nonce: res.locals.nonce,
                 rec: {}

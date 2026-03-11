@@ -52,6 +52,9 @@ const textCacheManager = require('./server/utils/textCacheManager');
 const app = express();
 app.disable('x-powered-by');
 
+const cdnProxy = require('./server/middlewares/cdnProxy');
+app.use(cdnProxy);
+
 const host = process.env.HOST || 'localhost';
 const port = Number(process.env.PORT || 5000);
 
@@ -197,10 +200,6 @@ const checkFileAuth = (req, res, next) => {
 };
 
 // ============================================================================
-// Serve Uploads (Protected)
-// ============================================================================
-
-// ============================================================================
 // Serve Uploads (Protected) - UPDATED FOR EDGE COMPATIBILITY
 // ============================================================================
 
@@ -238,6 +237,12 @@ app.locals.script = (path) => {
 
 app.locals.STATIC_BASE = STATIC_BASE;
 app.locals.NODE_ENV = node_env;
+
+app.locals.cdnUrl = (path) => {
+    const isDev = node_env !== 'production';
+    const base = isDev ? '/cdn-proxy/assets' : 'https://cdn.webpayrollsolutions.com/assets';
+    return `${base}/${path}`;
+};
 
 /* -------------------------------------------------------------------------- */
 /*                              Ρύθμιση Session                               */

@@ -328,14 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="checkbox" id="schedules" name="files" value="schedules" checked 
                                 class="custom-checkbox" />
                             <label for="schedules" class="margin-0 cursor-pointer font-size-rem-1_05">
-                                Δήλωση Μεταβολής Στοιχείων Εργασιακής Σχέσης
-                            </label>
-                        </div>
-
-                        <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox" id="history" name="files" value="history" checked 
-                                class="custom-checkbox" />
-                            <label for="history" class="margin-0 cursor-pointer font-size-rem-1_05">
                                 Ψηφιακό Οργάνωση Χρόνου Εργασίας
                             </label>
                         </div>
@@ -346,8 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const filesToUpdate = {
                         e3_anaggelia_proslhpshs:
                             document.getElementById('e3_anaggelia_proslhpshs').checked,
-                        schedules: document.getElementById('schedules').checked,
-                        history: document.getElementById('history').checked
+                        schedules: document.getElementById('schedules').checked
                     };
 
                     // ✅ DEBUG: Log checkbox values

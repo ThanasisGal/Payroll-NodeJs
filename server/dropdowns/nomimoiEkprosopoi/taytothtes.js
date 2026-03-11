@@ -7,6 +7,6 @@ module.exports = {
     model: TypoiTaytothtonModel,
     options: {
         searchFields: ['kodikos', 'perigrafh'],
-        sort: { perigrafh: 1 },
+        sort: { sort_order: 1 }
     }
 };

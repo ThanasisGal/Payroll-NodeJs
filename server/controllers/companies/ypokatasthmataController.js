@@ -1,7 +1,7 @@
-const mongoose = require("mongoose");
-const Models_B = require("../../models/privileges");
-const Models_C = require("../../models/companies");
-const Models = require("../../models/stathera_arxeia");
+const mongoose = require('mongoose');
+const Models_B = require('../../models/privileges');
+const Models_C = require('../../models/companies');
+const Models = require('../../models/stathera_arxeia');
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, YpokatasthmataModel } = Models_C;
@@ -11,13 +11,13 @@ function formatNumber(number, totalLength) {
     return number.toString().padStart(totalLength, '0');
 }
 
-let nextPageSearchTerm = "";
+let nextPageSearchTerm = '';
 
 class ypokatasthmataController {
     static mainYpokatasthmataForm = async (req, res) => {
         const locals = {
-            title: "Υποκαταστήματα",
-            description: "Web Payroll Solutions",
+            title: 'Υποκαταστήματα',
+            description: 'Web Payroll Solutions'
         };
 
         const sessionCompanyInUse = req.session.companyInUse;
@@ -30,7 +30,7 @@ class ypokatasthmataController {
         try {
             // Άντληση στοιχείων εταιρείας
             const company = await CompaniesModel.findOne({
-                _id: sessionCompanyInUse,
+                _id: sessionCompanyInUse
             });
 
             const companyIdAsString = company._id.toString(); // Μετατρέπω το company.id από object σε string
@@ -38,22 +38,22 @@ class ypokatasthmataController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Ypokatasthmata",
+                form: 'Ypokatasthmata'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $match: {
-                        companykod_object: companyIdAsString,
-                    },
+                        companykod_object: companyIdAsString
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
-            const countResults = await YpokatasthmataModel.aggregate( countPipeline ).exec();
+            const countResults = await YpokatasthmataModel.aggregate(countPipeline).exec();
 
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
@@ -67,47 +67,47 @@ class ypokatasthmataController {
             const queryPipeline = [
                 {
                     $match: {
-                        companykod_object: companyIdAsString,
-                    },
+                        companykod_object: companyIdAsString
+                    }
                 },
                 {
                     $lookup: {
                         //                  INNER JOIN
-                        from: "poleis", // Ορίζω το όνομα της συλλογής Poleis στη βάση δεδομένων MongoDB
-                        localField: "polh", // Το πεδίο στα ypokatasthmata που αντιστοιχεί στο kodikos του poleis
-                        foreignField: "kodikos", // Το πεδίο στην συλλογή Poleis που αντιστοιχεί στο κλειδί polh του ypokatasthmata
-                        as: "polhInfo", // Το όνομα του πεδίου στο οποίο θα αποθηκευτούν τα αποτελέσματα της ενώσης
-                    },
+                        from: 'poleis', // Ορίζω το όνομα της συλλογής Poleis στη βάση δεδομένων MongoDB
+                        localField: 'polh', // Το πεδίο στα ypokatasthmata που αντιστοιχεί στο kodikos του poleis
+                        foreignField: 'kodikos', // Το πεδίο στην συλλογή Poleis που αντιστοιχεί στο κλειδί polh του ypokatasthmata
+                        as: 'polhInfo' // Το όνομα του πεδίου στο οποίο θα αποθηκευτούν τα αποτελέσματα της ενώσης
+                    }
                 },
                 {
-                    $unwind: "$polhInfo", // Θέλω κάθε υποκατάστημα να έχει άμεσα τα στοιχεία της πόλης του
+                    $unwind: '$polhInfo' // Θέλω κάθε υποκατάστημα να έχει άμεσα τα στοιχεία της πόλης του
                 },
                 {
                     $sort: {
-                        perigrafh: 1,
-                    },
+                        perigrafh: 1
+                    }
                 },
                 {
-                    $skip: skipRecords,
+                    $skip: skipRecords
                 },
                 {
-                    $limit: limitPerPage,
-                },
+                    $limit: limitPerPage
+                }
             ];
 
-            const ypokatasthmata = await YpokatasthmataModel.aggregate( queryPipeline ).exec();
+            const ypokatasthmata = await YpokatasthmataModel.aggregate(queryPipeline).exec();
 
-            res.render("companies/ypokatasthmata/ypokatasthmata", {
+            res.render('companies/ypokatasthmata/ypokatasthmata', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 current: page,
                 pages: totalPages,
                 company,
                 ypokatasthmata,
-                perx,                       // <-- για το UI πολλαπλασιαστή
-                basePer,                    // (προαιρετικό, αν το δείχνεις)
-                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
-                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
+                perx, // <-- για το UI πολλαπλασιαστή
+                basePer, // (προαιρετικό, αν το δείχνεις)
+                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.log(error);
@@ -118,23 +118,23 @@ class ypokatasthmataController {
         const sessionUserTeam = req.session.userTeam;
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
-            title: "Προσθήκη Νέου Υποκαταστήματος",
-            description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέου Υποκαταστήματος',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             const company = await CompaniesModel.findOne({
-                _id: sessionCompanyInUse,
+                _id: sessionCompanyInUse
             });
 
-            const data = await PerifereiesModel.find().sort("kodikos");
-            res.render("companies/ypokatasthmata/add", {
+            const data = await PerifereiesModel.find().sort('kodikos');
+            res.render('companies/ypokatasthmata/add', {
                 locals,
                 company,
                 data,
                 mode: 'add',
-                context: "branch",
-                rec: {},
+                context: 'branch',
+                rec: {}
             });
         } catch (error) {
             console.log(error);
@@ -148,15 +148,13 @@ class ypokatasthmataController {
         try {
             const lastRecord = await YpokatasthmataModel.find({
                 team: formData.companyTeam,
-                companykod: formData.companyKodikos,
+                companykod: formData.companyKodikos
             })
                 .sort({ _id: -1 })
                 .limit(1);
 
             let kodValue =
-                lastRecord[0] && lastRecord[0].kodikos
-                ? parseInt(lastRecord[0].kodikos, 10)
-                : null;
+                lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
             if (kodValue !== null) {
                 kodValue++;
             } else {
@@ -164,7 +162,7 @@ class ypokatasthmataController {
             }
             aa_kod = kodValue;
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
 
         const newYpokatasthma = YpokatasthmataModel({
@@ -177,21 +175,15 @@ class ypokatasthmataController {
             arithmos: formData.arithmos,
             tk: formData.tk,
             perifereia: (formData.perifereies =
-                formData.perifereies === null || formData.perifereies === ""
-                ? "00"
-                : formData.perifereies),
+                formData.perifereies === null || formData.perifereies === ''
+                    ? '00'
+                    : formData.perifereies),
             nomos: (formData.nomos =
-                formData.nomos === null || formData.nomos === ""
-                ? "0000"
-                : formData.nomos),
+                formData.nomos === null || formData.nomos === '' ? '0000' : formData.nomos),
             dhmos: (formData.dhmos =
-                formData.dhmos === null || formData.dhmos === ""
-                ? "0000"
-                : formData.dhmos),
+                formData.dhmos === null || formData.dhmos === '' ? '0000' : formData.dhmos),
             polh: (formData.polh =
-                formData.polh === null || formData.polh === ""
-                ? "00000000"
-                : formData.polh),
+                formData.polh === null || formData.polh === '' ? '00000000' : formData.polh),
             pararthma_efka: formData.pararthma_efka,
             drasthriothta: formData.drasthriothta,
             thlefono: formData.thlefono,
@@ -217,20 +209,21 @@ class ypokatasthmataController {
             polh_ergolaboy: formData.polh_ergolaboy,
             ame_ergolaboy: formData.ame_ergolaboy,
             pararthma_efka_ergolaboy: (formData.pararthma_efka_ergolaboy =
-                formData.pararthma_efka_ergolaboy === null || formData.pararthma_efka_ergolaboy === ""
-                ? "   "
-                : formData.pararthma_efka_ergolaboy),
+                formData.pararthma_efka_ergolaboy === null ||
+                formData.pararthma_efka_ergolaboy === ''
+                    ? '   '
+                    : formData.pararthma_efka_ergolaboy),
             sepe_ergoy: formData.sepe,
             dypa_ergoy: formData.dypa,
             username_ypergol_ergoy: formData.username_ypergol_ergoy,
             password_ypergol_ergoy: formData.password_ypergol_ergoy,
             createdAt: Date.now(),
-            updatedAt: Date.now(),
+            updatedAt: Date.now()
         });
 
         try {
             await YpokatasthmataModel.create(newYpokatasthma);
-            res.json({ success: true, redirectUrl: "/companies/ypokatasthmata" });
+            res.json({ success: true, redirectUrl: '/companies/ypokatasthmata' });
         } catch (error) {
             console.log(error);
         }
@@ -238,8 +231,8 @@ class ypokatasthmataController {
 
     static searchGetYpokatasthmata = async (req, res) => {
         const locals = {
-            title: "Αναζήτηση Υποκαταστημάτων",
-            description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Υποκαταστημάτων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
@@ -254,22 +247,22 @@ class ypokatasthmataController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Ypokatasthmata",
+                form: 'Ypokatasthmata'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $lookup: {
-                        from: "poleis",
-                        localField: "polh",
-                        foreignField: "kodikos",
-                        as: "polhInfo"
+                        from: 'poleis',
+                        localField: 'polh',
+                        foreignField: 'kodikos',
+                        as: 'polhInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$polhInfo",
+                        path: '$polhInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -278,17 +271,17 @@ class ypokatasthmataController {
                         // team: sessionUserTeam,
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                            { perografh: { $regex: new RegExp(searchTerm, "i") } },
-                            { odos: { $regex: new RegExp(searchTerm, "i") } },
-                            { arithmos: { $regex: new RegExp(searchTerm, "i") } },
-                            { "polhInfo.perigrafh": { $regex: new RegExp(searchTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { perografh: { $regex: new RegExp(searchTerm, 'i') } },
+                            { odos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { arithmos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { 'polhInfo.perigrafh': { $regex: new RegExp(searchTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await YpokatasthmataModel.aggregate(countPipeline).exec();
@@ -296,37 +289,42 @@ class ypokatasthmataController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const ypokatasthmataFilteredRecs = await YpokatasthmataModel.aggregate([
                 {
                     $lookup: {
-                        from: "poleis",
-                        localField: "polh",
-                        foreignField: "kodikos",
-                        as: "polhInfo"
+                        from: 'poleis',
+                        localField: 'polh',
+                        foreignField: 'kodikos',
+                        as: 'polhInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$polhInfo",
+                        path: '$polhInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
                 {
                     $match: {
                         $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                            { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
-                            { odos: { $regex: new RegExp(searchTerm, "i") } },
-                            { arithmos: { $regex: new RegExp(searchTerm, "i") } },
-                            { "polhInfo.perigrafh": { $regex: new RegExp(searchTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(searchTerm, 'i') } },
+                            { odos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { arithmos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { 'polhInfo.perigrafh': { $regex: new RegExp(searchTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
                         ]
                     }
                 }
-            ]).skip(skipRecords).limit(limitPerPage);
-        
+            ])
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = ypokatasthmataFilteredRecs.map((record) => ({
                 ...record,
@@ -334,10 +332,12 @@ class ypokatasthmataController {
                 perigrafh: this.highlightText(record.perigrafh, searchTerm),
                 odos: this.highlightText(record.odos, searchTerm),
                 arithmos: this.highlightText(record.arithmos, searchTerm),
-                polhPerigrafh: record.polhInfo ? this.highlightText(record.polhInfo.perigrafh, searchTerm) : ""
+                polhPerigrafh: record.polhInfo
+                    ? this.highlightText(record.polhInfo.perigrafh, searchTerm)
+                    : ''
             }));
-        
-            res.render("companies/ypokatasthmata/search", {
+
+            res.render('companies/ypokatasthmata/search', {
                 ypokatasthmataFilteredRecs: highlightedRecords,
                 locals,
                 current: page,
@@ -345,7 +345,7 @@ class ypokatasthmataController {
                 userPrivileges,
                 sTerm: searchTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
             console.log(error);
@@ -354,8 +354,8 @@ class ypokatasthmataController {
 
     static searchPostYpokatasthmata = async (req, res) => {
         const locals = {
-            title: "Αναζήτηση Υποκαταστημάτων",
-            description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Υποκαταστημάτων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
@@ -364,7 +364,7 @@ class ypokatasthmataController {
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
             const sessionCompanyInUse = req.session.companyInUse;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, '');
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
 
@@ -374,22 +374,22 @@ class ypokatasthmataController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Ypokatasthmata",
+                form: 'Ypokatasthmata'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $lookup: {
-                        from: "poleis",
-                        localField: "polh",
-                        foreignField: "kodikos",
-                        as: "polhInfo"
+                        from: 'poleis',
+                        localField: 'polh',
+                        foreignField: 'kodikos',
+                        as: 'polhInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$polhInfo",
+                        path: '$polhInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -397,17 +397,17 @@ class ypokatasthmataController {
                     $match: {
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                            { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-                            { odos: { $regex: new RegExp(sTerm, "i") } },
-                            { arithmos: { $regex: new RegExp(sTerm, "i") } },
-                            { "polhInfo.perigrafh": { $regex: new RegExp(sTerm, "i") } }
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(sTerm, 'i') } },
+                            { odos: { $regex: new RegExp(sTerm, 'i') } },
+                            { arithmos: { $regex: new RegExp(sTerm, 'i') } },
+                            { 'polhInfo.perigrafh': { $regex: new RegExp(sTerm, 'i') } }
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await YpokatasthmataModel.aggregate(countPipeline).exec();
@@ -415,22 +415,24 @@ class ypokatasthmataController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-            
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const ypokatasthmataFilteredRecs = await YpokatasthmataModel.aggregate([
                 {
                     $lookup: {
-                        from: "poleis",
-                        localField: "polh",
-                        foreignField: "kodikos",
-                        as: "polhInfo"
+                        from: 'poleis',
+                        localField: 'polh',
+                        foreignField: 'kodikos',
+                        as: 'polhInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$polhInfo",
+                        path: '$polhInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -438,18 +440,18 @@ class ypokatasthmataController {
                     $match: {
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                            { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-                            { odos: { $regex: new RegExp(sTerm, "i") } },
-                            { arithmos: { $regex: new RegExp(sTerm, "i") } },
-                            { "polhInfo.perigrafh": { $regex: new RegExp(sTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της ιδιότητας
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(sTerm, 'i') } },
+                            { odos: { $regex: new RegExp(sTerm, 'i') } },
+                            { arithmos: { $regex: new RegExp(sTerm, 'i') } },
+                            { 'polhInfo.perigrafh': { $regex: new RegExp(sTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της ιδιότητας
                         ]
                     }
                 }
             ])
-            .skip(skipRecords)
-            .limit(limitPerPage);
-        
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = ypokatasthmataFilteredRecs.map((record) => ({
                 ...record,
@@ -457,10 +459,12 @@ class ypokatasthmataController {
                 perigrafh: this.highlightText(record.perigrafh, sTerm),
                 odos: this.highlightText(record.odos, sTerm),
                 arithmos: this.highlightText(record.arithmos, sTerm),
-                polhPerigrafh: record.polhInfo ? this.highlightText(record.polhInfo.perigrafh, sTerm) : ""
+                polhPerigrafh: record.polhInfo
+                    ? this.highlightText(record.polhInfo.perigrafh, sTerm)
+                    : ''
             }));
 
-            res.render("companies/ypokatasthmata/search", {
+            res.render('companies/ypokatasthmata/search', {
                 userPrivileges,
                 locals,
                 current: page,
@@ -468,7 +472,7 @@ class ypokatasthmataController {
                 sTerm: sTerm,
                 entries: perPage,
                 totalRecs: totalRecords,
-                ypokatasthmataFilteredRecs: highlightedRecords,
+                ypokatasthmataFilteredRecs: highlightedRecords
             });
         } catch (error) {
             console.log(error);
@@ -477,25 +481,27 @@ class ypokatasthmataController {
 
     static editYpokatasthmataForm = async (req, res) => {
         const locals = {
-            title: "Συντήρηση Υποκ/των",
-            description: "Web Payroll Solutions",
+            title: 'Συντήρηση Υποκ/των',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            const perifereies = await PerifereiesModel.find().sort("perigrafh");
+            const perifereies = await PerifereiesModel.find().sort('perigrafh');
 
             const ypokatasthmaId = req.params.id;
             const ypokatasthma = await YpokatasthmataModel.findById(ypokatasthmaId).lean();
-            const company = await CompaniesModel.findOne({ _id: ypokatasthma.companykod_object }).lean();
+            const company = await CompaniesModel.findOne({
+                _id: ypokatasthma.companykod_object
+            }).lean();
 
-            res.render("companies/ypokatasthmata/edit", {
+            res.render('companies/ypokatasthmata/edit', {
                 locals,
                 perifereies,
                 ypokatasthma,
                 company,
-                mode   : "edit",
-                context: "branch",
-                rec    : {}, 
+                mode: 'edit',
+                context: 'branch',
+                rec: {}
             });
         } catch (error) {
             console.log(error);
@@ -513,21 +519,15 @@ class ypokatasthmataController {
             arithmos: formData.arithmos,
             tk: formData.tk,
             perifereia: (formData.perifereies =
-                formData.perifereies === null || formData.perifereies === ""
-                ? "00"
-                : formData.perifereies),
+                formData.perifereies === null || formData.perifereies === ''
+                    ? '00'
+                    : formData.perifereies),
             nomos: (formData.nomos =
-                formData.nomos === null || formData.nomos === ""
-                ? "0000"
-                : formData.nomos),
+                formData.nomos === null || formData.nomos === '' ? '0000' : formData.nomos),
             dhmos: (formData.dhmos =
-                formData.dhmos === null || formData.dhmos === ""
-                ? "0000"
-                : formData.dhmos),
+                formData.dhmos === null || formData.dhmos === '' ? '0000' : formData.dhmos),
             polh: (formData.polh =
-                formData.polh === null || formData.polh === ""
-                ? "00000000"
-                : formData.polh),
+                formData.polh === null || formData.polh === '' ? '00000000' : formData.polh),
             pararthma_efka: formData.pararthma_efka,
             drasthriothta: formData.drasthriothta,
             thlefono: formData.thlefono,
@@ -553,14 +553,15 @@ class ypokatasthmataController {
             polh_ergolaboy: formData.polh_ergolaboy,
             ame_ergolaboy: formData.ame_ergolaboy,
             pararthma_efka_ergolaboy: (formData.pararthma_efka_ergolaboy =
-                formData.pararthma_efka_ergolaboy === null || formData.pararthma_efka_ergolaboy === ""
-                ? "   "
-                : formData.pararthma_efka_ergolaboy),
+                formData.pararthma_efka_ergolaboy === null ||
+                formData.pararthma_efka_ergolaboy === ''
+                    ? '   '
+                    : formData.pararthma_efka_ergolaboy),
             sepe_ergoy: formData.sepe,
             dypa_ergoy: formData.dypa,
             username_ypergol_ergoy: formData.username_ypergol_ergoy,
             password_ypergol_ergoy: formData.password_ypergol_ergoy,
-            updatedAt: Date.now(),
+            updatedAt: Date.now()
         };
 
         // Τώρα μπορώ να χρησιμοποιήσω το filteredDataCompany στη $set: για ενημέρωση
@@ -571,7 +572,7 @@ class ypokatasthmataController {
         );
 
         try {
-            res.json({ success: true, redirectUrl: "/companies/ypokatasthmata" });
+            res.json({ success: true, redirectUrl: '/companies/ypokatasthmata' });
         } catch (error) {
             throw error;
         }
@@ -580,17 +581,17 @@ class ypokatasthmataController {
     static deleteYpokatasthmata = async (req, res) => {
         try {
             await YpokatasthmataModel.deleteOne({ _id: req.params.id });
-            res.json({ success: true, redirectUrl: "/companies/ypokatasthmata" });
+            res.json({ success: true, redirectUrl: '/companies/ypokatasthmata' });
         } catch (error) {
             throw error;
         }
     };
 
     static highlightText(text, term) {
-        if (!text) return ""; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
+        if (!text) return ''; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
         const highlightStartTag = "<span class='highlight'>";
-        const highlightEndTag = "</span>";
-        const regex = new RegExp(`(${term})`, "gi");
+        const highlightEndTag = '</span>';
+        const regex = new RegExp(`(${term})`, 'gi');
         return text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
     }
 
@@ -598,14 +599,13 @@ class ypokatasthmataController {
         try {
             const ypokatasthma = await YpokatasthmataModel.find({
                 team: req.session.userTeam,
-                companykod_object: req.session.companyInUse,
+                companykod_object: req.session.companyInUse
             });
             res.json(ypokatasthma);
         } catch (error) {
             res.status(500).send(error);
         }
     };
-
 }
 
 module.exports = ypokatasthmataController;
