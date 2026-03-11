@@ -200,6 +200,10 @@ const checkFileAuth = (req, res, next) => {
 // Serve Uploads (Protected)
 // ============================================================================
 
+// ============================================================================
+// Serve Uploads (Protected) - UPDATED FOR EDGE COMPATIBILITY
+// ============================================================================
+
 app.use(
     '/uploads',
     checkFileAuth,
@@ -209,15 +213,17 @@ app.use(
         index: false,
         setHeaders: (res, filepath) => {
             res.set('X-Content-Type-Options', 'nosniff');
-            res.set('X-Frame-Options', 'DENY');
+            res.set('X-Frame-Options', 'SAMEORIGIN'); // ✅ ΑΛΛΑΓΗ ΑΠΟ DENY
             res.set('Referrer-Policy', 'no-referrer');
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
             if (filepath.endsWith('.pdf')) {
                 res.set('Content-Type', 'application/pdf');
                 res.set('Content-Disposition', 'inline');
                 res.set(
                     'Content-Security-Policy',
-                    "default-src 'none'; style-src 'unsafe-inline';"
+                    "default-src 'none'; style-src 'unsafe-inline'; object-src 'self';" // ✅ ΕΝΗΜΕΡΩΣΗ
                 );
             }
         }
@@ -506,8 +512,8 @@ const buildCSPDirectives = () => {
         ],
         'worker-src': ["'self'", 'blob:'],
         'object-src': ["'self'", 'blob:', 'data:'],
-        'frame-src': ["'self'", 'blob:', 'https://*.amazonaws.com', 'https://*.cloudfront.net'],
-        'child-src': ["'self'", 'blob:', 'https://*.amazonaws.com', 'https://*.cloudfront.net'],
+        'frame-src': ["'self'", 'blob:', 'data:', ...cdnDomains],
+        'child-src': ["'self'", 'blob:', 'data:', ...cdnDomains],
         'base-uri': ["'self'"],
         'form-action': ["'self'"],
         'frame-ancestors': ["'none'"]

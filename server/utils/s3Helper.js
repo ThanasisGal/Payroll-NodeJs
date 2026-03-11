@@ -11,6 +11,9 @@
 // const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 // const fs = require('fs').promises;
 // const path = require('path');
+// const crypto = require('crypto');
+// const os = require('os');
+// const { pipeline } = require('stream/promises');
 
 // // =========================================================================
 // // ENVIRONMENT CHECK
@@ -26,7 +29,226 @@
 // if (USE_LOCAL_STORAGE) {
 //     fs.mkdir(LOCAL_STORAGE_DIR, { recursive: true })
 //         .then(() => console.log(`📁 Local S3 mock directory: ${LOCAL_STORAGE_DIR}`))
-//         .catch(err => console.error('Failed to create local storage dir:', err));
+//         .catch((err) => console.error('Failed to create local storage dir:', err));
+// }
+
+// // =========================================================================
+// // ✅ NEW: S3 URL DETECTION & CONVERSION HELPERS
+// // =========================================================================
+
+// /**
+//  * ✅ Detect if URL is an S3 URL (s3:// or https://*.s3.*.amazonaws.com)
+//  */
+// function isS3Url(url) {
+//     if (!url || typeof url !== 'string') return false;
+
+//     // s3:// protocol
+//     if (url.startsWith('s3://')) return true;
+
+//     // HTTPS S3 URLs (*.s3.*.amazonaws.com or *.s3-*.amazonaws.com)
+//     if (url.startsWith('https://') || url.startsWith('http://')) {
+//         return /\.s3[.-]([\w-]+\.)?amazonaws\.com/.test(url);
+//     }
+
+//     return false;
+// }
+
+// /**
+//  * ✅ Convert HTTPS S3 URL to s3:// URI
+//  * Removes query parameters (presigned URL params) before conversion
+//  * @param {string} httpsUrl - HTTPS S3 URL
+//  * @returns {string|null} s3:// URI or null if invalid
+//  */
+// function convertHttpsToS3Uri(httpsUrl) {
+//     // ✅ Remove query parameters (X-Amz-Algorithm, X-Amz-Credential, etc.)
+//     const urlWithoutQuery = httpsUrl.split('?')[0];
+
+//     // Pattern 1: https://bucket.s3.region.amazonaws.com/key
+//     let match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
+//     if (match) {
+//         const bucket = match[1];
+//         const key = match[3];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     // Pattern 2: https://s3.region.amazonaws.com/bucket/key
+//     match = urlWithoutQuery.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
+//     if (match) {
+//         const bucket = match[2];
+//         const key = match[3];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     // Pattern 3: https://bucket.s3.amazonaws.com/key (no region)
+//     match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
+//     if (match) {
+//         const bucket = match[1];
+//         const key = match[2];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     return null;
+// }
+
+// /**
+//  * ✅ Parse s3:// URI into bucket and key
+//  * @param {string} s3Uri - s3://bucket/key
+//  * @returns {{bucket: string, key: string}|null}
+//  */
+// function parseS3Uri(s3Uri) {
+//     if (!s3Uri || typeof s3Uri !== 'string' || !s3Uri.startsWith('s3://')) return null;
+//     const rest = s3Uri.slice('s3://'.length);
+//     const slash = rest.indexOf('/');
+//     if (slash <= 0) return null;
+//     return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
+// }
+
+// // =========================================================================
+// // ✅ NEW: DOWNLOAD S3 FILE TO TEMP (for ERGANH XML uploads)
+// // =========================================================================
+
+// /**
+//  * ✅ Download S3 file to temporary directory
+//  * Supports s3://, HTTPS S3 URLs, and presigned URLs
+//  *
+//  * @param {string} s3Url - S3 URL (s3://, https://, or presigned URL)
+//  * @param {string} companyInUse - Company identifier for temp file naming
+//  * @returns {Promise<string>} Local temp file path
+//  */
+// async function downloadS3UriToTempFile(s3Url, companyInUse) {
+//     console.log('🔍 [S3-DOWNLOAD] Original s3Url:', s3Url);
+
+//     // =====================================================================
+//     // ✅ HTTPS/Presigned URL: Download directly with fetch
+//     // =====================================================================
+//     if (s3Url.startsWith('http://') || s3Url.startsWith('https://')) {
+//         console.log('[S3-DOWNLOAD] Using direct HTTPS download (presigned URL support)');
+
+//         // Extract filename from URL
+//         const urlPath = s3Url.split('?')[0]; // Remove query params
+//         const filename = path.basename(urlPath);
+//         const ext = path.extname(filename) || '.xml';
+
+//         const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+//         const uniq = crypto.randomBytes(6).toString('hex');
+//         const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+//         console.log('[S3-DOWNLOAD] Downloading from HTTPS', {
+//             url: s3Url.substring(0, 150) + '...',
+//             tempPath
+//         });
+
+//         // =====================================================================
+//         // DEV MODE: Check if it's a local file:// URL
+//         // =====================================================================
+//         if (USE_LOCAL_STORAGE && s3Url.startsWith('file://')) {
+//             const localPath = s3Url.replace('file://', '');
+//             console.log(`📁 [S3-DOWNLOAD] DEV MODE: Copying from ${localPath} to ${tempPath}`);
+
+//             try {
+//                 await fs.copyFile(localPath, tempPath);
+//                 console.log(`✅ [S3-DOWNLOAD] DEV copy complete: ${tempPath}`);
+//                 return tempPath;
+//             } catch (error) {
+//                 console.error(`❌ [S3-DOWNLOAD] Local file not found: ${localPath}`);
+//                 throw new Error(`Local file not found: ${localPath}`);
+//             }
+//         }
+
+//         // =====================================================================
+//         // PRODUCTION: Download from HTTPS (works with presigned URLs)
+//         // =====================================================================
+//         try {
+//             const https = require('https');
+//             const http = require('http');
+//             const client = s3Url.startsWith('https:') ? https : http;
+
+//             await new Promise((resolve, reject) => {
+//                 const file = require('fs').createWriteStream(tempPath);
+
+//                 client
+//                     .get(s3Url, (response) => {
+//                         if (response.statusCode !== 200) {
+//                             reject(
+//                                 new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`)
+//                             );
+//                             return;
+//                         }
+
+//                         response.pipe(file);
+
+//                         file.on('finish', () => {
+//                             file.close();
+//                             resolve();
+//                         });
+//                     })
+//                     .on('error', (err) => {
+//                         fs.unlink(tempPath).catch(() => {});
+//                         reject(err);
+//                     });
+
+//                 file.on('error', (err) => {
+//                     fs.unlink(tempPath).catch(() => {});
+//                     reject(err);
+//                 });
+//             });
+
+//             console.log('[S3-DOWNLOAD] HTTPS download complete', { tempPath });
+//             return tempPath;
+//         } catch (error) {
+//             console.error('[S3-DOWNLOAD] HTTPS download failed:', error.message);
+//             throw new Error(`Failed to download from HTTPS: ${error.message}`);
+//         }
+//     }
+
+//     // =====================================================================
+//     // ✅ s3:// URI: Use AWS SDK
+//     // =====================================================================
+//     const parsed = parseS3Uri(s3Url);
+//     if (!parsed) throw new Error(`Invalid s3:// URI: ${s3Url}`);
+
+//     const ext = path.extname(parsed.key) || '.xml';
+//     const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+//     const uniq = crypto.randomBytes(6).toString('hex');
+//     const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+//     console.log('[S3-DOWNLOAD] Downloading from S3 via SDK', {
+//         bucket: parsed.bucket,
+//         key: parsed.key,
+//         tempPath
+//     });
+
+//     // =====================================================================
+//     // DEV MODE: Copy from local filesystem
+//     // =====================================================================
+//     if (USE_LOCAL_STORAGE) {
+//         const localPath = path.join(LOCAL_STORAGE_DIR, parsed.key);
+//         console.log(`📁 [S3-DOWNLOAD] DEV MODE: Copying from ${localPath} to ${tempPath}`);
+
+//         try {
+//             await fs.copyFile(localPath, tempPath);
+//             console.log(`✅ [S3-DOWNLOAD] DEV copy complete: ${tempPath}`);
+//             return tempPath;
+//         } catch (error) {
+//             console.error(`❌ [S3-DOWNLOAD] Local file not found: ${localPath}`);
+//             throw new Error(`Local file not found: ${parsed.key}`);
+//         }
+//     }
+
+//     // =====================================================================
+//     // PRODUCTION: Download from AWS S3
+//     // =====================================================================
+//     const resp = await s3Client.send(
+//         new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
+//     );
+
+//     if (!resp?.Body) throw new Error('S3 GetObject: empty body');
+
+//     await pipeline(resp.Body, require('fs').createWriteStream(tempPath));
+
+//     console.log('[S3-DOWNLOAD] S3 SDK download complete', { tempPath });
+
+//     return tempPath;
 // }
 
 // // =========================================================================
@@ -48,7 +270,7 @@
 //         s3Url: `file://${localPath}`,
 //         localPath: localPath,
 //         bucket: 'LOCAL_STORAGE',
-//         etag: 'local-' + Date.now(),
+//         etag: 'local-' + Date.now()
 //     };
 // }
 
@@ -104,7 +326,7 @@
 //             Bucket: S3_BUCKET_NAME,
 //             Key: s3Key,
 //             Body: fileContent,
-//             ContentType: contentType,
+//             ContentType: contentType
 //         };
 
 //         const command = new PutObjectCommand(uploadParams);
@@ -119,9 +341,8 @@
 //             s3Key: s3Key,
 //             s3Url: s3Url,
 //             bucket: S3_BUCKET_NAME,
-//             etag: response.ETag,
+//             etag: response.ETag
 //         };
-
 //     } catch (error) {
 //         console.error('❌ S3 Upload Error:', error);
 //         throw error;
@@ -146,7 +367,7 @@
 //             Bucket: S3_BUCKET_NAME,
 //             Key: s3Key,
 //             Body: buffer,
-//             ContentType: contentType,
+//             ContentType: contentType
 //         };
 
 //         const command = new PutObjectCommand(uploadParams);
@@ -161,9 +382,8 @@
 //             s3Key: s3Key,
 //             s3Url: s3Url,
 //             bucket: S3_BUCKET_NAME,
-//             etag: response.ETag,
+//             etag: response.ETag
 //         };
-
 //     } catch (error) {
 //         console.error('❌ S3 Buffer Upload Error:', error);
 //         throw error;
@@ -186,7 +406,7 @@
 //         // PRODUCTION: Generate presigned S3 URL
 //         const command = new GetObjectCommand({
 //             Bucket: S3_BUCKET_NAME,
-//             Key: s3Key,
+//             Key: s3Key
 //         });
 
 //         const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
@@ -194,7 +414,6 @@
 //         console.log(`🔗 Presigned URL generated: ${s3Key} (expires: ${expiresIn}s)`);
 
 //         return presignedUrl;
-
 //     } catch (error) {
 //         console.error('❌ Presigned URL Error:', error);
 //         throw error;
@@ -217,7 +436,7 @@
 
 //         const command = new DeleteObjectCommand({
 //             Bucket: S3_BUCKET_NAME,
-//             Key: s3Key,
+//             Key: s3Key
 //         });
 
 //         await s3Client.send(command);
@@ -226,9 +445,8 @@
 
 //         return {
 //             success: true,
-//             s3Key: s3Key,
+//             s3Key: s3Key
 //         };
-
 //     } catch (error) {
 //         console.error('❌ S3 Delete Error:', error);
 //         throw error;
@@ -249,12 +467,11 @@
 //         // PRODUCTION: Check S3
 //         const command = new HeadObjectCommand({
 //             Bucket: S3_BUCKET_NAME,
-//             Key: s3Key,
+//             Key: s3Key
 //         });
 
 //         await s3Client.send(command);
 //         return true;
-
 //     } catch (error) {
 //         if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
 //             return false;
@@ -304,7 +521,7 @@
 
 //         const command = new GetObjectCommand({
 //             Bucket: S3_BUCKET_NAME,
-//             Key: s3Key,
+//             Key: s3Key
 //         });
 
 //         const response = await s3Client.send(command);
@@ -322,7 +539,6 @@
 //         console.log(`✅ [S3-HELPER] Downloaded ${buffer.length} bytes from S3`);
 
 //         return buffer;
-
 //     } catch (error) {
 //         console.error('❌ [S3-HELPER] Download Error:', error.message);
 
@@ -348,8 +564,12 @@
 //     generatePresignedUrl,
 //     deleteFileFromS3,
 //     fileExistsInS3,
-//     downloadFileFromS3,  // ✅ NEW - Added for email service and other use cases
-//     USE_LOCAL_STORAGE, // Export for debugging
+//     downloadFileFromS3,
+//     downloadS3UriToTempFile, // ✅ NEW - For ERGANH uploads
+//     isS3Url, // ✅ NEW - S3 URL detection
+//     convertHttpsToS3Uri, // ✅ NEW - HTTPS to s3:// conversion
+//     parseS3Uri, // ✅ NEW - Parse s3:// URIs
+//     USE_LOCAL_STORAGE // Export for debugging
 // };
 
 // server/utils/s3Helper.js
@@ -745,9 +965,15 @@ async function uploadBufferToS3(buffer, s3Key, contentType = 'application/pdf') 
 }
 
 // =========================================================================
-// GENERATE PRESIGNED URL (secure temporary access)
+// ✅ GENERATE PRESIGNED URL (EDGE COMPATIBLE) - UPDATED
 // =========================================================================
 
+/**
+ * ✅ Generate presigned URL with Edge-compatible headers
+ * @param {string} s3Key - S3 object key
+ * @param {number} expiresIn - Expiration time in seconds (default: 3600)
+ * @returns {Promise<string>} Presigned URL
+ */
 async function generatePresignedUrl(s3Key, expiresIn = 3600) {
     try {
         // DEV MODE: Return local file URL
@@ -757,15 +983,28 @@ async function generatePresignedUrl(s3Key, expiresIn = 3600) {
             return localUrl;
         }
 
-        // PRODUCTION: Generate presigned S3 URL
+        // =====================================================================
+        // ✅ PRODUCTION: Generate presigned S3 URL with Edge-compatible headers
+        // =====================================================================
+
         const command = new GetObjectCommand({
             Bucket: S3_BUCKET_NAME,
-            Key: s3Key
+            Key: s3Key,
+            // ✅ CRITICAL: Force correct headers for Edge browser
+            ResponseContentType: 'application/pdf',
+            ResponseContentDisposition: 'inline',
+            ResponseCacheControl: 'no-cache, must-revalidate'
         });
 
-        const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+        const presignedUrl = await getSignedUrl(s3Client, command, {
+            expiresIn,
+            // ✅ Ensure proper URL encoding
+            unhoistableHeaders: new Set(['x-amz-server-side-encryption'])
+        });
 
-        console.log(`🔗 Presigned URL generated: ${s3Key} (expires: ${expiresIn}s)`);
+        console.log(
+            `🔗 Presigned URL generated (Edge-compatible): ${s3Key} (expires: ${expiresIn}s)`
+        );
 
         return presignedUrl;
     } catch (error) {
@@ -919,9 +1158,9 @@ module.exports = {
     deleteFileFromS3,
     fileExistsInS3,
     downloadFileFromS3,
-    downloadS3UriToTempFile, // ✅ NEW - For ERGANH uploads
-    isS3Url, // ✅ NEW - S3 URL detection
-    convertHttpsToS3Uri, // ✅ NEW - HTTPS to s3:// conversion
-    parseS3Uri, // ✅ NEW - Parse s3:// URIs
+    downloadS3UriToTempFile, // ✅ For ERGANH uploads
+    isS3Url, // ✅ S3 URL detection
+    convertHttpsToS3Uri, // ✅ HTTPS to s3:// conversion
+    parseS3Uri, // ✅ Parse s3:// URIs
     USE_LOCAL_STORAGE // Export for debugging
 };
