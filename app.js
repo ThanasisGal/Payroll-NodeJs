@@ -66,11 +66,11 @@ const EGGRAFES = Number.parseInt(process.env.EGGRAFES ?? '15', 10) || 15;
 logger.info('========================================');
 logger.info('🔧 ENVIRONMENT CONFIG');
 logger.info('========================================');
-logger.info(`NODE_ENV:           ${node_env}`);
+logger.info(`NODE_ENV:          ${node_env}`);
 logger.info(`STATIC_BASE:       ${STATIC_BASE}`);
-logger.info(`isProd:           ${isProd}`);
-logger.info(`CDN_DOMAIN:       ${CDN_DOMAIN}`);
-logger.info(`S3_BUCKET:        ${S3_BUCKET}`);
+logger.info(`isProd:            ${isProd}`);
+logger.info(`CDN_DOMAIN:        ${CDN_DOMAIN}`);
+logger.info(`S3_BUCKET:         ${S3_BUCKET}`);
 if (CLOUDFRONT_DOMAIN) {
     logger.info(`CloudFront:         ${CLOUDFRONT_DOMAIN}`);
 }
@@ -505,7 +505,7 @@ const buildCSPDirectives = () => {
             ...cdnDomains
         ],
         'worker-src': ["'self'", 'blob:'],
-        'object-src': ["'self'", 'blob:'],
+        'object-src': ["'self'", 'blob:', 'data:'],
         'frame-src': ["'self'", 'blob:', 'https://*.amazonaws.com', 'https://*.cloudfront.net'],
         'child-src': ["'self'", 'blob:', 'https://*.amazonaws.com', 'https://*.cloudfront.net'],
         'base-uri': ["'self'"],

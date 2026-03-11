@@ -57,25 +57,6 @@ function parseS3Uri(s3Uri) {
     return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
 }
 
-// async function downloadS3UriToTempFile(s3Uri, companyInUse) {
-//     const parsed = parseS3Uri(s3Uri);
-//     if (!parsed) throw new Error('Invalid s3:// URI');
-
-//     const ext = path.extname(parsed.key) || '.xml';
-//     const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
-//     const uniq = crypto.randomBytes(6).toString('hex');
-//     const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
-
-//     const resp = await s3Client.send(
-//         new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
-//     );
-
-//     if (!resp?.Body) throw new Error('S3 GetObject: empty body');
-
-//     await pipeline(resp.Body, fs.createWriteStream(tempPath));
-//     return tempPath;
-// }
-
 // =========================================================================
 // ✅ HELPER FUNCTION: Validation για Ωράριο Εργασίας
 // =========================================================================
