@@ -300,15 +300,13 @@ app.get('/remaining-time', (req, res) => {
     // ✅ AUTHENTICATED USER
     // ═══════════════════════════════════════════════════════════════════════
     if (req.session && req.session.userId) {
-        // ✅ Use INACTIVITY_TIMEOUT (60 min) instead of DIARKEIA_SESSION (720 min)
         const INACTIVITY_TIMEOUT = Number(process.env.INACTIVITY_TIMEOUT || 60) * 60 * 1000;
-
         const lastActivity = req.session.lastActivity || now;
         const timeSinceLastActivity = now - lastActivity;
         const remaining = Math.max(0, INACTIVITY_TIMEOUT - timeSinceLastActivity);
 
         return res.json({
-            remainingTime: remaining, // ✅ 60 λεπτά inactivity countdown
+            remainingTime: remaining,
             sessionID: req.sessionID,
             userType: 'authenticated',
             lastActivity: lastActivity,
@@ -317,13 +315,17 @@ app.get('/remaining-time', (req, res) => {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ✅ NO SESSION (Error)
+    // ✅ NO SESSION → Return default anonymous data (DON'T return 401/500)
     // ═══════════════════════════════════════════════════════════════════════
     if (!req.session) {
-        return res.status(500).json({
-            error: 'Session middleware error',
-            remainingTime: 0,
-            userType: 'anonymous'
+        const GRACE_PERIOD_MS = Number(process.env.GRACE_PERIOD || grace_period || 5) * 60 * 1000;
+
+        return res.json({
+            // ← 200 OK instead of 500
+            remainingTime: GRACE_PERIOD_MS,
+            userType: 'anonymous',
+            gracePeriod: true,
+            message: 'No session - using default grace period'
         });
     }
 
@@ -339,21 +341,19 @@ app.get('/remaining-time', (req, res) => {
     const GRACE_PERIOD_MS = Number(process.env.GRACE_PERIOD || grace_period || 5) * 60 * 1000;
     const anonymousRemaining = Math.max(0, GRACE_PERIOD_MS - anonymousElapsed);
 
-    if (anonymousRemaining <= 0) {
-        return res.status(401).json({
-            error: 'Grace period expired',
-            remainingTime: 0,
-            userType: 'anonymous',
-            gracePeriod: true,
-            message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
-        });
-    }
-
+    // ═══════════════════════════════════════════════════════════════════════
+    // ✅ Even if grace period expired, return 200 with remainingTime: 0
+    // ═══════════════════════════════════════════════════════════════════════
     return res.json({
-        remainingTime: anonymousRemaining, // ✅ 5 λεπτά grace period
+        // ← Always 200 OK
+        remainingTime: anonymousRemaining,
         userType: 'anonymous',
         gracePeriod: true,
-        sessionID: req.sessionID
+        sessionID: req.sessionID,
+        ...(anonymousRemaining <= 0 && {
+            expired: true,
+            message: 'Παρακαλώ συνδεθείτε για να συνεχίσετε'
+        })
     });
 });
 
