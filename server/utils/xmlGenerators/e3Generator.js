@@ -329,19 +329,26 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
         try {
             const { uploadBufferToS3 } = require('../s3Helper');
 
+            // ✅ Get employee details
             const eponymoClean = ergazomenos.eponymo.toUpperCase().replace(/\s+/g, '_');
             const onomaClean = ergazomenos.onoma.toUpperCase().replace(/\s+/g, '_');
             const dateStr = formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs).replace(
                 /\//g,
                 '-'
             );
-            const filename = `E3N_${eponymoClean}_${onomaClean}_${dateStr}.xml`;
+
+            // ✅ Get employee ID (MongoDB _id)
+            const employeeId = String(ergazomenos._id || 'UNKNOWN');
+
+            // ✅ New filename format: id_EPONYMO_ONOMA_DATE.xml
+            const filename = `${employeeId}_${eponymoClean}_${onomaClean}_${dateStr}.xml`;
 
             const companyNameClean = companyData?.eponymia
                 ? companyData.eponymia.replace(/\s+/g, '_').substring(0, 50)
                 : 'UNKNOWN';
 
-            const s3Key = `xmls/${ergazomenos.team}/${companyData.kod}_${companyNameClean}/${filename}`;
+            // ✅ New path with E3N subfolder
+            const s3Key = `xmls/${ergazomenos.team}/${companyData.kod}_${companyNameClean}/E3N/${filename}`;
 
             console.log('💾 [E3-GENERATOR] Saving XML to:', s3Key);
 

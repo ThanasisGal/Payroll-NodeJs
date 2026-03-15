@@ -94,7 +94,8 @@ function validateOrarioFields(formData) {
 // Αν έχεις PM2 cluster / multiple instances, αυτό θέλει DB/Redis. Για single instance είναι ΟΚ.
 const erganiInflight = new Map(); // key -> true
 const erganiLastStart = new Map(); // key -> timestamp
-const ERGANI_COOLDOWN_MS = 60_000; // 60s, άλλαξέ το όπως θες
+
+const ERGANI_COOLDOWN_MS = process.env.NODE_ENV === 'production' ? 10_000 : 1_000;
 
 class ergazomenoiController {
     static mainErgazomenoiForm = async (req, res) => {
@@ -1260,12 +1261,12 @@ class ergazomenoiController {
                         s3_url: xmlResult.s3Url
                     });
 
-                    // ✅ Save S3 key to employee record (if saved successfully)
-                    if (xmlResult.s3Key) {
-                        savedErgazomenos.e3_xml_path = xmlResult.s3Key;
-                        await savedErgazomenos.save();
-                        console.log('✅ [E3-XML] Path saved to employee record');
-                    }
+                    // // ✅ Save S3 key to employee record (if saved successfully)
+                    // if (xmlResult.s3Key) {
+                    //     savedErgazomenos.e3_xml_path = xmlResult.s3Key;
+                    //     await savedErgazomenos.save();
+                    //     console.log('✅ [E3-XML] Path saved to employee record');
+                    // }
 
                     // ✅ Generate presigned download URL (10 min expiration)
                     if (xmlResult.s3Key) {
@@ -1298,7 +1299,6 @@ class ergazomenoiController {
                         const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
 
                         try {
-                            // const { generatePresignedUrl } = require('../../utils/s3Helper');
                             const downloadUrl = await generatePresignedUrl(xmlResult.s3Key, 600);
 
                             e3XmlData = {
@@ -1359,6 +1359,169 @@ class ergazomenoiController {
             }
 
             // =====================================================================
+            // ✅ CONDITIONAL WTO XML GENERATION
+            // =====================================================================
+
+            let wtoXmlData = null;
+
+            if (filesToUpdate?.schedules === true) {
+                logger.info('WTO XML generation requested', {
+                    module: 'WTO-XML',
+                    employee_kod: savedErgazomenos.kodikos,
+                    employee_afm: savedErgazomenos.afm,
+                    company: company?.eponymia || 'N/A'
+                });
+
+                try {
+                    // ✅ Get schedules from database
+                    const schedules = await ProdhlomenaOrariaModel.find({
+                        team: sessionUserTeam,
+                        company_kod: sessionCompanyInUse,
+                        kodikos: savedErgazomenos.kodikos,
+                        hmeromhnia: {
+                            $gte: formData.hmeromhnia_allaghs_orarioy_apo,
+                            $lte: formData.hmeromhnia_allaghs_orarioy_eos
+                        }
+                    }).sort({ hmeromhnia: 1 });
+
+                    // ✅ Check if schedules exist
+                    if (!schedules || schedules.length === 0) {
+                        logger.warn('WTO XML generation skipped (no schedules)', {
+                            module: 'WTO-XML',
+                            employee_kod: savedErgazomenos.kodikos
+                        });
+
+                        wtoXmlData = {
+                            success: false,
+                            error: 'Δεν βρέθηκαν ωράρια για το εύρος ημερομηνιών'
+                        };
+                    } else {
+                        logger.info(`Found ${schedules.length} schedule entries`, {
+                            module: 'WTO-XML',
+                            employee_kod: savedErgazomenos.kodikos
+                        });
+
+                        const {
+                            generateWtoXML
+                        } = require('../../utils/xmlGenerators/wtoGenerator');
+
+                        // ✅ Generate XML (returns object with xml + storage info)
+                        const xmlResult = await generateWtoXML(
+                            savedErgazomenos,
+                            company,
+                            ypokatasthmata,
+                            schedules
+                        );
+
+                        logger.info('WTO XML generated successfully', {
+                            module: 'WTO-XML',
+                            s3_key: xmlResult.s3Key,
+                            filename: xmlResult.filename,
+                            s3_url: xmlResult.s3Url
+                        });
+
+                        // // ✅ Save S3 key to employee record (if saved successfully)
+                        // if (xmlResult.s3Key) {
+                        //     savedErgazomenos.wto_xml_path = xmlResult.s3Key;
+                        //     await savedErgazomenos.save();
+                        //     console.log('✅ [WTO-XML] Path saved to employee record');
+                        // }
+
+                        // ✅ Generate presigned download URL (10 min expiration)
+                        if (xmlResult.s3Key) {
+                            // ✅ Helper to convert S3 URL to relative path
+                            const toRelativeUploadsPath = (p) => {
+                                if (!p) return null;
+
+                                // URL → pathname
+                                if (p.startsWith('http://') || p.startsWith('https://')) {
+                                    p = new URL(p).pathname;
+                                }
+
+                                // file:/// → filesystem
+                                if (p.startsWith('file:///')) {
+                                    p = p.replace('file:///', '/');
+                                }
+
+                                // normalize slashes
+                                p = p.replace(/\\/g, '/');
+
+                                // keep only "uploads/..."
+                                const idx = p.indexOf('/uploads/');
+                                if (idx !== -1) return p.slice(idx + 1); // -> "uploads/..."
+                                if (p.startsWith('/uploads/')) return p.slice(1);
+                                if (p.startsWith('uploads/')) return p;
+
+                                return null;
+                            };
+
+                            const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
+
+                            try {
+                                const downloadUrl = await generatePresignedUrl(
+                                    xmlResult.s3Key,
+                                    600
+                                );
+
+                                wtoXmlData = {
+                                    success: true,
+                                    s3Key: xmlResult.s3Key,
+                                    downloadUrl,
+                                    filename: xmlResult.filename,
+                                    relativePath
+                                };
+
+                                logger.info('[WTO-PATH] generated', {
+                                    filename: wtoXmlData.filename,
+                                    relativePath: wtoXmlData.relativePath
+                                });
+                            } catch (urlError) {
+                                wtoXmlData = {
+                                    success: true,
+                                    s3Key: xmlResult.s3Key,
+                                    downloadUrl: null,
+                                    filename: xmlResult.filename,
+                                    relativePath,
+                                    urlError: urlError.message
+                                };
+
+                                logger.warn('[WTO-PATH] generated WITHOUT presigned URL', {
+                                    filename: wtoXmlData.filename,
+                                    relativePath: wtoXmlData.relativePath,
+                                    urlError: urlError.message
+                                });
+                            }
+                        } else {
+                            logger.warn('[WTO-PATH] xml generated but NOT saved', {
+                                saveError: xmlResult.saveError
+                            });
+
+                            wtoXmlData = {
+                                success: false,
+                                error: xmlResult.saveError || 'XML not saved'
+                            };
+                        }
+                    }
+                } catch (wtoError) {
+                    logger.error('WTO XML generation failed', {
+                        module: 'WTO-XML',
+                        error: wtoError.message,
+                        stack: wtoError.stack
+                    });
+
+                    wtoXmlData = {
+                        success: false,
+                        error: wtoError.message
+                    };
+                }
+            } else {
+                logger.info('WTO XML generation skipped (checkbox not checked)', {
+                    module: 'WTO-XML',
+                    checkbox_value: filesToUpdate?.schedules
+                });
+            }
+
+            // =====================================================================
             // ✅ FINAL RESPONSE (with E3 data if generated)
             // =====================================================================
 
@@ -1380,12 +1543,14 @@ class ergazomenoiController {
                     bibliario_anhlikoy_path: savedErgazomenos.bibliario_anhlikoy_path,
                     arxeio_symbashs_daneismoy_path: savedErgazomenos.arxeio_symbashs_daneismoy_path,
                     arxeio_nomimopoihtikon_eggrafon_path:
-                        savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path,
-                    e3_xml_path: savedErgazomenos.e3_xml_path // ✅ NEW!
+                        savedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
+                    // e3_xml_path: savedErgazomenos.e3_xml_path,
+                    // wto_xml_path: savedErgazomenos.wto_xml_path
                 },
                 pdfResults: pdfResults,
                 contractPdf: contractPdfData,
-                e3XmlData: e3XmlData, // ✅ NEW!
+                e3XmlData: e3XmlData,
+                wtoXmlData: wtoXmlData, // ✅ NEW!
                 companyEmail: companyEmail,
                 companyPhone: companyPhone,
                 companyName: companyName,
@@ -1402,274 +1567,6 @@ class ergazomenoiController {
         }
     };
 
-    // // ======================================================================
-    // // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
-    // // Uses Playwright uploader that requires a local file path.
-    // // ======================================================================
-    // static uploadE3ToErganh = async (req, res) => {
-    //     const sessionCompanyInUse = req.session?.companyInUse;
-    //     const sessionUserId = req.session?.userId;
-
-    //     const { ergazomenosId, s3Url } = req.body || {};
-
-    //     // ✅ Σταθερό key για lock/cooldown
-    //     const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}`;
-
-    //     // ✅ Socket emitter (rooms: user_<userId>)
-    //     const { emitToUser } = require('../../socket');
-
-    //     function emitErganhStep(userId, step, message) {
-    //         const totalSteps = 4;
-    //         const percentByStep = { 1: 0, 2: 30, 3: 60, 4: 90 };
-    //         const percent = percentByStep[step] ?? 0;
-
-    //         if (!userId) return;
-
-    //         emitToUser(userId, 'erganh:progress', {
-    //             percent,
-    //             message,
-    //             step,
-    //             totalSteps
-    //         });
-    //     }
-
-    //     let localXmlPath = s3Url;
-    //     let tempDownloaded = false;
-
-    //     try {
-    //         // ------------------------------------------------------------------
-    //         // ✅ 0) Basic validation
-    //         // ------------------------------------------------------------------
-    //         if (!ergazomenosId || !s3Url) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Λείπουν στοιχεία αιτήματος.'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: 'Λείπουν στοιχεία αιτήματος (εργαζόμενος / αρχείο).',
-    //                 errorDetails: 'Missing ergazomenosId or s3Url',
-    //                 messages: []
-    //             });
-    //         }
-
-    //         if (!sessionCompanyInUse) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Δεν έχει οριστεί εταιρεία στη συνεδρία.'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: 'Δεν έχει οριστεί εταιρεία στη συνεδρία (companyInUse).',
-    //                 errorDetails: 'Missing session.companyInUse',
-    //                 messages: []
-    //             });
-    //         }
-
-    //         // ✅ Step 1: login entry (user sees loader immediately)
-    //         emitErganhStep(sessionUserId, 1, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ');
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 0.1) Cooldown
-    //         // ------------------------------------------------------------------
-    //         const now = Date.now();
-    //         const last = erganiLastStart.get(key) || 0;
-    //         const left = ERGANI_COOLDOWN_MS - (now - last);
-
-    //         if (left > 0) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Πολύ σύντομα επαναλαμβανόμενο αίτημα (cooldown).'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage:
-    //                     'Έγινε ήδη προσπάθεια πολύ πρόσφατα. Περιμένετε λίγο και ξαναδοκιμάστε.',
-    //                 errorDetails: `Cooldown active (${Math.ceil(left / 1000)}s left)`,
-    //                 messages: []
-    //             });
-    //         }
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 0.2) Concurrent lock
-    //         // ------------------------------------------------------------------
-    //         if (erganiInflight.has(key)) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Υπάρχει ήδη υποβολή σε εξέλιξη.'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: 'Υπάρχει ήδη υποβολή σε εξέλιξη για αυτόν τον εργαζόμενο.',
-    //                 errorDetails: 'ERGANH upload inflight (server-side lock)',
-    //                 messages: []
-    //             });
-    //         }
-
-    //         // ✅ lock + start cooldown timer
-    //         erganiInflight.set(key, true);
-    //         erganiLastStart.set(key, now);
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 1) Resolve local XML path (DEV vs PROD)
-    //         // ------------------------------------------------------------------
-    //         const prepMsg =
-    //             typeof s3Url === 'string' && s3Url.startsWith('s3://')
-    //                 ? 'Προετοιμασία Αποστολής (λήψη XML από S3)'
-    //                 : 'Προετοιμασία Αποστολής';
-
-    //         emitErganhStep(sessionUserId, 2, prepMsg);
-
-    //         if (typeof s3Url === 'string' && s3Url.startsWith('s3://')) {
-    //             logger.info('[ERGANH-UPLOAD] S3 download start', { s3Url });
-
-    //             localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
-    //             tempDownloaded = true;
-
-    //             logger.info('[ERGANH-UPLOAD] S3 download ok', { localXmlPath });
-    //         } else {
-    //             const cwd = process.cwd();
-
-    //             if (
-    //                 !path.isAbsolute(localXmlPath) &&
-    //                 !localXmlPath.startsWith('file:///') &&
-    //                 !localXmlPath.startsWith('http')
-    //             ) {
-    //                 localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
-    //             }
-
-    //             if (localXmlPath.startsWith('file:///')) {
-    //                 localXmlPath = localXmlPath.replace('file:///', '/');
-    //             }
-
-    //             localXmlPath = path.resolve(path.normalize(localXmlPath));
-    //         }
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 2) Ensure file exists + non-empty
-    //         // ------------------------------------------------------------------
-    //         const exists = await fs.pathExists(localXmlPath);
-    //         if (!exists) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Δεν βρέθηκε το XML αρχείο.'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: `Δεν βρέθηκε το XML αρχείο: ${path.basename(localXmlPath)}`,
-    //                 errorDetails: `XML file not found: ${localXmlPath}`,
-    //                 messages: []
-    //             });
-    //         }
-
-    //         const stats = await fs.stat(localXmlPath);
-    //         if (!stats.size) {
-    //             emitToUser(sessionUserId, 'erganh:error', { message: 'Το XML αρχείο είναι κενό.' });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: 'Το XML αρχείο είναι κενό.',
-    //                 errorDetails: `XML file is empty: ${localXmlPath}`,
-    //                 messages: []
-    //             });
-    //         }
-
-    //         logger.info('[ERGANH-UPLOAD] Local XML ready', { localXmlPath, size: stats.size });
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 3) Load ERGANH credentials
-    //         // ------------------------------------------------------------------
-    //         const passwordsData = await PasswordsModel.findOne({
-    //             companykod_object: sessionCompanyInUse,
-    //             kodikos: '0002'
-    //         }).lean();
-
-    //         const erganhUsername = passwordsData?.username;
-    //         const erganhPassword = passwordsData?.password;
-
-    //         if (!erganhUsername || !erganhPassword) {
-    //             emitToUser(sessionUserId, 'erganh:error', {
-    //                 message: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ.'
-    //             });
-    //             return res.status(200).json({
-    //                 success: false,
-    //                 userMessage: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ για την εταιρεία.',
-    //                 errorDetails: 'Missing ERGANH credentials (PasswordsModel kodikos=0002)',
-    //                 messages: []
-    //             });
-    //         }
-
-    //         // ✅ Step 3: selecting file
-    //         emitErganhStep(sessionUserId, 3, 'Επιλογή XML αρχείου');
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 4) Run uploader (BLOCKING)
-    //         // ------------------------------------------------------------------
-    //         const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
-
-    //         // ✅ Step 4: sending/uploading
-    //         emitErganhStep(sessionUserId, 4, 'Αποστολή');
-
-    //         const uploadResult = await uploadE3ToErganh(
-    //             sessionCompanyInUse,
-    //             localXmlPath,
-    //             sessionUserId,
-    //             { username: erganhUsername, password: erganhPassword }
-    //         );
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 5) Save protocol OR errors to DB
-    //         // ------------------------------------------------------------------
-    //         if (uploadResult?.success && uploadResult?.protocol) {
-    //             ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
-    //                 erganh_e3_protocol: uploadResult.protocol,
-    //                 erganh_e3_upload_date: new Date(),
-    //                 erganh_e3_screenshot: uploadResult.screenshot
-    //             }).catch(() => {});
-    //         } else if (uploadResult?.messages?.length) {
-    //             ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
-    //                 erganh_e3_errors: uploadResult.messages,
-    //                 erganh_e3_error_date: new Date(),
-    //                 erganh_e3_screenshot: uploadResult.screenshot
-    //             }).catch(() => {});
-    //         }
-
-    //         // ------------------------------------------------------------------
-    //         // ✅ 6) Return result to frontend
-    //         // ------------------------------------------------------------------
-    //         emitToUser(sessionUserId, 'erganh:done', { message: 'Ολοκληρώθηκε' });
-
-    //         return res.status(200).json({
-    //             success: !!uploadResult?.success,
-    //             protocol: uploadResult?.protocol || null,
-    //             screenshot: uploadResult?.screenshot || null,
-    //             userMessage:
-    //                 uploadResult?.userMessage ||
-    //                 (uploadResult?.success
-    //                     ? 'Η υποβολή ολοκληρώθηκε. (Προσωρινή Αποθήκευση.)'
-    //                     : 'Η υποβολή απέτυχε.'),
-    //             errorDetails: uploadResult?.errorDetails || uploadResult?.error || '',
-    //             messages: uploadResult?.messages || []
-    //         });
-    //     } catch (error) {
-    //         logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
-    //             error: error.message,
-    //             stack: error.stack
-    //         });
-
-    //         emitToUser(sessionUserId, 'erganh:error', { message: 'Αποτυχία υποβολής στο ΕΡΓΑΝΗ' });
-
-    //         return res.status(500).json({
-    //             success: false,
-    //             userMessage: 'Failed to upload to ERGANH',
-    //             errorDetails: error.message,
-    //             messages: []
-    //         });
-    //     } finally {
-    //         // ✅ cleanup temp file (only if downloaded from S3)
-    //         if (tempDownloaded && localXmlPath) {
-    //             fs.remove(localXmlPath).catch(() => {});
-    //         }
-
-    //         // ✅ always unlock
-    //         erganiInflight.delete(key);
-    //     }
-    // };
-
     // ======================================================================
     // ✅ UPLOAD E3 TO ERGANH - PROD SAFE (S3) + DEV SAFE (LOCAL)
     // Uses Playwright uploader that requires a local file path.
@@ -1681,7 +1578,7 @@ class ergazomenoiController {
         const { ergazomenosId, s3Url } = req.body || {};
 
         // ✅ Σταθερό key για lock/cooldown
-        const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}`;
+        const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}:E3`;
 
         // ✅ Socket emitter (rooms: user_<userId>)
         const { emitToUser } = require('../../socket');
@@ -1743,18 +1640,27 @@ class ergazomenoiController {
             const left = ERGANI_COOLDOWN_MS - (now - last);
 
             if (left > 0) {
+                const secondsLeft = Math.ceil(left / 1000);
+
+                console.log(
+                    `[Ε3 COOLDOWN] User ${sessionUserId}, Key: ${key}, ${secondsLeft}s remaining`
+                );
+
                 emitToUser(sessionUserId, 'erganh:error', {
-                    message: 'Πολύ σύντομα επαναλαμβανόμενο αίτημα (cooldown).'
+                    message: `Cooldown ενεργό. Περιμένετε ${secondsLeft} δευτερόλεπτα.`,
+                    cooldownMs: left,
+                    cooldownSeconds: secondsLeft
                 });
+
                 return res.status(200).json({
                     success: false,
-                    userMessage:
-                        'Έγινε ήδη προσπάθεια πολύ πρόσφατα. Περιμένετε λίγο και ξαναδοκιμάστε.',
-                    errorDetails: `Cooldown active (${Math.ceil(left / 1000)}s left)`,
+                    userMessage: `⏳ Πολύ γρήγορη ενέργεια. Περιμένετε ${secondsLeft} δευτερόλεπτα και ξαναπροσπαθήστε.`,
+                    errorDetails: `Cooldown: ${secondsLeft}s / ${Math.ceil(ERGANI_COOLDOWN_MS / 1000)}s total`,
+                    cooldownMs: left,
+                    cooldownSeconds: secondsLeft,
                     messages: []
                 });
             }
-
             // ------------------------------------------------------------------
             // ✅ 0.2) Concurrent lock
             // ------------------------------------------------------------------
@@ -1883,19 +1789,19 @@ class ergazomenoiController {
             // ------------------------------------------------------------------
             // ✅ 5) Save protocol OR errors to DB
             // ------------------------------------------------------------------
-            if (uploadResult?.success && uploadResult?.protocol) {
-                ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
-                    erganh_e3_protocol: uploadResult.protocol,
-                    erganh_e3_upload_date: new Date(),
-                    erganh_e3_screenshot: uploadResult.screenshot
-                }).catch(() => {});
-            } else if (uploadResult?.messages?.length) {
-                ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
-                    erganh_e3_errors: uploadResult.messages,
-                    erganh_e3_error_date: new Date(),
-                    erganh_e3_screenshot: uploadResult.screenshot
-                }).catch(() => {});
-            }
+            // if (uploadResult?.success && uploadResult?.protocol) {
+            //     ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+            //         erganh_e3_protocol: uploadResult.protocol,
+            //         erganh_e3_upload_date: new Date(),
+            //         erganh_e3_screenshot: uploadResult.screenshot
+            //     }).catch(() => {});
+            // } else if (uploadResult?.messages?.length) {
+            //     ErgazomenoiModel.findByIdAndUpdate(ergazomenosId, {
+            //         erganh_e3_errors: uploadResult.messages,
+            //         erganh_e3_error_date: new Date(),
+            //         erganh_e3_screenshot: uploadResult.screenshot
+            //     }).catch(() => {});
+            // }
 
             // ------------------------------------------------------------------
             // ✅ 6) Return result to frontend
@@ -1925,6 +1831,265 @@ class ergazomenoiController {
             return res.status(500).json({
                 success: false,
                 userMessage: 'Failed to upload to ERGANH',
+                errorDetails: error.message,
+                messages: []
+            });
+        } finally {
+            // ✅ cleanup temp file (only if downloaded from S3)
+            if (tempDownloaded && localXmlPath) {
+                fs.remove(localXmlPath).catch(() => {});
+            }
+
+            // ✅ always unlock
+            erganiInflight.delete(key);
+        }
+    };
+
+    static uploadWtoToErganh = async (req, res) => {
+        const sessionCompanyInUse = req.session?.companyInUse;
+        const sessionUserId = req.session?.userId;
+
+        const { ergazomenosId, s3Url } = req.body || {};
+
+        // ✅ Σταθερό key για lock/cooldown
+        const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}:WTO`;
+
+        // ✅ Socket emitter (rooms: user_<userId>)
+        const { emitToUser } = require('../../socket');
+
+        function emitErganhStep(userId, step, message) {
+            const totalSteps = 4;
+            const percentByStep = { 1: 0, 2: 30, 3: 60, 4: 90 };
+            const percent = percentByStep[step] ?? 0;
+
+            if (!userId) return;
+
+            emitToUser(userId, 'erganh:progress', {
+                percent,
+                message,
+                step,
+                totalSteps
+            });
+        }
+
+        let localXmlPath = s3Url;
+        let tempDownloaded = false;
+
+        try {
+            // ------------------------------------------------------------------
+            // ✅ 0) Basic validation
+            // ------------------------------------------------------------------
+            if (!ergazomenosId || !s3Url) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Λείπουν στοιχεία αιτήματος (WTO).'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Λείπουν στοιχεία αιτήματος (εργαζόμενος / αρχείο WTO).',
+                    errorDetails: 'Missing ergazomenosId or s3Url',
+                    messages: []
+                });
+            }
+
+            if (!sessionCompanyInUse) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Δεν έχει οριστεί εταιρεία στη συνεδρία.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Δεν έχει οριστεί εταιρεία στη συνεδρία (companyInUse).',
+                    errorDetails: 'Missing session.companyInUse',
+                    messages: []
+                });
+            }
+
+            // ✅ Step 1: login entry (user sees loader immediately)
+            emitErganhStep(sessionUserId, 1, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ (WTO)');
+
+            // ------------------------------------------------------------------
+            // ✅ 0.1) Cooldown
+            // ------------------------------------------------------------------
+            const now = Date.now();
+            const last = erganiLastStart.get(key) || 0;
+            const left = ERGANI_COOLDOWN_MS - (now - last);
+
+            if (left > 0) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Πολύ σύντομα επαναλαμβανόμενο αίτημα (cooldown WTO).'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage:
+                        'Έγινε ήδη προσπάθεια πολύ πρόσφατα. Περιμένετε λίγο και ξαναδοκιμάστε.',
+                    errorDetails: `Cooldown active (${Math.ceil(left / 1000)}s left)`,
+                    messages: []
+                });
+            }
+
+            // ------------------------------------------------------------------
+            // ✅ 0.2) Concurrent lock
+            // ------------------------------------------------------------------
+            if (erganiInflight.has(key)) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Υπάρχει ήδη υποβολή WTO σε εξέλιξη.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Υπάρχει ήδη υποβολή WTO σε εξέλιξη για αυτόν τον εργαζόμενο.',
+                    errorDetails: 'WTO upload inflight (server-side lock)',
+                    messages: []
+                });
+            }
+
+            // ✅ lock + start cooldown timer
+            erganiInflight.set(key, true);
+            erganiLastStart.set(key, now);
+
+            // ------------------------------------------------------------------
+            // ✅ 1) Resolve local XML path (DEV vs PROD)
+            // ------------------------------------------------------------------
+            const prepMsg =
+                typeof s3Url === 'string' && isS3Url(s3Url)
+                    ? 'Προετοιμασία Αποστολής WTO (λήψη XML από S3)'
+                    : 'Προετοιμασία Αποστολής WTO';
+
+            emitErganhStep(sessionUserId, 2, prepMsg);
+
+            if (typeof s3Url === 'string' && isS3Url(s3Url)) {
+                logger.info('[WTO-UPLOAD] S3 download start', { s3Url });
+
+                localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
+                tempDownloaded = true;
+
+                logger.info('[WTO-UPLOAD] S3 download ok', { localXmlPath });
+            } else {
+                const cwd = process.cwd();
+
+                if (
+                    !path.isAbsolute(localXmlPath) &&
+                    !localXmlPath.startsWith('file:///') &&
+                    !localXmlPath.startsWith('http')
+                ) {
+                    localXmlPath = path.join(cwd, localXmlPath.replace(/^\//, ''));
+                }
+
+                if (localXmlPath.startsWith('file:///')) {
+                    localXmlPath = localXmlPath.replace('file:///', '/');
+                }
+
+                localXmlPath = path.resolve(path.normalize(localXmlPath));
+            }
+
+            // ------------------------------------------------------------------
+            // ✅ 2) Ensure file exists + non-empty
+            // ------------------------------------------------------------------
+            const exists = await fs.pathExists(localXmlPath);
+            if (!exists) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Δεν βρέθηκε το WTO XML αρχείο.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: `Δεν βρέθηκε το WTO XML αρχείο: ${path.basename(localXmlPath)}`,
+                    errorDetails: `WTO XML file not found: ${localXmlPath}`,
+                    messages: []
+                });
+            }
+
+            const stats = await fs.stat(localXmlPath);
+            if (!stats.size) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Το WTO XML αρχείο είναι κενό.'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Το WTO XML αρχείο είναι κενό.',
+                    errorDetails: `WTO XML file is empty: ${localXmlPath}`,
+                    messages: []
+                });
+            }
+
+            logger.info('[WTO-UPLOAD] Local XML ready', { localXmlPath, size: stats.size });
+
+            // ------------------------------------------------------------------
+            // ✅ 3) Load ERGANH credentials
+            // ------------------------------------------------------------------
+            const passwordsData = await PasswordsModel.findOne({
+                companykod_object: sessionCompanyInUse,
+                kodikos: '0002'
+            }).lean();
+
+            const erganhUsername = passwordsData?.username;
+            const erganhPassword = passwordsData?.password;
+
+            if (!erganhUsername || !erganhPassword) {
+                emitToUser(sessionUserId, 'erganh:error', {
+                    message: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ (WTO).'
+                });
+                return res.status(200).json({
+                    success: false,
+                    userMessage: 'Λείπουν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ για την εταιρεία.',
+                    errorDetails: 'Missing ERGANH credentials (PasswordsModel kodikos=0002)',
+                    messages: []
+                });
+            }
+
+            // ✅ Step 3: selecting file
+            emitErganhStep(sessionUserId, 3, 'Επιλογή WTO XML αρχείου');
+
+            // ------------------------------------------------------------------
+            // ✅ 4) Run WTO uploader (BLOCKING)
+            // ------------------------------------------------------------------
+            const { uploadWtoToErganh } = require('../../utils/erganh/wtoUploader');
+
+            // ✅ Step 4: sending/uploading
+            emitErganhStep(sessionUserId, 4, 'Αποστολή WTO');
+
+            const uploadResult = await uploadWtoToErganh(
+                sessionCompanyInUse,
+                localXmlPath,
+                sessionUserId,
+                { username: erganhUsername, password: erganhPassword }
+            );
+
+            // ------------------------------------------------------------------
+            // ✅ 5) Save protocol OR errors to DB
+            // ------------------------------------------------------------------
+            // ------------------------------------------------------------------
+            // ✅ 5) DB Save skipped (Temporary storage in ERGANH only)
+            // ------------------------------------------------------------------
+            // ℹ️ ERGANH stores in "Προσωρινή" state, no need to save protocol yet
+            // Can be enabled later if needed
+            // ------------------------------------------------------------------
+            // ✅ 6) Return result to frontend
+            // ------------------------------------------------------------------
+            emitToUser(sessionUserId, 'erganh:done', { message: 'Ολοκληρώθηκε WTO' });
+
+            return res.status(200).json({
+                success: !!uploadResult?.success,
+                protocol: uploadResult?.protocol || null,
+                screenshot: uploadResult?.screenshot || null,
+                userMessage:
+                    uploadResult?.userMessage ||
+                    (uploadResult?.success
+                        ? 'Η υποβολή WTO ολοκληρώθηκε. (Προσωρινή Αποθήκευση.)'
+                        : 'Η υποβολή WTO απέτυχε.'),
+                errorDetails: uploadResult?.errorDetails || uploadResult?.error || '',
+                messages: uploadResult?.messages || []
+            });
+        } catch (error) {
+            logger.error('[WTO-UPLOAD] Blocking endpoint failed', {
+                error: error.message,
+                stack: error.stack
+            });
+
+            emitToUser(sessionUserId, 'erganh:error', {
+                message: 'Αποτυχία υποβολής WTO στο ΕΡΓΑΝΗ'
+            });
+
+            return res.status(500).json({
+                success: false,
+                userMessage: 'Failed to upload WTO to ERGANH',
                 errorDetails: error.message,
                 messages: []
             });
@@ -2490,12 +2655,100 @@ class ergazomenoiController {
         }
     };
 
+    // static deleteErgazomenoi = async (req, res) => {
+    //     try {
+    //         const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: req.params.id });
+    //         const team = ergazomenoiData.team;
+    //         const company = ergazomenoiData.company_kod;
+    //         const kodikos = ergazomenoiData.kodikos;
+
+    //         await ErgazomenoiModel.deleteOne({ _id: req.params.id });
+
+    //         await IstorikoProslhpseonAllagonModel.deleteMany({
+    //             team: team,
+    //             company_kod: company,
+    //             kodikos: kodikos
+    //         });
+
+    //         await ProdhlomenaOrariaModel.deleteMany({
+    //             team: team,
+    //             company_kod: company,
+    //             kodikos: kodikos
+    //         });
+
+    //         res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
+    //     } catch (error) {
+    //         throw error;
+    //     }
+    // };
+
     static deleteErgazomenoi = async (req, res) => {
         try {
+            console.log('🗑️  [DELETE-EMPLOYEE] Starting deletion for ID:', req.params.id);
+
             const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: req.params.id });
+
+            if (!ergazomenoiData) {
+                console.log('❌ [DELETE-EMPLOYEE] Employee not found');
+                return res.status(404).json({ success: false, message: 'Εργαζόμενος δεν βρέθηκε' });
+            }
+
             const team = ergazomenoiData.team;
             const company = ergazomenoiData.company_kod;
             const kodikos = ergazomenoiData.kodikos;
+            const employeeId = req.params.id; // MongoDB _id
+
+            console.log('📋 [DELETE-EMPLOYEE] Employee data:', {
+                employeeId,
+                team,
+                company,
+                kodikos
+            });
+
+            // =====================================================================
+            // ✅ DELETE XML FILES FROM S3 (E3N & WTO_weekly)
+            // =====================================================================
+
+            try {
+                console.log(`🔍 [DELETE-EMPLOYEE] Calling deleteXmlFilesForEmployee...`);
+
+                const { deleteXmlFilesForEmployee } = require('../../utils/s3Helper');
+
+                // ✅ Get company data (kod + name)
+                let companyKod = 'UNKNOWN';
+                let companyName = 'UNKNOWN';
+
+                try {
+                    const { CompaniesModel } = require('../../models/companies'); // ✅ DESTRUCTURE!
+                    const companyData = await CompaniesModel.findById(company).lean();
+
+                    companyKod = companyData?.kod || 'UNKNOWN';
+                    companyName =
+                        companyData?.eponymia?.replace(/\s+/g, '_').substring(0, 50) || 'UNKNOWN';
+
+                    console.log('📋 [DELETE-EMPLOYEE] Company kod:', companyKod);
+                    console.log('📋 [DELETE-EMPLOYEE] Company name:', companyName);
+                } catch (e) {
+                    console.error('[DELETE-EMPLOYEE] Failed to get company data:', e.message);
+                }
+
+                const deletionResult = await deleteXmlFilesForEmployee(employeeId, {
+                    team,
+                    companyKod: companyKod,
+                    companyName: companyName
+                });
+                console.log(`✅ [DELETE-EMPLOYEE] XML deletion result:`, deletionResult);
+            } catch (xmlError) {
+                console.error(`❌ [DELETE-EMPLOYEE] Failed to delete XML files:`, xmlError);
+                console.error(`   Stack:`, xmlError.stack);
+                // ⚠️ Don't fail the whole operation if XML deletion fails
+            }
+
+            // =====================================================================
+            // ✅ DELETE EMPLOYEE FROM DATABASE
+            // =====================================================================
+
+            console.log('🗑️  [DELETE-EMPLOYEE] Deleting from database...');
 
             await ErgazomenoiModel.deleteOne({ _id: req.params.id });
 
@@ -2511,9 +2764,13 @@ class ergazomenoiController {
                 kodikos: kodikos
             });
 
+            console.log(`✅ [DELETE-EMPLOYEE] Employee deleted: ${kodikos} (${employeeId})`);
+
             res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
         } catch (error) {
-            throw error;
+            console.error('❌ [DELETE-EMPLOYEE] Error:', error);
+            console.error('   Stack:', error.stack);
+            res.status(500).json({ success: false, message: error.message });
         }
     };
 

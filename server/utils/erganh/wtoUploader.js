@@ -1,4 +1,4 @@
-// e3Uploader.js
+// server/utils/erganh/wtoUploader.js
 'use strict';
 
 const fs = require('fs-extra');
@@ -10,7 +10,7 @@ const DEBUG = String(process.env.ERGANH_DEBUG || '').toLowerCase() === 'true';
 const HEADLESS = !DEBUG;
 
 const LOGIN_URL = 'https://eservices.yeka.gr/login.aspx';
-const UPLOAD_URL = 'https://eservices.yeka.gr/Anaggelies/AnaggeliesXML.aspx';
+const UPLOAD_URL = 'https://eservices.yeka.gr/Anaggelies/AnaggeliesXML.aspx'; // ✅ SAME AS E3 (WTO uses same page)
 
 const TIMEOUTS = {
     short: 5000,
@@ -18,12 +18,11 @@ const TIMEOUTS = {
     long: 20000,
     nav: 25000,
     modalAppear: 20000,
-
-    modalSettle: 5000, // ✅ NEW: wait 5s for modal body to populate
+    modalSettle: 5000,
     modalClose: 5000
 };
 
-// Login inputs (fallbacks)
+// Login inputs (same as E3)
 const SEL_LOGIN_USERNAME_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName',
     'input[type="text"][name*="UserName"]',
@@ -46,7 +45,7 @@ const SEL_LOGIN_SUBMIT_ANY = [
     'input[type="submit"]'
 ].join(', ');
 
-// Upload page selectors
+// Upload page selectors (same as E3)
 const SEL_UPLOAD_PROCESS_SELECT_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SKYpobolesList',
     'select[id*="SKYpobolesList"]',
@@ -91,13 +90,13 @@ const SEL_MODAL_OK_ANY = [
 ].join(', ');
 
 function log(...a) {
-    console.log('[ERGANH]', ...a);
+    console.log('[WTO-ERGANH]', ...a);
 }
 function warn(...a) {
-    console.warn('[ERGANH][WARN]', ...a);
+    console.warn('[WTO-ERGANH][WARN]', ...a);
 }
 function dbg(...a) {
-    if (DEBUG) console.log('[ERGANH][DEBUG]', ...a);
+    if (DEBUG) console.log('[WTO-ERGANH][DEBUG]', ...a);
 }
 
 function cleanText(s) {
@@ -110,17 +109,15 @@ function cleanText(s) {
 }
 
 function normalizeForExactCompare(s) {
-    return (
-        String(s || '')
-            .replace(/\r/g, '')
-            .replace(/[’‘]/g, "'")
-            .replace(/[“”]/g, '"')
-            // ✅ collapse ALL whitespace (spaces, tabs, newlines) to single spaces
-            .replace(/\s+/g, ' ')
-            .trim()
-    );
+    return String(s || '')
+        .replace(/\r/g, '')
+        .replace(/['']/g, "'")
+        .replace(/[""]/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
+// ✅ WTO Success modal text (same pattern as E3)
 const SUCCESS_MODAL_TEXT_EXACT = normalizeForExactCompare(
     [
         'Ειδοποίηση',
@@ -137,7 +134,7 @@ async function ensureScreensDir() {
 async function snap(page, label) {
     try {
         await ensureScreensDir();
-        const p = path.join(process.cwd(), 'screenshots', `${Date.now()}-${label}.png`);
+        const p = path.join(process.cwd(), 'screenshots', `${Date.now()}-wto-${label}.png`);
         await page.screenshot({ path: p, fullPage: true });
         warn('[SCREENSHOT]', p);
         return p;
@@ -273,7 +270,6 @@ async function ensureOnUploadPage(page, creds) {
     throw new Error(`Login/Upload page not reachable. Screenshot: ${shot || 'N/A'}`);
 }
 
-// ✅ fallback text when no modal: try to find likely error snippets on the page
 async function captureFallbackPageErrorText(page) {
     try {
         const t = cleanText(
@@ -310,14 +306,7 @@ async function captureFallbackPageErrorText(page) {
     }
 }
 
-/**
- * Robust modal capture:
- * - Waits for ANY dialog/swal2 or keyword presence
- * - ✅ NEW: waits extra 5s for modal content to fully populate
- * - Extracts text from dialog while filtering noise ("x", "Επιλογή", "OK")
- */
 async function captureModalTextAndClose(page) {
-    // 1) Wait for a VISIBLE OK button (this is modal-specific and won't match <option>)
     const okBtn = await (async () => {
         const loc = page.locator(SEL_MODAL_OK_ANY);
         const start = Date.now();
@@ -334,8 +323,6 @@ async function captureModalTextAndClose(page) {
 
     if (!okBtn) return { text: '' };
 
-    // 2) Find the container that actually holds the dialog text.
-    // We climb ancestors until we find a "big" text block (heuristic).
     let container = okBtn.locator('xpath=ancestor::div[1]').first();
 
     for (let level = 1; level <= 14; level++) {
@@ -343,8 +330,6 @@ async function captureModalTextAndClose(page) {
         const ancText = await anc.innerText().catch(() => '');
         const t = cleanText(ancText);
 
-        // Heuristic: modal text in your screenshot is definitely > 40 chars
-        // and contains either "Ειδοποίηση" or "Σφάλματα" or "xsd" or "Για το ΑΦΜ"
         const low = t.toLowerCase();
         const looksLikeModal =
             t.length > 40 &&
@@ -361,10 +346,8 @@ async function captureModalTextAndClose(page) {
         }
     }
 
-    // 3) Read text, and clean obvious noise
     let text = cleanText(await container.innerText().catch(() => ''));
 
-    // remove isolated noise lines
     text = text
         .split('\n')
         .map((l) => l.trim())
@@ -374,7 +357,6 @@ async function captureModalTextAndClose(page) {
         )
         .join('\n');
 
-    // 4) Click OK fast (closing modal in <= ~1s)
     await okBtn.click({ timeout: 1000, force: true }).catch(() => {});
     await page.waitForTimeout(150).catch(() => {});
 
@@ -407,20 +389,25 @@ async function uploadXml(page, xmlPath, creds) {
     await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
     await waitForOptionsOnSelect(dropdown, TIMEOUTS.long);
 
+    // ✅ WTO PROCESS CODE
     let selected = false;
+    const WTO_PROCESS_CODE = '182';
+
     try {
-        await dropdown.selectOption({ value: '213' });
+        await dropdown.selectOption({ value: WTO_PROCESS_CODE });
         selected = true;
     } catch {}
     if (!selected) {
         try {
-            await dropdown.selectOption('213');
+            await dropdown.selectOption(WTO_PROCESS_CODE);
             selected = true;
         } catch {}
     }
     if (!selected) {
-        const shot = await snap(page, 'process-select-failed');
-        throw new Error(`Could not select process 213. Screenshot: ${shot || 'N/A'}`);
+        const shot = await snap(page, 'wto-process-select-failed');
+        throw new Error(
+            `Could not select WTO process ${WTO_PROCESS_CODE}. Screenshot: ${shot || 'N/A'}`
+        );
     }
 
     await page.waitForTimeout(250).catch(() => {});
@@ -457,32 +444,31 @@ async function uploadXml(page, xmlPath, creds) {
     return modalText || '';
 }
 
-// ------------------------------ MAIN EXPORT ---------------------------------
 async function runOnce(companyId, xmlPath, userId, creds) {
     let session = null;
     let page = null;
 
     try {
-        log('Getting or creating session...', { companyId });
+        log('Getting or creating session (WTO will reuse E3 session)...', { companyId });
 
-        // ✅ Get shared session (reuses existing browser if available)
+        // ✅ Get shared session (reuses E3 browser session!)
         session = await sessionManager.getOrCreateSession(companyId, creds);
         page = session.page;
 
         const modalText = cleanText(await uploadXml(page, xmlPath, creds));
 
-        log('[MODAL TEXT]', JSON.stringify(modalText));
-        log('[MODAL OK?]', normalizeForExactCompare(modalText) === SUCCESS_MODAL_TEXT_EXACT);
+        log('[WTO MODAL TEXT]', JSON.stringify(modalText));
+        log('[WTO MODAL OK?]', normalizeForExactCompare(modalText) === SUCCESS_MODAL_TEXT_EXACT);
 
         if (!modalText) {
             const fallback = `Δεν ελήφθη απάντηση από το ΕΡΓΑΝΗ μέσα σε ${Math.round(
                 TIMEOUTS.modalAppear / 1000
-            )} δευτερόλεπτα.\n\nΗ υποβολή απέτυχε ή δεν εμφανίστηκε modal.`;
+            )} δευτερόλεπτα.\n\nΗ υποβολή WTO απέτυχε ή δεν εμφανίστηκε modal.`;
             const shot = await snap(page, 'no-modal');
             return {
                 success: false,
                 protocol: null,
-                userMessage: 'Η υποβολή απέτυχε.',
+                userMessage: 'Η υποβολή WTO απέτυχε.',
                 errorDetails: fallback,
                 error: fallback,
                 messages: [],
@@ -496,7 +482,7 @@ async function runOnce(companyId, xmlPath, userId, creds) {
             return {
                 success: true,
                 protocol: null,
-                userMessage: 'Επιτυχής Αποθήκευση (Προσωρινή)',
+                userMessage: 'Επιτυχής Αποθήκευση WTO (Προσωρινή)',
                 errorDetails: modalText,
                 messages: [],
                 screenshot: null
@@ -506,7 +492,7 @@ async function runOnce(companyId, xmlPath, userId, creds) {
         return {
             success: false,
             protocol: null,
-            userMessage: 'Η υποβολή απέτυχε.',
+            userMessage: 'Η υποβολή WTO απέτυχε.',
             errorDetails: modalText,
             error: modalText,
             messages: [],
@@ -514,28 +500,28 @@ async function runOnce(companyId, xmlPath, userId, creds) {
         };
     } catch (e) {
         const msg = String(e?.message || e);
-        warn('Run failed:', msg);
+        warn('WTO Run failed:', msg);
         const shot = page && !page.isClosed() ? await snap(page, 'final-fail') : null;
         return {
             success: false,
             protocol: null,
-            userMessage: 'Αποτυχία επικοινωνίας με το ΕΡΓΑΝΗ. Δοκιμάστε ξανά.',
+            userMessage: 'Αποτυχία επικοινωνίας με το ΕΡΓΑΝΗ (WTO). Δοκιμάστε ξανά.',
             errorDetails: msg,
             error: msg,
             messages: [],
             screenshot: shot
         };
     } finally {
-        log('E3 upload completed (session kept open for WTO)');
+        log('WTO upload completed (session will be closed by caller)');
     }
 }
 
 const inflightByCompany = new Map();
 
-async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null) {
-    const key = String(companyId ?? 'default');
+async function uploadWtoToErganh(companyId, xmlPath, userId = null, creds = null) {
+    const key = `wto_${String(companyId ?? 'default')}`;
     if (inflightByCompany.has(key)) {
-        warn('Upload already inflight for company:', key);
+        warn('WTO Upload already inflight for company:', key);
         return await inflightByCompany.get(key);
     }
 
@@ -544,6 +530,13 @@ async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null)
             return await runOnce(companyId, xmlPath, userId, creds);
         } finally {
             inflightByCompany.delete(key);
+
+            // ✅ CLOSE SESSION HERE (after WTO upload completes)
+            // This is the LAST upload, so we clean up the shared session
+            log('WTO upload finished, closing shared session...');
+            await sessionManager.closeSession(companyId).catch((e) => {
+                warn('Failed to close session:', e.message);
+            });
         }
     })();
 
@@ -551,4 +544,4 @@ async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null)
     return await p;
 }
 
-module.exports = { uploadE3ToErganh };
+module.exports = { uploadWtoToErganh };

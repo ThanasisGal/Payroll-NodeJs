@@ -24,39 +24,25 @@
             })();
         </script>
 
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/decimal.min.js"></script>
+        <script src="<%= cdnUrl('own/vendor/decimal.min.js') %>"></script>
 
-        <link
-            href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap.min.css"
-            rel="stylesheet"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.css"
-        />
-        <link
-            rel="icon"
-            href="https://cdn.webpayrollsolutions.com/assets/img/favicon.ico"
-            type="image/x-icon"
-        />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap"
-            rel="stylesheet"
-        />
+        <link href="<%= cdnUrl('css/bootstrap.min.css') %>" rel="stylesheet" />
+        <link href="<%= cdnUrl('css/bootstrap-icons.cdn.css') %>" rel="stylesheet" />
+        <link href="<%= cdnUrl('own/vendor/tom-select.css') %>" rel="stylesheet" />
+        <link rel="icon" href="<%= cdnUrl('img/favicon.ico') %>" type="image/x-icon" />
+
+        <!-- Preconnect για γρηγορότερο loading -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
         <link
             href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&display=swap"
             rel="stylesheet"
         />
 
         <link rel="stylesheet" href="<%= css('main') %>" />
-        <link
-            rel="stylesheet"
-            href="https://cdn.webpayrollsolutions.com/assets/own/css/navTabs.css"
-        />
+
+        <link href="<%= cdnUrl('own/css/navTabs.css') %>" rel="stylesheet" />
     </head>
 
     <body
@@ -100,6 +86,8 @@
             </div>
         </div>
 
+        <div id="contentDimOverlay" class="content-dim-overlay"></div>
+
         <%- include('../partials/header.ejs') %>
 
         <div class="container-fluid container-scroll">
@@ -137,13 +125,13 @@
         <script src="<%= script('dates/convertDateToISO') %>"></script>
 
         <!-- Vendors -->
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
+        <script src="<%= cdnUrl('own/vendor/jquery.min.js') %>"></script>
+        <script src="<%= cdnUrl('own/vendor/tom-select.complete.js') %>"></script>
         <script type="module" src="<%= script('app') %>"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/select2.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/bootstrap.bundle.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/sweetalert2.min.js"></script>
-        <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/math.min.js"></script>
+        <script src="<%= cdnUrl('own/vendor/select2.min.js') %>"></script>
+        <script src="<%= cdnUrl('own/vendor/bootstrap.bundle.min.js') %>"></script>
+        <script src="<%= cdnUrl('own/vendor/sweetalert2.min.js') %>"></script>
+        <script src="<%= cdnUrl('own/vendor/math.min.js') %>"></script>
         <script src="<%= script('common/checkScreenAnalysis') %>" defer></script>
         <script src="<%= script('common/deviceSwitcher') %>" defer></script>
 
@@ -171,21 +159,12 @@
                 const fillEl = () => document.getElementById('appLoaderProgressFill');
                 const textEl = () => document.getElementById('appLoaderProgressText');
 
-                // let timer = null;
-                // let value = 0;
-                // let target = 0;
-                // let cap = 90;
-                // let startedAt = 0;
-
                 let rafId = null;
                 let value = 0;
                 let target = 0;
                 let cap = 90;
                 let startedAt = 0;
                 let lastTs = 0;
-
-                // ✅ κρατάει ΜΟΝΙΜΑ το "Βήμα x/y: μήνυμα" που έρχεται από emitProgress,
-                // ώστε να μην το σβήνει το smooth loop
                 let suffixText = '';
 
                 function buildMeta(percentNumber) {
@@ -214,24 +193,22 @@
 
                     setProgress(0);
 
-                    const SPEED_PER_SEC = 2.4; // ~0.6 ανά 250ms όπως πριν (0.6 / 0.25 = 2.4)
+                    const SPEED_PER_SEC = 2.4;
 
                     const tick = (now) => {
                         const root = el();
 
-                        // Αν δεν υπάρχει ή δεν είναι visible, σταμάτα τελείως (μην καίει CPU)
                         if (!root || !root.classList.contains('is-visible')) {
                             rafId = null;
                             return;
                         }
 
-                        const dt = Math.max(0, (now - lastTs) / 1000); // seconds
+                        const dt = Math.max(0, (now - lastTs) / 1000);
                         lastTs = now;
 
                         const elapsed = (now - startedAt) / 1000;
                         const dynamicCap = Math.min(95, cap + Math.floor(elapsed / 10) * 2);
 
-                        // “smooth” αύξηση προς το dynamicCap, αλλά ποτέ κάτω από target
                         const next = Math.max(
                             target,
                             Math.min(dynamicCap, value + SPEED_PER_SEC * dt)
@@ -239,7 +216,7 @@
 
                         if (next > value) {
                             value = next;
-                            setProgress(value); // γράφει % + suffixText
+                            setProgress(value);
                         }
 
                         rafId = requestAnimationFrame(tick);
@@ -259,6 +236,10 @@
 
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
+                    // ✅ Ενεργοποίηση overlay
+                    const overlay = document.getElementById('contentDimOverlay');
+                    if (overlay) overlay.classList.add('is-active');
+
                     root.classList.add('is-visible');
                     startSmooth();
                 };
@@ -270,6 +251,12 @@
                     stopSmooth();
                     root.classList.remove('is-visible');
 
+                    // ✅ Απενεργοποίηση overlay
+                    setTimeout(() => {
+                        const overlay = document.getElementById('contentDimOverlay');
+                        if (overlay) overlay.classList.remove('is-active');
+                    }, 300);
+
                     value = 0;
                     target = 0;
                     cap = 90;
@@ -280,7 +267,6 @@
                     setProgress(0);
                 };
 
-                // ✅ percent + message + step/totalSteps
                 window.applyServerProgress = function (percent, message, step, totalSteps) {
                     const root = el();
                     if (root && !root.classList.contains('is-visible')) {
@@ -289,34 +275,27 @@
 
                     const p = Math.max(0, Math.min(100, Number(percent) || 0));
 
-                    // Title (πάνω γραμμή)
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
-                    // Step line (δεύτερη γραμμή)
                     const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
                     if (stepEl())
                         stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
 
-                    // ✅ Αυτό είναι που θα εμφανίζεται ΔΙΠΛΑ στο % (στο meta)
                     if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
                     else if (hasStep) suffixText = `Βήμα ${step}/${totalSteps}`;
                     else if (message) suffixText = String(message);
                     else suffixText = '';
 
-                    // Fill bar πάει κανονικά στον server percent
                     if (fillEl()) fillEl().style.width = p + '%';
 
-                    // Update smooth targets
                     target = Math.max(target, p);
                     cap = Math.max(cap, Math.min(99, target));
                     value = Math.min(value, target);
 
-                    // γράψε άμεσα το meta με το τρέχον smooth value (όχι να “πηδάει”)
                     setProgress(value);
                 };
 
                 window.finishProgressDone = function (message) {
-                    // στο τέλος δείχνει 100% + suffix
                     window.applyServerProgress(100, message || 'Ολοκληρώθηκε', 0, 0);
                     setTimeout(() => window.hideLoader(), 600);
                 };
@@ -325,7 +304,6 @@
                     const msg = message || 'Σφάλμα';
                     if (titleEl()) titleEl().textContent = `⚠️ ${msg}`;
 
-                    // στο error κράτα το meta ως έχει αλλά βάλε suffix error
                     suffixText = `⚠️ ${msg}`;
                     setProgress(value);
 
@@ -433,14 +411,16 @@
                     if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
                 }
 
+                // Βρες τις συναρτήσεις showSimple και hideSimple
+
                 function showSimple(text) {
-                    // Αν τρέχει EFKA loader, ΜΗΝ δείχνεις simple
                     const efka = efkaRoot();
                     if (efka && efka.classList.contains('is-visible')) return;
 
                     const root = simpleRoot();
                     if (!root) return;
                     setSimpleText(text);
+
                     root.classList.add('is-visible');
                 }
 
@@ -461,18 +441,15 @@
                     begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
                         activeCount++;
 
-                        // αν ήδη φαίνεται, απλά ανανέωσε text
                         const root = simpleRoot();
                         if (root && root.classList.contains('is-visible')) {
                             setSimpleText(text);
                             return;
                         }
 
-                        // ξεκίνα timer για anti-flicker
                         if (pendingTimer) clearTimeout(pendingTimer);
                         pendingTimer = setTimeout(() => {
                             pendingTimer = null;
-                            // εμφάνιση μόνο αν ακόμη τρέχει κάτι
                             if (activeCount > 0) {
                                 shownAt = Date.now();
                                 showSimple(text);
@@ -483,20 +460,16 @@
                     end() {
                         activeCount = Math.max(0, activeCount - 1);
 
-                        // αν υπάρχουν κι άλλα σε εξέλιξη, μην κλείνεις
                         if (activeCount > 0) return;
 
-                        // σταμάτα πιθανό pending show
                         if (pendingTimer) {
                             clearTimeout(pendingTimer);
                             pendingTimer = null;
                         }
 
-                        // αν δεν εμφανίστηκε ποτέ, τέλος
                         const root = simpleRoot();
                         if (!root || !root.classList.contains('is-visible')) return;
 
-                        // κράτα το λίγο για να μην “αναβοσβήνει”
                         const elapsed = Date.now() - shownAt;
                         const wait = Math.max(0, MIN_VISIBLE - elapsed);
                         setTimeout(() => hideSimple(), wait);
@@ -631,6 +604,49 @@
                     },
                     true
                 );
+            })();
+        </script>
+
+        <script nonce="<%= nonce %>">
+            (function () {
+                'use strict';
+
+                // ✅ Παρακολουθεί όλους τους loaders και προσθέτει class στο body
+                const observeLoaders = () => {
+                    const loaders = document.querySelectorAll('.app-loader');
+
+                    const checkLoadersState = () => {
+                        const anyVisible = Array.from(loaders).some((loader) =>
+                            loader.classList.contains('is-visible')
+                        );
+
+                        if (anyVisible) {
+                            document.body.classList.add('loader-active');
+                        } else {
+                            document.body.classList.remove('loader-active');
+                        }
+                    };
+
+                    // MutationObserver για να παρακολουθεί αλλαγές στα classes
+                    const observer = new MutationObserver(checkLoadersState);
+
+                    loaders.forEach((loader) => {
+                        observer.observe(loader, {
+                            attributes: true,
+                            attributeFilter: ['class']
+                        });
+                    });
+
+                    // Initial check
+                    checkLoadersState();
+                };
+
+                // Εκτέλεση όταν φορτώσει η σελίδα
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', observeLoaders);
+                } else {
+                    observeLoaders();
+                }
             })();
         </script>
     </body>
