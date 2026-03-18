@@ -444,41 +444,87 @@ document.addEventListener('DOMContentLoaded', () => {
                 backdrop: false,
                 allowOutsideClick: false,
                 icon: 'info',
-                title: 'ΑΜΕΣΗ ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
+                title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
                 html: `
         <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
+            <!-- ✅ TOGGLE: Προσωρινή/Οριστική -->
             <div class="display-flex align-items-center gap-0_75rem">
-                <input type="checkbox" id="e3_anaggelia_proslhpshs" name="files" value="e3_anaggelia_proslhpshs" checked 
-                    class="custom-checkbox" />
-                <label for="e3_anaggelia_proslhpshs" class="margin-0 cursor-pointer font-size-rem-1_05">
+                <input type="checkbox" 
+                       id="temporary_permanent_storage" 
+                       name="files" 
+                       value="temporary_permanent_storage" 
+                       class="custom-checkbox" />
+                <label for="temporary_permanent_storage" 
+                       id="storage_mode_label"
+                       class="margin-0 cursor-pointer font-size-rem-1_05"
+                       style="transition: all 0.2s; color: #000000">
+                    Προσωρινή Αποθήκευση
+                </label>
+            </div>
+
+            <!-- ✅ E3 CHECKBOX -->
+            <div class="display-flex align-items-center gap-0_75rem">
+                <input type="checkbox" 
+                       id="e3_anaggelia_proslhpshs" 
+                       name="files" 
+                       value="e3_anaggelia_proslhpshs" 
+                       checked 
+                       class="custom-checkbox" />
+                <label for="e3_anaggelia_proslhpshs" 
+                       class="margin-0 cursor-pointer font-size-rem-1_05">
                     Αναγγελία Πρόσληψης (E3)
                 </label>
             </div>
 
+            <!-- ✅ WTO CHECKBOX -->
             <div class="display-flex align-items-center gap-0_75rem">
-                <input type="checkbox" id="schedules" name="files" value="schedules" checked 
-                    class="custom-checkbox" />
-                <label for="schedules" class="margin-0 cursor-pointer font-size-rem-1_05">
+                <input type="checkbox" 
+                       id="schedules" 
+                       name="files" 
+                       value="schedules" 
+                       checked 
+                       class="custom-checkbox" />
+                <label for="schedules" 
+                       class="margin-0 cursor-pointer font-size-rem-1_05">
                     Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
                 </label>
             </div>
         </div>
     `,
                 focusConfirm: false,
+
+                // ✅ ATTACH EVENT LISTENER AFTER MODAL OPENS (CSP-safe)
+                didOpen: () => {
+                    const checkbox = document.getElementById('temporary_permanent_storage');
+                    const label = document.getElementById('storage_mode_label');
+
+                    if (checkbox && label) {
+                        checkbox.addEventListener('change', function () {
+                            if (this.checked) {
+                                label.innerHTML = '<strong>Οριστική Ενημέρωση</strong>';
+                                label.style.color = '#28a745'; // Green
+                            } else {
+                                label.innerHTML = 'Προσωρινή Αποθήκευση';
+                                label.style.color = '#000000'; // Gray
+                            }
+                        });
+                    }
+                },
+
                 preConfirm: () => {
+                    const isPermanent = document.getElementById(
+                        'temporary_permanent_storage'
+                    ).checked;
+                    const e3Enabled = document.getElementById('e3_anaggelia_proslhpshs').checked;
+                    const wtoEnabled = document.getElementById('schedules').checked;
+
                     const filesToUpdate = {
-                        e3_anaggelia_proslhpshs:
-                            document.getElementById('e3_anaggelia_proslhpshs').checked,
-                        schedules: document.getElementById('schedules').checked
+                        isPermanent: isPermanent,
+                        e3_anaggelia_proslhpshs: e3Enabled,
+                        schedules: wtoEnabled
                     };
 
-                    console.log('🔍 [FRONTEND] Checkboxes:', {
-                        e3_checkbox_element: document.getElementById('e3_anaggelia_proslhpshs'),
-                        e3_checked: document.getElementById('e3_anaggelia_proslhpshs')?.checked,
-                        schedules_checkbox_element: document.getElementById('schedules'),
-                        schedules_checked: document.getElementById('schedules')?.checked,
-                        filesToUpdate: filesToUpdate
-                    });
+                    console.log('🔍 [FRONTEND] Checkboxes:', filesToUpdate);
 
                     return filesToUpdate;
                 },
@@ -808,6 +854,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         // =====================================================================
                         console.log('📄 Opening PDF modal...');
 
+                        // ✅ Store upload options globally (so modal can access them)
+                        window.__erganhUploadOptions = {
+                            isPermanent: result.value?.isPermanent || false,
+                            e3Enabled: result.value?.e3_anaggelia_proslhpshs !== false,
+                            wtoEnabled: result.value?.schedules !== false
+                        };
+
+                        console.log('[MAIN] Stored upload options:', window.__erganhUploadOptions);
+
                         await showContractPdfModalAndWait(
                             data.contractPdf.url,
                             data.contractPdf.s3Key,
@@ -815,8 +870,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             employeeName,
                             companyData,
                             e3XmlData,
-                            wtoXmlData, // ✅ Pass WTO data
-                            data.data?._id // ✅ Pass ergazomenos ID for ERGANH upload
+                            wtoXmlData,
+                            data.data?._id,
+                            result.value // ✅ Pass filesToUpdate (checkbox state)
                         );
 
                         // =====================================================================
@@ -1056,7 +1112,8 @@ document.addEventListener('DOMContentLoaded', () => {
         companyData = {},
         e3XmlData = null,
         wtoXmlData = null,
-        ergazomenosId = null
+        ergazomenosId = null,
+        filesToUpdate = {} // ✅ New parameter
     ) {
         return new Promise((resolve) => {
             const modal = document.getElementById('pdfPreviewContractModal');
@@ -1123,22 +1180,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 iframe.src = '';
 
                 // =====================================================================
+                // ✅ GET UPLOAD OPTIONS (from function parameter)
+                // =====================================================================
+                const isPermanent = filesToUpdate?.isPermanent === true;
+                const e3Enabled = filesToUpdate?.e3_anaggelia_proslhpshs === true;
+                const wtoEnabled = filesToUpdate?.schedules === true;
+
+                console.log('[CLOSE-MODAL] Upload options:', {
+                    isPermanent,
+                    e3Enabled,
+                    wtoEnabled,
+                    filesToUpdate
+                });
+
+                // =====================================================================
                 // ✅ CHECK: What XMLs need upload?
                 // =====================================================================
-                const needsE3Upload = !!(e3XmlData?.success && ergazomenosId);
-                const needsWtoUpload = !!(wtoXmlData?.success && ergazomenosId);
+                const needsE3Upload = !!(e3Enabled && e3XmlData?.success && ergazomenosId);
+
+                // ✅ CRITICAL: For WTO, check if USER ENABLED schedules checkbox
+                // NOT if XML was generated (XML is only generated for isPermanent=true)
+                const needsWtoUpload = !!(wtoEnabled && ergazomenosId);
 
                 console.log('[XML-UPLOAD] closeModal checks:', {
                     needsE3Upload,
                     needsWtoUpload,
+                    wtoEnabled,
+                    isPermanent,
                     e3_s3Key: e3XmlData?.s3Key,
-                    e3_relativePath: e3XmlData?.relativePath,
                     wto_s3Key: wtoXmlData?.s3Key,
                     wto_relativePath: wtoXmlData?.relativePath,
                     ergazomenosId
                 });
 
-                // ��� If neither needs upload → redirect immediately
+                // ✅ If neither needs upload → redirect immediately
                 if (!needsE3Upload && !needsWtoUpload) {
                     resolve();
                     window.location.href = redirectUrl;
@@ -1146,8 +1221,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // =====================================================================
-                // ✅ UPLOAD E3 XML (if exists)
+                // ✅ UPLOAD E3 XML (if enabled - with isPermanent flag)
                 // =====================================================================
+                let e3UploadSuccess = false;
+
                 if (needsE3Upload) {
                     const e3UrlToSend =
                         e3XmlData?.relativePath ||
@@ -1159,68 +1236,174 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error('[E3-UPLOAD] Missing/invalid s3UrlToSend', e3UrlToSend);
 
                         await Swal.fire({
+                            backdrop: false,
                             icon: 'error',
                             title: 'E3 XML - ΕΡΓΑΝΗ ΙΙ',
                             text: 'Δεν βρέθηκε το path του E3 XML για αποστολή.',
-                            confirmButtonText: 'OK'
+                            confirmButtonText: 'OK',
+                            customClass: {
+                                confirmButton:
+                                    'class-error custom-confirm-button custom-swal-button',
+                                title: 'custom-title',
+                                popup: 'custom-swal-popup'
+                            }
                         });
                     } else {
                         try {
-                            console.log('[E3-UPLOAD] Uploading E3 XML...');
-                            await uploadToErganh(ergazomenosId, e3UrlToSend);
-                            console.log('[E3-UPLOAD] ✅ E3 XML uploaded successfully');
+                            const mode = isPermanent ? 'Οριστική' : 'Προσωρινή';
+                            console.log(`[E3-UPLOAD] Uploading E3 XML (${mode})...`);
+
+                            // ✅ Pass isPermanent flag to backend
+                            // ✅ CRITICAL: This function shows Swal alert - we MUST wait for it!
+                            const e3Result = await uploadToErganh(
+                                ergazomenosId,
+                                e3UrlToSend,
+                                isPermanent
+                            );
+
+                            console.log('[E3-UPLOAD] ✅ E3 upload function returned:', e3Result);
+
+                            e3UploadSuccess = e3Result?.success === true;
                         } catch (e) {
                             console.error('[E3-UPLOAD] ❌ Failed:', e?.message || e);
 
                             await Swal.fire({
+                                backdrop: false,
                                 icon: 'error',
                                 title: 'E3 XML - ΕΡΓΑΝΗ ΙΙ',
                                 text: 'Αποτυχία αποστολής E3 XML.',
-                                confirmButtonText: 'OK'
+                                confirmButtonText: 'OK',
+                                customClass: {
+                                    confirmButton:
+                                        'class-error custom-confirm-button custom-swal-button',
+                                    title: 'custom-title',
+                                    popup: 'custom-swal-popup'
+                                }
                             });
                         }
                     }
                 }
 
+                console.log('[E3-UPLOAD] Completed. Success:', e3UploadSuccess);
+                console.log('[NEXT] Checking if WTO upload is needed...');
+
                 // =====================================================================
-                // ✅ UPLOAD WTO XML (if exists)
+                // ✅ UPLOAD WTO (CONDITIONAL - based on isPermanent flag)
+                // ✅ CRITICAL: This ONLY runs AFTER E3 Swal is closed!
                 // =====================================================================
                 if (needsWtoUpload) {
-                    const wtoUrlToSend =
-                        wtoXmlData?.relativePath ||
-                        wtoXmlData?.s3Url ||
-                        wtoXmlData?.downloadUrl ||
-                        null;
+                    console.log('[WTO-UPLOAD] Starting WTO upload process...');
 
-                    if (!wtoUrlToSend || typeof wtoUrlToSend !== 'string') {
-                        console.error('[WTO-UPLOAD] Missing/invalid s3UrlToSend', wtoUrlToSend);
+                    try {
+                        if (isPermanent) {
+                            // =====================================================================
+                            // ✅ ΟΡΙΣΤΙΚΗ ΕΝΗΜΕΡΩΣΗ → XML Upload (sequential after E3)
+                            // =====================================================================
+                            console.log('[WTO-UPLOAD] Mode: Οριστική Ενημέρωση (XML upload)');
+
+                            const wtoUrlToSend =
+                                wtoXmlData?.relativePath ||
+                                wtoXmlData?.s3Url ||
+                                wtoXmlData?.downloadUrl ||
+                                null;
+
+                            console.log('[WTO-UPLOAD] WTO XML path:', wtoUrlToSend);
+
+                            if (!wtoUrlToSend || typeof wtoUrlToSend !== 'string') {
+                                console.error(
+                                    '[WTO-UPLOAD] ❌ Missing/invalid XML path',
+                                    wtoUrlToSend
+                                );
+
+                                await Swal.fire({
+                                    backdrop: false,
+                                    icon: 'error',
+                                    title: 'WTO XML - ΕΡΓΑΝΗ ΙΙ',
+                                    text: 'Δεν βρέθηκε το path του WTO XML για αποστολή.',
+                                    confirmButtonText: 'OK',
+                                    customClass: {
+                                        confirmButton:
+                                            'class-error custom-confirm-button custom-swal-button',
+                                        title: 'custom-title',
+                                        popup: 'custom-swal-popup'
+                                    }
+                                });
+                            } else {
+                                console.log('[WTO-UPLOAD] Calling uploadWtoToErganh...');
+
+                                // ✅ Call existing XML upload function
+                                const wtoResult = await uploadWtoToErganh(
+                                    ergazomenosId,
+                                    wtoUrlToSend
+                                );
+
+                                console.log('[WTO-UPLOAD] WTO upload result:', wtoResult);
+
+                                if (wtoResult?.success) {
+                                    console.log('[WTO-UPLOAD] ✅ WTO XML uploaded successfully');
+                                } else {
+                                    console.warn(
+                                        '[WTO-UPLOAD] ⚠️ WTO upload completed with warnings'
+                                    );
+                                }
+                            }
+                        } else {
+                            // =====================================================================
+                            // ✅ ΠΡΟΣΩΡΙΝΗ ΑΠΟΘΗΚΕΥΣΗ → Manual Form Navigation
+                            // =====================================================================
+                            console.log('[WTO-UPLOAD] Mode: Προσωρινή Αποθήκευση (manual form)');
+                            console.log('[WTO-UPLOAD] Calling uploadWtoTemporary...');
+
+                            // ✅ No XML path needed - we navigate the form manually
+                            // The uploadWtoTemporary function will:
+                            // 1. Navigate to WTO menu
+                            // 2. Fill the form fields (date, branch, process type)
+                            // 3. Click through tabs
+                            // 4. Fill employee details (AFM, Επώνυμο, Όνομα)
+                            const wtoTempResult = await uploadWtoTemporary(ergazomenosId, null);
+
+                            console.log('[WTO-UPLOAD] WTO temporary result:', wtoTempResult);
+
+                            if (wtoTempResult?.success !== false) {
+                                console.log('[WTO-UPLOAD] ✅ WTO temporary upload completed');
+                            } else {
+                                console.warn(
+                                    '[WTO-UPLOAD] ⚠️ WTO temporary upload completed with warnings'
+                                );
+                            }
+                        }
+                    } catch (e) {
+                        console.error('[WTO-UPLOAD] ❌ Failed:', e?.message || e);
+                        console.error('[WTO-UPLOAD] Error stack:', e?.stack);
 
                         await Swal.fire({
+                            backdrop: false,
                             icon: 'error',
-                            title: 'WTO XML - ΕΡΓΑΝΗ ΙΙ',
-                            text: 'Δεν βρέθηκε το path του WTO XML για αποστολή.',
-                            confirmButtonText: 'OK'
+                            title: 'WTO - ΕΡΓΑΝΗ ΙΙ',
+                            html: `
+                    <p>Αποτυχία αποστολής WTO.</p>
+                    <p class="text-muted" style="font-size: 0.9rem; margin-top: 10px;">
+                        ${e?.message || 'Unknown error'}
+                    </p>
+                `,
+                            confirmButtonText: 'OK',
+                            customClass: {
+                                confirmButton:
+                                    'class-error custom-confirm-button custom-swal-button',
+                                title: 'custom-title',
+                                popup: 'custom-swal-popup',
+                                htmlContainer: 'custom-html-container'
+                            }
                         });
-                    } else {
-                        try {
-                            console.log('[WTO-UPLOAD] Uploading WTO XML...');
-                            await uploadWtoToErganh(ergazomenosId, wtoUrlToSend);
-                            console.log('[WTO-UPLOAD] ✅ WTO XML uploaded successfully');
-                        } catch (e) {
-                            console.error('[WTO-UPLOAD] ❌ Failed:', e?.message || e);
-
-                            await Swal.fire({
-                                icon: 'error',
-                                title: 'WTO XML - ΕΡΓΑΝΗ ΙΙ',
-                                text: 'Αποτυχία αποστολής WTO XML.',
-                                confirmButtonText: 'OK'
-                            });
-                        }
                     }
+                } else {
+                    console.log('[WTO-UPLOAD] ⏸️ Skipped (not enabled or no employee ID)');
                 }
 
+                console.log('[CLOSE-MODAL] All uploads completed. Redirecting...');
+
                 // =====================================================================
-                // ✅ REDIRECT (after both uploads complete)
+                // ✅ REDIRECT (after BOTH uploads complete)
                 // =====================================================================
                 resolve();
                 window.location.href = redirectUrl;
@@ -1441,8 +1624,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Shows smooth progress loader steps via socket.io events (erganh:progress)
     // and hides loader immediately before Swal.
     // ============================================================================
-    async function uploadToErganh(ergazomenosId, s3Url) {
+    async function uploadToErganh(ergazomenosId, s3Url, isPermanent = false) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        console.log('[UPLOAD-E3] Options:', { ergazomenosId, isPermanent });
 
         // ✅ Safety
         if (!s3Url || typeof s3Url !== 'string') {
@@ -1541,7 +1726,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     'CSRF-Token': csrfToken
                 },
                 credentials: 'include',
-                body: JSON.stringify({ ergazomenosId, s3Url })
+                body: JSON.stringify({
+                    ergazomenosId,
+                    s3Url,
+                    isPermanent: isPermanent === true // ✅ Pass flag
+                })
             });
 
             let payload;
@@ -1813,6 +2002,210 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             return payload;
+        } finally {
+            if (window.hideLoader) window.hideLoader();
+            erganiUploadInProgress = false;
+        }
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Upload WTO TEMPORARY (Manual Form Navigation)
+    // ============================================================================
+    async function uploadWtoTemporary(ergazomenosId, _unusedParam = null) {
+        // We don't need s3Url for temporary mode (manual form navigation)
+        // This function triggers server-side browser automation
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        if (erganiUploadInProgress) {
+            await Swal.fire({
+                backdrop: false,
+                icon: 'info',
+                title: 'ΕΡΓΑΝΗ (WTO Προσωρινή)',
+                text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
+                confirmButtonText: 'OK'
+            });
+
+            return {
+                success: false,
+                userMessage: 'Upload already in progress'
+            };
+        }
+
+        erganiUploadInProgress = true;
+
+        const escapeHtml = (s) =>
+            String(s ?? '').replace(
+                /[<>&"]/g,
+                (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]
+            );
+
+        try {
+            // ✅ Start progress bar loader
+            if (window.applyServerProgress) {
+                window.applyServerProgress(0, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ (WTO - Προσωρινή)', 1, 12);
+            } else if (window.showLoader) {
+                window.showLoader('Είσοδος στο ΕΡΓΑΝΗ ΙΙ (WTO - Προσωρινή)');
+            }
+
+            console.log('[WTO-TEMP] Calling backend endpoint...');
+
+            // ✅ Call the CORRECT backend endpoint (wtoTemporaryUploader.js)
+            const uploadResponse = await fetch(
+                '/ergazomenoi/ergazomenoi/upload-wto-temporary-to-erganh',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        ergazomenosId: ergazomenosId
+                        // ✅ No s3Url needed - backend will fetch employee data from DB
+                    })
+                }
+            );
+
+            let payload;
+            try {
+                payload = await uploadResponse.json();
+            } catch {
+                payload = {
+                    success: false,
+                    userMessage: await uploadResponse.text()
+                };
+            }
+
+            console.log('[WTO-TEMP] Backend response:', payload);
+
+            // ✅ Hide loader before showing Swal
+            if (window.hideLoader) window.hideLoader();
+
+            // ✅ HTTP errors
+            if (!uploadResponse.ok) {
+                const userMessage =
+                    payload?.userMessage ||
+                    payload?.message ||
+                    payload?.error ||
+                    `HTTP ${uploadResponse.status}`;
+
+                await Swal.fire({
+                    backdrop: false,
+                    icon: 'error',
+                    title: 'WTO (Προσωρινή) - Αποτυχία',
+                    html: `
+                    <p>${escapeHtml(userMessage)}</p>
+                    ${
+                        payload?.errorDetails
+                            ? `
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer;">Λεπτομέρειες</summary>
+                            <pre style="max-height: 200px; overflow: auto; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
+                        </details>
+                    `
+                            : ''
+                    }
+                `,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup',
+                        htmlContainer: 'custom-html-container'
+                    }
+                });
+
+                return {
+                    success: false,
+                    userMessage
+                };
+            }
+
+            // ✅ Check if navigation was successful
+            if (payload.success) {
+                const userMsg =
+                    payload?.userMessage ||
+                    'Επιτυχής Προσωρινή Αποθήκευση WTO (φόρμα συμπληρώθηκε)';
+
+                await Swal.fire({
+                    backdrop: false,
+                    icon: 'success',
+                    title: 'ΕΡΓΑΝΗ ΙΙ (WTO - Προσωρινή)',
+                    html: `
+                    <div style="text-align: left;">
+                        <p style="font-weight: 600; margin-bottom: 10px;">${escapeHtml(userMsg)}</p>
+                        <p class="text-muted" style="font-size: 0.9rem;">
+                            Η φόρμα WTO συμπληρώθηκε αυτόματα. Ολοκλήρωσε την υποβολή στο παράθυρο του ΕΡΓΑΝΗ.
+                        </p>
+                    </div>
+                `,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup',
+                        htmlContainer: 'custom-html-container'
+                    }
+                });
+
+                return payload;
+            }
+
+            // ✅ Navigation completed but with warnings
+            const userMsg = payload?.userMessage || 'Η φόρμα WTO συμπληρώθηκε με προειδοποιήσεις';
+
+            await Swal.fire({
+                backdrop: false,
+                icon: 'warning',
+                title: 'ΕΡΓΑΝΗ ΙΙ (WTO - Προσωρινή)',
+                html: `
+                <div style="text-align: left;">
+                    <p style="font-weight: 600; margin-bottom: 10px;">${escapeHtml(userMsg)}</p>
+                    ${
+                        payload?.errorDetails
+                            ? `
+                        <details style="margin-top: 10px;">
+                            <summary style="cursor: pointer;">Λεπτομέρειες</summary>
+                            <pre style="max-height: 200px; overflow: auto; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
+                        </details>
+                    `
+                            : ''
+                    }
+                </div>
+            `,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container'
+                }
+            });
+
+            return payload;
+        } catch (error) {
+            console.error('[WTO-TEMP] ❌ Exception:', error);
+
+            if (window.hideLoader) window.hideLoader();
+
+            await Swal.fire({
+                backdrop: false,
+                icon: 'error',
+                title: 'WTO (Προσωρινή) - Σφάλμα',
+                text: error?.message || 'Unknown error',
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
+            });
+
+            return {
+                success: false,
+                userMessage: error?.message || 'Unknown error'
+            };
         } finally {
             if (window.hideLoader) window.hideLoader();
             erganiUploadInProgress = false;

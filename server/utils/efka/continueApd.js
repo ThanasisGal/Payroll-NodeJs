@@ -469,7 +469,7 @@ async function continueApd(sessionId, opts = {}) {
         if (await safeCount(roleSelect)) {
             await waitVisible(roleSelect, timeoutMs);
 
-            await apdPage.selectOption('select#role', { value: 'legacy-external-employer' });
+            await apdPage.selectOption('select#role', { value: 'external-employer' });
 
             const ameInput = apdPage.locator('input#ame[name="ame"]');
             await waitVisible(ameInput, timeoutMs);

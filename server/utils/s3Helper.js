@@ -713,6 +713,140 @@ async function deleteXmlFilesForEmployee(employeeId, options = {}) {
 }
 
 // =========================================================================
+// ✅ DELETE ALL CONTRACT FILES FOR EMPLOYEE
+// =========================================================================
+
+/**
+ * ✅ Delete all contract PDF files starting with employee ID
+ * @param {string} employeeId - MongoDB _id of employee
+ * @param {Object} options - { team, companyKod, companyName }
+ * @returns {Promise<Object>} Deletion result
+ */
+async function deleteContractsForEmployee(employeeId, options = {}) {
+    const { team, companyKod, companyName } = options;
+
+    if (!employeeId) {
+        throw new Error('Employee ID is required');
+    }
+
+    const deletedFiles = [];
+    const failedFiles = [];
+
+    try {
+        // =====================================================================
+        // ✅ BUILD SEARCH PATHS
+        // =====================================================================
+
+        const searchPaths = [];
+
+        if (team && companyKod && companyName) {
+            const baseDir = `contracts/${team}/${companyKod}_${companyName}`;
+            console.log(`📁 [CONTRACT-DELETE] Base directory: ${baseDir}`);
+            searchPaths.push(baseDir);
+        } else {
+            searchPaths.push('contracts');
+        }
+
+        console.log(`🔍 [CONTRACT-DELETE] Searching for files starting with: ${employeeId}`);
+
+        // =====================================================================
+        // ✅ DEV MODE: Search local filesystem
+        // =====================================================================
+
+        if (USE_LOCAL_STORAGE) {
+            const fg = require('fast-glob');
+
+            for (const searchPath of searchPaths) {
+                const pattern = path.join(LOCAL_STORAGE_DIR, searchPath, `${employeeId}_*.pdf`);
+
+                console.log(`📁 [CONTRACT-DELETE] DEV pattern: ${pattern}`);
+
+                const files = await fg(pattern, { onlyFiles: true });
+
+                console.log(`   Found ${files.length} files`);
+
+                for (const filePath of files) {
+                    try {
+                        await fs.unlink(filePath);
+                        const s3Key = path
+                            .relative(LOCAL_STORAGE_DIR, filePath)
+                            .replace(/\\/g, '/');
+                        deletedFiles.push(s3Key);
+                        console.log(`   ✅ Deleted: ${s3Key}`);
+                    } catch (err) {
+                        failedFiles.push({ path: filePath, error: err.message });
+                        console.error(`   ❌ Failed: ${filePath} - ${err.message}`);
+                    }
+                }
+            }
+
+            return {
+                success: true,
+                deletedCount: deletedFiles.length,
+                failedCount: failedFiles.length,
+                deletedFiles,
+                failedFiles
+            };
+        }
+
+        // =====================================================================
+        // ✅ PRODUCTION: List & delete from S3
+        // =====================================================================
+
+        const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
+
+        for (const searchPath of searchPaths) {
+            const prefix = `${searchPath}/${employeeId}_`;
+
+            console.log(`☁️  [CONTRACT-DELETE] S3 prefix: ${prefix}`);
+
+            const listCommand = new ListObjectsV2Command({
+                Bucket: S3_BUCKET_NAME,
+                Prefix: prefix
+            });
+
+            const listResponse = await s3Client.send(listCommand);
+
+            if (!listResponse.Contents || listResponse.Contents.length === 0) {
+                console.log(`   No files found with prefix: ${prefix}`);
+                continue;
+            }
+
+            console.log(`   Found ${listResponse.Contents.length} files`);
+
+            for (const obj of listResponse.Contents) {
+                try {
+                    await deleteFileFromS3(obj.Key);
+                    deletedFiles.push(obj.Key);
+                    console.log(`   ✅ Deleted: ${obj.Key}`);
+                } catch (err) {
+                    failedFiles.push({ path: obj.Key, error: err.message });
+                    console.error(`   ❌ Failed: ${obj.Key} - ${err.message}`);
+                }
+            }
+        }
+
+        return {
+            success: true,
+            deletedCount: deletedFiles.length,
+            failedCount: failedFiles.length,
+            deletedFiles,
+            failedFiles
+        };
+    } catch (error) {
+        console.error('[CONTRACT-DELETE] Error:', error.message);
+        return {
+            success: false,
+            deletedCount: deletedFiles.length,
+            failedCount: failedFiles.length,
+            deletedFiles,
+            failedFiles,
+            error: error.message
+        };
+    }
+}
+
+// =========================================================================
 // EXPORTS
 // =========================================================================
 
@@ -728,5 +862,6 @@ module.exports = {
     convertHttpsToS3Uri, // ✅ HTTPS to s3:// conversion
     parseS3Uri, // ✅ Parse s3:// URIs
     deleteXmlFilesForEmployee,
+    deleteContractsForEmployee,
     USE_LOCAL_STORAGE // Export for debugging
 };

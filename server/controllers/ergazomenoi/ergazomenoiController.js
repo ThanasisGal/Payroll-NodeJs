@@ -1361,158 +1361,54 @@ class ergazomenoiController {
             // =====================================================================
             // ✅ CONDITIONAL WTO XML GENERATION
             // =====================================================================
+            // =====================================================================
+            // ✅ 4) GENERATE WTO XML (if schedules enabled AND isPermanent)
+            // =====================================================================
 
-            let wtoXmlData = null;
+            let wtoXmlData = { success: false };
 
-            if (filesToUpdate?.schedules === true) {
-                logger.info('WTO XML generation requested', {
-                    module: 'WTO-XML',
-                    employee_kod: savedErgazomenos.kodikos,
-                    employee_afm: savedErgazomenos.afm,
-                    company: company?.eponymia || 'N/A'
-                });
-
+            // ✅ CRITICAL: Only generate WTO XML if:
+            //    1. schedules checkbox is checked
+            //    2. isPermanent is TRUE (Οριστική Ενημέρωση)
+            if (filesToUpdate?.schedules === true && filesToUpdate?.isPermanent === true) {
                 try {
-                    // ✅ Get schedules from database
-                    const schedules = await ProdhlomenaOrariaModel.find({
-                        team: sessionUserTeam,
-                        company_kod: sessionCompanyInUse,
-                        kodikos: savedErgazomenos.kodikos,
-                        hmeromhnia: {
-                            $gte: formData.hmeromhnia_allaghs_orarioy_apo,
-                            $lte: formData.hmeromhnia_allaghs_orarioy_eos
-                        }
-                    }).sort({ hmeromhnia: 1 });
+                    logger.info('WTO XML generation requested (Οριστική)', {
+                        module: 'WTO-XML',
+                        employee_kod: newErgazomenos.kodikos_ergazomenoy,
+                        employee_afm: newErgazomenos.afm,
+                        company: companyData?.eponymia || 'N/A',
+                        isPermanent: true
+                    });
 
-                    // ✅ Check if schedules exist
-                    if (!schedules || schedules.length === 0) {
-                        logger.warn('WTO XML generation skipped (no schedules)', {
-                            module: 'WTO-XML',
-                            employee_kod: savedErgazomenos.kodikos
-                        });
+                    const {
+                        generateWtoWeeklyXML
+                    } = require('../../utils/xmlGenerators/wtoGenerator');
 
-                        wtoXmlData = {
-                            success: false,
-                            error: 'Δεν βρέθηκαν ωράρια για το εύρος ημερομηνιών'
-                        };
-                    } else {
-                        logger.info(`Found ${schedules.length} schedule entries`, {
-                            module: 'WTO-XML',
-                            employee_kod: savedErgazomenos.kodikos
-                        });
+                    wtoXmlData = await generateWtoWeeklyXML(
+                        newErgazomenos._id,
+                        newErgazomenos,
+                        companyData,
+                        ypokatasthmataData
+                    );
 
-                        const {
-                            generateWtoXML
-                        } = require('../../utils/xmlGenerators/wtoGenerator');
-
-                        // ✅ Generate XML (returns object with xml + storage info)
-                        const xmlResult = await generateWtoXML(
-                            savedErgazomenos,
-                            company,
-                            ypokatasthmata,
-                            schedules
-                        );
-
+                    if (wtoXmlData.success) {
                         logger.info('WTO XML generated successfully', {
                             module: 'WTO-XML',
-                            s3_key: xmlResult.s3Key,
-                            filename: xmlResult.filename,
-                            s3_url: xmlResult.s3Url
+                            s3_key: wtoXmlData.s3Key,
+                            filename: wtoXmlData.filename,
+                            s3_url: wtoXmlData.s3Url
                         });
 
-                        // // ✅ Save S3 key to employee record (if saved successfully)
-                        // if (xmlResult.s3Key) {
-                        //     savedErgazomenos.wto_xml_path = xmlResult.s3Key;
-                        //     await savedErgazomenos.save();
-                        //     console.log('✅ [WTO-XML] Path saved to employee record');
-                        // }
-
-                        // ✅ Generate presigned download URL (10 min expiration)
-                        if (xmlResult.s3Key) {
-                            // ✅ Helper to convert S3 URL to relative path
-                            const toRelativeUploadsPath = (p) => {
-                                if (!p) return null;
-
-                                // URL → pathname
-                                if (p.startsWith('http://') || p.startsWith('https://')) {
-                                    p = new URL(p).pathname;
-                                }
-
-                                // file:/// → filesystem
-                                if (p.startsWith('file:///')) {
-                                    p = p.replace('file:///', '/');
-                                }
-
-                                // normalize slashes
-                                p = p.replace(/\\/g, '/');
-
-                                // keep only "uploads/..."
-                                const idx = p.indexOf('/uploads/');
-                                if (idx !== -1) return p.slice(idx + 1); // -> "uploads/..."
-                                if (p.startsWith('/uploads/')) return p.slice(1);
-                                if (p.startsWith('uploads/')) return p;
-
-                                return null;
-                            };
-
-                            const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
-
-                            try {
-                                const downloadUrl = await generatePresignedUrl(
-                                    xmlResult.s3Key,
-                                    600
-                                );
-
-                                wtoXmlData = {
-                                    success: true,
-                                    s3Key: xmlResult.s3Key,
-                                    downloadUrl,
-                                    filename: xmlResult.filename,
-                                    relativePath
-                                };
-
-                                logger.info('[WTO-PATH] generated', {
-                                    filename: wtoXmlData.filename,
-                                    relativePath: wtoXmlData.relativePath
-                                });
-                            } catch (urlError) {
-                                wtoXmlData = {
-                                    success: true,
-                                    s3Key: xmlResult.s3Key,
-                                    downloadUrl: null,
-                                    filename: xmlResult.filename,
-                                    relativePath,
-                                    urlError: urlError.message
-                                };
-
-                                logger.warn('[WTO-PATH] generated WITHOUT presigned URL', {
-                                    filename: wtoXmlData.filename,
-                                    relativePath: wtoXmlData.relativePath,
-                                    urlError: urlError.message
-                                });
-                            }
-                        } else {
-                            logger.warn('[WTO-PATH] xml generated but NOT saved', {
-                                saveError: xmlResult.saveError
-                            });
-
-                            wtoXmlData = {
-                                success: false,
-                                error: xmlResult.saveError || 'XML not saved'
-                            };
-                        }
+                        logger.info('[WTO-PATH] generated', {
+                            filename: wtoXmlData.filename,
+                            relativePath: wtoXmlData.relativePath
+                        });
                     }
                 } catch (wtoError) {
                     logger.error('WTO XML generation failed', {
                         module: 'WTO-XML',
-                        error: wtoError.message,
-                        stack: wtoError.stack
-                    });
-
-                    wtoXmlData = {
-                        success: false,
                         error: wtoError.message
-                    };
+                    });
                 }
             } else {
                 logger.info('WTO XML generation skipped (checkbox not checked)', {
@@ -1575,7 +1471,13 @@ class ergazomenoiController {
         const sessionCompanyInUse = req.session?.companyInUse;
         const sessionUserId = req.session?.userId;
 
-        const { ergazomenosId, s3Url } = req.body || {};
+        const { ergazomenosId, s3Url, isPermanent } = req.body || {};
+
+        console.log('[ERGANH-E3] Upload options:', {
+            ergazomenosId,
+            s3Url: s3Url?.substring(0, 80),
+            isPermanent: isPermanent === true
+        });
 
         // ✅ Σταθερό key για lock/cooldown
         const key = `${sessionCompanyInUse || 'NO_COMPANY'}:${ergazomenosId || 'NO_EMP'}:E3`;
@@ -1783,7 +1685,8 @@ class ergazomenoiController {
                 sessionCompanyInUse,
                 localXmlPath,
                 sessionUserId,
-                { username: erganhUsername, password: erganhPassword }
+                { username: erganhUsername, password: erganhPassword },
+                { isPermanent: isPermanent === true } // ✅ Pass options
             );
 
             // ------------------------------------------------------------------
@@ -2101,6 +2004,154 @@ class ergazomenoiController {
 
             // ✅ always unlock
             erganiInflight.delete(key);
+        }
+    };
+
+    static uploadWtoTemporaryToErganh = async (req, res) => {
+        const sessionCompanyInUse = req.session?.companyInUse;
+        const sessionUserId = req.session?.userId;
+
+        const { ergazomenosId } = req.body || {};
+        try {
+            console.log('[WTO-TEMP] Controller received:', {
+                ergazomenosId,
+                hasSession: !!req.session,
+                userId: sessionUserId,
+                companyInUse: sessionCompanyInUse
+            });
+
+            // =====================================================================
+            // ✅ VALIDATION
+            // =====================================================================
+            if (!ergazomenosId) {
+                console.error('[WTO-TEMP] Missing ergazomenosId');
+                return res.status(400).json({
+                    success: false,
+                    userMessage: 'Λείπουν στοιχεία αιτήματος (WTO).',
+                    errorDetails: 'ergazomenosId is required'
+                });
+            }
+
+            if (!sessionUserId || !sessionCompanyInUse) {
+                console.error('[WTO-TEMP] Missing session data');
+                return res.status(401).json({
+                    success: false,
+                    userMessage: 'Η συνεδρία έχει λήξει. Παρακαλώ συνδεθείτε ξανά.',
+                    errorDetails: 'Session expired'
+                });
+            }
+
+            // =====================================================================
+            // ✅ FETCH EMPLOYEE DATA FROM DATABASE
+            // =====================================================================
+            const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId).lean();
+
+            if (!ergazomenos) {
+                console.error('[WTO-TEMP] Employee not found:', ergazomenosId);
+                return res.status(404).json({
+                    success: false,
+                    userMessage: 'Δεν βρέθηκε ο εργαζόμενος.',
+                    errorDetails: `Employee ${ergazomenosId} not found`
+                });
+            }
+
+            console.log('[WTO-TEMP] Employee found:', {
+                afm: ergazomenos.afm,
+                eponymo: ergazomenos.eponymo,
+                onoma: ergazomenos.onoma,
+                ypokatasthma: ergazomenos.ypokatasthma
+            });
+
+            // =====================================================================
+            // ✅ PREPARE EMPLOYEE DATA FOR WTO FORM (COMPLETE VERSION)
+            // =====================================================================
+            const ergazomenosData = {
+                // ✅ Database query fields
+                team: ergazomenos.team,
+                company_kod: ergazomenos.company_kod,
+                kodikos: ergazomenos.kodikos,
+
+                // ✅ Date range
+                hmeromhnia_allaghs_orarioy_apo: ergazomenos.hmeromhnia_allaghs_orarioy_apo,
+                hmeromhnia_allaghs_orarioy_eos: ergazomenos.hmeromhnia_allaghs_orarioy_eos,
+
+                // ✅ Form fields
+                ypokatasthma: ergazomenos.ypokatasthma || '0000',
+                afm: ergazomenos.afm || '',
+                eponymo: ergazomenos.eponymo || '',
+                onoma: ergazomenos.onoma || ''
+            };
+
+            console.log('[WTO-TEMP] Prepared data (FULL):', ergazomenosData);
+
+            // =====================================================================
+            // ✅ GET ERGANH CREDENTIALS
+            // =====================================================================
+            const passwordsData = await PasswordsModel.findOne({
+                companykod_object: sessionCompanyInUse,
+                kodikos: '0002'
+            }).lean();
+
+            const erganhUsername = passwordsData?.username;
+            const erganhPassword = passwordsData?.password;
+
+            if (!erganhUsername || !erganhPassword) {
+                console.error('[WTO-TEMP] Missing ERGANH credentials');
+                return res.status(400).json({
+                    success: false,
+                    userMessage: 'Δεν βρέθηκαν τα στοιχεία σύνδεσης ΕΡΓΑΝΗ.',
+                    errorDetails: 'ERGANH credentials not configured'
+                });
+            }
+
+            console.log('[WTO-TEMP] ERGANH credentials found');
+
+            // =====================================================================
+            // ✅ CALL WTO TEMPORARY UPLOADER (NO XML PATH NEEDED!)
+            // =====================================================================
+            const { uploadWtoTemporary } = require('../../utils/erganh/wtoTemporaryUploader');
+
+            console.log('[WTO-TEMP] Calling uploadWtoTemporary...');
+
+            const uploadResult = await uploadWtoTemporary(
+                sessionCompanyInUse,
+                null, // ✅ NO XML PATH - manual form navigation
+                ergazomenosData,
+                sessionUserId,
+                { username: erganhUsername, password: erganhPassword }
+            );
+
+            console.log('[WTO-TEMP] Upload result:', uploadResult);
+
+            // =====================================================================
+            // ✅ RETURN RESULT
+            // =====================================================================
+            if (uploadResult?.success) {
+                return res.status(200).json({
+                    success: true,
+                    userMessage:
+                        uploadResult.userMessage ||
+                        'Η φόρμα WTO_weekly συμπληρώθηκε επιτυχώς. Ολοκλήρωσε την υποβολή στο παράθυρο του ΕΡΓΑΝΗ.',
+                    protocol: uploadResult.protocol || null
+                });
+            } else {
+                return res.status(500).json({
+                    success: false,
+                    userMessage:
+                        uploadResult?.userMessage || 'Αποτυχία συμπλήρωσης φόρμας WTO_weekly.',
+                    errorDetails:
+                        uploadResult?.error || uploadResult?.errorDetails || 'Unknown error',
+                    screenshot: uploadResult?.screenshot || null
+                });
+            }
+        } catch (error) {
+            console.error('[WTO-TEMP] Controller error:', error);
+
+            return res.status(500).json({
+                success: false,
+                userMessage: 'Σφάλμα κατά την επεξεργασία του αιτήματος.',
+                errorDetails: error.message
+            });
         }
     };
 
@@ -2655,33 +2706,6 @@ class ergazomenoiController {
         }
     };
 
-    // static deleteErgazomenoi = async (req, res) => {
-    //     try {
-    //         const ergazomenoiData = await ErgazomenoiModel.findOne({ _id: req.params.id });
-    //         const team = ergazomenoiData.team;
-    //         const company = ergazomenoiData.company_kod;
-    //         const kodikos = ergazomenoiData.kodikos;
-
-    //         await ErgazomenoiModel.deleteOne({ _id: req.params.id });
-
-    //         await IstorikoProslhpseonAllagonModel.deleteMany({
-    //             team: team,
-    //             company_kod: company,
-    //             kodikos: kodikos
-    //         });
-
-    //         await ProdhlomenaOrariaModel.deleteMany({
-    //             team: team,
-    //             company_kod: company,
-    //             kodikos: kodikos
-    //         });
-
-    //         res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
-    //     } catch (error) {
-    //         throw error;
-    //     }
-    // };
-
     static deleteErgazomenoi = async (req, res) => {
         try {
             console.log('🗑️  [DELETE-EMPLOYEE] Starting deletion for ID:', req.params.id);
@@ -2706,6 +2730,27 @@ class ergazomenoiController {
             });
 
             // =====================================================================
+            // ✅ GET COMPANY DATA (ONCE, USED BY BOTH XML & CONTRACT DELETION)
+            // =====================================================================
+
+            let companyKod = 'UNKNOWN';
+            let companyName = 'UNKNOWN';
+
+            try {
+                const { CompaniesModel } = require('../../models/companies');
+                const companyData = await CompaniesModel.findById(company).lean();
+
+                companyKod = companyData?.kod || 'UNKNOWN';
+                companyName =
+                    companyData?.eponymia?.replace(/\s+/g, '_').substring(0, 50) || 'UNKNOWN';
+
+                console.log('📋 [DELETE-EMPLOYEE] Company kod:', companyKod);
+                console.log('📋 [DELETE-EMPLOYEE] Company name:', companyName);
+            } catch (e) {
+                console.error('❌ [DELETE-EMPLOYEE] Failed to get company data:', e.message);
+            }
+
+            // =====================================================================
             // ✅ DELETE XML FILES FROM S3 (E3N & WTO_weekly)
             // =====================================================================
 
@@ -2714,34 +2759,41 @@ class ergazomenoiController {
 
                 const { deleteXmlFilesForEmployee } = require('../../utils/s3Helper');
 
-                // ✅ Get company data (kod + name)
-                let companyKod = 'UNKNOWN';
-                let companyName = 'UNKNOWN';
-
-                try {
-                    const { CompaniesModel } = require('../../models/companies'); // ✅ DESTRUCTURE!
-                    const companyData = await CompaniesModel.findById(company).lean();
-
-                    companyKod = companyData?.kod || 'UNKNOWN';
-                    companyName =
-                        companyData?.eponymia?.replace(/\s+/g, '_').substring(0, 50) || 'UNKNOWN';
-
-                    console.log('📋 [DELETE-EMPLOYEE] Company kod:', companyKod);
-                    console.log('📋 [DELETE-EMPLOYEE] Company name:', companyName);
-                } catch (e) {
-                    console.error('[DELETE-EMPLOYEE] Failed to get company data:', e.message);
-                }
-
                 const deletionResult = await deleteXmlFilesForEmployee(employeeId, {
                     team,
-                    companyKod: companyKod,
-                    companyName: companyName
+                    companyKod,
+                    companyName
                 });
+
                 console.log(`✅ [DELETE-EMPLOYEE] XML deletion result:`, deletionResult);
             } catch (xmlError) {
-                console.error(`❌ [DELETE-EMPLOYEE] Failed to delete XML files:`, xmlError);
-                console.error(`   Stack:`, xmlError.stack);
-                // ⚠️ Don't fail the whole operation if XML deletion fails
+                console.error(`❌ [DELETE-EMPLOYEE] Failed to delete XML files:`, xmlError.message);
+            }
+
+            // =====================================================================
+            // ✅ DELETE CONTRACT PDF FILES
+            // =====================================================================
+
+            try {
+                console.log(`🔍 [DELETE-EMPLOYEE] Calling deleteContractsForEmployee...`);
+
+                const { deleteContractsForEmployee } = require('../../utils/s3Helper');
+
+                const contractDeletionResult = await deleteContractsForEmployee(employeeId, {
+                    team,
+                    companyKod,
+                    companyName
+                });
+
+                console.log(
+                    `✅ [DELETE-EMPLOYEE] Contract deletion result:`,
+                    contractDeletionResult
+                );
+            } catch (contractError) {
+                console.error(
+                    `❌ [DELETE-EMPLOYEE] Failed to delete contracts:`,
+                    contractError.message
+                );
             }
 
             // =====================================================================

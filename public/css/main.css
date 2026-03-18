@@ -10669,3 +10669,16 @@ body.loader-active > *:not(.app-loader) {
 .app-loader--simple .app-loader__step {
     display: none !important;
 }
+
+/* ✅ Smooth color transition for storage mode label */
+#storage_mode_label {
+    transition:
+        color 0.3s ease,
+        font-weight 0.2s ease;
+}
+
+/* ✅ Checked state styling */
+.custom-checkbox:checked + #storage_mode_label {
+    color: #28a745 !important;
+    font-weight: 600;
+}

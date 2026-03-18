@@ -381,7 +381,14 @@ async function captureModalTextAndClose(page) {
     return { text };
 }
 
-async function uploadXml(page, xmlPath, creds) {
+async function uploadXml(page, xmlPath, creds, options = {}) {
+    // ✅ DEBUG: Log received parameters
+    log('[uploadXml] Parameters:', {
+        xmlPath: xmlPath ? path.basename(xmlPath) : 'MISSING',
+        hasCreds: !!(creds?.username && creds?.password),
+        options: options || 'UNDEFINED'
+    });
+
     await ensureOnUploadPage(page, creds);
 
     if (!xmlPath) throw new Error('Missing xmlPath');
@@ -390,6 +397,9 @@ async function uploadXml(page, xmlPath, creds) {
     const dropdown = page.locator(SEL_UPLOAD_PROCESS_SELECT_ANY).first();
     const fileInput = page.locator(SEL_UPLOAD_FILE_INPUT_ANY).first();
     const submitBtn = page.locator(SEL_UPLOAD_SUBMIT_ANY).first();
+    const submissionCheckbox = page
+        .locator('#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SubmitBox')
+        .first();
 
     if (!(await dropdown.count().catch(() => 0))) {
         const shot = await snap(page, 'process-dropdown-not-found');
@@ -437,6 +447,37 @@ async function uploadXml(page, xmlPath, creds) {
     await fileInput.setInputFiles(xmlPath);
     await dialogPromise;
 
+    // =====================================================================
+    // ✅ CHECK/UNCHECK SUBMISSION CHECKBOX BASED ON OPTIONS
+    // =====================================================================
+    const isPermanent = options?.isPermanent === true;
+    log(`   Submission mode: ${isPermanent ? 'Οριστική' : 'Προσωρινή'}`);
+
+    if (await submissionCheckbox.count().catch(() => 0)) {
+        try {
+            const isChecked = await submissionCheckbox.isChecked().catch(() => false);
+
+            if (isPermanent && !isChecked) {
+                log('✅ Checking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Οριστική mode)');
+                await submissionCheckbox.check({ timeout: TIMEOUTS.short });
+                await page.waitForTimeout(300);
+            } else if (!isPermanent && isChecked) {
+                log('⏸️  Unchecking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Προσωρινή mode)');
+                await submissionCheckbox.uncheck({ timeout: TIMEOUTS.short });
+                await page.waitForTimeout(300);
+            } else {
+                log(
+                    `ℹ️  Checkbox already in correct state: ${isChecked ? 'checked' : 'unchecked'}`
+                );
+            }
+        } catch (checkboxError) {
+            warn('Failed to toggle submission checkbox:', checkboxError.message);
+            // Non-fatal - continue with upload
+        }
+    } else {
+        warn('Submission checkbox not found on page (may not exist for this ERGANH version)');
+    }
+
     await page.waitForTimeout(150).catch(() => {});
     await submitBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
 
@@ -458,21 +499,20 @@ async function uploadXml(page, xmlPath, creds) {
 }
 
 // ------------------------------ MAIN EXPORT ---------------------------------
-async function runOnce(companyId, xmlPath, userId, creds) {
+async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
     let session = null;
     let page = null;
 
     try {
         log('Getting or creating session...', { companyId });
+        // ✅ Log options for debugging
+        log('Options received:', options);
 
-        // ✅ Get shared session (reuses existing browser if available)
         session = await sessionManager.getOrCreateSession(companyId, creds);
         page = session.page;
 
-        const modalText = cleanText(await uploadXml(page, xmlPath, creds));
-
-        log('[MODAL TEXT]', JSON.stringify(modalText));
-        log('[MODAL OK?]', normalizeForExactCompare(modalText) === SUCCESS_MODAL_TEXT_EXACT);
+        // ✅ Pass options (isPermanent) to uploadXml
+        const modalText = cleanText(await uploadXml(page, xmlPath, creds, options));
 
         if (!modalText) {
             const fallback = `Δεν ελήφθη απάντηση από το ΕΡΓΑΝΗ μέσα σε ${Math.round(
@@ -532,7 +572,7 @@ async function runOnce(companyId, xmlPath, userId, creds) {
 
 const inflightByCompany = new Map();
 
-async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null) {
+async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null, options = {}) {
     const key = String(companyId ?? 'default');
     if (inflightByCompany.has(key)) {
         warn('Upload already inflight for company:', key);
@@ -541,7 +581,8 @@ async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null)
 
     const p = (async () => {
         try {
-            return await runOnce(companyId, xmlPath, userId, creds);
+            // ✅ Pass options (isPermanent) to runOnce
+            return await runOnce(companyId, xmlPath, userId, creds, options);
         } finally {
             inflightByCompany.delete(key);
         }

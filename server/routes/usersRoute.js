@@ -316,6 +316,11 @@ router.post(
     checkAuth,
     ergazomenoiController.uploadWtoToErganh
 );
+router.post(
+    '/ergazomenoi/ergazomenoi/upload-wto-temporary-to-erganh',
+    checkAuth,
+    ergazomenoiController.uploadWtoTemporaryToErganh
+);
 
 // ============================================================================
 // ERGAZOMENOI - PROGRAMMATA ROUTES

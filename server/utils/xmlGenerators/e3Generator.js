@@ -226,7 +226,7 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
             f_proslipsitime: ergazomenos.ora_enarxhs_proths_foras || '08:00',
             f_apoxwrisitime: ergazomenos.ora_apoxorhshs_proths_foras || '16:00',
-            f_week_hours: formatWeekHours(ergazomenos.ores_ergasias_ebdomadas),
+            f_week_hours: formatWeekHours(ergazomenos.symbatikes_ores_ergasias),
             f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
             f_eidikothta_anal: ergazomenos.antikeimeno_ergasion || '',
             f_proipiresia: String(ergazomenos.proyphresia_se_eth || 0),
@@ -257,7 +257,18 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             // WORKING TIME ORGANIZATION
             f_working_time_digital_organization: ergazomenos.pshfiakh_organosh ? '1' : '0',
             f_full_employment_hours: formatWeekHours(ergazomenos.symbatikes_ores_ergasias || 40),
-            f_week_days: String(ergazomenos.hmeres_ergasias_ebdomadas || 5),
+            f_week_days: (() => {
+                const days = parseInt(ergazomenos.apasxolhsh_basei_symbashs);
+
+                // ✅ Validate: Must be 5 or 6
+                if (days === 6) {
+                    return '6'; // ΕΞΑΗΜΕΡΟ
+                } else if (days === 5 || !days || days < 5) {
+                    return '5'; // ΠΕΝΘΗΜΕΡΟ
+                } else {
+                    return '5';
+                }
+            })(),
             f_euelikto_wrario_minutes: String(ergazomenos.evelikth_proselefsh || 0),
             f_working_card: ergazomenos.karta_ergasias ? '1' : '0',
             f_dialeimma_minutes: String(ergazomenos.dialleima_se_lepta || 30),
