@@ -520,7 +520,7 @@ declare -a dates=(
 declare -a common_files=(
     "public/js/common/adjustFontSizeToFit.js"
     "public/js/common/amka_validation.js"
-    "public/js/common/getAppDate.js"
+    "public/js/common/anoigmaNeasXrhshs.js"
     "public/js/common/blockInvalidClick.js"
     "public/js/common/changeInputTypeFile.js"
     "public/js/common/changeFontSizeSelectDropdownMenu.js"
@@ -541,6 +541,7 @@ declare -a common_files=(
     "public/js/common/formatDates.js"
     "public/js/common/formatNumbers_2dec.js"
     "public/js/common/formatTimes.js"
+    "public/js/common/getAppDate.js"
     "public/js/common/getCompanyDescription.js"
     "public/js/common/getFieldValues.js"
     "public/js/common/getFocusNumberFields.js"

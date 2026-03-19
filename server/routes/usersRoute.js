@@ -7,6 +7,7 @@ const fs = require('fs').promises;
 // ============================================================================
 // IMPORTS - Controllers
 // ============================================================================
+const adminController = require('../controllers/adminController.js');
 const userController = require('../controllers/userController.js');
 const companiesController = require('../controllers/companies/companiesController.js');
 const mainAppController = require('../controllers/mainAppController.js');
@@ -97,6 +98,7 @@ router.delete('/admin/edit/:id', userController.deletePostUser);
 router.get('/admin/delete/:id', userController.checkAndDeletePostUser);
 router.post('/admin/search', userController.searchPostUser);
 router.get('/admin/search', userController.searchGetUser);
+router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', checkAuth, adminController.anoigmaNeasXrhshs);
 
 // ============================================================================
 // MAIN APP ROUTES

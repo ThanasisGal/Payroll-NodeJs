@@ -205,14 +205,22 @@ const XrhseisSchema = new Schema({
 });
 const XrhseisModel = model('Xrhseis', XrhseisSchema);
 
-const PeriodsSchema = new Schema({
-    xrhsh: { type: String, required: true },
-    kodikos: { type: String, required: true },
-    kodikosSort: { type: Number },
-    perigrafh: { type: String, trim: true },
-    apo: { type: Date, default: null },
-    eos: { type: Date, default: null }
-});
+const PeriodsSchema = new Schema(
+    {
+        xrhsh: { type: String, required: true },
+        kodikos: { type: String, required: true },
+        kodikosSort: { type: Number },
+        perigrafh: { type: String, trim: true },
+        apo: { type: Date, default: null },
+        eos: { type: Date, default: null }
+    },
+    {
+        collection: 'Periodoi'
+    }
+);
+
+PeriodsSchema.index({ xrhsh: 1, kodikos: 1 }, { unique: true, name: 'unique_period_per_xrhsh' });
+
 const PeriodsModel = model('Periods', PeriodsSchema);
 
 const SepeSchema = new Schema({
@@ -607,17 +615,28 @@ const LanguagesSchema = new Schema({
 });
 const LanguagesModel = model('Languages', LanguagesSchema);
 
-const ArgiesSchema = new Schema({
-    team: { type: String, trim: true },
-    company_kod: { type: String, trim: true },
-    etos: { type: String, trim: true },
-    kodikos: { type: String, trim: true },
-    perigrafh: { type: String, trim: true },
-    hmeromhnia: { type: Date },
-    hmera: { type: String, trim: true },
-    ypoxreotikh_argia: { type: Boolean, default: false },
-    topikh_argia: { type: Boolean, default: false }
-});
+const ArgiesSchema = new Schema(
+    {
+        team: { type: String, trim: true },
+        company_kod: { type: String, trim: true },
+        etos: { type: String, trim: true },
+        kodikos: { type: String, trim: true },
+        perigrafh: { type: String, trim: true },
+        hmeromhnia: { type: Date },
+        hmera: { type: String, trim: true },
+        ypoxreotikh_argia: { type: Boolean, default: false },
+        topikh_argia: { type: Boolean, default: false }
+    },
+    {
+        collection: 'Argies'
+    }
+);
+
+ArgiesSchema.index(
+    { company_kod: 1, etos: 1, kodikos: 1 },
+    { unique: true, name: 'unique_argia_per_company_etos' }
+);
+
 const ArgiesModel = model('Argies', ArgiesSchema);
 
 const KathgoriesErgasiasSchema = new Schema(

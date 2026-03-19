@@ -559,6 +559,8 @@ class companiesController {
 
             req.session.companyInUse = req.params.id;
             req.session.companyDescription = `${companies.eponymia} ${companies.firstname}`;
+            req.session.companyKodikos = companies.kod;
+
             redir = 'mainapp';
         } catch (error) {
             await res.flash(
