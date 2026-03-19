@@ -2771,6 +2771,11 @@ a {
     color: #ffffff !important;
 }
 
+.swal2-confirm.class-danger {
+    background-color: #012b0fb2 !important;
+    color: #ffffff !important;
+}
+
 .swal2-confirm.class-normal {
     background-color: #3332049a !important;
     color: #ffffff !important;
@@ -5617,6 +5622,12 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 .height-vh-35 {
     height: 35vh !important;
+}
+.height-vh-36 {
+    height: 36vh !important;
+}
+.height-vh-37 {
+    height: 37vh !important;
 }
 .height-vh-38 {
     height: 38vh !important;
@@ -10681,4 +10692,18 @@ body.loader-active > *:not(.app-loader) {
 .custom-checkbox:checked + #storage_mode_label {
     color: #28a745 !important;
     font-weight: 600;
+}
+
+.menu-separator {
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0;
+}
+
+.menu-hr {
+    border: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    margin: 0 -9999px;
+    padding: 0 9999px;
+    opacity: 0.5;
 }
