@@ -62,7 +62,7 @@
     "overrides": {
         "unzipper": "^0.12.3",
         "bluebird": "^3.7.2",
-        "fast-xml-parser": "^5.3.8"
+        "fast-xml-parser": "^5.5.7"
     },
     "devDependencies": {
         "@types/node": "^22.5.5",
