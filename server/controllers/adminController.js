@@ -9,9 +9,16 @@ const { pipeline } = require('stream/promises');
 const Models_A = require('../models/stathera_arxeia');
 const Models_B = require('../models/privileges');
 
-const { ArgiesModel, PeriodsModel } = Models_A;
+const {
+    ArgiesModel,
+    EkptoshForoyModel,
+    PeriodsModel,
+    ForologikesKlimakesModel,
+    Klimaka_ForoyModel,
+    AsfalistikesKlaseisModel // ✅ Νέο
+} = Models_A;
 
-const { UserPrivilegesModel } = Models_B;
+// const { UserPrivilegesModel } = Models_B;
 
 class adminController {
     static async anoigmaNeasXrhshs(req, res) {
@@ -28,7 +35,11 @@ class adminController {
 
         const results = {
             argies: { inserted: 0, skipped: false },
-            periods: { inserted: 0, skipped: false }
+            periods: { inserted: 0, skipped: false },
+            ekptoshForoy: { inserted: 0, skipped: false },
+            forologikesKlimakes: { inserted: 0, skipped: false },
+            klimakaForoy: { inserted: 0, skipped: false },
+            asfalistikesKlaseis: { inserted: 0, skipped: false } // ✅ Νέο
         };
 
         try {
@@ -41,7 +52,6 @@ class adminController {
             });
 
             if (existingArgies > 0) {
-                // ✅ Υπάρχουν ήδη → skip, συνέχισε στο Βήμα 2
                 logger.warn(
                     `anoigmaNeasXrhshs [Αργίες]: Υπάρχουν ήδη ${existingArgies} εγγραφές ` +
                         `για company_kod="${companyKodikos}", etos="${YearInUse}". Παράλειψη.`
@@ -49,7 +59,6 @@ class adminController {
                 results.argies.skipped = true;
                 results.argies.existing = existingArgies;
             } else {
-                // ✅ Δεν υπάρχουν → δημιούργησε
                 const protypaArgies = await ArgiesModel.find({
                     company_kod: '0000',
                     etos: '0000'
@@ -70,7 +79,6 @@ class adminController {
                 }));
 
                 const insertedArgies = await ArgiesModel.insertMany(neasArgies, { ordered: true });
-
                 results.argies.inserted = insertedArgies.length;
                 logger.info(
                     `anoigmaNeasXrhshs [Αργίες]: Δημιουργήθηκαν ${insertedArgies.length} εγγραφές ` +
@@ -81,12 +89,9 @@ class adminController {
             /* ============================================================
                ΒΗΜΑ 2 — PERIODS
             ============================================================ */
-            const existingPeriods = await PeriodsModel.countDocuments({
-                xrhsh: YearInUse
-            });
+            const existingPeriods = await PeriodsModel.countDocuments({ xrhsh: YearInUse });
 
             if (existingPeriods > 0) {
-                // ✅ Υπάρχουν ήδη → skip
                 logger.warn(
                     `anoigmaNeasXrhshs [Periods]: Υπάρχουν ήδη ${existingPeriods} εγγραφές ` +
                         `για xrhsh="${YearInUse}". Παράλειψη.`
@@ -94,16 +99,13 @@ class adminController {
                 results.periods.skipped = true;
                 results.periods.existing = existingPeriods;
             } else {
-                // ✅ Δεν υπάρχουν → δημιούργησε
-                const protypaPeriods = await PeriodsModel.find({
-                    xrhsh: '0000'
-                }).lean();
+                const protypaPeriods = await PeriodsModel.find({ xrhsh: '0000' }).lean();
 
                 if (!protypaPeriods || protypaPeriods.length === 0) {
                     return res.status(404).json({
                         success: false,
                         message: 'Δεν βρέθηκαν πρότυπες εγγραφές Periods (xrhsh="0000").',
-                        results // ← στέλνει και το αποτέλεσμα των Αργιών
+                        results
                     });
                 }
 
@@ -124,11 +126,184 @@ class adminController {
                 const insertedPeriods = await PeriodsModel.insertMany(neasPeriods, {
                     ordered: true
                 });
-
                 results.periods.inserted = insertedPeriods.length;
                 logger.info(
                     `anoigmaNeasXrhshs [Periods]: Δημιουργήθηκαν ${insertedPeriods.length} εγγραφές ` +
                         `για xrhsh="${YearInUse}".`
+                );
+            }
+
+            /* ============================================================
+               ΒΗΜΑ 3 — ΕΚΠΤΩΣΗ ΦΟΡΟΥ
+            ============================================================ */
+            const existingEkptoshForoy = await EkptoshForoyModel.countDocuments({
+                xrhsh: YearInUse
+            });
+
+            if (existingEkptoshForoy > 0) {
+                logger.warn(
+                    `anoigmaNeasXrhshs [EkptoshForoy]: Υπάρχουν ήδη ${existingEkptoshForoy} εγγραφές ` +
+                        `για xrhsh="${YearInUse}". Παράλειψη.`
+                );
+                results.ekptoshForoy.skipped = true;
+                results.ekptoshForoy.existing = existingEkptoshForoy;
+            } else {
+                const protypaEkptoshForoy = await EkptoshForoyModel.find({ xrhsh: '0000' }).lean();
+
+                if (!protypaEkptoshForoy || protypaEkptoshForoy.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Δεν βρέθηκαν πρότυπες εγγραφές EkptoshForoy (xrhsh="0000").',
+                        results
+                    });
+                }
+
+                const neasEkptoshForoy = protypaEkptoshForoy.map(({ _id, __v, ...rest }) => ({
+                    ...rest,
+                    xrhsh: YearInUse
+                }));
+
+                const insertedEkptoshForoy = await EkptoshForoyModel.insertMany(neasEkptoshForoy, {
+                    ordered: true
+                });
+                results.ekptoshForoy.inserted = insertedEkptoshForoy.length;
+                logger.info(
+                    `anoigmaNeasXrhshs [EkptoshForoy]: Δημιουργήθηκαν ${insertedEkptoshForoy.length} εγγραφές ` +
+                        `για xrhsh="${YearInUse}".`
+                );
+            }
+
+            /* ============================================================
+               ΒΗΜΑ 4 — ΦΟΡΟΛΟΓΙΚΕΣ ΚΛΙΜΑΚΕΣ
+            ============================================================ */
+            const existingForologikesKlimakes = await ForologikesKlimakesModel.countDocuments({
+                xrhsh: YearInUse
+            });
+
+            if (existingForologikesKlimakes > 0) {
+                logger.warn(
+                    `anoigmaNeasXrhshs [ForologikesKlimakes]: Υπάρχουν ήδη ${existingForologikesKlimakes} εγγραφές ` +
+                        `για xrhsh="${YearInUse}". Παράλειψη.`
+                );
+                results.forologikesKlimakes.skipped = true;
+                results.forologikesKlimakes.existing = existingForologikesKlimakes;
+            } else {
+                const protypaForologikesKlimakes = await ForologikesKlimakesModel.find({
+                    xrhsh: '0000'
+                }).lean();
+
+                if (!protypaForologikesKlimakes || protypaForologikesKlimakes.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message:
+                            'Δεν βρέθηκαν πρότυπες εγγραφές ForologikesKlimakes (xrhsh="0000").',
+                        results
+                    });
+                }
+
+                const neasForologikesKlimakes = protypaForologikesKlimakes.map(
+                    ({ _id, __v, ...rest }) => ({
+                        ...rest,
+                        xrhsh: YearInUse
+                    })
+                );
+
+                const insertedForologikesKlimakes = await ForologikesKlimakesModel.insertMany(
+                    neasForologikesKlimakes,
+                    { ordered: true }
+                );
+                results.forologikesKlimakes.inserted = insertedForologikesKlimakes.length;
+                logger.info(
+                    `anoigmaNeasXrhshs [ForologikesKlimakes]: Δημιουργήθηκαν ${insertedForologikesKlimakes.length} εγγραφές ` +
+                        `για xrhsh="${YearInUse}".`
+                );
+            }
+
+            /* ============================================================
+               ΒΗΜΑ 5 — ΚΛΙΜΑΚΑ ΦΟΡΟΥ
+            ============================================================ */
+            const existingKlimakaForoy = await Klimaka_ForoyModel.countDocuments({
+                xrhsh: YearInUse
+            });
+
+            if (existingKlimakaForoy > 0) {
+                logger.warn(
+                    `anoigmaNeasXrhshs [KlimakaForoy]: Υπάρχουν ήδη ${existingKlimakaForoy} εγγραφές ` +
+                        `για xrhsh="${YearInUse}". Παράλειψη.`
+                );
+                results.klimakaForoy.skipped = true;
+                results.klimakaForoy.existing = existingKlimakaForoy;
+            } else {
+                const protypaKlimakaForoy = await Klimaka_ForoyModel.find({
+                    xrhsh: '0000'
+                }).lean();
+
+                if (!protypaKlimakaForoy || protypaKlimakaForoy.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Δεν βρέθηκαν πρότυπες εγγραφές KlimakaForoy (xrhsh="0000").',
+                        results
+                    });
+                }
+
+                const neasKlimakaForoy = protypaKlimakaForoy.map(({ _id, __v, ...rest }) => ({
+                    ...rest,
+                    xrhsh: YearInUse
+                }));
+
+                const insertedKlimakaForoy = await Klimaka_ForoyModel.insertMany(neasKlimakaForoy, {
+                    ordered: true
+                });
+                results.klimakaForoy.inserted = insertedKlimakaForoy.length;
+                logger.info(
+                    `anoigmaNeasXrhshs [KlimakaForoy]: Δημιουργήθηκαν ${insertedKlimakaForoy.length} εγγραφές ` +
+                        `για xrhsh="${YearInUse}".`
+                );
+            }
+
+            /* ============================================================
+               ΒΗΜΑ 6 — ΑΣΦΑΛΙΣΤΙΚΕΣ ΚΛΑΣΕΙΣ ✅ Νέο
+            ============================================================ */
+            const existingAsfalistikesKlaseis = await AsfalistikesKlaseisModel.countDocuments({
+                etos: YearInUse
+            });
+
+            if (existingAsfalistikesKlaseis > 0) {
+                logger.warn(
+                    `anoigmaNeasXrhshs [AsfalistikesKlaseis]: Υπάρχουν ήδη ${existingAsfalistikesKlaseis} εγγραφές ` +
+                        `για etos="${YearInUse}". Παράλειψη.`
+                );
+                results.asfalistikesKlaseis.skipped = true;
+                results.asfalistikesKlaseis.existing = existingAsfalistikesKlaseis;
+            } else {
+                const protypaAsfalistikesKlaseis = await AsfalistikesKlaseisModel.find({
+                    etos: '0000'
+                }).lean();
+
+                if (!protypaAsfalistikesKlaseis || protypaAsfalistikesKlaseis.length === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message:
+                            'Δεν βρέθηκαν πρότυπες εγγραφές AsfalistikesKlaseis (etos="0000").',
+                        results
+                    });
+                }
+
+                const neasAsfalistikesKlaseis = protypaAsfalistikesKlaseis.map(
+                    ({ _id, __v, ...rest }) => ({
+                        ...rest,
+                        etos: YearInUse
+                    })
+                );
+
+                const insertedAsfalistikesKlaseis = await AsfalistikesKlaseisModel.insertMany(
+                    neasAsfalistikesKlaseis,
+                    { ordered: true }
+                );
+                results.asfalistikesKlaseis.inserted = insertedAsfalistikesKlaseis.length;
+                logger.info(
+                    `anoigmaNeasXrhshs [AsfalistikesKlaseis]: Δημιουργήθηκαν ${insertedAsfalistikesKlaseis.length} εγγραφές ` +
+                        `για etos="${YearInUse}".`
                 );
             }
 
@@ -143,9 +318,28 @@ class adminController {
                 ? `Περίοδοι: υπήρχαν ήδη ${results.periods.existing}`
                 : `Περίοδοι: δημιουργήθηκαν ${results.periods.inserted}`;
 
+            const ekptoshForoyMsg = results.ekptoshForoy.skipped
+                ? `Έκπτωση Φόρου: υπήρχαν ήδη ${results.ekptoshForoy.existing}`
+                : `Έκπτωση Φόρου: δημιουργήθηκαν ${results.ekptoshForoy.inserted}`;
+
+            const forologikesKlimakesMsg = results.forologikesKlimakes.skipped
+                ? `Φορολογικές Κατηγορίες: υπήρχαν ήδη ${results.forologikesKlimakes.existing}`
+                : `Φορολογικές Κατηγορίες: δημιουργήθηκαν ${results.forologikesKlimakes.inserted}`;
+
+            const klimakaForoyMsg = results.klimakaForoy.skipped
+                ? `Κλίμακα Φόρου: υπήρχαν ήδη ${results.klimakaForoy.existing}`
+                : `Κλίμακα Φόρου: δημιουργήθηκαν ${results.klimakaForoy.inserted}`;
+
+            const asfalistikesKlaseisMsg = results.asfalistikesKlaseis.skipped
+                ? `Ασφαλιστικές Κλάσεις: υπήρχαν ήδη ${results.asfalistikesKlaseis.existing}`
+                : `Ασφαλιστικές Κλάσεις: δημιουργήθηκαν ${results.asfalistikesKlaseis.inserted}`;
+
             return res.status(200).json({
                 success: true,
-                message: `Χρήση ${YearInUse} — ${argiesMsg} | ${periodsMsg}`,
+                message:
+                    `Χρήση ${YearInUse} — ${argiesMsg} | ${periodsMsg} | ` +
+                    `${ekptoshForoyMsg} | ${forologikesKlimakesMsg} | ${klimakaForoyMsg} | ` +
+                    `${asfalistikesKlaseisMsg}`,
                 results
             });
         } catch (error) {

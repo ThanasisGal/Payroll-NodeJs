@@ -446,17 +446,21 @@ const ApasxolhseisBaseiSymbashsModel = model(
     ApasxolhseisBaseiSymbashsSchema
 );
 
-const AsfalistikesKlaseisSchema = new Schema({
-    aa: { type: String, trim: true },
-    etos: { type: String, trim: true },
-    kodikos: { type: String, trim: true },
-    perigrafh: { type: String, trim: true },
-    poso: { type: Number },
-    apo_orio: { type: Number },
-    eos_orio: { type: Number },
-    isxyei_apo: { type: Date },
-    isxyei_eos: { type: Date }
-});
+const AsfalistikesKlaseisSchema = new Schema(
+    {
+        etos: { type: String, trim: true },
+        kodikos: { type: String, trim: true },
+        perigrafh: { type: String, trim: true },
+        poso: { type: Number },
+        apo_orio: { type: Number },
+        eos_orio: { type: Number },
+        isxyei_apo: { type: Date },
+        isxyei_eos: { type: Date }
+    },
+    {
+        collection: 'Asfalistikes_Klaseis'
+    }
+);
 const AsfalistikesKlaseisModel = model('AsfalistikesKlaseis', AsfalistikesKlaseisSchema);
 
 const TmhmataSchema = new Schema({
@@ -570,12 +574,17 @@ const KentraKostoysSchema = new Schema({
 });
 const KentraKostoysModel = model('KentraKostoys', KentraKostoysSchema);
 
-const GenikesParametroiSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
-    timh: { type: String, trim: true },
-    ypologismos: { type: String, trim: true }
-});
+const GenikesParametroiSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true },
+        timh: { type: String, trim: true },
+        ypologismos: { type: String, trim: true }
+    },
+    {
+        collection: 'Genikes_Parametroi'
+    }
+);
 const GenikesParametroiModel = model('GenikesParametroi', GenikesParametroiSchema);
 
 const AdeiesDiamonhsSchema = new Schema(
@@ -658,11 +667,16 @@ const KathgoriesAdeiasSchema = new Schema({
 });
 const KathgoriesAdeiasModel = model('KathgoriesAdeias', KathgoriesAdeiasSchema);
 
-const EkptoshForoySchema = new Schema({
-    xrhsh: { type: String, trim: true },
-    aa_teknon: { type: String, trim: true },
-    posoEkptoshs: { type: Number, default: 0 }
-});
+const EkptoshForoySchema = new Schema(
+    {
+        xrhsh: { type: String, trim: true },
+        aa_teknon: { type: String, trim: true },
+        posoEkptoshs: { type: Number, default: 0 }
+    },
+    {
+        collection: 'Ekptosh_Foroy'
+    }
+);
 const EkptoshForoyModel = model('EkptoshForoy', EkptoshForoySchema);
 
 const Eisodhma_Pro_Foroy_MeioshsSchema = new Schema({
@@ -686,14 +700,20 @@ const Eisodhma_Pro_Foroy_MeioshsModel = model(
     Eisodhma_Pro_Foroy_MeioshsSchema
 );
 
-const Klimaka_ForoySchema = new Schema({
-    xrhsh: { type: String, trim: true },
-    apo_poso: { type: Number, default: 0 },
-    eos_poso: { type: Number, default: 0 },
-    syntelesths_foroy: { type: Number, default: 0 },
-    syntelesths_meioshs_ekptoshs: { type: Number, default: 0 },
-    syntelesths_eisforas_allhleggyhs: { type: Number, default: 0 }
-});
+const Klimaka_ForoySchema = new Schema(
+    {
+        xrhsh: { type: String, trim: true },
+        kodikos_klimakas: { type: String, trim: true },
+        apo_poso: { type: Number, default: 0 },
+        eos_poso: { type: Number, default: 0 },
+        syntelesths_foroy: { type: Number, default: 0 },
+        syntelesths_meioshs_ekptoshs: { type: Number, default: 0 },
+        syntelesths_eisforas_allhleggyhs: { type: Number, default: 0 }
+    },
+    {
+        collection: 'Klimaka_Foroy'
+    }
+);
 const Klimaka_ForoyModel = model('Klimaka_Foroy', Klimaka_ForoySchema);
 
 const Typoi_ApodoxonSchema = new Schema({
@@ -703,11 +723,16 @@ const Typoi_ApodoxonSchema = new Schema({
 });
 const Typoi_ApodoxonModel = model('Typoi_Apodoxon', Typoi_ApodoxonSchema);
 
-const ForologikesKlimakesSchema = new Schema({
-    xrhsh: { type: String, trim: true },
-    kodikos: { type: String, trim: true },
-    perigrafh: { type: String, trim: true }
-});
+const ForologikesKlimakesSchema = new Schema(
+    {
+        xrhsh: { type: String, trim: true },
+        kodikos: { type: String, trim: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Forologikes_Klimakes'
+    }
+);
 const ForologikesKlimakesModel = model('ForologikesKlimakes', ForologikesKlimakesSchema);
 
 const ForeasEpikoyrikhsXorisEfkaSchema = new Schema(
