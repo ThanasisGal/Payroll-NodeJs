@@ -950,7 +950,7 @@ PHASE8_START=$(date +%s)
 log_phase "PHASE 1.8: Building non-obfuscated files (${#no_obfuscate[@]} files)..."
 echo ""
 
-# Πρ��σωρινά disable obfuscation για αυτά τα files
+# Προσωρινά disable obfuscation για αυτά τα files
 ORIGINAL_SKIP_OBFUSCATION="$SKIP_OBFUSCATION"
 export SKIP_OBFUSCATION="true"
 

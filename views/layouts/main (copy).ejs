@@ -278,8 +278,9 @@
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
                     const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
-                    if (stepEl())
-                        stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
+                    // if (stepEl())
+                    //     stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
+                    if (stepEl()) stepEl().textContent = hasStep && message ? String(message) : '';
 
                     if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
                     else if (hasStep) suffixText = `Βήμα ${step}/${totalSteps}`;

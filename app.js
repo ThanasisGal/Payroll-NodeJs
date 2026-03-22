@@ -38,6 +38,7 @@ const apiRoutes = require('./server/routes/apiRoutes');
 const adminRoutes = require('./server/routes/adminRoutes');
 const sessionRoutes = require('./server/routes/sessionRoute');
 const efkaRoutes = require('./server/routes/efkaRoutes');
+const efkaTekaRoute = require('./server/routes/efkaTekaRoute');
 require('./server/config/aws');
 
 const getSessionVars = require('./server/middlewares/session-variables');
@@ -595,6 +596,7 @@ app.use((req, res, next) => {
         '/remaining-time',
         '/csrf-token',
         '/api/session-data',
+        '/api/efka/teka',
         '/login/userLogin',
         '/register/userRegistration',
         '/login/send-reset-password-email',
@@ -760,7 +762,8 @@ app.use(
     isProd ? geoGuard : (req, res, next) => next()
 );
 
-app.use('/api', efkaRoutes);
+app.use('/api/efka/teka', efkaTekaRoute); // ✅ 1ο — πιο συγκεκριμένο
+app.use('/api', efkaRoutes); // ✅ 2ο
 app.use('/api', apiRoutes);
 app.use('/api/dropdown', dropdownRoutes);
 app.use('/', usersRoute);

@@ -254,11 +254,22 @@
                     rafId = null;
                 }
 
-                window.showLoader = function (text) {
+                let stepOverride = null; // ← νέο
+
+                window.showLoader = function (text, subtitle) {
                     const root = el();
                     if (!root) return;
 
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
+
+                    // ✅ Αν δοθεί subtitle, κλείδωσέ το ως override
+                    if (subtitle) {
+                        stepOverride = subtitle;
+                        if (stepEl()) stepEl().textContent = subtitle;
+                    } else {
+                        stepOverride = null;
+                        if (stepEl()) stepEl().textContent = '';
+                    }
 
                     root.classList.add('is-visible');
                     startSmooth();
@@ -275,13 +286,13 @@
                     target = 0;
                     cap = 90;
                     suffixText = '';
+                    stepOverride = null; // ✅ καθάρισε το override
 
                     if (stepEl()) stepEl().textContent = '';
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
                     setProgress(0);
                 };
 
-                // ✅ percent + message + step/totalSteps
                 window.applyServerProgress = function (percent, message, step, totalSteps) {
                     const root = el();
                     if (root && !root.classList.contains('is-visible')) {
@@ -290,29 +301,29 @@
 
                     const p = Math.max(0, Math.min(100, Number(percent) || 0));
 
-                    // Title (πάνω γραμμή)
                     if (titleEl()) titleEl().textContent = 'Παρακαλώ περιμένετε...';
 
-                    // Step line (δεύτερη γραμμή)
-                    const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
-                    if (stepEl())
-                        stepEl().textContent = hasStep ? `Βήμα ${step}/${totalSteps}` : '';
+                    // ✅ Αν υπάρχει override από showLoader, ΜΗΝ το αλλάζεις
+                    if (!stepOverride) {
+                        const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
+                        if (stepEl())
+                            stepEl().textContent = hasStep && message ? String(message) : '';
+                    }
+                    // ✅ Αν υπάρχει override, κράτα το
+                    // (το stepEl δεν αλλάζει)
 
-                    // ✅ Αυτό είναι που θα εμφανίζεται ΔΙΠΛΑ στο % (στο meta)
+                    const hasStep = Number(step) > 0 && Number(totalSteps) > 0;
                     if (hasStep && message) suffixText = `Βήμα ${step}/${totalSteps}: ${message}`;
                     else if (hasStep) suffixText = `Βήμα ${step}/${totalSteps}`;
                     else if (message) suffixText = String(message);
                     else suffixText = '';
 
-                    // Fill bar πάει κανονικά στον server percent
                     if (fillEl()) fillEl().style.width = p + '%';
 
-                    // Update smooth targets
                     target = Math.max(target, p);
                     cap = Math.max(cap, Math.min(99, target));
                     value = Math.min(value, target);
 
-                    // γράψε άμεσα το meta με το τρέχον smooth value (όχι να “πηδάει”)
                     setProgress(value);
                 };
 

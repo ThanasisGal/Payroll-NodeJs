@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
 						autoSelectHolidaysOnInit();
 					}
 					
-					// ✅ Π��ρίμενε για το auto-select να ολοκληρωθεί
+					// ✅ Περίμενε για το auto-select να ολοκληρωθεί
 					await new Promise(resolve => setTimeout(resolve, 200));
 					
 					// ✅ Τώρα τρέξε το updateKathgoriaBackgroundColor

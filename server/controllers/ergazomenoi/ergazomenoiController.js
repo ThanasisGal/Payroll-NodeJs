@@ -1245,7 +1245,7 @@ class ergazomenoiController {
                 });
 
                 try {
-                    const { generateE3XML } = require('../../utils/xmlGenerators/e3Generator');
+                    const { generateE3XML } = require('../../utils/xmlGenerators/e3N_v1Generator');
 
                     // ✅ Generate XML (returns object with xml + storage info)
                     const xmlResult = await generateE3XML(

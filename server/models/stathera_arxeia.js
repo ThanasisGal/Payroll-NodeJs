@@ -397,10 +397,15 @@ const OikogeneiakhKatastashSchema = new Schema({
 });
 const OikogeneiakhKatastashModel = model('OikogeneiakhKatastash', OikogeneiakhKatastashSchema);
 
-const KathestosApasxolhshsSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true }
-});
+const KathestosApasxolhshsSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Kathestos_Apasxolhshs'
+    }
+);
 const KathestosApasxolhshsModel = model('KathestosApasxolhshs', KathestosApasxolhshsSchema);
 
 const SxeseisErgasiasSchema = new Schema(

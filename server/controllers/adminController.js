@@ -1,3 +1,5 @@
+//   /server/controllers/adminController.js
+
 const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
 const path = require('path');
@@ -15,7 +17,7 @@ const {
     PeriodsModel,
     ForologikesKlimakesModel,
     Klimaka_ForoyModel,
-    AsfalistikesKlaseisModel // ✅ Νέο
+    AsfalistikesKlaseisModel
 } = Models_A;
 
 // const { UserPrivilegesModel } = Models_B;
@@ -39,7 +41,7 @@ class adminController {
             ekptoshForoy: { inserted: 0, skipped: false },
             forologikesKlimakes: { inserted: 0, skipped: false },
             klimakaForoy: { inserted: 0, skipped: false },
-            asfalistikesKlaseis: { inserted: 0, skipped: false } // ✅ Νέο
+            asfalistikesKlaseis: { inserted: 0, skipped: false }
         };
 
         try {
@@ -52,10 +54,6 @@ class adminController {
             });
 
             if (existingArgies > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [Αργίες]: Υπάρχουν ήδη ${existingArgies} εγγραφές ` +
-                        `για company_kod="${companyKodikos}", etos="${YearInUse}". Παράλειψη.`
-                );
                 results.argies.skipped = true;
                 results.argies.existing = existingArgies;
             } else {
@@ -80,10 +78,6 @@ class adminController {
 
                 const insertedArgies = await ArgiesModel.insertMany(neasArgies, { ordered: true });
                 results.argies.inserted = insertedArgies.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [Αργίες]: Δημιουργήθηκαν ${insertedArgies.length} εγγραφές ` +
-                        `για company_kod="${companyKodikos}", etos="${YearInUse}".`
-                );
             }
 
             /* ============================================================
@@ -92,10 +86,6 @@ class adminController {
             const existingPeriods = await PeriodsModel.countDocuments({ xrhsh: YearInUse });
 
             if (existingPeriods > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [Periods]: Υπάρχουν ήδη ${existingPeriods} εγγραφές ` +
-                        `για xrhsh="${YearInUse}". Παράλειψη.`
-                );
                 results.periods.skipped = true;
                 results.periods.existing = existingPeriods;
             } else {
@@ -127,10 +117,6 @@ class adminController {
                     ordered: true
                 });
                 results.periods.inserted = insertedPeriods.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [Periods]: Δημιουργήθηκαν ${insertedPeriods.length} εγγραφές ` +
-                        `για xrhsh="${YearInUse}".`
-                );
             }
 
             /* ============================================================
@@ -141,10 +127,6 @@ class adminController {
             });
 
             if (existingEkptoshForoy > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [EkptoshForoy]: Υπάρχουν ήδη ${existingEkptoshForoy} εγγραφές ` +
-                        `για xrhsh="${YearInUse}". Παράλειψη.`
-                );
                 results.ekptoshForoy.skipped = true;
                 results.ekptoshForoy.existing = existingEkptoshForoy;
             } else {
@@ -167,10 +149,6 @@ class adminController {
                     ordered: true
                 });
                 results.ekptoshForoy.inserted = insertedEkptoshForoy.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [EkptoshForoy]: Δημιουργήθηκαν ${insertedEkptoshForoy.length} εγγραφές ` +
-                        `για xrhsh="${YearInUse}".`
-                );
             }
 
             /* ============================================================
@@ -181,10 +159,6 @@ class adminController {
             });
 
             if (existingForologikesKlimakes > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [ForologikesKlimakes]: Υπάρχουν ήδη ${existingForologikesKlimakes} εγγραφές ` +
-                        `για xrhsh="${YearInUse}". Παράλειψη.`
-                );
                 results.forologikesKlimakes.skipped = true;
                 results.forologikesKlimakes.existing = existingForologikesKlimakes;
             } else {
@@ -213,10 +187,6 @@ class adminController {
                     { ordered: true }
                 );
                 results.forologikesKlimakes.inserted = insertedForologikesKlimakes.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [ForologikesKlimakes]: Δημιουργήθηκαν ${insertedForologikesKlimakes.length} εγγραφές ` +
-                        `για xrhsh="${YearInUse}".`
-                );
             }
 
             /* ============================================================
@@ -227,10 +197,6 @@ class adminController {
             });
 
             if (existingKlimakaForoy > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [KlimakaForoy]: Υπάρχουν ήδη ${existingKlimakaForoy} εγγραφές ` +
-                        `για xrhsh="${YearInUse}". Παράλειψη.`
-                );
                 results.klimakaForoy.skipped = true;
                 results.klimakaForoy.existing = existingKlimakaForoy;
             } else {
@@ -255,24 +221,16 @@ class adminController {
                     ordered: true
                 });
                 results.klimakaForoy.inserted = insertedKlimakaForoy.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [KlimakaForoy]: Δημιουργήθηκαν ${insertedKlimakaForoy.length} εγγραφές ` +
-                        `για xrhsh="${YearInUse}".`
-                );
             }
 
             /* ============================================================
-               ΒΗΜΑ 6 — ΑΣΦΑΛΙΣΤΙΚΕΣ ΚΛΑΣΕΙΣ ✅ Νέο
+               ΒΗΜΑ 6 — ΑΣΦΑΛΙΣΤΙΚΕΣ ΚΛΑΣΕΙΣ
             ============================================================ */
             const existingAsfalistikesKlaseis = await AsfalistikesKlaseisModel.countDocuments({
                 etos: YearInUse
             });
 
             if (existingAsfalistikesKlaseis > 0) {
-                logger.warn(
-                    `anoigmaNeasXrhshs [AsfalistikesKlaseis]: Υπάρχουν ήδη ${existingAsfalistikesKlaseis} εγγραφές ` +
-                        `για etos="${YearInUse}". Παράλειψη.`
-                );
                 results.asfalistikesKlaseis.skipped = true;
                 results.asfalistikesKlaseis.existing = existingAsfalistikesKlaseis;
             } else {
@@ -301,10 +259,6 @@ class adminController {
                     { ordered: true }
                 );
                 results.asfalistikesKlaseis.inserted = insertedAsfalistikesKlaseis.length;
-                logger.info(
-                    `anoigmaNeasXrhshs [AsfalistikesKlaseis]: Δημιουργήθηκαν ${insertedAsfalistikesKlaseis.length} εγγραφές ` +
-                        `για etos="${YearInUse}".`
-                );
             }
 
             /* ============================================================
