@@ -1,5 +1,5 @@
 :root {
-    --aaa: #e7fff6ea;
+    --aaa: #830900;
     --dark: #292c4f;
     --info: #0dcaf0;
     --light: #adb5bd;
@@ -4868,6 +4868,12 @@ input[type='time']::-webkit-calendar-picker-indicator {
     --bs-alert-border-color: #ffc107;
 }
 
+.alert-warning-light {
+    --bs-alert-bg: #fffb0718;
+    --bs-alert-color: #111111;
+    --bs-alert-border-color: #ffd207;
+}
+
 /* Προαιρετικό: να φαίνεται το X κλεισίματος πάνω σε σκούρο φόντο */
 .alert-success .btn-close,
 .alert-danger .btn-close {
@@ -5493,6 +5499,18 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 .margin-bottom-1rem {
     margin-bottom: 1rem !important;
+}
+
+.margin-bottom-1_5rem {
+    margin-bottom: 1.5rem !important;
+}
+
+.margin-bottom-2rem {
+    margin-bottom: 2rem !important;
+}
+
+.margin-bottom-3rem {
+    margin-bottom: 3rem !important;
 }
 
 .padding-0 {
@@ -10706,4 +10724,27 @@ body.loader-active > *:not(.app-loader) {
     margin: 0 -9999px;
     padding: 0 9999px;
     opacity: 0.5;
+}
+
+/* ===== TEKA Result Row ===== */
+.teka-result-row {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    /* margin-left: 1rem;
+    margin-right: 1rem; */
+}
+
+.teka-alert {
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.teka-icon {
+    font-size: 1.1rem;
+}
+
+.teka-label {
+    color: #830900 !important;
+    font-weight: 600;
+    font-size: 1rem !important;
 }
