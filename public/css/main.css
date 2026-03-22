@@ -4685,6 +4685,21 @@ select.tom-dropdown {
     padding: 0;
 }
 
+.ts-multi-reset-btn {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 34px) !important;
+    transform: translateY(-50%);
+    background-color: #ffffff !important;
+    color: #fd0d0dc7 !important;
+    border-radius: 4px;
+    height: 28px !important;
+    width: 28px !important;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0;
+}
+
 /* -------- Τοποθέτηση & ύψη dropdown για CSP-safe JS -------- */
 .ts-dropdown.place-below {
     top: 100%;
@@ -7512,8 +7527,8 @@ main {
     font-weight: 700 !important;
 }
 
-.ts-single-reset-btn {
-    color: #fd0d0d88; /* αρχικό χρώμα του icon */
+/* .ts-single-reset-btn {
+    color: #fd0d0d88;
     border: 1px solid transparent;
     border-radius: 6px;
     width: 24px;
@@ -7526,10 +7541,28 @@ main {
         color 0.15s ease,
         background-color 0.15s ease,
         border-color 0.15s ease;
-}
+} */
+
 .ts-single-reset-btn svg {
     width: 20px;
     height: 20px;
+}
+
+.ts-multi-reset-btn svg.bi-check-all {
+    width: 24px;
+    height: 24px;
+}
+
+/* Trash SVG — 20x20 */
+.ts-multi-reset-btn svg.bi-trash3 {
+    width: 20px;
+    height: 20px;
+}
+
+.ts-multi-reset-btn:hover {
+    border-color: #c50000 !important;
+    background-color: #f80000b0 !important;
+    color: #ffffff !important; /* ← κάνει το icon άσπρο */
 }
 
 .ts-single-reset-btn:hover {
