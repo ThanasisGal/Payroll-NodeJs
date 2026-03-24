@@ -8,7 +8,7 @@ const getSessionVars = async (req, res, next) => {
             res.locals.userStatus = req.session.userStatus;
             res.locals.companyInUse = req.session.companyInUse;
             res.locals.companyDescription = req.session.companyDescription;
-            res.locals.companyKod = req.session.companyDescription;
+            res.locals.companyKodikos = req.session.companyKodikos;
             res.locals.yearInUse = req.session.yearInUse;
             res.locals.periodInUse = req.session.periodInUse;
             res.locals.periodInUseDescr = req.session.periodInUseDescr;

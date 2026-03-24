@@ -351,16 +351,27 @@ router.post(
 // ============================================================================
 // ERGAZOMENOI - PROGRAMMATA - ERGANH ROUTES
 // ============================================================================
+// router.get(
+//     '/ergazomenoi/programmata/eisagoghOrarionApoErganh',
+//     checkAuth,
+//     erganhController.mainEisagoghOrarionApoErganhForm
+// );
+// router.post(
+//     '/ergazomenoi/programmata/importSchedule',
+//     checkAuth,
+//     erganhController.eisagoghOrarionApoErganh
+// );
 router.get(
-    '/ergazomenoi/programmata/eisagoghOrarionApoErganh',
+    '/ergazomenoi/programmata/lhpshOrarionApoErganh',
     checkAuth,
-    erganhController.mainEisagoghOrarionApoErganhForm
+    erganhController.mainLhpshOrarionApoErganhForm
 );
 router.post(
-    '/ergazomenoi/programmata/importSchedule',
+    '/ergazomenoi/programmata/downloadSchedule',
     checkAuth,
-    erganhController.eisagoghOrarionApoErganh
+    erganhController.lhpshOrarionApoErganh
 );
+
 router.get(
     '/ergazomenoi/programmata/eisagoghOrarionApoKartes',
     checkAuth,

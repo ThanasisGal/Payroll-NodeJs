@@ -1,8 +1,9 @@
-const { Schema: _Schema, model } = require("mongoose");
+const { Schema: _Schema, model } = require('mongoose');
 
-    const Schema = _Schema;
+const Schema = _Schema;
 
-    const ErgazomenoiSchema = new Schema({
+const ErgazomenoiSchema = new Schema(
+    {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
@@ -139,7 +140,7 @@ const { Schema: _Schema, model } = require("mongoose");
         isxyei_eos_eisforon_mhteron: { type: Date },
         palios_neos: { type: Boolean, default: false },
         amoibetai_me_sse: { type: Boolean, default: false },
-        
+
         epidoma_anergias: { type: Boolean, default: false },
         dypa: { type: String, trim: true },
         arithmos_deltioy_anergias: { type: String, trim: true },
@@ -153,7 +154,7 @@ const { Schema: _Schema, model } = require("mongoose");
         antikatastash_ergazomenoy: { type: Boolean, default: false },
         afm_antikatastath: { type: String, trim: true, length: 9 },
         amka_antikatastath: { type: String, trim: true, length: 11 },
-        
+
         kentro_kostoys_1: { type: String, trim: true },
         pososto_apasxolhshs_kk1: { type: Number, default: 0 },
         kentro_kostoys_2: { type: String, trim: true },
@@ -162,7 +163,7 @@ const { Schema: _Schema, model } = require("mongoose");
         pososto_apasxolhshs_kk3: { type: Number, default: 0 },
         kentro_kostoys_4: { type: String, trim: true },
         pososto_apasxolhshs_kk4: { type: Number, default: 0 },
-        
+
         symbash: { type: String, trim: true },
         kathgoria_symbashs: { type: String, trim: true },
         eidikothta_symbashs: { type: String, trim: true },
@@ -250,7 +251,7 @@ const { Schema: _Schema, model } = require("mongoose");
         arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh: { type: String, trim: true },
         apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
         eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh: { type: Date },
-        
+
         epaggelmatikh_katartish: { type: Boolean, default: false },
         antikeimeno_katartishs: { type: String, trim: true },
         thematiko_pedio: { type: String, trim: true },
@@ -295,29 +296,31 @@ const { Schema: _Schema, model } = require("mongoose");
         arxeio_apodoxhs_oysiodon_oron_base64: { type: String, default: null },
         arxeio_apodoxhs_oron_atomikhs_symbashs_base64: { type: String, default: null },
         arxeio_symbashs_daneismoy_base64: { type: String, default: null, trim: true },
-        
+
         createdAt: { type: Date, default: Date.now() },
-        updatedAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
     },
     {
         timestamps: true,
-        collection: "Ergazomenoi"
-    });
+        collection: 'Ergazomenoi'
+    }
+);
 
-    ErgazomenoiSchema.index(
-        { team: 1, company_kod: 1, ypokatasthma: 1, kodikos: 1 },
-        { partialFilterExpression: { archived: false, energos: true } }
-      );
-      
-      // 2. Ανενεργοί / αρχειοθετημένοι (για ιστορικό, admin προβολή)
-      ErgazomenoiSchema.index(
-        { team: 1, company_kod: 1, kodikos: 1 },
-        { partialFilterExpression: { archived: true } }
-      );
-              
-    const ErgazomenoiModel = model("Ergazomenoi", ErgazomenoiSchema);
+ErgazomenoiSchema.index(
+    { team: 1, company_kod: 1, ypokatasthma: 1, kodikos: 1 },
+    { partialFilterExpression: { archived: false, energos: true } }
+);
 
-    const ProdhlomenaOrariaSchema = new Schema({
+// 2. Ανενεργοί / αρχειοθετημένοι (για ιστορικό, admin προβολή)
+ErgazomenoiSchema.index(
+    { team: 1, company_kod: 1, kodikos: 1 },
+    { partialFilterExpression: { archived: true } }
+);
+
+const ErgazomenoiModel = model('Ergazomenoi', ErgazomenoiSchema);
+
+const ProdhlomenaOrariaSchema = new Schema(
+    {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
@@ -341,22 +344,58 @@ const { Schema: _Schema, model } = require("mongoose");
         adeia: { type: Boolean, default: false },
         kathgoria_adeias: { type: String, trim: true },
         astheneia: { type: Boolean, default: false },
-        ores_ergasias: { type: Number, default: 0 },
+        ores_ergasias: { type: Number, default: 0 }
     },
     {
-        collection: "Prodhlomena_Oraria"
-    });
+        collection: 'Prodhlomena_Oraria'
+    }
+);
 
-    ProdhlomenaOrariaSchema.index({
-    team: 1,
-    company_kod: 1,
-    kodikos: 1,
-    hmeromhnia: 1
-    }, { unique: false }); 
-      
-    const ProdhlomenaOrariaModel = model("ProdhlomenaOraria", ProdhlomenaOrariaSchema);
+ProdhlomenaOrariaSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        kodikos: 1,
+        hmeromhnia: 1
+    },
+    { unique: false }
+);
 
-    const OrariaFromCardsSchema = new Schema({
+const ProdhlomenaOrariaModel = model('ProdhlomenaOraria', ProdhlomenaOrariaSchema);
+
+const OrariaFromErganhSchema = new Schema(
+    {
+        team: { type: String, trim: true },
+        company_kod: { type: String, trim: true },
+        kodikos: { type: String, trim: true },
+        hmeromhnia: { type: Date },
+        kathgoria_ergasias: { type: String, trim: true },
+        apo_ora_01: { type: String },
+        eos_ora_01: { type: String },
+        apo_ora_02: { type: String },
+        eos_ora_02: { type: String },
+        apo_ora_03: { type: String },
+        eos_ora_03: { type: String }
+    },
+    {
+        collection: 'Oraria_Apo_Erganh'
+    }
+);
+
+OrariaFromErganhSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        kodikos: 1,
+        hmeromhnia: 1
+    },
+    { unique: false }
+);
+
+const OrariaFromErganhModel = model('OrariaFromErganh', OrariaFromErganhSchema);
+
+const OrariaFromCardsSchema = new Schema(
+    {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
@@ -394,15 +433,17 @@ const { Schema: _Schema, model } = require("mongoose");
         ores_paranomhs_yperorias: { type: Number, default: 0 },
         ores_paranomhs_yperorias_nyxtas: { type: Number, default: 0 },
         ores_paranomhs_yperorias_argion: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_argion_nyxtas: { type: Number, default: 0 },
+        ores_paranomhs_yperorias_argion_nyxtas: { type: Number, default: 0 }
     },
     {
-        collection: "Oraria_Apo_Kartes"
-    });
+        collection: 'Oraria_Apo_Kartes'
+    }
+);
 
-    const OrariaFromCardsModel = model("OrariaFromCards", OrariaFromCardsSchema);
+const OrariaFromCardsModel = model('OrariaFromCards', OrariaFromCardsSchema);
 
-    const OrariaApologistikaSchema = new Schema({
+const OrariaApologistikaSchema = new Schema(
+    {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
@@ -507,22 +548,27 @@ const { Schema: _Schema, model } = require("mongoose");
         ores_paranomhs_yperorias_nyxtas_apologistika: { type: Number, default: 0 },
         ores_paranomhs_yperorias_argion_apologistika: { type: Number, default: 0 },
         ores_paranomhs_yperorias_argion_nyxtas_apologistika: { type: Number, default: 0 },
-        apologitiko_biblio: { type: Boolean, default: false },
+        apologitiko_biblio: { type: Boolean, default: false }
     },
     {
-        collection: "Oraria_Apologistika"
-    });
+        collection: 'Oraria_Apologistika'
+    }
+);
 
-    OrariaApologistikaSchema.index({
+OrariaApologistikaSchema.index(
+    {
         team: 1,
         company_kod: 1,
         kodikos: 1,
         hmeromhnia: 1
-      }, { unique: false }); 
-      
-    const OrariaApologistikaModel = model("OrariaApologistika", OrariaApologistikaSchema);
+    },
+    { unique: false }
+);
 
-    const IstorikoProslhpseonAllagonSchema = new Schema({
+const OrariaApologistikaModel = model('OrariaApologistika', OrariaApologistikaSchema);
+
+const IstorikoProslhpseonAllagonSchema = new Schema(
+    {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
@@ -600,17 +646,23 @@ const { Schema: _Schema, model } = require("mongoose");
         krathsh_06: { type: String, trim: true },
         krathsh_07: { type: String, trim: true },
         createdAt: { type: Date, default: Date.now() },
-        updatedAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
     },
     {
-        collection: "Istoriko_Proslhpseon_Allagon"
-    });
+        collection: 'Istoriko_Proslhpseon_Allagon'
+    }
+);
 
-    const IstorikoProslhpseonAllagonModel = model("IstorikoProslhpseonAllagon", IstorikoProslhpseonAllagonSchema);
+const IstorikoProslhpseonAllagonModel = model(
+    'IstorikoProslhpseonAllagon',
+    IstorikoProslhpseonAllagonSchema
+);
 
-module.exports =  { ErgazomenoiModel,
-                    ProdhlomenaOrariaModel,
-                    OrariaFromCardsModel,
-                    OrariaApologistikaModel,
-                    IstorikoProslhpseonAllagonModel,
-                  };
+module.exports = {
+    ErgazomenoiModel,
+    ProdhlomenaOrariaModel,
+    OrariaFromErganhModel,
+    OrariaFromCardsModel,
+    OrariaApologistikaModel,
+    IstorikoProslhpseonAllagonModel
+};

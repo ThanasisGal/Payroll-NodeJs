@@ -847,12 +847,50 @@ async function deleteContractsForEmployee(employeeId, options = {}) {
 }
 
 // =========================================================================
+// ✅ UPLOAD ORARIA XLSX (Εισαγωγή Ωραρίων από Εργάνη)
+// =========================================================================
+
+/**
+ * Αποθηκεύει το ληφθέν xlsx ωραρίων είτε στο local s3-mock (dev)
+ * είτε στο AWS S3 (prod).
+ *
+ * S3 key δομή:
+ *   xlsx/<team>/<companyKod>_<companyName>/Oraria_Apo_Erganh/<year>_<month>.xlsx
+ *
+ * @param {Buffer} fileBuffer
+ * @param {object} params
+ * @param {string} params.team
+ * @param {string} params.companyKod
+ * @param {string} params.companyName   - π.χ. "ΕΤΑΙΡΕΙΑ ΑΕ"
+ * @param {string} params.year          - π.χ. "2026"
+ * @param {string} params.month         - π.χ. "03"  (2-ψήφιο)
+ * @returns {Promise<{s3Key:string, s3Url:string, localPath?:string}>}
+ */
+async function uploadOrariaXlsx(fileBuffer, { team, companyKod, companyName, year, month }) {
+    // Sanitize company name for safe filesystem/S3 key
+    const safeCompanyName = (companyName || 'unknown')
+        .replace(/[^a-zA-Z0-9_\u0370-\u03FF\u1F00-\u1FFF\u0080-\u024F]/g, '_')
+        .substring(0, 40);
+
+    const s3Key = `xlsx/${team}/${companyKod}_${safeCompanyName}/Oraria_Apo_Erganh/${year}_${month}.xlsx`;
+
+    console.log(`[uploadOrariaXlsx] Saving to: ${s3Key}`);
+
+    return uploadBufferToS3(
+        fileBuffer,
+        s3Key,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+}
+
+// =========================================================================
 // EXPORTS
 // =========================================================================
 
 module.exports = {
     uploadFileToS3,
     uploadBufferToS3,
+    uploadOrariaXlsx,
     generatePresignedUrl,
     deleteFileFromS3,
     fileExistsInS3,
