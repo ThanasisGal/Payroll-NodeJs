@@ -5450,6 +5450,10 @@ input[type='time']::-webkit-calendar-picker-indicator {
     margin-left: 2.5rem !important;
 }
 
+.margin-lef-20rem {
+    margin-left: 20rem !important;
+}
+
 .margin-left-percent-0_5 {
     margin-left: 0.5% !important;
 }
