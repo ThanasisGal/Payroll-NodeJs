@@ -2852,9 +2852,22 @@ class erganhController {
                 selectedPararthma
             );
 
-            // 7. Αποθήκευση
+            // 7α. Αποθήκευση τοπικά
             await fs.promises.writeFile(savePath, xlsxBuffer);
             console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε: ${savePath}`);
+
+            // 7β. ✅ Αποθήκευση στο S3
+            const { uploadBufferToS3 } = require('../utils/s3Helper');
+
+            const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Oraria_Apo_Erganh/${fileName}`;
+
+            await uploadBufferToS3(
+                xlsxBuffer,
+                s3Key,
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+
+            console.log(`[lhpshOrarionApoErganh] ✅ Αποθηκεύτηκε στο S3: ${s3Key}`);
 
             // 8. Επεξεργασία xlsx
             await processOrariaXlsx(savePath);
