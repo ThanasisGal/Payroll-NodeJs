@@ -2857,7 +2857,7 @@ class erganhController {
             console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε: ${savePath}`);
 
             // 7β. ✅ Αποθήκευση στο S3
-            const { uploadBufferToS3 } = require('../utils/s3Helper');
+            const { uploadBufferToS3 } = require('../../utils/s3Helper');
 
             const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Oraria_Apo_Erganh/${fileName}`;
 
