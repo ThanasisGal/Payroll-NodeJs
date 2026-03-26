@@ -420,8 +420,8 @@ class userController {
             .trim()
             .toLowerCase();
         const secret = process.env.JWT_SECRET_KEY;
-        const base = process.env.APP_ORIGIN || `http://localhost:${process.env.PORT || 5000}`;
 
+        const base = APP_ORIGIN || `http://localhost:${process.env.PORT || 5000}`;
         if (!email) {
             if (res.flash) await res.flash('error', 'Συμπλήρωσε e-mail.');
             return res.redirect('back');

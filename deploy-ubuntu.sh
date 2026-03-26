@@ -668,6 +668,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/pdf_Upload_Modal.js"
     "public/js/ergazomenoi/genika/pdfPreviewModule.js"
     "public/js/ergazomenoi/programmata/downloadScheduleButton.js"
+    "public/js/ergazomenoi/programmata/downloadCardsButton.js"
 )
 
 declare -a no_obfuscate=(

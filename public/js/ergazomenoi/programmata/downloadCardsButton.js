@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async function () {
-    const downloadScheduleButton = document.getElementById('downloadScheduleButton');
+    const downloadCardsButton = document.getElementById('downloadCardsButton');
 
     const selectedTeam = document.getElementById('team').value;
     const selectedCompany = document.getElementById('company_kod').value;
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         return true;
     }
 
-    downloadScheduleButton.addEventListener('click', async function (event) {
+    downloadCardsButton.addEventListener('click', async function (event) {
         event.preventDefault();
 
         const isValid = validateForm();
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const _result = await Swal.fire({
             title: 'Είσαι σίγουρος / η;',
-            html: `Θα γίνει λήψη των προδηλωμένων ωραρίων από την Εργάνη ΙΙ και αποθήκευση τους.`,
+            html: `Θα γίνει λήψη των απασχολήσεων βάσει καρτών από την ΕΡΓΑΝΗ ΙΙ και αποθήκευση τους.`,
             icon: 'info',
             showCancelButton: true,
             focusConfirm: true,
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     .find((row) => row.startsWith('psifl.x-csrf-token='))
                     ?.split('=')[1];
 
-                const response = await fetch('/ergazomenoi/programmata/downloadSchedule', {
+                const response = await fetch('/ergazomenoi/programmata/downloadCards', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -118,8 +118,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Επιτυχής Λήψη Ωραρίων',
-                    html: `Τα ωράρια αποθηκεύτηκαν επιτυχώς.`,
+                    title: 'Επιτυχής Λήψη Απασχολήσεων',
+                    html: `Οι απασχολήσεις βάσει των Ψηφιακών Καρτών αποθηκεύτηκαν επιτυχώς.`,
                     timer: 4000,
                     confirmButtonText: 'Κλείσιμο',
                     customClass: {
@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 Swal.fire({
                     icon: 'error',
-                    title: 'Σφάλμα κατά τη Λήψη Ωραρίων',
+                    title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
                     html: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
                     timer: 5000,
                     confirmButtonText: 'Κλείσιμο',

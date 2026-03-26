@@ -883,6 +883,23 @@ async function uploadOrariaXlsx(fileBuffer, { team, companyKod, companyName, yea
     );
 }
 
+async function uploadCardsXlsx(fileBuffer, { team, companyKod, companyName, year, month }) {
+    // Sanitize company name for safe filesystem/S3 key
+    const safeCompanyName = (companyName || 'unknown')
+        .replace(/[^a-zA-Z0-9_\u0370-\u03FF\u1F00-\u1FFF\u0080-\u024F]/g, '_')
+        .substring(0, 40);
+
+    const s3Key = `xlsx/${team}/${companyKod}_${safeCompanyName}/Apasxolhseis_Apo_Kartes/${year}_${month}.xlsx`;
+
+    console.log(`[uploadCardsXlsx] Saving to: ${s3Key}`);
+
+    return uploadBufferToS3(
+        fileBuffer,
+        s3Key,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+}
+
 // =========================================================================
 // EXPORTS
 // =========================================================================
@@ -891,6 +908,7 @@ module.exports = {
     uploadFileToS3,
     uploadBufferToS3,
     uploadOrariaXlsx,
+    uploadCardsXlsx,
     generatePresignedUrl,
     deleteFileFromS3,
     fileExistsInS3,

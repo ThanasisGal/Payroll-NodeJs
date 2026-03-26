@@ -351,16 +351,6 @@ router.post(
 // ============================================================================
 // ERGAZOMENOI - PROGRAMMATA - ERGANH ROUTES
 // ============================================================================
-// router.get(
-//     '/ergazomenoi/programmata/eisagoghOrarionApoErganh',
-//     checkAuth,
-//     erganhController.mainEisagoghOrarionApoErganhForm
-// );
-// router.post(
-//     '/ergazomenoi/programmata/importSchedule',
-//     checkAuth,
-//     erganhController.eisagoghOrarionApoErganh
-// );
 router.get(
     '/ergazomenoi/programmata/lhpshOrarionApoErganh',
     checkAuth,
@@ -371,17 +361,23 @@ router.post(
     checkAuth,
     erganhController.lhpshOrarionApoErganh
 );
-
 router.get(
-    '/ergazomenoi/programmata/eisagoghOrarionApoKartes',
+    '/ergazomenoi/programmata/lhpshOrarionApoKartes',
     checkAuth,
-    erganhController.mainEisagoghOrarionApoKartesForm
+    erganhController.mainLhpshOrarionApoKartesForm
 );
+
+// router.get(
+//     '/ergazomenoi/programmata/eisagoghOrarionApoKartes',
+//     checkAuth,
+//     erganhController.mainEisagoghOrarionApoKartesForm
+// );
 router.post(
     '/ergazomenoi/programmata/importCards',
     checkAuth,
-    erganhController.eisagoghOrarionApoKartes
+    erganhController.lhpshOrarionApoKartes
 );
+
 router.post('/ergazomenoi/programmata/delete-pdf', checkAuth, erganhController.deletePdfFile);
 router.get(
     '/ergazomenoi/programmata/exagoghOrarionSeErganh',
