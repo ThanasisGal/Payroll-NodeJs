@@ -420,8 +420,8 @@ class userController {
             .trim()
             .toLowerCase();
         const secret = process.env.JWT_SECRET_KEY;
-
         const base = APP_ORIGIN || `http://localhost:${process.env.PORT || 5000}`;
+
         if (!email) {
             if (res.flash) await res.flash('error', 'Συμπλήρωσε e-mail.');
             return res.redirect('back');
@@ -435,6 +435,24 @@ class userController {
 
         try {
             const now = new Date();
+
+            // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Αν verify=true αλλά δεν υπάρχει user → reset
+            const existingVerify = await VerifyModel.findOne({ email });
+            if (existingVerify?.verify === true) {
+                const existingUser = await UserModel.findOne({ email }).lean();
+                if (!existingUser) {
+                    // Επαλήθευσε αλλά δεν ολοκλήρωσε εγγραφή → reset verify
+                    await VerifyModel.updateOne(
+                        { email },
+                        { $set: { verify: false, updatedAt: now } }
+                    );
+                } else {
+                    // Υπάρχει ήδη εγγεγραμμένος χρήστης → μπλοκάρισε
+                    if (res.flash)
+                        await res.flash('info', 'Το email είναι ήδη εγγεγραμμένο. Συνδεθείτε.');
+                    return res.redirect('/login');
+                }
+            }
 
             // 2) ΑΤΟΜΙΚΟ UPSERT για να αποφύγουμε race conditions & E11000
             const doc = await VerifyModel.findOneAndUpdate(
@@ -465,23 +483,23 @@ class userController {
                 to: email,
                 subject: 'Επαλήθευση email - Web Payroll Solutions',
                 html: `
-        <div style="font-family: Arial, sans-serif; line-height:1.6;">
-          <h2>${greeting}, Καλώς ήρθατε στο Web Payroll Solutions</h2>
-          <p></p>
-          <p>Ευχαριστούμε που εγγραφήκατε στην εφαρμογή <strong>Web Payroll Solutions</strong>.</p>
-          <p>Για να ολοκληρώσετε τη διαδικασία, επαληθεύστε το email σας (διάρκεια 5').</p>
-          <p style="margin:20px 0;">
-            <a href="${link}" style="background:#28a745; color:#fff; padding:10px 15px; border-radius:5px; text-decoration:none;">
-              Επαλήθευση Email
-            </a>
-          </p>
-          <p>Αν δεν δημιουργήσατε εσείς λογαριασμό, αγνοήστε αυτό το μήνυμα.</p>
-          <hr style="margin:20px 0;">
-          <p style="font-size:14px; color:#555;">
-            Για υποστήριξη, επικοινωνήστε με την ομάδα μας μέσω email.
-          </p>
-        </div>
-      `
+                <div style="font-family: Arial, sans-serif; line-height:1.6;">
+                    <h2>${greeting}, Καλώς ήρθατε στο Web Payroll Solutions</h2>
+                    <p></p>
+                    <p>Ευχαριστούμε που εγγραφήκατε στην εφαρμογή <strong>Web Payroll Solutions</strong>.</p>
+                    <p>Για να ολοκληρώσετε τη διαδικασία, επαληθεύστε το email σας (διάρκεια 5').</p>
+                    <p style="margin:20px 0;">
+                        <a href="${link}" style="background:#28a745; color:#fff; padding:10px 15px; border-radius:5px; text-decoration:none;">
+                            Επαλήθευση Email
+                        </a>
+                    </p>
+                    <p>Αν δεν δημιουργήσατε εσείς λογαριασμό, αγνοήστε αυτό το μήνυμα.</p>
+                    <hr style="margin:20px 0;">
+                    <p style="font-size:14px; color:#555;">
+                        Για υποστήριξη, επικοινωνήστε με την ομάδα μας μέσω email.
+                    </p>
+                </div>
+            `
             });
 
             if (res.flash) {
@@ -513,10 +531,10 @@ class userController {
                             to: email,
                             subject: 'Επαλήθευση email - Web Payroll Solutions',
                             html: `
-              <h2>${greeting}, Καλώς ήρθατε στο Web Payroll Solutions</h2>
-              <p>Το email υπάρχει ήδη. Σας στείλαμε νέο link επαλήθευσης (ισχύει 5').</p>
-              <p><a href="${link}">Επαλήθευση Email</a></p>
-            `
+                            <h2>${greeting}, Καλώς ήρθατε στο Web Payroll Solutions</h2>
+                            <p>Το email υπάρχει ήδη. Σας στείλαμε νέο link επαλήθευσης (ισχύει 5').</p>
+                            <p><a href="${link}">Επαλήθευση Email</a></p>
+                        `
                         });
 
                         if (res.flash)
@@ -562,8 +580,30 @@ class userController {
             const checkSendLink = await VerifyModel.findById(req.query.s1);
             if (checkSendLink) {
                 if (checkSendLink.verify === true) {
-                    await res.flash('info', 'Έχετε ήδη επαληθεύσει το Email σας. Συνδεθείτε...');
-                    redir = 'login/login';
+                    // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Υπάρχει ήδη εγγεγραμμένος χρήστης;
+                    const existingUser = await UserModel.findOne({
+                        email: checkSendLink.email
+                    }).lean();
+
+                    if (existingUser) {
+                        // ✅ Υπάρχει user → πραγματικά έχει εγγραφεί
+                        await res.flash(
+                            'info',
+                            'Έχετε ήδη επαληθεύσει το Email σας και έχετε εγγραφεί. Συνδεθείτε...'
+                        );
+                        redir = 'login/login';
+                    } else {
+                        // ✅ ΔΕΝ υπάρχει user → επαλήθευσε αλλά δεν ολοκλήρωσε εγγραφή
+                        // Reset το verify ώστε να μπορεί να ξαναστείλει email
+                        await VerifyModel.findByIdAndUpdate(checkSendLink._id, {
+                            $set: { verify: false }
+                        });
+                        await res.flash(
+                            'warning',
+                            'Έχετε επαληθεύσει το email αλλά δεν ολοκληρώσατε την εγγραφή σας. Ζητήστε νέο link επαλήθευσης.'
+                        );
+                        redir = 'login/verify_email'; // ✅ Πήγαινέ τον να ξαναζητήσει link
+                    }
                 } else {
                     await VerifyModel.findByIdAndUpdate(checkSendLink._id, {
                         $set: { verify: true }
