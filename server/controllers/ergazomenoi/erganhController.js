@@ -762,23 +762,28 @@ class erganhController {
 
             // 7α. Αποθήκευση τοπικά
             await fs.promises.writeFile(savePath, xlsxBuffer);
-            console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε: ${savePath}`);
+            console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε τοπικά: ${savePath}`);
 
-            // 7β. ✅ Αποθήκευση στο S3
-            const { uploadBufferToS3 } = require('../../utils/s3Helper');
-
-            const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Oraria_Apo_Erganh/${fileName}`;
-
-            await uploadBufferToS3(
-                xlsxBuffer,
-                s3Key,
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            );
-
-            console.log(`[lhpshOrarionApoErganh] ✅ Αποθηκεύτηκε στο S3: ${s3Key}`);
-
-            // 8. Επεξεργασία xlsx
+            // 8. Επεξεργασία xlsx ← ΠΡΩΤΑ
             await processOrariaXlsx(savePath);
+
+            // 7β. ✅ Αποθήκευση στο S3 ← ΜΕΤΑ με το επεξεργασμένο αρχείο
+            try {
+                const { uploadBufferToS3 } = require('../../utils/s3Helper');
+                const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Oraria_Apo_Erganh/${fileName}`;
+
+                // ✅ Διάβασε το επεξεργασμένο αρχείο από τον δίσκο
+                const processedBuffer = await fs.promises.readFile(savePath);
+
+                await uploadBufferToS3(
+                    processedBuffer,
+                    s3Key,
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                );
+                console.log(`[lhpshOrarionApoErganh] ✅ Αποθηκεύτηκε στο S3: ${s3Key}`);
+            } catch (s3Error) {
+                console.error(`[lhpshOrarionApoKartes] ❌ S3 Error:`, s3Error.message);
+            }
 
             return res.status(200).json({
                 success: true,
@@ -896,13 +901,19 @@ class erganhController {
             await fs.promises.writeFile(savePath, xlsxBuffer);
             console.log(`[lhpshOrarionApoKartes] Αποθηκεύτηκε τοπικά: ${savePath}`);
 
-            // 7β. Αποθήκευση στο S3
+            // 8. Επεξεργασία xlsx + αποθήκευση MongoDB  ← ΠΡΩΤΑ η επεξεργασία
+            await processKartesXlsx(savePath, apoHmeromhnia);
+
+            // 7β. Αποθήκευση στο S3 ← ΜΕΤΑ ανέβασε το επεξεργασμένο αρχείο
             try {
                 const { uploadBufferToS3 } = require('../../utils/s3Helper');
                 const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Apasxolhseis_Apo_Kartes/${fileName}`;
 
+                // ✅ Διάβασε το επεξεργασμένο αρχείο από το δίσκο
+                const processedBuffer = await fs.promises.readFile(savePath);
+
                 await uploadBufferToS3(
-                    xlsxBuffer,
+                    processedBuffer,
                     s3Key,
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 );
@@ -910,9 +921,6 @@ class erganhController {
             } catch (s3Error) {
                 console.error(`[lhpshOrarionApoKartes] ❌ S3 Error:`, s3Error.message);
             }
-
-            // 8. Επεξεργασία xlsx + αποθήκευση MongoDB
-            await processKartesXlsx(savePath, apoHmeromhnia);
 
             return res.status(200).json({
                 success: true,
