@@ -596,1084 +596,6 @@ class erganhController {
         }
     };
 
-    // static eisagoghOrarionApoKartes = async (req, res) => {
-    //     try {
-    //         const {
-    //             selectedTeam,
-    //             selectedCompany,
-    //             fromDate,
-    //             toDate,
-    //             selectedAfm,
-    //             selectedUsername,
-    //             selectedPassword,
-    //             selectedPararthma,
-    //             selectedInterval
-    //         } = req.body;
-    //         team = selectedTeam;
-    //         company = selectedCompany;
-    //         username = selectedUsername;
-
-    //         processWorkHoursFromKartes(
-    //             selectedUsername,
-    //             selectedPassword,
-    //             fromDate,
-    //             toDate,
-    //             selectedAfm,
-    //             selectedPararthma,
-    //             selectedInterval
-    //         );
-    //     } catch (error) {
-    //         console.log('Error into erganhController -> eisagoghOrarionApoKartes :', error);
-    //     }
-
-    //     async function processWorkHoursFromKartes(
-    //         username,
-    //         password,
-    //         fromDate,
-    //         toDate,
-    //         afm,
-    //         pararthma,
-    //         stroggylopoihsh
-    //     ) {
-    //         const start = process.hrtime();
-    //         let excelFilePath;
-    //         try {
-    //             excelFilePath = await downloadKartesExcel(
-    //                 username,
-    //                 password,
-    //                 fromDate,
-    //                 toDate,
-    //                 afm,
-    //                 pararthma
-    //             );
-    //             const xlsData = await readXLSFile(excelFilePath);
-    //             const newXlsData = await adjustOvernightEntries(xlsData, stroggylopoihsh);
-    //             await updateOrariaFromCardsModelFromXLS(newXlsData, fromDate);
-    //         } catch (error) {
-    //             console.error('Σφάλμα κατά την εκτέλεση:', error);
-    //         } finally {
-    //             // Διαγραφή του αρχείου XLSX αφού ολοκληρωθεί η διαδικασία
-    //             if (excelFilePath) {
-    //                 try {
-    //                     await fs.promises.unlink(excelFilePath);
-    //                     res.json({
-    //                         url: _pdfUrlPath,
-    //                         success: true,
-    //                         redirectUrl: '/ergazomenoi/programmata/eisagoghOrarionApoKartes'
-    //                     });
-    //                 } catch (unlinkError) {
-    //                     console.error('Σφάλμα κατά τη διαγραφή του αρχείου:', unlinkError);
-    //                 }
-    //             }
-    //         }
-
-    //         for (let i = 0; i < 1e6; i++) {}
-
-    //         const diff = process.hrtime(start);
-    //         const timeInMs = diff[0] * 1000 + diff[1] / 1e6;
-    //         console.log(`Execution time: ${timeInMs.toFixed(3)}ms`);
-    //     }
-
-    //     async function downloadKartesExcel(username, password, fromDate, toDate, afm, pararthma) {
-    //         let directory;
-    //         if (isProduction) {
-    //             directory = '/tmp/downloads'; // π.χ. σε Linux server
-    //         } else {
-    //             directory = path.join(__dirname, 'downloads'); // σε Windows dev περιβάλλον
-    //         }
-
-    //         try {
-    //             if (!fs.existsSync(directory)) {
-    //                 fs.mkdirSync(directory, { recursive: true });
-    //                 fs.chmodSync(directory, 0o777); // πλήρη δικαιώματα
-    //             }
-    //         } catch (error) {
-    //             console.error('Error creating directory:', error);
-    //             return null;
-    //         }
-
-    //         // Εκκίνηση του browser (Chromium) σε headless mode
-    //         const browser = await chromium.launch({
-    //             headless: true,
-    //             args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
-    //         });
-
-    //         // Δημιουργούμε context και σελίδα με ενεργοποιημένα downloads
-    //         const context = await browser.newContext({ acceptDownloads: true });
-    //         const page = await context.newPage();
-
-    //         try {
-    //             // Μετάβαση στη σελίδα login
-    //             await page.goto('https://eservices.yeka.gr/login.aspx');
-
-    //             // Είσοδος (username/password -> Enter)
-    //             await page.fill(
-    //                 '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName',
-    //                 username
-    //             );
-    //             await page.fill(
-    //                 '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Password',
-    //                 password
-    //             );
-    //             await page.keyboard.press('Enter');
-
-    //             // Πλοήγηση στο μενού
-    //             await page.click(
-    //                 'xpath=//*[@id="ctl00_ctl00_ContentHolder_ContentHolder_SdcTableMenu"]/div/ol/li[2]/ol/li[6]/ol/li[3]/div/a'
-    //             );
-
-    //             // Συμπλήρωση πεδίων
-    //             if (pararthma) {
-    //                 await page.selectOption(
-    //                     '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_PararthmaSelection_PararthmaListEdit',
-    //                     pararthma
-    //                 );
-    //             }
-    //             if (afm) {
-    //                 await page.fill(
-    //                     '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_AfmEdit',
-    //                     afm
-    //                 );
-    //             }
-
-    //             // Μετατροπή σε μορφή χωρίς '-', όπως στο Selenium
-    //             const fromDateStr = fromDate.replace(/-/g, '');
-    //             const toDateStr = toDate.replace(/-/g, '');
-
-    //             await page.click(
-    //                 'xpath=//*[@id="igtxtctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_DateFromEdit"]'
-    //             );
-    //             await page.fill(
-    //                 'xpath=//*[@id="igtxtctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_DateFromEdit"]',
-    //                 fromDateStr
-    //             );
-
-    //             await page.click(
-    //                 'xpath=//*[@id="igtxtctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_DateToEdit"]'
-    //             );
-    //             await page.fill(
-    //                 'xpath=//*[@id="igtxtctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_DateToEdit"]',
-    //                 toDateStr
-    //             );
-
-    //             // Πατάμε Search
-    //             await page.click(
-    //                 '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_SearchControlSearchButton'
-    //             );
-
-    //             const excelExportButton = page.locator('.ExcelExport');
-    //             await excelExportButton.waitFor({ state: 'visible', timeout: 10000 });
-
-    //             // Ξεκινάμε το download πατώντας το κουμπί
-    //             const [download] = await Promise.all([
-    //                 page.waitForEvent('download'), // Περιμένουμε να ξεκινήσει download
-    //                 excelExportButton.click() // Κλικ στο κουμπί
-    //             ]);
-
-    //             // Αποθήκευση του αρχείου στο επιθυμητό path
-    //             const filename = 'Grid.xlsx';
-    //             const downloadPath = path.join(directory, filename);
-    //             await download.saveAs(downloadPath);
-
-    //             // Προαιρετικά, επιβεβαιώνουμε ότι το αρχείο υπάρχει και δεν είναι άδειο
-    //             // (Η download.saveAs επιστρέφει μόνο όταν έχει τελειώσει η λήψη)
-    //             const stats = fs.statSync(downloadPath);
-    //             if (!stats || stats.size === 0) {
-    //                 throw new Error('Το αρχείο XLSX είναι κενό ή δεν κατέβηκε σωστά!');
-    //             }
-    //             // Αφού βρέθηκε το αρχείο, το μετονομάζουμε/διαβάζουμε
-    //             const newPath = await renameFileAndRead(
-    //                 'erg_m_263',
-    //                 username,
-    //                 fromDate,
-    //                 toDate,
-    //                 directory
-    //             );
-    //             return newPath;
-    //         } finally {
-    //             // Κλείσιμο browser
-    //             await browser.close();
-    //         }
-    //     }
-
-    //     async function renameFileAndRead(prefix, username, fromDate, toDate, directory) {
-    //         const filename = 'Grid.xlsx';
-    //         const newFilename = `${prefix}_${username}__${fromDate.replace(/\//g, '-')}_${toDate.replace(/\//g, '-')}.xlsx`;
-    //         const newDownloadPath = path.join(directory, newFilename);
-
-    //         try {
-    //             // Χρησιμοποιούμε το fs.promises.rename για να μετονομάσουμε το αρχείο
-    //             await fs.promises.rename(path.join(directory, filename), newDownloadPath);
-
-    //             // Τώρα μπορούμε να διαβάσουμε το αρχείο
-    //             return newDownloadPath;
-    //         } catch (err) {
-    //             console.error('Error renaming the file or reading the file:', err);
-    //         }
-    //     }
-
-    //     // Συνάρτηση για ομαδοποίηση των εργαζομένων ανά ΑΦΜ
-    //     function groupByAFMCards(xlsData) {
-    //         const grouped = {};
-    //         for (const row of xlsData) {
-    //             const afm = row[1];
-    //             if (!grouped[afm]) {
-    //                 grouped[afm] = [];
-    //             }
-    //             grouped[afm].push(row);
-    //         }
-    //         return grouped;
-    //     }
-
-    //     function findWeeksInMonth(year, month) {
-    //         let monthInt = parseInt(month, 10);
-
-    //         let startDate = new Date(Date.UTC(year, monthInt - 1, 1)); // Ορισμός της πρώτης ημέρας του μήνα
-    //         let endDate = new Date(Date.UTC(year, monthInt, 0)); // Τελευταία ημέρα του μήνα
-    //         let weeks = []; // Μεταβλητή για την αποθήκευση των εβδομάδων
-    //         let currentDay = new Date(startDate); // Εύρεση της πρώτης ημέρας της πρώτης εβδομάδας
-
-    //         // Επανάληψη μέχρι την τελευταία ημέρα του μήνα
-    //         while (currentDay <= endDate) {
-    //             let weekStart = new Date(currentDay);
-
-    //             let dayOfWeek = weekStart.getDay(); // Εύρεση της Δευτέρας της τρέχουσας εβδομάδας (πρώτη ημέρα της εβδομάδας)
-    //             let daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Αν είναι Κυριακή (0), πάει πίσω 6 ημέρες
-    //             weekStart.setDate(weekStart.getDate() - daysToMonday);
-
-    //             weeks.push(weekStart.toISOString().substring(0, 10)); // Προσθήκη στον πίνακα εβδομάδων
-
-    //             currentDay.setDate(currentDay.getDate() + 7); // Προχωράμε στην επόμενη εβδομάδα
-    //         }
-
-    //         return weeks; // Επιστροφή του πίνακα με τις εβδομάδες
-    //     }
-
-    //     function processWeeks(weeks, year, month) {
-    //         let monthInt = parseInt(month, 10); // Μετατροπή της συμβολοσειράς month σε ακέραιο αριθμό
-
-    //         // Υπολογισμός της τελευταίας ημέρας του μήνα
-    //         let endDate = new Date(Date.UTC(year, monthInt, 0)); // τελευταία ημέρα του μήνα
-
-    //         // Πίνακας για τα διαστήματα των εβδομάδων
-    //         let intervals = [];
-
-    //         for (let i = 0; i < weeks.length; i++) {
-    //             let startOfWeek, endOfWeek;
-
-    //             if (i === 0) {
-    //                 // Η πρώτη εβδομάδα ξεκινάει από την 1η ημέρα του μήνα
-    //                 startOfWeek = new Date(Date.UTC(year, monthInt - 1, 1));
-    //                 endOfWeek = new Date(
-    //                     Date.UTC(year, monthInt - 1, new Date(weeks[i + 1]).getUTCDate() - 1)
-    //                 );
-    //             } else if (i === weeks.length - 1) {
-    //                 // Η τελευταία εβδομάδα τελειώνει στην τελευταία ημέρα του μήνα
-    //                 startOfWeek = new Date(
-    //                     Date.UTC(year, monthInt - 1, new Date(weeks[i]).getUTCDate())
-    //                 );
-    //                 endOfWeek = endDate; // Τελευταία ημέρα του μήνα
-    //             } else {
-    //                 // Ενδιάμεσες εβδομάδες
-    //                 startOfWeek = new Date(
-    //                     Date.UTC(year, monthInt - 1, new Date(weeks[i]).getUTCDate())
-    //                 );
-    //                 endOfWeek = new Date(
-    //                     Date.UTC(year, monthInt - 1, new Date(weeks[i + 1]).getUTCDate() - 1)
-    //                 );
-    //             }
-
-    //             // Προσθήκη του διαστήματος στον πίνακα
-    //             intervals.push({
-    //                 start: startOfWeek.toISOString().substring(0, 10),
-    //                 end: endOfWeek.toISOString().substring(0, 10)
-    //             });
-    //         }
-
-    //         return intervals;
-    //     }
-
-    //     function getDaysFromLastMondayOfPreviousMonth(startYear, startMonth) {
-    //         // Δημιουργία της πρώτης ημέρας του τρέχοντος μήνα
-    //         const firstDayOfCurrentMonth = new Date(Date.UTC(startYear, startMonth - 1, 1));
-    //         // Έλεγχος αν η πρώτη μέρα είναι Δευτέρα
-    //         if (firstDayOfCurrentMonth.getDay() === 1) {
-    //             return []; // Επιστροφή κενής λίστας καθώς δεν θέλουμε να κάνουμε τίποτα
-    //         }
-
-    //         // Δημιουργία της τελευταίας ημέρας του προηγούμενου μήνα
-    //         const lastDayOfPreviousMonth = new Date(Date.UTC(startYear, startMonth - 1, 0));
-
-    //         // Βρίσκουμε την τελευταία Δευτέρα του προηγούμενου μήνα
-    //         const lastMondayOfPreviousMonth = new Date(
-    //             Date.UTC(
-    //                 lastDayOfPreviousMonth.getUTCFullYear(),
-    //                 lastDayOfPreviousMonth.getUTCMonth(),
-    //                 lastDayOfPreviousMonth.getUTCDate()
-    //             )
-    //         );
-
-    //         const dayOfWeek = lastMondayOfPreviousMonth.getDay(); // 1 είναι η Δευτέρα
-
-    //         // Αν δεν είναι Δευτέρα, πηγαίνει πίσω στις μέρες μέχρι να βρει τη Δευτέρα
-    //         const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Πίσω από Κυριακή (6) ή από οποιαδήποτε μέρα μέχρι να βρούμε Δευτέρα
-    //         lastMondayOfPreviousMonth.setDate(lastMondayOfPreviousMonth.getDate() - daysToSubtract);
-
-    //         // Πίνακας για τις ημέρες που θέλουμε να αποθηκεύσουμε
-    //         const daysBetween = [];
-
-    //         // Ξεκινάμε από την τελευταία Δευτέρα του προηγούμενου μήνα μέχρι την προηγούμενη της πρώτης μέρας του τρέχοντα μήνα
-    //         let currentDay = lastMondayOfPreviousMonth;
-
-    //         while (currentDay < firstDayOfCurrentMonth) {
-    //             daysBetween.push(
-    //                 new Date(
-    //                     Date.UTC(
-    //                         currentDay.getUTCFullYear(),
-    //                         currentDay.getUTCMonth(),
-    //                         currentDay.getUTCDate()
-    //                     )
-    //                 )
-    //             ); // Προσθήκη της ημερομηνίας στον πίνακα
-    //             currentDay.setDate(currentDay.getDate() + 1); // Μετακινήση στην επόμενη ημέρα
-    //         }
-
-    //         return daysBetween;
-    //     }
-
-    //     // Συνάρτηση για ενημέρωση του OrariaModel με βάση το Excel
-    //     async function updateOrariaFromCardsModelFromXLS(xlsData, fromDate) {
-    //         // const batchSize = 500; // Μέγεθος της παρτίδας (batch)
-    //         const employeeData = groupByAFMCards(xlsData); // Ομαδοποίηση δεδομένων ανά ΑΦΜ
-
-    //         const _company = await CompaniesModel.find(
-    //             { _id: company },
-    //             'kod eponymia firstname fathername _id'
-    //         ).lean();
-    //         const companyCode = _company[0].kod.toString().padStart(4, '0');
-    //         const companyName =
-    //             _company[0].eponymia.trim() +
-    //             ' ' +
-    //             _company[0].fathername.substring(0, 3).trim() +
-    //             ' ' +
-    //             _company[0].firstname.trim();
-
-    //         const argies = await ArgiesModel.find(
-    //             { team: team, company_kod: companyCode, etos: new Date(fromDate).getFullYear() },
-    //             'hmeromhnia -_id'
-    //         ).lean();
-
-    //         // Μετατροπή των ημερομηνιών στη μορφή "ηη/μμ/εεεε"
-    //         const hmeromhniesArgion = argies.map((argia) => {
-    //             const date = new Date(argia.hmeromhnia); // Μετατροπή της ημερομηνίας σε Date object
-    //             // Μετατροπή στη μορφή ηη/μμ/εεεε
-    //             return date.toLocaleDateString('el-GR', {
-    //                 day: '2-digit',
-    //                 month: '2-digit',
-    //                 year: 'numeric'
-    //             });
-    //         });
-
-    //         let checkMonth, checkYear;
-    //         let _argia = false;
-
-    //         for (const afm in employeeData) {
-    //             const operations = []; // Αποθηκεύουμε τις λειτουργίες ενημέρωσης εδώ
-    //             const operations_cards = [];
-    //             let employees = [];
-    //             const rows = employeeData[afm]; // Δεδομένα για τον τρέχοντα εργαζόμενο
-
-    //             // Βρίσκουμε τον εργαζόμενο με βάση το ΑΦΜ
-    //             const ergazomenos = await ErgazomenoiModel.findOne({ afm });
-    //             if (!ergazomenos) {
-    //                 console.log(`Δεν βρέθηκε εργαζόμενος με ΑΦΜ: ${afm}`);
-    //                 continue;
-    //             }
-
-    //             const kodikos = ergazomenos.kodikos;
-    //             const onomateponymo =
-    //                 ergazomenos.eponymo.substring(0, 20).trim() +
-    //                 '\u00A0' +
-    //                 ergazomenos.patronymo.substring(0, 3).trim() +
-    //                 '\u00A0' +
-    //                 ergazomenos.onoma.substring(0, 14).trim();
-
-    //             // Βρίσκουμε τις καταγεγραμμένες ημερομηνίες από το Excel
-    //             let recordedDays = rows.map((row) => {
-    //                 const [day, month, year] = row[4].split('/').map(Number);
-    //                 return new Date(Date.UTC(year, month - 1, day)).toISOString().substring(0, 10);
-    //             });
-
-    //             let uniqueRecordedDays = [...new Set(recordedDays)];
-
-    //             checkMonth = parseInt(uniqueRecordedDays[0].split('-')[1]) - 1;
-    //             checkYear = parseInt(uniqueRecordedDays[0].split('-')[0]);
-
-    //             // Υπολογισμός της 1ης ημέρας του μήνα βάσει του fromDate
-    //             let currentDate = new Date(Date.UTC(checkYear, checkMonth, 1)); // Πρώτη ημέρα του δοσμένου μήνα
-    //             let lastDayOfMonth = new Date(Date.UTC(checkYear, checkMonth + 1, 0)); // Τελευταία ημέρα του μήνα
-
-    //             let allDays = [];
-
-    //             while (currentDate <= lastDayOfMonth) {
-    //                 allDays.push(currentDate.toISOString().substring(0, 10));
-    //                 currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-    //             }
-
-    //             // Περνάμε από όλες τις ημέρες του μήνα
-    //             for (const hmeromhniaErgasias of allDays) {
-    //                 const existingRow = rows.filter((row) => {
-    //                     const [dayStr, monthStr, yearStr] = row[4].split('/');
-    //                     const rowDate = new Date(Date.UTC(yearStr, monthStr - 1, dayStr))
-    //                         .toISOString()
-    //                         .substring(0, 10);
-    //                     return rowDate === hmeromhniaErgasias;
-    //                 });
-
-    //                 const orariaNoCards = await OrariaModel.find({
-    //                     team: team,
-    //                     company_kod: company,
-    //                     kodikos: kodikos,
-    //                     hmeromhnia: new Date(hmeromhniaErgasias)
-    //                 });
-
-    //                 if (existingRow.length !== 0) {
-    //                     // Αν η ημέρα υπάρχει στο Excel, προσθέτουμε την εγγραφή της
-
-    //                     const rowDate = existingRow[0][4]; // Π.χ., "1/8/2024"
-    //                     const [day, month, year] = rowDate.split('/').map(Number); // Εξαγωγή ημέρας, μήνα, έτους
-    //                     const date = new Date(Date.UTC(year, month - 1, day)); // Δημιουργία UTC ημερομηνία
-    //                     checkMonth = month;
-    //                     checkYear = year;
-    //                     const rowDateFormatted =
-    //                         day.toString().padStart(2, '0') +
-    //                         '/' +
-    //                         month.toString().padStart(2, '0') +
-    //                         '/' +
-    //                         year.toString();
-    //                     const nextDate = new Date(date);
-    //                     nextDate.setUTCDate(date.getUTCDate() + 1);
-    //                     const dayOfWeek = date.getDay();
-    //                     const nextDayOfWeek = nextDate.getDay();
-    //                     const nextDateFormatted = nextDate.toLocaleDateString('el-GR', {
-    //                         day: '2-digit',
-    //                         month: '2-digit',
-    //                         year: 'numeric'
-    //                     });
-
-    //                     // const workData = existingRow[8]; // Εργασία (ένατο κελί)
-
-    //                     _argia = hmeromhniesArgion.includes(rowDateFormatted);
-    //                     const isHoliday = hmeromhniesArgion.includes(rowDateFormatted);
-    //                     const isSunday = dayOfWeek === 0; // 0 = Κυριακή
-    //                     const isNextHoliday = hmeromhniesArgion.includes(nextDateFormatted);
-    //                     const isNextSunday = nextDayOfWeek === 0; // 0 = Κυριακή
-
-    //                     let orariaDataFromCards = {
-    //                         kathgoria_ergasias: '',
-    //                         apo_ora_01: null,
-    //                         eos_ora_01: null,
-    //                         apo_ora_02: null,
-    //                         eos_ora_02: null,
-    //                         apo_ora_03: null,
-    //                         eos_ora_03: null,
-    //                         repo: false,
-    //                         adeia: false,
-    //                         astheneia: false,
-    //                         argia: false,
-    //                         perigrafh_argias: '',
-    //                         kathgoria_adeias: '',
-    //                         ores_ergasias: 0,
-    //                         ores_nyxtas: 0,
-    //                         ores_argion: 0,
-    //                         ores_yperergasias: 0,
-    //                         ores_yperergasias_nyxtas: 0,
-    //                         ores_yperergasias_argion: 0,
-    //                         ores_yperergasias_argion_nyxtas: 0,
-    //                         ores_nominhs_yperorias: 0,
-    //                         ores_nominhs_yperorias_nyxtas: 0,
-    //                         ores_nominhs_yperorias_argion: 0,
-    //                         ores_nominhs_yperorias_argion_nyxtas: 0,
-    //                         ores_paranomhs_yperorias: 0,
-    //                         ores_paranomhs_yperorias_nyxtas: 0,
-    //                         ores_paranomhs_yperorias_argion: 0,
-    //                         ores_paranomhs_yperorias_argion_nyxtas: 0
-    //                     };
-
-    //                     let orariaDataFromCards_cards = {
-    //                         kathgoria_ergasias_cards: '',
-    //                         apo_ora_01_cards: null,
-    //                         eos_ora_01_cards: null,
-    //                         apo_ora_02_cards: null,
-    //                         eos_ora_02_cards: null,
-    //                         apo_ora_03_cards: null,
-    //                         eos_ora_03_cards: null,
-    //                         repo_cards: false,
-    //                         adeia_cards: false,
-    //                         astheneia_cards: false,
-    //                         argia_cards: false,
-    //                         perigrafh_argias_cards: '',
-    //                         kathgoria_adeias_cards: '',
-    //                         ores_ergasias_cards: 0,
-    //                         ores_nyxtas_cards: 0,
-    //                         ores_argion_cards: 0,
-    //                         ores_yperergasias_cards: 0,
-    //                         ores_yperergasias_nyxtas_cards: 0,
-    //                         ores_yperergasias_argion_cards: 0,
-    //                         ores_yperergasias_argion_nyxtas_cards: 0,
-    //                         ores_nominhs_yperorias_cards: 0,
-    //                         ores_nominhs_yperorias_nyxtas_cards: 0,
-    //                         ores_nominhs_yperorias_argion_cards: 0,
-    //                         ores_nominhs_yperorias_argion_nyxtas_cards: 0,
-    //                         ores_paranomhs_yperorias_cards: 0,
-    //                         ores_paranomhs_yperorias_nyxtas_cards: 0,
-    //                         ores_paranomhs_yperorias_argion_cards: 0,
-    //                         ores_paranomhs_yperorias_argion_nyxtas_cards: 0
-    //                     };
-
-    //                     orariaDataFromCards.kathgoria_ergasias = 'ΕΡΓ';
-    //                     orariaDataFromCards.repo = false;
-
-    //                     orariaDataFromCards_cards.kathgoria_ergasias_cards = 'ΕΡΓ';
-    //                     orariaDataFromCards_cards.repo_cards = false;
-
-    //                     let timePeriods = [];
-
-    //                     // Ελέγχουμε πόσες εγγραφές υπάρχουν για τη συγκεκριμένη ημερομηνία
-    //                     if (existingRow.length === 1) {
-    //                         // Αν υπάρχει 1 εγγραφή
-    //                         timePeriods[0] =
-    //                             typeof existingRow[0][5] === 'undefined'
-    //                                 ? orariaNoCards[0]._doc.apo_ora_01
-    //                                 : existingRow[0][5]; // Ώρα προσέλευσης
-    //                         timePeriods[1] = existingRow[0][6]; // Ώρα αποχώρησης
-    //                     } else if (existingRow.length === 2) {
-    //                         // Αν υπάρχουν 2 εγγραφές
-    //                         timePeriods[0] =
-    //                             typeof existingRow[0][5] === 'undefined'
-    //                                 ? orariaNoCards[0]._doc.apo_ora_01
-    //                                 : existingRow[0][5]; // Ώρα προσέλευσης  1ης εγγραφής
-    //                         timePeriods[2] =
-    //                             typeof existingRow[1][5] === 'undefined'
-    //                                 ? orariaNoCards[1]._doc.apo_ora_02
-    //                                 : existingRow[1][5]; // Ώρα προσέλευσης  2ης εγγραφής
-    //                         timePeriods[1] = existingRow[0][6]; // Ώρα αποχώρησης 1ης εγγραφής
-    //                         timePeriods[3] = existingRow[1][6]; // Ώρα αποχώρησης 2ης εγγραφής
-    //                     } else if (existingRow.length === 3) {
-    //                         // Αν υπάρχουν 3 εγγραφές
-    //                         timePeriods[0] =
-    //                             typeof existingRow[0][5] === 'undefined'
-    //                                 ? orariaNoCards[0]._doc.apo_ora_01
-    //                                 : existingRow[0][5]; // Ώρα προσέλευσης  1ης εγγραφής
-    //                         timePeriods[2] =
-    //                             typeof existingRow[1][5] === 'undefined'
-    //                                 ? orariaNoCards[1]._doc.apo_ora_02
-    //                                 : existingRow[1][5]; // Ώρα προσέλευσης  2ης εγγραφής
-    //                         timePeriods[3] =
-    //                             typeof existingRow[2][5] === 'undefined'
-    //                                 ? orariaNoCards[2]._doc.apo_ora_03
-    //                                 : existingRow[2][5]; // Ώρα προσέλευσης  3ης εγγραφής
-    //                         timePeriods[1] = existingRow[0][6]; // Ώρα αποχώρησης 1ης εγγραφής
-    //                         timePeriods[3] = existingRow[1][6]; // Ώρα αποχώρησης 2ης εγγραφής
-    //                         timePeriods[5] = existingRow[2][6]; // Ώρα αποχώρησης 3ης εγγραφής
-    //                     }
-
-    //                     calculateTimePeriodsInPairs(timePeriods, orariaNoCards);
-
-    //                     // Εισαγωγή των ωρών ανάλογα με τον αριθμό των περιόδων
-    //                     if (timePeriods.length === 2) {
-    //                         orariaDataFromCards.apo_ora_01 = timePeriods[0];
-    //                         orariaDataFromCards.eos_ora_01 = timePeriods[1];
-
-    //                         orariaDataFromCards_cards.apo_ora_01_cards = timePeriods[0];
-    //                         orariaDataFromCards_cards.eos_ora_01_cards = timePeriods[1];
-    //                     } else if (timePeriods.length === 4) {
-    //                         orariaDataFromCards.apo_ora_01 = timePeriods[0];
-    //                         orariaDataFromCards.eos_ora_01 = timePeriods[1];
-    //                         orariaDataFromCards.apo_ora_02 = timePeriods[2];
-    //                         orariaDataFromCards.eos_ora_02 = timePeriods[3];
-
-    //                         orariaDataFromCards_cards.apo_ora_01_cards = timePeriods[0];
-    //                         orariaDataFromCards_cards.eos_ora_01_cards = timePeriods[1];
-    //                         orariaDataFromCards_cards.apo_ora_02_cards = timePeriods[2];
-    //                         orariaDataFromCards_cards.eos_ora_02_cards = timePeriods[3];
-    //                     } else if (timePeriods.length === 6) {
-    //                         orariaDataFromCards.apo_ora_01 = timePeriods[0];
-    //                         orariaDataFromCards.eos_ora_01 = timePeriods[1];
-    //                         orariaDataFromCards.apo_ora_02 = timePeriods[2];
-    //                         orariaDataFromCards.eos_ora_02 = timePeriods[3];
-    //                         orariaDataFromCards.apo_ora_03 = timePeriods[4];
-    //                         orariaDataFromCards.eos_ora_03 = timePeriods[5];
-
-    //                         orariaDataFromCards_cards.apo_ora_01_cards = timePeriods[0];
-    //                         orariaDataFromCards_cards.eos_ora_01_cards = timePeriods[1];
-    //                         orariaDataFromCards_cards.apo_ora_02_cards = timePeriods[2];
-    //                         orariaDataFromCards_cards.eos_ora_02_cards = timePeriods[3];
-    //                         orariaDataFromCards_cards.apo_ora_03_cards = timePeriods[4];
-    //                         orariaDataFromCards_cards.eos_ora_03_cards = timePeriods[5];
-    //                     }
-
-    //                     let intervals = [];
-
-    //                     for (let j = 1; j <= 3; j++) {
-    //                         const startTimeInput = orariaDataFromCards[`apo_ora_0${j}`];
-    //                         const endTimeInput = orariaDataFromCards[`eos_ora_0${j}`];
-    //                         if (!startTimeInput || !endTimeInput) {
-    //                             continue;
-    //                         }
-
-    //                         let startTime = convertTimeToMinutes(startTimeInput);
-    //                         let endTime = convertTimeToMinutes(endTimeInput);
-    //                         if (endTime < startTime) endTime += 1440;
-
-    //                         intervals.push({ start: startTime, end: endTime, shift: j });
-    //                     }
-
-    //                     // Υπολογισμός ωρών εργασίας, υπερεργασίας κλπ
-    //                     const workHours = calculateWorkHoursForIntervals(
-    //                         intervals,
-    //                         isHoliday || isSunday,
-    //                         isNextHoliday || isNextSunday
-    //                     );
-
-    //                     orariaDataFromCards.argia = isHoliday;
-    //                     orariaDataFromCards.ores_ergasias = workHours.working;
-    //                     orariaDataFromCards.ores_nyxtas = workHours.night;
-    //                     orariaDataFromCards.ores_argion = workHours.holiday;
-    //                     orariaDataFromCards.ores_yperergasias = workHours.overwork;
-    //                     orariaDataFromCards.ores_yperergasias_nyxtas = workHours.nightOverwork;
-    //                     orariaDataFromCards.ores_yperergasias_argion = workHours.holidayOverwork;
-    //                     orariaDataFromCards.ores_yperergasias_argion_nyxtas =
-    //                         workHours.nightHolidayOverwork;
-    //                     orariaDataFromCards.ores_nominhs_yperorias = workHours.overtime;
-    //                     orariaDataFromCards.ores_nominhs_yperorias_nyxtas = workHours.nightOvertime;
-    //                     orariaDataFromCards.ores_nominhs_yperorias_argion =
-    //                         workHours.holidayOvertime;
-    //                     orariaDataFromCards.ores_nominhs_yperorias_argion_nyxtas =
-    //                         workHours.nightHolidayOvertime;
-    //                     orariaDataFromCards.ores_paranomhs_yperorias = workHours.overtimeIllegal;
-    //                     orariaDataFromCards.ores_paranomhs_yperorias_nyxtas =
-    //                         workHours.nightOvertimeIllegal;
-    //                     orariaDataFromCards.ores_paranomhs_yperorias_argion =
-    //                         workHours.holidayOvertimeIllegal;
-    //                     orariaDataFromCards.ores_paranomhs_yperorias_argion_nyxtas =
-    //                         workHours.nightHolidayOvertimeIllegal;
-
-    //                     orariaDataFromCards_cards.argia_cards = isHoliday;
-    //                     orariaDataFromCards_cards.ores_ergasias_cards = workHours.working;
-    //                     orariaDataFromCards_cards.ores_nyxtas_cards = workHours.night;
-    //                     orariaDataFromCards_cards.ores_argion_cards = workHours.holiday;
-    //                     orariaDataFromCards_cards.ores_yperergasias_cards = workHours.overwork;
-    //                     orariaDataFromCards_cards.ores_yperergasias_nyxtas_cards =
-    //                         workHours.nightOverwork;
-    //                     orariaDataFromCards_cards.ores_yperergasias_argion_cards =
-    //                         workHours.holidayOverwork;
-    //                     orariaDataFromCards_cards.ores_yperergasias_argion_nyxtas_cards =
-    //                         workHours.nightHolidayOverwork;
-    //                     orariaDataFromCards_cards.ores_nominhs_yperorias_cards = workHours.overtime;
-    //                     orariaDataFromCards_cards.ores_nominhs_yperorias_nyxtas_cards =
-    //                         workHours.nightOvertime;
-    //                     orariaDataFromCards_cards.ores_nominhs_yperorias_argion_cards =
-    //                         workHours.holidayOvertime;
-    //                     orariaDataFromCards_cards.ores_nominhs_yperorias_argion_nyxtas_cards =
-    //                         workHours.nightHolidayOvertime;
-    //                     orariaDataFromCards_cards.ores_paranomhs_yperorias_cards =
-    //                         workHours.overtimeIllegal;
-    //                     orariaDataFromCards_cards.ores_paranomhs_yperorias_nyxtas_cards =
-    //                         workHours.nightOvertimeIllegal;
-    //                     orariaDataFromCards_cards.ores_paranomhs_yperorias_argion_cards =
-    //                         workHours.holidayOvertimeIllegal;
-    //                     orariaDataFromCards_cards.ores_paranomhs_yperorias_argion_nyxtas_cards =
-    //                         workHours.nightHolidayOvertimeIllegal;
-
-    //                     // Προσθήκη της λειτουργίας ενημέρωσης στη λίστα operations
-    //                     operations.push({
-    //                         updateOne: {
-    //                             filter: {
-    //                                 team: team,
-    //                                 company_kod: company,
-    //                                 kodikos,
-    //                                 hmeromhnia: new Date(hmeromhniaErgasias)
-    //                             },
-    //                             update: {
-    //                                 $set: orariaDataFromCards,
-    //                                 $setOnInsert: {
-    //                                     team: team,
-    //                                     company_kod: company,
-    //                                     kodikos: kodikos,
-    //                                     hmeromhnia: new Date(hmeromhniaErgasias)
-    //                                 }
-    //                             },
-    //                             upsert: true
-    //                         }
-    //                     });
-
-    //                     operations_cards.push({
-    //                         updateOne: {
-    //                             filter: {
-    //                                 team: team,
-    //                                 company_kod: company,
-    //                                 kodikos,
-    //                                 hmeromhnia: new Date(hmeromhniaErgasias)
-    //                             },
-    //                             update: {
-    //                                 $set: orariaDataFromCards_cards,
-    //                                 $setOnInsert: {
-    //                                     team: team,
-    //                                     company_kod: company,
-    //                                     kodikos: kodikos,
-    //                                     hmeromhnia: new Date(hmeromhniaErgasias)
-    //                                 }
-    //                             },
-    //                             upsert: true
-    //                         }
-    //                     });
-    //                 } else {
-    //                     // Αν η ημέρα δεν υπάρχει στο Excel, προσθέτουμε την εγγραφή με την αντίστοιχη ημερομηνία απ' το ψηφιακό ωράριο
-    //                     let orariaDataFromCards = {
-    //                         kathgoria_ergasias:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ' ||
-    //                             orariaNoCards[0]._doc.argia === true
-    //                                 ? orariaNoCards[0]._doc.kathgoria_ergasias
-    //                                 : '',
-    //                         apo_ora_01: orariaNoCards[0]._doc.apo_ora_01,
-    //                         eos_ora_01: orariaNoCards[0]._doc.eos_ora_01,
-    //                         apo_ora_02: orariaNoCards[0]._doc.apo_ora_02,
-    //                         eos_ora_02: orariaNoCards[0]._doc.eos_ora_02,
-    //                         apo_ora_03: orariaNoCards[0]._doc.apo_ora_03,
-    //                         eos_ora_03: orariaNoCards[0]._doc.eos_ora_03,
-    //                         repo: orariaNoCards[0]._doc.repo,
-    //                         adeia:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ'
-    //                                 ? orariaNoCards[0]._doc.adeia
-    //                                 : true,
-    //                         astheneia: orariaNoCards[0]._doc.astheneia,
-    //                         argia: orariaNoCards[0]._doc.argia,
-    //                         perigrafh_argias: orariaNoCards[0]._doc.perigrafh_argias,
-    //                         kathgoria_adeias:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ'
-    //                                 ? orariaNoCards[0]._doc.kathgoria_adeias
-    //                                 : 'Ορφανό χτύπημα',
-    //                         ores_ergasias: orariaNoCards[0]._doc.ores_ergasias,
-    //                         ores_nyxtas: orariaNoCards[0]._doc.ores_nyxtas,
-    //                         ores_argion: orariaNoCards[0]._doc.ores_argion,
-    //                         ores_yperergasias: orariaNoCards[0]._doc.ores_yperergasias,
-    //                         ores_yperergasias_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_nyxtas,
-    //                         ores_yperergasias_argion:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_argion,
-    //                         ores_yperergasias_argion_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_argion_nyxtas,
-    //                         ores_nominhs_yperorias: orariaNoCards[0]._doc.ores_nominhs_yperorias,
-    //                         ores_nominhs_yperorias_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_nyxtas,
-    //                         ores_nominhs_yperorias_argion:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_argion,
-    //                         ores_nominhs_yperorias_argion_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_argion_nyxtas,
-    //                         ores_paranomhs_yperorias:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias,
-    //                         ores_paranomhs_yperorias_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_nyxtas,
-    //                         ores_paranomhs_yperorias_argion:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_argion,
-    //                         ores_paranomhs_yperorias_argion_nyxtas:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_argion_nyxtas
-    //                     };
-
-    //                     let orariaDataFromCards_cards = {
-    //                         kathgoria_ergasias_cards:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ' ||
-    //                             orariaNoCards[0]._doc.argia === true
-    //                                 ? orariaNoCards[0]._doc.kathgoria_ergasias
-    //                                 : '',
-    //                         apo_ora_01_cards: orariaNoCards[0]._doc.apo_ora_01,
-    //                         eos_ora_01_cards: orariaNoCards[0]._doc.eos_ora_01,
-    //                         apo_ora_02_cards: orariaNoCards[0]._doc.apo_ora_02,
-    //                         eos_ora_02_cards: orariaNoCards[0]._doc.eos_ora_02,
-    //                         apo_ora_03_cards: orariaNoCards[0]._doc.apo_ora_03,
-    //                         eos_ora_03_cards: orariaNoCards[0]._doc.eos_ora_03,
-    //                         repo_cards: orariaNoCards[0]._doc.repo,
-    //                         adeia_cards:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ'
-    //                                 ? orariaNoCards[0]._doc.adeia
-    //                                 : true,
-    //                         astheneia_cards: orariaNoCards[0]._doc.astheneia,
-    //                         argia_cards: orariaNoCards[0]._doc.argia,
-    //                         perigrafh_argias_cards: orariaNoCards[0]._doc.perigrafh_argias,
-    //                         kathgoria_adeias_cards:
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΜΕ' ||
-    //                             orariaNoCards[0]._doc.kathgoria_ergasias === 'ΑΝ'
-    //                                 ? orariaNoCards[0]._doc.kathgoria_adeias
-    //                                 : 'Ορφανό χτύπημα',
-    //                         ores_ergasias_cards: orariaNoCards[0]._doc.ores_ergasias,
-    //                         ores_nyxtas_cards: orariaNoCards[0]._doc.ores_nyxtas,
-    //                         ores_argion_cards: orariaNoCards[0]._doc.ores_argion,
-    //                         ores_yperergasias_cards: orariaNoCards[0]._doc.ores_yperergasias,
-    //                         ores_yperergasias_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_nyxtas,
-    //                         ores_yperergasias_argion_cards:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_argion,
-    //                         ores_yperergasias_argion_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_yperergasias_argion_nyxtas,
-    //                         ores_nominhs_yperorias_cards:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias,
-    //                         ores_nominhs_yperorias_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_nyxtas,
-    //                         ores_nominhs_yperorias_argion_cards:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_argion,
-    //                         ores_nominhs_yperorias_argion_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_nominhs_yperorias_argion_nyxtas,
-    //                         ores_paranomhs_yperorias_cards:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias,
-    //                         ores_paranomhs_yperorias_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_nyxtas,
-    //                         ores_paranomhs_yperorias_argion_cards:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_argion,
-    //                         ores_paranomhs_yperorias_argion_nyxtas_cards:
-    //                             orariaNoCards[0]._doc.ores_paranomhs_yperorias_argion_nyxtas
-    //                     };
-
-    //                     if (
-    //                         orariaNoCards[0]._doc.kathgoria_ergasias !== 'ΜΕ' &&
-    //                         orariaNoCards[0]._doc.kathgoria_ergasias !== 'ΑΝ'
-    //                     ) {
-    //                         let existingEmployee = employees.find(
-    //                             (employee) => employee.onomateponymo === onomateponymo
-    //                         );
-
-    //                         let hmeromhniaArgias =
-    //                             orariaNoCards[0]._doc.argia === true
-    //                                 ? new Date(hmeromhniaErgasias).toLocaleDateString() + ' Αργία'
-    //                                 : new Date(hmeromhniaErgasias).toLocaleDateString();
-
-    //                         if (existingEmployee) {
-    //                             // Αν υπάρχει, προσθέστε την ημερομηνία στις ήδη υπάρχουσες
-    //                             existingEmployee.hmeromhnies.push(hmeromhniaArgias);
-    //                         } else {
-    //                             // Αν δεν υπάρχει, προσθέστε τον εργαζόμενο στον πίνακα
-    //                             employees.push({
-    //                                 onomateponymo: onomateponymo,
-    //                                 hmeromhnies: [hmeromhniaArgias]
-    //                             });
-    //                         }
-    //                     }
-
-    //                     operations.push({
-    //                         updateOne: {
-    //                             filter: {
-    //                                 team: team,
-    //                                 company_kod: company,
-    //                                 kodikos,
-    //                                 hmeromhnia: new Date(hmeromhniaErgasias)
-    //                             },
-    //                             update: {
-    //                                 $set: orariaDataFromCards,
-    //                                 $setOnInsert: {
-    //                                     team: team,
-    //                                     company_kod: company,
-    //                                     kodikos: kodikos,
-    //                                     hmeromhnia: new Date(hmeromhniaErgasias)
-    //                                 }
-    //                             },
-    //                             upsert: true
-    //                         }
-    //                     });
-
-    //                     operations_cards.push({
-    //                         updateOne: {
-    //                             filter: {
-    //                                 team: team,
-    //                                 company_kod: company,
-    //                                 kodikos,
-    //                                 hmeromhnia: new Date(hmeromhniaErgasias)
-    //                             },
-    //                             update: {
-    //                                 $set: orariaDataFromCards_cards,
-    //                                 $setOnInsert: {
-    //                                     team: team,
-    //                                     company_kod: company,
-    //                                     kodikos: kodikos,
-    //                                     hmeromhnia: new Date(hmeromhniaErgasias)
-    //                                 }
-    //                             },
-    //                             upsert: true
-    //                         }
-    //                     });
-    //                 }
-    //             }
-
-    //             let weeksInMonth = findWeeksInMonth(checkYear, checkMonth);
-    //             let intervals = processWeeks(weeksInMonth, checkYear, checkMonth);
-
-    //             const daysOfPreviousMonth = getDaysFromLastMondayOfPreviousMonth(
-    //                 checkYear,
-    //                 checkMonth
-    //             );
-    //             const firstDate = daysOfPreviousMonth[0];
-    //             const lastDate = daysOfPreviousMonth[daysOfPreviousMonth.length - 1];
-
-    //             const orariaProhgMhna = await OrariaModel.find({
-    //                 team: team,
-    //                 company_kod: company,
-    //                 kodikos: kodikos,
-    //                 hmeromhnia: { $gte: new Date(firstDate), $lte: new Date(lastDate) }
-    //             }).sort({ hmeromhnia: 1 });
-
-    //             // Υπολογισμός του συνόλου των πεδίων
-    //             const data = orariaProhgMhna.reduce(
-    //                 (accumulator, schedule) => {
-    //                     return {
-    //                         ores_ergasias:
-    //                             accumulator.ores_ergasias + (schedule.ores_ergasias || 0),
-    //                         ores_yperergasias:
-    //                             accumulator.ores_yperergasias + (schedule.ores_yperergasias || 0),
-    //                         ores_yperergasias_nyxtas:
-    //                             accumulator.ores_yperergasias_nyxtas +
-    //                             (schedule.ores_yperergasias_nyxtas || 0),
-    //                         ores_yperergasias_argion:
-    //                             accumulator.ores_yperergasias_argion +
-    //                             (schedule.ores_yperergasias_argion || 0),
-    //                         ores_yperergasias_argion_nyxtas:
-    //                             accumulator.ores_yperergasias_argion_nyxtas +
-    //                             (schedule.ores_yperergasias_argion_nyxtas || 0)
-    //                     };
-    //                 },
-    //                 {
-    //                     ores_ergasias: 0,
-    //                     ores_yperergasias: 0,
-    //                     ores_yperergasias_nyxtas: 0,
-    //                     ores_yperergasias_argion: 0,
-    //                     ores_yperergasias_argion_nyxtas: 0
-    //                 }
-    //             );
-
-    //             const total = Object.values(data).reduce((sum, value) => sum + value, 0);
-    //             let weeklyTotal = 0;
-
-    //             for (let i = 0; i < intervals.length; i++) {
-    //                 let fromDay = parseInt(intervals[i].start.substring(8, 10)) - 1;
-    //                 let toDay = parseInt(intervals[i].end.substring(8, 10)) - 1;
-    //                 if (i === 0) {
-    //                     weeklyTotal = total;
-    //                 } else {
-    //                     weeklyTotal = 0;
-    //                 }
-
-    //                 // Πρώτα υπολογίζουμε το συνολικό weeklyTotal για όλες τις ημέρες της εβδομάδας
-    //                 for (let j = fromDay; j <= toDay; j++) {
-    //                     // Έλεγχος αν το incValues έχει τιμές (δηλαδή δεν είναι undefined ή null)
-    //                     const incValues = operations[j]?.updateOne?.update?.$set;
-
-    //                     if (incValues && Object.keys(incValues).length > 0) {
-    //                         // Ορισμός των πεδίων που θέλουμε να αθροίσουμε
-    //                         const fieldsToSum = [
-    //                             'ores_ergasias',
-    //                             'ores_yperergasias',
-    //                             'ores_yperergasias_nyxtas',
-    //                             'ores_yperergasias_argion',
-    //                             'ores_yperergasias_argion_nyxtas'
-    //                         ];
-
-    //                         // Χρήση Object.entries() για να αθροίσουμε μόνο τα επιθυμητά πεδία
-    //                         weeklyTotal += Object.entries(incValues)
-    //                             .filter(([key]) => fieldsToSum.includes(key)) // Επιλογή μόνο των επιθυμητών πεδίων
-    //                             .reduce((sum, [, value]) => sum + value, 0); // Άθροισμα των τιμών
-    //                     }
-    //                 }
-
-    //                 // Τώρα, αφού έχει υπολογιστεί το weeklyTotal για όλη την εβδομάδα, κάνουμε τον έλεγχο
-    //                 if (weeklyTotal <= 40) {
-    //                     // Εδώ γίνονται οι ενημερώσεις για όλες τις ημέρες
-    //                     for (let j = fromDay; j <= toDay; j++) {
-    //                         let ores_ergasias =
-    //                             (operations[j].updateOne.update.$set.ores_ergasias || 0) +
-    //                             (operations[j].updateOne.update.$set.ores_yperergasias || 0) +
-    //                             (operations[j].updateOne.update.$set.ores_yperergasias_nyxtas ||
-    //                                 0) +
-    //                             (operations[j].updateOne.update.$set.ores_yperergasias_argion ||
-    //                                 0) +
-    //                             (operations[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         let ores_nyxtas =
-    //                             (operations[j].updateOne.update.$set.ores_nyxtas || 0) +
-    //                             (operations[j].updateOne.update.$set.ores_yperergasias_nyxtas ||
-    //                                 0) +
-    //                             (operations[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         let ores_argion =
-    //                             (operations[j].updateOne.update.$set.ores_argion || 0) +
-    //                             (operations[j].updateOne.update.$set.ores_yperergasias_argion ||
-    //                                 0) +
-    //                             (operations[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         operations[j].updateOne.update.$set.ores_ergasias = ores_ergasias;
-    //                         operations[j].updateOne.update.$set.ores_nyxtas = ores_nyxtas;
-    //                         operations[j].updateOne.update.$set.ores_argion = ores_argion;
-    //                         operations[j].updateOne.update.$set.ores_yperergasias = 0;
-    //                         operations[j].updateOne.update.$set.ores_yperergasias_nyxtas = 0;
-    //                         operations[j].updateOne.update.$set.ores_yperergasias_argion = 0;
-    //                         operations[j].updateOne.update.$set.ores_yperergasias_argion_nyxtas = 0;
-
-    //                         let ores_ergasias_cards =
-    //                             (operations_cards[j].updateOne.update.$set.ores_ergasias || 0) +
-    //                             (operations_cards[j].updateOne.update.$set.ores_yperergasias || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_nyxtas || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         let ores_nyxtas_cards =
-    //                             (operations_cards[j].updateOne.update.$set.ores_nyxtas || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_nyxtas || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         let ores_argion_cards =
-    //                             (operations_cards[j].updateOne.update.$set.ores_argion || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion || 0) +
-    //                             (operations_cards[j].updateOne.update.$set
-    //                                 .ores_yperergasias_argion_nyxtas || 0);
-
-    //                         operations_cards[j].updateOne.update.$set.ores_ergasias = ores_ergasias;
-    //                         operations_cards[j].updateOne.update.$set.ores_nyxtas = ores_nyxtas;
-    //                         operations_cards[j].updateOne.update.$set.ores_argion = ores_argion;
-    //                         operations_cards[j].updateOne.update.$set.ores_yperergasias = 0;
-    //                         operations_cards[j].updateOne.update.$set.ores_yperergasias_nyxtas = 0;
-    //                         operations_cards[j].updateOne.update.$set.ores_yperergasias_argion = 0;
-    //                         operations_cards[
-    //                             j
-    //                         ].updateOne.update.$set.ores_yperergasias_argion_nyxtas = 0;
-    //                     }
-    //                 }
-    //             }
-
-    //             await generatePDF(_company, companyName, employees, hmeromhniesArgion);
-
-    //             // Εκτέλεση τυχόν υπόλοιπων operations
-    //             if (operations.length > 0) {
-    //                 await OrariaFromCardsModel.bulkWrite(operations);
-    //             }
-
-    //             if (operations_cards.length > 0) {
-    //                 await OrariaApologistikaModel.bulkWrite(operations_cards);
-    //             }
-    //         }
-    //     }
-    // };
-
     static deletePdfFile = async (req, res) => {
         const pdfUrl = req.body.pdfUrl;
         const pdfFilePath = path.join(__dirname, '..', '..', '..', 'public', pdfUrl);
@@ -1990,7 +912,7 @@ class erganhController {
             }
 
             // 8. Επεξεργασία xlsx + αποθήκευση MongoDB
-            await processKartesXlsx(savePath);
+            await processKartesXlsx(savePath, apoHmeromhnia);
 
             return res.status(200).json({
                 success: true,
@@ -2231,6 +1153,61 @@ async function processOrariaXlsx(filePath, sessionTeam) {
         writeTeliko(teliko_row++, colA, colB, colD, colC, colE, '', '', '');
     });
 
+    // ============================================================
+    // ✅ Έλεγχος και διαγραφή γραμμών:
+    // F κενό, G έχει τιμή, ίδια ημερομηνία με επόμενη γραμμή
+    // ============================================================
+    const telikoRowsForCheck = [];
+    sheetTeliko.eachRow((row, rowNumber) => {
+        telikoRowsForCheck.push({
+            rowNumber,
+            E: row.getCell(5).text?.trim() || '',
+            F: row.getCell(6).text?.trim() || '',
+            G: row.getCell(7).text?.trim() || ''
+        });
+    });
+
+    const rowsToDelete = new Set();
+
+    for (let j = 0; j < telikoRowsForCheck.length; j++) {
+        const cur = telikoRowsForCheck[j];
+        const next = telikoRowsForCheck[j + 1];
+
+        if (!cur.F && !!cur.G && next && cur.E === next.E) {
+            rowsToDelete.add(cur.rowNumber);
+        }
+    }
+
+    if (rowsToDelete.size > 0) {
+        // Διαβάζουμε όλες τις γραμμές του sheetTeliko
+        const allTelikoRows = [];
+        sheetTeliko.eachRow((row) => {
+            const cells = [];
+            for (let c = 1; c <= 7; c++) {
+                cells.push(row.getCell(c).value);
+            }
+            allTelikoRows.push({ rowNumber: row.number, cells });
+        });
+
+        // Κρατάμε μόνο τις γραμμές που ΔΕΝ διαγράφονται
+        const filteredRows = allTelikoRows.filter((r) => !rowsToDelete.has(r.rowNumber));
+
+        // Καθαρίζουμε το sheetTeliko και ξαναγράφουμε
+        sheetTeliko.spliceRows(1, sheetTeliko.rowCount);
+
+        filteredRows.forEach((r, idx) => {
+            const newRow = sheetTeliko.getRow(idx + 1);
+            r.cells.forEach((val, colIdx) => {
+                newRow.getCell(colIdx + 1).value = val;
+            });
+            newRow.commit();
+        });
+
+        console.log(
+            `[processKartesXlsx] 🗑️ Διαγράφηκαν ${rowsToDelete.size} γραμμές από Κάρτες_Τελικό`
+        );
+    }
+
     await workbook.xlsx.writeFile(filePath);
     console.log(`[processOrariaXlsx] Επεξεργασία ολοκληρώθηκε: ${filePath}`);
 
@@ -2404,254 +1381,394 @@ async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
     if (bulkOps.length > 0) {
         const result = await OrariaFromErganhModel.bulkWrite(bulkOps, { ordered: false });
     }
+}
 
-    async function processKartesXlsx(filePath) {
-        const ExcelJS = require('exceljs');
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.readFile(filePath);
+async function processKartesXlsx(filePath, apoHmeromhnia) {
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
 
-        // 7) Μετονόμασε το τρέχον φύλλο σε Κάρτες_Αρχικό
-        const sheetArxiko = workbook.worksheets[0];
-        sheetArxiko.name = 'Κάρτες_Αρχικό';
+    // 7) Μετονόμασε το τρέχον φύλλο σε Κάρτες_Αρχικό
+    const sheetArxiko = workbook.worksheets[0];
+    sheetArxiko.name = 'Κάρτες_Αρχικό';
 
-        // 8) Δημιούργησε νέο φύλλο Κάρτες_Τελικό
-        const sheetTeliko = workbook.addWorksheet('Κάρτες_Τελικό');
+    // 8) Δημιούργησε νέο φύλλο Κάρτες_Τελικό
+    const sheetTeliko = workbook.addWorksheet('Κάρτες_Τελικό');
 
-        // ============================================================
-        // Βοηθητική: γράψε γραμμή στο Κάρτες_Τελικό
-        // ============================================================
-        let telikoRow = 1;
+    // ============================================================
+    // Βοηθητική: γράψε γραμμή στο Κάρτες_Τελικό
+    // ============================================================
+    let telikoRow = 1;
 
-        function writeTelikoKartes(colA, colB, colC, colD, colE, colF, colG) {
-            const row = sheetTeliko.getRow(telikoRow++);
-            row.getCell(1).value = colA;
-            row.getCell(2).value = colB;
-            row.getCell(3).value = colC;
-            row.getCell(4).value = colD;
-            row.getCell(5).value = colE;
-            row.getCell(6).value = colF ?? '';
-            row.getCell(7).value = colG ?? '';
-            row.commit();
-        }
-
-        // ============================================================
-        // Βοηθητική: σύγκριση ημερομηνιών (στήλη E)
-        // ============================================================
-        function sameDate(val1, val2) {
-            if (!val1 || !val2) return false;
-            const d1 =
-                val1 instanceof Date ? val1.toISOString().split('T')[0] : String(val1).trim();
-            const d2 =
-                val2 instanceof Date ? val2.toISOString().split('T')[0] : String(val2).trim();
-            return d1 === d2;
-        }
-
-        // ============================================================
-        // 9) Επεξεργασία γραμμών από γραμμή 2
-        // ============================================================
-        const arxikoRows = [];
-        sheetArxiko.eachRow((row, rowNumber) => {
-            if (rowNumber < 2) return;
-            arxikoRows.push({
-                A: row.getCell(1).value,
-                B: row.getCell(2).value,
-                C: row.getCell(3).value,
-                D: row.getCell(4).value,
-                E: row.getCell(5).value,
-                F: row.getCell(6).text?.trim() || '',
-                G: row.getCell(7).text?.trim() || ''
-            });
-        });
-
-        let i = 0;
-        while (i < arxikoRows.length) {
-            const cur = arxikoRows[i];
-            const next = arxikoRows[i + 1];
-
-            const hasF = !!cur.F;
-            const hasG = !!cur.G;
-
-            // 9.1) F ✅  G ✅ → γράψε κανονικά
-            if (hasF && hasG) {
-                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, cur.G);
-                i++;
-                continue;
-            }
-
-            // 9.2) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ❌, G ✅
-            if (hasF && !hasG && next) {
-                const nextHasF = !!next.F;
-                const nextHasG = !!next.G;
-                const diffDate = !sameDate(cur.E, next.E);
-
-                if (diffDate && !nextHasF && nextHasG) {
-                    // Συγχώνευση: cur.F + next.G
-                    writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, next.G);
-                    i += 2; // skip next
-                    continue;
-                }
-
-                // 9.3) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ✅
-                if (diffDate && nextHasF) {
-                    writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, '');
-                    i++;
-                    continue;
-                }
-            }
-
-            // 9.4) F ❌  G ✅ → επόμενη: διαφ. ημ/νία, F ✅, G ✅
-            if (!hasF && hasG && next) {
-                const nextHasF = !!next.F;
-                const nextHasG = !!next.G;
-                const diffDate = !sameDate(cur.E, next.E);
-
-                if (diffDate && nextHasF && nextHasG) {
-                    writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, '', cur.G);
-                    i++;
-                    continue;
-                }
-            }
-
-            // Default: γράψε ό,τι έχεις
-            writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, cur.G);
-            i++;
-        }
-
-        await workbook.xlsx.writeFile(filePath);
-        console.log(`[processKartesXlsx] ✅ Επεξεργασία ολοκληρώθηκε: ${filePath}`);
-
-        // ============================================================
-        // Αποθήκευση στο OrariaFromCardsModel
-        // ============================================================
-        await saveKartesTelikoToMongo(sheetTeliko);
+    function writeTelikoKartes(colA, colB, colC, colD, colE, colF, colG) {
+        const row = sheetTeliko.getRow(telikoRow++);
+        row.getCell(1).value = colA;
+        row.getCell(2).value = colB;
+        row.getCell(3).value = colC;
+        row.getCell(4).value = colD;
+        row.getCell(5).value = colE;
+        row.getCell(6).value = colF ?? '';
+        row.getCell(7).value = colG ?? '';
+        row.commit();
     }
 
     // ============================================================
-    // saveKartesTelikoToMongo
-    // Στήλες: A=col1, B=afm, C=eponimo, D=onoma, E=hmeromhnia,
-    //         F=apo_ora, G=eos_ora
+    // Βοηθητική: σύγκριση ημερομηνιών (στήλη E)
     // ============================================================
-    async function saveKartesTelikoToMongo(sheetTeliko) {
-        const rows = [];
-        sheetTeliko.eachRow((row, rowNumber) => {
-            rows.push({
-                rowNumber,
-                afm: row.getCell(2).text?.trim(),
-                eponimo: row.getCell(3).text?.trim(),
-                onoma: row.getCell(4).text?.trim(),
-                hmeromhnia_raw: row.getCell(5).value,
-                apo_ora: row.getCell(6).text?.trim(),
-                eos_ora: row.getCell(7).text?.trim()
+    // function sameDate(val1, val2) {
+    //     // ← ΑΠΟ ΕΔΩ
+    //     if (!val1 || !val2) return false;
+    //     const d1 = val1 instanceof Date ? val1.toISOString().split('T')[0] : String(val1).trim();
+    //     const d2 = val2 instanceof Date ? val2.toISOString().split('T')[0] : String(val2).trim();
+    //     return d1 === d2;
+    // }
+    function sameDate(val1, val2) {
+        if (!val1 || !val2) return false;
+        // ✅ Και τα δύο είναι πλέον strings "dd/mm/yyyy"
+        return String(val1).trim() === String(val2).trim();
+    }
+
+    // ============================================================
+    // 9) Επεξεργασία γραμμών από γραμμή 2
+    // ============================================================
+    const arxikoRows = [];
+    sheetArxiko.eachRow((row, rowNumber) => {
+        if (rowNumber < 2) return;
+
+        // ✅ Μορφοποίηση ημερομηνίας στήλης E ως "dd/mm/yyyy"
+        const rawDate = row.getCell(5).value;
+        let formattedDate = '';
+        if (rawDate instanceof Date) {
+            const d = String(rawDate.getUTCDate()).padStart(2, '0'); // ✅ UTC
+            const m = String(rawDate.getUTCMonth() + 1).padStart(2, '0'); // ✅ UTC
+            const y = rawDate.getUTCFullYear(); // ✅ UTC
+            formattedDate = `${d}/${m}/${y}`;
+        } else if (typeof rawDate === 'string') {
+            formattedDate = rawDate.trim();
+        } else if (typeof rawDate === 'number') {
+            // Excel serial date
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+            const d = new Date(excelEpoch.getTime() + rawDate * 24 * 60 * 60 * 1000);
+            formattedDate =
+                String(d.getUTCDate()).padStart(2, '0') +
+                '/' +
+                String(d.getUTCMonth() + 1).padStart(2, '0') +
+                '/' +
+                d.getUTCFullYear();
+        }
+
+        arxikoRows.push({
+            A: row.getCell(1).value,
+            B: row.getCell(2).text?.trim() || '', // AFM ως string
+            C: row.getCell(3).value,
+            D: row.getCell(4).value,
+            E: formattedDate, // ✅ "dd/mm/yyyy"
+            F: row.getCell(6).text?.trim() || '',
+            G: row.getCell(7).text?.trim() || ''
+        });
+    });
+
+    // ✅ Ταξινόμηση κατά B (AFM) και E (ημερομηνία)
+    arxikoRows.sort((a, b) => {
+        // Πρώτα κατά AFM (string σύγκριση)
+        if (a.B < b.B) return -1;
+        if (a.B > b.B) return 1;
+
+        // Μετά κατά ημερομηνία (μετατροπή "dd/mm/yyyy" → Date για σύγκριση)
+        const toDate = (str) => {
+            if (!str) return new Date(0);
+            const parts = str.split('/');
+            if (parts.length !== 3) return new Date(0);
+            return new Date(
+                Date.UTC(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10))
+            );
+        };
+
+        return toDate(a.E) - toDate(b.E);
+    });
+
+    // ✅ Γράψε τις ταξινομημένες γραμμές πίσω στο Κάρτες_Αρχικό (από γραμμή 2)
+    // ✅ Καθάρισε όλες τις γραμμές από γραμμή 2 και κάτω
+    const lastRow = sheetArxiko.lastRow?.number ?? 1;
+    for (let r = 2; r <= lastRow; r++) {
+        const row = sheetArxiko.getRow(r);
+        row.values = [];
+        row.commit();
+    }
+
+    // ✅ Γράψε τις ταξινομημένες γραμμές πίσω στο Κάρτες_Αρχικό (από γραμμή 2)
+    arxikoRows.forEach((r, idx) => {
+        const row = sheetArxiko.getRow(idx + 2);
+        row.getCell(1).value = r.A;
+        row.getCell(2).value = r.B;
+        row.getCell(3).value = r.C;
+        row.getCell(4).value = r.D;
+        row.getCell(5).value = r.E;
+        row.getCell(6).value = r.F;
+        row.getCell(7).value = r.G;
+        row.commit();
+    });
+
+    // ============================================================
+    // Εξαγωγή μήνα/έτους φίλτρου από apoHmeromhnia "dd/mm/yyyy"
+    // ============================================================
+    const [_apoDay, _apoMonth, _apoYear] = apoHmeromhnia.split('/').map(Number);
+
+    let i = 0;
+    while (i < arxikoRows.length) {
+        const cur = arxikoRows[i];
+        const next = arxikoRows[i + 1];
+
+        // ✅ Φίλτρο: μόνο εγγραφές του ζητούμενου μήνα/έτους
+        const curParts = cur.E ? cur.E.split('/') : null;
+        const curMonth = curParts ? parseInt(curParts[1], 10) : null;
+        const curYear = curParts ? parseInt(curParts[2], 10) : null;
+        const isInMonth = curMonth === _apoMonth && curYear === _apoYear;
+
+        if (!isInMonth) {
+            i++;
+            continue;
+        }
+
+        const hasF = !!cur.F;
+        const hasG = !!cur.G;
+
+        // 9.1) F ✅  G ✅ → γράψε κανονικά
+        if (hasF && hasG) {
+            writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, cur.G);
+            i++;
+            continue;
+        }
+
+        // 9.2) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ❌, G ✅
+        if (hasF && !hasG && next) {
+            const nextHasF = !!next.F;
+            const nextHasG = !!next.G;
+            const diffDate = !sameDate(cur.E, next.E);
+
+            if (diffDate && !nextHasF && nextHasG) {
+                // Συγχώνευση: cur.F + next.G
+                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, next.G);
+                i += 2; // skip next
+                continue;
+            }
+
+            // 9.3) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ✅
+            if (diffDate && nextHasF) {
+                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, '');
+                i++;
+                continue;
+            }
+        }
+
+        // 9.4) F ❌  G ✅ → επόμενη: διαφ. ημ/νία, F ✅, G ✅
+        if (!hasF && hasG && next) {
+            const nextHasF = !!next.F;
+            const nextHasG = !!next.G;
+            const diffDate = !sameDate(cur.E, next.E);
+
+            if (diffDate && nextHasF && nextHasG) {
+                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, '', cur.G);
+                i++;
+                continue;
+            }
+        }
+
+        // Default: γράψε ό,τι έχεις
+        writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, cur.G);
+        i++;
+    }
+
+    // ============================================================
+    // ✅ Έλεγχος και διαγραφή γραμμών από Κάρτες_Τελικό:
+    // F κενό, G έχει τιμή, ίδια ημερομηνία με επόμενη γραμμή
+    // ============================================================
+    const telikoRowsForCheck = [];
+    sheetTeliko.eachRow((row, rowNumber) => {
+        telikoRowsForCheck.push({
+            rowNumber,
+            E: row.getCell(5).text?.trim() || '',
+            F: row.getCell(6).text?.trim() || '',
+            G: row.getCell(7).text?.trim() || ''
+        });
+    });
+
+    const rowsToDelete = new Set();
+
+    for (let j = 0; j < telikoRowsForCheck.length; j++) {
+        const cur = telikoRowsForCheck[j];
+        const next = telikoRowsForCheck[j + 1];
+
+        if (
+            !cur.F &&
+            !!cur.G &&
+            next &&
+            parseGRDate(cur.E)?.getTime() === parseGRDate(next.E)?.getTime()
+        ) {
+            rowsToDelete.add(cur.rowNumber);
+        }
+    }
+
+    if (rowsToDelete.size > 0) {
+        const allTelikoRows = [];
+        sheetTeliko.eachRow((row) => {
+            const cells = [];
+            for (let c = 1; c <= 7; c++) {
+                cells.push(row.getCell(c).value);
+            }
+            allTelikoRows.push({ rowNumber: row.number, cells });
+        });
+
+        const filteredRows = allTelikoRows.filter((r) => !rowsToDelete.has(r.rowNumber));
+
+        sheetTeliko.spliceRows(1, sheetTeliko.rowCount);
+
+        filteredRows.forEach((r, idx) => {
+            const newRow = sheetTeliko.getRow(idx + 1);
+            r.cells.forEach((val, colIdx) => {
+                newRow.getCell(colIdx + 1).value = val;
             });
+            newRow.commit();
         });
 
-        // ΒΗΜΑ 1: Μοναδικά AFM
-        const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
+        console.log(
+            `[processKartesXlsx] 🗑️ Διαγράφηκαν ${rowsToDelete.size} γραμμές από Κάρτες_Τελικό`
+        );
+    }
 
-        // ΒΗΜΑ 2: Φόρτωσε εργαζόμενους με ΜΙΑ query
-        const ergazomenoiList = await ErgazomenoiModel.find({
-            afm: { $in: uniqueAfms }
-        }).lean();
+    await workbook.xlsx.writeFile(filePath);
+    console.log(`[processKartesXlsx] ✅ Επεξεργασία ολοκληρώθηκε: ${filePath}`);
 
-        // ΒΗΜΑ 3: Map afm → ergazomenos
-        const ergazomenoiMap = {};
-        ergazomenoiList.forEach((e) => {
-            ergazomenoiMap[e.afm] = e;
+    // ============================================================
+    // Αποθήκευση στο OrariaFromCardsModel
+    // ============================================================
+    await saveKartesTelikoToMongo(sheetTeliko);
+}
+
+// ============================================================
+// saveKartesTelikoToMongo
+// Στήλες: A=col1, B=afm, C=eponimo, D=onoma, E=hmeromhnia,
+//         F=apo_ora, G=eos_ora
+// ============================================================
+async function saveKartesTelikoToMongo(sheetTeliko) {
+    const rows = [];
+    sheetTeliko.eachRow((row, rowNumber) => {
+        rows.push({
+            rowNumber,
+            afm: row.getCell(2).text?.trim(),
+            eponimo: row.getCell(3).text?.trim(),
+            onoma: row.getCell(4).text?.trim(),
+            hmeromhnia_raw: row.getCell(5).value,
+            apo_ora: row.getCell(6).text?.trim(),
+            eos_ora: row.getCell(7).text?.trim()
         });
+    });
 
-        // ΒΗΜΑ 4: Φτιάξε records
-        const bulkOps = [];
-        let i = 0;
+    // ΒΗΜΑ 1: Μοναδικά AFM
+    const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
 
-        while (i < rows.length) {
-            const current = rows[i];
+    // ΒΗΜΑ 2: Φόρτωσε εργαζόμενους με ΜΙΑ query
+    const ergazomenoiList = await ErgazomenoiModel.find({
+        afm: { $in: uniqueAfms }
+    }).lean();
 
-            if (!current.afm) {
+    // ΒΗΜΑ 3: Map afm → ergazomenos
+    const ergazomenoiMap = {};
+    ergazomenoiList.forEach((e) => {
+        ergazomenoiMap[e.afm] = e;
+    });
+
+    // ΒΗΜΑ 4: Φτιάξε records
+    const bulkOps = [];
+    let i = 0;
+
+    while (i < rows.length) {
+        const current = rows[i];
+
+        if (!current.afm) {
+            i++;
+            continue;
+        }
+
+        const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
+
+        if (!hmeromhnia) {
+            console.warn(
+                `[saveKartesTelikoToMongo] ⚠️ Άκυρη ημερομηνία γραμμή ${current.rowNumber} ` +
+                    `(raw: "${current.hmeromhnia_raw}") ΑΦΜ: ${current.afm} — παραλείπεται`
+            );
+            i++;
+            continue;
+        }
+
+        const ergazomenos = ergazomenoiMap[current.afm];
+        if (!ergazomenos) {
+            i++;
+            continue;
+        }
+
+        const record = {
+            team: ergazomenos.team,
+            company_kod: ergazomenos.company_kod,
+            kodikos: ergazomenos.kodikos,
+            hmeromhnia: hmeromhnia,
+            kathgoria_ergasias: 'ΕΡΓ',
+            apo_ora_01: current.apo_ora || '',
+            eos_ora_01: current.eos_ora || '',
+            apo_ora_02: '',
+            eos_ora_02: '',
+            apo_ora_03: '',
+            eos_ora_03: ''
+        };
+
+        // Έλεγξε επόμενη γραμμή — ίδια ημερομηνία;
+        if (i + 1 < rows.length) {
+            const next1 = rows[i + 1];
+            const next1Date = parseGRDate(next1.hmeromhnia_raw);
+
+            if (next1Date && next1Date.getTime() === hmeromhnia.getTime()) {
+                record.apo_ora_02 = next1.apo_ora || '';
+                record.eos_ora_02 = next1.eos_ora || '';
                 i++;
-                continue;
-            }
 
-            const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
+                if (i + 1 < rows.length) {
+                    const next2 = rows[i + 1];
+                    const next2Date = parseGRDate(next2.hmeromhnia_raw);
 
-            if (!hmeromhnia) {
-                console.warn(
-                    `[saveKartesTelikoToMongo] ⚠️ Άκυρη ημερομηνία γραμμή ${current.rowNumber} ` +
-                        `(raw: "${current.hmeromhnia_raw}") ΑΦΜ: ${current.afm} — παραλείπεται`
-                );
-                i++;
-                continue;
-            }
-
-            const ergazomenos = ergazomenoiMap[current.afm];
-            if (!ergazomenos) {
-                i++;
-                continue;
-            }
-
-            const record = {
-                team: ergazomenos.team,
-                company_kod: ergazomenos.company_kod,
-                kodikos: ergazomenos.kodikos,
-                hmeromhnia: hmeromhnia,
-                kathgoria_ergasias: 'ΕΡΓ',
-                apo_ora_01: current.apo_ora || '',
-                eos_ora_01: current.eos_ora || '',
-                apo_ora_02: '',
-                eos_ora_02: '',
-                apo_ora_03: '',
-                eos_ora_03: ''
-            };
-
-            // Έλεγξε επόμενη γραμμή — ίδια ημερομηνία;
-            if (i + 1 < rows.length) {
-                const next1 = rows[i + 1];
-                const next1Date = parseGRDate(next1.hmeromhnia_raw);
-
-                if (next1Date && next1Date.getTime() === hmeromhnia.getTime()) {
-                    record.apo_ora_02 = next1.apo_ora || '';
-                    record.eos_ora_02 = next1.eos_ora || '';
-                    i++;
-
-                    if (i + 1 < rows.length) {
-                        const next2 = rows[i + 1];
-                        const next2Date = parseGRDate(next2.hmeromhnia_raw);
-
-                        if (next2Date && next2Date.getTime() === hmeromhnia.getTime()) {
-                            record.apo_ora_03 = next2.apo_ora || '';
-                            record.eos_ora_03 = next2.eos_ora || '';
-                            i++;
-                        }
+                    if (next2Date && next2Date.getTime() === hmeromhnia.getTime()) {
+                        record.apo_ora_03 = next2.apo_ora || '';
+                        record.eos_ora_03 = next2.eos_ora || '';
+                        i++;
                     }
                 }
             }
-
-            bulkOps.push({
-                updateOne: {
-                    filter: {
-                        team: ergazomenos.team,
-                        company_kod: ergazomenos.company_kod,
-                        kodikos: ergazomenos.kodikos,
-                        hmeromhnia: hmeromhnia
-                    },
-                    update: { $set: record },
-                    upsert: true
-                }
-            });
-
-            i++;
         }
 
-        // ΒΗΜΑ 5: ΜΙΑ κλήση στη ΒΔ
-        if (bulkOps.length > 0) {
-            const result = await OrariaFromCardsModel.bulkWrite(bulkOps, { ordered: false });
-            console.log(
-                `[saveKartesTelikoToMongo] ✅ ${result.upsertedCount} inserted, ${result.modifiedCount} updated`
-            );
-        }
+        bulkOps.push({
+            updateOne: {
+                filter: {
+                    team: ergazomenos.team,
+                    company_kod: ergazomenos.company_kod,
+                    kodikos: ergazomenos.kodikos,
+                    hmeromhnia: hmeromhnia
+                },
+                update: { $set: record },
+                upsert: true
+            }
+        });
+
+        i++;
+    }
+
+    // ΒΗΜΑ 5: ΜΙΑ κλήση στη ΒΔ
+    if (bulkOps.length > 0) {
+        const result = await OrariaFromCardsModel.bulkWrite(bulkOps, { ordered: false });
+        console.log(
+            `[saveKartesTelikoToMongo] ✅ ${result.upsertedCount} inserted, ${result.modifiedCount} updated`
+        );
     }
 }
 
-module.exports = erganhController;
 async function downloadKartesXlsxToBuffer(
     username,
     password,
@@ -2714,7 +1831,7 @@ async function downloadKartesXlsxToBuffer(
         }
 
         // ============================================================
-        // 4α) Υπολογισμός: Δευτέρα της εβδομάδας του apoHmeromhnia
+        // 4α) Υπολογισμός: Κυριακή της εβδομάδας του apoHmeromhnia
         // apoHmeromhnia: "dd/mm/yyyy"
         // ============================================================
         const [apoDay, apoMonth, apoYear] = apoHmeromhnia.split('/').map(Number);
@@ -2722,12 +1839,13 @@ async function downloadKartesXlsxToBuffer(
 
         const dayOfWeek = apoDate.getUTCDay(); // 0=Κυρ, 1=Δευ, ..., 6=Σαβ
 
-        // Δευτέρα της εβδομάδας (ή ίδια ημέρα αν Κυριακή)
         let daysToSubtract;
-        if (dayOfWeek === 0) {
-            daysToSubtract = 0; // Κυριακή → ίδια
+
+        // Ιδιάζουσα περίπτωση: Κυριακή ΚΑΙ 1η του μήνα
+        if (dayOfWeek === 0 && apoDay === 1) {
+            daysToSubtract = 1; // Πίσω στο Σάββατο του προηγούμενου μήνα
         } else {
-            daysToSubtract = dayOfWeek - 1; // Δευ=0, Τρι=1, ...
+            daysToSubtract = dayOfWeek; // Κανονικά: πίσω στην Κυριακή (0=ίδια)
         }
 
         const proigoumenesHmeresPrevWeekDate = new Date(apoDate);
@@ -2835,3 +1953,5 @@ async function downloadKartesXlsxToBuffer(
         await browser.close();
     }
 }
+
+module.exports = erganhController;

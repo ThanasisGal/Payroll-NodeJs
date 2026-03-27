@@ -366,14 +366,8 @@ router.get(
     checkAuth,
     erganhController.mainLhpshOrarionApoKartesForm
 );
-
-// router.get(
-//     '/ergazomenoi/programmata/eisagoghOrarionApoKartes',
-//     checkAuth,
-//     erganhController.mainEisagoghOrarionApoKartesForm
-// );
 router.post(
-    '/ergazomenoi/programmata/importCards',
+    '/ergazomenoi/programmata/downloadCards',
     checkAuth,
     erganhController.lhpshOrarionApoKartes
 );

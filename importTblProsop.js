@@ -19,11 +19,19 @@ function excelDateToJS(value) {
     if (typeof value === 'string') {
         const trimmed = value.trim();
         if (!trimmed) return null;
+
+        // ISO 8601 format: 1979-10-16T00:00:00.000+00:00
+        if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+            const parsed = new Date(trimmed);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
         // DD/MM/YYYY
         if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
             const [d, m, y] = trimmed.split('/');
             return new Date(`${y}-${m}-${d}`);
         }
+
         const parsed = new Date(trimmed);
         return isNaN(parsed.getTime()) ? null : parsed;
     }
@@ -81,24 +89,24 @@ function printColumns(allRows) {
 function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
     return {
         // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
-        team: 'XAL',
-        company_kod: '0001',
+        team: 'BLG',
+        company_kod: '68d23c12d53dbc8acb96bad6',
         kodikos: toStr(row['C']),
 
         // ── Προσωπικά στοιχεία ────────────────────────────────────────────────
         eponymo: toStr(row['D']),
         onoma: toStr(row['E']),
-        afm: toStr(row['F']),
-        amka: toStr(row['G']),
-        eponymo_patera: toStr(row['H']),
-        patronymo: toStr(row['I']),
-        eponymo_mhteras: toStr(row['J']),
-        mhtronymo: toStr(row['K']),
-        fylo: toBoolean(row['L']),
-        hmeromhnia_gennhshs: excelDateToJS(row['M']),
-        topos_gennhshs: toStr(row['N']),
-        yphkoothta: toStr(row['O']),
-        arithmos_bibliarioy_anhlikoy: toStr(row['P']),
+        afm: toStr(row['K']),
+        amka: toStr(row['FH']),
+        eponymo_patera: '',
+        patronymo: toStr(row['F']),
+        eponymo_mhteras: '',
+        mhtronymo: toStr(row['G']),
+        fylo: row['EC'] === 1 ? false : row['NC'] === 2 ? true : null,
+        hmeromhnia_gennhshs: excelDateToJS(row['H']),
+        topos_gennhshs: toStr(row['I']),
+        yphkoothta: toStr(row['J']),
+        arithmos_bibliarioy_anhlikoy: toStr(row['FM']),
 
         // ── Ταυτότητα / Διαβατήριο ────────────────────────────────────────────
         typos_taytothtas: toStr(row['Q']),

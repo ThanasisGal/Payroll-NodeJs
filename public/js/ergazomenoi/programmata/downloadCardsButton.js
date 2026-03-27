@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const _result = await Swal.fire({
             title: 'Είσαι σίγουρος / η;',
-            html: `Θα γίνει λήψη των απασχολήσεων βάσει καρτών από την ΕΡΓΑΝΗ ΙΙ και αποθήκευση τους.`,
+            html: `Η δημιουργία των βάσει των ψηφιακών καρτών του ΕΡΓΑΝΗ ΙΙ </br> και ο έλεγχος αυτών, μπορεί να διαρκέσει από λίγα δευτερόλεπτα έως και μερικά λεπτά. </br> Αυτό εξαρτάται από την ταχύτητα που σας παρέχει ο πάροχος Internet.`,
             icon: 'info',
             showCancelButton: true,
             focusConfirm: true,
@@ -87,10 +87,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 toDateField.value.substring(0, 4);
 
             try {
-                // Διάβασε το CSRF token από το cookie
+                // ✅ Στο downloadCardsButton.js — διάβασε από cookie
                 const csrfToken = document.cookie
                     .split('; ')
-                    .find((row) => row.startsWith('psifl.x-csrf-token='))
+                    .find((row) => row.startsWith('XSRF-TOKEN=')) // ← βρες το σωστό όνομα του cookie
                     ?.split('=')[1];
 
                 const response = await fetch('/ergazomenoi/programmata/downloadCards', {
@@ -102,8 +102,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                     body: JSON.stringify({
                         selectedTeam: selectedTeam,
                         selectedCompany: selectedCompany,
-                        fromDate: fromDate,
-                        toDate: toDate,
+                        apoHmeromhnia: fromDate,
+                        eosHmeromhnia: toDate,
                         selectedPararthma: pararthma
                     })
                 });
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 Swal.fire({
                     icon: 'success',
                     title: 'Επιτυχής Λήψη Απασχολήσεων',
-                    html: `Οι απασχολήσεις βάσει των Ψηφιακών Καρτών αποθηκεύτηκαν επιτυχώς.`,
+                    html: `Οι απασχολήσεις βάσει των Ψηφιακών Καρτών του ΕΡΓΑΝΗ ΙΙ αποθηκεύτηκαν επιτυχώς.`,
                     timer: 4000,
                     confirmButtonText: 'Κλείσιμο',
                     customClass: {

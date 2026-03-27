@@ -90,4 +90,5 @@ public/min.js/
 uploads/s3-mock/contracts/
 uploads/s3-mock/pdfs/
 uploads/s3-mock/txt/
+uploads/s3-mock/xlsx/**
 uploads/s3-mock/xmls/
