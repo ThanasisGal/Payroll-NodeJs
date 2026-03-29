@@ -174,10 +174,17 @@ class ergazomenoiController {
 
         try {
             const userTeam = req.session.userTeam;
+            const sessionYearInUse = req.session.yearInUse;
             const companyId = req.session.companyInUse;
 
+            const companyData = await CompaniesModel.findById(companyId).lean();
+
             const ergazomenoiId = req.params.id;
-            const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).exec();
+            const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).lean().exec();
+
+            console.log('hmeromhnia_gennhshs:', ergazomenoiData.hmeromhnia_gennhshs);
+            console.log('typeof:', typeof ergazomenoiData.hmeromhnia_gennhshs);
+
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
             const istorikoData = await IstorikoProslhpseonAllagonModel.find({
@@ -204,10 +211,12 @@ class ergazomenoiController {
             res.render('ergazomenoi/ergazomenoi/edit', {
                 locals,
                 perifereies,
+                companyData,
                 genikesParametroi,
                 istorikoData,
                 orariaData,
                 ergazomenoiData,
+                sessionYearInUse,
                 mode: 'edit',
                 context: 'ergazomenoi',
                 rec: {}

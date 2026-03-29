@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 
 // ── Εισαγωγή του υπάρχοντος Model (ΟΧΙ νέο Schema) ───────────────────────────
-const ErgazomenoiModel = require('./server/models/ergazomenoi');
+const { ErgazomenoiModel } = require('./server/models/ergazomenoi');
 
 // ── Βοηθητικές συναρτήσεις ────────────────────────────────────────────────────
 
@@ -86,11 +86,21 @@ function printColumns(allRows) {
 //     11=K 12=L 13=M 14=N 15=O 16=P 17=Q 18=R 19=S 20=T
 //     21=U 22=V 23=W 24=X 25=Y 26=Z 27=AA 28=AB ... 52=AZ
 //     53=BA 54=BB 55=BC ... 78=BZ 79=CA ...
+
+function getKodKlimakas(row) {
+    const today = new Date('2026-03-28');
+    const birthDate = new Date(excelDateToJS(row['H']));
+    const age = Math.floor((today - birthDate) / (1000 * 60 * 60 * 24 * 365.25));
+
+    const klimaka = age <= 25 ? '00' : age < 30 ? '01' : '02';
+    return klimaka + String(row['AO']).padStart(2, '0');
+}
+
 function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
     return {
         // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
         team: 'BLG',
-        company_kod: '68d23c12d53dbc8acb96bad6',
+        company_kod: '69c574ff25255bcae152f16f',
         kodikos: toStr(row['C']),
 
         // ── Προσωπικά στοιχεία ────────────────────────────────────────────────
@@ -98,188 +108,212 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         onoma: toStr(row['E']),
         afm: toStr(row['K']),
         amka: toStr(row['FH']),
-        eponymo_patera: '',
+        eponymo_patera: toStr(row['FJ']),
         patronymo: toStr(row['F']),
-        eponymo_mhteras: '',
+        eponymo_mhteras: toStr(row['FK']),
         mhtronymo: toStr(row['G']),
         fylo: row['EC'] === 1 ? false : row['NC'] === 2 ? true : null,
-        hmeromhnia_gennhshs: excelDateToJS(row['H']),
+        hmeromhnia_gennhshs: excelDateToJS(row['H'])?.toISOString().startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['H']),
         topos_gennhshs: toStr(row['I']),
         yphkoothta: toStr(row['J']),
-        arithmos_bibliarioy_anhlikoy: toStr(row['FM']),
+        arithmos_bibliarioy_anhlikoy: toStr(row['FZ']),
 
         // ── Ταυτότητα / Διαβατήριο ────────────────────────────────────────────
-        typos_taytothtas: toStr(row['Q']),
-        adt: toStr(row['R']),
-        hmeromhnia_ekdoshs: excelDateToJS(row['S']),
-        hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: excelDateToJS(row['T']),
-        arxh_ekdoshs: toStr(row['U']),
-        doy: toStr(row['V']),
-        forologikh_klimaka: toStr(row['W']),
+        typos_taytothtas: toStr(row['FL']),
+        adt: toStr(row['L']),
+        hmeromhnia_ekdoshs: excelDateToJS(row['N'])?.toISOString().startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['NW']),
+        hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: excelDateToJS(row['FS']),
+        arxh_ekdoshs: toStr(row['M']),
+        doy: row['S'] != 0 ? toStr(row['S']) : '',
+        forologikh_klimaka: getKodKlimakas(row),
 
         // ── Επικοινωνία ───────────────────────────────────────────────────────
-        email: toStr(row['X']),
+        email: toStr(row['FR']),
         thlefono: toStr(row['Y']),
-        odos: toStr(row['Z']),
-        arithmos: toStr(row['AA']),
-        tk: toStr(row['AB']),
-        polh: toStr(row['AC']),
-        dhmos: toStr(row['AD']),
-        nomos: toStr(row['AE']),
-        perifereia: toStr(row['AF']),
+        odos: toStr(row['O']),
+        arithmos: toStr(row['FZ']),
+        tk: toStr(row['Q']),
+        polh: toStr(row['FZ']),
+        dhmos: toStr(row['FZ']),
+        nomos: toStr(row['FZ']),
+        perifereia: toStr(row['FZ']),
 
         // ── Οικογενειακή κατάσταση ────────────────────────────────────────────
         oikogeneiakh_katastash: toStr(row['AG']),
         arithmos_teknon: toNum(row['AH']),
-        eidikh_kathgoria_ergazomenoy: toStr(row['AI']),
+        eidikh_kathgoria_ergazomenoy: '0009',
 
         // ── Εκπαίδευση ────────────────────────────────────────────────────────
-        ekpaideytiko_epipedo: toStr(row['AJ']),
+        ekpaideytiko_epipedo: toStr(row['AQ']),
 
         // ── Τραπεζικά ─────────────────────────────────────────────────────────
-        trapeza: toStr(row['AK']),
-        iban: toStr(row['AL']),
+        trapeza: toStr(row['BB']),
+        iban: toStr(row['BC']),
 
         // ── Εργασιακά - Ημερομηνίες ───────────────────────────────────────────
-        hmeromhnia_proslhpshs: excelDateToJS(row['AM']),
-        hmeromhnia_allaghs_symbashs: excelDateToJS(row['AN']),
-        hmeromhnia_allaghs_orarioy_apo: excelDateToJS(row['AO']),
-        hmeromhnia_allaghs_orarioy_eos: excelDateToJS(row['AP']),
-        hmeromhnia_lhxhs_symbashs: excelDateToJS(row['AQ']),
-        hmeromhnia_apoxorhshs: excelDateToJS(row['AR']),
+        hmeromhnia_proslhpshs: excelDateToJS(row['U'])?.toISOString().startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['U']),
+        hmeromhnia_allaghs_symbashs: excelDateToJS(row['AN'])
+            ?.toISOString()
+            .startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['AN']),
+        hmeromhnia_allaghs_orarioy_apo: excelDateToJS(row['U'])
+            ?.toISOString()
+            .startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['U']),
+        hmeromhnia_allaghs_orarioy_eos: excelDateToJS(
+            new Date(new Date(row['U']).getTime() + 7 * 24 * 60 * 60 * 1000)
+        ),
+        hmeromhnia_lhxhs_symbashs: excelDateToJS(row['BT'])?.toISOString().startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['BT']),
+        hmeromhnia_apoxorhshs: excelDateToJS(row['W'])?.toISOString().startsWith('1900-01-01')
+            ? null
+            : excelDateToJS(row['W']),
 
         // ── Δανεισμός ─────────────────────────────────────────────────────────
-        afora_daneismo_ergazomenoy: toBoolean(row['AS']),
-        typos_daneismoy: toStr(row['AT']),
-        hmnia_enarxhs_daneismoy: excelDateToJS(row['AU']),
-        hmnia_lhxhs_daneismoy: excelDateToJS(row['AV']),
+        afora_daneismo_ergazomenoy: false,
+        typos_daneismoy: toStr(row['FZ']),
+        hmnia_enarxhs_daneismoy: null,
+        hmnia_lhxhs_daneismoy: null,
 
         // ── Δοκιμαστική περίοδος ──────────────────────────────────────────────
-        afora_dokimastikh_periodo: toBoolean(row['AW']),
-        hmnia_lhxhs_dokimastikhs_periodoy: excelDateToJS(row['AX']),
+        afora_dokimastikh_periodo: false,
+        hmnia_lhxhs_dokimastikhs_periodoy: null,
 
         // ── Σχέση εργασίας ────────────────────────────────────────────────────
-        kathestos_apasxolhshs: toStr(row['AY']),
-        sxesh_ergasias: toStr(row['AZ']),
-        proyphresia_se_eth: toNum(row['BA']),
-        proyphresia_se_mhnes: toNum(row['BB']),
-        proyphresia_adeias_se_eth: toNum(row['BC']),
-        synolo_proyphresias_se_eth: toNum(row['BD']),
-        synolo_proyphresias_se_mhnes: toNum(row['BE']),
-        misthologiko_klimakio: toNum(row['BF']),
-        syggeneia: toBoolean(row['BG']),
-        syggenikh_sxesh: toStr(row['BH']),
-        thesh_eythynhs: toStr(row['BI']),
-        eidikh_periptosh: toStr(row['BJ']),
-        topos_ergasias: toBoolean(row['BK']),
-        topos_ergasias_parathrhseis: toStr(row['BL']),
-        xronos_katabolhs_apodoxon: toStr(row['BM']),
-        efarmostea_sse: toBoolean(row['BN']),
-        efarmostea_sse_parathrhseis: toStr(row['BO']),
+        kathestos_apasxolhshs: toStr(row['AB'] === -1 ? 0 : row['AB'] === 0 ? 1 : row['AB']),
+        sxesh_ergasias: excelDateToJS(row['BT'])?.toISOString().startsWith('1900-01-01')
+            ? '0'
+            : '1',
+        proyphresia_se_eth: Math.floor(toNum(row['X'])),
+        proyphresia_se_mhnes: Math.round(parseFloat((toNum(row['X']) % 1).toFixed(2)) * 100),
+        // proyphresia_adeias_se_eth: toNum(row['BC']),
+        // synolo_proyphresias_se_eth: toNum(row['BD']),
+        // synolo_proyphresias_se_mhnes: toNum(row['BE']),
+        misthologiko_klimakio: toNum(row['Z']),
+        syggeneia: false,
+        syggenikh_sxesh: '',
+        thesh_eythynhs: '1',
+        eidikh_periptosh: '',
+        topos_ergasias: false,
+        // topos_ergasias: toBoolean(row['BK']),
+        topos_ergasias_parathrhseis: '',
+        xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
+        efarmostea_sse: true,
+        efarmostea_sse_parathrhseis: 'Σ.Σ.Ε. ΞΕΝΟΔΟΧΟΫΠΑΛΛΗΛΩΝ ΟΛΗΣ ΤΗΣ ΧΩΡΑΣ',
 
         // ── Ωράριο ────────────────────────────────────────────────────────────
-        plhrhs_apasxolhsh: toBoolean(row['BP']),
-        mh_problepsimo_programma: toBoolean(row['BQ']),
-        hmeres_ores_anaforas: toStr(row['BR']),
-        eidopoihsh_prin_thn_anathesh: toStr(row['BS']),
-        prothesmia_akyroshs_ths_anatheshs: toStr(row['BT']),
-        dieythethsh_ergasias: toBoolean(row['BU']),
-        hmnia_enarxhs_dieythethshs_ergasias: excelDateToJS(row['BV']),
-        hmnia_lhxhs_dieythethshs_ergasias: excelDateToJS(row['BW']),
-        hmeres_ergasias_ebdomadas: toNum(row['BX']),
-        ores_ergasias_ebdomadas: toNum(row['BY']),
+        plhrhs_apasxolhsh: toBoolean(row['AB']),
+        mh_problepsimo_programma: false,
+        hmeres_ores_anaforas: null,
+        eidopoihsh_prin_thn_anathesh: null,
+        prothesmia_akyroshs_ths_anatheshs: null,
+        dieythethsh_ergasias: false,
+        hmnia_enarxhs_dieythethshs: null,
+        hmnia_lhxhs_dieythethshs_ergasias: null,
+        hmeres_ergasias_ebdomadas: toNum(row['AC']),
+        ores_ergasias_ebdomadas: toNum(row['AD']),
         mo_oron_hmerhsias_ergasias: toNum(row['BZ']),
-        dialleima_se_lepta: toNum(row['CA']),
-        dialleima_entos_ektos_orarioy: toBoolean(row['CB']),
-        symbatikes_ores_ergasias: toNum(row['CC']),
-        typos_orarioy: toBoolean(row['CD']),
-        synexes_diakekomeno: toBoolean(row['CE']),
-        pshfiakh_organosh: toBoolean(row['CF']),
-        apasxolhsh_basei_symbashs: toStr(row['CG']),
-        karta_ergasias: toBoolean(row['CH']),
-        evelikth_proselefsh: toNum(row['CI']),
-        apasxolhsh_gia_proth_fora: toBoolean(row['CJ']),
-        ora_enarxhs_proths_foras: toStr(row['CK']),
-        ora_apoxorhshs_proths_foras: toStr(row['CL']),
-        asfalish_me_tekmarta: toBoolean(row['CM']),
-        asfalistikh_klash: toStr(row['CN']),
-        epoxikos: toBoolean(row['CO']),
+        dialleima_se_lepta: 30,
+        dialleima_entos_ektos_orarioy: false,
+        symbatikes_ores_ergasias: 40,
+        typos_orarioy: false,
+        synexes_diakekomeno: false,
+        pshfiakh_organosh: true,
+        apasxolhsh_basei_symbashs: '5',
+        karta_ergasias: true,
+        evelikth_proselefsh: 120,
+        apasxolhsh_gia_proth_fora: false,
+        ora_enarxhs_proths_foras: '07:00',
+        ora_apoxorhshs_proths_foras: '14:00',
+        asfalish_me_tekmarta: false,
+        asfalistikh_klash: '',
+        epoxikos: row['AL'] === -1 ? true : false,
 
-        // ── Οργανόγραμμα ────────────���─────────────────────────────────────────
+        // ── Οργανόγραμμα ─────────────────────────────────────────────────────
         tmhma: toStr(row['CP']),
-        eidikothta_erganh: toStr(row['CQ']),
-        antikeimeno_ergasion: toStr(row['CR']),
-        typos_ergazomenon: toStr(row['CS']),
-        ypokatasthma: toStr(row['CT']),
-        xarakthrismos_ergazomenon: toBoolean(row['CU']),
-        eidikothta: toStr(row['CV']),
-        diathesimothta: toBoolean(row['CW']),
-        enarxh_diathesimothtas: excelDateToJS(row['CX']),
-        lhxh_diathesimothtas: excelDateToJS(row['CY']),
+        eidikothta_erganh: toStr(row['FQ']),
+        antikeimeno_ergasion: '',
+        typos_ergazomenon: toStr(row['AS']),
+        ypokatasthma: String(row['AV']).padStart(4, '0'),
+        xxarakthrismos_ergazomenon: row['AR'] === 1000 ? 'Μ' : 'Η',
+        eidikothta: toStr(row['AP']),
+        diathesimothta: false,
+        enarxh_diathesimothtaxs: null,
+        lhxh_diathesimothtas: null,
 
         // ── Ασφάλιση ΕΦΚΑ ─────────────────────────────────────────────────────
-        foreas_kyrias_asfalishs: toStr(row['CZ']),
-        // foreas_epikoyrikhs_asfalishs είναι array - χειρίζεται παρακάτω
-        kad_efka: toStr(row['DA']),
-        eidikothta_efka: toStr(row['DB']),
-        kpk_efka: toStr(row['DC']),
-        kpk_efka_basei_symbashs: toStr(row['DD']),
-        epa_efka: toStr(row['DE']),
-        prosthetes_asfalistikes_apodoxes: toStr(row['DF']),
+        foreas_kyrias_asfalishs: '001',
+        foreas_epikoyrikhs_asfalishs: '001',
+        kad_efka: toStr(row['AW']),
+        eidikothta_efka: toStr(row['AX']),
+        kpk_efka: toStr(row['AY']).padStart(4, '0'),
+        kpk_efka_basei_symbashs: toStr(row['AY']),
+        epa_efka: toStr(row['AZ']),
+        prosthetes_asfalistikes_apodoxes: '',
 
         // ── Μειώσεις / Επιδοτήσεις εισφορών ──────────────────────────────────
-        meiosh_eisforon_ergazomenon: toBoolean(row['DG']),
-        kodikos_meioshs: toStr(row['DH']),
-        pososto_asfalismenoy_meioshs: toNum(row['DI']),
-        pososto_ergodoth_meioshs: toNum(row['DJ']),
-        isxyei_apo_meioshs: excelDateToJS(row['DK']),
-        isxyei_eos_meioshs: excelDateToJS(row['DL']),
-        epidothsh_eisforon_ergodoth: toBoolean(row['DM']),
-        kodikos_epidothshs: toStr(row['DN']),
-        pososto_asfalismenoy_epidothshs: toNum(row['DO']),
-        pososto_ergodoth_epidothshs: toNum(row['DP']),
-        isxyei_apo_epidothshs: excelDateToJS(row['DQ']),
-        isxyei_eos_epidothshs: excelDateToJS(row['DR']),
-        meiosh_eisforon_mhteron: toBoolean(row['DS']),
-        kodikos_meioshs_eisforon_mhteron: toStr(row['DT']),
-        pososto_asfalismenoy_eisforon_mhteron: toNum(row['DU']),
-        pososto_ergodoth_eisforon_mhteron: toNum(row['DV']),
-        isxyei_apo_eisforon_mhteron: excelDateToJS(row['DW']),
-        isxyei_eos_eisforon_mhteron: excelDateToJS(row['DX']),
-        palios_neos: toBoolean(row['DY']),
-        amoibetai_me_sse: toBoolean(row['DZ']),
+        meiosh_eisforon_ergazomenon: false,
+        kodikos_meioshs: '',
+        pososto_asfalismenoy_meioshs: 0,
+        pososto_ergodoth_meioshs: 0,
+        isxyei_apo_meioshs: null,
+        isxyei_eos_meioshs: null,
+        epidothsh_eisforon_ergodoth: false,
+        kodikos_epidothshs: '',
+        pososto_asfalismenoy_epidothshs: 0,
+        pososto_ergodoth_epidothshs: 0,
+        isxyei_apo_epidothshs: null,
+        isxyei_eos_epidothshs: null,
+        meiosh_eisforon_mhteron: false,
+        kodikos_meioshs_eisforon_mhteron: '',
+        pososto_asfalismenoy_eisforon_mhteron: 0,
+        pososto_ergodoth_eisforon_mhteron: 0,
+        isxyei_apo_eisforon_mhteron: null,
+        isxyei_eos_eisforon_mhteron: null,
+        palios_neos: row['BP'] === -1 ? true : false,
+
+        amoibetai_me_sse: false,
 
         // ── ΔΥΠΑ ──────────────────────────────────────────────────────────────
-        epidoma_anergias: toBoolean(row['EA']),
-        dypa: toStr(row['EB']),
-        arithmos_deltioy_anergias: toStr(row['EC']),
-        systatiko_shmeioma: toBoolean(row['ED']),
-        topothethsh_me_programma: toBoolean(row['EE']),
-        ypoxreotikh_ek_toy_nomoy_katartish: toBoolean(row['EF']),
-        programma_dypa: toStr(row['EG']),
-        egkritikh_apofash_dypa: toStr(row['EH']),
-        hmeromhnia_enarxhs_programmatos: excelDateToJS(row['EI']),
-        hmeromhnia_lhxhs_programmatos: excelDateToJS(row['EJ']),
-        antikatastash_ergazomenoy: toBoolean(row['EK']),
-        afm_antikatastath: toStr(row['EL']),
-        amka_antikatastath: toStr(row['EM']),
+        epidoma_anergias: false,
+        dypa: '',
+        arithmos_deltioy_anergias: '',
+        systatiko_shmeioma: false,
+        topothethsh_me_programma: false,
+        ypoxreotikh_ek_toy_nomoy_katartish: false,
+        programma_dypa: '',
+        egkritikh_apofash_dypa: '',
+        hmeromhnia_enarxhs_programmatos: null,
+        hmeromhnia_lhxhs_programmatos: null,
+        antikatastash_ergazomenoy: false,
+        afm_antikatastath: '',
+        amka_antikatastath: '',
 
         // ── Κέντρα κόστους ────────────────────────────────────────────────────
-        kentro_kostoys_1: toStr(row['EN']),
-        pososto_apasxolhshs_kk1: toNum(row['EO']),
-        kentro_kostoys_2: toStr(row['EP']),
-        pososto_apasxolhshs_kk2: toNum(row['EQ']),
-        kentro_kostoys_3: toStr(row['ER']),
-        pososto_apasxolhshs_kk3: toNum(row['ES']),
-        kentro_kostoys_4: toStr(row['ET']),
-        pososto_apasxolhshs_kk4: toNum(row['EU']),
+        kentro_kostoys_1: toStr(row['BG']).padStart(4, '0'),
+        pososto_apasxolhshs_kk1: toNum(row['BH']),
+        kentro_kostoys_2: toStr(row['BI']).padStart(4, '0'),
+        pososto_apasxolhshs_kk2: toNum(row['BJ']),
+        kentro_kostoys_3: toStr(row['BK']).padStart(4, '0'),
+        pososto_apasxolhshs_kk3: toNum(row['BL']),
+        kentro_kostoys_4: toStr(row['BM']).padStart(4, '0'),
+        pososto_apasxolhshs_kk4: toNum(row['BN']),
 
         // ── Κατάσταση εργαζόμενου ─────────────────────────────────────────────
-        energos: toBoolean(row['EV']),
+        energos: toBoolean(row['FC']),
         archived: false,
 
         // ── Παρατηρήσεις ──────────────────────────────────────────────────────
-        parathrhseis: toStr(row['EW'])
+        parathrhseis: toStr(row['T'])
     };
 }
 

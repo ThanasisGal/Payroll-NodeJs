@@ -413,6 +413,16 @@ const OrariaFromCardsSchema = new Schema(
     }
 );
 
+OrariaFromCardsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        kodikos: 1,
+        hmeromhnia: 1
+    },
+    { unique: false }
+);
+
 const OrariaFromCardsModel = model('OrariaFromCards', OrariaFromCardsSchema);
 
 const OrariaApologistikaSchema = new Schema(
@@ -420,6 +430,9 @@ const OrariaApologistikaSchema = new Schema(
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
         kodikos: { type: String, trim: true },
+        dialleima: { type: String, trim: true },
+        entos_ektos: { type: Boolean, default: false },
+        evelikth_proseleysh: { type: Number, default: 0 },
         hmeromhnia: { type: Date },
         kathgoria_ergasias: { type: String, trim: true },
         apo_ora_01_oraria: { type: String },
@@ -440,21 +453,6 @@ const OrariaApologistikaSchema = new Schema(
         argia_oraria: { type: Boolean, default: false },
         perigrafh_argias_oraria: { type: String, trim: true },
         kathgoria_adeias_oraria: { type: String, trim: true },
-        ores_ergasias_oraria: { type: Number, default: 0 },
-        ores_nyxtas_oraria: { type: Number, default: 0 },
-        ores_argion_oraria: { type: Number, default: 0 },
-        ores_yperergasias_oraria: { type: Number, default: 0 },
-        ores_yperergasias_nyxtas_oraria: { type: Number, default: 0 },
-        ores_yperergasias_argion_oraria: { type: Number, default: 0 },
-        ores_yperergasias_argion_nyxtas_oraria: { type: Number, default: 0 },
-        ores_nominhs_yperorias_oraria: { type: Number, default: 0 },
-        ores_nominhs_yperorias_nyxtas_oraria: { type: Number, default: 0 },
-        ores_nominhs_yperorias_argion_oraria: { type: Number, default: 0 },
-        ores_nominhs_yperorias_argion_nyxtas_oraria: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_oraria: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_nyxtas_oraria: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_argion_oraria: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_argion_nyxtas_oraria: { type: Number, default: 0 },
         apo_ora_01_cards: { type: String },
         eos_ora_01_cards: { type: String },
         apo_ora_02_cards: { type: String },
@@ -467,27 +465,6 @@ const OrariaApologistikaSchema = new Schema(
         dialleima_eos_ora_02_cards: { type: String },
         dialleima_apo_ora_03_cards: { type: String },
         dialleima_eos_ora_03_cards: { type: String },
-        repo_cards: { type: Boolean, default: false },
-        adeia_cards: { type: Boolean, default: false },
-        astheneia_cards: { type: Boolean, default: false },
-        argia_cards: { type: Boolean, default: false },
-        perigrafh_argias_cards: { type: String, trim: true },
-        kathgoria_adeias_cards: { type: String, trim: true },
-        ores_ergasias_cards: { type: Number, default: 0 },
-        ores_nyxtas_cards: { type: Number, default: 0 },
-        ores_argion_cards: { type: Number, default: 0 },
-        ores_yperergasias_cards: { type: Number, default: 0 },
-        ores_yperergasias_nyxtas_cards: { type: Number, default: 0 },
-        ores_yperergasias_argion_cards: { type: Number, default: 0 },
-        ores_yperergasias_argion_nyxtas_cards: { type: Number, default: 0 },
-        ores_nominhs_yperorias_cards: { type: Number, default: 0 },
-        ores_nominhs_yperorias_nyxtas_cards: { type: Number, default: 0 },
-        ores_nominhs_yperorias_argion_cards: { type: Number, default: 0 },
-        ores_nominhs_yperorias_argion_nyxtas_cards: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_cards: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_nyxtas_cards: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_argion_cards: { type: Number, default: 0 },
-        ores_paranomhs_yperorias_argion_nyxtas_cards: { type: Number, default: 0 },
         apo_ora_01_apologistika: { type: String },
         eos_ora_01_apologistika: { type: String },
         apo_ora_02_apologistika: { type: String },

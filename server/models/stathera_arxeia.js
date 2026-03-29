@@ -831,6 +831,17 @@ const ApodoxhOysiodonOronSchema = new Schema(
 );
 const ApodoxhOysiodonOronModel = model('ApodoxhOysiodonOron', ApodoxhOysiodonOronSchema);
 
+const XronosProetoimasiasSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Xronos_Proetoimasias'
+    }
+);
+const XronosProetoimasiasModel = model('XronosProetoimasias', XronosProetoimasiasSchema);
+
 module.exports = {
     AdeiesDiamonhsModel,
     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
@@ -899,5 +910,6 @@ module.exports = {
     TypoiErgazomenonModel,
     TypoiTaytothtonModel,
     XrhseisModel,
+    XronosProetoimasiasModel,
     YphkoothtesModel
 };

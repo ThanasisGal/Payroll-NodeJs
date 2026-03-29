@@ -89,6 +89,7 @@ const eidikothtesApoKathgoriesMulti = require('../dropdowns/symbaseis/eidikothte
 const stoixeiaApoEidikothtes = require('../dropdowns/symbaseis/stoixeiaApoEidikothtes');
 
 const ypokatasthmataErganh = require('../dropdowns/erganh/ypokatasthmata');
+const xronosProetoimasias = require('../dropdowns/erganh/xronosProetoimasias');
 
 const { YpokatasthmataModel, BanksPerCompanyModel } = companiesModels;
 
@@ -140,6 +141,7 @@ const {
     TypoiEpidothseonModel,
     TypoiErgazomenonModel,
     TypoiTaytothtonModel,
+    XronosProetoimasiasModel,
     YphkoothtesModel
 } = statheraArxeiaModels;
 
@@ -519,6 +521,10 @@ router.get(
 router.get(
     '/erganh/ypokatasthmata',
     buildDropdownRoute(YpokatasthmataModel, ypokatasthmataErganh.options)
+);
+router.get(
+    '/erganh/xronosProetoimasias',
+    buildDropdownRoute(XronosProetoimasiasModel, xronosProetoimasias.options)
 );
 
 module.exports = router;

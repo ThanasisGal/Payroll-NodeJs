@@ -935,11 +935,40 @@ class erganhController {
             });
         }
     };
+
+    static mainCalcApasxolhseisPeriodoyForm = async (req, res) => {
+        const locals = {
+            title: 'Υπολογισμός Απασχολήσεων Βάσει Καρτών',
+            description: 'Web Payroll Solutions'
+        };
+
+        const companyId = req.session.companyInUse;
+        const sessionUserId = req.session.userId;
+        const sessionTeam = req.session.userTeam;
+
+        try {
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'CalcApasxolhseisPeriodoy'
+            }).exec();
+
+            res.render('ergazomenoi/programmata/calcApasxolhseisPeriodoy', {
+                userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+                locals,
+                sessionTeam: sessionTeam,
+                companyId: companyId,
+                // passwords: cleanedPasswordsData,
+                rec: {}
+            });
+        } catch (error) {
+            console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
+        }
+    };
 }
 
 async function downloadOrariaToBuffer(username, password, fromDate, toDate, pararthma) {
     const browser = await chromium.launch({
-        headless: true,
+        headless: false,
         args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
     });
 

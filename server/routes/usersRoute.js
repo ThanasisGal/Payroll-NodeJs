@@ -372,6 +372,12 @@ router.post(
     erganhController.lhpshOrarionApoKartes
 );
 
+router.get(
+    '/ergazomenoi/programmata/calcApasxolhseisPeriodoy',
+    checkAuth,
+    erganhController.mainCalcApasxolhseisPeriodoyForm
+);
+
 router.post('/ergazomenoi/programmata/delete-pdf', checkAuth, erganhController.deletePdfFile);
 router.get(
     '/ergazomenoi/programmata/exagoghOrarionSeErganh',

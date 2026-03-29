@@ -1,6 +1,6 @@
 {
     "name": "payroll_nodejs",
-    "version": "1.0.48",
+    "version": "1.0.49",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -9,7 +9,9 @@
         "postinstall": "npx playwright install --with-deps",
         "css:minify": "cleancss --inline none -o public/css/main.min.css public/css/main.css",
         "css:upload": "aws s3 cp public/css/main.min.css s3://employee-certificates-webpayrollsolutions-central/assets/own/css/main.min.css --content-type text/css --cache-control max-age=31536000 --region eu-central-1",
-        "css:deploy": "npm run css:minify && npm run css:upload"
+        "css:deploy": "npm run css:minify && npm run css:upload",
+        "import:prosop": "PHASE=2 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js",
+        "import:prosop:phase1": "PHASE=1 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js"
     },
     "keywords": [],
     "author": "",
@@ -57,6 +59,7 @@
         "socket.io": "^4.8.3",
         "sweetalert2": "11.4.8",
         "winston": "3.17.0",
+        "xlsx": "^0.18.5",
         "xmlbuilder": "15.1.1"
     },
     "overrides": {

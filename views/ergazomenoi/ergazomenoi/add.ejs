@@ -556,46 +556,6 @@
 
 </script>
 
-    <!-- 
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillHiddenBankCode.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearSelects.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/infinityScrollingSelectJQuery.js"></script> -->
-    <!-- <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearEfkaSelects.js"></script>
- -->
-
-<!-- <script nonce="<%= nonce %>" type="module">
-	// --- ΣΤΟΧΕΥΜΕΝΟ hook για το antikatastash_ergazomenoy ---
-	(function () {
-		const cb  = document.getElementById('antikatastash_ergazomenoy');
-		const ids = ['afm_antikatastath', 'amka_antikatastath']; // αν δεν υπάρχει το δεύτερο, απλώς αγνοείται
-		if (!cb) return;
-
-		function apply() {
-			const enabled = cb.checked;
-			ids.forEach(id => {
-			const el = document.getElementById(id);
-			if (!el) return;
-			// property + attribute (για να ακυρώσουμε το disabled από το markup)
-			el.disabled = !enabled;
-			if (enabled) el.removeAttribute('disabled');
-			else el.setAttribute('disabled', 'disabled');
-			// αν το κλείνουμε, καθάρισε τιμή
-			if (!enabled) {
-				if (el._flatpickr) el._flatpickr.clear();
-				else el.value = '';
-				el.dispatchEvent(new Event('change', { bubbles: true }));
-			}
-			});
-		}
-
-		cb.addEventListener('change', apply);
-		cb.addEventListener('input', apply); // για custom-styled checkboxes
-		// αρχική κατάσταση
-		apply();
-	})();
-</script> -->
-
-
 <!-- ========================================================================
 PDF UPLOAD MODAL (Shared across all sections)
 ======================================================================== -->

@@ -1,93 +1,106 @@
 <div class="tadded-container">
-  <div class="container-fluid" style="height: 100vh !important; padding: 0;">
-    <div class="menu_Links">
-      <ul style="white-space: nowrap;">
-        <li class="active" style="margin-left: 1.5rem;">Σταθερά Στοιχεία</li>
-        <li>Αποδοχές</li>
-        <li>Κρατήσεις</li>
-        <li>Αλλοδαποί</li>
-        <li>Επαγγ.Κατάρτιση</li>
-        <li>Διάφορα</li>
-        <li>Ωράριο Εργασίας</li>
-        <li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
-      </ul>
-    </div>
+    <div class="container-fluid height-vh-100 padding-0">
+    	<div class="menu_Links">
+            <ul class="white-space-nowrap">
+               	<li class="active margin-left-1_5rem margin-right-0_5rem">Σταθερά Στοιχεία</li>
+                <li>Αποδοχές</li>
+                <li>Κρατήσεις</li>
+                <li>Αλλοδαποί</li>
+                <li>Επαγγ.Κατάρτιση</li>
+                <li>Διάφορα</li>
+        		<li>Ωράριο Εργασίας</li>
+        		<li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
+      		</ul>
+    	</div>
   
-    <hr style="margin-top: -2rem; margin-bottom: 1rem;" />
+        <hr class="margin-top--2rem margin-bottom-1rem" />
 
-    <div class="sections">
-      <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-        <div>
-          <form class="formRadius">
-            <div class="card d-flex flex-column z-depth-5" style="width: 96%; margin-left: 2%; height: 80vh !important; overflow: hidden;">
+		<input type="hidden" id="calcAge" name="calcAge" value="" />
+		<input type="hidden" id="calcChildren" name="calcChildren" value="" />
+		<input type="hidden" id="calcXrhsh" name="calcXrhsh" value="<%= sessionYearInUse %>" />
+		<input type="hidden" id="createTaxScale" name="createTaxScale" value="" />
+		<input type="hidden" name="apasxolhshTisArgies" id="apasxolhshTisArgies" class="form-control input-contents" value="<%= companyData.apasxolhsh_kata_tis_argies %>" />
 
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section1') %>
+		<div class="sections">
+		    <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
+        		<div>
+          			<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+	                        <%- include('../../partials/_csrfField') %>
+						<% } %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" id="cardBody" style="background-color: #ffffff;">
-                
-                <input type="hidden" name="ergazomenoiId" id="ergazomenoiId" class="form-control input-contents" value="<%= ergazomenoiData._id %>" />
-                <input type="hidden" name="istorikoId" id="istorikoId" class="form-control input-contents" value="<%= istorikoData._id %>" />
-                <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= ergazomenoiData.team %>" />
-                <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= ergazomenoiData.company_kod %>" />
-                <input type="hidden" name="eidikhKathgoriaErgazomenoy" id="eidikhKathgoriaErgazomenoy" value="0" />
-                <input type="hidden" name="kodikosHidden" id="kodikosHidden" value="<%= ergazomenoiData.kodikos %>" />
-                <input type="hidden" name="eponymoHidden" id="eponymoHidden" value="<%= ergazomenoiData.eponymo %>" />
-                <input type="hidden" name="onomaHidden" id="onomaHidden" value="<%= ergazomenoiData.onoma %>" />
-                <input type="hidden" name="afm_ergazomenoyHidden" id="afm_ergazomenoyHidden" value="<%= ergazomenoiData.afm %>" />
-                <input type="hidden" name="amka_ergazomenoyHidden" id="amka_ergazomenoyHidden" value="<%= ergazomenoiData.amka %>" />
-                <input type="hidden" name="eidikothtaErganh" id="eidikothtaErganh" value="<%= ergazomenoiData.eidikothta_erganh %>" />
-                <input type="hidden" name="kpk_efka" id="kpk_efka_hidden" value="<%= ergazomenoiData.kpk_efka %>" />
-                <input type="hidden" name="kpk_efka_basei_symbashs_hidden" id="kpk_efka_basei_symbashs_hidden" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
-          
-         
-                <div class="accordion" id="accordion">
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/prosopikaStoixeia') %>
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section1') %>
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+					
+								<input type="hidden" name="ergazomenoiId" id="ergazomenoiId" class="form-control input-contents" value="<%= ergazomenoiData._id %>" />
+								<input type="hidden" name="istorikoId" id="istorikoId" class="form-control input-contents" value="<%= istorikoData._id %>" />
+								<input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= ergazomenoiData.team %>" />
+								<input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= ergazomenoiData.company_kod %>" />
+								<input type="hidden" name="eidikhKathgoriaErgazomenoy" id="eidikhKathgoriaErgazomenoy" value="0" />
+								<input type="hidden" name="kodikosHidden" id="kodikosHidden" value="<%= ergazomenoiData.kodikos %>" />
+								<input type="hidden" name="eponymoHidden" id="eponymoHidden" value="<%= ergazomenoiData.eponymo %>" />
+								<input type="hidden" name="onomaHidden" id="onomaHidden" value="<%= ergazomenoiData.onoma %>" />
+								<input type="hidden" name="afm_ergazomenoyHidden" id="afm_ergazomenoyHidden" value="<%= ergazomenoiData.afm %>" />
+								<input type="hidden" name="amka_ergazomenoyHidden" id="amka_ergazomenoyHidden" value="<%= ergazomenoiData.amka %>" />
+								<input type="hidden" name="eidikothtaErganh" id="eidikothtaErganh" value="<%= ergazomenoiData.eidikothta_erganh %>" />
+								<input type="hidden" name="kpk_efka" id="kpk_efka_hidden" value="<%= ergazomenoiData.kpk_efka %>" />
+								<input type="hidden" name="kpk_efka_basei_symbashs_hidden" id="kpk_efka_basei_symbashs_hidden" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
+			
+			
+								<div class="accordion" id="accordion">
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/prosopikaStoixeia') %>
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/efka') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/dypa') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
 
-                  <%- include('./partials/edit/cardBodies/section1/accordion/kentraKostoys') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/efka') %>
 
-                </div>
-              </div>
+									<%- include('./partials/edit/cardBodies/section1/accordion/dypa') %>
 
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/kentraKostoys') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+								</div>
+							</div>
 
-      <section class="sel_2_section visible" data-section="Αποδοχές">
-        <div>
-          <form class="formRadius">
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2') %>
+			<section class="sel_2_section visible" data-section="Αποδοχές">
+				<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+	                        <%- include('../../partials/_csrfField') %>
+						<% } %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="background-color: #ffffff;" >
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-                <input type="hidden" name="selectedSymbash" id="selectedSymbash" />
-                <input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
-                <input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
+              				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-                <%- include('./partials/edit/cardBodies/section2/apodoxes') %>
+                        	<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              </div>
+								<input type="hidden" name="selectedSymbash" id="selectedSymbash" />
+								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
+								<input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
 
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+                				<%- include('./partials/edit/cardBodies/section2/apodoxes') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+							</div>
+
+							<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
       <section class="sel_3_section visible" data-section="Κρατήσεις">
         <div>
@@ -217,31 +230,40 @@
 
   </div>
   
-  <% if (process.env.NODE_ENV === 'production') { %>
+    <% const isProduction = NODE_ENV === 'production'; %>
+    
+    <script nonce="<%= nonce %>">
+        window.RUNTIME_ENV = "<%= NODE_ENV %>";
+    </script>
+              
+
+
+
+  <!-- <% if (process.env.NODE_ENV === 'production') { %>
     <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_edit_ejs.min.js"></script>
   <% } else { %>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/toggleDisabledSelectViaCheckbox.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/common/toggleLabelErgazomenon.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/common/checkHlikia.js"></script>  <!-- Εμφάνιση της Ηλικίας ή της έκφρασης "ΑΝΗΛΙΚΟΣ" -->
-    <script nonce="<%= nonce %>" src="/static/js/common/totalPercentChecker.js"></script>  <!-- Έλεγχος των % των Κ.Κ. να μην υπερβαίνουν το 100% -->
+    <script nonce="<%= nonce %>" src="/static/js/common/checkHlikia.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/common/totalPercentChecker.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/editStoixeiaSymbaseon.js"></script>  <!-- Φόρτωση των στοιχείων των συμβάσεων και υπολογισμός των αναλογούντων μικτών αποδοχών -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillLabelFromInput.js"></script>  <!-- Εμφάνιση των στοιχείων των εργαζομένων στο Header της φόρμας -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/loadDropdowns_edit.js"></script>  <!-- Φόρτωση των Dropdowns της φόρμας -->
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/editStoixeiaSymbaseon.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillLabelFromInput.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/loadDropdowns_edit.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/date-sync-edit.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/afmChecker.js"></script>  <!-- Έλεγχος ορθότητας ΑΦΜ -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/amkaChecker.js"></script>  <!-- Έλεγχος ορθότητας ΑΜΚΑ -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/ibanChecker.js"></script>  <!-- Έλεγχος ορθότητας ΙΒΑΝ -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillHiddenBankCode.js"></script>  <!-- Αποθήκευση του κωδικού Τράπεζας -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/calcProyphresia.js"></script>  <!-- Υπολογισμός Προϋπηρεσίας και Μισθολογικού Κλιμακίου -->
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/afmChecker.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/amkaChecker.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/ibanChecker.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/fillHiddenBankCode.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/calcProyphresia.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/infinityScrollingSelectJQuery.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearEfkaSelects.js"></script>  <!-- Καθαρισμός των selects ΕΦΚΑ και επαναφορά του ΚΠΚ αν είχε οριστεί προηγουμένως Ειδική Περίπτωση Ασφάλισης -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/editKrathseis.js"></script>  <!-- Φόρτωση των selects των Κρατήσεων -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearSelects.js"></script>  <!-- Καθαρισμός των selects των Συμβάσεων και των Κρατήσεων -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/reCalcApodoxes_Edit.js"></script>  <!-- Επανυπολογισμός των Αποδοχών -->
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script><!-- Εμφάνιση των ημερών απασχόλησης (Δε, Τρ...) και έλεγχος των ημερών αργίας -->
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearEfkaSelects.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/editKrathseis.js"></script>  
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/clearSelects.js"></script>  
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/reCalcApodoxes_Edit.js"></script>
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRepo.js"></script>
-    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs.js"></script>  <!-- Έλεγχος για το αν η ημ/νια αλλαγής σύμβασης είναι μικρότερη απ' την ημ/νία πρόσληψης -->
+    <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/putInputValuesToHiddenValues.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/calcOresApasxolhshs.js"></script>
     <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/putFieldValues.js"></script>
@@ -258,4 +280,334 @@
     endDateInput.focus();
     patronymo.focus();
   });
+</script> -->
+
+<%
+	// Helper function μόνο για αυτό το template
+	function moduleUrl(path) {
+		const isProd = NODE_ENV === 'production';
+		
+		if (isProd) {
+			return `https://cdn.webpayrollsolutions.com/static/min.js/${path}.js`;
+		} else {
+			return `/static/js/${path}.js`;
+		}
+	}
+%>
+
+<!-- ✅ Import Map Definition -->
+<script type="importmap" nonce="<%= nonce %>">
+	{
+		"imports": {
+			"apodoxes-calculations": "<%= moduleUrl('modules/apodoxesCalculations') %>",
+	        "dependent-select-toggle": "<%= moduleUrl('common/dependentSelectToggle') %>"
+		}
+	}
 </script>
+
+    <script src="<%= script('ergazomenoi/genika/toggleDisabledSelectViaCheckbox') %>"></script>
+    <script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
+    <script src="<%= script('common/checkHlikia') %>"></script>
+    <script src="<%= script('common/totalPercentChecker') %>"></script>
+    <script src="<%= script('common/scrollToTop') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/editStoixeiaSymbaseon') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>></script>
+    <script src="<%= script('ergazomenoi/genika/loadDropdowns_edit') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/date-sync-edit') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/afmChecker') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/amkaChecker') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/ibanChecker') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/fillHiddenBankCode') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/infinityScrollingSelectJQuery') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/clearEfkaSelects') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/editKrathseis') %>"></script>  
+    <script src="<%= script('ergazomenoi/genika/clearSelects') %>"></script>  
+    <script src="<%= script('ergazomenoi/genika/reCalcApodoxes_Edit') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/getDaysFromDate') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/selectRepo') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/checkHmeromhniaAllaghsSymbashs') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/calcOresApasxolhshs') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/putFieldValues') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/manipulateIstorikoModel') %>"></script>
+    <script src="<%= script('ergazomenoi/genika/toggleDisabledInputViaCheckbox') %>"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script nonce="<%= nonce %>" type="module">
+    import { bindCheckboxControlsSelect } from 'dependent-select-toggle';
+
+	// Συγγένεια
+    bindCheckboxControlsSelect({
+        checkboxId: 'syggeneia',
+        selectId  : 'syggenikh_sxesh',
+        hiddenId  : 'syggenikh_sxesh_stathera',
+
+		labelIds: [
+			'syggenikh_sxesh_label'
+		],
+
+		clearOnDisable: true,
+	});
+
+    // Αφορά δανεισμό εργαζομένου
+    bindCheckboxControlsSelect({
+        checkboxId: 'afora_daneismo_ergazomenoy',
+        selectId  : 'typos_daneismoy',
+        hiddenId  : 'typos_daneismoy_stathera',
+        
+		extraFieldIds: [
+            'hmnia_enarxhs_daneismoy',
+            'hmnia_lhxhs_daneismoy'
+        ],
+
+		labelIds: [
+			'typos_daneismoy_label',
+			'hmnia_enarxhs_daneismoy_label',
+			'hmnia_lhxhs_daneismoy_label'
+		],
+
+		clearOnDisable: true,
+    });
+
+    // Ασφαλιστική κλάση
+    bindCheckboxControlsSelect({
+        checkboxId: 'asfalish_me_tekmarta',
+        selectId  : 'asfalistikh_klash',
+        hiddenId  : 'asfalistikh_klash_stathera',
+
+		labelIds: [
+			'asfalistikh_klash_label'
+		],
+		
+		clearOnDisable: true,
+    });
+
+	// Μείωση Εργατικής Εισφοράς
+    bindCheckboxControlsSelect({
+        checkboxId: 'meiosh_eisforon_ergazomenon',
+        selectId  : 'meiosh_ergatikhs_eisforas',
+        hiddenId  : 'kodikos_meioshs_stathera'
+    });
+
+	// Επιδότηση Εργοδοτικής Εισφοράς
+    bindCheckboxControlsSelect({
+        checkboxId: 'epidothsh_eisforon_ergodoth',
+        selectId  : 'epidothsh_ergodotikhs_eisforas',
+        hiddenId  : 'kodikos_epidothshs_stathera'
+    });
+
+	// Μείωση Εισφορών Μητέρων
+    bindCheckboxControlsSelect({
+        checkboxId: 'mhteres',
+        selectId  : 'meiosh_eisforas_mhteron',
+        hiddenId  : 'kodikos_meioshs_eisforon_mhteron_stathera'
+    });
+
+
+    // Λήψη επιδόματος ανεργίας
+    bindCheckboxControlsSelect({
+        checkboxId: 'epidoma_anergias',
+        selectId  : 'dypa',
+        hiddenId  : 'dypa_stathera',
+
+		
+		labelIds: [
+			'dypa_label'
+		],
+		
+		clearOnDisable: true,
+
+    });
+
+    // Τοποθέτηση με Πρόγραμμα
+    bindCheckboxControlsSelect({
+        checkboxId: 'topothethsh_me_programma',
+        selectId  : 'programma_dypa',
+        hiddenId  : 'programma_dypa_stathera',
+        
+		extraFieldIds: [
+            'ypoxreotikh_ek_toy_nomoy_katartish',
+            'egkritikh_apofash_dypa',
+            'hmeromhnia_enarxhs_programmatos',
+            'hmeromhnia_lhxhs_programmatos'
+        ],
+
+		labelIds: [
+			'ypoxreotikh_ek_toy_nomoy_katartish_label',
+			'programma_dypa_label',
+			'egkritikh_apofash_dypa_label',
+			'hmeromhnia_enarxhs_programmatos_label',
+			'hmeromhnia_lhxhs_programmatos_label',
+			'gotoProgrammaDypa'
+		],
+
+
+		clearOnDisable: true,
+    });
+
+    // Αδεια Διαμονής με Άμεση Πρόσβαση για Εργασία
+    bindCheckboxControlsSelect({
+        checkboxId: 'adeia_diamonhs_me_amesh_prosbash_gia_ergasia',
+        selectId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
+        hiddenId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera',
+
+        extraFieldIds: [
+            'arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
+            'hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia'
+        ],
+	    
+		clearOnDisable: true,
+    });
+
+    // Αδεια Διαμονής χωρίς Άμεση Πρόσβαση για Εργασία
+    bindCheckboxControlsSelect({
+        checkboxId: 'adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+        selectId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+        hiddenId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera',
+
+        extraFieldIds: [
+            'arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+            'hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia'
+        ],
+    	
+		clearOnDisable: true,
+    });
+
+    // Θεματικό Πεδίο Επαγγελματικής Κατάρτισης
+    bindCheckboxControlsSelect({
+        checkboxId: 'epaggelmatikh_katartish',
+        selectId  : 'thematiko_pedio',
+        hiddenId  : 'thematiko_pedio_stathera',
+
+        // ✅ ΝΕΟ:  Cascading selects που θα enable/disable μαζί
+        cascadingSelectIds: [
+            'thematikh_enothta',
+            'foreas_katartishs'
+        ],
+        
+        clearOnDisable: true,
+    });
+
+</script>
+
+<!-- ========================================================================
+PDF UPLOAD MODAL (Shared across all sections)
+======================================================================== -->
+<div id="pdfUploadModal" class="pdf-modal hidden">
+    <div class="pdf-modal-content">
+        <div class="pdf-modal-header">
+            <h3 id="pdfModalTitle">Μεταφόρτωση Αρχείου PDF</h3>
+            <button type="button" class="pdf-modal-close" id="closePdfModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <div class="pdf-modal-body">
+            <!-- Drag & Drop Zone -->
+            <div id="pdfDropZone" class="pdf-drop-zone">
+                <div class="pdf-drop-zone-content">
+                    <i class="bi bi-file-earmark-pdf pdf-drop-icon"></i>
+                    <h4>Σύρετε το PDF εδώ</h4>
+                    <p>ή κάντε κλικ για επιλογή</p>
+                    <small class="text-muted">Μέγιστο μέγεθος: 10MB</small>
+                </div>
+                <input 
+                    type="file" 
+                    id="pdfFileInput" 
+                    name="pdfFile" 
+                    accept=".pdf,application/pdf" 
+                    class="hidden" 
+                />
+            </div>
+            
+            <!-- File Preview -->
+            <div id="pdfFilePreview" class="pdf-file-preview hidden">
+                <div class="pdf-file-info">
+                    <i class="bi bi-file-earmark-pdf text-danger pdf-file-icon"></i>
+                    <div class="pdf-file-details">
+                        <strong id="pdfFileName"></strong>
+                        <small id="pdfFileSize" class="text-muted"></small>
+                    </div>
+                    <button type="button" id="removePdfFile" class="pdf-btn-remove">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                
+                <!-- Preview Button -->
+                <div class="pdf-preview-actions">
+                    <button type="button" id="showPdfPreview" class="btn btn-info btn-sm">
+                        <i class="bi bi-eye"></i> Προεπισκόπηση
+                    </button>
+                </div>
+                
+                <div class="pdf-progress hidden" id="pdfProgressBar">
+                    <div class="pdf-progress-fill" id="pdfProgressFill"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="pdf-modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancelPdfUpload">Ακύρωση</button>
+            <button type="button" class="btn btn-success" id="confirmPdfUpload" disabled>Αποθήκευση</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================
+PDF PREVIEW MODAL (Contract Preview & Download)
+======================================================================== -->
+<div id="pdfPreviewContractModal" class="pdf-modal hidden">
+    <div class="pdf-modal-content pdf-preview-modal-large">
+        <div class="pdf-modal-header">
+            <h3>📄 Σύμβαση Εργαζόμενου</h3>
+            <button type="button" class="pdf-modal-close" id="closePdfPreviewModal">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <div class="pdf-modal-body pdf-preview-body">
+            <!-- PDF Preview iframe -->
+            <iframe
+                id="pdfPreviewIframe"
+                class="pdf-preview-iframe"
+                title="Contract PDF Preview"
+            ></iframe>
+            
+            <!-- Loading spinner -->
+            <div id="pdfPreviewLoading" class="pdf-preview-loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Φόρτωση...</span>
+                </div>
+                <p>Φόρτωση PDF...</p>
+            </div>
+        </div>
+        
+        <div class="pdf-modal-footer">
+            <button type="button" class="btn btn-secondary" id="skipPdfDownload">
+                Παράλειψη
+            </button>
+            
+            <button type="button" class="btn btn-info" id="downloadAndEmail" disabled>
+                <i class="bi bi-envelope-arrow-down"></i> Λήψη & Αποστολή Email
+            </button>
+            
+            <button type="button" class="btn btn-success" id="downloadAndContinue">
+                <i class="bi bi-download"></i> Λήψη PDF & Συνέχεια
+            </button>
+        </div>
+    </div>
+</div>

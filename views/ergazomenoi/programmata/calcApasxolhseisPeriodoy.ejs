@@ -6,11 +6,11 @@
 
         <div class="card-header p-0 height-rem-3_5">
             <label class="headers-content">
-                Λήψη Ωρών Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ
+                Υπολογισμός Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ
             </label>
         </div>
 
-        <div class="card-body overflow-auto flex-grow-1 height-vh-31 bg-white">
+        <div class="card-body overflow-auto flex-grow-1 height-vh-33 bg-white">
             <% const safe = (k) => (rec && rec[k]) || ''; %>
 
             <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
@@ -80,6 +80,45 @@
                     <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
                 </div>
             </div>
+
+            <div class="row form-group g-3 align-items-center mb-4"></div>
+
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align mt-n-0-15">
+                    <label for="xronosProetoimasias" class="col-form-label label-font-size-smaller">
+                        Πρόωρη Προσέλευση
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="xronosProetoimasias_stathera"
+                    id="xronosProetoimasias_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('xronosProetoimasias_stathera') %>"
+                    readonly
+                />
+
+                <div class="col-3-15 mt-2">
+                    <select
+                        id="xronosProetoimasias"
+                        name="xronosProetoimasias"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Υποκατάστημα"
+                        data-api="/api/dropdown/erganh/xronosProetoimasias"
+                        single
+                        data-target-input="xronosProetoimasias_stathera"
+                        data-preselect="xronosProetoimasias_stathera"
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="">
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div class="card-footer">
@@ -87,9 +126,9 @@
                 <button 
                     type="button" 
                     class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" 
-                    name="downloadCardsButton" 
-                    id="downloadCardsButton">
-                    <i class="bi bi-download"></i> Λήψη
+                    name="calcApasxolhseonButton" 
+                    id="calcApasxolhseonButton">
+                    <i class="bi bi-person-gear"></i> Υπολογισμός
                 </button>
                         
                 <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp">
