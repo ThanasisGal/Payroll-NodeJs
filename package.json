@@ -48,7 +48,7 @@
         "method-override": "3.0.0",
         "mongoose": "8.13.2",
         "multer": "^2.0.2",
-        "nodemailer": "^7.0.10",
+        "nodemailer": "^8.0.4",
         "pdf-lib": "1.17.1",
         "pdfjs-dist": "4.8.69",
         "pdfkit": "0.17.0",
@@ -59,7 +59,6 @@
         "socket.io": "^4.8.3",
         "sweetalert2": "11.4.8",
         "winston": "3.17.0",
-        "xlsx": "^0.18.5",
         "xmlbuilder": "15.1.1"
     },
     "overrides": {

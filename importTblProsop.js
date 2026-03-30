@@ -1,21 +1,31 @@
 require('dotenv').config();
-const xlsx = require('xlsx');
+const ExcelJS = require('exceljs');
 const mongoose = require('mongoose');
 const path = require('path');
 
 // ── Εισαγωγή του υπάρχοντος Model (ΟΧΙ νέο Schema) ───────────────────────────
 const { ErgazomenoiModel } = require('./server/models/ergazomenoi');
 
+// ── Βοηθητική: αριθμός στήλης → γράμμα (1→A, 2→B, 27→AA κλπ) ───────────────
+function columnIndexToLetter(index) {
+    let letter = '';
+    while (index > 0) {
+        const mod = (index - 1) % 26;
+        letter = String.fromCharCode(65 + mod) + letter;
+        index = Math.floor((index - 1) / 26);
+    }
+    return letter;
+}
+
 // ── Βοηθητικές συναρτήσεις ────────────────────────────────────────────────────
 
-/** Excel serial date ή string → JS Date */
+/** ExcelJS επιστρέφει ήδη JS Date για ημερομηνίες — απλά χειριζόμαστε strings */
 function excelDateToJS(value) {
     if (!value && value !== 0) return null;
-    if (typeof value === 'number') {
-        const date = xlsx.SSF.parse_date_code(value);
-        if (!date) return null;
-        return new Date(date.y, date.m - 1, date.d);
-    }
+
+    // ✅ exceljs επιστρέφει ήδη Date object
+    if (value instanceof Date) return value;
+
     if (typeof value === 'string') {
         const trimmed = value.trim();
         if (!trimmed) return null;
@@ -35,7 +45,12 @@ function excelDateToJS(value) {
         const parsed = new Date(trimmed);
         return isNaN(parsed.getTime()) ? null : parsed;
     }
-    if (value instanceof Date) return value;
+
+    // ✅ exceljs RichText object
+    if (typeof value === 'object' && value.text) {
+        return excelDateToJS(value.text);
+    }
+
     return null;
 }
 
@@ -53,6 +68,10 @@ function toBoolean(value) {
 /** Οποιαδήποτε τιμή → trimmed string ή undefined */
 function toStr(value) {
     if (value === null || value === undefined) return undefined;
+    // ✅ exceljs RichText object
+    if (typeof value === 'object' && value.text) return String(value.text).trim() || undefined;
+    // ✅ exceljs formula result
+    if (typeof value === 'object' && value.result !== undefined) return toStr(value.result);
     const s = String(value).trim();
     return s === '' ? undefined : s;
 }
@@ -60,6 +79,8 @@ function toStr(value) {
 /** Οποιαδήποτε τιμή → αριθμός ή 0 */
 function toNum(value) {
     if (value === null || value === undefined || value === '') return 0;
+    // ✅ exceljs formula result
+    if (typeof value === 'object' && value.result !== undefined) return toNum(value.result);
     const n = Number(value);
     return isNaN(n) ? 0 : n;
 }
@@ -77,16 +98,6 @@ function printColumns(allRows) {
     console.log('────────────────────────────────────────────────────────────────────\n');
 }
 
-// ── MAPPING: Γράμμα στήλης Excel → πεδίο ErgazomenoiModel ───────────────────
-// ⚠️  Μετά το PHASE=1, αντικατέστησε τα γράμματα με τα ΠΡΑΓΜΑΤΙΚΑ
-//     γράμματα που είδες στην έξοδο.
-//
-//     Πίνακας αντιστοίχισης αριθμού → γράμμα:
-//     1=A  2=B  3=C  4=D  5=E  6=F  7=G  8=H  9=I  10=J
-//     11=K 12=L 13=M 14=N 15=O 16=P 17=Q 18=R 19=S 20=T
-//     21=U 22=V 23=W 24=X 25=Y 26=Z 27=AA 28=AB ... 52=AZ
-//     53=BA 54=BB 55=BC ... 78=BZ 79=CA ...
-
 function getKodKlimakas(row) {
     const today = new Date('2026-03-28');
     const birthDate = new Date(excelDateToJS(row['H']));
@@ -98,7 +109,7 @@ function getKodKlimakas(row) {
 
 function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
     return {
-        // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
+        // ── Ταυτότητα εταιρείας ────────────────────────────────────────────���──
         team: 'BLG',
         company_kod: '69c574ff25255bcae152f16f',
         kodikos: toStr(row['C']),
@@ -195,16 +206,12 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
             : '1',
         proyphresia_se_eth: Math.floor(toNum(row['X'])),
         proyphresia_se_mhnes: Math.round(parseFloat((toNum(row['X']) % 1).toFixed(2)) * 100),
-        // proyphresia_adeias_se_eth: toNum(row['BC']),
-        // synolo_proyphresias_se_eth: toNum(row['BD']),
-        // synolo_proyphresias_se_mhnes: toNum(row['BE']),
         misthologiko_klimakio: toNum(row['Z']),
         syggeneia: false,
         syggenikh_sxesh: '',
         thesh_eythynhs: '1',
         eidikh_periptosh: '',
         topos_ergasias: false,
-        // topos_ergasias: toBoolean(row['BK']),
         topos_ergasias_parathrhseis: '',
         xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
         efarmostea_sse: true,
@@ -260,7 +267,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         epa_efka: toStr(row['AZ']),
         prosthetes_asfalistikes_apodoxes: '',
 
-        // ── Μειώσεις / Επιδοτήσεις εισφορών ──────────────────────────────────
+        // ── Μειώσεις / Επιδοτήσεις εισφορών ───��──────────────────────────────
         meiosh_eisforon_ergazomenon: false,
         kodikos_meioshs: '',
         pososto_asfalismenoy_meioshs: 0,
@@ -299,13 +306,13 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         amka_antikatastath: '',
 
         // ── Κέντρα κόστους ────────────────────────────────────────────────────
-        kentro_kostoys_1: toStr(row['BG']).padStart(4, '0'),
+        kentro_kostoys_1: toStr(row['BG'])?.padStart(4, '0'),
         pososto_apasxolhshs_kk1: toNum(row['BH']),
-        kentro_kostoys_2: toStr(row['BI']).padStart(4, '0'),
+        kentro_kostoys_2: toStr(row['BI'])?.padStart(4, '0'),
         pososto_apasxolhshs_kk2: toNum(row['BJ']),
-        kentro_kostoys_3: toStr(row['BK']).padStart(4, '0'),
+        kentro_kostoys_3: toStr(row['BK'])?.padStart(4, '0'),
         pososto_apasxolhshs_kk3: toNum(row['BL']),
-        kentro_kostoys_4: toStr(row['BM']).padStart(4, '0'),
+        kentro_kostoys_4: toStr(row['BM'])?.padStart(4, '0'),
         pososto_apasxolhshs_kk4: toNum(row['BN']),
 
         // ── Κατάσταση εργαζόμενου ─────────────────────────────────────────────
@@ -320,18 +327,31 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
 // ── Κύρια συνάρτηση ───────────────────────────────────────────────────────────
 async function main() {
     const PHASE = process.env.PHASE || '1';
-
-    // 1. Φόρτωση Excel
     const FILE_PATH = path.resolve(process.env.EXCEL_PATH || './tblProsop.xlsx');
-    const workbook = xlsx.readFile(FILE_PATH);
-    const sheetName = process.env.SHEET_NAME || workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
 
-    const allRows = xlsx.utils.sheet_to_json(sheet, { defval: null, header: 'A' });
-    const dataRows = allRows.slice(1); // αφαίρεση γραμμής headers
+    // ── Φόρτωση Excel με ExcelJS ──────────────────────────────────────────────
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(FILE_PATH);
+
+    const sheetName = process.env.SHEET_NAME || workbook.worksheets[0].name;
+    const worksheet = workbook.getWorksheet(sheetName);
 
     console.log(`\n📄  File  : ${FILE_PATH}`);
     console.log(`📄  Sheet : "${sheetName}"`);
+
+    // ── Μετατροπή σε array of objects με γράμμα στήλης ως key ────────────────
+    const allRows = [];
+    worksheet.eachRow({ includeEmpty: true }, (row) => {
+        const rowObj = {};
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            const colLetter = columnIndexToLetter(colNumber);
+            // ✅ Χρησιμοποίησε την πραγματική τιμή (όχι formula string)
+            rowObj[colLetter] = cell.value;
+        });
+        allRows.push(rowObj);
+    });
+
+    const dataRows = allRows.slice(1); // αφαίρεση γραμμής headers
     console.log(`📊  Γραμμές δεδομένων: ${dataRows.length}`);
 
     // ── PHASE 1: Μόνο εμφάνιση στηλών ────────────────────────────────────────
@@ -342,7 +362,7 @@ async function main() {
         return;
     }
 
-    // ── PHASE 2: Εισαγωγή στο MongoDB Atlas ──────────────────────────────────
+    // ── PHASE 2: Εισαγωγή στο MongoDB ────────────────────────────────────────
     const MONGO_URI = process.env.MONGODB_URL;
     if (!MONGO_URI) {
         console.error('❌  Δεν βρέθηκε MONGODB_URL στο .env');
@@ -373,8 +393,8 @@ async function main() {
         try {
             const result = await ErgazomenoiModel.updateOne(
                 {
-                    amka: doc.amka, // ← κύριο κλειδί
-                    company_kod: doc.company_kod // ← + εταιρεία
+                    amka: doc.amka,
+                    company_kod: doc.company_kod
                 },
                 { $set: doc },
                 { upsert: true }
