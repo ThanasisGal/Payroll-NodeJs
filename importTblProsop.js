@@ -6,7 +6,7 @@ const path = require('path');
 // ── Εισαγωγή του υπάρχοντος Model (ΟΧΙ νέο Schema) ───────────────────────────
 const { ErgazomenoiModel } = require('./server/models/ergazomenoi');
 
-// ── Βοηθητική: αριθμός στήλης → γράμμα (1→A, 2→B, 27→AA κλπ) ───────────────
+// ── Βοηθητική: αριθμός στήλης → γράμμα (1���A, 2→B, 27→AA κλπ) ───────────────
 function columnIndexToLetter(index) {
     let letter = '';
     while (index > 0) {
@@ -23,7 +23,6 @@ function columnIndexToLetter(index) {
 function excelDateToJS(value) {
     if (!value && value !== 0) return null;
 
-    // ✅ exceljs επιστρέφει ήδη Date object
     if (value instanceof Date) return value;
 
     if (typeof value === 'string') {
@@ -46,7 +45,6 @@ function excelDateToJS(value) {
         return isNaN(parsed.getTime()) ? null : parsed;
     }
 
-    // ✅ exceljs RichText object
     if (typeof value === 'object' && value.text) {
         return excelDateToJS(value.text);
     }
@@ -68,9 +66,7 @@ function toBoolean(value) {
 /** Οποιαδήποτε τιμή → trimmed string ή undefined */
 function toStr(value) {
     if (value === null || value === undefined) return undefined;
-    // ✅ exceljs RichText object
     if (typeof value === 'object' && value.text) return String(value.text).trim() || undefined;
-    // ✅ exceljs formula result
     if (typeof value === 'object' && value.result !== undefined) return toStr(value.result);
     const s = String(value).trim();
     return s === '' ? undefined : s;
@@ -79,7 +75,6 @@ function toStr(value) {
 /** Οποιαδήποτε τιμή → αριθμός ή 0 */
 function toNum(value) {
     if (value === null || value === undefined || value === '') return 0;
-    // ✅ exceljs formula result
     if (typeof value === 'object' && value.result !== undefined) return toNum(value.result);
     const n = Number(value);
     return isNaN(n) ? 0 : n;
@@ -104,12 +99,68 @@ function getKodKlimakas(row) {
     const age = Math.floor((today - birthDate) / (1000 * 60 * 60 * 24 * 365.25));
 
     const klimaka = age <= 25 ? '00' : age < 30 ? '01' : '02';
-    return klimaka + String(row['AO']).padStart(2, '0');
+    return klimaka + String(mapArithmosTéknon(row['AO'])).padStart(2, '0');
+}
+
+function mapOikogeneiakhKatastash(value) {
+    const n = toNum(value);
+    if (n === 1) return '0';
+    if (n > 1 && n < 9) return '1';
+    if (n > 13 && n < 22) return '2';
+    if (n > 21 && n < 30) return '3';
+    return null; // ή '' αν θέλεις κενό string για τις υπόλοιπες τιμές
+}
+
+function mapArithmosTéknon(value) {
+    const n = toNum(value);
+    if ([1, 2, 14, 22].includes(n)) return 0;
+    if ([3, 15, 23].includes(n)) return 1;
+    if ([4, 16, 24].includes(n)) return 2;
+    if ([5, 17, 25].includes(n)) return 3;
+    if ([6, 18, 26].includes(n)) return 4;
+    if ([7, 19, 27].includes(n)) return 5;
+    if ([8, 20, 28].includes(n)) return 6;
+    return 0; // default
+}
+
+// ── Map τιμών → κωδικών ──────────────────────────────────────────────────────
+const STOIXEIO_MAP = {
+    3: '0003',
+    164: '0004',
+    165: '0005',
+    166: '0006',
+    178: '0007',
+    179: '0008',
+    180: '0009',
+    181: '0011',
+    478: '0010',
+    33: '0010'
+};
+
+// ── Helper function ───────────────────────────────────────────────────────────
+function mapStoixeio(value) {
+    if (value === 0 || value === null || value === undefined) return '';
+    return STOIXEIO_MAP[value] ?? '';
+}
+
+// ── Βοηθητική για ημερομηνία με έλεγχο 1900-01-01 ────────────────────────────
+function safeDate(value) {
+    const d = excelDateToJS(value);
+    if (!d) return null;
+    return d.toISOString().startsWith('1900-01-01') ? null : d;
 }
 
 function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
+    // ── Stoixeia Symbashs (BZ→03, CA→04, CB→05, CC→06, CD→07, CE→08, CF→09, CG→10, CH→11) ──
+    const SYMBASHS_COLS = ['BZ', 'CA', 'CB', 'CC', 'CD', 'CE', 'CF', 'CG', 'CH'];
+    const stoixeia = {};
+    SYMBASHS_COLS.forEach((col, index) => {
+        const fieldIndex = String(index + 3).padStart(2, '0'); // '03','04',...,'11'
+        stoixeia[`stoixeio_symbashs_${fieldIndex}`] = mapStoixeio(row[col]);
+    });
+
     return {
-        // ── Ταυτότητα εταιρείας ────────────────────────────────────────────���──
+        // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
         team: 'BLG',
         company_kod: '69c574ff25255bcae152f16f',
         kodikos: toStr(row['C']),
@@ -123,10 +174,8 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         patronymo: toStr(row['F']),
         eponymo_mhteras: toStr(row['FK']),
         mhtronymo: toStr(row['G']),
-        fylo: row['EC'] === 1 ? false : row['NC'] === 2 ? true : null,
-        hmeromhnia_gennhshs: excelDateToJS(row['H'])?.toISOString().startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['H']),
+        fylo: row['EC'] === 1 ? false : true,
+        hmeromhnia_gennhshs: safeDate(row['H']),
         topos_gennhshs: toStr(row['I']),
         yphkoothta: toStr(row['J']),
         arithmos_bibliarioy_anhlikoy: toStr(row['FZ']),
@@ -134,9 +183,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         // ── Ταυτότητα / Διαβατήριο ────────────────────────────────────────────
         typos_taytothtas: toStr(row['FL']),
         adt: toStr(row['L']),
-        hmeromhnia_ekdoshs: excelDateToJS(row['N'])?.toISOString().startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['NW']),
+        hmeromhnia_ekdoshs: safeDate(row['NW']),
         hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: excelDateToJS(row['FS']),
         arxh_ekdoshs: toStr(row['M']),
         doy: row['S'] != 0 ? toStr(row['S']) : '',
@@ -144,7 +191,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
 
         // ── Επικοινωνία ───────────────────────────────────────────────────────
         email: toStr(row['FR']),
-        thlefono: toStr(row['Y']),
+        thlefono: toStr(row['R']),
         odos: toStr(row['O']),
         arithmos: toStr(row['FZ']),
         tk: toStr(row['Q']),
@@ -154,8 +201,8 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         perifereia: toStr(row['FZ']),
 
         // ── Οικογενειακή κατάσταση ────────────────────────────────────────────
-        oikogeneiakh_katastash: toStr(row['AG']),
-        arithmos_teknon: toNum(row['AH']),
+        oikogeneiakh_katastash: mapOikogeneiakhKatastash(row['AO']),
+        arithmos_teknon: mapArithmosTéknon(row['AO']),
         eidikh_kathgoria_ergazomenoy: '0009',
 
         // ── Εκπαίδευση ────────────────────────────────────────────────────────
@@ -166,28 +213,14 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         iban: toStr(row['BC']),
 
         // ── Εργασιακά - Ημερομηνίες ───────────────────────────────────────────
-        hmeromhnia_proslhpshs: excelDateToJS(row['U'])?.toISOString().startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['U']),
-        hmeromhnia_allaghs_symbashs: excelDateToJS(row['AN'])
-            ?.toISOString()
-            .startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['AN']),
-        hmeromhnia_allaghs_orarioy_apo: excelDateToJS(row['U'])
-            ?.toISOString()
-            .startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['U']),
+        hmeromhnia_proslhpshs: safeDate(row['U']),
+        hmeromhnia_allaghs_symbashs: safeDate(row['V']),
+        hmeromhnia_allaghs_orarioy_apo: safeDate(row['U']),
         hmeromhnia_allaghs_orarioy_eos: excelDateToJS(
             new Date(new Date(row['U']).getTime() + 7 * 24 * 60 * 60 * 1000)
         ),
-        hmeromhnia_lhxhs_symbashs: excelDateToJS(row['BT'])?.toISOString().startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['BT']),
-        hmeromhnia_apoxorhshs: excelDateToJS(row['W'])?.toISOString().startsWith('1900-01-01')
-            ? null
-            : excelDateToJS(row['W']),
+        hmeromhnia_lhxhs_symbashs: safeDate(row['BT']),
+        hmeromhnia_apoxorhshs: safeDate(row['W']),
 
         // ── Δανεισμός ─────────────────────────────────────────────────────────
         afora_daneismo_ergazomenoy: false,
@@ -201,9 +234,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
 
         // ── Σχέση εργασίας ────────────────────────────────────────────────────
         kathestos_apasxolhshs: toStr(row['AB'] === -1 ? 0 : row['AB'] === 0 ? 1 : row['AB']),
-        sxesh_ergasias: excelDateToJS(row['BT'])?.toISOString().startsWith('1900-01-01')
-            ? '0'
-            : '1',
+        sxesh_ergasias: safeDate(row['BT']) ? '1' : '0',
         proyphresia_se_eth: Math.floor(toNum(row['X'])),
         proyphresia_se_mhnes: Math.round(parseFloat((toNum(row['X']) % 1).toFixed(2)) * 100),
         misthologiko_klimakio: toNum(row['Z']),
@@ -212,13 +243,14 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         thesh_eythynhs: '1',
         eidikh_periptosh: '',
         topos_ergasias: false,
-        topos_ergasias_parathrhseis: '',
-        xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
+        topos_ergasias_parathrhseis:
+            'Η ΕΔΡΑ ΤΟΥ ΕΡΓΟΔΟΤΗ ΚΑΘΩΣ ΚΑΙ ΑΛΛΗ ΠΕΡΙΟΧΗ ΕΝΤΟΣ ΤΗΣ ΕΛΛΗΝΙΚΗΣ ΕΠΙΚΡΑΤΕΙΑΣ, ΟΠΟΥ Ο ΕΡΓΟΔΟΤΗΣ ΔΙΑΤΗΡΕΙ Ή ΘΑ ΔΙΑΤΗΡΕΙ ΣΤΟ ΜΕΛΛΟΝ ΕΓΚΑΤΑΣΤΑΣΕΙΣ.',
+        xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΝΘΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
         efarmostea_sse: true,
         efarmostea_sse_parathrhseis: 'Σ.Σ.Ε. ΞΕΝΟΔΟΧΟΫΠΑΛΛΗΛΩΝ ΟΛΗΣ ΤΗΣ ΧΩΡΑΣ',
 
         // ── Ωράριο ────────────────────────────────────────────────────────────
-        plhrhs_apasxolhsh: toBoolean(row['AB']),
+        plhrhs_apasxolhsh: row['AB'] === -1 ? true : false,
         mh_problepsimo_programma: false,
         hmeres_ores_anaforas: null,
         eidopoihsh_prin_thn_anathesh: null,
@@ -228,7 +260,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         hmnia_lhxhs_dieythethshs_ergasias: null,
         hmeres_ergasias_ebdomadas: toNum(row['AC']),
         ores_ergasias_ebdomadas: toNum(row['AD']),
-        mo_oron_hmerhsias_ergasias: toNum(row['BZ']),
+        mo_oron_hmerhsias_ergasias: parseFloat((toNum(row['AD']) / toNum(row['AC'])).toFixed(4)),
         dialleima_se_lepta: 30,
         dialleima_entos_ektos_orarioy: false,
         symbatikes_ores_ergasias: 40,
@@ -240,18 +272,18 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         evelikth_proselefsh: 120,
         apasxolhsh_gia_proth_fora: false,
         ora_enarxhs_proths_foras: '07:00',
-        ora_apoxorhshs_proths_foras: '14:00',
+        ora_apoxorhshs_proths_foras: '15:00',
         asfalish_me_tekmarta: false,
         asfalistikh_klash: '',
         epoxikos: row['AL'] === -1 ? true : false,
 
-        // ── Οργανόγραμμα ─────────────────────────────────────────────────────
-        tmhma: toStr(row['CP']),
+        // ── Οργανόγραμμα ──────────────────────────────────────────────────────
+        tmhma: '',
         eidikothta_erganh: toStr(row['FQ']),
         antikeimeno_ergasion: '',
-        typos_ergazomenon: toStr(row['AS']),
+        typos_ergazomenon: row['AS'] === 1 ? 'Μ' : 'Η',
         ypokatasthma: String(row['AV']).padStart(4, '0'),
-        xxarakthrismos_ergazomenon: row['AR'] === 1000 ? 'Μ' : 'Η',
+        xarakthrismos_ergazomenon: row['AR'] === 1000 ? true : false,
         eidikothta: toStr(row['AP']),
         diathesimothta: false,
         enarxh_diathesimothtaxs: null,
@@ -262,12 +294,12 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         foreas_epikoyrikhs_asfalishs: '001',
         kad_efka: toStr(row['AW']),
         eidikothta_efka: toStr(row['AX']),
-        kpk_efka: toStr(row['AY']).padStart(4, '0'),
+        kpk_efka: toStr(row['AY'])?.padStart(4, '0'),
         kpk_efka_basei_symbashs: toStr(row['AY']),
         epa_efka: toStr(row['AZ']),
         prosthetes_asfalistikes_apodoxes: '',
 
-        // ── Μειώσεις / Επιδοτήσεις εισφορών ───��──────────────────────────────
+        // ── Μειώσεις / Επιδοτήσεις εισφορών ──────────────────────────────────
         meiosh_eisforon_ergazomenon: false,
         kodikos_meioshs: '',
         pososto_asfalismenoy_meioshs: 0,
@@ -286,7 +318,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         pososto_ergodoth_eisforon_mhteron: 0,
         isxyei_apo_eisforon_mhteron: null,
         isxyei_eos_eisforon_mhteron: null,
-        palios_neos: row['BP'] === -1 ? true : false,
+        palios_neos: row['BP'] === -1 ? false : true,
 
         amoibetai_me_sse: false,
 
@@ -316,11 +348,32 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         pososto_apasxolhshs_kk4: toNum(row['BN']),
 
         // ── Κατάσταση εργαζόμενου ─────────────────────────────────────────────
-        energos: toBoolean(row['FC']),
+        energos: row['FC'] === -1 ? true : false,
         archived: false,
 
         // ── Παρατηρήσεις ──────────────────────────────────────────────────────
-        parathrhseis: toStr(row['T'])
+        parathrhseis: toStr(row['T']),
+
+        // ── Συμβάσεις ─────────────────────────────────────────────────────────
+        symbash: row['BU'] === 83 ? '0002' : '0001',
+        kathgoria_symbashs: (() => {
+            if (row['BU'] === 1001) {
+                if (row['BV'] === 2) return '0001';
+                if (row['BV'] === 1) return '0002';
+                return row['BV']?.toString().padStart(4, '0');
+            }
+            if (row['BU'] === 83) {
+                return row['BV']?.toString().padStart(4, '0');
+            }
+            return row['BV']?.toString().padStart(4, '0');
+        })(),
+
+        eidikothta_symbashs: '0001',
+        stoixeio_symbashs_01: '0001',
+        stoixeio_symbashs_02: '0002',
+
+        // ── Stoixeia Symbashs 03–11 (BZ→03 ... CH→11) ────────────────────────
+        ...stoixeia
     };
 }
 
@@ -329,7 +382,7 @@ async function main() {
     const PHASE = process.env.PHASE || '1';
     const FILE_PATH = path.resolve(process.env.EXCEL_PATH || './tblProsop.xlsx');
 
-    // ── Φόρτωση Excel με ExcelJS ──────────────────────────────────────────────
+    // ── Φόρτωση Excel με ExcelJS ──────────────────────────────────────��───────
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(FILE_PATH);
 
@@ -345,7 +398,6 @@ async function main() {
         const rowObj = {};
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             const colLetter = columnIndexToLetter(colNumber);
-            // ✅ Χρησιμοποίησε την πραγματική τιμή (όχι formula string)
             rowObj[colLetter] = cell.value;
         });
         allRows.push(rowObj);
@@ -391,21 +443,21 @@ async function main() {
         }
 
         try {
-            const result = await ErgazomenoiModel.updateOne(
-                {
-                    amka: doc.amka,
-                    company_kod: doc.company_kod
-                },
-                { $set: doc },
-                { upsert: true }
-            );
+            const filter = { amka: doc.amka, company_kod: doc.company_kod };
 
-            if (result.upsertedCount > 0) {
-                inserted++;
-                console.log(`  ✅  [ΝΕΟ]    ${doc.eponymo} ${doc.onoma} (AMKA: ${doc.amka})`);
-            } else {
+            // Ελέγχουμε αν υπάρχει η εγγραφή
+            const existing = await ErgazomenoiModel.findOne(filter).lean();
+
+            if (existing) {
+                // ── UPDATE: replaceOne διατηρεί σειρά πεδίων ─────────────────
+                await ErgazomenoiModel.replaceOne(filter, doc);
                 updated++;
                 console.log(`  🔄  [UPDATE] ${doc.eponymo} ${doc.onoma} (AMKA: ${doc.amka})`);
+            } else {
+                // ── INSERT: create() διατηρεί σειρά πεδίων ───────────────────
+                await ErgazomenoiModel.create(doc);
+                inserted++;
+                console.log(`  ✅  [ΝΕΟ]    ${doc.eponymo} ${doc.onoma} (AMKA: ${doc.amka})`);
             }
         } catch (err) {
             errors++;

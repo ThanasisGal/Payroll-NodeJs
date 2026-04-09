@@ -94,7 +94,7 @@
 
                     <div class="app-loader__textwrap">
                         <div class="app-loader__title">Παρακαλώ περιμένετε...</div>
-                        <div class="app-loader__meta">Εκτέλεση διαδικασίας...</div>
+                        <div class="app-loader__meta">Διαδικασία σε εξέλιξη...</div>
                     </div>
                 </div>
             </div>
@@ -442,7 +442,8 @@
 
                     // ✅ meta αλλάζει ανά περίπτωση
                     const meta = root.querySelector('.app-loader__meta');
-                    if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
+                    // if (meta) meta.innerHTML = '&nbsp;' + (text || 'Εκτέλεση διαδικασίας...');
+                    if (meta) meta.innerHTML = '&nbsp;Διαδικασία σε εξέλιξη...';
                 }
 
                 function showSimple(text) {
@@ -551,7 +552,7 @@
                     // προαιρετικά: δες URL για καλύτερο text
                     const url =
                         typeof input === 'string' ? input : input && input.url ? input.url : '';
-                    const txt = 'Παρακαλώ περιμένετε...';
+                    const txt = 'Ενημέρωση των πεδίων...';
 
                     window.AppLoader.begin(txt, 200);
 
@@ -576,7 +577,7 @@
                 XHR.prototype.send = function () {
                     // opt-out: set xhr.__skipLoader = true πριν το send (αν ποτέ χρειαστεί)
                     if (!this.__skipLoader) {
-                        window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+                        window.AppLoader.begin('Διαδικασία σε εξέλιξη...', 250);
 
                         const done = () => {
                             this.removeEventListener('loadend', done);
@@ -620,7 +621,7 @@
                         }
 
                         // anti-flicker: αν γίνει γρήγορα, δεν θα προλάβει να δείξει
-                        window.AppLoader.begin('Εκτέλεση διαδικασίας...', 250);
+                        window.AppLoader.begin('Διαδικασία σε εξέλιξη...', 250);
                         // δεν κάνουμε end — θα φύγει η σελίδα. Αν δεν φύγει, το pageshow reset το καθαρίζει.
                     },
                     true
@@ -638,7 +639,7 @@
                         if (form.checkValidity && !form.checkValidity()) return;
 
                         const msg =
-                            form.getAttribute('data-loader-text') || 'Εκτέλεση διαδικασίας...';
+                            form.getAttribute('data-loader-text') || 'Διαδικασία σε εξέλιξη...';
                         window.AppLoader.begin(msg, 250);
                     },
                     true

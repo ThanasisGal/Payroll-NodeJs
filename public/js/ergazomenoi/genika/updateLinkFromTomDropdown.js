@@ -1,40 +1,34 @@
 // public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js
-
+// ✅ Τρέχει ως module → μετά το initTomDropdown
 document.addEventListener('DOMContentLoaded', function () {
     const sel = document.getElementById('programma_dypa');
     const btn = document.getElementById('gotoProgrammaDypa');
     const hid = document.getElementById('link_programma_dypa_stathera');
-    
+
     if (!sel || !btn) return;
 
-    function getUrlFromHtmlOption(value) {
+    function getUrlFromOption(value) {
         if (!value) return '';
-        const option = sel.querySelector(`option[value="${value}"]`);
-        return option?.dataset.urlLink || '';
+        const val = String(value).trim();
+        const ts = sel.tomselect;
+        if (ts?.options) {
+            if (ts.options[val]) return ts.options[val].url_link || '';
+            const found = Object.values(ts.options).find((o) => String(o.value).trim() === val);
+            if (found) return found.url_link || '';
+        }
+        return '';
     }
 
     function updateButton() {
         const ts = sel.tomselect;
-        let val = '';
-        let url = '';
-        
-        if (ts) {
-            val = ts.getValue() || sel.value || '';
-            if (val && ts.options && ts.options[val]) {
-                url = ts.options[val].url_link || '';
-            }
-        } else {
-            val = sel.value || '';
-        }
-        
-        // Fallback: HTML option
-        if (!url && val) {
-            url = getUrlFromHtmlOption(val);
-        }
-        
+        const val = String((ts ? ts.getValue() : sel.value) || '').trim();
+        const url = getUrlFromOption(val);
+        const checkbox = document.getElementById('topothethsh_me_programma');
+        const isChecked = checkbox ? checkbox.checked : true;
+
         if (hid) hid.value = url;
-        
-        if (url) {
+
+        if (url && isChecked) {
             btn.href = url;
             btn.classList.remove('disabled');
             btn.removeAttribute('aria-disabled');
@@ -49,60 +43,44 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Wait for TomSelect (max 2 seconds)
+    // ✅ Αναμονή για TomSelect (modules τρέχουν deferred αλλά
+    //    το initTomDropdown μπορεί να καθυστερεί λίγο)
     let attempts = 0;
-    const MAX_ATTEMPTS = 10;
-    
     const wait = setInterval(() => {
         attempts++;
         const ts = sel.tomselect;
-        
+
         if (ts) {
             clearInterval(wait);
-        
-            // Bind TomSelect events
+
+            // Events από χρήστη
             ts.on('change', updateButton);
             ts.on('item_add', updateButton);
             ts.on('item_remove', updateButton);
             ts.on('clear', updateButton);
-            ts.on('load', updateButton);
-            
-            // Bind checkbox event
-            const checkbox = document.getElementById('topothethsh_me_programma');
-            if (checkbox) {
-                checkbox.addEventListener('change', function() {
-                setTimeout(updateButton, 200);
-                });
-            }
-            
-            // ✅ Smart polling: Ελέγχει μόνο αν άλλαξε κάτι
-            let lastValue = '';
-            let lastUrl = '';
-            
-            setInterval(function() {
-                const currentValue = ts.getValue() || sel.value || '';
-                
-                // Ενημέρωσε μόνο αν άλλαξε το value
-                if (currentValue !== lastValue) {
-                lastValue = currentValue;
-                updateButton();
-                } else {
-                // Έλεγξε αν τα options φόρτωσαν (για edit mode)
-                const currentUrl = (ts.options && ts.options[currentValue]) 
-                    ? (ts.options[currentValue].url_link || '') 
-                    : getUrlFromHtmlOption(currentValue);
-                
-                if (currentUrl !== lastUrl) {
-                    lastUrl = currentUrl;
+
+            // Checkbox
+            document
+                .getElementById('topothethsh_me_programma')
+                ?.addEventListener('change', () => setTimeout(updateButton, 200));
+
+            // ✅ Monkey-patch setValue (για silent preselect)
+            const _setValue = ts.setValue.bind(ts);
+            ts.setValue = function (value, silent) {
+                _setValue(value, silent);
+                setTimeout(updateButton, 0);
+            };
+
+            // ✅ Polling backup (max 3sec)
+            let p = 0;
+            const poll = setInterval(() => {
+                const v = String(ts.getValue() || '').trim();
+                if ((v && ts.options?.[v]?.url_link) || ++p >= 30) {
+                    clearInterval(poll);
                     updateButton();
                 }
-                }
-            }, 500); // ✅ Κάθε 500ms (πιο γρήγορο)
-            
-            // Initial update
-            updateButton();
-        
-        } else if (attempts >= MAX_ATTEMPTS) {
+            }, 100);
+        } else if (attempts >= 30) {
             clearInterval(wait);
         }
     }, 100);

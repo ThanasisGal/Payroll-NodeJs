@@ -85,7 +85,7 @@
 
               				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-                        	<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
 
 								<input type="hidden" name="selectedSymbash" id="selectedSymbash" />
 								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
@@ -338,7 +338,7 @@
 <script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>
 <script src="<%= script('ergazomenoi/genika/toggleDisabledSelectViaCheckbox') %>"></script>
 <script src="<%= script('ergazomenoi/genika/toggleDisabledInputViaCheckbox') %>"></script>
-<script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>></script>
+<script src="<%= script('ergazomenoi/genika/fillLabelFromInput') %>"></script>
 <script src="<%= script('ergazomenoi/genika/calcOresApasxolhshs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
 <script src="<%= script('ergazomenoi/genika/epidothseis_auto_clear') %>"></script>
@@ -359,11 +359,14 @@
 <script src="<%= script('ergazomenoi/genika/editStoixeiaSymbaseon') %>"></script>
 <script src="<%= script('ergazomenoi/genika/reCalcApodoxes_Edit') %>"></script>
 
+<script type="module" src="<%= script('ergazomenoi/genika/addStoixeiaSymbaseon') %>"></script>
 <script type="module" src="<%= script('ergazomenoi/genika/reCalcApodoxes') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/genika/updateLinkFromTomDropdown') %>"></script>
+
 
 <!-- <script src="<%= script('ergazomenoi/genika/loadDropdowns_edit') %>"></script> -->
-<!-- <script src="<%= script('ergazomenoi/genika/afmChecker') %>"></script>
-<script src="<%= script('ergazomenoi/genika/amkaChecker') %>"></script> -->
+<!-- <script src="<%= script('ergazomenoi/genika/amkaChecker') %>"></script> --> -->
+<!-- <script src="<%= script('ergazomenoi/genika/afmChecker') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/fillHiddenBankCode') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/infinityScrollingSelectJQuery') %>"></script> -->
 <!-- <script src="<%= script('ergazomenoi/genika/clearEfkaSelects') %>"></script> -->
@@ -437,94 +440,93 @@
 	// Μείωση Εισφορών Μητέρων
     bindCheckboxControlsSelect({
         checkboxId: 'mhteres',
-        selectId  : 'meiosh_eisforas_mhteron',
-        hiddenId  : 'kodikos_meioshs_eisforon_mhteron_stathera'
-    });
+		selectId  : 'meiosh_eisforas_mhteron',
+		hiddenId  : 'kodikos_meioshs_eisforon_mhteron_stathera'
+	});
 
 
-    // Λήψη επιδόματος ανεργίας
-    bindCheckboxControlsSelect({
-        checkboxId: 'epidoma_anergias',
-        selectId  : 'dypa',
-        hiddenId  : 'dypa_stathera',
+	// Λήψη επιδόματος ανεργίας
+	bindCheckboxControlsSelect({
+		checkboxId: 'epidoma_anergias',
+		selectId  : 'dypa',
+		hiddenId  : 'dypa_stathera',
 
-		
-		labelIds: [
-			'dypa_label'
-		],
-		
-		clearOnDisable: true,
+			
+			labelIds: [
+				'dypa_label'
+			],
+			
+			clearOnDisable: true,
 
-    });
+	});
 
     // Τοποθέτηση με Πρόγραμμα
-    bindCheckboxControlsSelect({
-        checkboxId: 'topothethsh_me_programma',
-        selectId  : 'programma_dypa',
-        hiddenId  : 'programma_dypa_stathera',
-        
+	bindCheckboxControlsSelect({
+	checkboxId: 'topothethsh_me_programma',
+	selectId  : 'programma_dypa',
+	hiddenId  : 'programma_dypa_stathera',
+	
+	extraFieldIds: [
+		'ypoxreotikh_ek_toy_nomoy_katartish',
+		'egkritikh_apofash_dypa',
+		'hmeromhnia_enarxhs_programmatos',
+		'hmeromhnia_lhxhs_programmatos'
+	],
+
+	labelIds: [
+		'ypoxreotikh_ek_toy_nomoy_katartish_label',
+		'programma_dypa_label',
+		'egkritikh_apofash_dypa_label',
+		'hmeromhnia_enarxhs_programmatos_label',
+		'hmeromhnia_lhxhs_programmatos_label'
+		// ✅ ΑΦΑΙΡΕΘΗΚΕ το 'gotoProgrammaDypa'
+	],
+
+	clearOnDisable: true,
+	});
+
+	// Αδεια Διαμονής με Άμεση Πρόσβαση για Εργασία
+	bindCheckboxControlsSelect({
+		checkboxId: 'adeia_diamonhs_me_amesh_prosbash_gia_ergasia',
+		selectId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
+		hiddenId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera',
+
 		extraFieldIds: [
-            'ypoxreotikh_ek_toy_nomoy_katartish',
-            'egkritikh_apofash_dypa',
-            'hmeromhnia_enarxhs_programmatos',
-            'hmeromhnia_lhxhs_programmatos'
-        ],
-
-		labelIds: [
-			'ypoxreotikh_ek_toy_nomoy_katartish_label',
-			'programma_dypa_label',
-			'egkritikh_apofash_dypa_label',
-			'hmeromhnia_enarxhs_programmatos_label',
-			'hmeromhnia_lhxhs_programmatos_label',
-			'gotoProgrammaDypa'
+			'arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
+			'hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia'
 		],
+		
+			clearOnDisable: true,
+	});
 
+	// Αδεια Διαμονής χωρίς Άμεση Πρόσβαση για Εργασία
+	bindCheckboxControlsSelect({
+		checkboxId: 'adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+		selectId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+		hiddenId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera',
 
+		extraFieldIds: [
+			'arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
+			'hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia'
+		],
+		
+			clearOnDisable: true,
+	});
+
+	// Θεματικό Πεδίο Επαγγελματικής Κατάρτισης
+	bindCheckboxControlsSelect({
+		checkboxId: 'epaggelmatikh_katartish',
+		selectId  : 'thematiko_pedio',
+		hiddenId  : 'thematiko_pedio_stathera',
+
+		// ✅ ΝΕΟ:  Cascading selects που θα enable/disable μαζί
+		cascadingSelectIds: [
+			'thematikh_enothta',
+			'foreas_katartishs'
+		],
+		
 		clearOnDisable: true,
-    });
-
-    // Αδεια Διαμονής με Άμεση Πρόσβαση για Εργασία
-    bindCheckboxControlsSelect({
-        checkboxId: 'adeia_diamonhs_me_amesh_prosbash_gia_ergasia',
-        selectId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
-        hiddenId  : 'eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera',
-
-        extraFieldIds: [
-            'arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia',
-            'hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia'
-        ],
-	    
-		clearOnDisable: true,
-    });
-
-    // Αδεια Διαμονής χωρίς Άμεση Πρόσβαση για Εργασία
-    bindCheckboxControlsSelect({
-        checkboxId: 'adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia',
-        selectId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
-        hiddenId  : 'eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera',
-
-        extraFieldIds: [
-            'arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia',
-            'hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia'
-        ],
-    	
-		clearOnDisable: true,
-    });
-
-    // Θεματικό Πεδίο Επαγγελματικής Κατάρτισης
-    bindCheckboxControlsSelect({
-        checkboxId: 'epaggelmatikh_katartish',
-        selectId  : 'thematiko_pedio',
-        hiddenId  : 'thematiko_pedio_stathera',
-
-        // ✅ ΝΕΟ:  Cascading selects που θα enable/disable μαζί
-        cascadingSelectIds: [
-            'thematikh_enothta',
-            'foreas_katartishs'
-        ],
-        
-        clearOnDisable: true,
-    });
+	});
 
 </script>
 
@@ -532,106 +534,106 @@
 PDF UPLOAD MODAL (Shared across all sections)
 ======================================================================== -->
 <div id="pdfUploadModal" class="pdf-modal hidden">
-    <div class="pdf-modal-content">
-        <div class="pdf-modal-header">
-            <h3 id="pdfModalTitle">Μεταφόρτωση Αρχείου PDF</h3>
-            <button type="button" class="pdf-modal-close" id="closePdfModal">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        
-        <div class="pdf-modal-body">
-            <!-- Drag & Drop Zone -->
-            <div id="pdfDropZone" class="pdf-drop-zone">
-                <div class="pdf-drop-zone-content">
-                    <i class="bi bi-file-earmark-pdf pdf-drop-icon"></i>
-                    <h4>Σύρετε το PDF εδώ</h4>
-                    <p>ή κάντε κλικ για επιλογή</p>
-                    <small class="text-muted">Μέγιστο μέγεθος: 10MB</small>
-                </div>
-                <input 
-                    type="file" 
-                    id="pdfFileInput" 
-                    name="pdfFile" 
-                    accept=".pdf,application/pdf" 
-                    class="hidden" 
-                />
-            </div>
-            
-            <!-- File Preview -->
-            <div id="pdfFilePreview" class="pdf-file-preview hidden">
-                <div class="pdf-file-info">
-                    <i class="bi bi-file-earmark-pdf text-danger pdf-file-icon"></i>
-                    <div class="pdf-file-details">
-                        <strong id="pdfFileName"></strong>
-                        <small id="pdfFileSize" class="text-muted"></small>
-                    </div>
-                    <button type="button" id="removePdfFile" class="pdf-btn-remove">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-                
-                <!-- Preview Button -->
-                <div class="pdf-preview-actions">
-                    <button type="button" id="showPdfPreview" class="btn btn-info btn-sm">
-                        <i class="bi bi-eye"></i> Προεπισκόπηση
-                    </button>
-                </div>
-                
-                <div class="pdf-progress hidden" id="pdfProgressBar">
-                    <div class="pdf-progress-fill" id="pdfProgressFill"></div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="pdf-modal-footer">
-            <button type="button" class="btn btn-secondary" id="cancelPdfUpload">Ακύρωση</button>
-            <button type="button" class="btn btn-success" id="confirmPdfUpload" disabled>Αποθήκευση</button>
-        </div>
-    </div>
+	<div class="pdf-modal-content">
+		<div class="pdf-modal-header">
+			<h3 id="pdfModalTitle">Μεταφόρτωση Αρχείου PDF</h3>
+			<button type="button" class="pdf-modal-close" id="closePdfModal">
+				<i class="bi bi-x-lg"></i>
+			</button>
+		</div>
+		
+		<div class="pdf-modal-body">
+			<!-- Drag & Drop Zone -->
+			<div id="pdfDropZone" class="pdf-drop-zone">
+				<div class="pdf-drop-zone-content">
+					<i class="bi bi-file-earmark-pdf pdf-drop-icon"></i>
+					<h4>Σύρετε το PDF εδώ</h4>
+					<p>ή κάντε κλικ για επιλογή</p>
+					<small class="text-muted">Μέγιστο μέγεθος: 10MB</small>
+				</div>
+				<input 
+					type="file" 
+					id="pdfFileInput" 
+					name="pdfFile" 
+					accept=".pdf,application/pdf" 
+					class="hidden" 
+				/>
+			</div>
+			
+			<!-- File Preview -->
+			<div id="pdfFilePreview" class="pdf-file-preview hidden">
+				<div class="pdf-file-info">
+					<i class="bi bi-file-earmark-pdf text-danger pdf-file-icon"></i>
+					<div class="pdf-file-details">
+					<strong id="pdfFileName"></strong>
+					<small id="pdfFileSize" class="text-muted"></small>
+					</div>
+					<button type="button" id="removePdfFile" class="pdf-btn-remove">
+					<i class="bi bi-trash"></i>
+					</button>
+				</div>
+				
+				<!-- Preview Button -->
+				<div class="pdf-preview-actions">
+					<button type="button" id="showPdfPreview" class="btn btn-info btn-sm">
+					<i class="bi bi-eye"></i> Προεπισκόπηση
+					</button>
+				</div>
+				
+				<div class="pdf-progress hidden" id="pdfProgressBar">
+					<div class="pdf-progress-fill" id="pdfProgressFill"></div>
+				</div>
+			</div>
+		</div>
+		
+		<div class="pdf-modal-footer">
+			<button type="button" class="btn btn-secondary" id="cancelPdfUpload">Ακύρωση</button>
+			<button type="button" class="btn btn-success" id="confirmPdfUpload" disabled>Αποθήκευση</button>
+		</div>
+	</div>
 </div>
 
 <!-- ========================================================================
 PDF PREVIEW MODAL (Contract Preview & Download)
 ======================================================================== -->
 <div id="pdfPreviewContractModal" class="pdf-modal hidden">
-    <div class="pdf-modal-content pdf-preview-modal-large">
-        <div class="pdf-modal-header">
-            <h3>📄 Σύμβαση Εργαζόμενου</h3>
-            <button type="button" class="pdf-modal-close" id="closePdfPreviewModal">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        
-        <div class="pdf-modal-body pdf-preview-body">
-            <!-- PDF Preview iframe -->
-            <iframe
-                id="pdfPreviewIframe"
-                class="pdf-preview-iframe"
-                title="Contract PDF Preview"
-            ></iframe>
-            
-            <!-- Loading spinner -->
-            <div id="pdfPreviewLoading" class="pdf-preview-loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Φόρτωση...</span>
-                </div>
-                <p>Φόρτωση PDF...</p>
-            </div>
-        </div>
-        
-        <div class="pdf-modal-footer">
-            <button type="button" class="btn btn-secondary" id="skipPdfDownload">
-                Παράλειψη
-            </button>
-            
-            <button type="button" class="btn btn-info" id="downloadAndEmail" disabled>
-                <i class="bi bi-envelope-arrow-down"></i> Λήψη & Αποστολή Email
-            </button>
-            
-            <button type="button" class="btn btn-success" id="downloadAndContinue">
-                <i class="bi bi-download"></i> Λήψη PDF & Συνέχεια
-            </button>
-        </div>
-    </div>
+	<div class="pdf-modal-content pdf-preview-modal-large">
+		<div class="pdf-modal-header">
+			<h3>📄 Σύμβαση Εργαζόμενου</h3>
+			<button type="button" class="pdf-modal-close" id="closePdfPreviewModal">
+				<i class="bi bi-x-lg"></i>
+			</button>
+		</div>
+		
+		<div class="pdf-modal-body pdf-preview-body">
+			<!-- PDF Preview iframe -->
+			<iframe
+				id="pdfPreviewIframe"
+				class="pdf-preview-iframe"
+				title="Contract PDF Preview"
+			></iframe>
+			
+			<!-- Loading spinner -->
+			<div id="pdfPreviewLoading" class="pdf-preview-loading">
+				<div class="spinner-border text-primary" role="status">
+					<span class="visually-hidden">Φόρτωση...</span>
+				</div>
+				<p>Φόρτωση PDF...</p>
+			</div>
+		</div>
+		
+		<div class="pdf-modal-footer">
+			<button type="button" class="btn btn-secondary" id="skipPdfDownload">
+				Παράλειψη
+			</button>
+			
+			<button type="button" class="btn btn-info" id="downloadAndEmail" disabled>
+				<i class="bi bi-envelope-arrow-down"></i> Λήψη & Αποστολή Email
+			</button>
+			
+			<button type="button" class="btn btn-success" id="downloadAndContinue">
+				<i class="bi bi-download"></i> Λήψη PDF & Συνέχεια
+			</button>
+		</div>
+	</div>
 </div>

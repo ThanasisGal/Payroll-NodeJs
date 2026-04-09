@@ -502,6 +502,7 @@ declare -a modules=(
     "public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js"
     "public/js/modules/apodoxesCalculations.js"
     "public/js/utils/formatNumber.js"
+    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
 )
 
 declare -a utils=(
@@ -672,7 +673,7 @@ declare -a ergazomenoi=(
 )
 
 declare -a no_obfuscate=(
-    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
+#    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
 )
 
 # =============================================================================

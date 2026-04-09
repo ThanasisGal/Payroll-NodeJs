@@ -1,141 +1,463 @@
-<div class="accordion-item">
-  <h2 class="accordion-header">
-    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="false" aria-controls="panelsStayOpen-collapseFour">
-      Ε.Φ.Κ.Α.
-    </button>
-  </h2>
-  <div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
-    <div class="accordion-body" style=" margin-top: -3rem;">
-      <input type="hidden" name="kad_efka_hidden" id="kad_efka_hidden" value="<%= ergazomenoiData.kad_efka %>" />
-      <input type="hidden" name="eidikothta_efka_hidden" id="eidikothta_efka_hidden" value="<%= ergazomenoiData.eidikothta_efka %>" />
-      <input type="hidden" name="kpk_efka_basei_symbashs" id="kpk_efka_basei_symbashs" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
-      <input type="hidden" name="tmp_kpk_efka_basei_symbashs" id="tmp_kpk_efka_basei_symbashs" />
+<div class="accordion-item margin-top--2_5rem">
+	<h2 class="accordion-header">
+		<button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="true" aria-controls="panelsStayOpen-collapseFour" 
+		tabindex="-1">
+		Ε.Φ.Κ.Α.
+		</button>
+	</h2>
+	<div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="kad_efka" class="col-form-label label-font-size field-required">
-            Κ.Α.Δ. ΕΦΚΑ
-          </label>
-        </div>
-        <div class="col-9-5">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kad_efka" id="kad_efka" data-selected="<%= ergazomenoiData.kad_efka %>">
-          </select>
-        </div>
-        <button
-        type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-001" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων ΚΑΔ, Ειδικότητα, ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
-        <i class="bi bi-trash" style="color: red"></i> 
-        </button>
-        <div class="col-0-2-1"></div>
-      </div>
+		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="eidikothta_efka" class="col-form-label label-font-size field-required">
-            Ειδικότητα ΕΦΚΑ
-          </label>
-        </div>
-        <div class="col-9-5">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_efka" id="eidikothta_efka" data-selected="<%= ergazomenoiData.eidikothta_efka %>" disabled>
-          </select>
-        </div>
-        <button
-          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-002" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων Ειδικότητα, ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
-          <i class="bi bi-trash" style="color: red"></i> 
-        </button>
-      </div>
+		<div class="accordion-body bg-white margin-bottom--0_5rem">
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+				<div class="col-2 text-left">
+					<label for="foreas_kyrias_asfalishs" class="col-form-label label-font-size field-required">
+					Φορέας Κύριας Ασφάλισης
+					</label>
+				</div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="kpk_efka" class="col-form-label label-font-size field-required">
-            Κ.Π.Κ. ΕΦΚΑ
-          </label>
-        </div>
-        <div class="col-9-5">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kpk_efka" id="kpk_efka" data-selected="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" disabled>
-          </select>
-        </div>
-        <button
-          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-003" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων ΚΠΚ και Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
-        <i class="bi bi-trash" style="color: red"></i> 
-        </button>
-      </div>
+				<input
+					type="hidden"
+					name="foreas_kyrias_asfalishs_stathera"
+					id="foreas_kyrias_asfalishs_stathera"
+					class="form-control input-contents"
+					value="<%= ergazomenoiData.foreas_kyrias_asfalishs %>"
+				/>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="epa_efka" class="col-form-label label-font-size field-required">
-            Ειδική Περίπτωση ΕΦΚΑ
-          </label>
-        </div>
-        <div class="col-9-5">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="epa_efka" id="epa_efka" data-selected="<%= ergazomenoiData.epa_efka %>" >
-          </select>
-        </div>
-        <button
-          type="button" class="btn rounded-4 mt-2 col-0-3" id="clearSelect-004" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός του πεδίου Ειδική Περίπτωση Ασφάλισης ΕΦΚΑ" data-bs-placement="bottom">
-          <i class="bi bi-trash" style="color: red"></i> 
-        </button>
-      </div>
+				<div class="col-9-74">
+					<select
+					id="foreas_kyrias_asfalishs"
+					name="foreas_kyrias_asfalishs"
+					class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+					aria-label="Φορέας Κύριας Ασφάλισης"
+					data-api="/api/dropdown/ergazomenoi/foreas_kyrias_asfalishs"
+					single
+					data-target-input=<%= `foreas_kyrias_asfalishs_stathera` %>
+					data-preselect="foreas_kyrias_asfalishs_stathera"
+					data-preload-all="true"
+					data-pad-length="3"
+					placeholder="Αναζήτηση Φορέα Κύριας Ασφάλισης">
+					</select>
+				</div>
+			</div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="meiosh_eisforon_ergazomenon" class="col-form-label label-font-size">
-            Μείωση Εργατικής Εισφοράς
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="meiosh_eisforon_ergazomenon" name="meiosh_eisforon_ergazomenon" <%= ergazomenoiData.meiosh_eisforon_ergazomenon ? 'checked' : '' %> value="" />
-          <label for="meiosh_eisforon_ergazomenon" id="label-meiosh_eisforon_ergazomenon" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
+			<div class="height-vh-0_3"></div>
 
-        <div class="col-3"></div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1rem">
+				<div class="col-2 left-align">
+					<label for="foreas_epikoyrikhs_asfalishs" class="col-form-label label-font-size field-required">
+					Φορείς Επικουρικής Ασφάλισης
+					</label>
+				</div>
+				
+				<input 
+					type="hidden" 
+					id="foreas_epikoyrikhs_asfalishs_stathera" 
+					name="foreas_epikoyrikhs_asfalishs_stathera"
+					class="form-control input-contents" 
+					value="<%= JSON.stringify(ergazomenoiData.foreas_epikoyrikhs_asfalishs || []) %>"
+				/>
 
-        <div class="col-2 left-align">
-          <label for="epidothsh_eisforon_ergodoth" class="col-form-label label-font-size">
-            Επιδ/ση Εργοδ/κής Εισφοράς
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="epidothsh_eisforon_ergodoth" name="epidothsh_eisforon_ergodoth" <%= ergazomenoiData.epidothsh_eisforon_ergodoth ? 'checked' : '' %> value="" />
-          <label for="epidothsh_eisforon_ergodoth" id="label-epidothsh_eisforon_ergodoth" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-      </div>
+				<input 
+					type="hidden" 
+					id="foreas_epikoyrikhs_asfalishs_table" 
+					name="foreas_epikoyrikhs_asfalishs_table" 
+					value="[]"
+				/>
+				
+				<div class="col-9-5">
+					<select
+						id="foreas_epikoyrikhs_asfalishs"
+						name="foreas_epikoyrikhs_asfalishs"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Φορείς Επικουρικής Ασφάλισης"
+						data-api="api/dropdown/ergazomenoi/foreas_epikoyrikhs_asfalishs"
+						data-target-input="foreas_epikoyrikhs_asfalishs_stathera"
+						data-target-table="foreas_epikoyrikhs_asfalishs_table"
+						data-preselect="foreas_epikoyrikhs_asfalishs_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-reserve-right="28"
+						multiple
+					placeholder="Αναζήτηση Φορέων Επικουρικής Ασφάλισης">
+					</select>
+				</div>
+			</div>
 
-      <hr class="hr-style" />
+			<div class="height-vh-0_3"></div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="palios_neos" class="col-form-label label-font-size field-required">
-            Παλιός/Νέος Ασφαλισμένος
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="palios_neos" name="palios_neos" <%= ergazomenoiData.palios_neos ? 'checked' : '' %> value="" />
-          <label for="palios_neos" id="label-palios_neos" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΠΑΛΙΟΣ
-          </label>
-        </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="kad_efka" class="col-form-label label-font-size field-required">
+					Κ.Α.Δ. ΕΦΚΑ
+					</label>
+				</div>
 
-        <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="amoibetai_me_sse" class="col-form-label label-font-size">
-            Αμοίβεται με οικεία ΣΣΕ και ασφαλίζεται με Τεκμαρτά
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox"  class="form-check-input custom-checkbox checkbox-class" id="amoibetai_me_sse" name="amoibetai_me_sse" <%= ergazomenoiData.amoibetai_me_sse ? 'checked' : '' %> value="" />
-          <label for="amoibetai_me_sse" id="label-amoibetai_me_sse" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-      </div>
+				<div class="col-9-74">
+					<input
+						type="hidden"
+						name="kad_efka_stathera"
+						id="kad_efka_stathera"
+						class="form-control input-contents"
+						value="<%= ergazomenoiData.kad_efka %>"
+					/>
 
-      <hr class="hr-style" />
+					<select
+						id="kad_efka"
+						name="kad_efka"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Κ.Α.Δ. ΕΦΚΑ"
+						data-api="/api/dropdown/ergazomenoi/kad_efka"
+						single
+						data-target-input=<%= `kad_efka_stathera` %>
+						data-preselect="kad_efka_stathera"
+						data-preload-all="true"
+						data-skip-autoload="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Κ.Α.Δ. ΕΦΚΑ">
+					</select>
+				</div>
+			</div>
 
-    </div>
-  </div>
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="eidikothta_efka" class="col-form-label label-font-size field-required">
+					Ειδικότητα ΕΦΚΑ
+					</label>
+				</div>
+
+				<div class="col-9-74">
+					<input
+						type="hidden"
+						name="eidikothta_efka_stathera"
+						id="eidikothta_efka_stathera"
+						class="form-control input-contents"
+						value="<%= ergazomenoiData.eidikothta_efka %>"
+					/>
+
+					<select
+						id="eidikothta_efka"
+						name="eidikothta_efka"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Ειδικότητες ΕΦΚΑ"
+						data-api="/api/dropdown/ergazomenoi/eidikothta_efka"
+						single
+						data-target-input=<%= `eidikothta_efka_stathera` %>
+						data-preselect="eidikothta_efka_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-pad-length="6"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Ειδικοτήτων ΕΦΚΑ">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="kpk_efka" class="col-form-label label-font-size field-required" aria-disabled="true">
+					Κ.Π.Κ. ΕΦΚΑ
+					</label>
+				</div>
+
+				<div class="col-9-74">
+					<input
+						type="hidden"
+						name="kpk_efka_stathera"
+						id="kpk_efka_stathera"
+						class="form-control input-contents"
+						value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>"
+					/>
+
+					<input 
+						type="hidden" 
+						name="tmp_kpk_efka_stathera"
+						id="tmp_kpk_efka_stathera" 
+						class="form-control input-contents" 
+						value=""
+					/>
+
+					<select
+						id="kpk_efka"
+						name="kpk_efka"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Κ.Π.Κ. ΕΦΚΑ"
+						data-api="/api/dropdown/ergazomenoi/kpk_efka"
+						single
+						data-target-input=<%= `kpk_efka_stathera` %>
+						data-preselect="kpk_efka_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Κ.Π.Κ. ΕΦΚΑ">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="epa_efka" class="col-form-label label-font-size field-required">
+					Ειδική Περίπτωση ΕΦΚΑ
+					</label>
+				</div>
+
+				<div class="col-9-74">
+					<input
+						type="hidden"
+						name="epa_efka_stathera"
+						id="epa_efka_stathera"
+						class="form-control input-contents"
+						value="<%= ergazomenoiData.epa_efka %>"
+					/>
+
+					<input
+						type="hidden"
+						name="tmp_epa_efka_stathera"
+						id="tmp_epa_efka_stathera"
+						class="form-control input-contents"
+						value=""
+					/>
+
+					<select
+						id="epa_efka"
+						name="epa_efka"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Ειδική Περίπτωση ΕΦΚΑ"
+						data-api="/api/dropdown/ergazomenoi/epa_efka"
+						single
+						data-target-input=<%= `epa_efka_stathera` %>
+						data-preselect="epa_efka_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Ειδικών Περιπτώσεων ΕΦΚΑ">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1rem">
+				<div class="col-2 left-align">
+					<label for="prosthetes_asfalistikes_apodoxes" class="col-form-label label-font-size">
+					Πρόσθετες Ασφ/στικές Αποδοχές
+					</label>
+				</div>
+				<div class="col-10">
+					<input 
+						type="text" 						name="prosthetes_asfalistikes_apodoxes" id="prosthetes_asfalistikes_apodoxes" class="form-control input-contents" value="<%= ergazomenoiData.prosthetes_asfalistikes_apodoxes %>" autocomplete="off" maxlength="500" 
+					/>
+				</div>
+			</div>
+			
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="meiosh_eisforon_ergazomenon" class="col-form-label label-font-size">
+					Μείωση Εργατικής Εισφοράς
+					</label>
+				</div>
+				<div class="col-1 left-align checkbox-flex-center">
+					<input 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="meiosh_eisforon_ergazomenon" name="meiosh_eisforon_ergazomenon" <%= ergazomenoiData.meiosh_eisforon_ergazomenon %> value="" 
+					/>
+					<label for="meiosh_eisforon_ergazomenon" id="label-meiosh_eisforon_ergazomenon" class="margin-left-0_75rem  font-size-vw-0_875">
+						ΟΧΙ
+					</label>
+				</div>
+
+				<input
+					type="hidden"
+					name="kodikos_meioshs_stathera"
+					id="kodikos_meioshs_stathera"
+					class="form-control input-contents"
+					value="<%= ergazomenoiData.kodikos_meioshs %>"
+				/>
+
+				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+				<input type="hidden" name="pososto_asfalismenoy_meioshs_stathera" id="pososto_asfalismenoy_meioshs_stathera" value="<%= safe("pososto_asfalismenoy_meioshs_stathera") %>" />
+				<input type="hidden" name="pososto_ergodoth_meioshs_stathera" id="pososto_ergodoth_meioshs_stathera" value="<%= safe("pososto_ergodoth_meioshs_stathera") %>" />
+				<input type="hidden" name="isxyei_apo_meioshs_stathera" id="isxyei_apo_meioshs_stathera" value="<%= safe("isxyei_apo_meioshs_stathera") %>" />
+				<input 
+					type="hidden" name="isxyei_eos_meioshs_stathera" id="isxyei_eos_meioshs_stathera" value="<%= safe("isxyei_eos_meioshs_stathera") %>" 
+				/>
+
+				<div class="col-8-74">
+					<select
+						id="meiosh_ergatikhs_eisforas"
+						name="meiosh_ergatikhs_eisforas"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Μείωση Εργατικής Εισφοράς"
+						data-api="/api/dropdown/ergazomenoi/meiosh_ergatikhs_eisforas"
+						single
+						data-target-input=<%= `kodikos_meioshs_stathera` %>
+						data-preselect="kodikos_meioshs_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_meioshs_stathera","pososto_ergodoth":"pososto_ergodoth_meioshs_stathera","isxyei_apo":"isxyei_apo_meioshs_stathera","isxyei_eos":"isxyei_eos_meioshs_stathera"}'
+						placeholder="Αναζήτηση Μείωσης Εργατικής Εισφοράς">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="epidothsh_eisforon_ergodoth" class="col-form-label label-font-size">
+					Επιδότηση Εργοδοτικής Εισφοράς
+					</label>
+				</div>
+				<div class="col-1 left-align checkbox-flex-center">
+					<input 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidothsh_eisforon_ergodoth" name="epidothsh_eisforon_ergodoth" <%= ergazomenoiData.epidothsh_eisforon_ergodoth %> value="" 
+					/>
+					<label for="epidothsh_eisforon_ergodoth" id="label-epidothsh_eisforon_ergodoth" class="margin-left-0_75rem  font-size-vw-0_875">
+					ΟΧΙ
+					</label>
+				</div>
+
+				<input
+					type="hidden"
+					name="kodikos_epidothshs_stathera"
+					id="kodikos_epidothshs_stathera"
+					class="form-control input-contents"
+					value="<%= ergazomenoiData.kodikos_epidothshs %>"
+				/>
+
+				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+				<input type="hidden" name="pososto_asfalismenoy_epidothshs_stathera" id="pososto_asfalismenoy_epidothshs_stathera" value="<%= safe("pososto_asfalismenoy_epidothshs_stathera") %>" />
+				<input type="hidden" name="pososto_ergodoth_epidothshs_stathera" id="pososto_ergodoth_epidothshs_stathera" value="<%= safe("pososto_ergodoth_epidothshs_stathera") %>" />
+				<input type="hidden" name="isxyei_apo_epidothshs_stathera" id="isxyei_apo_epidothshs_stathera" value="<%= safe("isxyei_apo_epidothshs_stathera") %>" />
+				<input type="hidden" name="isxyei_eos_epidothshs_stathera" id="isxyei_eos_epidothshs_stathera" value="<%= safe("isxyei_eos_epidothshs_stathera") %>" />
+
+				<div class="col-8-74">
+					<select
+						id="epidothsh_ergodotikhs_eisforas"
+						name="epidothsh_ergodotikhs_eisforas"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Επιδότηση Εργοδοτικής Εισφοράς"
+						data-api="/api/dropdown/ergazomenoi/epidothsh_ergodotikhs_eisforas"
+						single
+						data-target-input=<%= `kodikos_epidothshs_stathera` %>
+						data-preselect="kodikos_epidothshs_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_epidothshs_stathera","pososto_ergodoth":"pososto_ergodoth_epidothshs_stathera","isxyei_apo":"isxyei_apo_epidothshs_stathera","isxyei_eos":"isxyei_eos_epidothshs_stathera"}'
+						placeholder="Αναζήτηση Επιδότησης Εισφοράς">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_3"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="mhteres" class="col-form-label label-font-size">
+					ΜΗΤΕΡΕΣ Μείωση Εισφορών
+					</label>
+				</div>
+				<div class="col-1 left-align checkbox-flex-center">
+					<input 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="mhteres" name="mhteres" <%= ergazomenoiData.kodikos_meioshs_eisforon_mhteron %> value="" 
+					/>
+					<label for="mhteres" id="label-mhteres" class="margin-left-0_75rem  	font-size-vw-0_875">
+					ΟΧΙ
+					</label>
+				</div>
+
+				<input
+					type="hidden"
+					name="kodikos_meioshs_eisforon_mhteron_stathera"
+					id="kodikos_meioshs_eisforon_mhteron_stathera"
+					class="form-control input-contents"
+					value="<%= ergazomenoiData. kodikos_meioshs_eisforon_mhteron_stathera %>"
+				/>
+
+				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
+				<input type="hidden" name="pososto_asfalismenoy_eisforon_mhteron_stathera" id="pososto_asfalismenoy_eisforon_mhteron_stathera" value="<%= safe("pososto_asfalismenoy_eisforon_mhteron_stathera") %>" />
+				<input type="hidden" name="pososto_ergodoth_eisforon_mhteron_stathera" id="pososto_ergodoth_eisforon_mhteron_stathera" value="<%= safe("pososto_ergodoth_eisforon_mhteron_stathera") %>" />
+				<input type="hidden" name="isxyei_apo_eisforon_mhteron_stathera" id="isxyei_apo_eisforon_mhteron_stathera" value="<%= safe("isxyei_apo_eisforon_mhteron_stathera") %>" />
+				<input type="hidden" name="isxyei_eos_eisforon_mhteron_stathera" id="isxyei_eos_eisforon_mhteron_stathera" value="<%= safe("isxyei_eos_eisforon_mhteron_stathera") %>" />
+
+				<div class="col-8-74">
+					<select
+						id="meiosh_eisforas_mhteron"
+						name="meiosh_eisforas_mhteron"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Μείωση Εισφορών Μητέρων"
+						data-api="/api/dropdown/ergazomenoi/meiosh_eisforas_mhteron"
+						single
+						data-target-input=<%= `kodikos_meioshs_eisforon_mhteron_stathera` %>
+						data-preselect="kodikos_meioshs_eisforon_mhteron_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-field-mappings='{"pososto_asfalismenoy":"pososto_asfalismenoy_eisforon_mhteron_stathera","pososto_ergodoth":"pososto_ergodoth_eisforon_mhteron_stathera","isxyei_apo":"isxyei_apo_eisforon_mhteron_stathera","isxyei_eos":"isxyei_eos_eisforon_mhteron_stathera"}'
+						placeholder="Αναζήτηση Μείωσης Εισφορών Μητέρων">
+					</select>
+				</div>
+			</div>
+
+			<div class="height-vh-0_8"></div>
+
+			<hr class="hr-style-6" />
+
+				<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="palios_neos" class="col-form-label label-font-size field-required">
+					Παλιός/Νέος Ασφαλισμένος
+					</label>
+				</div>
+				<div class="col-1 left-align checkbox-flex-center">
+					<input 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="palios_neos" name="palios_neos" <%= ergazomenoiData.palios_neos ? 'checked' : '' %> value="" 
+					/>
+					<label for="palios_neos" id="label-palios_neos" class="margin-left-0_75rem  font-size-vw-0_875">
+					ΠΑΛΙΟΣ
+					</label>
+				</div>
+
+				<div class="col-3"></div>
+
+				<div class="col-2 left-align">
+					<label for="amoibetai_me_sse" class="col-form-label label-font-size">
+					Αμοίβεται με οικεία ΣΣΕ και ασφαλίζεται με Τεκμαρτά
+					</label>
+				</div>
+				<div class="col-1 left-align checkbox-flex-center">
+					<input 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="amoibetai_me_sse" name="amoibetai_me_sse" <%= ergazomenoiData.amoibetai_me_sse ? 'checked' : '' %> value="" 
+					/>
+					<label for="amoibetai_me_sse" id="label-amoibetai_me_sse" class="margin-left-0_75rem  font-size-vw-0_875">
+					ΟΧΙ
+					</label>
+				</div>
+
+				<div class="height-vh-1_5"></div>
+			</div>
+		</div>
+	</div>
 </div>

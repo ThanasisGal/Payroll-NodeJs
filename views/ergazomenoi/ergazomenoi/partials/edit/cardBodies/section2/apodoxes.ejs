@@ -1,175 +1,244 @@
-<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-2 left-align">
-    <label for="symbash" class="col-form-label label-font-size field-required">
-      Σύμβαση
-    </label>
-  </div>
-  <div class="col-9-5">
-    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="symbash" id="symbash" data-selected="<%= ergazomenoiData.symbash.trim() %>">
-    </select>
-  </div>
+	<% const safe = (k) => (ergazomenoiData && ergazomenoiData[k]) || ''; %>
 
-  <button
-  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-001" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων Σύμβαση, Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-  <i class="bi bi-trash" style="color: red"></i> 
-  </button>
-</div>
+	<input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
 
-<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-2 left-align">
-    <label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
-      Κατηγορία Σύμβασης
-    </label>
-  </div>
-  <div class="col-9-5">
-    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="kathgoria_symbashs" id="kathgoria_symbashs" data-selected="<%= ergazomenoiData.kathgoria_symbashs %>" disabled>
-    </select>
-  </div>
+	<!-- Hidden table fields (χρειάζονται για την αλυσίδα) -->
+	<input type="hidden" name="kathgoria_symbashs_table" id="kathgoria_symbashs_table" value="[]" />
+	<input type="hidden" name="eidikothta_symbashs_table" id="eidikothta_symbashs_table" value="[]" />
 
-  <button
-  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-002" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων Κατηγορία Σύμβασης, Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-  <i class="bi bi-trash" style="color: red"></i> 
-  </button>
-</div>
+	<div class="row form-group g-1 align-items-center margin-left-1rem margin-top--1rem">
+		<div class="col-2 left-align margin-left--1rem">
+			<label for="symbash" class="col-form-label label-font-size field-required">
+				Σύμβαση
+			</label>
+		</div>
 
-<div class="row form-group clearStoixeiaTable g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-2 left-align">
-    <label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
-      Ειδικότητα Σύμβασης
-    </label>
-  </div>
-  <div class="col-9-5">
-    <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikothta_symbashs" id="eidikothta_symbashs" data-selected="<%= ergazomenoiData.eidikothta_symbashs %>" disabled>
-    </select>
-  </div>
+		<input
+			type="hidden"
+			name="symbash_stathera"
+			id="symbash_stathera"
+			class="form-control input-contents"
+			value="<%= safe('symbash') %>"
+		/>
 
-  <button
-  type="button" class="btn rounded-4 mt-2 col-0-3 clearSelect" id="clearSelectSymbaseon-003" style="border: 0;" data-bs-toggle="tooltip" data-bs-title="Καθαρισμός των πεδίων Ειδικότητα Σύμβασης, και Στοιχείων Σύμβασης" data-bs-placement="bottom">
-  <i class="bi bi-trash" style="color: red"></i> 
-  </button>
-</div>
+		<div class="col-9-8">
+			<select
+				id="symbash"
+				name="symbash"
+				class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+				aria-label="Συμβάσεις"
+				data-api="/api/dropdown/symbaseis/symbash"
+				single
+				data-target-input="symbash_stathera"
+				data-preselect="symbash_stathera"
+				data-preload-all="true"
+				data-pad-length="4"
+				data-skip-autoload="true"
+				placeholder="Αναζήτηση Σύμβασης">
+			</select>
+		</div>
+	</div>
 
-<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem">
-  <% for (let i = 1; i <= 15; i++) { %>
-    <input type="hidden" name="stoixeioSymbashsHidden_<%= ('0' + i).slice(-2) %>" id="stoixeioSymbashsHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['stoixeio_symbashs_' + ('0' + i).slice(-2)] %>" />
-    <input type="hidden" name="posoSymbashsHidden_<%= ('0' + i).slice(-2) %>" id="posoSymbashsHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['poso_symbashs_' + ('0' + i).slice(-2)] %>" />
-    <input type="hidden" name="posoSymbashsBaseiOronErgasiasHidden_<%= ('0' + i).slice(-2) %>" id="posoSymbashsBaseiOronErgasiasHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['poso_symbashs_basei_oron_ergasias_' + ('0' + i).slice(-2)] %>" />
-  <% } %>
+	<div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem">
+		<div class="col-2 left-align margin-left--1rem">
+			<label for="kathgoria_symbashs" class="col-form-label label-font-size field-required">
+				Κατηγορία Σύμβασης
+			</label>
+		</div>
 
-  <div class="col-1 text-center">
-    <label class="col-form-label field-required">
-      α/α
-    </label>
-  </div>
-  <div class="col-7 text-center">
-    <label class="col-form-label field-required">
-      Στοιχείο Σύμβασης
-    </label>
-  </div>
-  <div class="col-1-5 text-center">
-    <label class="col-form-label field-required">
-      Ποσό Βάσει Σύμβασης
-    </label>
-  </div>
-  <div class="col-0-3"></div>
-  <div class="col-2 text-center">
-    <label class="col-form-label field-required">
-      Αποδοχές Βάσει Ωρών Εργασίας
-    </label>
-  </div>
-</div>
+		<input
+			type="hidden"
+			name="kathgoria_symbashs_stathera"
+			id="kathgoria_symbashs_stathera"
+			class="form-control input-contents"
+			value="<%= safe('kathgoria_symbashs') %>"
+		/>
 
-<div id="stoixeiaSymbaseonContainer">
-  <!-- Εδώ θα προστεθούν δυναμικά τα select στοιχεία -->
-</div>
+		<div class="col-9-8">
+			<select
+				id="kathgoria_symbashs"
+				name="kathgoria_symbashs"
+				class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+				aria-label="Κατηγορίες Συμβάσεων"
+				data-api="/api/dropdown/symbaseis/kathgoria_symbashs"
+				single
+				data-target-input="kathgoria_symbashs_stathera"
+				data-preselect="kathgoria_symbashs_stathera"
+				data-extra-filter="symbash_stathera"
+				data-preload-all="true"
+				data-pad-length="4"
+				data-skip-autoload="true"
+				placeholder="Αναζήτηση Κατηγορίας Σύμβασης">
+			</select>
+		</div>
+	</div>
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-8 text-right">
-    <label class="col-form-label field-required text-right">
-      Σ Υ Ν Ο Λ Α 
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble" name="synolo_symbashs" id="synolo_symbashs" style="background-color: #eeff0223;" value="<%= parseFloat(ergazomenoiData.synolo_symbashs).toFixed(2) %>" readonly />
-  </div>
-  <div class="col-0-5"></div>
-  <div class="col-1-5">
-    <input type="text" class="form-control input-contents right-align clearAble" name="synolo_symbashs_basei_oron_ergasias" id="synolo_symbashs_basei_oron_ergasias" style="background-color: #2b97001e" value="<%= parseFloat(ergazomenoiData.synolo_symbashs_basei_oron_ergasias).toFixed(2) %>" readonly />
-  </div>
-</div>
+	<div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem mb-2">
+		<div class="col-2 left-align margin-left--1rem">
+			<label for="eidikothta_symbashs" class="col-form-label label-font-size field-required">
+				Ειδικότητα
+			</label>
+		</div>
 
-<hr style=" margin-bottom: 1rem;" />
+		<input
+			type="hidden"
+			name="eidikothta_symbashs_stathera"
+			id="eidikothta_symbashs_stathera"
+			class="form-control input-contents"
+			value="<%= safe('eidikothta_symbashs') %>"
+		/>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Νόμιμος Μισθός
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble"  style="background-color: #eeff0223;" name="nomimosMisthos" id="nomimosMisthos" value="<%= parseFloat(ergazomenoiData.nomimosMisthos || 0).toFixed(2) %>" readonly />
-  </div>
+		<div class="col-9-8">
+			<select
+				id="eidikothta_symbashs"
+				name="eidikothta_symbashs"
+				class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+				aria-label="Ειδικότητα Συμβάσεων"
+				data-api="/api/dropdown/symbaseis/eidikothta_symbashs_multi"
+				single
+				data-target-input="eidikothta_symbashs_stathera"
+				data-preselect="eidikothta_symbashs_stathera"
+				data-extra-filter="symbash_stathera"
+				data-extra-filter2="kathgoria_symbashs_stathera"
+				data-preload-all="true"
+				data-pad-length="4"
+				data-skip-autoload="true"
+				placeholder="Αναζήτηση Ειδικότητας Σύμβασης">
+			</select>
+		</div>
+	</div>
 
-  <div class="col-0-5"></div>
+	<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem">
+		<% for (let i = 1; i <= 15; i++) { %>
+			<input type="hidden" name="stoixeioSymbashsHidden_<%= ('0' + i).slice(-2) %>" id="stoixeioSymbashsHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['stoixeio_symbashs_' + ('0' + i).slice(-2)] %>" />
+			<input type="hidden" name="posoSymbashsHidden_<%= ('0' + i).slice(-2) %>" id="posoSymbashsHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['poso_symbashs_' + ('0' + i).slice(-2)] %>" />
+			<input type="hidden" name="posoSymbashsBaseiOronErgasiasHidden_<%= ('0' + i).slice(-2) %>" id="posoSymbashsBaseiOronErgasiasHidden_<%= ('0' + i).slice(-2) %>" value="<%= ergazomenoiData['poso_symbashs_basei_oron_ergasias_' + ('0' + i).slice(-2)] %>" />
+		<% } %>
 
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Νόμιμο Ημερομίσθιο
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble"  style="background-color: #eeff0223;" name="nomimoHmeromisthio" id="nomimoHmeromisthio" value="<%= parseFloat(ergazomenoiData.nomimoHmeromisthio || 0).toFixed(2) %>" readonly />
-  </div>
+		<div class="col-0-5 text-center">
+			<label class="col-form-label field-required font-size-vw-0_85">
+				α/α
+			</label>
+		</div>
 
-  <div class="col-0-5"></div>
+		<div class="col-7 text-center">
+			<label class="col-form-label field-required font-size-vw-0_85">
+				Στοιχείο Σύμβασης
+			</label>
+		</div>
+		
+		<div class="col-0-5"></div>
+		
+		<div class="col-1-5 text-center">
+			<label class="col-form-label field-required font-size-vw-0_85">
+				Ποσό Βάσει Σύμβασης
+			</label>
+		</div>
 
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Νόμιμο Ωρομίσθιο
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #eeff0223;" name="nomimoOromisthio" id="nomimoOromisthio" value="<%= parseFloat(ergazomenoiData.nomimoOromisthio || 0).toFixed(4) %>" readonly />
-  </div>
-</div>
+		<div class="col-0-3"></div>
+		
+		<div class="col-2 text-center">
+			<label class="col-form-label field-required font-size-vw-0_85">
+				Αποδοχές Βάσει Ωρών Εργασίας
+			</label>
+		</div>
+	</div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Πραγματικός Μισθός 
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikosMisthos" id="pragmatikosMisthos" value="<%= parseFloat(ergazomenoiData.pragmatikosMisthos || 0).toFixed(2) %>" readonly />
-  </div>
+	<div id="stoixeiaSymbaseonContainer">
+		<!-- Εδώ θα προστεθούν δυναμικά τα select στοιχεία -->
+	</div>
 
-  <div class="col-0-5"></div>
+	<div class="row form-group align-items-center mt-3 bg-white margin-left--1rem margin-right--1rem">
+		<div class="col-8 text-right">
+			<label class="col-form-label field-required text-right">
+			Σ Υ Ν Ο Λ Α 
+			</label>
+		</div>
 
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Πραγματικό Ημερ/σθιο
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" value="<%= parseFloat(ergazomenoiData.pragmatikoHmeromisthio || 0).toFixed(2) %>" readonly />
-  </div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-eeff0223 clearAble" name="synolo_symbashs" id="synolo_symbashs" value="<%= parseFloat(ergazomenoiData.synolo_symbashs).toFixed(2) %>" readonly />
+		</div>
 
-  <div class="col-0-5"></div>
+		<div class="col-0-5"></div>
 
-  <div class="col-2 text-left">
-    <label class="col-form-label field-required text-left">
-      Πραγματικό Ωρομίσθιο
-    </label>
-  </div>
-  <div class="col-1-5">
-    <input type="number" class="form-control input-contents right-align clearAble" style="background-color: #2b97001e;" name="pragmatikoOromisthio" id="pragmatikoOromisthio" value="<%= parseFloat(ergazomenoiData.pragmatikoOromisthio || 0).toFixed(4) %>" readonly />
-  </div>
-</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="synolo_symbashs_basei_oron_ergasias" id="synolo_symbashs_basei_oron_ergasias" readonl value="<%= parseFloat(ergazomenoiData.synolo_symbashs_basei_oron_ergasias).toFixed(2) %>" readonly />
+		</div>
+	</div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="col-9"></div>
+	<hr style=" margin-bottom: 1rem;" />
 
-  <button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content" name="reCalcButton" id="reCalcButton">
-    <i class="bi bi-floppy"></i> Επανυπολογισμός Αποδοχών
-  </button>
-</div>
+	<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Νόμιμος Μισθός
+			</label>
+		</div>
+
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-eeff0223 clearAble" name="nomimosMisthos" id="nomimosMisthos" value="<%= parseFloat(ergazomenoiData.nomimosMisthos || 0).toFixed(2) %>" readonly />
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Νόμιμο Ημερομίσθιο
+			</label>
+		</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-eeff0223 clearAble" name="nomimoHmeromisthio" id="nomimoHmeromisthio" value="<%= parseFloat(ergazomenoiData.nomimoHmeromisthio || 0).toFixed(2) %>" readonly />
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Νόμιμο Ωρομίσθιο
+			</label>
+		</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-eeff0223 clearAble" name="nomimoOromisthio" id="nomimoOromisthio" value="<%= parseFloat(ergazomenoiData.nomimoOromisthio || 0).toFixed(4) %>" readonly />
+		</div>
+	</div>
+
+	<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Πραγματικός Μισθός
+			</label>
+		</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikosMisthos" id="pragmatikosMisthos" value="<%= parseFloat(ergazomenoiData.pragmatikosMisthos || 0).toFixed(2) %>" readonly />
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Πραγματικό Ημερ/σθιο
+			</label>
+		</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikoHmeromisthio" id="pragmatikoHmeromisthio" value="<%= parseFloat(ergazomenoiData.pragmatikoHmeromisthio || 0).toFixed(2) %>" readonly />
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-2 text-left">
+			<label class="col-form-label field-required text-left">
+			Πραγματικό Ωρομίσθιο
+			</label>
+		</div>
+		<div class="col-1-5">
+			<input type="number" class="form-control input-contents right-align bg-2b97001e clearAble" name="pragmatikoOromisthio" id="pragmatikoOromisthio" value="<%= parseFloat(ergazomenoiData.pragmatikoOromisthio || 0).toFixed(4) %>" readonly />
+		</div>
+	</div>
+
+	<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+		<div class="col-9"></div>
+
+		<button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content" name="reCalcButton" id="reCalcButton">
+			<i class="bi bi-floppy"></i> Επανυπολογισμός Αποδοχών
+		</button>
+	</div>

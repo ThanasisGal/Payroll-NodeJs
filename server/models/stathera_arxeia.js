@@ -567,16 +567,21 @@ const ProgrammataDypaSchema = new Schema(
         anoixto_kleisto: { type: Boolean, default: false }
     },
     {
-        collection: 'programmata_dypa'
+        collection: 'Programmata_Dypa'
     }
 );
 
 const ProgrammataDypaModel = model('ProgrammataDypa', ProgrammataDypaSchema);
 
-const KentraKostoysSchema = new Schema({
-    kodikos: { type: String, unique: true, index: true },
-    perigrafh: { type: String, trim: true }
-});
+const KentraKostoysSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true, index: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Kentra_Kostoys'
+    }
+);
 const KentraKostoysModel = model('KentraKostoys', KentraKostoysSchema);
 
 const GenikesParametroiSchema = new Schema(

@@ -1,31 +1,31 @@
 <div class="accordion-item">
-  	<h2 class="accordion-header">
-       	<button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" tabindex="-1">
-        Προσωπικά Στοιχεία
-    	</button>
-  	</h2>
+	<h2 class="accordion-header">
+		<button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" tabindex="-1">
+		Προσωπικά Στοιχεία
+		</button>
+	</h2>
 
-  	<div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show">
-    	<% const safe = (k) => (rec && rec[k]) || ''; %>
+	<div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show">
+		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
-        <div class="accordion-body bg-white margin-bottom--0_5rem">
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
-        		<div class="col-2 left-align">
-          			<label for="eponymo_patera" class="col-form-label label-font-size">
-            		Επώνυμο Πατέρα
+		<div class="accordion-body bg-white margin-bottom--0_5rem">
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
+				<div class="col-2 left-align">
+					<label for="eponymo_patera" class="col-form-label label-font-size">
+					Επώνυμο Πατέρα
 					</label>
 				</div>
 				<div class="col-4">
-					<input type="text" name="eponymo_patera" id="eponymo_patera" class="form-control input-contents" value="<%= ergazomenoiData.eponymo_patera %>" autocomplete="off" />
+					<input type="text" name="eponymo_patera" id="eponymo_patera" class="form-control input-contents" value="<%= safe('eponymo_patera') %>" autocomplete="off" />
 				</div>
-			
+
 				<div class="col-2 left-align">
 					<label for="patronymo" class="col-form-label label-font-size field-required">
 					Όνομα Πατέρα
 					</label>
 				</div>
 				<div class="col-3">
-					<input type="text" name="patronymo" id="patronymo" class="form-control input-contents" value="<%= ergazomenoiData.patronymo %>" autocomplete="off" />
+					<input type="text" name="patronymo" id="patronymo" class="form-control input-contents" value="<%= safe('patronymo') %>" autocomplete="off" />
 				</div>
 			</div>
 
@@ -38,16 +38,16 @@
 					</label>
 				</div>
 				<div class="col-4">
-					<input type="text" name="eponymo_mhteras" id="eponymo_mhteras" class="form-control input-contents field-required" value="<%= ergazomenoiData.eponymo_mhteras %>" autocomplete="off" />
+					<input type="text" name="eponymo_mhteras" id="eponymo_mhteras" class="form-control input-contents field-required" value="<%= safe('eponymo_mhteras') %>" autocomplete="off" />
 				</div>
-			
+
 				<div class="col-2 left-align">
 					<label for="mhtronymo" class="col-form-label label-font-size field-required">
 					Όνομα Μητέρας
 					</label>
 				</div>
 				<div class="col-3">
-					<input type="text" name="mhtronymo" id="mhtronymo" class="form-control input-contents" value="<%= ergazomenoiData.mhtronymo %>" autocomplete="off" />
+					<input type="text" name="mhtronymo" id="mhtronymo" class="form-control input-contents" value="<%= safe('mhtronymo') %>" autocomplete="off" />
 				</div>
 			</div>
 
@@ -60,12 +60,12 @@
 					</label>
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
-					<input type="checkbox" class="form-check-input custom-checkbox checkbox-classmargin-top--0_1rem" id="energos" name="energos" <%= ergazomenoiData.energos ? 'checked' : '' %> value="" />
-                    <label for="energos" id="label-energos" class="margin-left-0_75rem  font-size-vw-0_875 margin-top--0_2rem">
+					<input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="energos" name="energos" <%= safe('energos') ? 'checked' : '' %> value="" />
+					<label for="energos" id="label-energos" class="margin-left-0_75rem font-size-vw-0_875 margin-top--0_2rem">
 					ΑΝΕΝΕΡΓΟΣ
 					</label>
 				</div>
-			
+
 				<div class="col-0-5"></div>
 
 				<div class="col-1 left-align">
@@ -74,631 +74,625 @@
 					</label>
 				</div>
 				<div class="col-1 left-align checkbox-flex-center field-required">
-					<input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="fylo" name="fylo" <%= ergazomenoiData.fylo ? 'checked' : '' %> value="" />
-					<label for="fylo" id="label-fylo" class="margin-left-0_75rem  font-size-vw-0_875 margin-top--0_2rem">
+					<input type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_1rem" id="fylo" name="fylo" <%= safe('fylo') ? 'checked' : '' %> value="" />
+					<label for="fylo" id="label-fylo" class="margin-left-0_75rem font-size-vw-0_875 margin-top--0_2rem">
 					ΑΝΔΡΑΣ
 					</label>
 				</div>
 
-        		<div class="col-0-5"></div>
+				<div class="col-0-5"></div>
 
-                <div class="col-2 left-align">
-                    <label for="doy" class="col-form-label label-font-size field-required">Δ.Ο.Υ.</label>
-                </div>
+				<div class="col-2 left-align">
+					<label for="doy" class="col-form-label label-font-size field-required">Δ.Ο.Υ.</label>
+				</div>
 				<input
 					type="hidden"
 					name="doy_stathera"
 					id="doy_stathera"
 					class="form-control input-contents"
-					value="<%= ergazomenoiData.doy ?? '' %>"
+					value="<%= safe('doy') %>"
 					readonly
 				/>
 
-                <div class="col-3-74">
-                    <select
-                        id="doy"
-                        name="doy"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align"
-                        aria-label="Δ.Ο.Υ."
-                        data-api="/api/dropdown/doy"
-                        single
-                        data-target-input=<%= `doy_stathera` %>
-                        data-preselect="doy_stathera"
-                        data-preload-all="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Δ.Ο.Υ.">
-                    </select>
-                </div>
-            </div>
-
-            <div class="height-vh-0_2"></div>
-
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="typos_taytothtas" class="col-form-label label-font-size field-required">
-                    Τύπος Νομ/κού Εγγράφου
-                    </label>
-                </div>
-
-                <input
-                    type="hidden"
-                    name="taytothta_stathera"
-                    id="taytothta_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.typos_taytothtas ?? '' %>"
-                    readonly
-                />
-
-                <div class="col-3-75">
-                    <select
-                        id="typos_taytothtas"
-                        name="typos_taytothtas"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align"
-                        aria-label="Νομιμοποιητικά έγγραφα"
-                        data-api="/api/dropdown/nomimoiEkprosopoi/taytothta"
-                        single
-                        data-target-input=<%= `taytothta_stathera` %>
-                        data-preselect="taytothta_stathera"
-                        data-preload-all="true"
-                        data-pad-length="6"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Τύπων Νομιμοποιητικών Εγγράφων">
-                    </select>
-                </div>
-
-                <div class="col-0-25"></div>
-
-                <div class="col-2 left-align">
-                    <label for="adt" class="col-form-label label-font-size field-required">
-                    Αριθ.Νομιμ/κού Εγγράφου
-                    </label>
-                </div>
-				<div class="col-1-5">
-					<input type="text" name="adt" id="adt" class="form-control input-contents" value="<%= ergazomenoiData.adt %>" autocomplete="off" />
+				<div class="col-3-74">
+					<select
+						id="doy"
+						name="doy"
+						class="tom-dropdown selectpicker-dropdown-normal left-align"
+						aria-label="Δ.Ο.Υ."
+						data-api="/api/dropdown/doy"
+						single
+						data-target-input="doy_stathera"
+						data-preselect="doy_stathera"
+						data-preload-all="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζ��τηση Δ.Ο.Υ.">
+					</select>
 				</div>
 			</div>
 
-            <div class="height-vh-0_2"></div>
+			<div class="height-vh-0_2"></div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="hmeromhnia_ekdoshs" class="col-form-label label-font-size">
-                    Ημ/νία Έκδοσης / Λήξης
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="typos_taytothtas" class="col-form-label label-font-size field-required">
+					Τύπος Νομ/κού Εγγράφου
+					</label>
+				</div>
+
+				<input
+					type="hidden"
+					name="taytothta_stathera"
+					id="taytothta_stathera"
+					class="form-control input-contents"
+					value="<%= safe('typos_taytothtas') %>"
+					readonly
+				/>
+
+				<div class="col-3-75">
+					<select
+						id="typos_taytothtas"
+						name="typos_taytothtas"
+						class="tom-dropdown selectpicker-dropdown-normal left-align"
+						aria-label="Νομιμοποιητικά έγγραφα"
+						data-api="/api/dropdown/nomimoiEkprosopoi/taytothta"
+						single
+						data-target-input="taytothta_stathera"
+						data-preselect="taytothta_stathera"
+						data-preload-all="true"
+						data-pad-length="6"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Τύπων Νομιμοποιητικών Εγγράφων">
+					</select>
+				</div>
+
+				<div class="col-0-25"></div>
+
+				<div class="col-2 left-align">
+					<label for="adt" class="col-form-label label-font-size field-required">
+					Αριθ.Νομιμ/κού Εγγράφου
+					</label>
+				</div>
 				<div class="col-1-5">
-					<input type="date" name="hmeromhnia_ekdoshs" id="hmeromhnia_ekdoshs" class="date-control" value="<%= ergazomenoiData.hmeromhnia_ekdoshs ? new Date(ergazomenoiData.hmeromhnia_ekdoshs).toISOString().split('T')[0] : '' %>" />
+					<input type="text" name="adt" id="adt" class="form-control input-contents" value="<%= safe('adt') %>" autocomplete="off" />
+				</div>
+			</div>
+
+			<div class="height-vh-0_2"></div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="hmeromhnia_ekdoshs" class="col-form-label label-font-size">
+					Ημ/νία Έκδοσης / Λήξης
+					</label>
+				</div>
+				<div class="col-1-5">
+					<input type="date" name="hmeromhnia_ekdoshs" id="hmeromhnia_ekdoshs" class="date-control" value="<%= safe('hmeromhnia_ekdoshs') ? new Date(safe('hmeromhnia_ekdoshs')).toISOString().split('T')[0] : '' %>" />
 				</div>
 
 				<div class="col-1-5">
-					<input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="<%= ergazomenoiData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy ? new Date(ergazomenoiData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy).toISOString().split('T')[0] : '' %>" />
-		        </div>
-    
-		        <div class="col-1"></div>
+					<input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="<%= safe('hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy') ? new Date(safe('hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy')).toISOString().split('T')[0] : '' %>" />
+				</div>
 
-        		<div class="col-2 left-align">
-          			<label for="arxh_ekdoshs" class="col-form-label label-font-size">
-            		Αρχή Έκδοσης
-          			</label>
-        		</div>
-		        <div class="col-3-99">
-          			<input type="text" name="arxh_ekdoshs" id="arxh_ekdoshs" class="form-control input-contents" value="<%= ergazomenoiData.arxh_ekdoshs %>" />
-        		</div>
-      		</div>
+				<div class="col-1"></div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-        		<div class="col-2 left-align">
-          			<label for="hmeromhnia_gennhshs" class="col-form-label label-font-size field-required">
-            		Ημ/νία Γέννησης
-          			</label>
-        		</div>
-        		<div class="col-1-5">
+				<div class="col-2 left-align">
+					<label for="arxh_ekdoshs" class="col-form-label label-font-size">
+					Αρχή Έκδοσης
+					</label>
+				</div>
+				<div class="col-3-99">
+					<input type="text" name="arxh_ekdoshs" id="arxh_ekdoshs" class="form-control input-contents" value="<%= safe('arxh_ekdoshs') %>" />
+				</div>
+			</div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="hmeromhnia_gennhshs" class="col-form-label label-font-size field-required">
+					Ημ/νία Γέννησης
+					</label>
+				</div>
+				<div class="col-1-5">
 					<input 
 						type="date" 
 						name="hmeromhnia_gennhshs" 
 						id="hmeromhnia_gennhshs" 
 						class="date-control" 
-						value="<%= ergazomenoiData.hmeromhnia_gennhshs instanceof Date ? 
-							ergazomenoiData.hmeromhnia_gennhshs.toISOString().substring(0, 10) : 
-							ergazomenoiData.hmeromhnia_gennhshs ? 
-							new Date(ergazomenoiData.hmeromhnia_gennhshs).toISOString().substring(0, 10) : '' %>" 
+						value="<%= safe('hmeromhnia_gennhshs') instanceof Date ? 
+							safe('hmeromhnia_gennhshs').toISOString().substring(0, 10) : 
+							safe('hmeromhnia_gennhshs') ? 
+							new Date(safe('hmeromhnia_gennhshs')).toISOString().substring(0, 10) : '' %>" 
 					/>
-        		</div>
+				</div>
 
 				<div class="col-2-5 left-align">
 					<label id="label-anhlikos" class="col-form-label"> </label>
 				</div>
 
-        		<div class="col-2 left-align">
-          			<label for="topos_gennhshs" class="col-form-label label-font-size">
-            		Τόπος Γέννησης
-          			</label>
-        		</div>
-        		<div class="col-3-99">
-          			<input type="text" name="topos_gennhshs" id="topos_gennhshs" class="form-control input-contents" value="<%= ergazomenoiData.topos_gennhshs %>" autocomplete="off" />
-        		</div>
-      		</div>
+				<div class="col-2 left-align">
+					<label for="topos_gennhshs" class="col-form-label label-font-size">
+					Τόπος Γέννησης
+					</label>
+				</div>
+				<div class="col-3-99">
+					<input type="text" name="topos_gennhshs" id="topos_gennhshs" class="form-control input-contents" value="<%= safe('topos_gennhshs') %>" autocomplete="off" />
+				</div>
+			</div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-        		<div class="col-2 left-align">
-          			<label for="arithmos_bibliarioy_anhlikoy" class="col-form-label label-font-size">
-            		Αριθ. Βιβλ. Ανηλίκου
-          			</label>
-        		</div>
-        		<div class="col-2">
-          			<input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="<%= ergazomenoiData.arithmos_bibliarioy_anhlikoy %>" autocomplete="off" />
-        		</div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="arithmos_bibliarioy_anhlikoy" class="col-form-label label-font-size">
+					Αριθ. Βιβλ. Ανηλίκου
+					</label>
+				</div>
+				<div class="col-2">
+					<input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="<%= safe('arithmos_bibliarioy_anhlikoy') %>" autocomplete="off" />
+				</div>
 
-                <div class="col-2 margin-bottom-0_2rem">
-                    <!-- Wrapper για button + badge toggle -->
-                    <div class="pdf-button-wrapper">
-                        <!-- Original Button (εμφανίζεται όταν ΔΕΝ έχει file) -->
-                        <button 
-                            type="button" 
-                            id="customButton_anhlikoi" 
-                            class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
-                            data-document-type="anhlikoi"
-                            data-data-bs-title="Βιβλιάριο Ανηλίκου"
-                            disabled>
-                            <i class="bi bi-cloud-arrow-up"></i> 
-                            Βιβλιάριο Ανηλίκου (pdf)
-                        </button>
-                        
-                        <!-- Badge Replacement (εμφανίζεται όταν έχει αρχείο) -->
-                        <div 
-                            class="pdf-badge-replacement hidden" 
-                            data-document-type="anhlikoi"
-                            data-bs-title="Κλικ για αλλαγή αρχείου">
-                            <div class="badge-content">
-                                <i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
-                                <span class="badge-filename text-left">file.pdf</span>
-                            </div>
-                            <button 
-                                type="button" 
-                                class="badge-remove-btn" 
-                                data-bs-title="Αφαίρεση αρχείου"
-                                data-document-type="anhlikoi">
-                                <i class="bi bi-x-circle-fill"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+				<div class="col-2 margin-bottom-0_2rem">
+					<div class="pdf-button-wrapper">
+						<button 
+							type="button" 
+							id="customButton_anhlikoi" 
+							class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+							data-document-type="anhlikoi"
+							data-data-bs-title="Βιβλιάριο Ανηλίκου"
+							disabled>
+							<i class="bi bi-cloud-arrow-up"></i> 
+							Βιβλιάριο Ανηλίκου (pdf)
+						</button>
+						<div 
+							class="pdf-badge-replacement hidden" 
+							data-document-type="anhlikoi"
+							data-bs-title="Κλικ για αλλαγή αρχείου">
+							<div class="badge-content">
+								<i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+								<span class="badge-filename text-left">file.pdf</span>
+							</div>
+							<button 
+								type="button" 
+								class="badge-remove-btn" 
+								data-bs-title="Αφαίρεση αρχείου"
+								data-document-type="anhlikoi">
+								<i class="bi bi-x-circle-fill"></i>
+							</button>
+						</div>
+					</div>
+				</div>
 
-                <div class="col-2 left-align">
-                    <label for="email" class="col-form-label label-font-size field-required">
-                    eMail
-                    </label>
-                </div>
-                <div class="col-4">
-					<input type="text" name="email" id="email" class="form-control input-contents" value="<%= ergazomenoiData.email %>" autocomplete="off" />
-        		</div>
-      		</div>
+				<div class="col-2 left-align">
+					<label for="email" class="col-form-label label-font-size field-required">
+					eMail
+					</label>
+				</div>
+				<div class="col-4">
+					<input type="text" name="email" id="email" class="form-control input-contents" value="<%= safe('email') %>" autocomplete="off" />
+				</div>
+			</div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="yphkoothta" class="col-form-label label-font-size field-required">
-                    Υπηκοότητα
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="yphkoothta" class="col-form-label label-font-size field-required">
+					Υπηκοότητα
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="yphkoothta_stathera"
-                    id="yphkoothta_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.yphkoothta ?? '' %>"
-                    readonly
-                />
+				<input
+					type="hidden"
+					name="yphkoothta_stathera"
+					id="yphkoothta_stathera"
+					class="form-control input-contents"
+					value="<%= safe('yphkoothta') %>"
+					readonly
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="yphkoothta"
-                        name="yphkoothta"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Υπηκοότητες"
-                        data-api="/api/dropdown/ergazomenoi/yphkoothta"
-                        single
-                        data-target-input=<%= `yphkoothta_stathera` %>
-                        data-preselect="yphkoothta_stathera"
-                        data-preload-all="true"
-                        data-pad-length="3"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Υπηκοότητας">
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="yphkoothta"
+						name="yphkoothta"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Υπηκοότητες"
+						data-api="/api/dropdown/ergazomenoi/yphkoothta"
+						single
+						data-target-input="yphkoothta_stathera"
+						data-preselect="yphkoothta_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Υπηκοότητας">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="eidikh_kathgoria_ergazomenoy" class="col-form-label label-font-size">
-                    Ειδική Κατηγορία
-                    </label>
-                </div>
+				<div class="col-2 left-align">
+					<label for="eidikh_kathgoria_ergazomenoy" class="col-form-label label-font-size">
+					Ειδική Κατηγορία
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="eidikh_kathgoria_stathera"
-                    id="eidikh_kathgoria_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.eidikh_kathgoria_ergazomenoy %>"
-                    readonly
-                />
+				<input
+					type="hidden"
+					name="eidikh_kathgoria_stathera"
+					id="eidikh_kathgoria_stathera"
+					class="form-control input-contents"
+					value="<%= safe('eidikh_kathgoria_ergazomenoy') %>"
+					readonly
+				/>
 
-                <div class="col-3-74">
-                    <select
-                        id="eidikh_kathgoria_ergazomenoy"
-                        name="eidikh_kathgoria_ergazomenoy"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Ειδικές κατηγορίες εργαζομένων"
-                        data-api="/api/dropdown/ergazomenoi/eidikh_kathgoria"
-                        single
-                        data-target-input=<%= `eidikh_kathgoria_stathera` %>
-                        data-preselect="eidikh_kathgoria_stathera"
-                        data-preload-all="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Ειδικής Κατηγορίας">
-                    </select>
-                </div>
-            </div>
+				<div class="col-3-74">
+					<select
+						id="eidikh_kathgoria_ergazomenoy"
+						name="eidikh_kathgoria_ergazomenoy"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Ειδικές κατηγορίες εργαζομένων"
+						data-api="/api/dropdown/ergazomenoi/eidikh_kathgoria"
+						single
+						data-target-input="eidikh_kathgoria_stathera"
+						data-preselect="eidikh_kathgoria_stathera"
+						data-preload-all="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Ειδικής Κατηγορίας">
+					</select>
+				</div>
+			</div>
 
 			<div class="height-vh-0_2"></div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem ">
-                <div class="col-2 left-align">
-                    <label for="oikogeneiakh_katastash" class="col-form-label label-font-size field-required">
-                    Οικογενειακή Κατάσταση
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="oikogeneiakh_katastash" class="col-form-label label-font-size field-required">
+					Οικογενειακή Κατάσταση
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="oikogeneiakh_katastash_stathera"
-                    id="oikogeneiakh_katastash_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.oikogeneiakh_katastash %>"
-                    readonly
-                />
+				<input
+					type="hidden"
+					name="oikogeneiakh_katastash_stathera"
+					id="oikogeneiakh_katastash_stathera"
+					class="form-control input-contents"
+					value="<%= safe('oikogeneiakh_katastash') %>"
+					readonly
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="oikogeneiakh_katastash"
-                        name="oikogeneiakh_katastash"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Οικογενειακή Κατάσταση"
-                        data-api="/api/dropdown/ergazomenoi/oikogeneiakh_katastash"
-                        single
-                        data-target-input=<%= `oikogeneiakh_katastash_stathera` %>
-                        data-preselect="oikogeneiakh_katastash_stathera"
-                        data-preload-all="true"
-                        data-pad-length="1"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Οικογενειακής Κατάστασης">
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="oikogeneiakh_katastash"
+						name="oikogeneiakh_katastash"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Οικογενειακή Κατάσταση"
+						data-api="/api/dropdown/ergazomenoi/oikogeneiakh_katastash"
+						single
+						data-target-input="oikogeneiakh_katastash_stathera"
+						data-preselect="oikogeneiakh_katastash_stathera"
+						data-preload-all="true"
+						data-pad-length="1"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Οικογενειακής Κατάστασης">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="arithmos_teknon" class="col-form-label label-font-size field-required">
-                    Αριθ. Τέκνων/Προστ.Μελών
-                    </label>
-                </div>
-		        <div class="col-0-75">
-          			<input type="number" name="arithmos_teknon" id="arithmos_teknon" class="form-control input-contents right-align" value="<%= ergazomenoiData.arithmos_teknon %>" min="0" max="9" />
-        		</div>
-      		</div>
+				<div class="col-2 left-align">
+					<label for="arithmos_teknon" class="col-form-label label-font-size field-required">
+					Αριθ. Τέκνων/Προστ.Μελών
+					</label>
+				</div>
+				<div class="col-0-75">
+					<input type="number" name="arithmos_teknon" id="arithmos_teknon" class="form-control input-contents right-align" value="<%= safe('arithmos_teknon') %>" min="0" max="9" />
+				</div>
+			</div>
 
-       		<hr class="hr-style" />
+			<hr class="hr-style" />
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
 				<div class="col-2 left-align">
 					<label for="odos" class="col-form-label label-font-size">
 					Οδός
 					</label>
 				</div>
 				<div class="col-4">
-					<input type="text" name="odos" id="odos" class="form-control input-contents field-required" value="<%= ergazomenoiData.odos %>" autocomplete="off" />
+					<input type="text" name="odos" id="odos" class="form-control input-contents field-required" value="<%= safe('odos') %>" autocomplete="off" />
 				</div>
-        
-        		<div class="col-2 left-align">
-          			<label for="arithmos" class="col-form-label label-font-size">
-            		Αριθμός
-          			</label>
-        		</div>
-        		<div class="col-1">
-          			<input type="text" name="arithmos" id="arithmos" class="form-control input-contents" value="<%= ergazomenoiData.arithmos %>" autocomplete="off" />
-        		</div>
-      		</div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="tk" class="col-form-label label-font-size">
-                    Ταχ.Κώδικας
-                    </label>
-                </div>
-                <div class="col-1">
-          			<input type="text" name="tk" id="tk" class="form-control input-contents field-required" value="<%= ergazomenoiData.tk %>" autocomplete="off" />
-        		</div>
+				<div class="col-2 left-align">
+					<label for="arithmos" class="col-form-label label-font-size">
+					Αριθμός
+					</label>
+				</div>
+				<div class="col-1">
+					<input type="text" name="arithmos" id="arithmos" class="form-control input-contents" value="<%= safe('arithmos') %>" autocomplete="off" />
+				</div>
+			</div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="tk" class="col-form-label label-font-size">
+					Ταχ.Κώδικας
+					</label>
+				</div>
+				<div class="col-1">
+					<input type="text" name="tk" id="tk" class="form-control input-contents field-required" value="<%= safe('tk') %>" autocomplete="off" />
+				</div>
 
 				<div class="col-3"></div>
 
 				<div class="col-2 left-align">
 					<label for="thlefono" class="col-form-label label-font-size">
-		            Τηλέφωνο
-          			</label>
-        		</div>
+					Τηλέφωνο
+					</label>
+				</div>
 				<div class="col-2">
-					<input type="text" name="thlefono" id="thlefono" class="form-control input-contents" value="<%= ergazomenoiData.thlefono %>" autocomplete="off" />
-        		</div>
-      		</div>
+					<input type="text" name="thlefono" id="thlefono" class="form-control input-contents" value="<%= safe('thlefono') %>" autocomplete="off" />
+				</div>
+			</div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="perifereia" class="col-form-label label-font-size">
-                    Περιφέρεια
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="perifereia" class="col-form-label label-font-size">
+					Περιφέρεια
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="perifereia_stathera"
-                    id="perifereia_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.perifereia %>"
-                />
+				<input
+					type="hidden"
+					name="perifereia_stathera"
+					id="perifereia_stathera"
+					class="form-control input-contents"
+					value="<%= safe('perifereia') %>"
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="perifereia"
-                        name="perifereia"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Περιφέρεια"
-                        data-api="/api/dropdown/ergazomenoi/perifereia"
-                        single
-                        data-target-input=<%= `perifereia_stathera` %>
-                        data-preselect="perifereia_stathera"
-                        data-preload-all="true"
-                        data-pad-length="2"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Περιφερειών">
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="perifereia"
+						name="perifereia"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Περιφέρεια"
+						data-api="/api/dropdown/ergazomenoi/perifereia"
+						single
+						data-target-input="perifereia_stathera"
+						data-preselect="perifereia_stathera"
+						data-preload-all="true"
+						data-skip-autoload="true"
+						data-pad-length="2"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Περιφερειών">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="nomos" class="col-form-label label-font-size">
-                    Περιφερειακή Ενότητα
-                    </label>
-                </div>
+				<div class="col-2 left-align">
+					<label for="nomos" class="col-form-label label-font-size">
+					Περιφερειακή Ενότητα
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="nomos_stathera"
-                    id="nomos_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.nomos %>"
-                />
+				<input
+					type="hidden"
+					name="nomos_stathera"
+					id="nomos_stathera"
+					class="form-control input-contents"
+					value="<%= safe('nomos') %>"
+				/>
 
-                <div class="col-3-74">
-                    <select
-                        id="nomos"
-                        name="nomos"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Περιφερειακή Ενότητα"
-                        data-api="/api/dropdown/ergazomenoi/nomos"
-                        single
-                        data-target-input=<%= `nomos_stathera` %>
-                        data-preselect="nomos_stathera"
-                        data-preload-all="false"
-                        data-skip-autoload="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Περιφερειακών Ενοτήτων"
-                        >
-                    </select>
-                </div>
-            </div>
+				<div class="col-3-74">
+					<select
+						id="nomos"
+						name="nomos"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Περιφερειακή Ενότητα"
+						data-api="/api/dropdown/ergazomenoi/nomos"
+						single
+						data-target-input="nomos_stathera"
+						data-preselect="nomos_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Περιφερειακών Ενοτήτων">
+					</select>
+				</div>
+			</div>
 
-            <div class="height-vh-0_2"></div>
+			<div class="height-vh-0_2"></div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="dhmos" class="col-form-label label-font-size">
-                    Δημοτική Ενότητα
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+				<div class="col-2 left-align">
+					<label for="dhmos" class="col-form-label label-font-size">
+					Δημοτική Ενότητα
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="dhmos_stathera"
-                    id="dhmos_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.dhmos %>"
-                />
+				<input
+					type="hidden"
+					name="dhmos_stathera"
+					id="dhmos_stathera"
+					class="form-control input-contents"
+					value="<%= safe('dhmos') %>"
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="dhmos"
-                        name="dhmos"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Δημοτική Ενότητα"
-                        data-api="/api/dropdown/ergazomenoi/dhmos"
-                        single
-                        data-target-input=<%= `dhmos_stathera` %>
-                        data-preselect="dhmos_stathera"
-                        data-preload-all="false"
-                        data-skip-autoload="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Δημοτικών Ενοτήτων"
-                        disabled>
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="dhmos"
+						name="dhmos"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Δημοτική Ενότητα"
+						data-api="/api/dropdown/ergazomenoi/dhmos"
+						single
+						data-target-input="dhmos_stathera"
+						data-preselect="dhmos_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Δημοτικών Ενοτήτων">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="polh" class="col-form-label label-font-size">
-                    Δημοτικό Διαμέρισμα
-                    </label>
-                </div>
+				<div class="col-2 left-align">
+					<label for="polh" class="col-form-label label-font-size">
+					Δημοτικό Διαμέρισμα
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="polh_stathera"
-                    id="polh_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.polh %>"
-                />
+				<input
+					type="hidden"
+					name="polh_stathera"
+					id="polh_stathera"
+					class="form-control input-contents"
+					value="<%= safe('polh') %>"
+				/>
 
-                <div class="col-3-74">
-                    <select
-                        id="polh"
-                        name="polh"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Δημοτικό Διαμέρισμα"
-                        data-api="/api/dropdown/ergazomenoi/polh"
-                        single
-                        data-target-input=<%= `polh_stathera` %>
-                        data-preselect="polh_stathera"
-                        data-preload-all="false"
-                        data-skip-autoload="true"
-                        data-pad-length="8"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Δημοτικών Διαμερισμάτων"
-                        disabled>
-                    </select>
-                </div>
-            </div>
+				<div class="col-3-74">
+					<select
+						id="polh"
+						name="polh"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Δημοτικό Διαμέρισμα"
+						data-api="/api/dropdown/ergazomenoi/polh"
+						single
+						data-target-input="polh_stathera"
+						data-preselect="polh_stathera"
+						data-preload-all="false"
+						data-skip-autoload="true"
+						data-pad-length="8"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Δημοτικών Διαμερισμάτων">
+					</select>
+				</div>
+			</div>
 
-            <hr  class="hr-style" />
+			<hr class="hr-style" />
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-bottom-0_65rem">
-                <div class="col-2 left-align">
-                    <label for="ekpaideytiko_epipedo" class="col-form-label label-font-size field-required">
-                    Εκπαιδευτικό Επίπεδο
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-bottom-0_65rem">
+				<div class="col-2 left-align">
+					<label for="ekpaideytiko_epipedo" class="col-form-label label-font-size field-required">
+					Εκπαιδευτικό Επίπεδο
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="ekpaideytiko_epipedo_stathera"
-                    id="ekpaideytiko_epipedo_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.ekpaideytiko_epipedo %>"
-                />
+				<input
+					type="hidden"
+					name="ekpaideytiko_epipedo_stathera"
+					id="ekpaideytiko_epipedo_stathera"
+					class="form-control input-contents"
+					value="<%= safe('ekpaideytiko_epipedo') %>"
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="ekpaideytiko_epipedo"
-                        name="ekpaideytiko_epipedo"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Εκπαιδευτικό Επίπεδο"
-                        data-api="/api/dropdown/ergazomenoi/ekpaideytiko_epipedo"
-                        single
-                        data-target-input=<%= `ekpaideytiko_epipedo_stathera` %>
-                        data-preselect="ekpaideytiko_epipedo_stathera"
-                        data-preload-all="true"
-                        data-pad-length="2"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Εκπαιδευτικού Επιπέδου">
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="ekpaideytiko_epipedo"
+						name="ekpaideytiko_epipedo"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Εκπαιδευτικό Επίπεδο"
+						data-api="/api/dropdown/ergazomenoi/ekpaideytiko_epipedo"
+						single
+						data-target-input="ekpaideytiko_epipedo_stathera"
+						data-preselect="ekpaideytiko_epipedo_stathera"
+						data-preload-all="true"
+						data-pad-length="2"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Εκπαιδευτικού Επιπέδου">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="thesh_eythynhs" class="col-form-label label-font-size">
-                    Φορολογική Κλίμακα
-                    </label>
-                </div>
+				<div class="col-2 left-align">
+					<label for="forologikh_klimaka" class="col-form-label label-font-size">
+					Φορολογική Κλίμακα
+					</label>
+				</div>
 
-                <div class="col-4">
-                    <input type="text" name="forologikh_klimaka" id="forologikh_klimaka" class="form-control input-contents" value="<%= ergazomenoiData.forologikh_klimaka %>" readonly/>
-                </div>
-            </div>
+				<div class="col-4">
+					<input type="text" name="forologikh_klimaka" id="forologikh_klimaka" class="form-control input-contents" value="<%= safe('forologikh_klimaka') %>" readonly />
+				</div>
+			</div>
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
-                <div class="col-2 left-align">
-                    <label for="trapeza" class="col-form-label label-font-size">
-                    Τράπεζα Κατάθεσης Μισθού
-                    </label>
-                </div>
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--1_5rem">
+				<div class="col-2 left-align">
+					<label for="trapeza" class="col-form-label label-font-size">
+					Τράπεζα Κατάθεσης Μισθού
+					</label>
+				</div>
 
-                <input
-                    type="hidden"
-                    name="trapeza_stathera"
-                    id="trapeza_stathera"
-                    class="form-control input-contents"
-                    value="<%= ergazomenoiData.trapeza %>"
-                    readonly
-                />
+				<input
+					type="hidden"
+					name="trapeza_stathera"
+					id="trapeza_stathera"
+					class="form-control input-contents"
+					value="<%= safe('trapeza') %>"
+					readonly
+				/>
 
-                <div class="col-3-75">
-                    <select
-                        id="trapeza"
-                        name="trapeza"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Τράπεζα"
-                        data-api="/api/dropdown/ergazomenoi/trapeza"
-                        single
-                        data-target-input=<%= `trapeza_stathera` %>
-                        data-preselect="trapeza_stathera"
-                        data-preload-all="true"
-                        data-pad-length="4"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
-                        placeholder="Αναζήτηση Τράπεζας">
-                    </select>
-                </div>
+				<div class="col-3-75">
+					<select
+						id="trapeza"
+						name="trapeza"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Τράπεζα"
+						data-api="/api/dropdown/ergazomenoi/trapeza"
+						single
+						data-target-input="trapeza_stathera"
+						data-preselect="trapeza_stathera"
+						data-preload-all="true"
+						data-pad-length="4"
+						data-xrhsh-related="false"
+						data-team-related="false"
+						data-company-related="false"
+						data-mhnas-related="false"
+						placeholder="Αναζήτηση Τράπεζας">
+					</select>
+				</div>
 
-                <div class="col-0-25"></div>
+				<div class="col-0-25"></div>
 
-                <div class="col-2 left-align">
-                    <label for="iban" class="col-form-label label-font-size">
-                    IBAN Εργαζόμενου / ης
-                    </label>
-                </div>
-                <div class="col-3-99">
-                    <input type="text" name="iban" id="iban" class="form-control input-contents" value="<%= ergazomenoiData.iban %>" autocomplete="off" />
-                </div>
-            </div>
-            <div class="height-vh-3_5"></div>
-        </div>
-    </div>
+				<div class="col-2 left-align">
+					<label for="iban" class="col-form-label label-font-size">
+					IBAN Εργαζόμενου / ης
+					</label>
+				</div>
+				<div class="col-3-99">
+					<input type="text" name="iban" id="iban" class="form-control input-contents" value="<%= safe('iban') %>" autocomplete="off" />
+				</div>
+			</div>
+			<div class="height-vh-3_5"></div>
+		</div>
+	</div>
 </div>

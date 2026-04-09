@@ -16,8 +16,13 @@ const Models_C = require('../../models/companies');
 const Models_D = require('../../models/ergazomenoi');
 const Models_E = require('../../models/pdfDocument');
 
-const { KrathseisModel, PerifereiesModel, GenikesParametroiModel, ForologikesKlimakesModel } =
-    Models_A;
+const {
+    KrathseisModel,
+    PerifereiesModel,
+    GenikesParametroiModel,
+    ForologikesKlimakesModel,
+    ProgrammataDypaModel
+} = Models_A;
 
 const { UserPrivilegesModel } = Models_B;
 
@@ -208,6 +213,18 @@ class ergazomenoiController {
                 .sort({ hmeromhnia: 1 })
                 .exec();
 
+            let url_link_programma_dypa = '';
+
+            if (ergazomenoiData.programma_dypa) {
+                const programma = await ProgrammataDypaModel.findOne({
+                    kodikos: ergazomenoiData.programma_dypa
+                })
+                    .select('url_link')
+                    .lean();
+
+                url_link_programma_dypa = programma?.url_link || '';
+            }
+
             res.render('ergazomenoi/ergazomenoi/edit', {
                 locals,
                 perifereies,
@@ -215,11 +232,14 @@ class ergazomenoiController {
                 genikesParametroi,
                 istorikoData,
                 orariaData,
-                ergazomenoiData,
+                ergazomenoiData: {
+                    ...ergazomenoiData,
+                    url_link_programma_dypa // ✅ Πέρασέ το στο view
+                },
                 sessionYearInUse,
                 mode: 'edit',
                 context: 'ergazomenoi',
-                rec: {}
+                rec: ergazomenoiData
             });
         } catch (error) {
             console.log('Σφάλμα :', error);

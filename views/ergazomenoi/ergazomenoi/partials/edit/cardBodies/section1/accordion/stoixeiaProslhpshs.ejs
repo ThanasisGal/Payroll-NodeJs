@@ -18,20 +18,20 @@
                     </label>
                 </div>
                 <div class="col-1-5">
-					<input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= ergazomenoiData.hmeromhnia_proslhpshs ? new Date(ergazomenoiData.hmeromhnia_proslhpshs).toISOString().split('T')[0] : '' %>" />
-        		</div>
-        		
-				<div class="col-2-5"></div>
+                    <input type="date" name="hmeromhnia_proslhpshs" id="hmeromhnia_proslhpshs" class="date-control" value="<%= safe('hmeromhnia_proslhpshs') ? new Date(safe('hmeromhnia_proslhpshs')).toISOString().split('T')[0] : '' %>" />
+                </div>
+                
+                <div class="col-2-5"></div>
 
-        		<div class="col-2 left-align">
-          			<label for="hmeromhnia_allaghs_symbashs" class="col-form-label label-font-size">
-            		Ημ/νία Αλλαγής Σύμβασης
-          			</label>
-        		</div>
-        		<div class="col-1-5">
-          			<input type="date" name="hmeromhnia_allaghs_symbashs" id="hmeromhnia_allaghs_symbashs" class="date-control" value="<%= ergazomenoiData.hmeromhnia_allaghs_symbashs ? new Date(ergazomenoiData.hmeromhnia_allaghs_symbashs).toISOString().split('T')[0] : '' %>" />
-				</div>
-      		</div>
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_allaghs_symbashs" class="col-form-label label-font-size">
+                    Ημ/νία Αλλαγής Σύμβασης
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_symbashs" id="hmeromhnia_allaghs_symbashs" class="date-control" value="<%= safe('hmeromhnia_allaghs_symbashs') ? new Date(safe('hmeromhnia_allaghs_symbashs')).toISOString().split('T')[0] : '' %>" />
+                </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
@@ -40,20 +40,20 @@
                    </label>
                 </div>
                 <div class="col-1-5">
-					<input type="date" name="hmeromhnia_allaghs_orarioy_apo" id="hmeromhnia_allaghs_orarioy_apo" class="date-control" value="<%= ergazomenoiData.hmeromhnia_allaghs_orarioy_apo ? new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo).toISOString().split('T')[0] : '' %>" />
-		        </div>
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_apo" id="hmeromhnia_allaghs_orarioy_apo" class="date-control" value="<%= safe('hmeromhnia_allaghs_orarioy_apo') ? new Date(safe('hmeromhnia_allaghs_orarioy_apo')).toISOString().split('T')[0] : '' %>" />
+                </div>
 
-        		<div class="col-2-5"></div>
+                <div class="col-2-5"></div>
 
-				<div class="col-2 left-align">
-					<label for="hmeromhnia_allaghs_orarioy_eos" class="col-form-label" style="font-size: 0.72vw;">
-					Ημ/νία Αλλαγής Ωραρίου ΕΩΣ
-					</label>
-				</div>
-				<div class="col-1-5">
-          			<input type="date" name="hmeromhnia_allaghs_orarioy_eos" id="hmeromhnia_allaghs_orarioy_eos" class="date-control" value="<%= ergazomenoiData.hmeromhnia_allaghs_orarioy_eos ? new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos).toISOString().split('T')[0] : '' %>" />
-        		</div>
-      		</div>
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_allaghs_orarioy_eos" class="col-form-label" style="font-size: 0.72vw;">
+                    Ημ/νία Αλλαγής Ωραρίου ΕΩΣ
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_allaghs_orarioy_eos" id="hmeromhnia_allaghs_orarioy_eos" class="date-control" value="<%= safe('hmeromhnia_allaghs_orarioy_eos') ? new Date(safe('hmeromhnia_allaghs_orarioy_eos')).toISOString().split('T')[0] : '' %>" />
+                </div>
+            </div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
@@ -61,23 +61,23 @@
                     Ημ/νία Λήξης Σύμβασης
                     </label>
                 </div>
-				<div class="col-1-5">
-					<input type="date" name="hmeromhnia_lhxhs_symbashs" id="hmeromhnia_lhxhs_symbashs" class="date-control" value="<%= ergazomenoiData.hmeromhnia_lhxhs_symbashs ? new Date(ergazomenoiData.hmeromhnia_lhxhs_symbashs).toISOString().split('T')[0] : '' %>" />
-				</div>
-		
-				<div class="col-2-5"></div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_lhxhs_symbashs" id="hmeromhnia_lhxhs_symbashs" class="date-control" value="<%= safe('hmeromhnia_lhxhs_symbashs') ? new Date(safe('hmeromhnia_lhxhs_symbashs')).toISOString().split('T')[0] : '' %>" />
+                </div>
+        
+                <div class="col-2-5"></div>
 
-		        <div class="col-2 left-align">
-          			<label for="hmeromhnia_apoxorhshs" class="col-form-label label-font-size">
-            		Ημ/νία Αποχώρησης  
-          			</label>  
-        		</div>  
-        		<div class="col-1-5">
-          			<input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="<%= ergazomenoiData.hmeromhnia_apoxorhshs ? new Date(ergazomenoiData.hmeromhnia_apoxorhshs).toISOString().split('T')[0] : '' %>" />  
-        		</div>		  
-			</div>		  
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_apoxorhshs" class="col-form-label label-font-size">
+                    Ημ/νία Αποχώρησης  
+                    </label>  
+                </div>  
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_apoxorhshs" id="hmeromhnia_apoxorhshs" class="date-control" value="<%= safe('hmeromhnia_apoxorhshs') ? new Date(safe('hmeromhnia_apoxorhshs')).toISOString().split('T')[0] : '' %>" />  
+                </div>		  
+            </div>		  
 
-			<div class="height-vh-0_2"></div>
+            <div class="height-vh-0_2"></div>
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
@@ -86,7 +86,7 @@
                     </label>
                 </div>
                 <div class="col-1 left-align checkbox-flex-center">
-                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_daneismo_ergazomenoy" name="afora_daneismo_ergazomenoy" <%= ergazomenoiData.afora_daneismo_ergazomenoy ? 'checked' : '' %>  value="" />
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_daneismo_ergazomenoy" name="afora_daneismo_ergazomenoy" <%= safe('afora_daneismo_ergazomenoy') ? 'checked' : '' %> value="" />
                     <label for="afora_daneismo_ergazomenoy" id="label-afora_daneismo_ergazomenoy" class="margin-left-0_75rem  font-size-vw-0_875">
                     </label>
                 </div>
@@ -137,7 +137,7 @@
                     name="typos_daneismoy_stathera"
                     id="typos_daneismoy_stathera"
                     class="form-control input-contents"
-                    value="<%= ergazomenoiData.typos_daneismoy %>"
+                    value="<%= safe('typos_daneismoy') %>"
                 />
 
                 <div class="col-3-75">
@@ -155,7 +155,6 @@
                         placeholder="Αναζήτηση Τύπου Δανεισμού">
                     </select>
                 </div>
-
             </div>
 
             <div class="height-vh-0_2"></div>
@@ -167,7 +166,7 @@
                     </label>
                 </div>
                 <div class="col-1-5 left-align">
-					<input type="date" name="hmnia_enarxhs_daneismoy" id="hmnia_enarxhs_daneismoy" class="date-control" value="<%= ergazomenoiData.hmnia_enarxhs_daneismoy ? new Date(ergazomenoiData.hmnia_enarxhs_daneismoy).toISOString().split('T')[0] : '' %>" />  
+                    <input type="date" name="hmnia_enarxhs_daneismoy" id="hmnia_enarxhs_daneismoy" class="date-control" value="<%= safe('hmnia_enarxhs_daneismoy') ? new Date(safe('hmnia_enarxhs_daneismoy')).toISOString().split('T')[0] : '' %>" />  
                 </div>
                 
                 <div class="col-2-5"></div>
@@ -178,7 +177,7 @@
                     </label>
                 </div>
                 <div class="col-1-5 left-align">
-					<input type="date" name="hmnia_lhxhs_daneismoy" id="hmnia_lhxhs_daneismoy" class="date-control" value="<%= ergazomenoiData.hmnia_lhxhs_daneismoy ? new Date(ergazomenoiData.hmnia_lhxhs_daneismoy).toISOString().split('T')[0] : '' %>" />  
+                    <input type="date" name="hmnia_lhxhs_daneismoy" id="hmnia_lhxhs_daneismoy" class="date-control" value="<%= safe('hmnia_lhxhs_daneismoy') ? new Date(safe('hmnia_lhxhs_daneismoy')).toISOString().split('T')[0] : '' %>" />  
                 </div>
             </div>
 
@@ -192,7 +191,7 @@
                     </label>
                 </div>
                 <div class="col-3-75 left-align checkbox-flex-center">
-                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_dokimastikh_periodo" name="afora_dokimastikh_periodo" <%= ergazomenoiData.afora_dokimastikh_periodo ? 'checked' : '' %>  value="" />
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="afora_dokimastikh_periodo" name="afora_dokimastikh_periodo" <%= safe('afora_dokimastikh_periodo') ? 'checked' : '' %> value="" />
                     <label for="afora_dokimastikh_periodo" id="label-afora_dokimastikh_periodo" class="margin-left-0_75rem  font-size-vw-0_875">
                     </label>
                 </div>
@@ -205,7 +204,7 @@
                     </label>
                 </div>
                 <div class="col-1-5 left-align">
-                    <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" data-bs-toggle="tooltip" data-bs-title="Στην Αορίστου Χρόνου η δοκιμαστική περίοδος είναι έως 6 μήνες ενώ στην ορισμένου χρόνου έως το ¼ της χρονικής διάρκειάς της και σε κάθε περίπτωση έως 6 μήνες." data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="" />
+                    <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" data-bs-toggle="tooltip" data-bs-title="Στην Αορίστου Χρόνου η δοκιμαστική περίοδος είναι έως 6 μήνες ενώ στην ορισμένου χρόνου έως το ¼ της χρονικής διάρκειάς της και σε κάθε περίπτωση έως 6 μήνες." data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="<%= safe('hmnia_lhxhs_dokimastikhs_periodoy') ? new Date(safe('hmnia_lhxhs_dokimastikhs_periodoy')).toISOString().split('T')[0] : '' %>" />
                 </div>
             </div>
 
@@ -224,7 +223,7 @@
                     name="kathestos_apasxolhshs_stathera"
                     id="kathestos_apasxolhshs_stathera"
                     class="form-control input-contents"
-                    value="<%= ergazomenoiData.kathestos_apasxolhshs %>"
+                    value="<%= safe('kathestos_apasxolhshs') %>"
                 />
 
                 <div class="col-3-75">
@@ -259,7 +258,7 @@
                     name="sxesh_ergasias_stathera"
                     id="sxesh_ergasias_stathera"
                     class="form-control input-contents"
-                    value="<%= ergazomenoiData.sxesh_ergasias %>"
+                    value="<%= safe('sxesh_ergasias') %>"
                 />
 
                 <div class="col-3-74">
@@ -285,126 +284,264 @@
             
             <div class="height-vh-0_1"></div>
 
-
-
-
-			
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="proyphresia_se_eth" class="col-form-label label-font-size field-required">
-            Έτη Προϋπηρεσίας
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="proyphresia_se_eth" name="proyphresia_se_eth" class="form-control input-contents" min="0" max="40" value="<%= ergazomenoiData.proyphresia_se_eth %>" />
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="proyphresia_se_eth" class="col-form-label label-font-size field-required">
+                    Έτη Προϋπηρεσίας
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="proyphresia_se_eth" name="proyphresia_se_eth" class="form-control input-contents right-align" min="0" max="40" value="<%= safe('proyphresia_se_eth') %>" />
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="proyphresia_se_mhnes" class="col-form-label label-font-size field-required">
-            Μήνες Προϋπηρεσίας
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="proyphresia_se_mhnes" name="proyphresia_se_mhnes" class="form-control input-contents" min="0" max="11" value="<%= ergazomenoiData.proyphresia_se_mhnes %>" />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="proyphresia_se_mhnes" class="col-form-label label-font-size">
+                    Μήνες Προϋπηρεσίας
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="proyphresia_se_mhnes" name="proyphresia_se_mhnes" class="form-control input-contents right-align" min="0" max="11" value="<%= safe('proyphresia_se_mhnes') %>" />
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="synolo_proyphresias_se_eth" class="col-form-label label-font-size">
-            Σύνολο Ετών Προϋπηρεσίας
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="synolo_proyphresias_se_eth" name="synolo_proyphresias_se_eth" class="form-control input-contents" value="<%= ergazomenoiData.synolo_proyphresias_se_eth %>" readonly />
-        </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="synolo_proyphresias_se_eth" class="col-form-label label-font-size">
+                    Σύνολο Ετών Προϋπηρεσίας
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="synolo_proyphresias_se_eth" name="synolo_proyphresias_se_eth" class="form-control input-contents right-align" value="<%= safe('synolo_proyphresias_se_eth') %>" readonly />
+                </div>        
+                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="synolo_proyphresias_se_mhnes" class="col-form-label label-font-size-smaller">
+                    Σύνολο Μηνών Προϋπηρεσίας
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="synolo_proyphresias_se_mhnes" name="synolo_proyphresias_se_mhnes" class="form-control input-contents right-align" value="<%= safe('synolo_proyphresias_se_mhnes') %>" readonly />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="proyphresia_adeias_se_eth" class="col-form-label label-font-size">
+                    Έτη Προϋπηρεσίας (Άδεια)
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="proyphresia_adeias_se_eth" name="proyphresia_adeias_se_eth" class="form-control input-contents right-align" min="0" max="40" value="<%= safe('proyphresia_adeias_se_eth') %>" />
+                </div>
         
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="synolo_proyphresias_se_mhnes" class="col-form-label label-font-size-smaller">
-            Σύνολο Μηνών Προϋπηρεσίας
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="synolo_proyphresias_se_mhnes" name="synolo_proyphresias_se_mhnes" class="form-control input-contents" value="<%= ergazomenoiData.synolo_proyphresias_se_mhnes %>" readonly />
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="misthologiko_klimakio" class="col-form-label label-font-size">
+                    Μισθολογικό Κλιμάκιο
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="misthologiko_klimakio" name="misthologiko_klimakio" class="form-control input-contents right-align" value="<%= safe('misthologiko_klimakio') %>" readonly />
+                </div>
+            </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="proyphresia_adeias_se_eth" class="col-form-label label-font-size field-required">
-            Έτη Προϋπηρεσίας (Άδεια)
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="proyphresia_adeias_se_eth" name="proyphresia_adeias_se_eth" class="form-control input-contents" min="0" max="40" value="<%= ergazomenoiData.synolo_proyphresias_se_mhnes %>" />
-        </div>
-        
-        <div class="col-3"></div>
+            <div class="height-vh-0_2"></div>
 
-        <div class="col-2 left-align">
-          <label for="misthologiko_klimakio" class="col-form-label label-font-size">
-            Μισθολογικό Κλιμάκιο
-          </label>
-        </div>
-        <div class="col-1 left-align">
-          <input type="number" id="misthologiko_klimakio" name="misthologiko_klimakio" class="form-control input-contents" value="<%= ergazomenoiData.misthologiko_klimakio %>" readonly />
-        </div>
-      </div>
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="syggeneia" class="col-form-label label-font-size">
+                    Συγγένεια
+                    </label>
+                </div>
+                <div class="col-1 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="syggeneia" name="syggeneia" <%= safe('syggeneia') ? 'checked' : '' %> value="" />
+                    <label for="syggeneia" id="label-syggeneia" class="margin-left-0_75rem  font-size-vw-0_875">
+                    ΟΧΙ
+                    </label>
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="syggeneia" class="col-form-label label-font-size">
-            Συγγένεια
-          </label>
-        </div>
-        <div class="col-1 left-align checkbox-flex-center">
-          <input type="checkbox" id="syggeneia" name="syggeneia" class="form-check-input custom-checkbox checkbox-class" data-related-select="syggenikh_sxesh" <%= ergazomenoiData.syggeneia ? 'checked' : '' %> value="" />
-          <label for="syggeneia" id="label-syggeneia" style="margin-left: 0.75rem; font-size: 0.875vw;">
-            ΟΧΙ
-          </label>
-        </div>
-        
-        <div class="col-3"></div>
+                <div class="col-3"></div>
 
-        <div class="col-2 left-align">
-          <label for="syggenikh_sxesh" class="col-form-label label-font-size">
-            Συγγενική Σχέση
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal select-class" data-live-search="true" name="syggenikh_sxesh" id="syggenikh_sxesh" data-selected="<%= ergazomenoiData.syggenikh_sxesh.trim() %>" disabled>
-          </select>
-        </div>
-      </div>
+                <div class="col-2 left-align">
+                    <label for="syggenikh_sxesh" id="syggenikh_sxesh_label" class="col-form-label label-font-size">
+                    Συγγενική Σχέση
+                    </label>
+                </div>
 
-      <div class="row form-group g-3 align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-        <div class="col-2 left-align">
-          <label for="thesh_eythynhs" class="col-form-label label-font-size">
-            Θέση Ευθύνης
-          </label>
-        </div>
-        <div class="col-4">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="thesh_eythynhs" id="thesh_eythynhs" data-selected="<%= ergazomenoiData.thesh_eythynhs.trim() %>">
-          </select>
-        </div>
+                <input
+                    type="hidden"
+                    name="syggenikh_sxesh_stathera"
+                    id="syggenikh_sxesh_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('syggenikh_sxesh') %>"
+                />
 
-        <div class="col-2 left-align">
-          <label for="eidikh_periptosh" class="col-form-label label-font-size">
-            Ειδική Περίπτωση
-          </label>
-        </div>
-        <div class="col-3-99">
-          <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidikh_periptosh" id="eidikh_periptosh" data-selected="<%= ergazomenoiData.eidikh_periptosh.trim() %>">
-          </select>
-        </div>
-      </div>
+                <div class="col-3-74">
+                    <select
+                        id="syggenikh_sxesh"
+                        name="syggenikh_sxesh"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Συγγενική Σχέση"
+                        data-api="/api/dropdown/ergazomenoi/syggenikh_sxesh"
+                        single
+                        data-target-input=<%= `syggenikh_sxesh_stathera` %>
+                        data-preselect="syggenikh_sxesh_stathera"
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Συγγενικής Σχέσης">
+                    </select>
+                </div>
+            </div>
 
-      <hr class="hr-style" />
+            <div class="height-vh-0_2"></div>
 
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="thesh_eythynhs" class="col-form-label label-font-size">
+                    Θέση Ευθύνης
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="thesh_eythynhs_stathera"
+                    id="thesh_eythynhs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('thesh_eythynhs') || '1' %>"
+                />
+
+                <div class="col-3-75">
+                    <select
+                        id="thesh_eythynhs"
+                        name="thesh_eythynhs"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Θέση Ευθύνης"
+                        data-api="/api/dropdown/ergazomenoi/thesh_eythynhs"
+                        single
+                        data-target-input=<%= `thesh_eythynhs_stathera` %>
+                        data-preselect="thesh_eythynhs_stathera"
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Θέσης Ευθύνης">
+                    </select>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="eidikh_periptosh" class="col-form-label label-font-size">
+                    Ειδική Περίπτωση
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="eidikh_periptosh_stathera"
+                    id="eidikh_periptosh_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('eidikh_periptosh') %>"
+                />
+
+                <div class="col-3-74">
+                    <select
+                        id="eidikh_periptosh"
+                        name="eidikh_periptosh"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Ειδική Περίπτωση"
+                        data-api="/api/dropdown/ergazomenoi/eidikh_periptosh"
+                        single
+                        data-target-input=<%= `eidikh_periptosh_stathera` %>
+                        data-preselect="eidikh_periptosh_stathera"
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Ειδικής Περίπτωσης">
+                    </select>
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="topos_ergasias" class="col-form-label label-font-size field-required">
+                    Τόπος Εργασίας
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="topos_ergasias" name="topos_ergasias" <%= safe('topos_ergasias') ? 'checked' : '' %> value="" />
+                    <label for="topos_ergasias" id="label-topos_ergasias" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="topos_ergasias_parathrhseis" class="col-form-label label-font-size">
+                    Τόπος Εργασίας-Παρατηρήσεις
+                    </label>
+                </div>
+                <div class="col-4 left-align">
+                    <input type="text" id="topos_ergasias_parathrhseis" name="topos_ergasias_parathrhseis" class="form-control input-contents clearableInputs left-align" value="<%= safe('topos_ergasias_parathrhseis') %>" maxlength="500" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="xronos_katabolhs_apodoxon" class="col-form-label label-font-size field-required">
+                    Χρόνος Καταβολής Αποδοχών
+                    </label>
+                </div>
+
+                <div class="col-10 left-align">
+                    <input type="text" id="xronos_katabolhs_apodoxon" name="xronos_katabolhs_apodoxon" class="form-control input-contents clearableInputs left-align" value="<%= safe('xronos_katabolhs_apodoxon') %>" maxlength="100" />
+                </div>
+            </div>
+
+            <div class="height-vh-0_1"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
+                    <label for="efarmostea_sse" class="col-form-label label-font-size field-required">
+                    Εφαρμοστέα Σ.Σ.Ε.
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="efarmostea_sse" name="efarmostea_sse" <%= safe('efarmostea_sse') ? 'checked' : '' %> value="" />
+                    <label for="efarmostea_sse" id="label-efarmostea_sse" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="efarmostea_sse_parathrhseis" class="col-form-label label-font-size">
+                    Εφαρμοστέα ΣΣΕ-Παρατηρήσεις
+                    </label>
+                </div>
+                <div class="col-4 left-align">
+                    <input type="text" id="efarmostea_sse_parathrhseis" name="efarmostea_sse_parathrhseis" class="form-control input-contents clearableInputs left-align" value="<%= safe('efarmostea_sse_parathrhseis') %>" maxlength="500" />
+                </div>
+            </div>
+
+            <div class="height-vh-3_5"></div>
+        </div>
     </div>
-  </div>
 </div>

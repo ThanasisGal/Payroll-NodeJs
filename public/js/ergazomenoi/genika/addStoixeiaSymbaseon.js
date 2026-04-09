@@ -6,25 +6,25 @@ const Decimal = window.Decimal;
 
 import { initTomDropdown } from '../../dropdown-item.js';
 
-import { 
-	toDecimal, 
-	formatDecimal, 
-	showAlert,
-	fetchGenikesParametroi,
-	fetchApodoxesData,
-	updateGeneralParameters,
-	updatePosoBasedOnHours
-} from 'apodoxes-calculations';  // ✅ Alias από importmap
+import {
+    toDecimal,
+    formatDecimal,
+    showAlert,
+    fetchGenikesParametroi,
+    fetchApodoxesData,
+    updateGeneralParameters,
+    updatePosoBasedOnHours
+} from 'apodoxes-calculations'; // ✅ Alias από importmap
 
 // ========================================================================
 // DECIMAL.JS CONFIGURATION
 // ========================================================================
 
-Decimal.set({ 
-	precision: 28,
-	rounding: Decimal.ROUND_HALF_UP,
-	toExpNeg: -7,
-	toExpPos: 15
+Decimal.set({
+    precision: 28,
+    rounding: Decimal.ROUND_HALF_UP,
+    toExpNeg: -7,
+    toExpPos: 15
 });
 
 // ========================================================================
@@ -35,9 +35,9 @@ function formatForDisplay(decimalValue, decimals) {
     const rounded = toDecimal(decimalValue).toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP);
     const str = rounded.toString();
     const parts = str.split('.');
-    
+
     if (parts.length === 1) {
-        return str + '.' + '0'. repeat(decimals);
+        return str + '.' + '0'.repeat(decimals);
     } else {
         const decimalPart = parts[1].padEnd(decimals, '0');
         return parts[0] + '.' + decimalPart;
@@ -48,8 +48,12 @@ function formatForDisplay(decimalValue, decimals) {
 function safeSetValue(id, value) {
     const el = document.getElementById(id);
     if (el) {
-        try { el.value = value; } catch (_) { console.warn('safeSetValue: cannot set value for', id); }
-    } 
+        try {
+            el.value = value;
+        } catch (_) {
+            console.warn('safeSetValue: cannot set value for', id);
+        }
+    }
 }
 
 // ========================================================================
@@ -60,35 +64,35 @@ let currentValues = {};
 let data = {};
 
 let _AA_STOIXEIOY = 0,
-	_ARITHMOS_STOIXEION_SYMBASEON = 0,
-	_HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS = new Decimal(0), 
-	_HMEROMISTHIO = new Decimal(0),
-	_MISTHOS = new Decimal(0),
-	_NOMIMO_OROMISTHIO = new Decimal(0), 
-	_PLHRHS_APASXOLHSH, 
-	_ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = new Decimal(0),
-	_ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = new Decimal(0), 
-	_ORES_HMERHSIAS_ERGASIAS = new Decimal(0), 
-	_PRAGMATIKO_OROMISTHIO = new Decimal(0),
-	_PRAGMATIKOS_MISTHOS = new Decimal(0),
-	_SYNTELESTHS_EBDOMADON_HMEROMISTHION = new Decimal(0), 
-	_SYNTELESTHS_EBDOMADON_MISTHOTON = new Decimal(0), 
-	_SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = new Decimal(0), 
-	totalSymbashs = new Decimal(0),
-	totalBaseiOronErgasias = new Decimal(0),
-	_TOTAL_EXTRA_APODOXES = new Decimal(0);
+    _ARITHMOS_STOIXEION_SYMBASEON = 0,
+    _HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS = new Decimal(0),
+    _HMEROMISTHIO = new Decimal(0),
+    _MISTHOS = new Decimal(0),
+    _NOMIMO_OROMISTHIO = new Decimal(0),
+    _PLHRHS_APASXOLHSH,
+    _ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = new Decimal(0),
+    _ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = new Decimal(0),
+    _ORES_HMERHSIAS_ERGASIAS = new Decimal(0),
+    _PRAGMATIKO_OROMISTHIO = new Decimal(0),
+    _PRAGMATIKOS_MISTHOS = new Decimal(0),
+    _SYNTELESTHS_EBDOMADON_HMEROMISTHION = new Decimal(0),
+    _SYNTELESTHS_EBDOMADON_MISTHOTON = new Decimal(0),
+    _SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = new Decimal(0),
+    totalSymbashs = new Decimal(0),
+    totalBaseiOronErgasias = new Decimal(0),
+    _TOTAL_EXTRA_APODOXES = new Decimal(0);
 
 // ========================================================================
 // ΑΡΧΙΚΟΠΟΙΗΣΗ
 // ========================================================================
 
-document.addEventListener("DOMContentLoaded", function () {
-	_PLHRHS_APASXOLHSH = document.getElementById('plhrhs_apasxolhsh');
-	generateSelectRowsOfSymbaseis();
-	setupAutocompleteHack();
-	addEventListeners();
-	calculateTotal();
-	watchEidikothtaChanges();
+document.addEventListener('DOMContentLoaded', function () {
+    _PLHRHS_APASXOLHSH = document.getElementById('plhrhs_apasxolhsh');
+    generateSelectRowsOfSymbaseis();
+    setupAutocompleteHack();
+    addEventListeners();
+    calculateTotal();
+    watchEidikothtaChanges();
 });
 
 // ========================================================================
@@ -96,17 +100,17 @@ document.addEventListener("DOMContentLoaded", function () {
 // ========================================================================
 
 function generateSelectRowsOfSymbaseis() {
-	const container = document.getElementById('stoixeiaSymbaseonContainer');
-	if (!container) {
-		console.warn('⚠️ Container stoixeiaSymbaseonContainer not found');
-		return;
-	}
-	
-	container.innerHTML = ''; 
+    const container = document.getElementById('stoixeiaSymbaseonContainer');
+    if (!container) {
+        console.warn('⚠️ Container stoixeiaSymbaseonContainer not found');
+        return;
+    }
 
-	for (let i = 1; i <= 15; i++) {
-		const idNum = i.toString().padStart(2, '0');
-		const rowHTML = `
+    container.innerHTML = '';
+
+    for (let i = 1; i <= 15; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const rowHTML = `
 			<div class="row form-group align-items-center margin-top-0_75rem d-none showhide_row_${idNum} addStoixSymb001" id="row_${idNum}">
 				<div class="col-0-5 text-center">
 					<label class="col-form-label label-font-size">${i}</label>
@@ -156,21 +160,25 @@ function generateSelectRowsOfSymbaseis() {
 				</button>
 			</div>
 		`;
-		container.insertAdjacentHTML('beforeend', rowHTML);
-	}
+        container.insertAdjacentHTML('beforeend', rowHTML);
+    }
 }
 
 function setupAutocompleteHack() {
-	const container = document.getElementById('stoixeiaSymbaseonContainer');
-	if (!container) return;
-	
-	// Event delegation:  ένας listener για όλα τα inputs
-	container.addEventListener('focus', (e) => {
-		const input = e.target;
-		if (input.matches && input.matches('input[data-autocomplete-hack="true"]')) {
-			input.removeAttribute('readonly');
-		}
-	}, true);  // true = capture phase (πιάνει το focus πριν φτάσει στο input)
+    const container = document.getElementById('stoixeiaSymbaseonContainer');
+    if (!container) return;
+
+    // Event delegation:  ένας listener για όλα τα inputs
+    container.addEventListener(
+        'focus',
+        (e) => {
+            const input = e.target;
+            if (input.matches && input.matches('input[data-autocomplete-hack="true"]')) {
+                input.removeAttribute('readonly');
+            }
+        },
+        true
+    ); // true = capture phase (πιάνει το focus πριν φτάσει στο input)
 }
 
 // ========================================================================
@@ -178,76 +186,80 @@ function setupAutocompleteHack() {
 // ========================================================================
 
 function addEventListeners() {
-	const container = document.getElementById('stoixeiaSymbaseonContainer');
-	if (!container) return;
-	
-	container.addEventListener('input', handleInputEvent);
+    const container = document.getElementById('stoixeiaSymbaseonContainer');
+    if (!container) return;
 
-	container.addEventListener('click', (e) => {
-		const trashBtn = e.target.closest('.clear-row');
-		if (trashBtn) {
-			const targetId = trashBtn.dataset.target;
-			const selectEl = document.getElementById(targetId);
-			if (selectEl && selectEl.tomselect) {
-				selectEl.tomselect.clear();
-				selectEl.tomselect.clearOptions();
-			}
-			
-			const rowNum = targetId.match(/\d+/)[0];
-			const posoField = document.getElementById(`poso_symbashs_${rowNum}`);
-			const posoBaseiField = document.getElementById(`poso_symbashs_basei_oron_ergasias_${rowNum}`);
-			if (posoField) posoField.value = '';
-			if (posoBaseiField) posoBaseiField.value = '';
-			
-			calculateTotal();
-		}
-	});
+    container.addEventListener('input', handleInputEvent);
+
+    container.addEventListener('click', (e) => {
+        const trashBtn = e.target.closest('.clear-row');
+        if (trashBtn) {
+            const targetId = trashBtn.dataset.target;
+            const selectEl = document.getElementById(targetId);
+            if (selectEl && selectEl.tomselect) {
+                selectEl.tomselect.clear();
+                selectEl.tomselect.clearOptions();
+            }
+
+            const rowNum = targetId.match(/\d+/)[0];
+            const posoField = document.getElementById(`poso_symbashs_${rowNum}`);
+            const posoBaseiField = document.getElementById(
+                `poso_symbashs_basei_oron_ergasias_${rowNum}`
+            );
+            if (posoField) posoField.value = '';
+            if (posoBaseiField) posoBaseiField.value = '';
+
+            calculateTotal();
+        }
+    });
 }
 
 function handleInputEvent(event) {
-	if (event.target.type === 'number' && event.target.classList.contains('numeric')) {
-		const elementId = event.target.id;
-		const newValue = toDecimal(event.target.value);
-		const oldValue = currentValues[elementId] ? toDecimal(currentValues[elementId]) : new Decimal(0);
+    if (event.target.type === 'number' && event.target.classList.contains('numeric')) {
+        const elementId = event.target.id;
+        const newValue = toDecimal(event.target.value);
+        const oldValue = currentValues[elementId]
+            ? toDecimal(currentValues[elementId])
+            : new Decimal(0);
 
-		_TOTAL_EXTRA_APODOXES = _TOTAL_EXTRA_APODOXES.plus(newValue).minus(oldValue);
-		currentValues[elementId] = newValue.toString();
+        _TOTAL_EXTRA_APODOXES = _TOTAL_EXTRA_APODOXES.plus(newValue).minus(oldValue);
+        currentValues[elementId] = newValue.toString();
 
-		formatNumericInput(event.target);
+        formatNumericInput(event.target);
 
-		data.poso = newValue;
-		const rowMatch = elementId.match(/poso_symbashs_basei_oron_ergasias_(\d+)/);
-		if (rowMatch) {
-			_AA_STOIXEIOY = parseInt(rowMatch[1]);
-			
-			let extraApodoxes = true;
-			if (data.genikesParametroi) {
-				updateGeneralParameters(data.genikesParametroi);
-			}
-			updatePosoBasedOnHours(_AA_STOIXEIOY, data, elementId, extraApodoxes);
-		}
+        data.poso = newValue;
+        const rowMatch = elementId.match(/poso_symbashs_basei_oron_ergasias_(\d+)/);
+        if (rowMatch) {
+            _AA_STOIXEIOY = parseInt(rowMatch[1]);
 
-		calculateTotal();
-	}
+            let extraApodoxes = true;
+            if (data.genikesParametroi) {
+                updateGeneralParameters(data.genikesParametroi);
+            }
+            updatePosoBasedOnHours(_AA_STOIXEIOY, data, elementId, extraApodoxes);
+        }
+
+        calculateTotal();
+    }
 }
 
 function formatNumericInput(input) {
-	if (!input || !input.value) {
+    if (!input || !input.value) {
         return;
     }
 
-	const cursorPosition = input.selectionStart;
-	const originalValue = input.value;
-	
-	if (!originalValue) {
-		input.value = '';
-		return;
-	}
-	
-	const numValue = toDecimal(originalValue);
-	const newValue = formatDecimal(numValue, 2);
+    const cursorPosition = input.selectionStart;
+    const originalValue = input.value;
 
-	if (newValue !== originalValue) {
+    if (!originalValue) {
+        input.value = '';
+        return;
+    }
+
+    const numValue = toDecimal(originalValue);
+    const newValue = formatDecimal(numValue, 2);
+
+    if (newValue !== originalValue) {
         if (input.type === 'text' && input.setSelectionRange) {
             try {
                 const diff = newValue.length - originalValue.length;
@@ -258,11 +270,11 @@ function formatNumericInput(input) {
             }
         }
 
-		// input.value = newValue;
-		// const diff = newValue.length - originalValue.length;
-		// const newPos = Math.max(0, cursorPosition + diff);
-		// input.setSelectionRange(newPos, newPos);
-	}
+        // input.value = newValue;
+        // const diff = newValue.length - originalValue.length;
+        // const newPos = Math.max(0, cursorPosition + diff);
+        // input.setSelectionRange(newPos, newPos);
+    }
 }
 
 // ========================================================================
@@ -270,339 +282,366 @@ function formatNumericInput(input) {
 // ========================================================================
 
 async function calculateTotal() {
-	// ✅ Αρχικοποίηση με Decimal objects (ΧΩΡΙΣ rounding)
-	totalSymbashs = new Decimal(0);
-	totalBaseiOronErgasias = new Decimal(0);
-	_TOTAL_EXTRA_APODOXES = new Decimal(0);
-	_PRAGMATIKO_OROMISTHIO = new Decimal(0);
-	
-	const nomimosMisthos = document. getElementById('nomimosMisthos');
-	const nomimoHmeromisthio = document. getElementById('nomimoHmeromisthio');
-	const nomimoOromisthio = document.getElementById('nomimoOromisthio');
-	const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
-	const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
-	const pragmatikoOromisthio = document. getElementById('pragmatikoOromisthio');
-	
-	const oresEl = document.getElementById("ores_ergasias_ebdomadas");
-	const hmeresEl = document.getElementById("hmeres_ergasias_ebdomadas");
-	
-	const ores_ergasias_ebdomadas = toDecimal(oresEl?.value);
-	const hmeres_ergasias_ebdomadas = toDecimal(hmeresEl?.value);
+    // ✅ Αρχικοποίηση με Decimal objects (ΧΩΡΙΣ rounding)
+    totalSymbashs = new Decimal(0);
+    totalBaseiOronErgasias = new Decimal(0);
+    _TOTAL_EXTRA_APODOXES = new Decimal(0);
+    _PRAGMATIKO_OROMISTHIO = new Decimal(0);
 
-	// ✅ Άθροισμα όλων των γραμμών (ΧΩΡΙΣ rounding)
-	for (let i = 1; i <= (_ARITHMOS_STOIXEION_SYMBASEON || 15); i++) {
-		const idNum = i. toString().padStart(2, '0');
-		const posoInput = document.getElementById(`poso_symbashs_${idNum}`);
-		const posoInputBaseiOron = document.getElementById(`poso_symbashs_basei_oron_ergasias_${idNum}`);
-		
-		const posoValue = toDecimal(posoInput?.value);
-		const posoBaseiValue = toDecimal(posoInputBaseiOron?.value);
-		
-		// Άθροισμα με πλήρη ακρίβεια
-		totalSymbashs = totalSymbashs.plus(posoValue);
-		totalBaseiOronErgasias = totalBaseiOronErgasias.plus(posoBaseiValue);
-		
-		// Έλεγχος για extra αποδοχές
-		if (! posoBaseiValue.isZero() && posoValue.isZero()) {
-			_TOTAL_EXTRA_APODOXES = _TOTAL_EXTRA_APODOXES. plus(posoBaseiValue);
-		}
-	}
+    const nomimosMisthos = document.getElementById('nomimosMisthos');
+    const nomimoHmeromisthio = document.getElementById('nomimoHmeromisthio');
+    const nomimoOromisthio = document.getElementById('nomimoOromisthio');
+    const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
+    const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
+    const pragmatikoOromisthio = document.getElementById('pragmatikoOromisthio');
 
-	// ✅ Εμφάνιση συνόλων - Round ΚΑΙ format
-	safeSetValue('synolo_symbashs', formatForDisplay(totalSymbashs, 2));
-	safeSetValue('synolo_symbashs_basei_oron_ergasias', formatForDisplay(totalBaseiOronErgasias, 2));	
-	// Παίρνουμε τον τύπο εργαζομένου και ειδική κατηγορία
-	const typosErg = document.getElementById('typos_ergazomenon')?.value;
-	const eidKath = document.getElementById('eidikh_kathgoria_ergazomenoy')?.value;
-	
-	// ✅ Υπολογισμοί ανάλογα με πλήρη/μερική απασχόληση
-	if (_PLHRHS_APASXOLHSH && _PLHRHS_APASXOLHSH.checked) {
-		calculateFullTimeWages(typosErg, eidKath, ores_ergasias_ebdomadas, hmeres_ergasias_ebdomadas);
-	} else {
-		calculatePartTimeWages(typosErg, eidKath, ores_ergasias_ebdomadas, hmeres_ergasias_ebdomadas);
-	}
-	
-	// Setup automatic recalculation listeners
-	setupAutomaticRecalculation();
+    const oresEl = document.getElementById('ores_ergasias_ebdomadas');
+    const hmeresEl = document.getElementById('hmeres_ergasias_ebdomadas');
+
+    const ores_ergasias_ebdomadas = toDecimal(oresEl?.value);
+    const hmeres_ergasias_ebdomadas = toDecimal(hmeresEl?.value);
+
+    // ✅ Άθροισμα όλων των γραμμών (ΧΩΡΙΣ rounding)
+    for (let i = 1; i <= (_ARITHMOS_STOIXEION_SYMBASEON || 15); i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const posoInput = document.getElementById(`poso_symbashs_${idNum}`);
+        const posoInputBaseiOron = document.getElementById(
+            `poso_symbashs_basei_oron_ergasias_${idNum}`
+        );
+
+        const posoValue = toDecimal(posoInput?.value);
+        const posoBaseiValue = toDecimal(posoInputBaseiOron?.value);
+
+        // Άθροισμα με πλήρη ακρίβεια
+        totalSymbashs = totalSymbashs.plus(posoValue);
+        totalBaseiOronErgasias = totalBaseiOronErgasias.plus(posoBaseiValue);
+
+        // Έλεγχος για extra αποδοχές
+        if (!posoBaseiValue.isZero() && posoValue.isZero()) {
+            _TOTAL_EXTRA_APODOXES = _TOTAL_EXTRA_APODOXES.plus(posoBaseiValue);
+        }
+    }
+
+    // ✅ Εμφάνιση συνόλων - Round ΚΑΙ format
+    safeSetValue('synolo_symbashs', formatForDisplay(totalSymbashs, 2));
+    safeSetValue(
+        'synolo_symbashs_basei_oron_ergasias',
+        formatForDisplay(totalBaseiOronErgasias, 2)
+    );
+    // Παίρνουμε τον τύπο εργαζομένου και ειδική κατηγορία
+    const typosErg = document.getElementById('typos_ergazomenon')?.value;
+    const eidKath = document.getElementById('eidikh_kathgoria_ergazomenoy')?.value;
+
+    // ✅ Υπολογισμοί ανάλογα με πλήρη/μερική απασχόληση
+    if (_PLHRHS_APASXOLHSH && _PLHRHS_APASXOLHSH.checked) {
+        calculateFullTimeWages(
+            typosErg,
+            eidKath,
+            ores_ergasias_ebdomadas,
+            hmeres_ergasias_ebdomadas
+        );
+    } else {
+        calculatePartTimeWages(
+            typosErg,
+            eidKath,
+            ores_ergasias_ebdomadas,
+            hmeres_ergasias_ebdomadas
+        );
+    }
+
+    // Setup automatic recalculation listeners
+    setupAutomaticRecalculation();
 }
 
 function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
-	const nomimosMisthos = document. getElementById('nomimosMisthos');
-	const nomimoHmeromisthio = document. getElementById('nomimoHmeromisthio');
-	const nomimoOromisthio = document.getElementById('nomimoOromisthio');
-	const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
-	const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
-	const pragmatikoOromisthio = document. getElementById('pragmatikoOromisthio');
+    const nomimosMisthos = document.getElementById('nomimosMisthos');
+    const nomimoHmeromisthio = document.getElementById('nomimoHmeromisthio');
+    const nomimoOromisthio = document.getElementById('nomimoOromisthio');
+    const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
+    const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
+    const pragmatikoOromisthio = document.getElementById('pragmatikoOromisthio');
 
-	// ✅ Όλοι οι υπολογισμοί με ΠΛΗΡΗ ακρίβεια (Decimal objects)
-	// ✅ ΑΡΧΙΚΟΠΟΙΗΣΗ με Decimal(0) - ΟΧΙ undefined! 
-	let nomimosMisthosValue = new Decimal(0);
-	let nomimoHmeromisthioValue = new Decimal(0);
-	let nomimoOromisthioValue = new Decimal(0);
-	let pragmatikosMisthosValue = new Decimal(0);
-	let pragmatikoHmeromisthioValue = new Decimal(0);
-	let pragmatikoOromisthioValue = new Decimal(0);
+    // ✅ Όλοι οι υπολογισμοί με ΠΛΗΡΗ ακρίβεια (Decimal objects)
+    // ✅ ΑΡΧΙΚΟΠΟΙΗΣΗ με Decimal(0) - ΟΧΙ undefined!
+    let nomimosMisthosValue = new Decimal(0);
+    let nomimoHmeromisthioValue = new Decimal(0);
+    let nomimoOromisthioValue = new Decimal(0);
+    let pragmatikosMisthosValue = new Decimal(0);
+    let pragmatikoHmeromisthioValue = new Decimal(0);
+    let pragmatikoOromisthioValue = new Decimal(0);
 
+    switch (typosErg) {
+        case 'Ω':
+            if (eidKath === '0001') {
+                // Υπολογισμοί χωρίς rounding
+                _NOMIMO_OROMISTHIO = new Decimal(6)
+                    .div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
+                    .div(25)
+                    .times(totalSymbashs);
 
-	switch (typosErg) {
-		case "Ω":
-			if (eidKath === "0001") {
-				// Υπολογισμοί χωρίς rounding
-				_NOMIMO_OROMISTHIO = new Decimal(6)
-					.div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
-					.div(25)
-					.times(totalSymbashs);
-				
-				_PRAGMATIKO_OROMISTHIO = new Decimal(6)
-					.div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
-					.div(25)
-					.times(totalBaseiOronErgasias);
+                _PRAGMATIKO_OROMISTHIO = new Decimal(6)
+                    .div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
+                    .div(25)
+                    .times(totalBaseiOronErgasias);
 
-				if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-					_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-				}
+                if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+                }
 
-				nomimosMisthosValue = _NOMIMO_OROMISTHIO
-					.times(ores)
-					.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
-				
-				nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO
-					.times(ores)
-					.div(hmeres);
-				
-				nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
-				
-				pragmatikosMisthosValue = totalBaseiOronErgasias;
-				
-				pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO
-					.times(ores)
-					.div(hmeres);
-				
-				pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			}
-			break;
-			
-		case "Μ":
-			_NOMIMO_OROMISTHIO = totalSymbashs
-				.div(toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS));
-			
-			_PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-				.div(toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS));
+                nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                    .times(ores)
+                    .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
 
-			if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-				_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-			}
+                nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(ores).div(hmeres);
 
-			nomimosMisthosValue = _NOMIMO_OROMISTHIO
-				.times(ores)
-				.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
-			
-			nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO
-				.times(toDecimal(window._ORES_HMERHSIAS_ERGASIAS));
-			
-			nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
-			
-			pragmatikosMisthosValue = _PRAGMATIKO_OROMISTHIO
-				.times(ores)
-				.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
-			
-			pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO
-				.times(toDecimal(window._ORES_HMERHSIAS_ERGASIAS));
-			
-			pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			break;
-			
-		case "Η":
-			_NOMIMO_OROMISTHIO = totalSymbashs
-				.times(toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO));
-			
-			_PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-				.div(ores. times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION)));
+                nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-			if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-				_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-			}
+                pragmatikosMisthosValue = totalBaseiOronErgasias;
 
-			nomimosMisthosValue = _NOMIMO_OROMISTHIO
-				.times(ores)
-				.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
-			
-			nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO
-				.times(toDecimal(window._ORES_HMERHSIAS_ERGASIAS));
-			
-			nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
-			
-			pragmatikosMisthosValue = totalBaseiOronErgasias;
-			
-			if (! ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-				pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO
-					.times(ores)
-					.div(hmeres);
-			} else {
-				pragmatikoHmeromisthioValue = new Decimal(0);
-			}
-			
-			pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			break;
-	}
+                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
 
-	// ✅ Format για εμφάνιση
-	nomimosMisthos. value = formatForDisplay(nomimosMisthosValue, 2);
-	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
-	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
-	
-	pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
-	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
-	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
+                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            }
+            break;
+
+        case 'Μ':
+            _NOMIMO_OROMISTHIO = totalSymbashs.div(
+                toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+            );
+
+            _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
+                toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+            );
+
+            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+            }
+
+            nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
+
+            nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(
+                toDecimal(window._ORES_HMERHSIAS_ERGASIAS)
+            );
+
+            nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+            pragmatikosMisthosValue = _PRAGMATIKO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
+
+            pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(
+                toDecimal(window._ORES_HMERHSIAS_ERGASIAS)
+            );
+
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            break;
+
+        case 'Η':
+            _NOMIMO_OROMISTHIO = totalSymbashs.times(
+                toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
+            );
+
+            _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
+                ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
+            );
+
+            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+            }
+
+            nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
+
+            nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(
+                toDecimal(window._ORES_HMERHSIAS_ERGASIAS)
+            );
+
+            nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+
+            if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
+            } else {
+                pragmatikoHmeromisthioValue = new Decimal(0);
+            }
+
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            break;
+    }
+
+    // ✅ Format για εμφάνιση
+    nomimosMisthos.value = formatForDisplay(nomimosMisthosValue, 2);
+    nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
+    nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
+
+    pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
+    pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+    pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
 }
 
 function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
-	const nomimosMisthos = document. getElementById('nomimosMisthos');
-	const nomimoHmeromisthio = document. getElementById('nomimoHmeromisthio');
-	const nomimoOromisthio = document.getElementById('nomimoOromisthio');
-	const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
-	const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
-	const pragmatikoOromisthio = document. getElementById('pragmatikoOromisthio');
+    const nomimosMisthos = document.getElementById('nomimosMisthos');
+    const nomimoHmeromisthio = document.getElementById('nomimoHmeromisthio');
+    const nomimoOromisthio = document.getElementById('nomimoOromisthio');
+    const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
+    const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
+    const pragmatikoOromisthio = document.getElementById('pragmatikoOromisthio');
 
-	// ✅ Υπολογισμός ωρών ανά ημέρα (ΧΩΡΙΣ rounding)
-	const _ores_apasxolhshs = ores.div(hmeres);
+    // ✅ Υπολογισμός ωρών ανά ημέρα (ΧΩΡΙΣ rounding)
+    const _ores_apasxolhshs = ores.div(hmeres);
 
-	let nomimosMisthosValue, nomimoHmeromisthioValue, nomimoOromisthioValue;
-	let pragmatikosMisthosValue, pragmatikoHmeromisthioValue, pragmatikoOromisthioValue;
+    let nomimosMisthosValue, nomimoHmeromisthioValue, nomimoOromisthioValue;
+    let pragmatikosMisthosValue, pragmatikoHmeromisthioValue, pragmatikoOromisthioValue;
 
-	switch (typosErg) {
-		case "Ω":
-			if (eidKath === "0001") {
-				_NOMIMO_OROMISTHIO = new Decimal(6)
-					.div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
-					.div(25)
-					.times(totalSymbashs);
-				
-				_PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-					.div(ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON)));
+    switch (typosErg) {
+        case 'Ω':
+            if (eidKath === '0001') {
+                _NOMIMO_OROMISTHIO = new Decimal(6)
+                    .div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
+                    .div(25)
+                    .times(totalSymbashs);
 
-				if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-					_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-				}
+                _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
+                    ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
+                );
 
-				nomimosMisthosValue = _NOMIMO_OROMISTHIO
-					. times(ores)
-					. times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
-				
-				nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO. times(_ores_apasxolhshs);
-				nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+                if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+                }
 
-				pragmatikosMisthosValue = totalBaseiOronErgasias;
+                nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                    .times(ores)
+                    .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
 
-				if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO. isZero()) {
-					pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO
-						.times(ores)
-						.div(hmeres);
-				} else {
-					pragmatikoHmeromisthioValue = new Decimal(0);
-				}
-				
-				pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			}
-			break;
-			
-		case "Μ":
-			_NOMIMO_OROMISTHIO = totalSymbashs
-				.div(toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS));
-			
-			_PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-				.div(ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON)));
+                nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+                nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-			if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-				_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-			}
+                pragmatikosMisthosValue = totalBaseiOronErgasias;
 
-			nomimosMisthosValue = _NOMIMO_OROMISTHIO
-				.times(ores)
-				.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
-			
-			nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO. times(_ores_apasxolhshs);
-			nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
-			
-			pragmatikosMisthosValue = totalBaseiOronErgasias;
+                if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
+                } else {
+                    pragmatikoHmeromisthioValue = new Decimal(0);
+                }
 
-			if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-				pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO. times(_ores_apasxolhshs);
-			} else {
-				pragmatikoHmeromisthioValue = new Decimal(0);
-			}
-			
-			pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			break;
-			
-		case "Η":
-			// const aaa = new Decimal(13);
-			// const seh = toDecimal(aaa.div(toDecimal(3)));
-			_NOMIMO_OROMISTHIO = totalSymbashs
-				.times(toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO));
-			
-			// _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-			// 	. div(ores.times(toDecimal(seh)));
-			_PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
-				. div(ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION)));
+                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            }
+            break;
 
-			if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
-				_PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-			}
+        case 'Μ':
+            _NOMIMO_OROMISTHIO = totalSymbashs.div(
+                toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+            );
 
-			nomimosMisthosValue = _NOMIMO_OROMISTHIO
-				.times(ores)
-				.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
-			
-			nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO. times(_ores_apasxolhshs);
-			nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
-			
-			pragmatikosMisthosValue = totalBaseiOronErgasias;
+            _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
+                ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
+            );
 
-			if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-				pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
-			} else {
-				pragmatikoHmeromisthioValue = new Decimal(0);
-			}
-			
-			pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-			break;
-	}
+            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+            }
 
-	// ✅ Format για εμφάνιση
-	nomimosMisthos. value = formatForDisplay(nomimosMisthosValue, 2);
-	nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
-	nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
-	
-	pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
-	pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
-	pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
+            nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
+
+            nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+            nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+
+            if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
+            } else {
+                pragmatikoHmeromisthioValue = new Decimal(0);
+            }
+
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            break;
+
+        case 'Η':
+            // const aaa = new Decimal(13);
+            // const seh = toDecimal(aaa.div(toDecimal(3)));
+            _NOMIMO_OROMISTHIO = totalSymbashs.times(
+                toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
+            );
+
+            // _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias
+            // 	. div(ores.times(toDecimal(seh)));
+            _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
+                ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
+            );
+
+            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+            }
+
+            nomimosMisthosValue = _NOMIMO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
+
+            nomimoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+            nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+
+            if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
+            } else {
+                pragmatikoHmeromisthioValue = new Decimal(0);
+            }
+
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+            break;
+    }
+
+    // ✅ Format για εμφάνιση
+    nomimosMisthos.value = formatForDisplay(nomimosMisthosValue, 2);
+    nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
+    nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
+
+    pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
+    pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+    pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
 }
 
 function setupAutomaticRecalculation() {
-	const pragmatikoOromisthioEl = document.getElementById('pragmatikoOromisthio');
-	if (!pragmatikoOromisthioEl) return;
-	
-	const pragmatikoOromisthio = pragmatikoOromisthioEl.value;
-	const oromisthioValue = toDecimal(pragmatikoOromisthio);
-	const isOromisthioValid = pragmatikoOromisthio && !oromisthioValue.isNaN() && !oromisthioValue.isZero();
+    const pragmatikoOromisthioEl = document.getElementById('pragmatikoOromisthio');
+    if (!pragmatikoOromisthioEl) return;
 
-	if (isOromisthioValid) {
-		const ids = ['hmeromhnia_allaghs_symbashs', 'proyphresia_se_eth', 'proyphresia_se_mhnes',
-		'eidikh_kathgoria_ergazomenoy', 'plhrhs_apasxolhsh', 'hmeres_ergasias_ebdomadas', 
-		'ores_ergasias_ebdomadas', 'typos_ergazomenon', 'misthologiko_klimakio'];
+    const pragmatikoOromisthio = pragmatikoOromisthioEl.value;
+    const oromisthioValue = toDecimal(pragmatikoOromisthio);
+    const isOromisthioValid =
+        pragmatikoOromisthio && !oromisthioValue.isNaN() && !oromisthioValue.isZero();
 
-		ids.forEach(id => {
-			const element = document.getElementById(id);
-			if (element && !element.__recalcBound) {
-				element.__recalcBound = true;
-				element.addEventListener('change', () => {
-					if (typeof window.reCalculate === 'function') window.reCalculate();
-					else calculateTotal();
-				});
-			}
-		});
-	}
+    if (isOromisthioValid) {
+        const ids = [
+            'hmeromhnia_allaghs_symbashs',
+            'proyphresia_se_eth',
+            'proyphresia_se_mhnes',
+            'eidikh_kathgoria_ergazomenoy',
+            'plhrhs_apasxolhsh',
+            'hmeres_ergasias_ebdomadas',
+            'ores_ergasias_ebdomadas',
+            'typos_ergazomenon',
+            'misthologiko_klimakio'
+        ];
+
+        ids.forEach((id) => {
+            const element = document.getElementById(id);
+            if (element && !element.__recalcBound) {
+                element.__recalcBound = true;
+                element.addEventListener('change', () => {
+                    if (typeof window.reCalculate === 'function') window.reCalculate();
+                    else calculateTotal();
+                });
+            }
+        });
+    }
 }
 
 // ========================================================================
@@ -610,329 +649,345 @@ function setupAutomaticRecalculation() {
 // ========================================================================
 
 async function loadStoixeiaSymbaseonFromAPI() {
-	try {
-		const symbash = document.getElementById('symbash_stathera')?.value?.trim();
-		const kathgoria = document.getElementById('kathgoria_symbashs_stathera')?.value?.trim();
-		const eidikothta = document.getElementById('eidikothta_symbashs_stathera')?.value?.trim();
+    try {
+        const symbash = document.getElementById('symbash_stathera')?.value?.trim();
+        const kathgoria = document.getElementById('kathgoria_symbashs_stathera')?.value?.trim();
+        const eidikothta = document.getElementById('eidikothta_symbashs_stathera')?.value?.trim();
 
-		if (!symbash || !kathgoria || !eidikothta) {
-			console.warn('⚠️ Λείπουν Σύμβαση/Κατηγορία/Ειδικότητα');
-			return;
-		}
+        if (!symbash || !kathgoria || !eidikothta) {
+            console.warn('⚠️ Λείπουν Σύμβαση/Κατηγορία/Ειδικότητα');
+            return;
+        }
 
-		const url = new URL('/api/dropdown/symbaseis/stoixeio_symbashs', window.location.origin);
-		url.searchParams.set('symbash_stathera', symbash.padStart(4, '0'));
-		url.searchParams.set('kathgoria_symbashs_stathera', kathgoria.padStart(4, '0'));
-		url.searchParams.set('eidikothta_symbashs_stathera', eidikothta.padStart(4, '0'));
-		url.searchParams.set('limit', 50);
+        const url = new URL('/api/dropdown/symbaseis/stoixeio_symbashs', window.location.origin);
+        url.searchParams.set('symbash_stathera', symbash.padStart(4, '0'));
+        url.searchParams.set('kathgoria_symbashs_stathera', kathgoria.padStart(4, '0'));
+        url.searchParams.set('eidikothta_symbashs_stathera', eidikothta.padStart(4, '0'));
+        url.searchParams.set('limit', 50);
 
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: { 'Content-Type': 'application/json' },
-			credentials: 'include'
-		});
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
 
-		if (!response.ok) {
-			throw new Error(`API Error: ${response.status} ${response.statusText}`);
-		}
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
 
-		const apiData = await response.json();
-		const items = Array.isArray(apiData.items) ? apiData.items : [];
+        const apiData = await response.json();
+        const items = Array.isArray(apiData.items) ? apiData.items : [];
 
-		if (items.length === 0) {
-			showAlert({
-				icon: 'warning',
-				title: 'Προσοχή !!!',
-				html: 'Δεν υπάρχουν διαθέσιμα <strong>Στοιχεία Σύμβασης</strong> για την επιλεγμένη Ειδικότητα.'
-			});
-			return;
-		}
+        if (items.length === 0) {
+            showAlert({
+                icon: 'warning',
+                title: 'Προσοχή !!!',
+                html: 'Δεν υπάρχουν διαθέσιμα <strong>Στοιχεία Σύμβασης</strong> για την επιλεγμένη Ειδικότητα.'
+            });
+            return;
+        }
 
-		const selectedSymbashEl = document.getElementById('selectedSymbash');
-		const selectedKathgoriaEl = document.getElementById('selectedKathgoria');
-		const selectedEidikothtaEl = document.getElementById('selectedEidikothta');
-		
-		if (selectedSymbashEl) selectedSymbashEl.value = symbash.padStart(4, '0');
-		if (selectedKathgoriaEl) selectedKathgoriaEl.value = kathgoria.padStart(4, '0');
-		if (selectedEidikothtaEl) selectedEidikothtaEl.value = eidikothta.padStart(4, '0');
+        const selectedSymbashEl = document.getElementById('selectedSymbash');
+        const selectedKathgoriaEl = document.getElementById('selectedKathgoria');
+        const selectedEidikothtaEl = document.getElementById('selectedEidikothta');
 
-		const genikesParametroi = await fetchGenikesParametroi();
-		updateGeneralParameters(genikesParametroi);
+        if (selectedSymbashEl) selectedSymbashEl.value = symbash.padStart(4, '0');
+        if (selectedKathgoriaEl) selectedKathgoriaEl.value = kathgoria.padStart(4, '0');
+        if (selectedEidikothtaEl) selectedEidikothtaEl.value = eidikothta.padStart(4, '0');
 
-		// Ενημέρωση global για χρήση στο shared module
-		window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[0]?.timh);
-		window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = toDecimal(genikesParametroi[1]?.timh);
-		window._SYNTELESTHS_EBDOMADON_MISTHOTON = toDecimal(genikesParametroi[2]?.timh);
-		window._SYNTELESTHS_EBDOMADON_HMEROMISTHION = toDecimal(genikesParametroi[3]?.timh);
-		window._ORES_HMERHSIAS_ERGASIAS = toDecimal(genikesParametroi[4]?.timh);
-		window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[5]?.timh);
-		window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[6]?.timh);
-		window._ARITHMOS_STOIXEION_SYMBASEON = toDecimal(genikesParametroi[22]?.timh);
-		
-		_ARITHMOS_STOIXEION_SYMBASEON = window._ARITHMOS_STOIXEION_SYMBASEON.toNumber();
+        const genikesParametroi = await fetchGenikesParametroi();
+        updateGeneralParameters(genikesParametroi);
 
-		await initializeTomSelectForStoixeia(items);
-		
-	} catch (error) {
-		showAlert({
-			icon: 'error',
-			title: 'Σφάλμα κατά τη φόρτωση Στοιχείων Σύμβασης',
-			html: `Σφάλμα: ${error.message}`
-		});
-	}
+        // Ενημέρωση global για χρήση στο shared module
+        window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[0]?.timh);
+        window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = toDecimal(
+            genikesParametroi[1]?.timh
+        );
+        window._SYNTELESTHS_EBDOMADON_MISTHOTON = toDecimal(genikesParametroi[2]?.timh);
+        window._SYNTELESTHS_EBDOMADON_HMEROMISTHION = toDecimal(genikesParametroi[3]?.timh);
+        window._ORES_HMERHSIAS_ERGASIAS = toDecimal(genikesParametroi[4]?.timh);
+        window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[5]?.timh);
+        window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[6]?.timh);
+        window._ARITHMOS_STOIXEION_SYMBASEON = toDecimal(genikesParametroi[22]?.timh);
+
+        _ARITHMOS_STOIXEION_SYMBASEON = window._ARITHMOS_STOIXEION_SYMBASEON.toNumber();
+
+        await initializeTomSelectForStoixeia(items);
+    } catch (error) {
+        showAlert({
+            icon: 'error',
+            title: 'Σφάλμα κατά τη φόρτωση Στοιχείων Σύμβασης',
+            html: `Σφάλμα: ${error.message}`
+        });
+    }
 }
 
 async function initializeTomSelectForStoixeia(items) {
-	if (!initTomDropdown) {
-		console.error('❌ initTomDropdown not available! Make sure dropdown-item.js is loaded first.');
-		return;
-	}
+    if (!initTomDropdown) {
+        console.error(
+            '❌ initTomDropdown not available! Make sure dropdown-item.js is loaded first.'
+        );
+        return;
+    }
 
-	let aa_stoixeion_symbaseon = (_ARITHMOS_STOIXEION_SYMBASEON !== 0) ? _ARITHMOS_STOIXEION_SYMBASEON : 15;
+    let aa_stoixeion_symbaseon =
+        _ARITHMOS_STOIXEION_SYMBASEON !== 0 ? _ARITHMOS_STOIXEION_SYMBASEON : 15;
 
-	for (let i = 1; i <= aa_stoixeion_symbaseon; i++) {
-		const idNum = i.toString().padStart(2, '0');
-		const selectId = `stoixeio_symbashs_${idNum}`;
-		const rowId = `row_${idNum}`;
-		const selectEl = document.getElementById(selectId);
-		const row = document.getElementById(rowId);
-		
-		if (selectEl?.tomselect) {
-			try {
-				selectEl.tomselect.destroy();
-			} catch (e) {
-				console.warn(`⚠️ Failed to destroy ${selectId}:`, e);
-			}
-		}
-		
-		if (row) row.classList.add('d-none');
-	}
+    for (let i = 1; i <= aa_stoixeion_symbaseon; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const selectId = `stoixeio_symbashs_${idNum}`;
+        const rowId = `row_${idNum}`;
+        const selectEl = document.getElementById(selectId);
+        const row = document.getElementById(rowId);
 
-	const numRows = Math.min(items.length, aa_stoixeion_symbaseon);
+        if (selectEl?.tomselect) {
+            try {
+                selectEl.tomselect.destroy();
+            } catch (e) {
+                console.warn(`⚠️ Failed to destroy ${selectId}:`, e);
+            }
+        }
 
-	const symbashVal = (document.getElementById('symbash_stathera')?.value || '').trim().padStart(4, '0');
-	const kathgoriaVal = (document.getElementById('kathgoria_symbashs_stathera')?.value || '').trim().padStart(4, '0');
-	const eidikothtaVal = (document.getElementById('eidikothta_symbashs_stathera')?.value || '').trim().padStart(4, '0');
+        if (row) row.classList.add('d-none');
+    }
 
-	for (let i = 1; i <= numRows; i++) {
-		const idNum = i.toString().padStart(2, '0');
-		const selectId = `stoixeio_symbashs_${idNum}`;
-		const rowId = `row_${idNum}`;
-		
-		const row = document.getElementById(rowId);
-		const selectEl = document.getElementById(selectId);
+    const numRows = Math.min(items.length, aa_stoixeion_symbaseon);
 
-		if (!row || !selectEl) continue;
+    const symbashVal = (document.getElementById('symbash_stathera')?.value || '')
+        .trim()
+        .padStart(4, '0');
+    const kathgoriaVal = (document.getElementById('kathgoria_symbashs_stathera')?.value || '')
+        .trim()
+        .padStart(4, '0');
+    const eidikothtaVal = (document.getElementById('eidikothta_symbashs_stathera')?.value || '')
+        .trim()
+        .padStart(4, '0');
 
-		row.classList.remove('d-none');
+    for (let i = 1; i <= numRows; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const selectId = `stoixeio_symbashs_${idNum}`;
+        const rowId = `row_${idNum}`;
 
-		try {
-			await initTomDropdown({
-				selector: `#${selectId}`,
-				url: '/api/dropdown/symbaseis/stoixeio_symbashs',
-				extraParams: {
-					symbash_stathera: symbashVal,
-					kathgoria_symbashs_stathera: kathgoriaVal,
-					eidikothta_symbashs_stathera: eidikothtaVal,
-					padLength: '4'
-				},
-				minChars: 0,
-				hooks: {
-					onInitialize: function() {
-						this.on('change', async (value) => {
-							if (value) {
-								await handleStoixeioChange(idNum, value);
-							}
-						});
-					}
-				}
-			});
+        const row = document.getElementById(rowId);
+        const selectEl = document.getElementById(selectId);
 
-		} catch (err) {
-			console.error(`❌ Failed to init Tom-Select for ${selectId}:`, err);
-		}
-	}
+        if (!row || !selectEl) continue;
+
+        row.classList.remove('d-none');
+
+        try {
+            await initTomDropdown({
+                selector: `#${selectId}`,
+                url: '/api/dropdown/symbaseis/stoixeio_symbashs',
+                extraParams: {
+                    symbash_stathera: symbashVal,
+                    kathgoria_symbashs_stathera: kathgoriaVal,
+                    eidikothta_symbashs_stathera: eidikothtaVal,
+                    padLength: '4'
+                },
+                minChars: 0,
+                hooks: {
+                    onInitialize: function () {
+                        this.on('change', async (value) => {
+                            if (value) {
+                                await handleStoixeioChange(idNum, value);
+                            }
+                        });
+                    }
+                }
+            });
+        } catch (err) {
+            console.error(`❌ Failed to init Tom-Select for ${selectId}:`, err);
+        }
+    }
 }
 
 async function handleStoixeioChange(rowIndex, selectedValue) {
-	if (!selectedValue) return;
+    if (!selectedValue) return;
 
-	_AA_STOIXEIOY = parseInt(rowIndex);
+    _AA_STOIXEIOY = parseInt(rowIndex);
 
-	const contract = document.getElementById("selectedSymbash")?.value?.padStart(4, '0');
-	const category = document.getElementById("selectedKathgoria")?.value?.padStart(4, '0');
-	const specialty = document.getElementById("selectedEidikothta")?.value?.padStart(4, '0');
-	const klimakioEl = document.getElementById("misthologiko_klimakio");
-	const klimakio = klimakioEl?.value?.padStart(2, '0') || '01';
-	const hmeromhniaEl = document.getElementById("hmeromhnia_allaghs_symbashs");
-	const hmeromhnia = hmeromhniaEl?.value || '';
+    const contract = document.getElementById('selectedSymbash')?.value?.padStart(4, '0');
+    const category = document.getElementById('selectedKathgoria')?.value?.padStart(4, '0');
+    const specialty = document.getElementById('selectedEidikothta')?.value?.padStart(4, '0');
+    const klimakioEl = document.getElementById('misthologiko_klimakio');
+    const klimakio = klimakioEl?.value?.padStart(2, '0') || '01';
+    const hmeromhniaEl = document.getElementById('hmeromhnia_allaghs_symbashs');
+    const hmeromhnia = hmeromhniaEl?.value || '';
 
-	try {
-		data = await fetchApodoxesData(
-			contract, 
-			category, 
-			specialty, 
-			selectedValue.padStart(4, '0'), 
-			klimakio, 
-			hmeromhnia
-		);
-		
-		if (!data.success) {
-			showAlert({
-				icon: 'warning',
-				title: 'Προσοχή !!!',
-				html: 'Δεν έχουν ενημερωθεί <strong>τα κλιμάκια</strong> της επιλεγείσας σύμβασης'
-			});
-			return;
-		}
+    try {
+        data = await fetchApodoxesData(
+            contract,
+            category,
+            specialty,
+            selectedValue.padStart(4, '0'),
+            klimakio,
+            hmeromhnia
+        );
 
-		const posoFieldId = `poso_symbashs_${rowIndex}`;
-		const posoBasedOnHoursFieldId = `poso_symbashs_basei_oron_ergasias_${rowIndex}`;
-		const posoField = document.getElementById(posoFieldId);
+        if (!data.success) {
+            showAlert({
+                icon: 'warning',
+                title: 'Προσοχή !!!',
+                html: 'Δεν έχουν ενημερωθεί <strong>τα κλιμάκια</strong> της επιλεγείσας σύμβασης'
+            });
+            return;
+        }
 
-		if (posoField) {
-			posoField.value = formatDecimal(data.poso, 2);
-		}
+        const posoFieldId = `poso_symbashs_${rowIndex}`;
+        const posoBasedOnHoursFieldId = `poso_symbashs_basei_oron_ergasias_${rowIndex}`;
+        const posoField = document.getElementById(posoFieldId);
 
-		let extraApodoxes = false;
-		updateGeneralParameters(data.genikesParametroi);
-		updatePosoBasedOnHours(parseInt(rowIndex), data, posoBasedOnHoursFieldId, extraApodoxes);
+        if (posoField) {
+            posoField.value = formatDecimal(data.poso, 2);
+        }
 
-		const posoValue = toDecimal(data.poso);
-		if (!posoValue.isZero()) {
-			calculateTotal();
-		}
+        let extraApodoxes = false;
+        updateGeneralParameters(data.genikesParametroi);
+        updatePosoBasedOnHours(parseInt(rowIndex), data, posoBasedOnHoursFieldId, extraApodoxes);
 
-	} catch (error) {
-		console.error('❌ Σφάλμα κατά την ενημέρωση αποδοχών:', error);
-	}
+        const posoValue = toDecimal(data.poso);
+        if (!posoValue.isZero()) {
+            calculateTotal();
+        }
+    } catch (error) {
+        console.error('❌ Σφάλμα κατά την ενημέρωση αποδοχών:', error);
+    }
 }
 
 function watchEidikothtaChanges() {
-	const eidikothtaHidden = document.getElementById('eidikothta_symbashs_stathera');
-	const eidikothtaTable = document.getElementById('eidikothta_symbashs_table');
-	
-	if (!eidikothtaHidden) {
-		console.warn('⚠️ Δε βρέθηκε το hidden field: eidikothta_symbashs_stathera');
-		return;
-	}
+    const eidikothtaHidden = document.getElementById('eidikothta_symbashs_stathera');
+    const eidikothtaTable = document.getElementById('eidikothta_symbashs_table');
 
-	let previousValue = eidikothtaHidden.value;
-	let previousTable = eidikothtaTable?.value || '[]';
+    if (!eidikothtaHidden) {
+        console.warn('⚠️ Δε βρέθηκε το hidden field: eidikothta_symbashs_stathera');
+        return;
+    }
 
-	const checkChange = () => {
-		const currentValue = eidikothtaHidden.value?.trim();
-		const currentTable = eidikothtaTable?.value || '[]';
-		
-		const valueChanged = currentValue !== previousValue;
-		const tableChanged = currentTable !== previousTable;
+    let previousValue = eidikothtaHidden.value;
+    let previousTable = eidikothtaTable?.value || '[]';
 
-		if (valueChanged || tableChanged) {
-			previousValue = currentValue;
-			previousTable = currentTable;
-		
-			if (!currentValue) {
-				clearAllStoixeiaRows();
-				return;
-			}
-		
-			clearAllStoixeiaRows();
-			setTimeout(() => loadStoixeiaSymbaseonFromAPI(), 150);
-		}
-	};
+    const checkChange = () => {
+        const currentValue = eidikothtaHidden.value?.trim();
+        const currentTable = eidikothtaTable?.value || '[]';
 
-	const observer = new MutationObserver(checkChange);
-	observer.observe(eidikothtaHidden, { attributes: true, attributeFilter: ['value'] });
+        const valueChanged = currentValue !== previousValue;
+        const tableChanged = currentTable !== previousTable;
 
-	if (eidikothtaTable) {
-		const tableObserver = new MutationObserver(checkChange);
-		tableObserver.observe(eidikothtaTable, { attributes: true, attributeFilter: ['value'] });
-	}
+        if (valueChanged || tableChanged) {
+            previousValue = currentValue;
+            previousTable = currentTable;
 
-	['change', 'input'].forEach(eventType => {
-		eidikothtaHidden.addEventListener(eventType, checkChange);
-		eidikothtaTable?.addEventListener(eventType, checkChange);
-	});
+            if (!currentValue) {
+                clearAllStoixeiaRows();
+                return;
+            }
 
-	window.addEventListener('eidikothtaChanged', checkChange);
+            clearAllStoixeiaRows();
+            setTimeout(() => loadStoixeiaSymbaseonFromAPI(), 150);
+        }
+    };
+
+    const observer = new MutationObserver(checkChange);
+    observer.observe(eidikothtaHidden, { attributes: true, attributeFilter: ['value'] });
+
+    if (eidikothtaTable) {
+        const tableObserver = new MutationObserver(checkChange);
+        tableObserver.observe(eidikothtaTable, { attributes: true, attributeFilter: ['value'] });
+    }
+
+    ['change', 'input'].forEach((eventType) => {
+        eidikothtaHidden.addEventListener(eventType, checkChange);
+        eidikothtaTable?.addEventListener(eventType, checkChange);
+    });
+
+    window.addEventListener('eidikothtaChanged', checkChange);
 }
 
 function clearAllStoixeiaRows() {
-	const limit = _ARITHMOS_STOIXEION_SYMBASEON || 15;
-	
-	for (let i = 1; i <= limit; i++) {
-		const idNum = i.toString().padStart(2, '0');
-		const selectId = `stoixeio_symbashs_${idNum}`;
-		const selectEl = document.getElementById(selectId);
-		
-		if (selectEl?.tomselect) {
-			try {
-				selectEl.tomselect.destroy();
-			} catch (e) {
-				console.warn(`⚠️ Failed to destroy ${selectId}:`, e);
-			}
-		}
-		
-		const posoField = document.getElementById(`poso_symbashs_${idNum}`);
-		const posoBaseiField = document.getElementById(`poso_symbashs_basei_oron_ergasias_${idNum}`);
-		if (posoField) posoField.value = '';
-		if (posoBaseiField) posoBaseiField.value = '';
-		
-		const row = document.getElementById(`row_${idNum}`);
-		if (row) row.classList.add('d-none');
-	}
-	
-	const synoloSymb = document.getElementById('synolo_symbashs');
-	const synoloBasei = document.getElementById('synolo_symbashs_basei_oron_ergasias');
-	if (synoloSymb) synoloSymb.value = '0.00';
-	if (synoloBasei) synoloBasei.value = '0.00';
+    const limit = _ARITHMOS_STOIXEION_SYMBASEON || 15;
+
+    for (let i = 1; i <= limit; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const selectId = `stoixeio_symbashs_${idNum}`;
+        const selectEl = document.getElementById(selectId);
+
+        if (selectEl?.tomselect) {
+            try {
+                selectEl.tomselect.destroy();
+            } catch (e) {
+                console.warn(`⚠️ Failed to destroy ${selectId}:`, e);
+            }
+        }
+
+        const posoField = document.getElementById(`poso_symbashs_${idNum}`);
+        const posoBaseiField = document.getElementById(
+            `poso_symbashs_basei_oron_ergasias_${idNum}`
+        );
+        if (posoField) posoField.value = '';
+        if (posoBaseiField) posoBaseiField.value = '';
+
+        const row = document.getElementById(`row_${idNum}`);
+        if (row) row.classList.add('d-none');
+    }
+
+    const synoloSymb = document.getElementById('synolo_symbashs');
+    const synoloBasei = document.getElementById('synolo_symbashs_basei_oron_ergasias');
+    if (synoloSymb) synoloSymb.value = '0.00';
+    if (synoloBasei) synoloBasei.value = '0.00';
 }
 
-window.clearStoixeiaSymbaseonContainer = function() {
-	const limit = _ARITHMOS_STOIXEION_SYMBASEON || 15;
-	
-	for (let i = 1; i <= limit; i++) {
-		const idNum = i.toString().padStart(2, '0');
-		const selectId = `stoixeio_symbashs_${idNum}`;
-		const selectEl = document.getElementById(selectId);
-		
-		if (selectEl?.tomselect) {
-			try {
-				selectEl.tomselect.clear();
-				selectEl.tomselect.clearOptions();
-				selectEl.tomselect.destroy();
-			} catch (e) {}
-		}
-		
-		const posoField = document.getElementById(`poso_symbashs_${idNum}`);
-		const posoBaseiField = document.getElementById(`poso_symbashs_basei_oron_ergasias_${idNum}`);
-		if (posoField) posoField.value = '';
-		if (posoBaseiField) posoBaseiField.value = '';
-		
-		const row = document.getElementById(`row_${idNum}`);
-		if (row) row.classList.add('d-none');
-	}
-	
-	const synoloSymb = document.getElementById('synolo_symbashs');
-	const synoloBasei = document.getElementById('synolo_symbashs_basei_oron_ergasias');
-	if (synoloSymb) synoloSymb.value = '0.00';
-	if (synoloBasei) synoloBasei.value = '0.00';
-	
-	const selectedSymbashEl = document.getElementById('selectedSymbash');
-	const selectedKathgoriaEl = document.getElementById('selectedKathgoria');
-	const selectedEidikothtaEl = document.getElementById('selectedEidikothta');
-	if (selectedSymbashEl) selectedSymbashEl.value = '';
-	if (selectedKathgoriaEl) selectedKathgoriaEl.value = '';
-	if (selectedEidikothtaEl) selectedEidikothtaEl.value = '';
-	
-	const fields = [
-		'nomimosMisthos', 'nomimoHmeromisthio', 'nomimoOromisthio',
-		'pragmatikosMisthos', 'pragmatikoHmeromisthio', 'pragmatikoOromisthio'
-	];
-	fields.forEach(id => {
-		const el = document.getElementById(id);
-		if (el) el.value = '0.00';
-	});
+window.clearStoixeiaSymbaseonContainer = function () {
+    const limit = _ARITHMOS_STOIXEION_SYMBASEON || 15;
+
+    for (let i = 1; i <= limit; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const selectId = `stoixeio_symbashs_${idNum}`;
+        const selectEl = document.getElementById(selectId);
+
+        if (selectEl?.tomselect) {
+            try {
+                selectEl.tomselect.clear();
+                selectEl.tomselect.clearOptions();
+                selectEl.tomselect.destroy();
+            } catch (e) {}
+        }
+
+        const posoField = document.getElementById(`poso_symbashs_${idNum}`);
+        const posoBaseiField = document.getElementById(
+            `poso_symbashs_basei_oron_ergasias_${idNum}`
+        );
+        if (posoField) posoField.value = '';
+        if (posoBaseiField) posoBaseiField.value = '';
+
+        const row = document.getElementById(`row_${idNum}`);
+        if (row) row.classList.add('d-none');
+    }
+
+    const synoloSymb = document.getElementById('synolo_symbashs');
+    const synoloBasei = document.getElementById('synolo_symbashs_basei_oron_ergasias');
+    if (synoloSymb) synoloSymb.value = '0.00';
+    if (synoloBasei) synoloBasei.value = '0.00';
+
+    const selectedSymbashEl = document.getElementById('selectedSymbash');
+    const selectedKathgoriaEl = document.getElementById('selectedKathgoria');
+    const selectedEidikothtaEl = document.getElementById('selectedEidikothta');
+    if (selectedSymbashEl) selectedSymbashEl.value = '';
+    if (selectedKathgoriaEl) selectedKathgoriaEl.value = '';
+    if (selectedEidikothtaEl) selectedEidikothtaEl.value = '';
+
+    const fields = [
+        'nomimosMisthos',
+        'nomimoHmeromisthio',
+        'nomimoOromisthio',
+        'pragmatikosMisthos',
+        'pragmatikoHmeromisthio',
+        'pragmatikoOromisthio'
+    ];
+    fields.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '0.00';
+    });
 };
 
 // ========================================================================
