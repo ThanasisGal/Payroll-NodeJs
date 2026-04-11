@@ -91,8 +91,6 @@ document.addEventListener('DOMContentLoaded', function () {
             plhrhsCheckbox.checked = isFullTime;
             if (isFullTime) {
                 oresErgasiasEbdomadas.value = eidikhKathgoriaErgazomenoy.value;
-            } else {
-                oresErgasiasEbdomadas.value = '';
             }
             toggleCheckboxState('plhrhs_apasxolhsh', isFullTime);
         }

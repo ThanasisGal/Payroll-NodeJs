@@ -1,11 +1,11 @@
 // /js/common/kathestos_apasxolhshs_fulltime_sync.js
 (function () {
     const IDS = {
-        select:  'kathestos_apasxolhshs',
-        hidden:  'kathestos_apasxolhshs_stathera',
-        cb:      'plhrhs_apasxolhsh',
-        label:   'label-plhrhs_apasxolhsh',
-        hours:   'ores_ergasias_ebdomadas',
+        select: 'kathestos_apasxolhshs',
+        hidden: 'kathestos_apasxolhshs_stathera',
+        cb: 'plhrhs_apasxolhsh',
+        label: 'label-plhrhs_apasxolhsh',
+        hours: 'ores_ergasias_ebdomadas'
     };
 
     const $ = (id) => document.getElementById(id);
@@ -53,6 +53,7 @@
     // <-- ΝΕΟ: μηδενισμός ωρών εβδομάδας (υποστηρίζει και TomSelect)
     function zeroWeeklyHours() {
         const hoursEl = $(IDS.hours);
+
         if (!hoursEl) return;
         if (hoursEl.tomselect && typeof hoursEl.tomselect.setValue === 'function') {
             hoursEl.tomselect.setValue('0', true);
@@ -64,9 +65,9 @@
     }
 
     function wireUp() {
-        const sel   = $(IDS.select);
-        const hid   = $(IDS.hidden);
-        const cb    = $(IDS.cb);
+        const sel = $(IDS.select);
+        const hid = $(IDS.hidden);
+        const cb = $(IDS.cb);
         const label = $(IDS.label);
         if (!sel || !cb) return false;
 
@@ -76,17 +77,17 @@
             const raw = getSelectRaw(sel, hid);
             if (raw === lastRaw) return;
             lastRaw = raw;
-            const isFull = (String(raw).trim() === '0'); // 0 = ΠΛΗΡΕΣ
+            const isFull = String(raw).trim() === '0'; // 0 = ΠΛΗΡΕΣ
             setCheckboxUI(cb, label, isFull);
         };
 
         setTimeout(sync, 0);
 
         sel.addEventListener('change', sync);
-        sel.addEventListener('input',  sync);
+        sel.addEventListener('input', sync);
         if (hid) {
             hid.addEventListener('change', sync);
-            hid.addEventListener('input',  sync);
+            hid.addEventListener('input', sync);
         }
         if (sel.tomselect && typeof sel.tomselect.on === 'function') {
             sel.tomselect.on('change', sync);
@@ -113,7 +114,7 @@
 
         // ---- έλεγχος ασυμφωνίας όταν αλλάζει ο χρήστης το checkbox ----
         cb.addEventListener('change', async () => {
-            const isFullFromSelect = (getSelectRaw(sel, hid).trim() === '0');
+            const isFullFromSelect = getSelectRaw(sel, hid).trim() === '0';
             const isFullFromCb = cb.checked;
             if (isFullFromSelect === isFullFromCb) {
                 setCheckboxUI(cb, label, isFullFromCb);
@@ -123,18 +124,18 @@
                 await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
-                    icon: "warning",
-                    title: "Ασυμφωνία επιλογών",
+                    icon: 'warning',
+                    title: 'Ασυμφωνία επιλογών',
                     html: isFullFromCb
                         ? 'Το checkbox Πλήρης Απασχόληση δείχνει <b>ΝΑΙ</b>, αλλά το Καθεστώς Απασχόλησης δεν είναι <b>0 - ΠΛΗΡΗΣ</b>.'
                         : 'Το checkbox Πλήρης Απασχόληση δείχνει <b>ΟΧΙ</b>, αλλά το Καθεστώς Απασχόλησης είναι <b>0 - ΠΛΗΡΗΣ</b>.',
                     showConfirmButton: true,
-                    confirmButtonText: "Κλείσιμο",
+                    confirmButtonText: 'Κλείσιμο',
                     customClass: {
-                        confirmButton: "class-warning custom-confirm-button custom-swal-button",
-                        title: "custom-title",
-                        popup: "custom-swal-popup",
-                    },
+                        confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup'
+                    }
                 });
                 // <-- ΝΕΟ: μηδένισε τις ώρες εβδομάδας όταν ενεργοποιηθεί το Swal
                 zeroWeeklyHours();
@@ -149,7 +150,9 @@
 
     function init() {
         if (wireUp()) return;
-        const obs = new MutationObserver(() => { if (wireUp()) obs.disconnect(); });
+        const obs = new MutationObserver(() => {
+            if (wireUp()) obs.disconnect();
+        });
         obs.observe(document.body, { childList: true, subtree: true });
     }
 

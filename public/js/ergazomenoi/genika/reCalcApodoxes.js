@@ -1,14 +1,14 @@
 const Decimal = window.Decimal;
 
-import { 
-    toDecimal, 
-    formatDecimal, 
+import {
+    toDecimal,
+    formatDecimal,
     showAlert,
     fetchGenikesParametroi,
     fetchApodoxesData,
     updateGeneralParameters,
     updatePosoBasedOnHours
-} from 'apodoxes-calculations';  // ✅ Alias από importmap
+} from 'apodoxes-calculations';
 
 // ========================================================================
 // DECIMAL.JS CONFIGURATION
@@ -23,10 +23,8 @@ function waitForDecimal(callback) {
     }
 }
 
-waitForDecimal(function() {
-    // console.log('✅ Decimal.js loaded, initializing reCalcApodoxes...');
-    
-    Decimal.set({ 
+waitForDecimal(function () {
+    Decimal.set({
         precision: 28,
         rounding: Decimal.ROUND_HALF_UP,
         toExpNeg: -7,
@@ -41,7 +39,7 @@ waitForDecimal(function() {
 // ========================================================================
 
 function initReCalc() {
-    document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener('DOMContentLoaded', function () {
         const recalcButton = document.getElementById('reCalcButton');
         if (recalcButton) {
             recalcButton.addEventListener('click', reCalculate);
@@ -55,6 +53,9 @@ function initReCalc() {
 
 async function reCalculate() {
     try {
+        // 🔵 ΒΗΜΑ 1: Αποθήκευση δωτών ποσών ΠΡΙΝ τον καθαρισμό
+        const savedExtraValues = saveExtraApodoxes();
+
         clearInputsApodoxon();
 
         const genikesParametroi = await fetchGenikesParametroi();
@@ -64,11 +65,22 @@ async function reCalculate() {
 
         updateGeneralParameters(genikesParametroi);
 
-        const contract = document.getElementById("symbash_stathera")?.value?.trim().padStart(4, '0');
-        const category = document.getElementById("kathgoria_symbashs_stathera")?.value?.trim().padStart(4, '0');
-        const specialty = document.getElementById("eidikothta_symbashs_stathera")?.value?.trim().padStart(4, '0');
-        const klimakio = document.getElementById("misthologiko_klimakio")?.value?.trim().padStart(2, '0') || '01';
-        const hmeromhnia = document.getElementById("hmeromhnia_allaghs_symbashs")?.value || '';
+        const contract = document
+            .getElementById('symbash_stathera')
+            ?.value?.trim()
+            .padStart(4, '0');
+        const category = document
+            .getElementById('kathgoria_symbashs_stathera')
+            ?.value?.trim()
+            .padStart(4, '0');
+        const specialty = document
+            .getElementById('eidikothta_symbashs_stathera')
+            ?.value?.trim()
+            .padStart(4, '0');
+        const klimakio =
+            document.getElementById('misthologiko_klimakio')?.value?.trim().padStart(2, '0') ||
+            '01';
+        const hmeromhnia = document.getElementById('hmeromhnia_allaghs_symbashs')?.value || '';
 
         if (!contract || !category || !specialty) {
             showAlert({
@@ -80,27 +92,30 @@ async function reCalculate() {
         }
 
         const limit = window._ARITHMOS_STOIXEION_SYMBASEON || 15;
-        
+
         for (let i = 1; i <= limit; i++) {
             const idNum = i.toString().padStart(2, '0');
             const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
-            
+
             if (!selectEl) continue;
 
             const selectedElement = selectEl.tomselect?.getValue() || selectEl.value;
-            
-            if (selectedElement && selectedElement !== "" && selectedElement !== "0000") {
+
+            if (selectedElement && selectedElement !== '' && selectedElement !== '0000') {
                 await updatePosoAndTotal(
-                    i, 
-                    contract, 
-                    category, 
-                    specialty, 
-                    selectedElement.padStart(4, '0'), 
-                    klimakio, 
+                    i,
+                    contract,
+                    category,
+                    specialty,
+                    selectedElement.padStart(4, '0'),
+                    klimakio,
                     hmeromhnia
                 );
             }
         }
+
+        // 🔵 ΒΗΜΑ 2: Επαναφορά δωτών ποσών ΜΕΤΑ τον επανυπολογισμό
+        restoreExtraApodoxes(savedExtraValues);
 
         if (typeof window.calculateTotal === 'function') {
             window.calculateTotal();
@@ -112,7 +127,6 @@ async function reCalculate() {
             html: 'Οι αποδοχές επανυπολογίστηκαν με επιτυχία!',
             confirmButtonText: 'OK'
         });
-
     } catch (error) {
         console.error('❌ Error in reCalculate:', error);
         showAlert({
@@ -124,13 +138,89 @@ async function reCalculate() {
 }
 
 // ========================================================================
+// SAVE / RESTORE ΔΩΤΩΝ ΑΠΟΔΟΧΩΝ
+// ========================================================================
+
+/**
+ * Αποθηκεύει τα δωτά ποσά (στοιχεία που έχουν posoBasei > 0 και poso == 0)
+ * πριν τον καθαρισμό των πεδίων.
+ */
+function saveExtraApodoxes() {
+    const saved = [];
+    const limit = window._ARITHMOS_STOIXEION_SYMBASEON || 15;
+
+    for (let i = 1; i <= limit; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const posoField = document.getElementById(`poso_symbashs_${idNum}`);
+        const posoBaseiField = document.getElementById(
+            `poso_symbashs_basei_oron_ergasias_${idNum}`
+        );
+
+        if (!posoField || !posoBaseiField) continue;
+
+        const posoVal = toDecimal(posoField.value);
+        const posoBaseiVal = toDecimal(posoBaseiField.value);
+
+        // Δωτό = έχει τιμή βάσει ωρών αλλά ΔΕΝ έχει τιμή βάσει σύμβασης
+        if (!posoBaseiVal.isZero() && posoVal.isZero()) {
+            saved.push({
+                idNum,
+                posoBasei: posoBaseiField.value
+            });
+        }
+    }
+
+    if (saved.length > 0) {
+        console.log(
+            `💾 Αποθηκεύτηκαν ${saved.length} δωτά ποσά:`,
+            saved.map((v) => `Row ${v.idNum}: ${v.posoBasei}`).join(', ')
+        );
+    }
+
+    return saved;
+}
+
+/**
+ * Επαναφέρει τα δωτά ποσά μετά τον επανυπολογισμό.
+ */
+function restoreExtraApodoxes(savedValues) {
+    if (!savedValues || savedValues.length === 0) return;
+
+    for (const saved of savedValues) {
+        const posoBaseiField = document.getElementById(
+            `poso_symbashs_basei_oron_ergasias_${saved.idNum}`
+        );
+        if (posoBaseiField) {
+            posoBaseiField.value = saved.posoBasei;
+        }
+    }
+
+    console.log(`♻️ Επαναφέρθηκαν ${savedValues.length} δωτά ποσά`);
+}
+
+// ========================================================================
 // UPDATE FUNCTIONS
 // ========================================================================
 
-async function updatePosoAndTotal(rowIndex, contract, category, specialty, selectedElement, klimakio, hmeromhnia) {
+async function updatePosoAndTotal(
+    rowIndex,
+    contract,
+    category,
+    specialty,
+    selectedElement,
+    klimakio,
+    hmeromhnia
+) {
     try {
-        const data = await fetchApodoxesData(contract, category, specialty, selectedElement, klimakio, hmeromhnia);
-        
+        const data = await fetchApodoxesData(
+            contract,
+            category,
+            specialty,
+            selectedElement,
+            klimakio,
+            hmeromhnia
+        );
+
         if (!data.success) {
             console.warn(`⚠️ No data for row ${rowIndex}, element ${selectedElement}`);
             return;
@@ -138,7 +228,7 @@ async function updatePosoAndTotal(rowIndex, contract, category, specialty, selec
 
         const idNum = rowIndex.toString().padStart(2, '0');
         const posoField = document.getElementById(`poso_symbashs_${idNum}`);
-        
+
         if (posoField) {
             posoField.value = formatDecimal(data.poso, 2);
         }
@@ -149,9 +239,8 @@ async function updatePosoAndTotal(rowIndex, contract, category, specialty, selec
 
         const posoBasedOnHoursFieldId = `poso_symbashs_basei_oron_ergasias_${idNum}`;
         const extraApodoxes = false;
-        
-        updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, extraApodoxes);
 
+        updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, extraApodoxes);
     } catch (error) {
         console.error(`❌ Error updating row ${rowIndex}:`, error);
     }
@@ -163,7 +252,7 @@ async function updatePosoAndTotal(rowIndex, contract, category, specialty, selec
 
 function clearInputsApodoxon() {
     const inputs = document.querySelectorAll('.clearAble');
-    inputs.forEach(input => {
+    inputs.forEach((input) => {
         input.value = '';
     });
 }

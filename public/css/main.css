@@ -10815,3 +10815,61 @@ body.loader-active > *:not(.app-loader) {
 .ts-wrapper.ts-disabled-selected .ts-control input {
     color: #000000 !important;
 }
+
+/* =========================================================
+   ΜΟΝΟ για τα dynamic Στοιχεία Σύμβασης
+   ========================================================= */
+
+/* TomSelect disabled wrapper override */
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-disabled-selected,
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled.ts-disabled-selected,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-locked.ts-disabled-selected {
+    opacity: 1 !important;
+}
+
+/* ίδιο λευκό background όπως στη Σύμβαση */
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled .ts-control,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-disabled-selected .ts-control,
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled.ts-disabled-selected .ts-control,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-locked.ts-disabled-selected .ts-control {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    cursor: default !important;
+}
+
+/* selected text */
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled .ts-control .item,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-disabled-selected .ts-control .item,
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled.ts-disabled-selected .ts-control .item,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-locked.ts-disabled-selected .ts-control .item {
+    color: #000000 !important;
+    opacity: 1 !important;
+}
+
+/* input / placeholder */
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled .ts-control input,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-disabled-selected .ts-control input,
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled.ts-disabled-selected .ts-control input,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-locked.ts-disabled-selected .ts-control input {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    cursor: default !important;
+}
+
+#stoixeiaSymbaseonContainer .ts-wrapper.disabled .ts-control input::placeholder,
+#stoixeiaSymbaseonContainer .ts-wrapper.ts-disabled-selected .ts-control input::placeholder,
+#stoixeiaSymbaseonContainer
+    .ts-wrapper.disabled.ts-disabled-selected
+    .ts-control
+    input::placeholder,
+#stoixeiaSymbaseonContainer
+    .ts-wrapper.ts-locked.ts-disabled-selected
+    .ts-control
+    input::placeholder {
+    color: #000000 !important;
+    opacity: 1 !important;
+}

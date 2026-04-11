@@ -498,6 +498,7 @@ declare -a modules=(
     "public/js/companies/genikastoixeia/initPararthmataEfkaDropdowns.js"
     "public/js/companies/genikastoixeia/initTameiaDropdowns.js"
     "public/js/ergazomenoi/genika/addStoixeiaSymbaseon.js"
+    "public/js/ergazomenoi/genika/editStoixeiaSymbaseon.js"
     "public/js/ergazomenoi/genika/reCalcApodoxes.js"
     "public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.js"
     "public/js/modules/apodoxesCalculations.js"

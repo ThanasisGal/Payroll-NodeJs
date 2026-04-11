@@ -8,7 +8,7 @@
 
 	<div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show">
 
-		<% const safe = (k) => (rec && rec[k]) || ''; %>
+		<% const safe = (k) => (rec && rec[k] != null ? rec[k] : ''); %>
 
 		<div class="accordion-body bg-white margin-bottom--0_5rem">
 			<input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
@@ -18,7 +18,7 @@
 					<label for="plhrhs_apasxolhsh" class="col-form-label label-font-size">
 					Πλήρης Απασχόληση
 					</label>
-				</div>
+				</div>	
 				<div class="col-1 left-align checkbox-flex-center">
 					<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="plhrhs_apasxolhsh" name="plhrhs_apasxolhsh" <%= safe('plhrhs_apasxolhsh') ? 'checked' : '' %> value="" />
 					<label for="plhrhs_apasxolhsh" id="label-plhrhs_apasxolhsh" class="margin-left-0_75rem font-size-vw-0_875">
@@ -107,7 +107,7 @@
 					</label>
 				</div>
 				<div class="col-1">
-					<input type="number" name="hmeres_ergasias_ebdomadas" id="hmeres_ergasias_ebdomadas" class="form-control input-contents" value="<%= safe('hmeres_ergasias_ebdomadas') %>" min="1" max="7" />
+					<input type="number" name="hmeres_ergasias_ebdomadas" id="hmeres_ergasias_ebdomadas" class="form-control input-contents right-align" value="<%= safe('hmeres_ergasias_ebdomadas') %>" min="1" max="7" />
 				</div>
 
 				<div class="col-3"></div>
@@ -118,7 +118,7 @@
 					</label>
 				</div>
 				<div class="col-1">
-					<input type="number" name="ores_ergasias_ebdomadas" id="ores_ergasias_ebdomadas" class="form-control input-contents" value="<%= safe('ores_ergasias_ebdomadas') %>" min="0" max="40" />
+					<input type="number" name="ores_ergasias_ebdomadas" id="ores_ergasias_ebdomadas" class="form-control input-contents right-align" value="<%= safe('ores_ergasias_ebdomadas') %>" min="0" max="40" />
 				</div>
 
 				<div class="col-2 left-align">
@@ -138,7 +138,7 @@
 					</label>
 				</div>
 				<div class="col-1">
-					<input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents" value="<%= safe('dialleima_se_lepta') %>" min="0" max="45" />
+					<input type="number" name="dialleima_se_lepta" id="dialleima_se_lepta" class="form-control input-contents right-align" value="<%= safe('dialleima_se_lepta') %>" min="0" max="45" />
 				</div>
 
 				<div class="col-0-3"></div>
