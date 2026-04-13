@@ -6,7 +6,7 @@
                 <li>Αποδοχές</li>
                 <li>Κρατήσεις</li>
                 <li>Αλλοδαποί</li>
-                <li>Επαγγ.Κατάρτιση</li>
+                <li>Επαγγ. Κατάρτιση</li>
                 <li>Διάφορα</li>
         		<li>Ωράριο Εργασίας</li>
         		<li class="align-right">Ιστορικό Προσλήψεων/Αλλαγών</li>
@@ -85,7 +85,7 @@
 
               				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody">
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody1">
 
 								<input type="hidden" name="selectedSymbash" id="selectedSymbash" />
 								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
@@ -102,139 +102,158 @@
         		</div>
       		</section>
 
-      <section class="sel_3_section visible" data-section="Κρατήσεις">
-        <div>
-          <form class="formRadius">
+			<section class="sel_3_section visible" data-section="Κρατήσεις">
+				<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section3') %>
-              
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+              				<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-                <%- include('./partials/edit/cardBodies/section3/krathseis') %>
-              </div>
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody2">
 
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+								<%- include('./partials/edit/cardBodies/section3/krathseis') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+							</div>
 
-      <section class="sel_4_section visible" data-section="Αλλοδαποί">
-        <div>
-          <form class="formRadius">
+							<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+						</div>
+					</form>
+				</div>
+			</section>
 
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section4') %>
+			<section class="sel_4_section visible" data-section="Αλλοδαποί">
+				<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
+
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody3">
+				
+								<%- include('./partials/edit/cardBodies/section4/allodapoi') %>
+
+							</div>
+
+							<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+						</div>
+					</form>
+        		</div>
+      		</section>
+
+			<section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
+				<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
+
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
+
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody4	">
+
+                				<%- include('./partials/edit/cardBodies/section5/epaggelmatikhKatartish') %>
+
+              				</div>
+
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            			</div>
+          			</form>
+        		</div>
+      		</section>
+
+			<section class="sel_6_section visible" data-section="Διάφορα">
+				<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
+
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
+
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody5">
+
+								<%- include('./partials/edit/cardBodies/section6/diafora') %>
+
+							</div>
+
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+
+            			</div>
+          			</form>
+        		</div>
+      		</section>
+
+      		<section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
+        		<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
+
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
+
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody6">
+                				<input type="hidden" id="dateDifference" name="dateDifference" value="">
                 
-                <%- include('./partials/edit/cardBodies/section4/allodapoi') %>
+                				<%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
 
-              </div>
+              				</div>
 
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_5_section visible" data-section="Επαγγ.Κατάρτιση">
-        <div>
-          <form class="formRadius">
+      		<section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
+        		<div>
+					<form class="formRadius">
+						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+							<%- include('../../partials/_csrfField') %>
+						<% } %>
 
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section5') %>
+							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
+							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody7">
 
-                <%- include('./partials/edit/cardBodies/section5/epaggelmatikhKatartish') %>
+                				<%- include('./partials/edit/cardBodies/section7/istoriko') %>
 
-              </div>
+							</div>
 
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
 
-            </div>
-          </form>
-        </div>
-      </section>
+            			</div>
+          			</form>
+        		</div>
+      		</section>
 
-      <section class="sel_6_section visible" data-section="Διάφορα">
-        <div>
-          <form class="formRadius">
-
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
-
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section6') %>
-
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
-
-                <%- include('./partials/edit/cardBodies/section6/diafora') %>
-
-              </div>
-
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
-
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
-        <div>
-          <form class="formRadius">
-
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
-
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section8') %>
-
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
-                <input type="hidden" id="dateDifference" name="dateDifference" value="">
-                
-                <%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
-
-              </div>
-
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
-
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <section class="sel_7_section visible" data-section="Ιστορικό Προσλήψεων/Αλλαγών">
-        <div>
-          <form class="formRadius">
-
-            <div class="card d-flex flex-column z-depth-5" style="width: 94%; margin-left: 3%">
-
-              <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section7') %>
-
-              <div class="card-body overflow-auto flex-grow-1 w-100" style="height: 64vh; background-color: #ffffff;" >
-
-                <%- include('./partials/edit/cardBodies/section7/istoriko') %>
-
-              </div>
-
-              <%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
-
-            </div>
-          </form>
-        </div>
-      </section>
-
-  </div>
+  		</div>
   
-    <% const isProduction = NODE_ENV === 'production'; %>
+    	<% const isProduction = NODE_ENV === 'production'; %>
     
-    <script nonce="<%= nonce %>">
-        window.RUNTIME_ENV = "<%= NODE_ENV %>";
-    </script>
+    	<script nonce="<%= nonce %>">
+        	window.RUNTIME_ENV = "<%= NODE_ENV %>";
+    	</script>
               
 
 
@@ -593,7 +612,7 @@ PDF UPLOAD MODAL (Shared across all sections)
 <!-- ========================================================================
 PDF PREVIEW MODAL (Contract Preview & Download)
 ======================================================================== -->
-<div id="pdfPreviewContractModal" class="pdf-modal hidden">
+<div id=	"pdfPreviewContractModal" class="pdf-modal hidden">
 	<div class="pdf-modal-content pdf-preview-modal-large">
 		<div class="pdf-modal-header">
 			<h3>📄 Σύμβαση Εργαζόμενου</h3>

@@ -609,23 +609,38 @@ const AdeiesDiamonhsSchema = new Schema(
 );
 const AdeiesDiamonhsModel = model('AdeiesDiamonhs', AdeiesDiamonhsSchema);
 
-const ThematikaPediaSchema = new Schema({
-    kodikos: { type: String, unique: true, index: true },
-    perigrafh: { type: String, trim: true }
-});
+const ThematikaPediaSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true, index: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Thematika_Pedia'
+    }
+);
 const ThematikaPediaModel = model('ThematikaPedia', ThematikaPediaSchema);
 
-const ThematikesEnothtesSchema = new Schema({
-    kodikos: { type: String, trim: true },
-    perigrafh: { type: String, trim: true },
-    kodikos_sysxetishs: { type: String, trim: true }
-});
+const ThematikesEnothtesSchema = new Schema(
+    {
+        kodikos: { type: String, trim: true },
+        perigrafh: { type: String, trim: true },
+        kodikos_sysxetishs: { type: String, trim: true }
+    },
+    {
+        collection: 'Thematikes_Enothtes'
+    }
+);
 const ThematikesEnothtesModel = model('ThematikesEnothtes', ThematikesEnothtesSchema);
 
-const ForeisEkpaideyshsSchema = new Schema({
-    kodikos: { type: String, unique: true, index: true },
-    perigrafh: { type: String, trim: true }
-});
+const ForeisEkpaideyshsSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true, index: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Foreis_Ekpaideyshs'
+    }
+);
 const ForeisEkpaideyshsModel = model('ForeisEkpaideyshs', ForeisEkpaideyshsSchema);
 
 const LanguagesSchema = new Schema({

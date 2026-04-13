@@ -1,183 +1,299 @@
-<!-- <div class="row form-group align-items-center mt-1 mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">                
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label class="col-form-label label-font-size field-required">
-        Ημερομηνία Λήξης Νομιμοποιητικού εγγράφου
-      </label>
-    </div>
-    <div class="col-1-5">
-      <input type="date" name="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" id="hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy" class="date-control" value="<%= ergazomenoiData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy ? new Date(ergazomenoiData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy).toISOString().split('T')[0] : '' %>" />
-    </div>
-  </div>
-</div> 
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+    const safe = (k) => (recordData && recordData[k]) || '';
+    const isEmpty = (val) => !val || val.toString().trim() === '';
+%>
 
-<hr style="margin-top: -0.1rem; margin-bottom: -0.5rem;" /> -->
+<div class="row form-group align-items-center bg-white margin-top--1rem margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-6 text-left">
+			<label 
+				for="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" class="col-form-label label-font-size field-required">
+				Αφορά Άδεια Διαμονής Πολιτών Τρίτων Χωρών που παρέχει δικαίωμα άμεσης πρόσβασης στην αγορά εργασίας
+			</label>
+		</div>
+		
+		<div class="col-1 left-align checkbox-flex-center margin-top--0_2rem">
+			<input 
+				type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" name="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" <%= ergazomenoiData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? 'checked' : '' %> value="" 
+			/>
+			<label 
+				for="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" id="label-adeia_diamonhs_me_amesh_prosbash_gia_ergasia" class="margin-left-0_75rem font-size-vw-0_875">
+				ΟΧΙ
+			</label>
+		</div>
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-6 text-left">
-      <label for="adeia_diamonhs_me_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size field-required">
-        Αφορά Άδεια Διαμονής Πολιτών Τρίτων Χωρών που παρέχει δικαίωμα άμεσης πρόσβασης στην αγορά εργασίας
-      </label>
-    </div>
-    <div class="col-1 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" name="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" <%= ergazomenoiData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? 'checked' : '' %> value="" />
-      <label for="adeia_diamonhs_me_amesh_prosbash_gia_ergasia" id="label-adeia_diamonhs_me_amesh_prosbash_gia_ergasia" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-    <div class="col-5">
-      <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" id="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" data-selected="<%= ergazomenoiData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia %>" disabled>
-      </select>
-    </div>
-  </div>
+		<input
+			type="hidden"
+			name="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera"
+			id="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera"
+			class="form-control input-contents"
+			value="<%= safe("eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera") %>"
+			readonly
+		/>
+
+		<div class="col-4-8">
+			<select
+				id="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"
+				name="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"
+				class="tom-dropdown selectpicker-dropdown-normal left-align"
+				aria-label="Άδεια Διαμονής με Άμεση Πρόσβαση για Εργασία"
+				data-api="/api/dropdown/ergazomenoi/adeies_diamonhs_typos_0"
+				single
+				data-target-input=<%= `eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera` %>
+				data-preselect="eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera"
+				data-preload-all="true"
+				data-pad-length="2"
+				placeholder="Αναζήτηση Τύπων Άδειας Διαμονής">
+			</select>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
-        Αριθμός Άδειας Διαμονής Πολιτών Τρίτων Χωρών
-      </label>
-    </div>
-    <div class="col-2">
-      <input type="text" class="form-control input-contents" name="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" id="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia %>" disabled>
-      </input>
-    </div>
-  </div>
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+		
+		<div class="col-9-3 text-left">
+			<label 
+				for="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
+				Αριθμός Άδειας Διαμονής Πολιτών Τρίτων Χωρών
+			</label>
+		</div>
+	
+		<div class="col-2">
+			<input 
+				type="text" class="form-control input-contents" name="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" id="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia %>" disabled 
+			/>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
-        Ημερομηνία Λήξης Άδειας Διαμονής Πολιτών Τρίτων Χωρών
-      </label>
-    </div>
-    <div class="col-0-5"></div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" id="hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia ? new Date(ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
+<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+
+		<div class="col-9-3 text-left">
+			<label 
+				for="arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
+				Ημερομηνία Λήξης Άδειας Διαμονής Πολιτών Τρίτων Χωρών
+			</label>
+		</div>
+
+		<div class="col-0-5"></div>
+		
+		<div class="col-1-5">
+			<input type="date" class="date-control" name="hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" id="hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia ? new Date(ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia).toISOString().split('T')[0] : '' %>" disabled>
+			</input>
+		</div>
+	</div>
 </div>
 
-<hr style="margin-top: -0.1rem; margin-bottom: -0.5rem;" />                
+<hr class="hr-style" />
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-6 text-left">
-      <label for="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size field-required">
-        Αφορά Άδεια Διαμονής Πολιτών Τρίτων Χωρών για την οποία απαιτείται επιπλέον έγκριση για πρόσβαση στην αγορά εργασίας
-      </label>
-    </div>
-    <div class="col-1 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" name="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" <%= ergazomenoiData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia ? 'checked' : '' %> value="" />
-      <label for="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="label-adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-    <div class="col-5">
-      <select class="form-select selectpicker-dropdown-normal" data-live-search="true" name="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" data-selected="<%= ergazomenoiData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia %>" disabled>
-      </select>
-    </div>
-  </div>
+<div class="row form-group align-items-center bg-white margin-top--0_5rem margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-6 text-left">
+			<label for="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size field-required">
+				Αφορά Άδεια Διαμονής Πολιτών Τρίτων Χωρών για την οποία απαιτείται επιπλέον έγκριση για πρόσβαση στην αγορά εργασίας
+			</label>
+		</div>
+
+		<div class="col-1 left-align checkbox-flex-center margin-top--0_2rem">
+			<input 
+				type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" name="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" <%= ergazomenoiData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia ? 'checked' : '' %> value="" 
+			/>
+			<label 
+				for="adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="label-adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia" class="margin-left-0_75rem font-size-vw-0_875">
+				ΟΧΙ
+			</label>
+		</div>
+
+		<input
+			type="hidden"
+			name="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera"
+			id="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera"
+			class="form-control input-contents"
+			value="<%= safe("eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera") %>"
+			readonly
+		/>
+		
+		<div class="col-4-8">
+			<select
+				id="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia"
+				name="eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia"
+				class="tom-dropdown selectpicker-dropdown-normal left-align"
+				aria-label="Άδεια Διαμονής χωρίς Άμεση Πρόσβαση για Εργασία"
+				data-api="/api/dropdown/ergazomenoi/adeies_diamonhs_typos_1"
+				single
+				data-target-input=<%= `eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera` %>
+				data-preselect=<%= `eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera` %>
+				data-preload-all="true"
+				data-pad-length="2"
+				placeholder="Αναζήτηση Τύπων Άδειας Διαμονής">
+			</select>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
-        Αριθμός Άδειας Διαμονής Πολιτών Τρίτων Χωρών
-      </label>
-    </div>
-    <div class="col-2">
-      <input type="text" class="form-control input-contents" name="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia %>" disabled>
-      </input>
-    </div>
-  </div>
+<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+
+		<div class="col-9-3 text-left">
+			<label 
+				for="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
+				Αριθμός Άδειας Διαμονής Πολιτών Τρίτων Χωρών
+			</label>
+		</div>
+
+		<div class="col-2">
+		
+			<input 
+				type="text" class="form-control input-contents" name="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia %>" disabled
+			/>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia"  class="col-form-label label-font-size">
-        Ημερομηνία Λήξης Άδειας Διαμονής Πολιτών Τρίτων Χωρών
-      </label>
-    </div>
-    <div class="col-0-5"></div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia ? new Date(ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+
+		<div class="col-9-3 text-left">
+			<label 
+				for="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" class="col-form-label label-font-size">
+				Ημερομηνία Λήξης Άδειας Διαμονής Πολιτών Τρίτων Χωρών
+			</label>
+		</div>
+
+		<div class="col-0-5"></div>
+
+		<div class="col-1-5">
+			<input 
+				type="date" class="date-control" name="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" id="hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia" value="<%= ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia ? new Date(ergazomenoiData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia).toISOString().split('T')[0] : '' %>" disabled>
+			</input>
+		</div>
+	</div>
 </div>
 
-<hr style="margin-top: -0.1rem; margin-bottom: -0.5rem;" />
+<hr class="hr-style" />
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-6 text-left">
-      <label for="adeia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size field-required">
-        Αφορά Εποχική Απασχόληση Πολίτη Τρίτης Χώρας που εργάζεται με την Θεώρηση Εισόδου (VISA)
-      </label>
-    </div>
-    <div class="col-1 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_eisodoy_gia_epoxikh_apasxolhsh" name="adeia_eisodoy_gia_epoxikh_apasxolhsh" <%= ergazomenoiData.adeia_eisodoy_gia_epoxikh_apasxolhsh ? 'checked' : '' %> value="" />
-      <label for="adeia_eisodoy_gia_epoxikh_apasxolhsh" id="label-adeia_eisodoy_gia_epoxikh_apasxolhsh" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-  </div>
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-6 text-left">
+			<label 
+				for="adeia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size field-required">
+				Αφορά Εποχική Απασχόληση Πολίτη Τρίτης Χώρας που εργάζεται με την Θεώρηση Εισόδου (VISA)
+			</label>
+		</div>
+
+		<div class="col-1 left-align checkbox-flex-center">
+			<input 
+				type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="adeia_eisodoy_gia_epoxikh_apasxolhsh" name="adeia_eisodoy_gia_epoxikh_apasxolhsh" <%= ergazomenoiData.adeia_eisodoy_gia_epoxikh_apasxolhsh ? 'checked' : '' %> value="" 
+			/>
+			<label 
+				for="adeia_eisodoy_gia_epoxikh_apasxolhsh" id="label-adeia_eisodoy_gia_epoxikh_apasxolhsh" class="margin-left-0_75rem  font-size-vw-0_875">
+				ΟΧΙ
+			</label>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
-        Αριθμός Άδειας για Εποχική Απασχόληση (VISA)
-      </label>
-    </div>
-    <div class="col-2">
-      <input type="text" class="form-control input-contents" name="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh" id="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh %>" disabled>
-      </input>
-    </div>
-  </div>
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+		
+		<div class="col-9-3 text-left">
+			<label 
+				for="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
+				Αριθμός Άδειας για Εποχική Απασχόληση (VISA)
+			</label>
+		</div>
+		<div class="col-2">
+			<input 
+				type="text" class="form-control input-contents" name="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh" id="arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh %>" disabled>
+			</input>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
-        Ημερομηνία Θεώρησης Εισόδου
-      </label>
-    </div>
-    <div class="col-0-5"></div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" id="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh ? new Date(ergazomenoiData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+
+		<div class="col-9-3 text-left">
+			<label 
+				for="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
+				Ημερομηνία Θεώρησης Εισόδου
+			</label>
+		</div>
+		
+		<div class="col-0-5"></div>
+		
+		<div class="col-1-5">
+			<input 
+				type="date" class="date-control" name="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" id="apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh ? new Date(ergazomenoiData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh).toISOString().split('T')[0] : '' %>" disabled>
+			</input>
+		</div>
+	</div>
 </div>
- 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-0-5"></div>
-    <div class="col-9-3 text-left">
-      <label for="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
-        Ημερομηνία Λήξης Θεώρησης Εισόδου
-      </label>
-    </div>
-    <div class="col-0-5"></div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" id="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh ? new Date(ergazomenoiData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
+	
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="row form-group align-items-center">
+		<div class="col-0-5"></div>
+
+		<div class="col-9-3 text-left">
+			<label 
+				for="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh"  class="col-form-label label-font-size">
+				Ημερομηνία Λήξης Θεώρησης Εισόδου
+			</label>
+		</div>
+
+		<div class="col-0-5"></div>
+		
+		<div class="col-1-5">
+			<input 
+				type="date" class="date-control" name="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" id="eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh" value="<%= ergazomenoiData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh ? new Date(ergazomenoiData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh).toISOString().split('T')[0] : '' %>" disabled>
+			</input>
+		</div>
+	</div>
+</div>
+
+<div class="height-vh-3_5"></div>
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem" >
+	<div class="col-8-1 left-align"></div>
+	<div class="col-3-5 left-align">
+		<div class="pdf-button-wrapper">
+			<button 
+				type="button" 
+				id="customButton_allodapoi" 
+				class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+				data-document-type="allodapoi"
+				data-data-bs-title="Νομιμοποιητικά έγγραφα"
+				disabled>
+				<i class="bi bi-cloud-arrow-up"></i> 
+				Αρχείο Νομιμοποιητικών Εγγράφων (pdf)
+			</button>
+			
+			<div 
+				class="pdf-badge-replacement hidden" 
+				data-document-type="allodapoi"
+				data-bs-title="Κλικ για αλλαγή αρχείου">
+				<div class="badge-content">
+					<i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+					<span class="badge-filename">file.pdf</span>
+				</div>
+				<button 
+					type="button" 
+					class="badge-remove-btn" 
+					data-bs-title="Αφαίρεση αρχείου"
+					data-document-type="allodapoi">
+					<i class="bi bi-x-circle-fill"></i>
+				</button>
+			</div>
+		</div>
+	</div>
 </div>

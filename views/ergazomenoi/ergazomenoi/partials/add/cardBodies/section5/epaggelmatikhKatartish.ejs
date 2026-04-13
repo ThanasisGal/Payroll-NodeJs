@@ -70,10 +70,15 @@
 
 	<div class="col-9-74">
 		<select id="thematikh_enothta" name="thematikh_enothta"
-			class="tom-dropdown selectpicker-dropdown-normal left-align" aria-label="Θεματική Ενότητα"
-			data-api="/api/dropdown/ergazomenoi/thematikh_enothta" single
-			data-target-input=<%= `thematikh_enothta_stathera` %> data-preselect=<%= `thematikh_enothta_stathera` %>
-			data-preload-all="true" data-pad-length="2" placeholder="Αναζήτηση Θεματικής Ενότητας...">
+			class="tom-dropdown selectpicker-dropdown-normal left-align"
+			aria-label="Θεματική Ενότητα"
+			data-api="/api/dropdown/ergazomenoi/thematikh_enothta"
+			single
+			data-target-input="thematikh_enothta_stathera"
+			data-preselect="thematikh_enothta_stathera"
+			data-skip-autoload="true"
+			data-pad-length="2"
+			placeholder="Αναζήτηση Θεματικής Ενότητας...">
 		</select>
 	</div>
 </div>
