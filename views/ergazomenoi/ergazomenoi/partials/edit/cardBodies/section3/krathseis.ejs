@@ -1,4 +1,31 @@
-<% const safe = (k) => (ergazomenoiData && ergazomenoiData[k]) || ''; %>
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
 
 <input type="hidden" id="krathseis_table" name="krathseis_table" value="[]" />
 
@@ -48,8 +75,8 @@
 		<div class="col-0-5"></div>
 
 		<div class="col-1-5">
-			<input type="text" name="ama_<%= idNum %>" id="ama_<%= idNum %>" class="form-control input-contents"
-				value="<%= safe(`ama_${idNum}`) %>" />
+			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" class="form-control input-contents"
+				value="<%= safe(`ama_krathshs_${idNum}`) %>" />
 		</div>
 	</div>
 <% } %>
@@ -82,7 +109,7 @@
 		name="epikoyrikh_xoris_efka_stathera"
 		id="epikoyrikh_xoris_efka_stathera"
 		class="form-control input-contents"
-		value="<%= safe("epikoyrikh_xoris_efka_stathera") %>"
+		value="<%= safe('epikoyrikh_xoris_efka') %>"
 	/>
 
 	<div class="col-3-75">
@@ -108,7 +135,7 @@
 		name="astheneia_xoris_efka_stathera"
 		id="astheneia_xoris_efka_stathera"
 		class="form-control input-contents"
-		value="<%= safe("astheneia_xoris_efka_stathera") %>"
+		value="<%= safe('astheneia_xoris_efka') %>"
 	/>
 
 	<div class="col-3-75">
@@ -134,7 +161,7 @@
 		name="idiothta_sto_ergo_39_stathera"
 		id="idiothta_sto_ergo_39_stathera"
 		class="form-control input-contents"
-		value="<%= safe("idiothta_sto_ergo_39_stathera") %>"
+		value="<%= safe('idiothta_sto_ergo_39') %>"
 	/>
 
 	<div class="col-3-75">

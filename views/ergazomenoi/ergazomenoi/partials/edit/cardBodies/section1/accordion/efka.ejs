@@ -1,3 +1,32 @@
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
+
 <div class="accordion-item margin-top--2_5rem">
 	<h2 class="accordion-header">
 		<button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700  caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseFour" aria-expanded="true" aria-controls="panelsStayOpen-collapseFour" 
@@ -6,8 +35,6 @@
 		</button>
 	</h2>
 	<div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
-
-		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
 		<div class="accordion-body bg-white margin-bottom--0_5rem">
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
@@ -22,7 +49,7 @@
 					name="foreas_kyrias_asfalishs_stathera"
 					id="foreas_kyrias_asfalishs_stathera"
 					class="form-control input-contents"
-					value="<%= ergazomenoiData.foreas_kyrias_asfalishs %>"
+					value="<%= safe('foreas_kyrias_asfalishs') %>"
 				/>
 
 				<div class="col-9-74">
@@ -56,7 +83,7 @@
 					id="foreas_epikoyrikhs_asfalishs_stathera" 
 					name="foreas_epikoyrikhs_asfalishs_stathera"
 					class="form-control input-contents" 
-					value="<%= JSON.stringify(ergazomenoiData.foreas_epikoyrikhs_asfalishs || []) %>"
+					value="<%= JSON.stringify(safe('foreas_epikoyrikhs_asfalishs') || []) %>"
 				/>
 
 				<input 
@@ -101,7 +128,7 @@
 						name="kad_efka_stathera"
 						id="kad_efka_stathera"
 						class="form-control input-contents"
-						value="<%= ergazomenoiData.kad_efka %>"
+						value="<%= safe('kad_efka') %>"
 					/>
 
 					<select
@@ -140,7 +167,7 @@
 						name="eidikothta_efka_stathera"
 						id="eidikothta_efka_stathera"
 						class="form-control input-contents"
-						value="<%= ergazomenoiData.eidikothta_efka %>"
+						value="<%= safe('eidikothta_efka') %>"
 					/>
 
 					<select
@@ -179,7 +206,15 @@
 						name="kpk_efka_stathera"
 						id="kpk_efka_stathera"
 						class="form-control input-contents"
-						value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>"
+						value="<%= safe('kpk_efka') %>"
+					/>
+
+					<input
+						type="hidden"
+						name="kpk_efka_basei_symbashs_stathera"
+						id="kpk_efka_basei_symbashs_stathera"
+						class="form-control input-contents"
+						value="<%= safe('kpk_efka_basei_symbashs') %>"
 					/>
 
 					<input 
@@ -226,7 +261,7 @@
 						name="epa_efka_stathera"
 						id="epa_efka_stathera"
 						class="form-control input-contents"
-						value="<%= ergazomenoiData.epa_efka %>"
+						value="<%= safe('epa_efka') %>"
 					/>
 
 					<input
@@ -267,7 +302,7 @@
 				</div>
 				<div class="col-10">
 					<input 
-						type="text" 						name="prosthetes_asfalistikes_apodoxes" id="prosthetes_asfalistikes_apodoxes" class="form-control input-contents" value="<%= ergazomenoiData.prosthetes_asfalistikes_apodoxes %>" autocomplete="off" maxlength="500" 
+						type="text" name="prosthetes_asfalistikes_apodoxes" id="prosthetes_asfalistikes_apodoxes" class="form-control input-contents" value="<%= safe('prosthetes_asfalistikes_apodoxes') %>" autocomplete="off" maxlength="500" 
 					/>
 				</div>
 			</div>
@@ -282,7 +317,7 @@
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
 					<input 
-						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="meiosh_eisforon_ergazomenon" name="meiosh_eisforon_ergazomenon" <%= ergazomenoiData.meiosh_eisforon_ergazomenon %> value="" 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="meiosh_eisforon_ergazomenon" name="meiosh_eisforon_ergazomenon" <%= safeCheck('meiosh_eisforon_ergazomenon') %> value="" 
 					/>
 					<label for="meiosh_eisforon_ergazomenon" id="label-meiosh_eisforon_ergazomenon" class="margin-left-0_75rem  font-size-vw-0_875">
 						ΟΧΙ
@@ -294,15 +329,14 @@
 					name="kodikos_meioshs_stathera"
 					id="kodikos_meioshs_stathera"
 					class="form-control input-contents"
-					value="<%= ergazomenoiData.kodikos_meioshs %>"
+					value="<%= safe('kodikos_meioshs') %>"
 				/>
 
 				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
-				<input type="hidden" name="pososto_asfalismenoy_meioshs_stathera" id="pososto_asfalismenoy_meioshs_stathera" value="<%= safe("pososto_asfalismenoy_meioshs_stathera") %>" />
-				<input type="hidden" name="pososto_ergodoth_meioshs_stathera" id="pososto_ergodoth_meioshs_stathera" value="<%= safe("pososto_ergodoth_meioshs_stathera") %>" />
-				<input type="hidden" name="isxyei_apo_meioshs_stathera" id="isxyei_apo_meioshs_stathera" value="<%= safe("isxyei_apo_meioshs_stathera") %>" />
-				<input 
-					type="hidden" name="isxyei_eos_meioshs_stathera" id="isxyei_eos_meioshs_stathera" value="<%= safe("isxyei_eos_meioshs_stathera") %>" 
+				<input type="hidden" name="pososto_asfalismenoy_meioshs_stathera" id="pososto_asfalismenoy_meioshs_stathera" value="<%= safe('pososto_asfalismenoy_meioshs_stathera') %>" />
+				<input type="hidden" name="pososto_ergodoth_meioshs_stathera" id="pososto_ergodoth_meioshs_stathera" value="<%= safe('pososto_ergodoth_meioshs_stathera') %>" />
+				<input type="hidden" name="isxyei_apo_meioshs_stathera" id="isxyei_apo_meioshs_stathera" value="<%= safe('isxyei_apo_meioshs_stathera') %>" />
+				<input type="hidden" name="isxyei_eos_meioshs_stathera" id="isxyei_eos_meioshs_stathera" value="<%= safe('isxyei_eos_meioshs_stathera') %>" 
 				/>
 
 				<div class="col-8-74">
@@ -333,7 +367,7 @@
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
 					<input 
-						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidothsh_eisforon_ergodoth" name="epidothsh_eisforon_ergodoth" <%= ergazomenoiData.epidothsh_eisforon_ergodoth %> value="" 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidothsh_eisforon_ergodoth" name="epidothsh_eisforon_ergodoth" <%= safeCheck('epidothsh_eisforon_ergodoth') %> value="" 
 					/>
 					<label for="epidothsh_eisforon_ergodoth" id="label-epidothsh_eisforon_ergodoth" class="margin-left-0_75rem  font-size-vw-0_875">
 					ΟΧΙ
@@ -345,14 +379,14 @@
 					name="kodikos_epidothshs_stathera"
 					id="kodikos_epidothshs_stathera"
 					class="form-control input-contents"
-					value="<%= ergazomenoiData.kodikos_epidothshs %>"
+					value="<%= safe('kodikos_epidothshs') %>"
 				/>
 
 				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
-				<input type="hidden" name="pososto_asfalismenoy_epidothshs_stathera" id="pososto_asfalismenoy_epidothshs_stathera" value="<%= safe("pososto_asfalismenoy_epidothshs_stathera") %>" />
-				<input type="hidden" name="pososto_ergodoth_epidothshs_stathera" id="pososto_ergodoth_epidothshs_stathera" value="<%= safe("pososto_ergodoth_epidothshs_stathera") %>" />
-				<input type="hidden" name="isxyei_apo_epidothshs_stathera" id="isxyei_apo_epidothshs_stathera" value="<%= safe("isxyei_apo_epidothshs_stathera") %>" />
-				<input type="hidden" name="isxyei_eos_epidothshs_stathera" id="isxyei_eos_epidothshs_stathera" value="<%= safe("isxyei_eos_epidothshs_stathera") %>" />
+				<input type="hidden" name="pososto_asfalismenoy_epidothshs_stathera" id="pososto_asfalismenoy_epidothshs_stathera" value="<%= safe('pososto_asfalismenoy_epidothshs_stathera') %>" />
+				<input type="hidden" name="pososto_ergodoth_epidothshs_stathera" id="pososto_ergodoth_epidothshs_stathera" value="<%= safe('pososto_ergodoth_epidothshs_stathera') %>" />
+				<input type="hidden" name="isxyei_apo_epidothshs_stathera" id="isxyei_apo_epidothshs_stathera" value="<%= safe('isxyei_apo_epidothshs_stathera') %>" />
+				<input type="hidden" name="isxyei_eos_epidothshs_stathera" id="isxyei_eos_epidothshs_stathera" value="<%= safe('isxyei_eos_epidothshs_stathera') %>" />
 
 				<div class="col-8-74">
 					<select
@@ -382,9 +416,9 @@
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
 					<input 
-						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="mhteres" name="mhteres" <%= ergazomenoiData.kodikos_meioshs_eisforon_mhteron %> value="" 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="mhteres" name="mhteres" <%= safeCheck('meiosh_eisforon_mhteron') %> value="" 
 					/>
-					<label for="mhteres" id="label-mhteres" class="margin-left-0_75rem  	font-size-vw-0_875">
+					<label for="mhteres" id="label-mhteres" class="margin-left-0_75rem font-size-vw-0_875">
 					ΟΧΙ
 					</label>
 				</div>
@@ -394,14 +428,14 @@
 					name="kodikos_meioshs_eisforon_mhteron_stathera"
 					id="kodikos_meioshs_eisforon_mhteron_stathera"
 					class="form-control input-contents"
-					value="<%= ergazomenoiData. kodikos_meioshs_eisforon_mhteron_stathera %>"
+					value="<%= safe('kodikos_meioshs_eisforon_mhteron') %>"
 				/>
 
 				<!-- Hidden fields που θα ενημερώνονται αυτόματα -->
-				<input type="hidden" name="pososto_asfalismenoy_eisforon_mhteron_stathera" id="pososto_asfalismenoy_eisforon_mhteron_stathera" value="<%= safe("pososto_asfalismenoy_eisforon_mhteron_stathera") %>" />
-				<input type="hidden" name="pososto_ergodoth_eisforon_mhteron_stathera" id="pososto_ergodoth_eisforon_mhteron_stathera" value="<%= safe("pososto_ergodoth_eisforon_mhteron_stathera") %>" />
-				<input type="hidden" name="isxyei_apo_eisforon_mhteron_stathera" id="isxyei_apo_eisforon_mhteron_stathera" value="<%= safe("isxyei_apo_eisforon_mhteron_stathera") %>" />
-				<input type="hidden" name="isxyei_eos_eisforon_mhteron_stathera" id="isxyei_eos_eisforon_mhteron_stathera" value="<%= safe("isxyei_eos_eisforon_mhteron_stathera") %>" />
+				<input type="hidden" name="pososto_asfalismenoy_eisforon_mhteron_stathera" id="pososto_asfalismenoy_eisforon_mhteron_stathera" value="<%= safe('pososto_asfalismenoy_eisforon_mhteron') %>" />
+				<input type="hidden" name="pososto_ergodoth_eisforon_mhteron_stathera" id="pososto_ergodoth_eisforon_mhteron_stathera" value="<%= safe('pososto_ergodoth_eisforon_mhteron') %>" />
+				<input type="hidden" name="isxyei_apo_eisforon_mhteron_stathera" id="isxyei_apo_eisforon_mhteron_stathera" value="<%= safe('isxyei_apo_eisforon_mhteron') %>" />
+				<input type="hidden" name="isxyei_eos_eisforon_mhteron_stathera" id="isxyei_eos_eisforon_mhteron_stathera" value="<%= safe('isxyei_eos_eisforon_mhteron') %>" />
 
 				<div class="col-8-74">
 					<select
@@ -433,7 +467,7 @@
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
 					<input 
-						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="palios_neos" name="palios_neos" <%= ergazomenoiData.palios_neos ? 'checked' : '' %> value="" 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="palios_neos" name="palios_neos" <%= safeCheck('palios_neos') %> value="" 
 					/>
 					<label for="palios_neos" id="label-palios_neos" class="margin-left-0_75rem  font-size-vw-0_875">
 					ΠΑΛΙΟΣ
@@ -449,7 +483,7 @@
 				</div>
 				<div class="col-1 left-align checkbox-flex-center">
 					<input 
-						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="amoibetai_me_sse" name="amoibetai_me_sse" <%= ergazomenoiData.amoibetai_me_sse ? 'checked' : '' %> value="" 
+						type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="amoibetai_me_sse" name="amoibetai_me_sse" <%= safeCheck('amoibetai_me_sse') %> value="" 
 					/>
 					<label for="amoibetai_me_sse" id="label-amoibetai_me_sse" class="margin-left-0_75rem  font-size-vw-0_875">
 					ΟΧΙ

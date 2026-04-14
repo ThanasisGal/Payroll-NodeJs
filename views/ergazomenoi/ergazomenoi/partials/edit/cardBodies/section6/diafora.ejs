@@ -1,245 +1,373 @@
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
+
+<div class="row form-group align-items-center mt-n-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-3 left-align">
-      <label for="symfonhtheis_misthos_genikos" class="col-form-label label-font-size">
-        Καθαρός Συμφωνηθείς Μισθός
-      </label>
+      	<label for="symfonhtheis_misthos_genikos" class="col-form-label label-font-size">
+        	Καθαρός Συμφωνηθείς Μισθός
+      	</label>
     </div>
+
     <div class="col-1-5 left-align">
-      <input type="number" id="symfonhtheis_misthos_genikos" name="symfonhtheis_misthos_genikos" class="form-control input-contents right-align" min="0" value="<%= parseFloat(ergazomenoiData.symfonhtheis_misthos_genikos).toFixed(2) %>" />
+		<input 
+			type="number" 
+			id="symfonhtheis_misthos_genikos" 
+			name="symfonhtheis_misthos_genikos" 
+			class="form-control input-contents right-align" 
+			value="<%= safeFloat('symfonhtheis_misthos_genikos') %>" 
+			min="0"
+		/>
     </div>
     
     <div class="col-3"></div>
 
     <div class="col-3 left-align">
-      <label for="symfonhtheis_misthos_apasxolhseis" class="col-form-label label-font-size">
-        Καθαρός Συμφ/θείς Μισθός (Απασχολήσεις) 
-      </label>
+      	<label for="symfonhtheis_misthos_apasxolhseis" class="col-form-label label-font-size">
+        	Καθαρός Συμφ/θείς Μισθός (Απασχολήσεις) 
+      	</label>
     </div>
-    <div class="col-1-5 left-align">
-      <input type="number" id="symfonhtheis_misthos_apasxolhseis" name="symfonhtheis_misthos_apasxolhseis" class="form-control input-contents right-align" min="0" value="<%= parseFloat(ergazomenoiData.symfonhtheis_misthos_apasxolhseis).toFixed(2) %>" />
+    
+	<div class="col-1-5 left-align">
+		<input 
+			type="number" 
+			id="symfonhtheis_misthos_apasxolhseis" 
+			name="symfonhtheis_misthos_apasxolhseis" 
+			class="form-control input-contents right-align" 
+			value="<%= safeFloat('symfonhtheis_misthos_apasxolhseis') %>" 
+			min="0"
+		/>
     </div>
-  </div>
 </div>
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center margin-top-0_4rem bg-white margin-left--1rem margin-right--1rem">
     <div class="col-3 left-align">
-      <label for="paketo_apodoxon" class="col-form-label label-font-size">
-        Καθαρό Μηνιαίο Πακέτο Αποδοχών
-      </label>
+	    <label for="paketo_apodoxon" class="col-form-label label-font-size">
+    	    Καθαρό Μηνιαίο Πακέτο Αποδοχών
+      	</label>
     </div>
-    <div class="col-1-5 text-right">
-      <input type="number" id="paketo_apodoxon" name="paketo_apodoxon" class="form-control input-contents right-align" min="0" value="<%= parseFloat(ergazomenoiData.paketo_apodoxon).toFixed(2) %>" />
+    
+	<div class="col-1-5 text-right">
+      	<input type="number" id="paketo_apodoxon" name="paketo_apodoxon" class="form-control input-contents right-align" min="0" value="<%= safeFloat('paketo_apodoxon') %>" />
     </div>
     
     <div class="col-3"></div>
 
     <div class="col-3 left-align">
-      <label for="mhniaia_repo" class="col-form-label label-font-size">
-        Μηνιαία Ωράρια
-      </label>
+      	<label for="mhniaia_repo" class="col-form-label label-font-size">
+        	Μηνιαία Ρεπό
+      	</label>
     </div>
-    <div class="col-1-5 left-align">
-      <input type="number" id="mhniaia_repo" name="mhniaia_repo" class="form-control input-contents right-align" min="0" max="10" value="<%= parseInt(ergazomenoiData.mhniaia_repo) %>" />
+    
+	<div class="col-1-5 left-align">
+      	<input type="number" id="mhniaia_repo" name="mhniaia_repo" class="form-control input-contents right-align" min="0" max="10" value="<%= safeInt('mhniaia_repo') %>" />
     </div>
-  </div>
 </div>
 
-<hr style="margin-top: 0.2rem !important; margin-bottom: -0.1rem;" />
+<hr class="margin-top-0_2rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
     <div class="col-10-5 text-left">
-      <label for="ypologismos_foroy"  class="col-form-label label-font-size field-required">
-        Υπολογίζεται φόρος στις μηνιαίες αποδοχές
-      </label>
+		<label for="ypologismos_foroy"  class="col-form-label label-font-size field-required">
+    	    Υπολογίζεται φόρος στις μηνιαίες αποδοχές
+      	</label>
     </div>
-    <div class="col-1-5 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="ypologismos_foroy" name="ypologismos_foroy" <%= ergazomenoiData.ypologismos_foroy ? 'checked' : '' %> value="" />
-      <label for="ypologismos_foroy" id="label-ypologismos_foroy" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
+	
+    <div class="col-1-5 left-align checkbox-flex-center margin-top--0_2rem">
+      	<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="ypologismos_foroy" name="ypologismos_foroy" <%= safeCheck('ypologismos_foroy') %> value="" />
+      	<label for="ypologismos_foroy" id="label-ypologismos_foroy" class="margin-left-0_75rem font-size-vw-0_875">
+        	ΟΧΙ
+      	</label>
     </div>
-  </div>
 </div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center bg-white mt-n-0-7 margin-right--1rem">
     <div class="col-10-5 text-left">
-      <label for="oros_sth_symbash_n_3986_2011"  class="col-form-label label-font-size field-required">
-        Υπάρχει όρος στη σύμβαση εργασίας, να εφαρμόζονται ως προς την αποζημίωση απόλυσης οι διατάξεις για τη σύμβαση εργασίας αορίστου χρόνου, σε περίπτωση ΠΡΟΩΡΗΣ καταγγελίας της σύμβασης. (Ν.3986/2011)
-      </label>
+      	<label for="oros_sth_symbash_n_3986_2011"  class="col-form-label label-font-size field-required">
+        	Υπάρχει όρος στη σύμβαση εργασίας, να εφαρμόζονται ως προς την αποζημίωση απόλυσης οι διατάξεις για τη σύμβαση εργασίας αορίστου χρόνου, σε περίπτωση ΠΡΟΩΡΗΣ καταγγελίας της σύμβασης. (Ν.3986/2011)
+      	</label>
     </div>
-    <div class="col-1-5 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="oros_sth_symbash_n_3986_2011" name="oros_sth_symbash_n_3986_2011" <%= ergazomenoiData.oros_sth_symbash_n_3986_2011 ? 'checked' : '' %> value=""  />
-      <label for="oros_sth_symbash_n_3986_2011" id="label-oros_sth_symbash_n_3986_2011" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-  </div>
+	
+    <div class="col-1-5 left-align checkbox-flex-center margin-top--0_2rem">
+      	<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="oros_sth_symbash_n_3986_2011" name="oros_sth_symbash_n_3986_2011" <%= safeCheck('oros_sth_symbash_n_3986_2011') %> value="" />
+      	<label for="oros_sth_symbash_n_3986_2011" id="label-oros_sth_symbash_n_3986_2011" class="margin-left-0_75rem font-size-vw-0_875">
+        	ΟΧΙ
+      	</label>
+	</div>
 </div>
 
-<hr style="margin-top: -0.05rem; margin-bottom: -0.1rem;" />
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--0_3rem">
+	<div class="col-2 text-left">
+		<label for="oysiodeis_oroi" class="col-form-label label-font-size field-required font-size-rem-1">
+		ΑΠΟΔΟΧΗ ΟΥΣΙΩΔΩΝ ΟΡΩΝ
+		</label>
+	</div>
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="kataggelia_katopin_eggrafhs_proeidopoihshs"  class="col-form-label label-font-size">
-        Καταγγέλθηκε η σχέση εργασίας κατόπιν προηγούμενης έγγραφης προειδοποίησης του εργοδότη
-      </label>
-    </div>
-    <div class="col-1-5 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="kataggelia_katopin_eggrafhs_proeidopoihshs" name="kataggelia_katopin_eggrafhs_proeidopoihshs" <%= ergazomenoiData.kataggelia_katopin_eggrafhs_proeidopoihshs ? 'checked' : '' %> value="" />
-      <label for="kataggelia_katopin_eggrafhs_proeidopoihshs" id="label-kataggelia_katopin_eggrafhs_proeidopoihshs" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-  </div>
+	<input
+		type="hidden"
+		name="oysiodeis_oroi_stathera"
+		id="oysiodeis_oroi_stathera"
+		class="form-control input-contents"
+		value="<%= safe('oysiodeis_oroi') %>"
+	/>
+
+	<div class="col-6-75">
+		<select
+			id="oysiodeis_oroi"
+			name="oysiodeis_oroi"
+			class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+			aria-label="Αποδοχή Ουσιωδών Όρων"
+			data-api="/api/dropdown/ergazomenoi/oysiodeis_oroi"
+			single
+			data-target-input="oysiodeis_oroi_stathera"
+			data-preselect="oysiodeis_oroi_stathera"
+			data-preload-all="true"
+			data-pad-length="3"
+			placeholder="Αναζήτηση τρόπων Αποδοχής Ουσιωδών Όρων... ">
+		</select>
+	</div>
+
+	<div class="col-0-25"></div>
+
+	<div class="col-3 right-align">
+		<div class="pdf-button-wrapper">
+			<button 
+				type="button" 
+				id="customButton_oysiodeis_oroi" 
+				class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+				data-document-type="oysiodeis_oroi"
+				data-data-bs-title="Αποδοχή Ουσιωδών Όρων"
+				disabled>
+				<i class="bi bi-cloud-arrow-up"></i> 
+				Αρχείο Αποδοχής Ουσιωδών Όρων (pdf)
+			</button>
+			
+			<div 
+				class="pdf-badge-replacement hidden" 
+				data-document-type="oysiodeis_oroi"
+				data-bs-title="Κλικ για αλλαγή αρχείου">
+				<div class="badge-content">
+					<i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+					<span class="badge-filename left-align">file.pdf</span>
+				</div>
+				<button 
+					type="button" 
+					class="badge-remove-btn" 
+					data-bs-title="Αφαίρεση αρχείου"
+					data-document-type="oysiodeis_oroi">
+					<i class="bi bi-x-circle-fill"></i>
+				</button>
+			</div>
+		</div>
+	</div>
 </div>
 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="hmeromhnia_eggrafhs_proeidopoihshs" class="col-form-label label-font-size">
-        Ημερομηνία επίδοσης έγγραφης προειδοποίησης στον εργαζόμενο
-      </label>
+<div class="height-vh-1_5"></div>
+
+<hr class="margin-top--0_05rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
+	<div class="col-10-5 text-left">
+      	<label for="kataggelia_katopin_eggrafhs_proeidopoihshs"  class="col-form-label label-font-size">
+        	Καταγγέλθηκε η σχέση εργασίας κατόπιν προηγούμενης έγγραφης προειδοποίησης του εργοδότη
+      	</label>
     </div>
+
+    <div class="col-1-5 left-align checkbox-flex-center margin-top--0_2rem">
+      	<input 
+			type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="kataggelia_katopin_eggrafhs_proeidopoihshs" name="kataggelia_katopin_eggrafhs_proeidopoihshs" <%= safeCheck('kataggelia_katopin_eggrafhs_proeidopoihshs') %> value="" 
+		/>
+      	<label 
+			for="kataggelia_katopin_eggrafhs_proeidopoihshs" id="label-kataggelia_katopin_eggrafhs_proeidopoihshs" class="margin-left-0_75rem font-size-vw-0_875">
+        	ΟΧΙ
+      	</label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-10-5 text-left">
+      	<label for="hmeromhnia_eggrafhs_proeidopoihshs" class="col-form-label label-font-size">
+        	Ημερομηνία επίδοσης έγγραφης προειδοποίησης στον εργαζόμενο
+      	</label>
+    </div>
+    
+	<div class="col-1-5">
+      	<input type="date" class="date-control" name="hmeromhnia_eggrafhs_proeidopoihshs" id="hmeromhnia_eggrafhs_proeidopoihshs" value="<%= safeDate('hmeromhnia_eggrafhs_proeidopoihshs') %>" disabled>
+      	</input>
+    </div>
+</div>
+
+<hr class="margin-top--0_05rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-10-5 text-left">
+      	<label for="omadikh_apolysh"  class="col-form-label label-font-size">
+	        Η καταγγελία της σύμβασης εργασίας εμπίπτει στις ομαδικές απολύσεις
+      	</label>
+    </div>
+    
+	<div class="col-1-5 left-align checkbox-flex-center margin-top--0_2rem">
+      	<input 
+			type="checkbox" class="form-check-input custom-checkbox checkbox-class" data-related-text="arithmos_apofashs_gia_omadikh_apolysh" data-related-date="hmeromhnia_apofashs_gia_omadikh_apolysh" id="omadikh_apolysh" name="omadikh_apolysh" <%= safeCheck('omadikh_apolysh') %>value="" />
+      		<label for="omadikh_apolysh" id="label-omadikh_apolysh" class="margin-left-0_75rem font-size-vw-0_875">
+        	ΟΧΙ
+      	</label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-10-5 text-left">
+      	<label for="arithmos_apofashs_gia_omadikh_apolysh"  class="col-form-label label-font-size">
+        	Αριθμός Σχετικής Απόφασης
+      	</label>
+    </div>
+
     <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_eggrafhs_proeidopoihshs" id="hmeromhnia_eggrafhs_proeidopoihshs" value="<%= ergazomenoiData.hmeromhnia_eggrafhs_proeidopoihshs ? new Date(ergazomenoiData.hmeromhnia_eggrafhs_proeidopoihshs).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
+      	<input type="text" class="form-control input-contents" name="arithmos_apofashs_gia_omadikh_apolysh" id="arithmos_apofashs_gia_omadikh_apolysh" value="<%= safe('arithmos_apofashs_gia_omadikh_apolysh') %>" disabled>
+      	</input>
     </div>
-  </div>
 </div>
 
-<hr style="margin-top: -0.05rem; margin-bottom: -0.1rem;" />
-
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-10-5 text-left">
-      <label for="omadikh_apolysh"  class="col-form-label label-font-size">
-        Η καταγγελία της σύμβασης εργασίας εμπίπτει στις ομαδικές απολύσεις
-      </label>
-    </div>
-    <div class="col-1-5 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class"  id="omadikh_apolysh" name="omadikh_apolysh" <%= ergazomenoiData.omadikh_apolysh ? 'checked' : '' %> value="" />
-      <label for="omadikh_apolysh" id="label-omadikh_apolysh" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-  </div>
+      	<label for="hmeromhnia_apofashs_gia_omadikh_apolysh" class="col-form-label label-font-size">
+        	Ημερομηνία Σχετικής Απόφασης
+      	</label>
+	</div>
+    
+	<div class="col-1-5">
+      	<input type="date" class="date-control" name="hmeromhnia_apofashs_gia_omadikh_apolysh" id="hmeromhnia_apofashs_gia_omadikh_apolysh" value="<%= safeDate('hmeromhnia_apofashs_gia_omadikh_apolysh') %>"disabled>
+      	</input>
+	</div>
 </div>
 
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<hr class="margin-top--0_05rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-10-5 text-left">
-      <label for="arithmos_apofashs_gia_omadikh_apolysh"  class="col-form-label label-font-size">
-        Αριθμός Σχετικής Απόφασης
-      </label>
+      	<label for="epidosh_me_dikastiko_epimelhth"  class="col-form-label label-font-size">
+        	Επίδοση της καταγγελίας σύμβασης με Δικαστικό Επιμελητή
+      	</label>
     </div>
+    
+	<div class="col-1-5 left-align checkbox-flex-center margin-top--0_2rem">
+      	<input 
+			type="checkbox" class="form-check-input custom-checkbox checkbox-class" data-related-date="hmeromhnia_epidoshs" id="epidosh_me_dikastiko_epimelhth" name="epidosh_me_dikastiko_epimelhth" <%= safeCheck('epidosh_me_dikastiko_epimelhth') %> value="" 
+		/>
+      	<label for="epidosh_me_dikastiko_epimelhth" id="label-epidosh_me_dikastiko_epimelhth" class="margin-left-0_75rem font-size-vw-0_875">
+	        ΟΧΙ
+		</label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-10-5 text-left">
+      	<label for="hmeromhnia_epidoshs" class="col-form-label label-font-size">
+        	Ημερομηνία Επίδοσης
+      	</label>
+    </div>
+    
+	<div class="col-1-5">
+      	<input 
+			type="date" class="date-control" name="hmeromhnia_epidoshs" id="hmeromhnia_epidoshs" value="<%= safeDate('hmeromhnia_epidoshs') %>" disabled>
+      	</input>
+    </div>
+</div>
+
+<hr class="margin-top--0_05rem margin-bottom--0_1rem margin-left--1rem margin-right--1rem" />
+
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
+    <div class="col-10-5 text-left">
+      	<label for="hmeromhnia_katabolhs_ths_apozhmioshs" class="col-form-label label-font-size">
+        	Ημερομηνία Καταβολής της Αποζημίωσης
+      	</label>
+    </div>
+
     <div class="col-1-5">
-      <input type="text" class="form-control input-contents" name="arithmos_apofashs_gia_omadikh_apolysh" id="arithmos_apofashs_gia_omadikh_apolysh" value="<%= ergazomenoiData.arithmos_apofashs_gia_omadikh_apolysh %>" disabled>
-      </input>
+      	<input type="date" class="date-control" name="hmeromhnia_katabolhs_ths_apozhmioshs" id="hmeromhnia_katabolhs_ths_apozhmioshs" value="<%= safeDate('hmeromhnia_katabolhs_ths_apozhmioshs') %>">
+      	</input>
     </div>
-  </div>
 </div>
 
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="hmeromhnia_apofashs_gia_omadikh_apolysh" class="col-form-label label-font-size">
-        Ημερομηνία Σχετικής Απόφασης
-      </label>
-    </div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_apofashs_gia_omadikh_apolysh" id="hmeromhnia_apofashs_gia_omadikh_apolysh" value="<%= ergazomenoiData.hmeromhnia_apofashs_gia_omadikh_apolysh ? new Date(ergazomenoiData.hmeromhnia_apofashs_gia_omadikh_apolysh).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
-</div>
-
-<hr style="margin-top: -0.05rem; margin-bottom: -0.1rem;" />
-
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="epidosh_me_dikastiko_epimelhth"  class="col-form-label label-font-size">
-        Επίδοση της καταγγελίας σύμβασης με Δικαστικό Επιμελητή
-      </label>
-    </div>
-    <div class="col-1-5 left-align checkbox-flex-center" style="margin-top: -0.2rem !important;">
-      <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="epidosh_me_dikastiko_epimelhth" name="epidosh_me_dikastiko_epimelhth" <%= ergazomenoiData.epidosh_me_dikastiko_epimelhth ? 'checked' : '' %> value="" />
-      <label for="epidosh_me_dikastiko_epimelhth" id="label-epidosh_me_dikastiko_epimelhth" style="margin-left: 0.75rem; font-size: 0.875vw;">
-        ΟΧΙ
-      </label>
-    </div>
-  </div>
-</div>
-
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="hmeromhnia_epidoshs" class="col-form-label label-font-size">
-        Ημερομηνία Επίδοσης
-      </label>
-    </div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_epidoshs" id="hmeromhnia_epidoshs" value="<%= ergazomenoiData.hmeromhnia_epidoshs ? new Date(ergazomenoiData.hmeromhnia_epidoshs).toISOString().split('T')[0] : '' %>" disabled>
-      </input>
-    </div>
-  </div>
-</div>
-
-<hr style="margin-top: -0.05rem; margin-bottom: 0.3rem;" />
-
-<div class="row form-group align-items-center mb-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
-    <div class="col-10-5 text-left">
-      <label for="hmeromhnia_katabolhs_ths_apozhmioshs" class="col-form-label label-font-size">
-        Ημερομηνία Καταβολής της Αποζημίωσης
-      </label>
-    </div>
-    <div class="col-1-5">
-      <input type="date" class="date-control" name="hmeromhnia_katabolhs_ths_apozhmioshs" id="hmeromhnia_katabolhs_ths_apozhmioshs" value="<%= ergazomenoiData.hmeromhnia_epidoshs %>">
-      </input>
-    </div>
-  </div>
-</div>
-
-<div class="row form-group align-items-center" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center mb-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-4 text-left">
-      <label for="shmeioseis_apozhmioshs"  class="col-form-label label-font-size">
-        Σημειώσεις σχετικές με τις ΔΟΣΕΙΣ καταβολής της Αποζημίωσης
-      </label>
+      	<label for="shmeioseis_apozhmioshs"  class="col-form-label label-font-size">
+        	Σημειώσεις σχετικές με τις ΔΟΣΕΙΣ καταβολής της Αποζημίωσης
+      	</label>
     </div>
-    <div class="col-8">
-      <textarea
-        class="form-control textarea-content use-default-enter"
-        name="shmeioseis_apozhmioshs"
-        id="shmeioseis_apozhmioshs"
-        cols="30"
-        rows="2"
-        style="height: 5vh;"><%= ergazomenoiData.shmeioseis_apozhmioshs %></textarea>
-        </div>
-  </div>
+    
+	<div class="col-8">
+      	<textarea class="form-control textarea-content use-default-enter height-vh-5" name="shmeioseis_apozhmioshs" id="shmeioseis_apozhmioshs" cols="30" rows="2"><%= safe('shmeioseis_apozhmioshs') %></textarea>
+    </div>
 </div>
 
-<div class="row form-group align-items-center mt-1" style="background-color: #ffffff; margin-left: -1rem; margin-right: -1rem;">
-  <div class="row form-group align-items-center">
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
     <div class="col-4 text-left">
-      <label for="parathrhseis"  class="col-form-label label-font-size">
-        Παρατηρήσεις - Σημειώσεις
-      </label>
+      	<label for="parathrhseis"  class="col-form-label label-font-size">
+        	Παρατηρήσεις - Σημειώσεις
+      	</label>
     </div>
-    <div class="col-8">
-      <textarea
-        class="form-control textarea-content use-default-enter"
-        name="parathrhseis"
-        id="parathrhseis"
-        cols="30"
-        rows="2"
-        style="height: 5vh;"><%= ergazomenoiData.parathrhseis.trim() %></textarea>
+    
+	<div class="col-8">
+      	<textarea class="form-control textarea-content use-default-enter height-vh-5" name="parathrhseis" id="parathrhseis" cols="30" rows="2" maxlength="100"><%= safe('parathrhseis').trim() %></textarea>
     </div>
-  </div>
+</div>
+
+<div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
+	<div class="col-8"></div>
+	<div class="col-4 right-align">
+		<div class="pdf-button-wrapper">
+			<button 
+				type="button" 
+				id="customButton_arxeio_symbashs" 
+				class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+				data-document-type="arxeio_symbashs"
+				data-data-bs-title="Αποδοχή Όρων Ατομικής Σύμβασης">
+				<i class="bi bi-cloud-arrow-up"></i> 
+				Αρχείο Αποδοχής Όρων Ατομικής Σύμβασης (pdf)
+			</button>
+			
+			<div 
+				class="pdf-badge-replacement hidden" 
+				data-document-type="arxeio_symbashs"
+				data-bs-title="Κλικ για αλλαγή αρχείου">
+				<div class="badge-content">
+					<i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
+					<span class="badge-filename left-align">file.pdf</span>
+				</div>
+				<button 
+					type="button" 
+					class="badge-remove-btn" 
+					data-bs-title="Αφαίρεση αρχείου"
+					data-document-type="arxeio_symbashs">
+					<i class="bi bi-x-circle-fill"></i>
+				</button>
+			</div>
+		</div>
+	</div>
 </div>

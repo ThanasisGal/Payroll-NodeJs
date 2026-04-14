@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }, 100);
                 });
 
-                return;
+                // return; Δεν κάνουμε return γιατί θέλουμε να εμφανίσουμε το σωστό moOron στο πεδίο, αλλά ενημερώνουμε τον χρήστη για το πρόβλημα
             }
 
             const finalCheck = parseFloat((moOron * hmeres).toFixed(4));

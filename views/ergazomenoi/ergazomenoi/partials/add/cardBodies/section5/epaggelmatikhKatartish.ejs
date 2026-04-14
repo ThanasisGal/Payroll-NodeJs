@@ -1,7 +1,30 @@
 <% 
     const recordData = typeof rec !== 'undefined' ? rec : {};
-    const safe = (k) => (recordData && recordData[k]) || '';
-    const isEmpty = (val) => !val || val.toString().trim() === '';
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
 %>
 
 <div class="row form-group align-items-center mt-1 bg-white margin-left--1rem margin-right--1rem">
