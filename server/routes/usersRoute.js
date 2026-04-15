@@ -763,6 +763,7 @@ router.get('/api/languages', genikaAPIsController.getLanguages);
 router.post('/api/checkArgies', genikaAPIsController.checkArgies);
 router.post('/api/dateDifference', genikaAPIsController.dateDifference);
 router.get('/api/kathgoriesErgasias', genikaAPIsController.getKathgoriesErgasias);
+router.post('/api/getProdhlomenaOraria', genikaAPIsController.getProdhlomenaOraria);
 
 // ============================================================================
 // API ENDPOINTS - User & Session

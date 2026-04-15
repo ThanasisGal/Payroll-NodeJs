@@ -788,6 +788,10 @@ small,
     flex: 0 0 auto;
     width: 0.83% !important;
 }
+.col-0-1-15 {
+    flex: 0 0 auto;
+    width: 1.04% !important;
+}
 .col-0-1-5 {
     flex: 0 0 auto;
     width: 1.25% !important;
@@ -923,6 +927,14 @@ small,
 .col-1-2 {
     flex: 0 0 auto;
     width: 10% !important;
+}
+.col-1-2-01 {
+    flex: 0 0 auto;
+    width: 10.1% !important;
+}
+.col-1-2-1 {
+    flex: 0 0 auto;
+    width: 10.2% !important;
 }
 .col-1-25 {
     flex: 0 0 auto;
@@ -1223,6 +1235,10 @@ small,
 .col-5-4 {
     flex: 0 0 auto;
     width: 45% !important;
+}
+.col-5-0 {
+    flex: 0 0 auto;
+    width: 42.35% !important;
 }
 .col-5-5 {
     flex: 0 0 auto;

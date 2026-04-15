@@ -521,9 +521,9 @@ export const initTomDropdown = ({
                 resetList();
                 this.clearOptions();
                 this.nextPage = null;
-                if (this.settings._preloadAll) {
-                    this.load('');
-                }
+                // if (this.settings._preloadAll) {
+                //     this.load('');
+                // }
                 setTimeout(() => this.refreshOptions(false));
 
                 // ✅ Clear chain callback
@@ -1282,7 +1282,7 @@ function updateOverflow(tom) {
                     if (tom?.wrapper) {
                         updateOverflow(tom);
                         tom.ignoreFocusOpen = false;
-                        tom.open();
+                        // tom.open();
                     }
                 }, 0);
             });

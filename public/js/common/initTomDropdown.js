@@ -4,7 +4,7 @@ import { initTomDropdown, attachInlineSummary } from '../dropdown-item.js';
 // Global registry για instances (ώστε να μη διπλο-αρχικοποιούνται)
 window.__tomInstances = window.__tomInstances || {};
 
-const getMode = () => (document.body.dataset.mode || 'add');
+const getMode = () => document.body.dataset.mode || 'add';
 const isEdit = () => getMode() === 'edit';
 
 function getPreselect(sel) {
@@ -21,20 +21,60 @@ function ensureOption(instance, val) {
     if (!instance.options[val]) instance.addOption({ value: val, label: val });
 }
 
+// function syncTargetOnChange(instance, sel, hidden, opts = {}) {
+//     let bootstrapping = true;
+
+//     const applyPre = () => {
+//         if (opts.preVal) {
+//             ensureOption(instance, opts.preVal);
+//             instance.setValue(opts.preVal, true);
+//         }
+//         bootstrapping = false;
+//     };
+
+//     // Κάνε preselect σίγουρα: και στο ready και στο load
+//     instance.on('ready', applyPre);
+//     instance.on('load', applyPre);
+
+//     instance.on('change', (val) => {
+//         if (bootstrapping) return;
+//         if (sel.disabled) return;
+//         if (hidden) hidden.value = val || '';
+//     });
+// }
 function syncTargetOnChange(instance, sel, hidden, opts = {}) {
     let bootstrapping = true;
+    let preApplied = false;
 
     const applyPre = () => {
-        if (opts.preVal) {
-            ensureOption(instance, opts.preVal);
-            instance.setValue(opts.preVal, true);
+        const preVal = (opts.preVal || '').toString().trim();
+        const currentVal = (instance.getValue() || '').toString().trim();
+
+        if (preApplied) {
+            bootstrapping = false;
+            return;
         }
+
+        if (!preVal) {
+            bootstrapping = false;
+            return;
+        }
+
+        if (currentVal === preVal) {
+            preApplied = true;
+            bootstrapping = false;
+            return;
+        }
+
+        ensureOption(instance, preVal);
+        instance.setValue(preVal, true);
+
+        preApplied = true;
         bootstrapping = false;
     };
 
-    // Κάνε preselect σίγουρα: και στο ready και στο load
+    // ✅ ΜΟΝΟ once στο ready
     instance.on('ready', applyPre);
-    instance.on('load', applyPre);
 
     instance.on('change', (val) => {
         if (bootstrapping) return;
@@ -54,39 +94,39 @@ export function initOneTomSelect(sel) {
 
     const api = sel.dataset.api;
     if (!api) return;
-    
+
     // Δημιουργία instance μέσω helper
     const ts = initTomDropdown({
-        selector    : key,
-        url         : api,
-        extraParams : {},
-        minChars    : 0
+        selector: key,
+        url: api,
+        extraParams: {},
+        minChars: 0
     });
 
     const instance = ts || window.__tomInstances[key];
     if (!instance) return;
 
     attachInlineSummary(instance, sel);
-    
+
     // Μόνο για την Ασφαλιστική Κλάση: φαρδύ dropdown & δεξιά ευθυγράμμιση (expand left)
     // ⬇️ ΠΡΟΣΟΧΗ: εδώ ΔΕΝ συμπεριλαμβάνεται πλέον το eidikothta_erganh
     if (sel.dataset.ddWide === 'true' || sel.id === 'asfalistikh_klash') {
         instance.wrapper.classList.add('dd-wide', 'dd-right');
 
         instance.on('dropdown_open', () => {
-            const dd   = instance.dropdown;
+            const dd = instance.dropdown;
             const wrap = instance.wrapper;
             if (!dd || !wrap) return;
 
-            const MIN_W    = 820; // προσαρμόσ’ το στα columns σου
+            const MIN_W = 820; // προσαρμόσ’ το στα columns σου
             const wrapRect = wrap.getBoundingClientRect();
-            const wrapW    = wrapRect.width;
+            const wrapW = wrapRect.width;
 
             // Μετράμε-ορίζουμε πλάτος και μετακινούμε με transform ώστε να ευθυγραμμιστεί δεξιά
             requestAnimationFrame(() => {
-                dd.style.width = 'auto';                     // αφήνουμε να «απλωθεί» για μέτρηση
+                dd.style.width = 'auto'; // αφήνουμε να «απλωθεί» για μέτρηση
                 const contentW = Math.max(dd.scrollWidth, MIN_W);
-                const ddW      = Math.max(MIN_W, contentW);
+                const ddW = Math.max(MIN_W, contentW);
                 dd.style.width = ddW + 'px';
 
                 // shift = πλάτος wrapper - πλάτος dropdown => αρνητικό => «άπλωμα» προς τα αριστερά
@@ -122,16 +162,16 @@ export function initOneTomSelect(sel) {
             dd.style.setProperty('transform', 'none', 'important');
 
             // επιβολή πλάτους (ό,τι κι αν είναι το default CSS)
-            dd.style.setProperty('width',     W, 'important');
+            dd.style.setProperty('width', W, 'important');
             dd.style.setProperty('min-width', W, 'important');
             dd.style.setProperty('max-width', 'none', 'important');
-            dd.style.setProperty('box-sizing','border-box','important');
+            dd.style.setProperty('box-sizing', 'border-box', 'important');
 
             // το search input full width
             const inp = dd.querySelector('.dropdown-input');
             if (inp) {
-            inp.style.setProperty('width', '100%', 'important');
-            inp.style.setProperty('box-sizing', 'border-box', 'important');
+                inp.style.setProperty('width', '100%', 'important');
+                inp.style.setProperty('box-sizing', 'border-box', 'important');
             }
         };
 
@@ -145,19 +185,25 @@ export function initOneTomSelect(sel) {
 
             // 2-3 ράφ για την περίπτωση που αλλάζει μετά το paint
             requestAnimationFrame(() => {
-            pinWidth();
-            requestAnimationFrame(pinWidth);
+                pinWidth();
+                requestAnimationFrame(pinWidth);
             });
         };
 
         const stopObserver = () => {
-            if (obs) { obs.disconnect(); obs = null; }
+            if (obs) {
+                obs.disconnect();
+                obs = null;
+            }
         };
 
-        instance.on('dropdown_open',  () => { pinWidth(); startObserver(); });
-        instance.on('load',           pinWidth);
-        instance.on('type',           pinWidth);
-        instance.on('refresh_options',pinWidth);
+        instance.on('dropdown_open', () => {
+            pinWidth();
+            startObserver();
+        });
+        instance.on('load', pinWidth);
+        instance.on('type', pinWidth);
+        instance.on('refresh_options', pinWidth);
         instance.on('dropdown_close', stopObserver);
     }
 
@@ -184,7 +230,7 @@ export function initOneTomSelect(sel) {
 
 export function initAllTomSelects(scope) {
     const selects = (scope || document).querySelectorAll('select.tom-dropdown');
-    selects.forEach(sel => {
+    selects.forEach((sel) => {
         initOneTomSelect(sel);
     });
 }
@@ -211,4 +257,4 @@ export function destroyTomSelectById(id) {
 window.initOneTomSelect = initOneTomSelect;
 window.initAllTomSelects = initAllTomSelects;
 window.reinitTomDropdowns = reinitTomDropdowns;
-window.destroyTomSelectById = destroyTomSelectById;  
+window.destroyTomSelectById = destroyTomSelectById;

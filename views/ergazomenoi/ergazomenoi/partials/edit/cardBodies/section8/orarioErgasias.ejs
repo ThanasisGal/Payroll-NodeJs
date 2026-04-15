@@ -1,4 +1,4 @@
-<div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem; margin-bottom: -0.1rem;">
+<!-- <div class="row form-group align-items-center" style="background-color: #3d4e001e !important; margin-left: -1rem; margin-right: -1rem; font-size: 0.8rem; margin-bottom: -0.1rem;">
   <div class="col-5"></div>
   <div class="col-2-1 text-center">
     <label class="col-form-label field-required">
@@ -218,4 +218,41 @@
   <div class="col-1-5 text-center">
     <input type="text" class="form-control input-contents right-align" id="night_holiday_overtimeParanomh_hours_day" name="night_holiday_overtimeParanomh_hours_day" style="background-color: #ffa60023;" value="" readonly />
   </div>
+</div> -->
+
+<% const safe = (k) => (rec && rec[k]) || ''; %>
+
+<input type="hidden" id="differenceInDays" value="0" />
+<input type="hidden" id="differenceDaysToEndOfMonth" value="0" />
+
+<div id="dynamicFields"></div>
+
+<div
+    class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem"
+>
+    <div class="col-12 text-center">
+        <label class="col-form-label field-required font-size-rem-1_3rem font-weight-700">
+            ΣΥΝΟΛΟ &nbsp; ΩΡΩΝ &nbsp; ΕΒΔΟΜΑΔΙΑΙΟΥ &nbsp; ΠΡΟΔΗΛΩΜΕΝΟΥ &nbsp; ΠΡΟΓΡΑΜΜΑΤΟΣ &nbsp;
+            ΕΡΓΑΣΙΑΣ
+        </label>
+    </div>
+</div>
+
+<div class="row form-group align-items-center bg-white mb-2">
+    <div class="col-2 left-align">
+        <label for="total_hours_day" class="col-form-label label-font-size field-required"
+            >Ώρες Εργασίας</label
+        >
+    </div>
+
+    <div class="col-1-5 text-center">
+        <input
+            type="text"
+            class="form-control input-contents right-align bg-cddbc63d font-weight-700"
+            id="total_hours_day"
+            name="total_hours_day"
+            value=""
+            readonly
+        />
+    </div>
 </div>

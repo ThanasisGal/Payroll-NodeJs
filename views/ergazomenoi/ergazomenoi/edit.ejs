@@ -200,25 +200,104 @@
 
       		<section class="sel_8_section visible" data-section="Ωράριο Εργασίας">
         		<div>
-					<form class="formRadius">
+          			<form class="formRadius">
 						<% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
-							<%- include('../../partials/_csrfField') %>
+	                        <%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+                        <div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
 
-							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
+                            <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody6">
+							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
+								<div class="col-5">
+									<label class="col-form-label font-size-rem-1rem font-weight-700 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
+										<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') 
+											? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
+											:  'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
+										%>
+									</label>
+								</div>
+
+								<div class="col-2-1 text-center">
+									</label>
+									<label class="col-form-label field-required font-size-rem-1">
+									ΩΡΕΣ ΕΡΓΑΣΙΑΣ
+									</label>
+								</div>
+								
+								<div class="col-0-7"></div>
+								
+								<div class="col-1-5 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									ΩΡΕΣ ΔΙΑΛΕΙΜΜΑΤΟΣ
+									</label>
+								</div>
+							</div>
+
+							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem ">
+								<div class="col-0-5 text-center">
+									<label class="col-form-label field-required"></label>
+								</div>
+
+								<div class="col-1-5 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Ημερομηνία
+									</label>
+								</div>
+
+								<div class="col-2-5 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Τύπος Εργασίας
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-1 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Από
+									</label>
+								</div>
+
+								<div class="col-1-1-71 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Έως
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1-1 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Από
+									</label>
+								</div>
+
+								<div class="col-1-2 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Έως
+									</label>
+								</div>
+
+								<div class="col-0-5"></div>
+
+								<div class="col-1 text-center">
+									<label class="col-form-label field-required font-size-rem-1">
+									Repo
+									</label>
+								</div>
+							</div>
+
+              				<div class="card-body overflow-auto flex-grow-1 w-100 height-vh-64 bg-white"  id="cardBody6">
                 				<input type="hidden" id="dateDifference" name="dateDifference" value="">
-                
-                				<%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
+
+				                <%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
 
               				</div>
-
               				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
 
-            			</div>
+			            </div>
           			</form>
         		</div>
       		</section>
@@ -351,7 +430,7 @@
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/scrollToTop') %>"></script>
 <script src="<%= script('common/sectionsVisible') %>"></script>
-<script src="<%= script('ergazomenoi/genika/loadDataFromEfka') %>"></script>
+<script src="<%= script('ergazomenoi/genika/loadData') %>"></script>
 <script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
 
 <script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>

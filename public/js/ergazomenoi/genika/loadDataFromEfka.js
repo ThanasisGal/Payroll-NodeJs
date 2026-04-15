@@ -92,7 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const p = contRes.person;
             if (p) {
                 const ama1El = document.getElementById('ama_krathshs_01');
-                if (ama1El) ama1El.value = p.ama1 || '';
+                if (ama1El) {
+                    ama1El.value = p.ama1 || '';
+
+                    ama1El.dispatchEvent(new Event('input', { bubbles: true }));
+                    ama1El.dispatchEvent(new Event('change', { bubbles: true }));
+                    ama1El.dispatchEvent(new Event('blur', { bubbles: true }));
+                }
 
                 const eponymoEl = document.getElementById('eponymo');
                 const eponymoHidden = document.getElementById('eponymoHidden');
