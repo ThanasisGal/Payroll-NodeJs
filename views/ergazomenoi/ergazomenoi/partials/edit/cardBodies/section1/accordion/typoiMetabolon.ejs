@@ -1,0 +1,93 @@
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
+
+<div class="accordion-item">
+	<h2 class="accordion-header">
+		<button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseSeven" aria-expanded="true" aria-controls="panelsStayOpen-collapseSeven" tabindex="-1">
+		Τύποι Μεταβολών
+		</button>
+	</h2>
+	<div id="panelsStayOpen-collapseSeven" class="accordion-collapse collapse show">
+
+		<div class="accordion-body bg-white margin-bottom--0_5rem">
+			<div class="row form-group align-items-center margin-left--1_4rem margin-right--1rem margin-top--3rem">
+				<div class="col-2 left-align">
+					<label for="typos_metabolhs" class="col-form-label label-font-size field-required">
+					Τύποι Μεταβολών
+					</label>
+				</div>
+				
+				<input 
+					type="hidden" 
+					id="typos_metabolhs_stathera" 
+					name="typos_metabolhs_stathera"
+					class="form-control input-contents" 
+					value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>"
+				/>
+
+				<input 
+					type="hidden" 
+					id="typos_metabolhs_table" 
+					name="typos_metabolhs_table" 
+					value="[]"
+				/>
+				
+				<div class="col-9-5">
+					<select
+						id="typos_metabolhs"
+						name="typos_metabolhs"
+						class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+						aria-label="Τύποι Μεταβολών"
+						data-api="api/dropdown/ergazomenoi/typos_metabolhs"
+						data-target-input="typos_metabolhs_stathera"
+						data-target-table="typos_metabolhs_table"
+						data-preselect="typos_metabolhs_stathera"
+						data-preload-all="true"
+						data-pad-length="3"
+						data-reserve-right="28"
+						multiple
+					    placeholder="Αναζήτηση Τύπων Μεταβολών">
+					</select>
+				</div>
+			</div>
+
+			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem d-none" id="allo-parathrhseis-row">
+				<div class="col-2 left-align">
+					<label for="allo_parathrhseis" class="col-form-label label-font-size field-required">
+					Άλλες Παρατηρήσεις
+					</label>
+				</div>
+				<div class="col-10">
+					<input type="text" name="allo_parathrhseis" id="allo_parathrhseis" class="form-control input-contents" value="<%= safe('allo_parathrhseis') %>" autocomplete="off" />
+				</div>
+			</div>			
+            <div class="height-vh-3_5"></div>
+		</div>
+	</div>
+</div>

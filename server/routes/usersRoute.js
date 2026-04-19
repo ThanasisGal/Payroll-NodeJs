@@ -78,7 +78,7 @@ router.post('/login/userLogin', userController.userLogin);
 router.get('/login/change_password', userController.changePasswordForm);
 router.post('/login/send-reset-password-email', userController.sendUserResetPasswordEmail);
 router.get('/reset_password', userController.resetPasswordForm);
-router.get('/login/reset_old_password/: uid/:token', userController.showResetPasswordForm);
+router.get('/login/reset_old_password/:uid/:token', userController.showResetPasswordForm);
 router.post('/login/reset_old_password/:uid/:token', userController.handleResetPassword);
 
 router.get('/login/logout', userController.logoutForm);
@@ -186,7 +186,7 @@ router.get(
     nomimoiekprosopoiController.editNomimoiEkprosopoiForm
 );
 router.delete(
-    '/companies/nomimoi_ekprosopoi/delete/: id',
+    '/companies/nomimoi_ekprosopoi/delete/:id',
     checkAuth,
     nomimoiekprosopoiController.deleteNomimoiEkprosopoi
 );
@@ -210,7 +210,7 @@ router.get('/companies/trapezes/add', checkAuth, trapezesController.addTrapezesF
 router.post('/companies/trapezes/add', trapezesController.postTrapezesForm);
 router.get('/companies/trapezes/search', checkAuth, trapezesController.searchGetTrapezes);
 router.post('/companies/trapezes/search', trapezesController.searchPostTrapezes);
-router.get('/companies/trapezes/edit/: id', checkAuth, trapezesController.editTrapezesForm);
+router.get('/companies/trapezes/edit/:id', checkAuth, trapezesController.editTrapezesForm);
 router.delete('/companies/trapezes/delete/:id', checkAuth, trapezesController.deleteTrapezes);
 
 // ============================================================================
@@ -224,7 +224,7 @@ router.get(
 );
 router.post('/companies/antistoixiseis/search', antistoixiseisController.searchPostAntistoixiseis);
 router.get(
-    '/companies/antistoixiseis/add/: id',
+    '/companies/antistoixiseis/add/:id',
     checkAuth,
     antistoixiseisController.addAntistoixiseisForm
 );
@@ -261,7 +261,7 @@ router.delete('/krathseis/genika/delete/:id', checkAuth, krathseisController.del
 router.get('/krathseis/pososta/add', checkAuth, krathseisController.addPosostaKrathseonForm);
 router.post('/krathseis/pososta/add', krathseisController.postPosostaKrathseonForm);
 router.get(
-    '/krathseis/posostaKrathseon/edit/: id',
+    '/krathseis/posostaKrathseon/edit/:id',
     checkAuth,
     krathseisController.editPosostaKrathseonForm
 );
@@ -288,12 +288,12 @@ router.get(
 router.get('/api/ergazomenoi/:id', ergazomenoiController.getErgazomenosById);
 router.get('/api/ergazomenoi', ergazomenoiController.getAllErgazomenoiWithUrls);
 router.get(
-    '/ergazomenoi/ergazomenoi/istoriko/: kod',
+    '/ergazomenoi/ergazomenoi/istoriko/:kod',
     checkAuth,
     ergazomenoiController.getIstorikoData
 );
 router.post(
-    '/ergazomenoi/ergazomenoi/istoriko/: kod',
+    '/ergazomenoi/ergazomenoi/istoriko/:kod',
     checkAuth,
     ergazomenoiController.updateIstorikoData
 );
@@ -333,7 +333,7 @@ router.get(
     programmataController.mainProgrammaErgasiasForm
 );
 router.delete(
-    '/ergazomenoi/programmata/delete/:selectedTeam/:selectedCompany/: selectedKodikos/: startDate/:endDate',
+    '/ergazomenoi/programmata/delete/:selectedTeam/:selectedCompany/:selectedKodikos/:startDate/:endDate',
     checkAuth,
     programmataController.deleteOrariaErgazomenoyApoEos
 );
@@ -406,21 +406,22 @@ router.delete('/symbaseis/symbaseis/delete/:id', checkAuth, symbaseisController.
 // ============================================================================
 router.get('/symbaseis/kathgories', checkAuth, symbaseisController.mainKathgoriesSymbaseonForm);
 router.get(
-    '/symbaseis/kathgories/add/: kodikosSymbashs',
+    '/symbaseis/kathgories/add/:kodikosSymbashs',
     checkAuth,
     symbaseisController.addKathgoriesSymbaseonForm
 );
 router.post('/symbaseis/kathgories/add', symbaseisController.postKathgoriesSymbaseonForm);
-router.get(
-    '/symbaseis/kathgories/search/',
-    checkAuth,
-    symbaseisController.searchGetKathgoriesSymbaseon
-);
 router.post(
-    '/symbaseis/kathgories/search/: symbash_stathera',
+    '/symbaseis/kathgories/search/:symbash',
     checkAuth,
     symbaseisController.searchPostKathgoriesSymbaseon
 );
+router.get(
+    '/symbaseis/kathgories/search',
+    checkAuth,
+    symbaseisController.searchGetKathgoriesSymbaseon
+);
+
 router.get(
     '/symbaseis/kathgories/edit/:id',
     checkAuth,
@@ -442,7 +443,7 @@ router.get(
     symbaseisController.searchGetEidikothtesSymbaseon
 );
 router.post(
-    '/symbaseis/eidikothtes/search/: kodikos_symbashs_kathgorias',
+    '/symbaseis/eidikothtes/search/:kodikos_symbashs_kathgorias',
     checkAuth,
     symbaseisController.searchPostEidikothtesSymbaseon
 );
@@ -458,7 +459,7 @@ router.get(
     symbaseisController.editEidikothtesSymbaseonForm
 );
 router.delete(
-    '/symbaseis/eidikothtes/delete/: id',
+    '/symbaseis/eidikothtes/delete/:id',
     checkAuth,
     symbaseisController.deleteEidikothtesSymbaseon
 );
@@ -472,7 +473,7 @@ router.get(
     symbaseisController.mainStoixeiaSymbaseonForm
 );
 router.post(
-    '/symbaseis/stoixeiaSymbaseon/search/: kodikos_symbashs_kathgorias_eidikothtas',
+    '/symbaseis/stoixeiaSymbaseon/search/:kodikos_symbashs_kathgorias_eidikothtas',
     checkAuth,
     symbaseisController.searchPostStoixeiaSymbaseon
 );
@@ -510,7 +511,7 @@ router.get('/symbaseis/klimakia', checkAuth, symbaseisController.mainKlimakiaFor
 router.get('/kinhseis/apasxolhseis', checkAuth, kinhseisController.mainApasxolhseisForm);
 router.post('/kinhseis/apasxolhseis/add', checkAuth, kinhseisController.postApasxolhseisForm);
 router.delete(
-    '/kinhseis/apasxolhseis/delete/: id',
+    '/kinhseis/apasxolhseis/delete/:id',
     checkAuth,
     kinhseisController.deleteApasxolhseis
 );
@@ -558,18 +559,18 @@ router.post('/api/afmEtaireias', companiesController.checkAfmEtaireias);
 router.get('/api/allUser', mainAppController.getAllUsers);
 router.get('/api/allUsersByTeam/:companyTeam', companiesController.getAllUsersByTeam);
 router.get('/api/appDateInUse', mainAppController.getAppDateInUse);
-router.get('/api/companies/: companyId', companiesController.getCompanies);
+router.get('/api/companies/:companyId', companiesController.getCompanies);
 router.get(
-    '/api/companies/antistoixiseis/getAntistoixiseis/: krathshId',
+    '/api/companies/antistoixiseis/getAntistoixiseis/:krathshId',
     antistoixiseisController.getAntistoixiseis
 );
 router.post(
-    '/api/companies/antistoixiseis/update/: antistoixishId',
+    '/api/companies/antistoixiseis/update/:antistoixishId',
     antistoixiseisController.postAntistoixiseisUpdate
 );
 router.post('/api/companies/update/:companyId', companiesController.postCompanyUpdate);
 router.get('/api/companyDescription', mainAppController.getCompanyDescription);
-router.get('/api/companyUsers/: companyId', companiesController.populateCompanyUsers);
+router.get('/api/companyUsers/:companyId', companiesController.populateCompanyUsers);
 
 // ============================================================================
 // API ENDPOINTS - General Data
@@ -588,11 +589,11 @@ router.get(
     genikaAPIsController.getEmmesosErgodoths
 );
 router.get('/api/getKadForEditForm', companiesController.getKadForEditForm);
-router.get('/api/getKads/: companyId', companiesController.getCompanyKads);
+router.get('/api/getKads/:companyId', companiesController.getCompanyKads);
 router.get('/api/handleNomikesMorfes', genikaAPIsController.handleNomikesMorfes);
 router.get('/api/handlePararthmataEfka', genikaAPIsController.handlePararthmataEfka);
 router.post('/api/iatrosErgasias', genikaAPIsController.checkIatrosErgasias);
-router.get('/api/iatrosErgasias/: kodikosIatroy', genikaAPIsController.getIatrosErgasias);
+router.get('/api/iatrosErgasias/:kodikosIatroy', genikaAPIsController.getIatrosErgasias);
 router.get('/api/idiothtes', genikaAPIsController.getIdiothtes);
 
 // ============================================================================
@@ -613,12 +614,12 @@ router.post('/api/krathseis/update/:krathseisId', krathseisController.postKraths
 // ============================================================================
 // API ENDPOINTS - Geographic Data
 // ============================================================================
-router.get('/api/loadDhmoi/: nomosKodikos', genikaAPIsController.getDhmoiEditForm);
+router.get('/api/loadDhmoi/:nomosKodikos', genikaAPIsController.getDhmoiEditForm);
 router.get('/api/loadNomoi/:perifereiaKodikos', genikaAPIsController.getNomoiEditForm);
-router.get('/api/loadPoleis/: dhmosKodikos', genikaAPIsController.getPoleisEditForm);
+router.get('/api/loadPoleis/:dhmosKodikos', genikaAPIsController.getPoleisEditForm);
 router.get('/api/login/getRoles', userController.getUserRoles);
 router.post('/api/logisths', genikaAPIsController.checkLogisths);
-router.get('/api/logisths/: kodikosLogisth', genikaAPIsController.getLogisths);
+router.get('/api/logisths/:kodikosLogisth', genikaAPIsController.getLogisths);
 
 // ============================================================================
 // API ENDPOINTS - Legal & Administrative
@@ -654,7 +655,7 @@ router.get('/api/typoiTaytothton', genikaAPIsController.getTypoiTaytothton);
 router.get('/api/yphkoothtes', genikaAPIsController.getYphkoothtes);
 router.get('/api/eidikesKathgories', genikaAPIsController.getEidikesKathgories);
 router.get(
-    '/api/oresEidikonKathgorion/: kodikos',
+    '/api/oresEidikonKathgorion/:kodikos',
     genikaAPIsController.getOresFromEidikesKathgories
 );
 router.get('/api/oikogeneiakhKatastash', genikaAPIsController.getOikogeneiakhKatastash);
@@ -696,9 +697,9 @@ router.get('/api/populateKentraKostoys', genikaAPIsController.getKentraKostoys);
 // ============================================================================
 router.get('/api/symbaseis', genikaAPIsController.getSymbaseis);
 router.post('/api/symbaseis/update/:symbaseisId', symbaseisController.postSymbaseisUpdate);
-router.get('/api/kathgoriesSymbaseon/: symbash', genikaAPIsController.getKathgoriesSymbaseon);
+router.get('/api/kathgoriesSymbaseon/:symbash', genikaAPIsController.getKathgoriesSymbaseon);
 router.post(
-    '/api/kathgoriesSymbaseon/update/: kathgoriesId',
+    '/api/kathgoriesSymbaseon/update/:kathgoriesId',
     symbaseisController.postKathgoriesSymbaseonUpdate
 );
 router.get(
@@ -738,11 +739,11 @@ router.post('/api/forologikes-klimakes/lookup', ergazomenoiController.forologike
 // API ENDPOINTS - Programmata
 // ============================================================================
 router.get(
-    '/api/getAllErgazomenoi/: selectedTeam/: selectedCompany',
+    '/api/getAllErgazomenoi/:selectedTeam/:selectedCompany',
     programmataController.getAllErgazomenoi
 );
 router.get(
-    '/api/getErgazomeno/:selectedTeam/:selectedCompany/: selectedKodikos',
+    '/api/getErgazomeno/:selectedTeam/:selectedCompany/:selectedKodikos',
     programmataController.getErgazomeno
 );
 router.post(
@@ -755,7 +756,7 @@ router.post('/api/ergazomenoi/programmata/getOraria', programmataController.getO
 // ============================================================================
 // API ENDPOINTS - Additional Employee Data
 // ============================================================================
-router.get('/api/adeiesDiamonhs/: typosAdeias', genikaAPIsController.getAdeiesDiamonhs);
+router.get('/api/adeiesDiamonhs/:typosAdeias', genikaAPIsController.getAdeiesDiamonhs);
 router.get('/api/thematikaPedia', genikaAPIsController.getThematikaPedia);
 router.get('/api/thematikesEnothtes', genikaAPIsController.getThematikesEnothtes);
 router.get('/api/foreisEkpaideyshs', genikaAPIsController.getForeisEkpaideyshs);
@@ -772,7 +773,7 @@ router.get('/api/user', mainAppController.getUser);
 router.get('/api/xrhseis', mainAppController.getXrhseis);
 router.get('/api/yearInUse', mainAppController.getYearInUse);
 router.post(
-    '/api/ypokatasthmata/update/: ypokatasthmaId',
+    '/api/ypokatasthmata/update/:ypokatasthmaId',
     ypokatasthmataController.postYpokatasthmaUpdate
 );
 router.post('/api/trapezes/update/:trapezesId', trapezesController.postTrapezesUpdate);
@@ -781,11 +782,11 @@ router.post('/api/trapezes/update/:trapezesId', trapezesController.postTrapezesU
 // API ENDPOINTS - Kinhseis
 // ============================================================================
 router.get(
-    '/api/kinhseis/getErgazomenoi/: selectedTeam/:selectedCompany',
+    '/api/kinhseis/getErgazomenoi/:selectedTeam/:selectedCompany',
     kinhseisController.getErgazomenoi
 );
 router.get(
-    '/api/kinhseis/getLoipaStoixeiaErgazomenoy/:selectedTeam/:selectedCompany/: selectedKodikos',
+    '/api/kinhseis/getLoipaStoixeiaErgazomenoy/:selectedTeam/:selectedCompany/:selectedKodikos',
     kinhseisController.loipaStoixeiaErgazomenoy
 );
 router.get('/api/kinhseis/typoiApodoxon', kinhseisController.getTypoiApodoxon);

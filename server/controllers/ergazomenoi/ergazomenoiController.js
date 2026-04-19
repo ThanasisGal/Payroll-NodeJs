@@ -187,9 +187,6 @@ class ergazomenoiController {
             const ergazomenoiId = req.params.id;
             const ergazomenoiData = await ErgazomenoiModel.findById(ergazomenoiId).lean().exec();
 
-            console.log('hmeromhnia_gennhshs:', ergazomenoiData.hmeromhnia_gennhshs);
-            console.log('typeof:', typeof ergazomenoiData.hmeromhnia_gennhshs);
-
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
             const istorikoData = await IstorikoProslhpseonAllagonModel.find({
@@ -917,6 +914,7 @@ class ergazomenoiController {
             formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
+        newErgazomenos.typos_metabolhs = [];
 
         let savedErgazomenos = null; // ✅ Δήλωση
 
@@ -2230,7 +2228,7 @@ class ergazomenoiController {
 
     static postErgazomenoiUpdate = async (req, res) => {
         const ergazomenoiId = req.params.ergazomenoiId;
-        const formData = req.body;
+        const { formData, filesToUpdate } = req.body;
 
         const omadaErgasias = formData.team;
         const kodikosEtaireias = formData.company_kod;
@@ -2281,14 +2279,14 @@ class ergazomenoiController {
         }
 
         const filteredDataErgazomenoi = {
-            energos: formData.energos,
-            fylo: formData.fylo,
             eponymo: formData.eponymoHidden,
             onoma: formData.onomaHidden,
             eponymo_patera: formData.eponymo_patera,
             patronymo: formData.patronymo,
             eponymo_mhteras: formData.eponymo_mhteras,
             mhtronymo: formData.mhtronymo,
+            energos: formData.energos,
+            fylo: formData.fylo,
             afm: formData.afm_ergazomenoyHidden,
             doy: formData.doy,
             typos_taytothtas: formData.typos_taytothtas,
@@ -2480,10 +2478,10 @@ class ergazomenoiController {
             for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
                 const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
                 if (numberFields.has(fieldStoixeio)) {
-                    filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                    filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0;
                 } else {
                     filteredDataErgazomenoi[fieldNameStoixeioy] =
-                        formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                        formData[fieldNameStoixeioy] || null;
                 }
             }
         });
@@ -2495,12 +2493,11 @@ class ergazomenoiController {
             }
         });
 
-        // Τώρα μπορώ να χρησιμοποιήσω το filteredDataErgazomenoi στη $set: για ενημέρωση
         try {
             await ErgazomenoiModel.findOneAndUpdate(
                 { _id: ergazomenoiId },
                 { $set: filteredDataErgazomenoi },
-                { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
+                { new: true }
             );
         } catch (error) {
             throw error;
@@ -2576,14 +2573,13 @@ class ergazomenoiController {
         const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
         const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
 
-        let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
+        let currentDate = new Date(fromDate);
         let i = 1;
 
         while (currentDate <= toDate) {
             let i1 = i < 10 ? '0' + i : i;
             const orarioData = createOrarioData(i1);
 
-            // Χρησιμοποιούμε findOneAndUpdate για να ενημερώσουμε ή να δημιουργήσουμε εγγραφή
             const updatePromise = ProdhlomenaOrariaModel.findOneAndUpdate(
                 {
                     team: orarioData.team,
@@ -2593,7 +2589,6 @@ class ergazomenoiController {
                 },
                 {
                     $set: {
-                        // Ενημερώνουμε μόνο τα πεδία που πρέπει να αλλάζουν πάντα
                         kathgoria_ergasias: orarioData.kathgoria_ergasias,
                         apo_ora_01: orarioData.apo_ora_01,
                         eos_ora_01: orarioData.eos_ora_01,
@@ -2632,19 +2627,18 @@ class ergazomenoiController {
                             orarioData.ores_paranomhs_yperorias_argion_nyxtas
                     },
                     $setOnInsert: {
-                        // Τα πεδία που θα ρυθμιστούν μόνο κατά τη δημιουργία νέας εγγραφής
                         team: orarioData.team,
                         company_kod: orarioData.company_kod,
                         kodikos: orarioData.kodikos,
                         hmeromhnia: orarioData.hmeromhnia
                     }
                 },
-                { new: true, upsert: true } // Επιστρέφει το ενημερωμένο έγγραφο, και το δημιουργεί αν δεν υπάρχει
+                { new: true, upsert: true }
             );
 
             promises.push(updatePromise);
 
-            currentDate.setDate(currentDate.getDate() + 1); // Προσθέτουμε μία ημέρα
+            currentDate.setDate(currentDate.getDate() + 1);
             i++;
         }
 
@@ -2655,10 +2649,12 @@ class ergazomenoiController {
         }
 
         // ============================ ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ =============================
-        //
-        // Πεδία που ενημερώνονται μόνο κατά την εισαγωγή νέας εγγραφής του ΙΣΤΟΡΙΚΟΥ ΑΡΧΕΙΟΥ
+
+        let updateFieldsIstoriko = {};
+        let filteredDataIstoriko = {};
+
         if (!recExist) {
-            const filteredDataIstoriko = {
+            filteredDataIstoriko = {
                 team: formData.team,
                 company_kod: formData.company_kod,
                 kodikos: formData.kodikosHidden,
@@ -2667,8 +2663,7 @@ class ergazomenoiController {
                 createdAt: Date.now()
             };
 
-            // Πεδία που ενημερώνονται πάντα (και κατά την εισαγωγή νέας εγγραφής και κατά την διόρθωση)
-            const updateFieldsIstoriko = {
+            updateFieldsIstoriko = {
                 hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
                 hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
                 hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
@@ -2693,15 +2688,16 @@ class ergazomenoiController {
                 pragmatikoOromisthio: formData.pragmatikoOromisthio,
                 updatedAt: Date.now()
             };
+
             fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
                 for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
                     const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
                     if (numberFields.has(fieldStoixeio)) {
                         updateFieldsIstoriko[fieldNameStoixeioy] =
-                            formData[fieldNameStoixeioy] || 0; // Χειρισμός number πεδίων
+                            formData[fieldNameStoixeioy] || 0;
                     } else {
                         updateFieldsIstoriko[fieldNameStoixeioy] =
-                            formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                            formData[fieldNameStoixeioy] || null;
                     }
                 }
             });
@@ -2722,17 +2718,96 @@ class ergazomenoiController {
                     },
                     {
                         $set: updateFieldsIstoriko,
-                        $setOnInsert: filteredDataIstoriko // Μόνο όταν δημιουργείται νέα εγγραφή
+                        $setOnInsert: filteredDataIstoriko
                     },
                     { new: true, upsert: true }
                 );
-                res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
             } catch (error) {
                 throw error;
             }
-        } else {
-            res.json({ success: true, redirectUrl: '/ergazomenoi/ergazomenoi' });
         }
+
+        // =========================================================================
+        // ✅ GENERATE CONTRACT PDF (ίδια λογική με postErgazomenoiForm)
+        // =========================================================================
+
+        const { generateContractPDF } = require('../../utils/contractGenerator');
+        const { getUserContext } = require('../../utils/userContext');
+
+        let contractPdfData = null;
+
+        try {
+            const updatedErgazomenos = await ErgazomenoiModel.findById(ergazomenoiId).lean();
+
+            if (updatedErgazomenos) {
+                const userContext = await getUserContext(req);
+                const contractS3Key = await generateContractPDF(updatedErgazomenos, userContext);
+                const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
+
+                // ✅ Αποθήκευση S3 key στο document
+                await ErgazomenoiModel.findByIdAndUpdate(ergazomenoiId, {
+                    arxeio_apodoxhs_oron_atomikhs_symbashs_path: contractS3Key
+                });
+
+                contractPdfData = {
+                    url: pdfUrl,
+                    s3Key: contractS3Key,
+                    showPreview: true
+                };
+
+                console.log('✅ [UPDATE] Contract PDF generated:', contractS3Key);
+            }
+        } catch (pdfError) {
+            console.error('⚠️ [UPDATE] Error generating contract PDF:', pdfError.message);
+            contractPdfData = {
+                error: 'PDF generation failed: ' + pdfError.message,
+                showPreview: false
+            };
+        }
+
+        // =========================================================================
+        // ✅ GET COMPANY DATA (για email στο modal)
+        // =========================================================================
+
+        let companyEmail = null,
+            companyPhone = null,
+            companyName = null,
+            companyType = 'ΕΠΙΧΕΙΡΗΣΗ';
+
+        try {
+            const sessionCompanyInUse = req.session.companyInUse;
+            const company = await CompaniesModel.findById(sessionCompanyInUse).lean();
+
+            companyEmail = company?.email || null;
+            companyPhone = company?.thlefono || null;
+            companyName = company
+                ? `${company.eponymia || ''} ${company.firstname || ''}`.trim()
+                : null;
+
+            if (company?.eponymia && !(company.firstname || '').trim()) {
+                companyType = 'ΕΤΑΙΡΕΙΑ';
+            }
+        } catch (e) {
+            console.error('❌ [UPDATE] Error fetching company:', e.message);
+        }
+
+        // =========================================================================
+        // ✅ ΤΕΛΙΚΟ RESPONSE (με contractPdf — όπως το postErgazomenoiForm)
+        // =========================================================================
+
+        return res.json({
+            success: true,
+            data: { _id: ergazomenoiId },
+            pdfResults: [],
+            contractPdf: contractPdfData,
+            e3XmlData: null,
+            wtoXmlData: null,
+            companyEmail,
+            companyPhone,
+            companyName,
+            companyType,
+            redirectUrl: '/ergazomenoi/ergazomenoi'
+        });
     };
 
     static deleteErgazomenoi = async (req, res) => {

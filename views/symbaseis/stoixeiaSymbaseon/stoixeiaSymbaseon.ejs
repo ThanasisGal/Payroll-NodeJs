@@ -100,7 +100,7 @@
         </table>
     </div>
 
-    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-49 bg-white">
+    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-47 bg-white">
         <table class="table table-striped table-bordered table-sm table-hover w-100" id="myTable">
             <tbody class="font-size-vw-0_875">
             </tbody>
@@ -152,7 +152,7 @@
 
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
-    window.__CONFIG__ = <% - JSON.stringify(CONFIG) %>;
+    window.__CONFIG__ = "<% - JSON.stringify(CONFIG) %>";
 </script>
 
 <script src="<%= script('common/blockInvalidClick') %>"></script>

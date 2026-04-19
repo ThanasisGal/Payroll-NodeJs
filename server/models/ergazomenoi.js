@@ -296,6 +296,8 @@ const ErgazomenoiSchema = new Schema(
         arxeio_apodoxhs_oysiodon_oron_base64: { type: String, default: null },
         arxeio_apodoxhs_oron_atomikhs_symbashs_base64: { type: String, default: null },
         arxeio_symbashs_daneismoy_base64: { type: String, default: null, trim: true },
+        typos_metabolhs: [{ type: String, trim: true }],
+        allo_parathrhseis: { type: String, default: null, trim: true },
 
         createdAt: { type: Date, default: Date.now() },
         updatedAt: { type: Date, default: Date.now() }

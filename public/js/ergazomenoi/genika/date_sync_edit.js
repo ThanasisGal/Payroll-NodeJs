@@ -701,12 +701,12 @@ document.addEventListener('DOMContentLoaded', function () {
                                 value="${pEosOra01}" />
                         </div>
                         <div class="col-0-5"></div>
-                            <div class="col-1-2 ml-0_3rem">
+                            <div class="col-1-2">
                             <input type="time" class="date-control clearableInput text-center"
                                 id="dialleima_apo_ora_01_${i1}" name="dialleima_apo_ora_01_${i1}"
                                 value="${pDialApo01}" />
                         </div>
-                        <div class="col-1-2 ml--0_1rem">
+                        <div class="col-1-1-80">
                             <input type="time" class="date-control clearableInput text-center"
                                 id="dialleima_eos_ora_01_${i1}" name="dialleima_eos_ora_01_${i1}"
                                 value="${pDialEos01}" />
@@ -749,12 +749,12 @@ document.addEventListener('DOMContentLoaded', function () {
                                     value="${pEosOra02}" />
                             </div>
                             <div class="col-0-5"></div>
-                                <div class="col-1-2 ml-0_3rem">
+                                <div class="col-1-2 ml-0_2_1rem">
                                 <input type="time" class="date-control clearableInput text-center"
                                     id="dialleima_apo_ora_02_${i1}" name="dialleima_apo_ora_02_${i1}"
                                     value="${pDialApo02}" />
                             </div>
-                            <div class="col-1-2 ml--0_1rem">
+                            <div class="col-1-2">
                                 <input type="time" class="date-control clearableInput text-center"
                                     id="dialleima_eos_ora_02_${i1}" name="dialleima_eos_ora_02_${i1}"
                                     value="${pDialEos02}" />

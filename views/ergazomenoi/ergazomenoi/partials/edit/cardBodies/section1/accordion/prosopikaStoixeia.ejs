@@ -1,4 +1,33 @@
-<div class="accordion-item">
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
+
+<div class="accordion-item margin-top--2_5rem">
 	<h2 class="accordion-header">
 		<button class="accordion-button bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseOne" aria-expanded="true" aria-controls="panelsStayOpen-collapseOne" tabindex="-1">
 		Προσωπικά Στοιχεία
@@ -6,7 +35,6 @@
 	</h2>
 
 	<div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show">
-		<% const safe = (k) => (rec && rec[k]) || ''; %>
 
 		<div class="accordion-body bg-white margin-bottom--0_5rem">
 			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
@@ -110,7 +138,7 @@
 						data-team-related="false"
 						data-company-related="false"
 						data-mhnas-related="false"
-						placeholder="Αναζ��τηση Δ.Ο.Υ.">
+						placeholder="Αναζήτηση Δ.Ο.Υ.">
 					</select>
 				</div>
 			</div>

@@ -51,6 +51,7 @@ const poleis = require('../dropdowns/ergazomenoi/poleis');
 
 const foreas_kyrias_asfalishs = require('../dropdowns/ergazomenoi/foreas_kyrias_asfalishs');
 const foreas_epikoyrikhs_asfalishs = require('../dropdowns/ergazomenoi/foreas_epikoyrikhs_asfalishs');
+const typos_metabolhs = require('../dropdowns/ergazomenoi/typos_metabolhs');
 const kadEfka = require('../dropdowns/ergazomenoi/kadEfka');
 const eidikothtesEfka = require('../dropdowns/ergazomenoi/eidikothtesEfka');
 const kpkEfka = require('../dropdowns/ergazomenoi/kpkEfka');
@@ -140,6 +141,7 @@ const {
     Typoi_ApodoxonModel,
     TypoiEpidothseonModel,
     TypoiErgazomenonModel,
+    TypoiMetabolonModel,
     TypoiTaytothtonModel,
     XronosProetoimasiasModel,
     YphkoothtesModel
@@ -395,6 +397,10 @@ router.get(
 router.get(
     '/ergazomenoi/foreas_epikoyrikhs_asfalishs',
     buildDropdownRoute(ForeasEpikoyrikhsAsfalishsModel, foreas_epikoyrikhs_asfalishs.options)
+);
+router.get(
+    '/ergazomenoi/typos_metabolhs',
+    buildDropdownRoute(TypoiMetabolonModel, typos_metabolhs.options)
 );
 router.get('/ergazomenoi/kad_efka', buildDropdownRoute(KadEfkaModel, kadEfka.options));
 router.get('/ergazomenoi/eidikothta_efka', eidikothtesEfka.handler);

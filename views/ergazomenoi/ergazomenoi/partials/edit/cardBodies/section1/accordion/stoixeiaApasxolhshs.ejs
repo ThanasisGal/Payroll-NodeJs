@@ -1,3 +1,32 @@
+<% 
+    const recordData = typeof rec !== 'undefined' ? rec : {};
+	const safe = (k) => (recordData && recordData[k]) || '';
+
+	const isEmpty = (val) => !val || val.toString().trim() === '';
+
+    const safeFloat = (k) => {
+        const val = parseFloat(safe(k));
+        return isNaN(val) ? '' : val.toFixed(2);
+    };
+
+    const safeInt = (k) => {
+        const val = parseInt(safe(k));
+        return isNaN(val) ? '' : val;
+    };
+
+    const safeDate = (k) => {
+        const val = safe(k);
+        if (!val) return '';
+        try {
+            return new Date(val).toISOString().split('T')[0];
+        } catch(e) {
+            return '';
+        }
+    };
+
+	const safeCheck = (k) => safe(k) ? 'checked' : '';
+%>
+
 <div class="accordion-item margin-top--2_5rem">
 	<h2 class="accordion-header">
 		<button class="accordion-button collapsed bg-accordion font-size-vw-1 font-weight-700 caccordion" type="button" data-bs-toggle="collapse" data-bs-target="#panelsStayOpen-collapseThree" aria-expanded="true" aria-controls="panelsStayOpen-collapseThree" 
@@ -7,8 +36,6 @@
 	</h2>
 
 	<div id="panelsStayOpen-collapseThree" class="accordion-collapse collapse show">
-
-		<% const safe = (k) => (rec && rec[k] != null ? rec[k] : ''); %>
 
 		<div class="accordion-body bg-white margin-bottom--0_5rem">
 			<input type="hidden" name="kodikos_eidikothtas_erganh" id="kodikos_eidikothtas_erganh" />
@@ -264,7 +291,7 @@
 					</label>
 				</div>
 				<div class="col-1 left-align">
-					<input type="number" id="evelikth_proselefsh" name="evelikth_proselefsh" class="form-control input-contents" min="0" max="120" value="<%= safe('evelikth_proselefsh') %>" />
+					<input type="number" id="evelikth_proselefsh" name="evelikth_proselefsh" class="form-control input-contents" min="0" max="120" value="<%= safeInt('evelikth_proselefsh') %>" />
 				</div>
 			</div>
 

@@ -52,6 +52,8 @@
 			
 								<div class="accordion" id="accordion">
 
+									<%- include('./partials/edit/cardBodies/section1/accordion/typoiMetabolon') %>
+
 									<%- include('./partials/edit/cardBodies/section1/accordion/prosopikaStoixeia') %>
 
 									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
@@ -209,9 +211,9 @@
 
                             <%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
-							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
+							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem mt-n-0-5 margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
 								<div class="col-5">
-									<label class="col-form-label font-size-rem-1rem font-weight-700 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
+									<label class="col-form-label font-size-rem-1_05 font-weight-500 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
 										<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') 
 											? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
 											:  'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
@@ -295,7 +297,7 @@
 				                <%- include('./partials/edit/cardBodies/section8/orarioErgasias') %>
 
               				</div>
-              				<%- include('./partials/edit/cardFooters/cardFooter_Edit') %>
+              				<%- include('./partials/edit/cardFooters/cardFooter_Edit_6') %>
 
 			            </div>
           			</form>
@@ -309,7 +311,7 @@
 							<%- include('../../partials/_csrfField') %>
 						<% } %>
 
-						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80 overflow-hidden">
+						<div class="card d-flex flex-column z-depth-5 width-percent-97 margin-left-percent-1 height-vh-80-5 overflow-hidden">
 
 							<%- include('./partials/edit/cardHeaders/cardHeader_Edit_Section2_8') %>
 
@@ -430,7 +432,7 @@
 <script src="<%= script('common/moveByEnter') %>"></script>
 <script src="<%= script('common/scrollToTop') %>"></script>
 <script src="<%= script('common/sectionsVisible') %>"></script>
-<script src="<%= script('ergazomenoi/genika/loadData') %>"></script>
+<script src="<%= script('ergazomenoi/genika/loadDataFromEfka') %>"></script>
 <script src="<%= script('ergazomenoi/genika/putInputValuesToHiddenValues') %>"></script>
 
 <script src="<%= script('ergazomenoi/genika/calcProyphresia') %>"></script>
@@ -449,6 +451,7 @@
 <script src="<%= script('ergazomenoi/genika/calcChildren') %>"></script>
 <script src="<%= script('ergazomenoi/genika/autoLoadTaxScale') %>"></script>
 <script src="<%= script('ergazomenoi/genika/autoCalculateEndDate') %>"></script>
+<script src="<%= script('ergazomenoi/genika/alles_parathrhseis') %>"></script>
 <script src="<%= script('ergazomenoi/genika/dokimastikhPeriodos_Blur') %>"></script>
 <script src="<%= script('ergazomenoi/genika/pdfPreviewModule') %>"></script>
 

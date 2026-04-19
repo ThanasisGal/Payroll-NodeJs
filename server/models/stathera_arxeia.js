@@ -2,38 +2,63 @@ const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
 
-const PerifereiesSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true }
-});
+const PerifereiesSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Perifereies'
+    }
+);
 const PerifereiesModel = model('Perifereies', PerifereiesSchema);
 
-const NomoiSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
-    perifereia: { type: String, trim: true }
-});
+const NomoiSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true },
+        perifereia: { type: String, trim: true }
+    },
+    {
+        collection: 'Nomos'
+    }
+);
 const NomoiModel = model('Nomos', NomoiSchema);
 
-const DhmoiSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
-    nomos: { type: String, trim: true }
-});
+const DhmoiSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true },
+        nomos: { type: String, trim: true }
+    },
+    {
+        collection: 'Dhmos'
+    }
+);
 const DhmoiModel = model('Dhmos', DhmoiSchema);
 
-const PoleisSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true },
-    dhmos: { type: String, trim: true },
-    alt_perigrafh: { type: String, trim: true }
-});
+const PoleisSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true },
+        dhmos: { type: String, trim: true },
+        alt_perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Poleis'
+    }
+);
 const PoleisModel = model('Poleis', PoleisSchema);
 
-const NomikesMorfesSchema = new Schema({
-    kodikos: { type: String, unique: true },
-    perigrafh: { type: String, trim: true }
-});
+const NomikesMorfesSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Nomikes_Morfes'
+    }
+);
 const NomikesMorfesModel = model('NomikesMorfes', NomikesMorfesSchema);
 
 const TypoiDaneismoySchema = new Schema(
@@ -42,7 +67,7 @@ const TypoiDaneismoySchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'typoi_daneismoy'
+        collection: 'Typoi_Daneismoy'
     }
 );
 const TypoiDaneismoyModel = model('TypoiDaneismoy', TypoiDaneismoySchema);
@@ -499,6 +524,17 @@ const TypoiErgazomenonSchema = new Schema({
 });
 const TypoiErgazomenonModel = model('TypoiErgazomenon', TypoiErgazomenonSchema);
 
+const TypoiMetabolonSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Typoi_Metabolon'
+    }
+);
+const TypoiMetabolonModel = model('TypoiMetabolon', TypoiMetabolonSchema);
+
 const KadEfkaSchema = new Schema({
     kodikos: { type: String, unique: true, index: true },
     perigrafh: { type: String, trim: true }
@@ -766,7 +802,7 @@ const ForeasEpikoyrikhsXorisEfkaSchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'foreas_epikoyrikhs_xoris_efka'
+        collection: 'Foreas_Epikoyrikhs_Xoris_Efka'
     }
 );
 const ForeasEpikoyrikhsXorisEfkaModel = model(
@@ -780,7 +816,7 @@ const ForeasAstheneiasXorisEfkaSchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'foreas_astheneias_xoris_efka'
+        collection: 'Foreas_Astheneias_Xoris_Efka'
     }
 );
 const ForeasAstheneiasXorisEfkaModel = model(
@@ -794,7 +830,7 @@ const IdiothtaErgoy39Par9Schema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'idiothta_antisymballomenoy_ergoy_39_par_9'
+        collection: 'Idiothta_Antisymballomenoy_Ergoy_39_Par_9'
     }
 );
 const IdiothtaErgoy39Par9Model = model('IdiothtaErgoy39Par9', IdiothtaErgoy39Par9Schema);
@@ -821,7 +857,7 @@ const ForeasKyriasAsfalishsSchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'foreas_kyrias_asfalishs'
+        collection: 'Foreas_Kyrias_Asfalishs'
     }
 );
 const ForeasKyriasAsfalishsModel = model('ForeasKyriasAsfalishs', ForeasKyriasAsfalishsSchema);
@@ -832,7 +868,7 @@ const ForeasEpikoyrikhsAsfalishsSchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'foreas_epikoyrikhs_asfalishs'
+        collection: 'Foreas_Epikoyrikhs_Asfalishs'
     }
 );
 const ForeasEpikoyrikhsAsfalishsModel = model(
@@ -846,7 +882,7 @@ const ApodoxhOysiodonOronSchema = new Schema(
         perigrafh: { type: String, trim: true }
     },
     {
-        collection: 'oysiodeis_oroi'
+        collection: 'Oysiodeis_Oroi'
     }
 );
 const ApodoxhOysiodonOronModel = model('ApodoxhOysiodonOron', ApodoxhOysiodonOronSchema);
@@ -928,6 +964,7 @@ module.exports = {
     TypoiDaneismoyModel,
     TypoiEpidothseonModel,
     TypoiErgazomenonModel,
+    TypoiMetabolonModel,
     TypoiTaytothtonModel,
     XrhseisModel,
     XronosProetoimasiasModel,
