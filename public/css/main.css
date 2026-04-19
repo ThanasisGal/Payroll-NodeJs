@@ -1,5 +1,5 @@
 :root {
-    --aaa: #830900;
+    --aaa: #1a500144;
     --dark: #292c4f;
     --info: #0dcaf0;
     --light: #adb5bd;
@@ -919,6 +919,10 @@ small,
 .col-1-1-75 {
     flex: 0 0 auto;
     width: 9.8% !important;
+}
+.col-1-1-80 {
+    flex: 0 0 auto;
+    width: 9.85% !important;
 }
 .col-1-1-85 {
     flex: 0 0 auto;
@@ -5077,6 +5081,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .ml-0_2rem {
     margin-left: -0.2rem;
 }
+.ml-0_2_1rem {
+    margin-left: 0.2rem;
+}
 .ml-0_3rem {
     margin-left: 0.3rem;
 }
@@ -5425,6 +5432,12 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .margin-left--1rem {
     margin-left: -1rem !important;
 }
+.margin-left--1_3rem {
+    margin-left: -1.3rem !important;
+}
+.margin-left--1_4rem {
+    margin-left: -1.4rem !important;
+}
 .margin-left--1_5rem {
     margin-left: -1.5rem !important;
 }
@@ -5703,6 +5716,12 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .height-vh-45 {
     height: 45vh !important;
 }
+.height-vh-46 {
+    height: 46vh !important;
+}
+.height-vh-47 {
+    height: 47vh !important;
+}
 .height-vh-48 {
     height: 48vh !important;
 }
@@ -5721,8 +5740,29 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .height-vh-53 {
     height: 53vh !important;
 }
+.height-vh-54 {
+    height: 54vh !important;
+}
+.height-vh-55 {
+    height: 55vh !important;
+}
+.height-vh-56 {
+    height: 56vh !important;
+}
+.height-vh-57 {
+    height: 57vh !important;
+}
 .height-vh-58 {
     height: 58vh !important;
+}
+.height-vh-59 {
+    height: 59vh !important;
+}
+.height-vh-60 {
+    height: 60vh !important;
+}
+.height-vh-61 {
+    height: 61vh !important;
 }
 .height-vh-62 {
     height: 62vh !important;
@@ -5744,6 +5784,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 .height-vh-80 {
     height: 80vh !important;
+}
+.height-vh-80-5 {
+    height: 81vh !important;
 }
 .height-vh-90 {
     height: 90vh !important;
@@ -8357,7 +8400,13 @@ tbody .group-row--category:first-of-type > td {
 .custom-html-container {
     overflow: visible !important;
 }
-
+.custom-html-container div::-webkit-scrollbar {
+    width: 8px;
+}
+.custom-html-container div::-webkit-scrollbar-thumb {
+    background-color: #1a500144;
+    border-radius: 4px;
+}
 #accordion .accordion-item {
     margin-bottom: 0.25rem !important;
 }
@@ -10888,4 +10937,22 @@ body.loader-active > *:not(.app-loader) {
     input::placeholder {
     color: #000000 !important;
     opacity: 1 !important;
+}
+
+.swal-overflow {
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.temp_perm {
+    transition: all 0.2s;
+    color: #000000;
+}
+.no_update_message {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    width: 100%;
 }
