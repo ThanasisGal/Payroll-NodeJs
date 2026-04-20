@@ -1,1 +1,1 @@
-function convertNumberLocaleToFloat(T,Y){return parseFloat(T['replace'](',','.'))['toFixed'](Y);}
+function convertNumberLocaleToFloat(q,m){return parseFloat(q['replace'](',','.'))['toFixed'](m);}

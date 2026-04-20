@@ -73,8 +73,8 @@ class ypokatasthmataController {
                 {
                     $lookup: {
                         //                  INNER JOIN
-                        from: 'poleis', // Ορίζω το όνομα της συλλογής Poleis στη βάση δεδομένων MongoDB
-                        localField: 'polh', // Το πεδίο στα ypokatasthmata που αντιστοιχεί στο kodikos του poleis
+                        from: 'Poleis', // Ορίζω το όνομα της συλλογής Poleis στη βάση δεδομένων MongoDB
+                        localField: 'polh', // Το πεδίο στα ypokatasthmata που αντιστοιχεί στο kodikos του Poleis
                         foreignField: 'kodikos', // Το πεδίο στην συλλογή Poleis που αντιστοιχεί στο κλειδί polh του ypokatasthmata
                         as: 'polhInfo' // Το όνομα του πεδίου στο οποίο θα αποθηκευτούν τα αποτελέσματα της ενώσης
                     }
@@ -254,7 +254,7 @@ class ypokatasthmataController {
             const countPipeline = [
                 {
                     $lookup: {
-                        from: 'poleis',
+                        from: 'Poleis',
                         localField: 'polh',
                         foreignField: 'kodikos',
                         as: 'polhInfo'
@@ -298,7 +298,7 @@ class ypokatasthmataController {
             const ypokatasthmataFilteredRecs = await YpokatasthmataModel.aggregate([
                 {
                     $lookup: {
-                        from: 'poleis',
+                        from: 'Poleis',
                         localField: 'polh',
                         foreignField: 'kodikos',
                         as: 'polhInfo'
@@ -381,7 +381,7 @@ class ypokatasthmataController {
             const countPipeline = [
                 {
                     $lookup: {
-                        from: 'poleis',
+                        from: 'Poleis',
                         localField: 'polh',
                         foreignField: 'kodikos',
                         as: 'polhInfo'
@@ -424,7 +424,7 @@ class ypokatasthmataController {
             const ypokatasthmataFilteredRecs = await YpokatasthmataModel.aggregate([
                 {
                     $lookup: {
-                        from: 'poleis',
+                        from: 'Poleis',
                         localField: 'polh',
                         foreignField: 'kodikos',
                         as: 'polhInfo'

@@ -79,6 +79,12 @@ function clearRowAmounts(idNum) {
 }
 
 function applyNomimaFromSymbashTotals() {
+    const typosErg = document.getElementById('typos_ergazomenon')?.value;
+
+    // Για ημερομίσθιους ('Η'), ο υπολογισμός γίνεται αποκλειστικά
+    // από calculateFullTimeWages/calculatePartTimeWages — μην αντικαθιστάς.
+    if (typosErg === 'Η') return;
+
     const synoloSymbashsEl = document.getElementById('synolo_symbashs');
     const nomimosMisthosEl = document.getElementById('nomimosMisthos');
     const nomimoHmeromisthioEl = document.getElementById('nomimoHmeromisthio');
@@ -98,20 +104,6 @@ function applyNomimaFromSymbashTotals() {
 }
 
 let _recalcInProgress = false;
-
-// async function runFullRecalculation() {
-//     if (_recalcInProgress) return;
-//     if (typeof window.reCalculate !== 'function') return;
-
-//     _recalcInProgress = true;
-//     try {
-//         await window.reCalculate();
-//     } catch (err) {
-//         console.error('❌ runFullRecalculation failed:', err);
-//     } finally {
-//         _recalcInProgress = false;
-//     }
-// }
 
 function applyLockedTomStyle(tomInst) {
     if (!tomInst) return;
@@ -210,6 +202,9 @@ let _AA_STOIXEIOY = 0,
     _PLHRHS_APASXOLHSH,
     _ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = new Decimal(0),
     _ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = new Decimal(0),
+    _ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = new Decimal(
+        document.getElementById('symbatikes_ores_ergasias')?.value
+    ),
     _ORES_HMERHSIAS_ERGASIAS = new Decimal(0),
     _PRAGMATIKO_OROMISTHIO = new Decimal(0),
     _PRAGMATIKOS_MISTHOS = new Decimal(0),
@@ -1106,11 +1101,11 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
             }
 
-            nomimosMisthosValue = totalSymbashs;
-            nomimoHmeromisthioValue = totalSymbashs.div(
-                toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
-            );
+            nomimoHmeromisthioValue = totalSymbashs;
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+            nomimosMisthosValue = nomimoOromisthioValue
+                .times(toDecimal(_ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS))
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
 
             if (hasExtraApodoxes) {
                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;

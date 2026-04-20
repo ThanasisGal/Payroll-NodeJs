@@ -77,7 +77,6 @@
 
         const qsKeep  = qsParts.length ? '&' + qsParts.join('&') : '';
 
-        // Βάση URL της τρέχουσας σελίδας (άλλαξέ το αν χρειάζεται)
         const base    = '/companies/ypokatasthmata';
 
         // Helpers για href
@@ -183,7 +182,7 @@
                             <% } %>
                         </li>
                     <% } %>
-
+190
                     <!-- Ellipsis μετά + τελευταία -->
                     <% if (end < total) { %>
                         <li class="page-item disabled"><span class="page-link">…</span></li>
