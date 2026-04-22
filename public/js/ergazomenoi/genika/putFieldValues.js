@@ -1123,11 +1123,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             data.data?._id
                         ) {
                             const e3UrlToSend =
-                                e3XmlData?.relativePath ||
+                                e3XmlData?.s3Url || // ✅ ΠΡΩΤΑ: https://s3.amazonaws.com/...
+                                e3XmlData?.downloadUrl || // ✅ ΔΕΥΤΕΡΟ: HTTPS URL
+                                e3XmlData?.relativePath || // ✅ ΤΡΙΤΟ: fallback
                                 e3XmlData?.s3Key ||
-                                e3XmlData?.downloadUrl ||
                                 null;
-
                             if (e3UrlToSend && typeof e3UrlToSend === 'string') {
                                 try {
                                     console.log('[E3-UPLOAD] Uploading E3 XML...');
@@ -1224,11 +1224,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         data.data?._id
                     ) {
                         const e3UrlToSend =
-                            e3XmlData?.relativePath ||
+                            e3XmlData?.s3Url || // ✅ ΠΡΩΤΑ: https://s3.amazonaws.com/...
+                            e3XmlData?.downloadUrl || // ✅ ΔΕΥΤΕΡΟ: HTTPS URL
+                            e3XmlData?.relativePath || // ✅ ΤΡΙΤΟ: fallback
                             e3XmlData?.s3Key ||
-                            e3XmlData?.downloadUrl ||
                             null;
-
                         if (e3UrlToSend && typeof e3UrlToSend === 'string') {
                             try {
                                 console.log('[E3-UPLOAD] Uploading E3 XML (failed PDFs path)...');
@@ -1455,10 +1455,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (needsE3Upload) {
                     const e3UrlToSend =
-                        e3XmlData?.relativePath ||
-                        e3XmlData?.s3Url ||
-                        e3XmlData?.downloadUrl ||
+                        e3XmlData?.s3Url || // ✅ ΠΡΩΤΑ: https://s3.amazonaws.com/...
+                        e3XmlData?.downloadUrl || // ✅ ΔΕΥΤΕΡΟ: HTTPS URL
+                        e3XmlData?.relativePath || // ✅ ΤΡΙΤΟ: fallback
+                        e3XmlData?.s3Key ||
                         null;
+                    e3XmlData?.relativePath || e3XmlData?.s3Url || e3XmlData?.downloadUrl || null;
 
                     if (!e3UrlToSend || typeof e3UrlToSend !== 'string') {
                         console.error('[E3-UPLOAD] Missing/invalid s3UrlToSend', e3UrlToSend);
