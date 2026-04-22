@@ -202,9 +202,7 @@ let _AA_STOIXEIOY = 0,
     _PLHRHS_APASXOLHSH,
     _ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS = new Decimal(0),
     _ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = new Decimal(0),
-    _ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = new Decimal(
-        document.getElementById('symbatikes_ores_ergasias')?.value
-    ),
+    _ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = new Decimal(0),
     _ORES_HMERHSIAS_ERGASIAS = new Decimal(0),
     _PRAGMATIKO_OROMISTHIO = new Decimal(0),
     _PRAGMATIKOS_MISTHOS = new Decimal(0),
@@ -408,6 +406,7 @@ async function loadExistingStoixeia() {
         updateGeneralParameters(gp);
 
         window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = toDecimal(gp[0]?.timh);
+        window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = toDecimal(gp[55]?.timh);
         window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = toDecimal(gp[1]?.timh);
         window._SYNTELESTHS_EBDOMADON_MISTHOTON = toDecimal(gp[2]?.timh);
         window._SYNTELESTHS_EBDOMADON_HMEROMISTHION = toDecimal(gp[3]?.timh);
@@ -1104,7 +1103,7 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
             nomimoHmeromisthioValue = totalSymbashs;
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
             nomimosMisthosValue = nomimoOromisthioValue
-                .times(toDecimal(_ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS))
+                .times(toDecimal(window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS))
                 .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
 
             if (hasExtraApodoxes) {
@@ -1303,6 +1302,9 @@ async function loadStoixeiaSymbaseonFromAPI() {
         updateGeneralParameters(genikesParametroi);
 
         window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = toDecimal(genikesParametroi[0]?.timh);
+        window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = toDecimal(
+            genikesParametroi[55]?.timh
+        );
         window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = toDecimal(
             genikesParametroi[1]?.timh
         );

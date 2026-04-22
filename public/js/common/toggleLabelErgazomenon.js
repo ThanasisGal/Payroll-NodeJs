@@ -356,12 +356,18 @@ function toggleCheckboxState(checkboxId, isChecked) {
 
         case 'efarmostea_sse':
             label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ - ΚΑΤΩΤΑΤΕΣ ΝΟΜΟΘ/ΝΕΣ ΑΠΟΔΟΧΕΣ ΕΓΣΣΕ';
-            document.getElementById('efarmostea_sse_parathrhseis').value = null;
+            // document.getElementById('efarmostea_sse_parathrhseis').value = '';
             setFieldsDisabled(['efarmostea_sse_parathrhseis'], !isChecked);
             break;
         case 'karta_ergasias':
             label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ';
-            document.getElementById('evelikth_proselefsh').value = 0;
+
+            // ✅ Μηδένισε ΜΟΝΟ όταν αποεπιλέγεται (isChecked = false)
+            // Όταν isChecked = true, κράτα την υπάρχουσα τιμή
+            if (!isChecked) {
+                document.getElementById('evelikth_proselefsh').value = 0;
+            }
+
             setFieldsDisabled(['evelikth_proselefsh'], !isChecked);
             break;
         case 'xarakthrismos_ergazomenon':

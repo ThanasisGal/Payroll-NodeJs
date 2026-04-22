@@ -23,12 +23,12 @@ export function formatDecimal(value, decimals = 2) {
     return toDecimal(value).toFixed(decimals);
 }
 
-export function showAlert({ 
-    title, 
-    html, 
-    icon = 'info', 
+export function showAlert({
+    title,
+    html,
+    icon = 'info',
     confirmButtonText = 'Κλείσιμο',
-    allowOutsideClick = false 
+    allowOutsideClick = false
 } = {}) {
     return Swal.fire({
         backdrop: false,
@@ -41,8 +41,8 @@ export function showAlert({
         customClass: {
             confirmButton: `class-${icon} custom-confirm-button custom-swal-button`,
             title: 'custom-title',
-            popup: 'custom-swal-popup',
-        },
+            popup: 'custom-swal-popup'
+        }
     });
 }
 
@@ -63,23 +63,29 @@ export async function fetchGenikesParametroi() {
         }
 
         const result = await response.json();
-        
+
         if (!result.success) {
             throw new Error('Failed to fetch genikes parametroi');
         }
 
         return result.data;
-
     } catch (error) {
         console.error('❌ Error fetching genikes parametroi:', error);
         throw error;
     }
 }
 
-export async function fetchApodoxesData(contract, category, specialty, selectedElement, klimakio, date) {
+export async function fetchApodoxesData(
+    contract,
+    category,
+    specialty,
+    selectedElement,
+    klimakio,
+    date
+) {
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
-        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
         if (!csrfToken) {
             console.error('❌ CSRF token not found!');
             throw new Error('CSRF token missing. Please refresh the page.');
@@ -113,7 +119,6 @@ export async function fetchApodoxesData(contract, category, specialty, selectedE
 
         const data = await response.json();
         return data;
-
     } catch (error) {
         console.error('❌ Fetch Error:', error);
         throw error;
@@ -126,8 +131,9 @@ export async function fetchApodoxesData(contract, category, specialty, selectedE
 
 export function updateGeneralParameters(parameters) {
     if (!parameters || !Array.isArray(parameters)) return;
-    
+
     window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = toDecimal(parameters[0]?.timh);
+    window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS = toDecimal(parameters[55]?.timh);
     window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO = toDecimal(parameters[1]?.timh);
     window._SYNTELESTHS_EBDOMADON_MISTHOTON = toDecimal(parameters[2]?.timh);
     window._SYNTELESTHS_EBDOMADON_HMEROMISTHION = toDecimal(parameters[3]?.timh);
@@ -149,12 +155,16 @@ export function calculateHourlyWage(data, hours, days, fullTime, extraApodoxes) 
     const poso = toDecimal(data.poso);
 
     switch (eidKathEl.value) {
-        case "0001": // ΚΑΘΗΓΗΤΕΣ ΦΡΟΝΤΙΣΤΗΡΙΩΝ
+        case '0001': // ΚΑΘΗΓΗΤΕΣ ΦΡΟΝΤΙΣΤΗΡΙΩΝ
             if (!poso.isZero()) {
                 if (!extraApodoxes) {
-                    const _ORES_EIDIKHS = toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS);
-                    const _SYNTELESTHS_EBD_MIST = toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
-                    
+                    const _ORES_EIDIKHS = toDecimal(
+                        window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS
+                    );
+                    const _SYNTELESTHS_EBD_MIST = toDecimal(
+                        window._SYNTELESTHS_EBDOMADON_MISTHOTON
+                    );
+
                     const oromisthio = new Decimal(6).div(_ORES_EIDIKHS).div(25).times(poso);
                     value = oromisthio.times(hours).times(_SYNTELESTHS_EBD_MIST);
                 } else {
@@ -171,27 +181,32 @@ export function calculateHourlyWage(data, hours, days, fullTime, extraApodoxes) 
 export function calculateMonthlyWage(data, hours, days, fullTime, type, extraApodoxes) {
     let value = new Decimal(0);
     const poso = toDecimal(data.poso);
-    
+
     if (!poso.isZero()) {
         if (!extraApodoxes) {
             const _ORES_ERGASIAS_MHNA = toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS);
-            const _SYNTELESTHS_METATR = toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO);
+            const _ORES_ERGASIAS_EBDOMADAS = toDecimal(
+                window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS
+            );
+            const _SYNTELESTHS_METATR = toDecimal(
+                window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO
+            );
             const _SYNTELESTHS_EBD_MIST = toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
             const _SYNTELESTHS_EBD_HMER = toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION);
-            
+
             let oromisthio;
-            if (type === "Μ") {
+            if (type === 'Μ') {
                 oromisthio = poso.div(_ORES_ERGASIAS_MHNA);
             } else {
                 oromisthio = poso.times(_SYNTELESTHS_METATR);
             }
-            
-            const syntelesths = type === "Μ" ? _SYNTELESTHS_EBD_MIST : _SYNTELESTHS_EBD_HMER;
+
+            const syntelesths = type === 'Μ' ? _SYNTELESTHS_EBD_MIST : _SYNTELESTHS_EBD_HMER;
             value = oromisthio.times(hours).times(syntelesths);
         } else {
             value = poso;
         }
-    }  
+    }
     return value;
 }
 
@@ -203,17 +218,31 @@ export function calculateWageBasedOnWorkType(type, data, hours, days, extraApodo
 
     if (isFullTime) {
         switch (type) {
-            case "Μ": value = toDecimal(data.poso); break;
-            case "Η": value = calculateMonthlyWage(data, hours, days, true, type, extraApodoxes); break;
-            case "Ω": value = calculateHourlyWage(data, hours, days, true, extraApodoxes); break;
-            default: value = null;
+            case 'Μ':
+                value = toDecimal(data.poso);
+                break;
+            case 'Η':
+                value = calculateMonthlyWage(data, hours, days, true, type, extraApodoxes);
+                break;
+            case 'Ω':
+                value = calculateHourlyWage(data, hours, days, true, extraApodoxes);
+                break;
+            default:
+                value = null;
         }
     } else {
         switch (type) {
-            case "Μ": value = calculateMonthlyWage(data, hours, days, false, type, extraApodoxes); break;
-            case "Η": value = calculateMonthlyWage(data, hours, days, false, type, extraApodoxes); break;
-            case "Ω": value = calculateHourlyWage(data, hours, days, false, extraApodoxes); break;
-            default: value = null;
+            case 'Μ':
+                value = calculateMonthlyWage(data, hours, days, false, type, extraApodoxes);
+                break;
+            case 'Η':
+                value = calculateMonthlyWage(data, hours, days, false, type, extraApodoxes);
+                break;
+            case 'Ω':
+                value = calculateHourlyWage(data, hours, days, false, extraApodoxes);
+                break;
+            default:
+                value = null;
         }
     }
 
@@ -230,7 +259,7 @@ export function updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, 
         });
         return;
     }
-    
+
     const typeEl1 = document.getElementById('hmeres_ergasias_ebdomadas');
     if (!typeEl1 || !typeEl1.value) {
         showAlert({
@@ -240,7 +269,7 @@ export function updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, 
         });
         return;
     }
-    
+
     const typeEl2 = document.getElementById('ores_ergasias_ebdomadas');
     if (!typeEl2 || !typeEl2.value) {
         showAlert({
@@ -250,13 +279,13 @@ export function updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, 
         });
         return;
     }
-    
+
     const type = typeEl.value;
     const posoBasedOnHoursField = document.getElementById(posoBasedOnHoursFieldId);
-    
-    const oresEl = document.getElementById("ores_ergasias_ebdomadas");
-    const hmeresEl = document.getElementById("hmeres_ergasias_ebdomadas");
-    
+
+    const oresEl = document.getElementById('ores_ergasias_ebdomadas');
+    const hmeresEl = document.getElementById('hmeres_ergasias_ebdomadas');
+
     const hours = toDecimal(oresEl?.value);
     const days = toDecimal(hmeresEl?.value);
 
@@ -268,7 +297,7 @@ export function updatePosoBasedOnHours(rowIndex, data, posoBasedOnHoursFieldId, 
             title: 'Λείπει ο Τύπος Εργαζομένου',
             html: 'Δεν είναι εφικτός ο υπολογισμός των αποδοχών βάσει των ωρών εργασίας γιατί δεν έχετε επιλέξει <strong>ΤΥΠΟ ΕΡΓΑΖΟΜΕΝΟΥ</strong> στην καρτέλλα <strong>Σταθερά Στοιχεία</strong>.'
         });
-        if (posoBasedOnHoursField) posoBasedOnHoursField.value = "0.00";
+        if (posoBasedOnHoursField) posoBasedOnHoursField.value = '0.00';
     } else {
         if (posoBasedOnHoursField) {
             posoBasedOnHoursField.value = formatDecimal(calculatedValue, 2);

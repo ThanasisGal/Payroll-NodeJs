@@ -697,7 +697,7 @@ class ergazomenoiController {
             topos_ergasias_parathrhseis: formData.topos_ergasias_parathrhseis,
             xronos_katabolhs_apodoxon: formData.xronos_katabolhs_apodoxon,
             efarmostea_sse: formData.efarmostea_sse,
-            efarmostea_sse_parathrhseis: formData.efarmostea_sse_parathrhseis || '',
+            efarmostea_sse_parathrhseis: formData.parathrhseis_efarmosteas_sse || '',
 
             plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
             mh_problepsimo_programma: formData.mh_problepsimo_programma,
@@ -718,7 +718,7 @@ class ergazomenoiController {
             pshfiakh_organosh: formData.pshfiakh_organosh,
             apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs_stathera,
             karta_ergasias: formData.karta_ergasias,
-            evelikth_proselefsh: formData.evelikth_proselefsh,
+            evelikth_proselefsh: formData.evelikth_proselefsh_add,
             apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
             ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
             ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
@@ -851,7 +851,7 @@ class ergazomenoiController {
         newErgazomenos.idiothta_sto_ergo_39 = formData.idiothta_sto_ergo_39 || null;
 
         newErgazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia;
+            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
         newErgazomenos.εidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
             formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
         newErgazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
@@ -2236,6 +2236,9 @@ class ergazomenoiController {
         let aa_eggr = null,
             recExist = false;
 
+        // =========================================================================
+        // ✅ 1) ΑΝΑΓΝΩΣΗ ΙΣΤΟΡΙΚΟΥ
+        // =========================================================================
         try {
             const existRecord = await IstorikoProslhpseonAllagonModel.findOne({
                 team: omadaErgasias,
@@ -2255,7 +2258,7 @@ class ergazomenoiController {
                     : null
             });
 
-            recExist = existRecord ? true : false;
+            recExist = !!existRecord;
 
             const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
                 team: omadaErgasias,
@@ -2264,37 +2267,43 @@ class ergazomenoiController {
             })
                 .sort({ _id: -1 })
                 .limit(1);
+
             let aaValue =
                 lastRecordIstorikoy[0] && lastRecordIstorikoy[0].aa_eggrafhs
                     ? parseInt(lastRecordIstorikoy[0].aa_eggrafhs, 10)
                     : null;
-            if (aaValue !== null) {
-                aaValue++;
-            } else {
-                aaValue = 1;
-            }
-            aa_eggr = aaValue;
+
+            aa_eggr = aaValue !== null ? aaValue + 1 : 1;
         } catch (error) {
-            console.log('Σφάλμα :', error);
+            console.error('❌ Σφάλμα κατά την ανάγνωση ιστορικού:', error);
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Σφάλμα κατά την ανάγνωση ιστορικού εργαζόμενου'
+            });
         }
 
+        // =========================================================================
+        // ✅ 2) FILTERED DATA ΕΡΓΑΖΟΜΕΝΟΥ
+        // =========================================================================
         const filteredDataErgazomenoi = {
             eponymo: formData.eponymoHidden,
             onoma: formData.onomaHidden,
+            afm: formData.afm_ergazomenoyHidden,
+            amka: formData.amka_ergazomenoyHidden,
             eponymo_patera: formData.eponymo_patera,
             patronymo: formData.patronymo,
             eponymo_mhteras: formData.eponymo_mhteras,
             mhtronymo: formData.mhtronymo,
             energos: formData.energos,
             fylo: formData.fylo,
-            afm: formData.afm_ergazomenoyHidden,
             doy: formData.doy,
             typos_taytothtas: formData.typos_taytothtas,
             adt: formData.adt,
-            hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs,
+            hmeromhnia_ekdoshs: formData.hmeromhnia_ekdoshs || null,
+            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy:
+                formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy || null,
             arxh_ekdoshs: formData.arxh_ekdoshs,
-            amka: formData.amka_ergazomenoyHidden,
-            hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs,
+            hmeromhnia_gennhshs: formData.hmeromhnia_gennhshs || null,
             topos_gennhshs: formData.topos_gennhshs,
             arithmos_bibliarioy_anhlikoy: formData.arithmos_bibliarioy_anhlikoy,
             yphkoothta: formData.yphkoothta,
@@ -2307,31 +2316,51 @@ class ergazomenoiController {
             dhmos: formData.dhmos,
             polh: formData.polh,
             email: formData.email,
-            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
-            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
+            forologikh_klimaka: formData.forologikh_klimaka,
+            trapeza: formData.trapeza,
+            iban: formData.iban,
+            hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs || null,
+            hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs || null,
+            hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo || null,
+            hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
+            hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
+            hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
+            typos_daneismoy: formData.typos_daneismoy,
+            hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
+            hmnia_lhxhs_daneismoy: formData.hmnia_lhxhs_daneismoy || null,
+            afora_dokimastikh_periodo: formData.afora_dokimastikh_periodo,
+            hmnia_lhxhs_dokimastikhs_periodoy: formData.hmnia_lhxhs_dokimastikhs_periodoy || null,
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
             sxesh_ergasias: formData.sxesh_ergasias,
-            apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
-            ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
-            ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
-            karta_ergasias: formData.karta_ergasias,
-            evelikth_proselefsh: formData.evelikth_proselefsh,
-            syggeneia: formData.syggeneia,
-            syggenikh_sxesh: formData.syggenikh_sxesh,
             proyphresia_se_eth: formData.proyphresia_se_eth,
             proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
             proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
             synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
             synolo_proyphresias_se_mhnes: formData.synolo_proyphresias_se_mhnes,
             misthologiko_klimakio: formData.misthologiko_klimakio,
+            syggeneia: formData.syggeneia,
+            syggenikh_sxesh: formData.syggenikh_sxesh,
+            thesh_eythynhs: formData.thesh_eythynhs,
+            eidikh_periptosh: formData.eidikh_periptosh,
+            topos_ergasias: formData.topos_ergasias,
+            topos_ergasias_parathrhseis: formData.topos_ergasias_parathrhseis,
+            xronos_katabolhs_apodoxon: formData.xronos_katabolhs_apodoxon,
+            efarmostea_sse: formData.efarmostea_sse,
+            efarmostea_sse_parathrhseis: formData.parathrhseis_efarmosteas_sse || '',
             plhrhs_apasxolhsh: formData.plhrhs_apasxolhsh,
+            mh_problepsimo_programma: formData.mh_problepsimo_programma,
+            hmeres_ores_anaforas: formData.hmeres_ores_anaforas,
+            eidopoihsh_prin_thn_anathesh: formData.eidopoihsh_prin_thn_anathesh,
+            prothesmia_akyroshs_ths_anatheshs: formData.prothesmia_akyroshs_ths_anatheshs,
             dieythethsh_xronoy_ergasias: formData.dieythethsh_xronoy_ergasias,
+            hmnia_enarxhs_dieythethshs_ergasias:
+                formData.hmnia_enarxhs_dieythethshs_ergasias || null,
+            hmnia_lhxhs_dieythethshs_ergasias: formData.hmnia_lhxhs_dieythethshs_ergasias || null,
             hmeres_ergasias_ebdomadas: formData.hmeres_ergasias_ebdomadas,
             ores_ergasias_ebdomadas: formData.ores_ergasias_ebdomadas,
+            mo_oron_hmerhsias_ergasias: formData.mo_oron_hmerhsias_ergasias,
             dialleima_se_lepta: formData.dialleima_se_lepta,
             dialleima_entos_ektos_orarioy: formData.dialleima_entos_ektos_orarioy,
             symbatikes_ores_ergasias: formData.symbatikes_ores_ergasias,
@@ -2339,6 +2368,11 @@ class ergazomenoiController {
             synexes_diakekomeno: formData.synexes_diakekomeno,
             pshfiakh_organosh: formData.pshfiakh_organosh,
             apasxolhsh_basei_symbashs: formData.apasxolhsh_basei_symbashs,
+            karta_ergasias: formData.karta_ergasias,
+            evelikth_proselefsh: formData.evelikth_proselefsh_edit,
+            apasxolhsh_gia_proth_fora: formData.apasxolhsh_gia_proth_fora,
+            ora_enarxhs_proths_foras: formData.ora_enarxhs_proths_foras,
+            ora_apoxorhshs_proths_foras: formData.ora_apoxorhshs_proths_foras,
             asfalish_me_tekmarta: formData.asfalish_me_tekmarta,
             asfalistikh_klash: formData.asfalistikh_klash,
             epoxikos: formData.epoxikos,
@@ -2346,7 +2380,6 @@ class ergazomenoiController {
             eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
             oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
             arithmos_teknon: formData.arithmos_teknon,
-            ekpaideytiko_epipedo: formData.ekpaideytiko_epipedo,
             eidikothta: formData.eidikothta,
             antikeimeno_ergasion: formData.antikeimeno_ergasion,
             typos_ergazomenon: formData.typos_ergazomenon,
@@ -2358,36 +2391,53 @@ class ergazomenoiController {
             kpk_efka: formData.kpk_efka,
             kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
             epa_efka: formData.epa_efka,
+            prosthetes_asfalistikes_apodoxes: formData.prosthetes_asfalistikes_apodoxes,
             meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
+            kodikos_meioshs: formData.kodikos_meioshs,
+            pososto_asfalismenoy_meioshs: formData.pososto_asfalismenoy_meioshs,
+            pososto_ergodoth_meioshs: formData.pososto_ergodoth_meioshs,
+            isxyei_apo_meioshs: formData.isxyei_apo_meioshs || null,
+            isxyei_eos_meioshs: formData.isxyei_eos_meioshs || null,
             epidothsh_eisforon_ergodoth: formData.epidothsh_eisforon_ergodoth,
+            kodikos_epidothshs: formData.kodikos_epidothshs,
+            pososto_asfalismenoy_epidothshs: formData.pososto_asfalismenoy_epidothshs,
+            pososto_ergodoth_epidothshs: formData.pososto_ergodoth_epidothshs,
+            isxyei_apo_epidothshs: formData.isxyei_apo_epidothshs || null,
+            isxyei_eos_epidothshs: formData.isxyei_eos_epidothshs || null,
+            meiosh_eisforon_mhteron: formData.meiosh_eisforon_mhteron,
+            kodikos_meioshs_eisforon_mhteron: formData.kodikos_meioshs_eisforon_mhteron,
+            pososto_asfalismenoy_eisforon_mhteron: formData.pososto_asfalismenoy_eisforon_mhteron,
+            pososto_ergodoth_eisforon_mhteron: formData.pososto_ergodoth_eisforon_mhteron,
+            isxyei_apo_eisforon_mhteron: formData.isxyei_apo_eisforon_mhteron || null,
+            isxyei_eos_eisforon_mhteron: formData.isxyei_eos_eisforon_mhteron || null,
+            foreas_kyrias_asfalishs: formData.foreas_kyrias_asfalishs,
+            foreas_epikoyrikhs_asfalishs: formData.foreas_epikoyrikhs_asfalishs || [],
             diathesimothta: formData.diathesimothta,
-            enarxh_diathesimothtas: formData.enarxh_diathesimothtas,
-            lhxh_diathesimothtas: formData.lhxh_diathesimothtas,
+            enarxh_diathesimothtas: formData.enarxh_diathesimothtas || null,
+            lhxh_diathesimothtas: formData.lhxh_diathesimothtas || null,
             palios_neos: formData.palios_neos,
             amoibetai_me_sse: formData.amoibetai_me_sse,
-            trapeza: formData.trapeza,
-            iban: formData.iban,
+            epidoma_anergias: formData.epidoma_anergias,
+            dypa: formData.dypa,
             arithmos_deltioy_anergias: formData.arithmos_deltioy_anergias,
             systatiko_shmeioma: formData.systatiko_shmeioma,
+            topothethsh_me_programma: formData.topothethsh_me_programma,
+            ypoxreotikh_ek_toy_nomoy_katartish: formData.ypoxreotikh_ek_toy_nomoy_katartish,
             programma_dypa: formData.programma_dypa,
             egkritikh_apofash_dypa: formData.egkritikh_apofash_dypa,
-            hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos,
-            hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos,
+            hmeromhnia_enarxhs_programmatos: formData.hmeromhnia_enarxhs_programmatos || null,
+            hmeromhnia_lhxhs_programmatos: formData.hmeromhnia_lhxhs_programmatos || null,
             antikatastash_ergazomenoy: formData.antikatastash_ergazomenoy,
             afm_antikatastath: formData.afm_antikatastath,
             amka_antikatastath: formData.amka_antikatastath,
-            epidoma_anergias: formData.epidoma_anergias,
-            dypa: formData.dypa,
-            thesh_eythynhs: formData.thesh_eythynhs,
-            eidikh_periptosh: formData.eidikh_periptosh,
             kentro_kostoys_1: formData.kentro_kostoys_1,
-            pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1,
+            pososto_apasxolhshs_kk1: formData.pososto_apasxolhshs_kk1 || 0,
             kentro_kostoys_2: formData.kentro_kostoys_2,
-            pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2,
+            pososto_apasxolhshs_kk2: formData.pososto_apasxolhshs_kk2 || 0,
             kentro_kostoys_3: formData.kentro_kostoys_3,
-            pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3,
+            pososto_apasxolhshs_kk3: formData.pososto_apasxolhshs_kk3 || 0,
             kentro_kostoys_4: formData.kentro_kostoys_4,
-            pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4,
+            pososto_apasxolhshs_kk4: formData.pososto_apasxolhshs_kk4 || 0,
             symbash: formData.symbash,
             kathgoria_symbashs: formData.kathgoria_symbashs,
             eidikothta_symbashs: formData.eidikothta_symbashs,
@@ -2399,22 +2449,9 @@ class ergazomenoiController {
             pragmatikosMisthos: formData.pragmatikosMisthos,
             pragmatikoHmeromisthio: formData.pragmatikoHmeromisthio,
             pragmatikoOromisthio: formData.pragmatikoOromisthio,
-            krathsh_01: formData.krathsh_01,
-            ama_krathshs_01: formData.ama_krathshs_01,
-            krathsh_02: formData.krathsh_02,
-            ama_krathshs_02: formData.ama_krathshs_02,
-            krathsh_03: formData.krathsh_03,
-            ama_krathshs_03: formData.ama_krathshs_03,
-            krathsh_04: formData.krathsh_04,
-            ama_krathshs_04: formData.ama_krathshs_04,
-            krathsh_05: formData.krathsh_05,
-            ama_krathshs_05: formData.ama_krathshs_05,
-            krathsh_06: formData.krathsh_06,
-            ama_krathshs_06: formData.ama_krathshs_06,
-            krathsh_07: formData.krathsh_07,
-            ama_krathshs_07: formData.ama_krathshs_07,
-            hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy:
-                formData.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy,
+            epikoyrikh_xoris_efka: formData.epikoyrikh_xoris_efka || null,
+            astheneia_xoris_efka: formData.astheneia_xoris_efka || null,
+            idiothta_sto_ergo_39: formData.idiothta_sto_ergo_39 || null,
             adeia_diamonhs_me_amesh_prosbash_gia_ergasia:
                 formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
             eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
@@ -2422,7 +2459,7 @@ class ergazomenoiController {
             arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
                 formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
             hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
-                formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+                formData.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || null,
             adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia:
                 formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
             eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
@@ -2430,14 +2467,14 @@ class ergazomenoiController {
             arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
                 formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
             hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
-                formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                formData.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || null,
             adeia_eisodoy_gia_epoxikh_apasxolhsh: formData.adeia_eisodoy_gia_epoxikh_apasxolhsh,
             arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh:
                 formData.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh,
             apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh:
-                formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+                formData.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null,
             eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh:
-                formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh,
+                formData.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh || null,
             epaggelmatikh_katartish: formData.epaggelmatikh_katartish,
             antikeimeno_katartishs: formData.antikeimeno_katartishs,
             thematiko_pedio: formData.thematiko_pedio,
@@ -2453,17 +2490,19 @@ class ergazomenoiController {
             allh_glossa_04: formData.allh_glossa_04,
             gnosh_ypologiston: formData.gnosh_ypologiston,
             allo_proson: formData.allo_proson,
+            oysiodeis_oroi: formData.oysiodeis_oroi || '0',
             oros_sth_symbash_n_3986_2011: formData.oros_sth_symbash_n_3986_2011,
             kataggelia_katopin_eggrafhs_proeidopoihshs:
                 formData.kataggelia_katopin_eggrafhs_proeidopoihshs,
-            hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs,
+            hmeromhnia_eggrafhs_proeidopoihshs: formData.hmeromhnia_eggrafhs_proeidopoihshs || null,
             omadikh_apolysh: formData.omadikh_apolysh,
             arithmos_apofashs_gia_omadikh_apolysh: formData.arithmos_apofashs_gia_omadikh_apolysh,
             hmeromhnia_apofashs_gia_omadikh_apolysh:
-                formData.hmeromhnia_apofashs_gia_omadikh_apolysh,
+                formData.hmeromhnia_apofashs_gia_omadikh_apolysh || null,
             epidosh_me_dikastiko_epimelhth: formData.epidosh_me_dikastiko_epimelhth,
-            hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs,
-            hmeromhnia_katabolhs_ths_apozhmioshs: formData.hmeromhnia_katabolhs_ths_apozhmioshs,
+            hmeromhnia_epidoshs: formData.hmeromhnia_epidoshs || null,
+            hmeromhnia_katabolhs_ths_apozhmioshs:
+                formData.hmeromhnia_katabolhs_ths_apozhmioshs || null,
             shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
             parathrhseis: formData.parathrhseis,
             symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
@@ -2474,18 +2513,32 @@ class ergazomenoiController {
             updatedAt: Date.now()
         };
 
+        // =========================================================================
+        // ✅ 3) DYNAMIC FIELDS: Στοιχεία Σύμβασης
+        // =========================================================================
+        const fieldsWithHidden = new Set(['stoixeio_symbashs']);
+
         fieldsStoixeionSymbashs.forEach((fieldStoixeio) => {
             for (let i = 1; i <= arithmosStoixeionSymbashs; i++) {
                 const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+
                 if (numberFields.has(fieldStoixeio)) {
                     filteredDataErgazomenoi[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || 0;
                 } else {
                     filteredDataErgazomenoi[fieldNameStoixeioy] =
                         formData[fieldNameStoixeioy] || null;
                 }
+
+                if (fieldsWithHidden.has(fieldStoixeio)) {
+                    const hiddenFieldName = `${fieldNameStoixeioy}_hidden`;
+                    filteredDataErgazomenoi[hiddenFieldName] = formData[hiddenFieldName] || null;
+                }
             }
         });
 
+        // =========================================================================
+        // ✅ 4) DYNAMIC FIELDS: Κρατήσεις
+        // =========================================================================
         fieldsKrathseon.forEach((fieldKrathsh) => {
             for (let i = 1; i <= arithmosKrathseon; i++) {
                 const fieldNameKrathshs = `${fieldKrathsh}_${i < 10 ? '0' + i : i}`;
@@ -2493,17 +2546,35 @@ class ergazomenoiController {
             }
         });
 
+        // =========================================================================
+        // ✅ 5) UPDATE ΕΡΓΑΖΟΜΕΝΟΥ ΣΤΗ ΒΔ
+        // =========================================================================
+        let updatedErgazomenos = null;
+
         try {
-            await ErgazomenoiModel.findOneAndUpdate(
+            updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate(
                 { _id: ergazomenoiId },
                 { $set: filteredDataErgazomenoi },
-                { new: true }
+                { new: true } // ✅ Επιστρέφει το updated document
             );
+
+            if (!updatedErgazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    errorMessage: 'Ο εργαζόμενος δεν βρέθηκε'
+                });
+            }
         } catch (error) {
-            throw error;
+            console.error('❌ Σφάλμα κατά την ενημέρωση εργαζόμενου:', error);
+            return res.status(500).json({
+                success: false,
+                errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου'
+            });
         }
 
-        // ============================ ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ =============================
+        // =========================================================================
+        // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ (Upsert ανά ημέρα)
+        // =========================================================================
         function createOrarioData(i1) {
             return {
                 team: formData.team,
@@ -2529,55 +2600,54 @@ class ergazomenoiController {
                 argia: formData[`argia_${i1}`] || false,
                 perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
                 kathgoria_adeias: '',
-                ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`]).toFixed(4),
-                ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`]).toFixed(4),
-                ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`]).toFixed(4),
-                ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`]).toFixed(4),
+                ores_ergasias: parseFloat(formData[`total_hours_day_${i1}`] || 0).toFixed(4),
+                ores_nyxtas: parseFloat(formData[`night_hours_day_${i1}`] || 0).toFixed(4),
+                ores_argion: parseFloat(formData[`holiday_hours_day_${i1}`] || 0).toFixed(4),
+                ores_yperergasias: parseFloat(formData[`overwork_hours_day_${i1}`] || 0).toFixed(4),
                 ores_yperergasias_nyxtas: parseFloat(
-                    formData[`night_overwork_hours_day_${i1}`]
+                    formData[`night_overwork_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_yperergasias_argion: parseFloat(
-                    formData[`holiday_overwork_hours_day_${i1}`]
+                    formData[`holiday_overwork_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_yperergasias_argion_nyxtas: parseFloat(
-                    formData[`night_holiday_overwork_hours_day_${i1}`]
+                    formData[`night_holiday_overwork_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_nominhs_yperorias: parseFloat(
-                    formData[`overtimeNomimh_hours_day_${i1}`]
+                    formData[`overtimeNomimh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_nominhs_yperorias_nyxtas: parseFloat(
-                    formData[`night_overtimeNomimh_hours_day_${i1}`]
+                    formData[`night_overtimeNomimh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_nominhs_yperorias_argion: parseFloat(
-                    formData[`holiday_overtimeNomimh_hours_day_${i1}`]
+                    formData[`holiday_overtimeNomimh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_nominhs_yperorias_argion_nyxtas: parseFloat(
-                    formData[`night_holiday_overtimeNomimh_hours_day_${i1}`]
+                    formData[`night_holiday_overtimeNomimh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_paranomhs_yperorias: parseFloat(
-                    formData[`overtimeParanomh_hours_day_${i1}`]
+                    formData[`overtimeParanomh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_paranomhs_yperorias_nyxtas: parseFloat(
-                    formData[`night_overtimeParanomh_hours_day_${i1}`]
+                    formData[`night_overtimeParanomh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_paranomhs_yperorias_argion: parseFloat(
-                    formData[`holiday_overtimeParanomh_hours_day_${i1}`]
+                    formData[`holiday_overtimeParanomh_hours_day_${i1}`] || 0
                 ).toFixed(4),
                 ores_paranomhs_yperorias_argion_nyxtas: parseFloat(
-                    formData[`night_holiday_overtimeParanomh_hours_day_${i1}`]
+                    formData[`night_holiday_overtimeParanomh_hours_day_${i1}`] || 0
                 ).toFixed(4)
             };
         }
 
-        let promises = [];
+        const orarioPromises = [];
         const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo);
         const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos);
-
         let currentDate = new Date(fromDate);
         let i = 1;
 
         while (currentDate <= toDate) {
-            let i1 = i < 10 ? '0' + i : i;
+            const i1 = i < 10 ? '0' + i : i;
             const orarioData = createOrarioData(i1);
 
             const updatePromise = ProdhlomenaOrariaModel.findOneAndUpdate(
@@ -2636,43 +2706,38 @@ class ergazomenoiController {
                 { new: true, upsert: true }
             );
 
-            promises.push(updatePromise);
-
+            orarioPromises.push(updatePromise);
             currentDate.setDate(currentDate.getDate() + 1);
             i++;
         }
 
         try {
-            await Promise.all(promises);
+            await Promise.all(orarioPromises);
         } catch (error) {
-            console.error('Σφάλμα κατά την ενημέρωση των οραρίων:', error);
+            console.error('❌ Σφάλμα κατά την ενημέρωση των ωραρίων:', error);
         }
 
-        // ============================ ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ =============================
-
-        let updateFieldsIstoriko = {};
-        let filteredDataIstoriko = {};
-
+        // =========================================================================
+        // ✅ 7) ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ (μόνο αν δεν υπάρχει ήδη)
+        // =========================================================================
         if (!recExist) {
-            filteredDataIstoriko = {
+            const filteredDataIstoriko = {
                 team: formData.team,
                 company_kod: formData.company_kod,
                 kodikos: formData.kodikosHidden,
                 aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
-                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs,
+                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs || null,
                 createdAt: Date.now()
             };
 
-            updateFieldsIstoriko = {
-                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs,
-                hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo,
-                hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos,
-                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
-                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
+            const updateFieldsIstoriko = {
+                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs || null,
+                hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo || null,
+                hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
+                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
+                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
                 afora_proslhpsh:
-                    formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs
-                        ? true
-                        : false,
+                    formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs,
                 kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
                 misthologiko_klimakio: formData.misthologiko_klimakio,
                 symbash: formData.symbash,
@@ -2714,7 +2779,7 @@ class ergazomenoiController {
                     {
                         team: formData.team,
                         company_kod: formData.company_kod,
-                        kodikos: formData.kodikos
+                        kodikos: formData.kodikosHidden
                     },
                     {
                         $set: updateFieldsIstoriko,
@@ -2723,28 +2788,119 @@ class ergazomenoiController {
                     { new: true, upsert: true }
                 );
             } catch (error) {
-                throw error;
+                console.error('❌ Σφάλμα κατά την ενημέρωση ιστορικού:', error);
+                return res.status(500).json({
+                    success: false,
+                    errorMessage: 'Σφάλμα κατά την ενημέρωση ιστορικού'
+                });
             }
         }
 
         // =========================================================================
-        // ✅ GENERATE CONTRACT PDF (ίδια λογική με postErgazomenoiForm)
+        // ✅ 8) ΕΠΕΞΕΡΓΑΣΙΑ PDF ΑΡΧΕΙΩΝ (Base64 → S3)
+        //       Ενημερώνει ΜΟΝΟ τα PDF που έχουν σταλεί (δεν αντικαθιστά τα υπόλοιπα)
         // =========================================================================
+        const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 
+        const pdfFieldMappings = {
+            arxeio_apodoxhs_oron_atomikhs_symbashs_base64: {
+                documentType: 'arxeio_symbashs',
+                dbField: 'arxeio_apodoxhs_oron_atomikhs_symbashs_path'
+            },
+            arxeio_apodoxhs_oysiodon_oron_base64: {
+                documentType: 'oysiodeis_oroi',
+                dbField: 'arxeio_apodoxhs_oysiodon_oron_path'
+            },
+            bibliario_anhlikoy_base64: {
+                documentType: 'anhlikoi',
+                dbField: 'bibliario_anhlikoy_path'
+            },
+            arxeio_symbashs_daneismoy_base64: {
+                documentType: 'symbash_daneismoy',
+                dbField: 'arxeio_symbashs_daneismoy_path'
+            },
+            arxeio_nomimopoihtikon_eggrafon_base64: {
+                documentType: 'allodapoi',
+                dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
+            }
+        };
+
+        const pdfResults = [];
+        const pdfPathUpdates = {}; // ✅ Θα αποθηκεύσουμε τα S3 keys για bulk update
+
+        for (const [base64Field, mapping] of Object.entries(pdfFieldMappings)) {
+            const base64Data = formData[base64Field];
+
+            if (base64Data && base64Data.startsWith('data:application/pdf;base64,')) {
+                try {
+                    const s3Key = await savePdfFromBase64(
+                        base64Data,
+                        mapping.documentType,
+                        ergazomenoiId
+                    );
+
+                    pdfPathUpdates[mapping.dbField] = s3Key;
+                    // ✅ Ενημέρωσε και το local object για χρήση στο contract PDF
+                    updatedErgazomenos[mapping.dbField] = s3Key;
+
+                    pdfResults.push({
+                        documentType: mapping.documentType,
+                        success: true,
+                        s3Key
+                    });
+
+                    console.log(`✅ [UPDATE] PDF uploaded: ${mapping.documentType} → ${s3Key}`);
+                } catch (error) {
+                    console.error(
+                        `❌ [UPDATE] Failed to process ${mapping.documentType}:`,
+                        error.message
+                    );
+                    pdfResults.push({
+                        documentType: mapping.documentType,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            } else {
+                console.log(`⏭️  [UPDATE] Skipping ${mapping.documentType} (no new data)`);
+            }
+        }
+
+        // ✅ Αποθήκευση S3 keys στη ΒΔ (μόνο αν υπάρχουν νέα PDFs)
+        if (Object.keys(pdfPathUpdates).length > 0) {
+            try {
+                await ErgazomenoiModel.findByIdAndUpdate(ergazomenoiId, {
+                    $set: pdfPathUpdates
+                });
+                console.log(`✅ [UPDATE] PDF paths saved to DB:`, Object.keys(pdfPathUpdates));
+            } catch (error) {
+                console.error('❌ [UPDATE] Failed to save PDF paths:', error);
+            }
+        }
+
+        const pdfSuccessCount = pdfResults.filter((r) => r.success).length;
+        const pdfFailCount = pdfResults.filter((r) => !r.success).length;
+        if (pdfFailCount > 0) {
+            console.warn(`⚠️ [UPDATE] Failed to upload ${pdfFailCount} PDF(s)`);
+        }
+
+        // =========================================================================
+        // ✅ 9) ΑΥΤΟΜΑΤΗ ΔΗΜΙΟΥΡΓΙΑ PDF ΣΥΜΒΑΣΗΣ
+        //       Παρακάμπτεται αν create_contract === false
+        // =========================================================================
         const { generateContractPDF } = require('../../utils/contractGenerator');
         const { getUserContext } = require('../../utils/userContext');
 
         let contractPdfData = null;
 
-        try {
-            const updatedErgazomenos = await ErgazomenoiModel.findById(ergazomenoiId).lean();
-
-            if (updatedErgazomenos) {
+        if (filesToUpdate?.create_contract === true) {
+            // ✅ Ο χρήστης ζήτησε δημιουργία σύμβασης
+            try {
                 const userContext = await getUserContext(req);
+
                 const contractS3Key = await generateContractPDF(updatedErgazomenos, userContext);
                 const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
 
-                // ✅ Αποθήκευση S3 key στο document
                 await ErgazomenoiModel.findByIdAndUpdate(ergazomenoiId, {
                     arxeio_apodoxhs_oron_atomikhs_symbashs_path: contractS3Key
                 });
@@ -2756,27 +2912,34 @@ class ergazomenoiController {
                 };
 
                 console.log('✅ [UPDATE] Contract PDF generated:', contractS3Key);
+            } catch (pdfError) {
+                console.error('⚠️ [UPDATE] Σφάλμα δημιουργίας PDF σύμβασης:', pdfError.message);
+                contractPdfData = {
+                    error: 'PDF generation failed: ' + pdfError.message,
+                    showPreview: false
+                };
             }
-        } catch (pdfError) {
-            console.error('⚠️ [UPDATE] Error generating contract PDF:', pdfError.message);
+        } else {
+            // ⏭️ Ο χρήστης ΔΕΝ ζήτησε δημιουργία σύμβασης — παράκαμψη
+            console.log('⏭️ [UPDATE] Contract PDF generation skipped (create_contract=false)');
             contractPdfData = {
-                error: 'PDF generation failed: ' + pdfError.message,
-                showPreview: false
+                showPreview: false,
+                skipped: true
             };
         }
-
         // =========================================================================
-        // ✅ GET COMPANY DATA (για email στο modal)
+        // ✅ 10) ΑΝΑΚΤΗΣΗ ΔΕΔΟΜΕΝΩΝ ΕΤΑΙΡΕΙΑΣ & ΥΠΟΚΑΤΑΣΤΗΜΑΤΟΣ
         // =========================================================================
-
-        let companyEmail = null,
+        let company = null,
+            ypokatasthmata = null,
+            companyEmail = null,
             companyPhone = null,
             companyName = null,
             companyType = 'ΕΠΙΧΕΙΡΗΣΗ';
 
         try {
             const sessionCompanyInUse = req.session.companyInUse;
-            const company = await CompaniesModel.findById(sessionCompanyInUse).lean();
+            company = await CompaniesModel.findById(sessionCompanyInUse).lean();
 
             companyEmail = company?.email || null;
             companyPhone = company?.thlefono || null;
@@ -2788,25 +2951,204 @@ class ergazomenoiController {
                 companyType = 'ΕΤΑΙΡΕΙΑ';
             }
         } catch (e) {
-            console.error('❌ [UPDATE] Error fetching company:', e.message);
+            console.error('❌ [UPDATE] Σφάλμα κατά την ανάγνωση εταιρείας:', e.message);
+        }
+
+        // ✅ Ανάκτηση υποκαταστήματος (απαραίτητο για E3/WTO XML)
+        try {
+            ypokatasthmata = await YpokatasthmataModel.findOne({
+                companykod_object: req.session.companyInUse,
+                kodikos: updatedErgazomenos.ypokatasthma
+            }).lean();
+
+            if (!ypokatasthmata) {
+                console.warn(
+                    '⚠️ [UPDATE] No ypokatasthmata found for:',
+                    updatedErgazomenos.ypokatasthma
+                );
+            }
+        } catch (error) {
+            console.error('❌ [UPDATE] Error fetching ypokatasthmata:', error.message);
+            ypokatasthmata = null;
         }
 
         // =========================================================================
-        // ✅ ΤΕΛΙΚΟ RESPONSE (με contractPdf — όπως το postErgazomenoiForm)
+        // ✅ 11) ΔΗΜΙΟΥΡΓΙΑ E3 XML (ΕΡΓΑΝΗ) — Υπό συνθήκη
         // =========================================================================
+        let e3XmlData = null;
 
+        logger.debug('E3 Generation block reached (UPDATE)', {
+            module: 'E3-XML-DEBUG',
+            filesToUpdate,
+            e3_flag: filesToUpdate?.e3_anaggelia_proslhpshs
+        });
+
+        if (filesToUpdate?.e3_anaggelia_proslhpshs === true) {
+            logger.info('E3 XML generation requested (UPDATE)', {
+                module: 'E3-XML',
+                employee_kod: updatedErgazomenos.kodikos,
+                employee_afm: updatedErgazomenos.afm,
+                company: company?.eponymia || 'N/A'
+            });
+
+            try {
+                const { generateE3XML } = require('../../utils/xmlGenerators/e3N_v1Generator');
+
+                const xmlResult = await generateE3XML(updatedErgazomenos, company, ypokatasthmata);
+
+                logger.info('E3 XML generated successfully (UPDATE)', {
+                    module: 'E3-XML',
+                    s3_key: xmlResult.s3Key,
+                    filename: xmlResult.filename
+                });
+
+                if (xmlResult.s3Key) {
+                    const toRelativeUploadsPath = (p) => {
+                        if (!p) return null;
+                        if (p.startsWith('http://') || p.startsWith('https://')) {
+                            p = new URL(p).pathname;
+                        }
+                        if (p.startsWith('file:///')) p = p.replace('file:///', '/');
+                        p = p.replace(/\\/g, '/');
+                        const idx = p.indexOf('/uploads/');
+                        if (idx !== -1) return p.slice(idx + 1);
+                        if (p.startsWith('/uploads/')) return p.slice(1);
+                        if (p.startsWith('uploads/')) return p;
+                        return null;
+                    };
+
+                    const relativePath = toRelativeUploadsPath(xmlResult.s3Url);
+
+                    try {
+                        const downloadUrl = await generatePresignedUrl(xmlResult.s3Key, 600);
+                        e3XmlData = {
+                            success: true,
+                            s3Key: xmlResult.s3Key,
+                            downloadUrl,
+                            filename: xmlResult.filename,
+                            relativePath
+                        };
+                        logger.info('[E3PATH] generated (UPDATE)', {
+                            filename: e3XmlData.filename,
+                            relativePath
+                        });
+                    } catch (urlError) {
+                        e3XmlData = {
+                            success: true,
+                            s3Key: xmlResult.s3Key,
+                            downloadUrl: null,
+                            filename: xmlResult.filename,
+                            relativePath,
+                            urlError: urlError.message
+                        };
+                        logger.warn('[E3PATH] generated WITHOUT presigned URL (UPDATE)', {
+                            filename: e3XmlData.filename,
+                            urlError: urlError.message
+                        });
+                    }
+                } else {
+                    e3XmlData = {
+                        success: false,
+                        error: xmlResult.saveError || 'XML not saved'
+                    };
+                }
+            } catch (e3Error) {
+                logger.error('E3 XML generation failed (UPDATE)', {
+                    module: 'E3-XML',
+                    error: e3Error.message,
+                    stack: e3Error.stack
+                });
+                e3XmlData = {
+                    success: false,
+                    error: e3Error.message
+                };
+            }
+        } else {
+            logger.info('E3 XML generation skipped (UPDATE — checkbox not checked)', {
+                module: 'E3-XML',
+                checkbox_value: filesToUpdate?.e3_anaggelia_proslhpshs
+            });
+        }
+
+        // =========================================================================
+        // ✅ 12) ΔΗΜΙΟΥΡΓΙΑ WTO XML (Ωράριο ΕΡΓΑΝΗ) — Υπό συνθήκη
+        // =========================================================================
+        let wtoXmlData = { success: false };
+
+        if (filesToUpdate?.schedules === true && filesToUpdate?.isPermanent === true) {
+            try {
+                logger.info('WTO XML generation requested (UPDATE — Οριστική)', {
+                    module: 'WTO-XML',
+                    employee_kod: updatedErgazomenos.kodikos,
+                    employee_afm: updatedErgazomenos.afm,
+                    company: company?.eponymia || 'N/A',
+                    isPermanent: true
+                });
+
+                const { generateWtoWeeklyXML } = require('../../utils/xmlGenerators/wtoGenerator');
+
+                wtoXmlData = await generateWtoWeeklyXML(
+                    updatedErgazomenos._id,
+                    updatedErgazomenos, // ✅ Χρήση updated data αντί για newErgazomenos
+                    company, // ✅ Χρήση company αντί για companyData
+                    ypokatasthmata // ✅ Χρήση ypokatasthmata αντί για ypokatasthmataData
+                );
+
+                if (wtoXmlData.success) {
+                    logger.info('WTO XML generated successfully (UPDATE)', {
+                        module: 'WTO-XML',
+                        s3_key: wtoXmlData.s3Key,
+                        filename: wtoXmlData.filename
+                    });
+                }
+            } catch (wtoError) {
+                logger.error('WTO XML generation failed (UPDATE)', {
+                    module: 'WTO-XML',
+                    error: wtoError.message
+                });
+                wtoXmlData = { success: false, error: wtoError.message };
+            }
+        } else {
+            logger.info('WTO XML generation skipped (UPDATE — checkbox not checked)', {
+                module: 'WTO-XML',
+                checkbox_value: filesToUpdate?.schedules,
+                isPermanent: filesToUpdate?.isPermanent
+            });
+        }
+
+        // =========================================================================
+        // ✅ 13) ΤΕΛΙΚΟ RESPONSE
+        // =========================================================================
         return res.json({
             success: true,
-            data: { _id: ergazomenoiId },
-            pdfResults: [],
+            message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',
+            data: {
+                _id: ergazomenoiId,
+                kodikos: updatedErgazomenos.kodikos,
+                eponymo: updatedErgazomenos.eponymo,
+                onoma: updatedErgazomenos.onoma,
+                email: updatedErgazomenos.email,
+                fylo: updatedErgazomenos.fylo,
+                yphkoothta: updatedErgazomenos.yphkoothta,
+                arxeio_apodoxhs_oron_atomikhs_symbashs_path:
+                    updatedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path,
+                arxeio_apodoxhs_oysiodon_oron_path:
+                    updatedErgazomenos.arxeio_apodoxhs_oysiodon_oron_path,
+                bibliario_anhlikoy_path: updatedErgazomenos.bibliario_anhlikoy_path,
+                arxeio_symbashs_daneismoy_path: updatedErgazomenos.arxeio_symbashs_daneismoy_path,
+                arxeio_nomimopoihtikon_eggrafon_path:
+                    updatedErgazomenos.arxeio_nomimopoihtikon_eggrafon_path
+            },
+            pdfResults,
             contractPdf: contractPdfData,
-            e3XmlData: null,
-            wtoXmlData: null,
+            e3XmlData,
+            wtoXmlData,
             companyEmail,
             companyPhone,
             companyName,
             companyType,
-            redirectUrl: '/ergazomenoi/ergazomenoi'
+            redirectUrl: '/ergazomenoi/ergazomenoi',
+            waitingForPdfConfirmation: true
         });
     };
 

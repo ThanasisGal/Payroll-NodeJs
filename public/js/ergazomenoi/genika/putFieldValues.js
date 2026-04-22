@@ -587,10 +587,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const noUpdatesHtml = noErganiUpdates
                 ? `
-                    <div class="display-flex align-items-center gap-0_75rem padding-1rem">
-                        <label class="margin-0 font-size-rem-1_05 no_update_message">
-                            ⚠️ Δεν ενημερώνεται το ΕΡΓΑΝΗ ΙΙ αλλά μόνο τα αρχεία της εφαρμογής, 
-                            που αφορούν τον εργαζόμενο...
+                    <!-- ✅ E3 CHECKBOX -->
+                    <div class="display-flex align-items-center gap-0_75rem">
+                        <input type="checkbox" 
+                            id="e3_anaggelia_proslhpshs" 
+                            name="files" 
+                            value="e3_anaggelia_proslhpshs" 
+                            class="custom-checkbox" />
+                        <label for="e3_anaggelia_proslhpshs" 
+                            class="margin-0 cursor-pointer font-size-rem-1_05">
+                            Αναγγελία Πρόσληψης (E3N)
                         </label>
                     </div>
                 `
@@ -617,6 +623,19 @@ document.addEventListener('DOMContentLoaded', () => {
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
                                 style="transition: all 0.2s; color: ${noErganiUpdates ? '#aaaaaa' : '#000000'}">
                                 Προσωρινή Αποθήκευση
+                            </label>
+                        </div>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" 
+                                id="create_contract" 
+                                name="files" 
+                                value="create_contract" 
+                                class="custom-checkbox" />
+                            <label for="create_contract" 
+                                id="create_contract_label"
+                                class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-400">
+                                Δημιουργία Σύμβασης
                             </label>
                         </div>
 
@@ -649,6 +668,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 preConfirm: () => {
                     const isPermanent =
                         document.getElementById('temporary_permanent_storage')?.checked ?? false;
+
+                    const createContract =
+                        document.getElementById('create_contract')?.checked ?? false;
+
+                    const e3AnaggeliaProslhpshs =
+                        document.getElementById('e3_anaggelia_proslhpshs')?.checked ?? false;
 
                     // ✅ Μεταβολές — null safe
                     const e3Enabled_1 =
@@ -700,8 +725,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const filesToUpdate = {
                         isPermanent,
+
+                        create_contract: createContract,
+
+                        e3_anaggelia_proslhpshs: e3AnaggeliaProslhpshs,
+
                         e3_metaboles_ergasiakhs_sxeshs: e3Enabled_1,
                         e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy: e3Enabled_2,
+
                         ma_222: wtoEnabled_222,
                         ma_227: wtoEnabled_227,
                         ma_217: wtoEnabled_217,
@@ -747,105 +778,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 filesToUpdate: result.value
             };
 
-            // ============================================================================
-            // ✅ SHOW PROGRESS BAR MODAL
-            // ============================================================================
+            const createContract = result.value?.create_contract === true;
 
-            Swal.fire({
-                title: 'Δημιουργία Σύμβασης Εργασίας',
-                html: `
-                    <div class="pdf-generation-progress">
-                        <div class="progress-spinner">
-                            <div class="spinner-border text-success" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                        
-                        <div class="progress-step-text" id="progress-step-text">
-                            Προετοιμασία...
-                        </div>
-                        
-                        <div class="progress-bar-container">
-                            <div class="custom-progress">
-                                <div class="custom-progress-bar progress-bar-striped progress-bar-animated" 
-                                    id="pdf-progress-bar" 
-                                    role="progressbar"
-                                    aria-valuenow="0"
-                                    aria-valuemin="0"
-                                    aria-valuemax="100"
-                                    style="width: 0%">
-                                    0%
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="progress-info-text">
-                            <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
-                            <ul class="progress-steps-list">
-                                <li>Αποθήκευση στοιχείων εργαζόμενου</li>
-                                <li>Δημιουργία εγγράφου από template</li>
-                                <li>Μετατροπή σε PDF</li>
-                                <li>Ασφαλή αποθήκευση στο cloud</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="progress-time-estimate">
-                            <span style="margin-right: 8px;">⏱️</span>
-                            <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
+            if (createContract) {
+                Swal.fire({
+                    title: 'Δημιουργία Σύμβασης Εργασίας',
+                    html: `
+            <div class="pdf-generation-progress">
+                <div class="progress-spinner">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <div class="progress-step-text" id="progress-step-text">
+                    Προετοιμασία...
+                </div>
+                
+                <div class="progress-bar-container">
+                    <div class="custom-progress">
+                        <div class="custom-progress-bar progress-bar-striped progress-bar-animated" 
+                            id="pdf-progress-bar" 
+                            role="progressbar"
+                            aria-valuenow="0"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            style="width: 0%">
+                            0%
                         </div>
                     </div>
-                `,
-                backdrop: false,
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                customClass: {
-                    popup: 'custom-swal-popup',
-                    title: 'custom-title'
-                },
-                didOpen: () => {
-                    // ✅ Start progress simulation
-                    startProgressAnimation();
-                }
-            });
-
-            // ============================================================================
-            // ✅ PROGRESS ANIMATION FUNCTION
-            // ============================================================================
-            function startProgressAnimation() {
-                const steps = [
-                    { percent: 15, text: 'Αποθήκευση στοιχείων εργαζόμενου...', duration: 800 },
-                    { percent: 30, text: 'Δημιουργία DOCX από template...', duration: 1500 },
-                    { percent: 50, text: 'Συμπλήρωση στοιχείων σύμβασης...', duration: 2000 },
-                    { percent: 70, text: 'Μετατροπή DOCX σε PDF...', duration: 3000 },
-                    { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
-                    { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
-                ];
-
-                let currentStepIndex = 0;
-
-                function updateProgress() {
-                    if (currentStepIndex >= steps.length) return;
-
-                    const step = steps[currentStepIndex];
-                    const progressBar = document.getElementById('pdf-progress-bar');
-                    const progressText = document.getElementById('progress-step-text');
-
-                    if (progressBar && progressText) {
-                        progressBar.style.width = `${step.percent}%`;
-                        progressBar.textContent = `${step.percent}%`;
-                        progressBar.setAttribute('aria-valuenow', step.percent);
-                        progressText.textContent = step.text;
+                </div>
+                
+                <div class="progress-info-text">
+                    <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                    <ul class="progress-steps-list">
+                        <li>Αποθήκευση στοιχείων εργαζόμενου</li>
+                        <li>Δημιουργία εγγράφου από template</li>
+                        <li>Μετατροπή σε PDF</li>
+                        <li>Ασφαλή αποθήκευση στο cloud</li>
+                    </ul>
+                </div>
+                
+                <div class="progress-time-estimate">
+                    <span style="margin-right: 8px;">⏱️</span>
+                    <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
+                </div>
+            </div>
+        `,
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-title'
+                    },
+                    didOpen: () => {
+                        startProgressAnimation();
                     }
-
-                    currentStepIndex++;
-
-                    if (currentStepIndex < steps.length) {
-                        setTimeout(updateProgress, step.duration);
-                    }
-                }
-
-                // Start animation
-                setTimeout(updateProgress, 250);
+                });
             }
 
             const response = await fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
@@ -859,32 +849,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // ============================================================================
-            // ✅ SMOOTH PROGRESS COMPLETION
+            // ✅ SMOOTH PROGRESS COMPLETION — ΜΟΝΟ αν το modal άνοιξε
             // ============================================================================
 
-            // Calculate minimum wait time (sum of all animation durations: ~9.6s)
-            const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
+            if (createContract) {
+                await new Promise((resolve) => setTimeout(resolve, 3000));
 
-            // Wait minimum 3 seconds so user can see the progress animation
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+                const progressBar = document.getElementById('pdf-progress-bar');
+                const progressText = document.getElementById('progress-step-text');
 
-            // Smoothly transition to 100%
-            const progressBar = document.getElementById('pdf-progress-bar');
-            const progressText = document.getElementById('progress-step-text');
+                if (progressBar && progressText) {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.setAttribute('aria-valuenow', 100);
+                    progressText.textContent = 'Ολοκλήρωση...';
 
-            if (progressBar && progressText) {
-                // Force 100% completion
-                progressBar.style.width = '100%';
-                progressBar.textContent = '100%';
-                progressBar.classList.remove('progress-bar-animated');
-                progressBar.setAttribute('aria-valuenow', 100);
-                progressText.textContent = 'Ολοκλήρωση...';
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
 
-                // Show completion message for 1 second
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                Swal.close();
             }
-            // Close progress modal smoothly
-            Swal.close();
 
             // =========================================================================
             // RESPONSE HANDLING
@@ -970,6 +955,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wtoXmlData = data?.wtoXmlData || null;
                 const hasWtoXml = wtoXmlData && wtoXmlData.success === true;
 
+                const userWantsE3 = result.value?.e3_anaggelia_proslhpshs === true;
+
                 // ✅ BUILD HTML STRINGS (ONCE)
                 const e3XmlHtml = hasE3Xml
                     ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
@@ -1011,15 +998,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             console.error('❌ [FRONTEND] Missing s3Key in backend response!');
                             console.error('   contractPdf:', data.contractPdf);
 
-                            // ✅ Fallback: Show alert without email button
                             await Swal.fire({
                                 backdrop: false,
                                 icon: 'warning',
-                                title: 'PDF Δημιουργήθηκε',
+                                title: 'PDF Δημιουργήθηκ��',
                                 html: `
-                                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
-                                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
-                                `,
+                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
+                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
+                `,
                                 confirmButtonText: 'OK'
                             }).then(() => {
                                 window.location.href =
@@ -1042,14 +1028,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             type: data.companyType || 'ΕΠΙΧΕΙΡΗΣΗ'
                         };
 
-                        // =====================================================================
-                        // ✅ SHOW MODAL (STEP 1) - User downloads/emails PDF
-                        // =====================================================================
                         console.log('📄 Opening PDF modal...');
 
-                        // ✅ Store upload options globally (so modal can access them)
                         window.__erganhUploadOptions = {
                             isPermanent: result.value?.isPermanent || false,
+                            e3_anaggelia_proslhpshs: result.value?.e3_anaggelia_proslhpshs || false, // ✅
                             e3Enabled_1: result.value?.e3_metaboles_ergasiakhs_sxeshs !== false,
                             e3Enabled_2:
                                 result.value
@@ -1094,13 +1077,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             e3XmlData,
                             wtoXmlData,
                             data.data?._id,
-                            result.value // ✅ Pass filesToUpdate (checkbox state)
+                            result.value
                         );
-
-                        // =====================================================================
-                        // ✅ AFTER MODAL CLOSES (STEP 2) - Upload to ERGANH happens automatically
-                        // (handled inside showContractPdfModalAndWait function)
-                        // =====================================================================
                     } else {
                         // =====================================================================
                         // ✅ NO PDF PREVIEW - Show success with XML downloads
@@ -1111,15 +1089,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             icon: 'success',
                             title: 'Επιτυχής καταχώριση!',
                             html: `
-                                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
-                                ${
-                                    successfulPdfs.length > 0
-                                        ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
-                                        : ''
-                                }
-                                ${e3XmlHtml}
-                                ${wtoXmlHtml}
-                            `,
+                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
+                ${
+                    successfulPdfs.length > 0
+                        ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
+                        : ''
+                }
+                ${e3XmlHtml}
+                ${wtoXmlHtml}
+            `,
                             timer: hasE3Xml || hasWtoXml ? null : 1500,
                             showConfirmButton: hasE3Xml || hasWtoXml,
                             confirmButtonText: 'OK',
@@ -1132,23 +1110,32 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
 
                         // =====================================================================
-                        // ✅ UPLOAD BOTH XMLs TO ERGANH (SEQUENTIAL)
+                        // ✅ UPLOAD E3 XML — με έλεγχο userWantsE3
                         // =====================================================================
+                        let e3Result = { success: true };
 
-                        // ✅ 1. Upload E3 XML (if exists)
-                        let e3Result = { success: true }; // Default to success if not uploaded
-
-                        if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
+                        if (
+                            userWantsE3 &&
+                            e3XmlData?.success &&
+                            (e3XmlData?.relativePath ||
+                                e3XmlData?.s3Key ||
+                                e3XmlData?.downloadUrl) &&
+                            data.data?._id
+                        ) {
                             const e3UrlToSend =
                                 e3XmlData?.relativePath ||
-                                e3XmlData?.s3Url ||
+                                e3XmlData?.s3Key ||
                                 e3XmlData?.downloadUrl ||
                                 null;
 
                             if (e3UrlToSend && typeof e3UrlToSend === 'string') {
                                 try {
                                     console.log('[E3-UPLOAD] Uploading E3 XML...');
-                                    e3Result = await uploadToErganh(data.data._id, e3UrlToSend);
+                                    e3Result = await uploadToErganh(
+                                        data.data._id,
+                                        e3UrlToSend,
+                                        result.value?.isPermanent === true
+                                    );
                                     console.log('[E3-UPLOAD] Result:', e3Result);
                                 } catch (e) {
                                     console.error('[E3-UPLOAD] ❌ Exception:', e?.message || e);
@@ -1157,8 +1144,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
 
-                        // ✅ 2. Upload WTO XML (if exists) - ALWAYS RUNS
-                        let wtoResult = { success: true }; // Default to success if not uploaded
+                        // =====================================================================
+                        // ✅ UPLOAD WTO XML
+                        // =====================================================================
+                        let wtoResult = { success: true };
 
                         if (wtoXmlData?.success && wtoXmlData?.s3Url && data.data?._id) {
                             const wtoUrlToSend =
@@ -1182,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
 
-                        // ✅ 3. Final summary (optional - if you want to show combined status)
                         if (!e3Result.success || !wtoResult.success) {
                             console.warn('[ERGANH] Some uploads failed:', {
                                 e3: e3Result.success,
@@ -1190,7 +1178,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                         }
 
-                        // ✅ 4. Redirect AFTER BOTH uploads complete
                         console.log(
                             '[REDIRECT] Redirecting to:',
                             data.redirectUrl || '/ergazomenoi/ergazomenoi'
@@ -1209,16 +1196,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         icon: 'warning',
                         title: 'Ο εργαζόμενος αποθηκεύτηκε',
                         html: `
-                            <p><strong>Αλλά ${failedPdfs.length} PDF απέτυχαν!</strong></p>
-                            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
-                                Αποτυχία: ${failedTypes}
-                            </p>
-                            <p style="color: #999; font-size: 0.85rem; margin-top: 10px;">
-                                Μπορείτε να τα ανεβάσετε αργότερα από την επεξεργασία.
-                            </p>
-                            ${e3XmlHtml}
-                            ${wtoXmlHtml}
-                        `,
+            <p><strong>Αλλά ${failedPdfs.length} PDF απέτυχαν!</strong></p>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
+                Αποτυχία: ${failedTypes}
+            </p>
+            <p style="color: #999; font-size: 0.85rem; margin-top: 10px;">
+                Μπορείτε να τα ανεβάσετε αργότερα από την επεξεργασία.
+            </p>
+            ${e3XmlHtml}
+            ${wtoXmlHtml}
+        `,
                         confirmButtonText: 'OK',
                         customClass: {
                             confirmButton: 'class-warning custom-confirm-button custom-swal-button',
@@ -1228,21 +1215,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
 
                     // =====================================================================
-                    // ✅ UPLOAD BOTH XMLs TO ERGANH (SEQUENTIAL)
+                    // ✅ UPLOAD E3 XML — με έλεγχο userWantsE3
                     // =====================================================================
-
-                    // ✅ 1. Upload E3 XML (if exists)
-                    if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
+                    if (
+                        userWantsE3 &&
+                        e3XmlData?.success &&
+                        (e3XmlData?.relativePath || e3XmlData?.s3Key || e3XmlData?.downloadUrl) &&
+                        data.data?._id
+                    ) {
                         const e3UrlToSend =
                             e3XmlData?.relativePath ||
-                            e3XmlData?.s3Url ||
+                            e3XmlData?.s3Key ||
                             e3XmlData?.downloadUrl ||
                             null;
 
                         if (e3UrlToSend && typeof e3UrlToSend === 'string') {
                             try {
                                 console.log('[E3-UPLOAD] Uploading E3 XML (failed PDFs path)...');
-                                await uploadToErganh(data.data._id, e3UrlToSend);
+                                await uploadToErganh(
+                                    data.data._id,
+                                    e3UrlToSend,
+                                    result.value?.isPermanent === true
+                                );
                                 console.log('[E3-UPLOAD] ✅ Success');
                             } catch (e) {
                                 console.error('[E3-UPLOAD] ❌ Failed:', e?.message || e);
@@ -1250,7 +1244,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    // ✅ 2. Upload WTO XML (if exists)
+                    // =====================================================================
+                    // ✅ UPLOAD WTO XML
+                    // =====================================================================
                     if (wtoXmlData?.success && wtoXmlData?.s3Url && data.data?._id) {
                         const wtoUrlToSend =
                             wtoXmlData?.relativePath ||
@@ -1269,7 +1265,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    // ✅ 3. Redirect AFTER both uploads
                     window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                 }
                 return;
@@ -1405,6 +1400,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // ✅ GET UPLOAD OPTIONS (from function parameter)
                 // =====================================================================
                 const isPermanent = filesToUpdate?.isPermanent === true;
+
+                const e3AnaggeliaProslhpshs = filesToUpdate?.e3_anaggelia_proslhpshs === true;
+
                 const e3Enabled_1 = filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs === true;
                 const e3Enabled_2 =
                     filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true;
@@ -1430,59 +1428,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wtoEnabled_236 =
                     filesToUpdate?.ma_236_oikeiothelhs_apoxorhsh_logo_15etias === true;
 
-                console.log('[CLOSE-MODAL] Upload options:', {
-                    isPermanent,
-                    e3Enabled_1,
-                    e3Enabled_2,
-                    wtoEnabled_222,
-                    wtoEnabled_227,
-                    wtoEnabled_217,
-                    wtoEnabled_221,
-                    wtoEnabled_220,
-                    wtoEnabled_218,
-                    wtoEnabled_219,
-                    wtoEnabled_223,
-                    wtoEnabled_229,
-                    wtoEnabled_226,
-                    wtoEnabled_228,
-                    wtoEnabled_224,
-                    wtoEnabled_225,
-                    wtoEnabled_236,
-                    filesToUpdate
-                });
-
                 // =====================================================================
                 // ✅ CHECK: What XMLs need upload?
                 // =====================================================================
-                const needsE3Upload = !!(e3Enabled_1 && e3XmlData?.success && ergazomenosId);
+                const needsE3Upload = !!(
+                    (e3Enabled_1 || e3AnaggeliaProslhpshs) &&
+                    e3XmlData?.success &&
+                    ergazomenosId
+                );
 
                 // ✅ CRITICAL: For WTO, check if USER ENABLED schedules checkbox
                 // NOT if XML was generated (XML is only generated for isPermanent=true)
                 const needsWtoUpload = !!(wtoEnabled_217 && ergazomenosId);
-
-                console.log('[XML-UPLOAD] closeModal checks:', {
-                    needsE3Upload,
-                    needsWtoUpload,
-                    wtoEnabled_222,
-                    wtoEnabled_227,
-                    wtoEnabled_217,
-                    wtoEnabled_221,
-                    wtoEnabled_220,
-                    wtoEnabled_218,
-                    wtoEnabled_219,
-                    wtoEnabled_223,
-                    wtoEnabled_229,
-                    wtoEnabled_226,
-                    wtoEnabled_228,
-                    wtoEnabled_224,
-                    wtoEnabled_225,
-                    wtoEnabled_236,
-                    isPermanent,
-                    e3_s3Key: e3XmlData?.s3Key,
-                    wto_s3Key: wtoXmlData?.s3Key,
-                    wto_relativePath: wtoXmlData?.relativePath,
-                    ergazomenosId
-                });
 
                 // ✅ If neither needs upload → redirect immediately
                 if (!needsE3Upload && !needsWtoUpload) {

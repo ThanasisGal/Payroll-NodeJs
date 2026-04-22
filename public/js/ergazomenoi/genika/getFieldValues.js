@@ -42,6 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (input.type === 'date') {
                         formData[input.name] = input.value === '' ? null : input.value;
                     }
+                    // } else if (input.type === 'date') {
+                    //         formData[input.name] = input.value === '' ? null : new Date(input.value);
+                    //         // input.value = "2025-03-15" (βάλθηκε από date_format_fix.js) ✅
+                    //     }
 
                     // ✅ 4. TIME (κενό)
                     else if (input.type === 'time') {

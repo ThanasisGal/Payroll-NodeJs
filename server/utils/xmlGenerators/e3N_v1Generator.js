@@ -226,7 +226,7 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
             f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
             f_proslipsitime: ergazomenos.ora_enarxhs_proths_foras || '08:00',
             f_apoxwrisitime: ergazomenos.ora_apoxorhshs_proths_foras || '16:00',
-            f_week_hours: formatWeekHours(ergazomenos.symbatikes_ores_ergasias),
+            f_week_hours: formatWeekHours(ergazomenos.ores_ergasias_ebdomadas),
             f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
             f_eidikothta_anal: ergazomenos.antikeimeno_ergasion || '',
             f_proipiresia: String(ergazomenos.proyphresia_se_eth || 0),
