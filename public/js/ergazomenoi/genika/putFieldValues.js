@@ -252,7 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
-
             // =========================================================================
             // ✅ PRE-VALIDATION: Check WTO schedules
             // =========================================================================
@@ -437,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="checkbox" id="ma_220_lysh_kataggelia_xoris_proeidopoihsh" name="files"
                             value="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="custom-checkbox" />
                         <label for="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χω��ίς Προειδοποίηση
+                            ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
@@ -684,6 +683,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const createContract = result.value?.create_contract === true;
 
+            console.group('[CONTRACT-DEBUG] BEFORE FETCH');
+            console.log('ergazomenoiId:', ergazomenoiId);
+            console.log('createContract:', createContract);
+            console.log('filesToUpdate:', result.value);
+            console.log('employee:', {
+                eponymo: formData.eponymoHidden,
+                onoma: formData.onomaHidden,
+                afm: formData.afm_ergazomenoyHidden,
+                amka: formData.amka_ergazomenoyHidden
+            });
+            console.log('current user context:', {
+                pathname: window.location.pathname,
+                origin: window.location.origin
+            });
+            console.log('request payload v:', v);
+            console.groupEnd();
+
             if (createContract) {
                 Swal.fire({
                     title: 'Δημιουργία Σύμβασης Εργασίας',
@@ -738,6 +754,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
+            // ============================================================================
+            // ✅ PROGRESS ANIMATION FUNCTION
+            // ============================================================================
+            function startProgressAnimation() {
+                const steps = [
+                    { percent: 15, text: 'Αποθήκευση στοιχείων εργαζόμενου...', duration: 800 },
+                    { percent: 30, text: 'Δημιουργία DOCX από template...', duration: 1500 },
+                    { percent: 50, text: 'Συμπλήρωση στοιχείων σύμβασης...', duration: 2000 },
+                    { percent: 70, text: 'Μετατροπή DOCX σε PDF...', duration: 3000 },
+                    { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
+                    { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
+                ];
+
+                let currentStepIndex = 0;
+
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('pdf-progress-bar');
+                    const progressText = document.getElementById('progress-step-text');
+
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+
+                    currentStepIndex++;
+
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+
+                // Start animation
+                setTimeout(updateProgress, 250);
+            }
+
             const response = await fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
                 method: 'POST',
                 headers: {
@@ -747,6 +803,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 credentials: 'include',
                 body: JSON.stringify(v)
             });
+
+            console.group('[CONTRACT-DEBUG] FETCH RESPONSE');
+            console.log('response.status:', response.status);
+            console.log('response.ok:', response.ok);
+            console.log('response.redirected:', response.redirected);
+            console.log('response.url:', response.url);
+            console.log('content-type:', response.headers.get('content-type'));
+            console.log('location header:', response.headers.get('Location'));
+            console.groupEnd();
 
             // ============================================================================
             // ✅ SMOOTH PROGRESS COMPLETION
@@ -776,6 +841,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 1) Browser auto-followed redirect
             if (response.redirected && response.url) {
+                console.warn('[CONTRACT-DEBUG] Browser auto-followed redirect:', response.url);
                 window.location.href = response.url;
                 return;
             }
@@ -783,6 +849,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2) 3xx without auto-follow
             if (response.status >= 300 && response.status < 400) {
                 const loc = response.headers.get('Location') || response.headers.get('location');
+                console.warn('[CONTRACT-DEBUG] Manual redirect branch:', {
+                    status: response.status,
+                    location: loc
+                });
                 if (loc) {
                     const abs = loc.startsWith('http')
                         ? loc
@@ -795,11 +865,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 3) CSRF/Forbidden
             if (response.status === 403) {
+                console.error('[CONTRACT-DEBUG] 403 Forbidden / CSRF blocked');
                 throw new Error('CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.');
             }
-
             // 4) 204 No Content
             if (response.status === 204) {
+                console.warn('[CONTRACT-DEBUG] 204 No Content branch hit');
                 if (window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload()) {
                     await Swal.fire({
                         backdrop: false,
@@ -841,7 +912,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 message = data?.errorMessage || '';
 
+                console.group('[CONTRACT-DEBUG] RESPONSE JSON');
+                console.log('success:', data?.success);
+                console.log('message:', data?.errorMessage || null);
+                console.log('redirectUrl:', data?.redirectUrl || null);
+                console.log('employeeId from backend:', data?.data?._id || null);
+                console.log('contractPdf exists:', !!data?.contractPdf);
+                console.log('contractPdf:', data?.contractPdf || null);
+                console.log('contractPdf.showPreview:', data?.contractPdf?.showPreview);
+                console.log('contractPdf.url:', data?.contractPdf?.url || null);
+                console.log('contractPdf.s3Key:', data?.contractPdf?.s3Key || null);
+                console.log('pdfResults:', data?.pdfResults || []);
+                console.log('e3XmlData:', data?.e3XmlData || null);
+                console.log('wtoXmlData:', data?.wtoXmlData || null);
+                console.groupEnd();
+
                 if (!response.ok || !data?.success) {
+                    console.error('[CONTRACT-DEBUG] JSON response indicates failure', {
+                        responseOk: response.ok,
+                        success: data?.success,
+                        status: response.status,
+                        message
+                    });
                     throw new Error(`HTTP ${response.status} / success=${data?.success}`);
                 }
 
@@ -885,6 +977,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pdfResults = data?.pdfResults || [];
                 const successfulPdfs = pdfResults.filter((r) => r.success);
                 const failedPdfs = pdfResults.filter((r) => !r.success);
+
+                console.group('[CONTRACT-DEBUG] MODAL DECISION INPUTS');
+                console.log('failedPdfs.length:', failedPdfs.length);
+                console.log('successfulPdfs.length:', successfulPdfs.length);
+                console.log('createContract:', createContract);
+                console.log('has contractPdf:', !!data.contractPdf);
+                console.log('showPreview:', data?.contractPdf?.showPreview);
+                console.log('has url:', !!data?.contractPdf?.url);
+                console.log('has s3Key:', !!data?.contractPdf?.s3Key);
+                console.log('hadPdfs:', hadPdfs);
+                console.groupEnd();
 
                 // ✅ Clear in-memory PDFs
                 if (hadPdfs && window.pdfUploadModule.clearAllFiles) {
@@ -937,7 +1040,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     console.log('[MAIN] Stored upload options:', window.__erganhUploadOptions);
                 };
-
                 // ✅ Helper: E3 + WTO uploads
                 const runXmlUploads = async () => {
                     let e3Result = { success: true };
@@ -1019,6 +1121,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ✅ CASE A: showPreview = true → modal
                     // =====================================================================
                     if (data.contractPdf && data.contractPdf.showPreview && data.contractPdf.url) {
+                        console.log('[CONTRACT-DEBUG] ENTER CASE A: showPreview=true + url');
+
                         if (!data.contractPdf.s3Key) {
                             console.error('❌ [FRONTEND] Missing s3Key in backend response!');
 
@@ -1057,6 +1161,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         // ✅ CASE B: createContract=true αλλά showPreview=false → modal
                         // =====================================================================
                     } else if (createContract && data.contractPdf?.url) {
+                        console.log(
+                            '[CONTRACT-DEBUG] ENTER CASE B: createContract=true + contractPdf.url'
+                        );
+
                         if (!data.contractPdf.s3Key) {
                             console.warn('⚠️ [FRONTEND] Missing s3Key — skipping modal');
                             await runXmlUploads();
@@ -1085,6 +1193,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         // ✅ CASE C: NO PDF → κανονικό success
                         // =====================================================================
                     } else {
+                        console.warn('[CONTRACT-DEBUG] ENTER CASE C: NO MODAL PATH', {
+                            createContract,
+                            contractPdf: data?.contractPdf || null
+                        });
+
                         await Swal.fire({
                             backdrop: false,
                             allowOutsideClick: false,
@@ -1125,6 +1238,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // =====================================================================
                     const failedTypes = failedPdfs.map((f) => f.documentType).join(', ');
 
+                    console.warn('[CONTRACT-DEBUG] SOME PDFs FAILED TO SAVE', {
+                        failedCount: failedPdfs.length,
+                        failedTypes
+                    });
+
                     await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
@@ -1148,7 +1266,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             popup: 'custom-swal-popup'
                         }
                     });
-
                     await runXmlUploads();
 
                     window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
@@ -1158,6 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 6) Other content-type but OK
             if (response.ok) {
+                console.warn('[CONTRACT-DEBUG] Non-JSON but OK response branch hit');
                 await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
@@ -1175,6 +1293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 7) HTTP Error
+            console.error('[CONTRACT-DEBUG] HTTP error branch hit', response.status);
             throw new Error(`HTTP error ${response.status}`);
         } catch (err) {
             console.error('❌ Form submission error:', err);
@@ -1226,6 +1345,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const downloadBtn = document.getElementById('downloadAndContinue');
             const emailBtn = document.getElementById('downloadAndEmail');
 
+            console.group('[CONTRACT-DEBUG] SHOW MODAL');
+            console.log('pdfUrl:', pdfUrl);
+            console.log('s3Key:', s3Key);
+            console.log('redirectUrl:', redirectUrl);
+            console.log('employeeName:', employeeName);
+            console.log('ergazomenosId:', ergazomenosId);
+            console.log('filesToUpdate:', filesToUpdate);
+            console.log('modal found:', !!modal);
+            console.log('iframe found:', !!iframe);
+            console.log('loading found:', !!loading);
+            console.log('closeBtn found:', !!closeBtn);
+            console.log('skipBtn found:', !!skipBtn);
+            console.log('downloadBtn found:', !!downloadBtn);
+            console.log('emailBtn found:', !!emailBtn);
+            console.groupEnd();
+
             if (!modal || !iframe) {
                 console.error('❌ PDF preview modal elements not found!');
                 resolve();
@@ -1256,15 +1391,16 @@ document.addEventListener('DOMContentLoaded', () => {
             iframe.src = pdfUrl;
 
             iframe.onload = () => {
+                console.log('[CONTRACT-DEBUG] iframe loaded successfully:', pdfUrl);
                 if (loading) {
                     loading.classList.add('hidden');
                 }
             };
 
             iframe.onerror = (error) => {
-                console.error('❌ PDF loading error:', error);
+                console.error('[CONTRACT-DEBUG] iframe load error:', error, 'pdfUrl:', pdfUrl);
                 if (loading) {
-                    loading.innerHTML = '<p class="text-danger">❌ Αποτυχία φόρτ��σης PDF</p>';
+                    loading.innerHTML = '<p class="text-danger">❌ Αποτυχία φόρτωσης PDF</p>';
                 }
             };
 
@@ -1272,6 +1408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // ✅ CLOSE MODAL HANDLER
             // =====================================================================
             const closeModal = async () => {
+                console.log('[CONTRACT-DEBUG] closeModal invoked');
                 modal.classList.add('hidden');
                 iframe.src = '';
 
@@ -1290,12 +1427,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const needsWtoUpload = !!(wtoEnabled_217 && ergazomenosId);
 
+                console.group('[CONTRACT-DEBUG] CLOSE MODAL DECISION');
+                console.log('isPermanent:', isPermanent);
+                console.log('needsE3Upload:', needsE3Upload);
+                console.log('needsWtoUpload:', needsWtoUpload);
+                console.log('e3Enabled_1:', e3Enabled_1);
+                console.log('e3Enabled_2:', e3Enabled_2);
+                console.log('e3AnaggeliaProslhpshs:', e3AnaggeliaProslhpshs);
+                console.log('wtoEnabled_217:', wtoEnabled_217);
+                console.groupEnd();
+
                 if (!needsE3Upload && !needsWtoUpload) {
+                    console.log('[CONTRACT-DEBUG] No XML uploads needed after modal close');
                     resolve();
                     window.location.href = redirectUrl;
                     return;
                 }
-
                 // ✅ UPLOAD E3
                 let e3UploadSuccess = false;
 
@@ -1473,7 +1620,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     timerProgressBar: true
                 });
             };
-
             // =====================================================================
             // ✅ DOWNLOAD + EMAIL HANDLER
             // =====================================================================
@@ -1523,6 +1669,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         companyType: companyData?.type || 'ΕΠΙΧΕΙΡΗΣΗ'
                     };
 
+                    console.group('[CONTRACT-DEBUG] SEND EMAIL REQUEST');
+                    console.log('requestBody:', requestBody);
+                    console.groupEnd();
+
                     const response = await fetch('/api/send-contract-email', {
                         method: 'POST',
                         headers: {
@@ -1533,7 +1683,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify(requestBody)
                     });
 
+                    console.group('[CONTRACT-DEBUG] SEND EMAIL RESPONSE');
+                    console.log('status:', response.status);
+                    console.log('ok:', response.ok);
+                    console.groupEnd();
+
                     const data = await response.json();
+
+                    console.log('[CONTRACT-DEBUG] SEND EMAIL JSON:', data);
 
                     if (response.ok && data.success) {
                         await Swal.fire({
@@ -1604,7 +1761,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalBody.appendChild(e3Container);
                 }
             }
-
             // =====================================================================
             // ✅ ADD WTO XML DOWNLOAD BUTTON
             // =====================================================================
@@ -1640,6 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // =====================================================================
             const escHandler = (e) => {
                 if (e.key === 'Escape') {
+                    console.log('[CONTRACT-DEBUG] ESC pressed -> closing modal');
                     closeModal();
                     document.removeEventListener('keydown', escHandler);
                 }

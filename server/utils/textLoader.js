@@ -441,12 +441,12 @@ function loadTextsByPrefix(team, companyFolder, category, prefix) {
         }
 
         // ✅ Always log if no results (even without DEBUG mode)
-        if (Object.keys(results).length === 0) {
-            console.warn(`⚠️ loadTextsByPrefix: No templates found for prefix "${prefix}"`);
-            console.warn(`   Path: ${pathPrefix}`);
-            console.warn(`   Cache size: ${cacheManager.memoryCache.size}`);
-            console.warn(`   Set DEBUG_TEXT_LOADER=true for detailed logging`);
-        }
+        // if (Object.keys(results).length === 0) {
+        //     console.warn(`⚠️ loadTextsByPrefix: No templates found for prefix "${prefix}"`);
+        //     console.warn(`   Path: ${pathPrefix}`);
+        //     console.warn(`   Cache size: ${cacheManager.memoryCache.size}`);
+        //     console.warn(`   Set DEBUG_TEXT_LOADER=true for detailed logging`);
+        // }
 
         return results;
     } catch (error) {

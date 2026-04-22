@@ -542,7 +542,7 @@ async function generateContractPDF(ergazomenos, userContext) {
 
         const company = await CompaniesModel.findOne({ _id: ergazomenos.company_kod }).lean();
         if (!company) {
-            throw new Error('Company not found');
+            throw new Error(`Company not found for _id ${ergazomenos.company_kod}`);
         }
 
         const poleis = await PoleisModel.findOne({ kodikos: company.polh }).lean();
@@ -552,12 +552,40 @@ async function generateContractPDF(ergazomenos, userContext) {
             kodikos: '0001'
         }).lean();
 
+        console.log('[CONTRACT-DEBUG] company_kod:', ergazomenos.company_kod);
+        console.log('[CONTRACT-DEBUG] company:', company?._id, company?.eponymia);
+        console.log('[CONTRACT-DEBUG] nomimoiEkprosopoi:', nomimoiEkprosopoi);
+
+        const ekprosopos = nomimoiEkprosopoi || {};
+
+        const trimOrDots = (v, dots = '..........') =>
+            typeof v === 'string' && v.trim() ? v.trim() : dots;
+
+        const safeTrim = (v) => (typeof v === 'string' ? v.trim() : '');
+
+        const removeTrailingSigma = (v) => {
+            const s = safeTrim(v);
+            if (!s) return '..........';
+            return s.endsWith('Σ') ? s.slice(0, -1).trim() : s;
+        };
+
+        const fatherNameToGenitive = (v) => {
+            const s = safeTrim(v);
+            if (!s) return '..........';
+
+            if (s.endsWith('ΟΣ')) return (s.slice(0, -2) + 'ΟΥ').trim();
+            if (s.endsWith('Σ')) return s.slice(0, -1).trim();
+            return s.trim();
+        };
+
         let eponymia_Etairias =
             (company.eponymia ? company.eponymia.trim() : '') +
             ' ' +
             (company.fathername ? company.fathername.substring(0, 3).trim() : '') +
             ' ' +
             (company.firstname ? company.firstname.trim() : '');
+
+        eponymia_Etairias = eponymia_Etairias.trim();
 
         const _CAPITAL_ONOMASTIKH_A = ergazomenos.fylo ? 'Η' : 'Ο';
         const _CAPITAL_ONOMASTIKH_K = ergazomenos.fylo ? 'Η' : 'ΟΣ';
@@ -574,8 +602,7 @@ async function generateContractPDF(ergazomenos, userContext) {
         let categoryParts = {};
         let _COMBINED_TEXT = '';
 
-        // ✅ Determine which category to load
-        const categoryToLoad = ergazomenos.eidikh_kathgoria_ergazomenoy || '0000'; // Default fallback
+        const categoryToLoad = ergazomenos.eidikh_kathgoria_ergazomenoy || '0000';
         const isDefaultCategory = categoryToLoad === '0000';
 
         if (userContext) {
@@ -593,13 +620,12 @@ async function generateContractPDF(ergazomenos, userContext) {
 
                 categoryParts = templates || {};
 
-                if (Object.keys(templates).length > 0) {
+                if (templates && Object.keys(templates).length > 0) {
                     _COMBINED_TEXT = combineTexts(templates);
                     console.log(`✅ [CONTRACT] Loaded ${Object.keys(templates).length} templates`);
                 } else {
                     console.warn(`⚠️ [CONTRACT] No templates found for category ${categoryToLoad}`);
 
-                    // ✅ If selected category is empty BUT not 0000, try 0000 as final fallback
                     if (categoryToLoad !== '0000') {
                         console.log(`🔄 [CONTRACT] Falling back to Γενικοί Όροι (0000)...`);
 
@@ -688,6 +714,7 @@ async function generateContractPDF(ergazomenos, userContext) {
             ergazomenos.hmeromhnia_allaghs_symbashs,
             ergazomenos.hmeromhnia_lhxhs_symbashs
         );
+
         let diarkeia = '.';
         if (differenceInMonths !== 0) {
             diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
@@ -711,7 +738,7 @@ async function generateContractPDF(ergazomenos, userContext) {
             _ERGODOTHS_CAPITAL_A: company.firstname == '' ? 'Η εταιρεία' : 'Η εργοδότρια',
             _ERGODOTHS_GENIKH: company.firstname == '' ? 'της εταιρείας' : 'των εργοδότριας',
             _ERGODOTHS_AITIATIKH: company.firstname == '' ? 'την εταιρεία' : 'την εργοδότρια',
-            _EPONYMIA: eponymia_Etairias,
+            _EPONYMIA: eponymia_Etairias || '..........',
             _ODOS: company.odos ? company.odos.trim() : '..........',
             _ARITHMOS: company.arithmos ? company.arithmos.trim() : '.....',
             _AFM_ETAIREIAS: company.afm ? company.afm.trim() : '..........',
@@ -723,33 +750,16 @@ async function generateContractPDF(ergazomenos, userContext) {
                 : 'ΕΚΤΟΣ ΩΡΑΡΙΟΥ',
 
             _YPOGRAFON_EKPROSOPOS:
-                nomimoiEkprosopoi.eponymia.trim() + ' ' + nomimoiEkprosopoi.onoma.trim(),
+                `${trimOrDots(ekprosopos.eponymia)} ${trimOrDots(ekprosopos.onoma)}`.trim(),
 
-            _EPONYMO_EKPROSOPOY: nomimoiEkprosopoi?.eponymia
-                ? (nomimoiEkprosopoi.eponymia.endsWith('Σ')
-                      ? nomimoiEkprosopoi.eponymia.slice(0, -1).trim()
-                      : nomimoiEkprosopoi.eponymia
-                  ).trim()
-                : '..........',
-            _ONOMA_EKPROSOPOY: nomimoiEkprosopoi?.onoma
-                ? (nomimoiEkprosopoi.onoma.endsWith('Σ')
-                      ? nomimoiEkprosopoi.onoma.slice(0, -1).trim()
-                      : nomimoiEkprosopoi.onoma
-                  ).trim()
-                : '..........',
-            _PATRONYMO_EKPROSOPOY: nomimoiEkprosopoi?.onoma_patera
-                ? (nomimoiEkprosopoi.onoma_patera.endsWith('ΟΣ')
-                      ? nomimoiEkprosopoi.onoma_patera.slice(0, -2) + 'ΟΥ'
-                      : nomimoiEkprosopoi.onoma_patera.endsWith('Σ')
-                        ? nomimoiEkprosopoi.onoma_patera.slice(0, -1).trim()
-                        : nomimoiEkprosopoi.onoma_patera
-                  ).trim()
-                : '..........',
-            _DT_EKPROSOPOY: nomimoiEkprosopoi?.typos_taytothtas || '..........',
-            _ADT_EKPROSOPOY: nomimoiEkprosopoi?.arithmos_taytothtas || '..........',
-            _AFM_EKPROSOPOY: nomimoiEkprosopoi?.afm || '..........',
-            _THLEFONO_EKPROSOPOY: nomimoiEkprosopoi?.thlefono || '..........',
-            _EMAIL_EKPROSOPOY: nomimoiEkprosopoi?.email || '..........',
+            _EPONYMO_EKPROSOPOY: removeTrailingSigma(ekprosopos.eponymia),
+            _ONOMA_EKPROSOPOY: removeTrailingSigma(ekprosopos.onoma),
+            _PATRONYMO_EKPROSOPOY: fatherNameToGenitive(ekprosopos.onoma_patera),
+            _DT_EKPROSOPOY: ekprosopos?.typos_taytothtas || '..........',
+            _ADT_EKPROSOPOY: ekprosopos?.arithmos_taytothtas || '..........',
+            _AFM_EKPROSOPOY: ekprosopos?.afm || '..........',
+            _THLEFONO_EKPROSOPOY: ekprosopos?.thlefono || '..........',
+            _EMAIL_EKPROSOPOY: ekprosopos?.email || '..........',
 
             _CAPITAL_ONOMASTIKH_A,
             _ONOMASTIKH_A,
@@ -825,7 +835,6 @@ async function generateContractPDF(ergazomenos, userContext) {
         };
 
         const dynamicPlaceholders = generateCategoryPlaceholders(categoryParts, ergazomenos);
-
         Object.assign(data, dynamicPlaceholders);
 
         const undefinedKeys = [];
@@ -846,16 +855,9 @@ async function generateContractPDF(ergazomenos, userContext) {
         const doc = new Docxtemplater(zip, {
             paragraphLoop: true,
             linebreaks: true,
-            // ✅ FIX: Replace undefined placeholders with empty string
             nullGetter: function (part) {
-                // Return empty string for ANY undefined/null/missing placeholder
-                if (!part.module) {
-                    return '';
-                }
-                // For loop/table items that don't exist
-                if (part.value == null) {
-                    return '';
-                }
+                if (!part.module) return '';
+                if (part.value == null) return '';
                 return '';
             }
         });
@@ -893,10 +895,6 @@ async function generateContractPDF(ergazomenos, userContext) {
             throw new Error('PDF file was not created');
         }
 
-        // ============================================================================
-        // ✅ INSERT COMPANY STAMP (ΣΦΡΑΓΙΔΑ) INTO PDF
-        // ============================================================================
-
         if (company.sfragida) {
             try {
                 const searchText = 'ΕΙΣΑΓΩΓΗ ΕΙΚΟΝΑΣ ΕΔΩ';
@@ -918,50 +916,27 @@ async function generateContractPDF(ergazomenos, userContext) {
                 }
             } catch (stampError) {
                 console.error('❌ Error inserting stamp:', stampError.message);
-                // Continue without stamp (non-fatal error)
             }
         }
 
         const { uploadBufferToS3 } = require('./s3Helper');
 
-        // ✅ Sanitize filename components
         const sanitizeFilename = (str) => {
             if (!str) return 'UNKNOWN';
 
-            // ✅ Remove ONLY illegal characters (keep Greek letters)
             return str
                 .trim()
                 .toUpperCase()
-                .replace(/\s+/g, '_') // Spaces → underscore
-                .replace(/[\/\\:*?"<>|]/g, '') // Remove illegal chars
-                .replace(/[^\w\u0370-\u03FF\u1F00-\u1FFF_-]/g, '') // Keep only: alphanumeric, Greek, underscore, hyphen
+                .replace(/\s+/g, '_')
+                .replace(/[\/\\:*?"<>|]/g, '')
+                .replace(/[^\w\u0370-\u03FF\u1F00-\u1FFF_-]/g, '')
                 .substring(0, 50);
         };
 
-        // const kodikos = ergazomenos.kodikos;
-        // const eponymo = sanitizeFilename(ergazomenos.eponymo || 'UNKNOWN');
-        // const onoma = sanitizeFilename(ergazomenos.onoma || 'UNKNOWN');
-
-        // // ✅ Generate timestamp (human-readable format)
-        // const now = new Date();
-        // const timestamps = [
-        //     now.getFullYear(),
-        //     String(now.getMonth() + 1).padStart(2, '0'),
-        //     String(now.getDate()).padStart(2, '0')
-        // ].join('-') + '_' + [
-        //     String(now.getHours()).padStart(2, '0'),
-        //     String(now.getMinutes()).padStart(2, '0'),
-        //     String(now.getSeconds()).padStart(2, '0')
-        // ].join('-');
-
-        // const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/${kodikos}_${eponymo}_${onoma}_contract_${timestamps}.pdf`;
-
-        // ✅ Use MongoDB _id (same as XMLs!)
         const employeeId = String(ergazomenos._id || 'UNKNOWN');
         const eponymo = sanitizeFilename(ergazomenos.eponymo || 'UNKNOWN');
         const onoma = sanitizeFilename(ergazomenos.onoma || 'UNKNOWN');
 
-        // ✅ Generate timestamp (human-readable format)
         const now = new Date();
         const timestamps =
             [
@@ -976,7 +951,6 @@ async function generateContractPDF(ergazomenos, userContext) {
                 String(now.getSeconds()).padStart(2, '0')
             ].join('-');
 
-        // ✅ NEW: Use employeeId instead of kodikos
         const s3Key = `contracts/${userContext.team}/${userContext.companyFolder}/${employeeId}_${eponymo}_${onoma}_contract_${timestamps}.pdf`;
 
         const pdfBuffer = await fs.readFile(tempPdfPath);
@@ -1006,7 +980,6 @@ async function generateContractPDF(ergazomenos, userContext) {
         throw error;
     }
 }
-
 module.exports = {
     generateContractPDF
 };
