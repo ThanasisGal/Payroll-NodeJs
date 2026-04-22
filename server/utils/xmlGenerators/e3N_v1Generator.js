@@ -382,9 +382,10 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
 
             return {
                 xml: xml,
-                s3Key: null,
-                s3Url: null,
-                filename: null,
+                s3Key: uploadResult.s3Key,
+                s3Url: uploadResult.s3Url, // ✅ Πάντα S3 URL
+                relativePath: uploadResult.s3Key, // ✅ Το s3Key ως relativePath
+                filename: filename,
                 saveError: saveError.message
             };
         }
