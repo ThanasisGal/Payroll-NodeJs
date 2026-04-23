@@ -6,6 +6,46 @@ document.addEventListener('DOMContentLoaded', () => {
     let message = '';
     let erganiUploadInProgress = false;
 
+    // ============================================================================
+    // ✅ PROGRESS ANIMATION FUNCTION
+    // ============================================================================
+    function startProgressAnimation() {
+        const steps = [
+            { percent: 15, text: 'Αποθήκευση στοιχείων εργαζόμενου...', duration: 800 },
+            { percent: 30, text: 'Δημιουργία DOCX από template...', duration: 1500 },
+            { percent: 50, text: 'Συμπλήρωση στοιχείων σύμβασης...', duration: 2000 },
+            { percent: 70, text: 'Μετατροπή DOCX σε PDF...', duration: 3000 },
+            { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
+            { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
+        ];
+
+        let currentStepIndex = 0;
+
+        function updateProgress() {
+            if (currentStepIndex >= steps.length) return;
+
+            const step = steps[currentStepIndex];
+            const progressBar = document.getElementById('pdf-progress-bar');
+            const progressText = document.getElementById('progress-step-text');
+
+            if (progressBar && progressText) {
+                progressBar.style.width = `${step.percent}%`;
+                progressBar.textContent = `${step.percent}%`;
+                progressBar.setAttribute('aria-valuenow', step.percent);
+                progressText.textContent = step.text;
+            }
+
+            currentStepIndex++;
+
+            if (currentStepIndex < steps.length) {
+                setTimeout(updateProgress, step.duration);
+            }
+        }
+
+        // Start animation
+        setTimeout(updateProgress, 250);
+    }
+
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -270,6 +310,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // if (errors.length) {
+            //     const hasNonCriticalErrors = errors.some((error) => !error.critical);
+
+            //     if (hasNonCriticalErrors) {
+            //         const errorItems = errors
+            //             .map((error, index) => {
+            //                 const cssClass = error.critical
+            //                     ? 'error-item error-critical'
+            //                     : 'error-item';
+            //                 return `<div class="${cssClass}"><strong>${index + 1}</strong>.${error.text}</div>`;
+            //             })
+            //             .join('');
+
+            //         const gridHTML = `
+            //             <div class="error-grid-container">
+            //                 <div class="error-grid">${errorItems}</div>
+            //             </div>
+            //         `;
+
+            //         await Swal.fire({
+            //             backdrop: false,
+            //             allowOutsideClick: false,
+            //             icon: 'warning',
+            //             title: 'ΠΡΟΣΟΧΗ !!!',
+            //             html: `<p class="error-header">Τα παρακάτω ${errors.length} πεδία είναι υποχρεωτικά για την πρόσληψη:</p>
+            //             <p class="warning-header">Τα πεδία με το εικονίδιο ⚠️ είναι προειδοποιητικά και μόνο για επανέλεγχο</p>${gridHTML}`,
+            //             heightAuto: true,
+            //             confirmButtonText: 'Κλείσιμο',
+            //             customClass: {
+            //                 confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+            //                 title: 'custom-title',
+            //                 popup: 'custom-swal-popup',
+            //                 htmlContainer: 'custom-html-container'
+            //             }
+            //         });
+            //         return;
+            //     }
+            // }
+
             if (errors.length) {
                 const hasNonCriticalErrors = errors.some((error) => !error.critical);
 
@@ -289,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     `;
 
-                    await Swal.fire({
+                    const validationResult = await Swal.fire({
                         backdrop: false,
                         allowOutsideClick: false,
                         icon: 'warning',
@@ -297,9 +376,336 @@ document.addEventListener('DOMContentLoaded', () => {
                         html: `<p class="error-header">Τα παρακάτω ${errors.length} πεδία είναι υποχρεωτικά για την πρόσληψη:</p>
                         <p class="warning-header">Τα πεδία με το εικονίδιο ⚠️ είναι προειδοποιητικά και μόνο για επανέλεγχο</p>${gridHTML}`,
                         heightAuto: true,
-                        confirmButtonText: 'Κλείσιμο',
+                        showCancelButton: true,
+                        confirmButtonText: 'Συνέχεια',
+                        cancelButtonText: 'Κλείσιμο',
                         customClass: {
                             confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                            cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup',
+                            htmlContainer: 'custom-html-container'
+                        },
+                        didOpen: () => {
+                            const confirmBtn = document.querySelector('.swal2-confirm');
+                            const cancelBtn = document.querySelector('.swal2-cancel');
+
+                            if (confirmBtn) {
+                                confirmBtn.title = 'Αποθήκευση ΜΟΝΟ των στοιχείων του εργαζόμενου';
+                            }
+                            if (cancelBtn) {
+                                cancelBtn.title = 'Επιστροφή για ΔΙΟΡΘΩΣΗ των ελλείψεων';
+                            }
+                        }
+                    });
+
+                    // ✅ "Κλείσιμο" → σταματάμε
+                    if (validationResult.isDismissed) {
+                        return;
+                    }
+
+                    // ✅ "Συνέχεια" → συνεχίζουμε με skipValidation = true
+                    // (παραλείπουμε schedule checks + disabled checkboxes στο ΕΡΓΑΝΗ modal)
+                }
+            }
+
+            // =====================================================================
+            // ✅ FLAG: αν φτάσαμε εδώ μέσω "Συνέχεια" από validation errors
+            // =====================================================================
+            const skipScheduleValidation = errors.length > 0 && errors.some((e) => !e.critical);
+
+            //         // =========================================================================
+            //         // ✅ PRE-VALIDATION: Check WTO schedules BEFORE showing ERGANH modal
+            //         // =========================================================================
+
+            //         console.log('🔍 [PRE-VALIDATION] Checking weekly schedule...');
+
+            //         const days = ['01', '02', '03', '04', '05', '06', '07'];
+            //         const scheduleErrors = [];
+
+            //         // =====================================================================
+            //         // ✅ CHECK 1: ALL days must have a category
+            //         // =====================================================================
+
+            //         const emptyDays = [];
+
+            //         days.forEach((day) => {
+            //             const category = (formData[`kathgoria_ergasias_${day}`] || '').trim();
+
+            //             if (!category) {
+            //                 const label = document.getElementById(`day_label_${day}`);
+            //                 const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
+            //                 emptyDays.push(dateStr);
+            //             }
+            //         });
+
+            //         if (emptyDays.length > 0) {
+            //             await Swal.fire({
+            //                 backdrop: false,
+            //                 allowOutsideClick: false,
+            //                 icon: 'error',
+            //                 title: 'Ελλιπές Εβδομαδιαίο Ωράριο',
+            //                 html: `
+            //         <p><strong>${emptyDays.length}</strong> ημέρες δεν έχουν Κατηγορία Εργασίας:</p>
+            //         <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
+            //             ${emptyDays.map((date) => `<li><strong>${date}</strong></li>`).join('')}
+            //         </ul>
+            //         <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
+            //             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και συμπλήρωσε την κατηγορία για όλες τις ημέρες (ΕΡΓ, ΤΗΛ, ΑΝ, ΜΕ).
+            //         </p>
+            //     `,
+            //                 confirmButtonText: 'OK',
+            //                 customClass: {
+            //                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
+            //                     title: 'custom-title',
+            //                     popup: 'custom-swal-popup'
+            //                 }
+            //             });
+            //             return; // ❌ Stop submission
+            //         }
+
+            //         console.log('✅ [PRE-VALIDATION] All days have categories');
+
+            //         // =====================================================================
+            //         // ✅ CHECK 2: Validate each day's times
+            //         // =====================================================================
+
+            //         days.forEach((day) => {
+            //             const category = (formData[`kathgoria_ergasias_${day}`] || '').trim().toUpperCase();
+
+            //             const label = document.getElementById(`day_label_${day}`);
+            //             const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
+
+            //             // ✅ Get all 6 time fields
+            //             const apo1 = (formData[`apo_ora_01_${day}`] || '').trim();
+            //             const eos1 = (formData[`eos_ora_01_${day}`] || '').trim();
+            //             const apo2 = (formData[`apo_ora_02_${day}`] || '').trim();
+            //             const eos2 = (formData[`eos_ora_02_${day}`] || '').trim();
+            //             const apo3 = (formData[`apo_ora_03_${day}`] || '').trim();
+            //             const eos3 = (formData[`eos_ora_03_${day}`] || '').trim();
+
+            //             const isEmpty = (val) => !val || val === '--:--' || val === '';
+            //             const isValidTime = (val) => val && val.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+
+            //             const allTimes = [apo1, eos1, apo2, eos2, apo3, eos3];
+            //             const nonEmptyTimes = allTimes.filter((t) => !isEmpty(t));
+
+            //             // ✅ RULE 1: ΕΡΓ/ΤΗΛ → Must have at least ONE complete shift
+            //             if (category === 'ΕΡΓ' || category === 'ΤΗΛ') {
+            //                 const shift1Valid = isValidTime(apo1) && isValidTime(eos1);
+            //                 const shift2Valid = isValidTime(apo2) && isValidTime(eos2);
+            //                 const shift3Valid = isValidTime(apo3) && isValidTime(eos3);
+
+            //                 if (!shift1Valid && !shift2Valid && !shift3Valid) {
+            //                     scheduleErrors.push(
+            //                         `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> χωρίς ώρες (από-έως)`
+            //                     );
+            //                 }
+            //             }
+
+            //             // ✅ RULE 2: ΜΕ/ΑΝ → Must NOT have ANY times
+            //             if (category === 'ΜΕ' || category === 'ΑΝ') {
+            //                 if (nonEmptyTimes.length > 0) {
+            //                     scheduleErrors.push(
+            //                         `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> ΔΕΝ πρέπει να έχει ώρες (βρέθηκαν ${nonEmptyTimes.length} πεδία με τιμές)`
+            //                     );
+            //                 }
+            //             }
+            //         });
+
+            //         // =====================================================================
+            //         // ✅ Show schedule errors if any
+            //         // =====================================================================
+
+            //         if (scheduleErrors.length > 0) {
+            //             await Swal.fire({
+            //                 backdrop: false,
+            //                 allowOutsideClick: false,
+            //                 icon: 'error',
+            //                 title: 'Λάθη στο Εβδομαδιαίο Ωράριο',
+            //                 html: `
+            //         <p>Βρέθηκαν <strong>${scheduleErrors.length}</strong> λάθη στο ωράριο:</p>
+            //         <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
+            //             ${scheduleErrors.map((err) => `<li>${err}</li>`).join('')}
+            //         </ul>
+            //         <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
+            //             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και διόρθωσε τα πεδία.
+            //         </p>
+            //     `,
+            //                 confirmButtonText: 'OK',
+            //                 customClass: {
+            //                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
+            //                     title: 'custom-title',
+            //                     popup: 'custom-swal-popup',
+            //                     htmlContainer: 'custom-html-container'
+            //                 }
+            //             });
+            //             return; // ❌ Stop submission
+            //         }
+
+            //         console.log('✅ [PRE-VALIDATION] All schedule checks passed');
+
+            //         // =========================================================================
+            //         // ✅ ΕΡΓΑΝΗ FILES SELECTION (Only shown if validation passes)
+            //         // =========================================================================
+
+            //         const result = await Swal.fire({
+            //             backdrop: false,
+            //             allowOutsideClick: false,
+            //             icon: 'info',
+            //             title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
+            //             html: `
+            //     <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
+            //         <!-- ✅ TOGGLE: Προσωρινή/Οριστική -->
+            //         <div class="display-flex align-items-center gap-0_75rem">
+            //             <input type="checkbox"
+            //                    id="temporary_permanent_storage"
+            //                    name="files"
+            //                    value="temporary_permanent_storage"
+            //                    class="custom-checkbox" />
+            //             <label for="temporary_permanent_storage"
+            //                    id="storage_mode_label"
+            //                    class="margin-0 cursor-pointer font-size-rem-1_05"
+            //                    style="transition: all 0.2s; color: #000000">
+            //                 Προσωρινή Αποθήκευση
+            //             </label>
+            //         </div>
+
+            //         <!-- ✅ E3 CHECKBOX -->
+            //         <div class="display-flex align-items-center gap-0_75rem">
+            //             <input type="checkbox"
+            //                    id="e3_anaggelia_proslhpshs"
+            //                    name="files"
+            //                    value="e3_anaggelia_proslhpshs"
+            //                    checked
+            //                    class="custom-checkbox" />
+            //             <label for="e3_anaggelia_proslhpshs"
+            //                    class="margin-0 cursor-pointer font-size-rem-1_05">
+            //                 Αναγγελία Πρόσληψης (E3)
+            //             </label>
+            //         </div>
+
+            //         <!-- ✅ WTO CHECKBOX -->
+            //         <div class="display-flex align-items-center gap-0_75rem">
+            //             <input type="checkbox"
+            //                    id="schedules"
+            //                    name="files"
+            //                    value="schedules"
+            //                    checked
+            //                    class="custom-checkbox" />
+            //             <label for="schedules"
+            //                    class="margin-0 cursor-pointer font-size-rem-1_05">
+            //                 Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
+            //             </label>
+            //         </div>
+            //     </div>
+            // `,
+
+            // =========================================================================
+            // ✅ PRE-VALIDATION: Check WTO schedules (παραλείπεται αν skipScheduleValidation)
+            // =========================================================================
+
+            if (!skipScheduleValidation) {
+                console.log('🔍 [PRE-VALIDATION] Checking weekly schedule...');
+
+                const days = ['01', '02', '03', '04', '05', '06', '07'];
+                const scheduleErrors = [];
+                const emptyDays = [];
+
+                days.forEach((day) => {
+                    const category = (formData[`kathgoria_ergasias_${day}`] || '').trim();
+                    if (!category) {
+                        const label = document.getElementById(`day_label_${day}`);
+                        const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
+                        emptyDays.push(dateStr);
+                    }
+                });
+
+                if (emptyDays.length > 0) {
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: 'error',
+                        title: 'Ελλιπές Εβδομαδιαίο Ωράριο',
+                        html: `
+                            <p><strong>${emptyDays.length}</strong> ημέρες δεν έχουν Κατηγορία Εργασίας:</p>
+                            <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
+                                ${emptyDays.map((date) => `<li><strong>${date}</strong></li>`).join('')}
+                            </ul>
+                            <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
+                                Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και συμπλήρωσε την κατηγορία για όλες τις ημέρες (ΕΡΓ, ΤΗΛ, ΑΝ, ΜΕ).
+                            </p>
+                        `,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup'
+                        }
+                    });
+                    return;
+                }
+
+                console.log('✅ [PRE-VALIDATION] All days have categories');
+
+                days.forEach((day) => {
+                    const category = (formData[`kathgoria_ergasias_${day}`] || '')
+                        .trim()
+                        .toUpperCase();
+                    const label = document.getElementById(`day_label_${day}`);
+                    const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
+
+                    const apo1 = (formData[`apo_ora_01_${day}`] || '').trim();
+                    const eos1 = (formData[`eos_ora_01_${day}`] || '').trim();
+                    const apo2 = (formData[`apo_ora_02_${day}`] || '').trim();
+                    const eos2 = (formData[`eos_ora_02_${day}`] || '').trim();
+                    const apo3 = (formData[`apo_ora_03_${day}`] || '').trim();
+                    const eos3 = (formData[`eos_ora_03_${day}`] || '').trim();
+
+                    const isEmpty = (val) => !val || val === '--:--' || val === '';
+                    const isValidTime = (val) => val && val.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+
+                    const allTimes = [apo1, eos1, apo2, eos2, apo3, eos3];
+                    const nonEmptyTimes = allTimes.filter((t) => !isEmpty(t));
+
+                    if (category === 'ΕΡΓ' || category === 'ΤΗΛ') {
+                        const shift1Valid = isValidTime(apo1) && isValidTime(eos1);
+                        const shift2Valid = isValidTime(apo2) && isValidTime(eos2);
+                        const shift3Valid = isValidTime(apo3) && isValidTime(eos3);
+                        if (!shift1Valid && !shift2Valid && !shift3Valid) {
+                            scheduleErrors.push(
+                                `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> χωρίς ώρες (από-έως)`
+                            );
+                        }
+                    }
+
+                    if (category === 'ΜΕ' || category === 'ΑΝ') {
+                        if (nonEmptyTimes.length > 0) {
+                            scheduleErrors.push(
+                                `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> ΔΕΝ πρέπει να έχει ώρες (βρέθηκαν ${nonEmptyTimes.length} πεδία με τιμές)`
+                            );
+                        }
+                    }
+                });
+
+                if (scheduleErrors.length > 0) {
+                    await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: 'error',
+                        title: 'Λάθη στο Εβδομαδιαίο Ωράριο',
+                        html: `
+                            <p>Βρέθηκαν <strong>${scheduleErrors.length}</strong> λάθη στο ωράριο:</p>
+                            <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
+                                ${scheduleErrors.map((err) => `<li>${err}</li>`).join('')}
+                            </ul>
+                            <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
+                                Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και διόρθωσε τα πεδία.
+                            </p>
+                        `,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'class-error custom-confirm-button custom-swal-button',
                             title: 'custom-title',
                             popup: 'custom-swal-popup',
                             htmlContainer: 'custom-html-container'
@@ -307,141 +713,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     return;
                 }
+
+                console.log('✅ [PRE-VALIDATION] All schedule checks passed');
+            } else {
+                console.log('⚠️ [PRE-VALIDATION] Skipped (user chose Συνέχεια)');
             }
 
             // =========================================================================
-            // ✅ PRE-VALIDATION: Check WTO schedules BEFORE showing ERGANH modal
-            // =========================================================================
-
-            console.log('🔍 [PRE-VALIDATION] Checking weekly schedule...');
-
-            const days = ['01', '02', '03', '04', '05', '06', '07'];
-            const scheduleErrors = [];
-
-            // =====================================================================
-            // ✅ CHECK 1: ALL days must have a category
-            // =====================================================================
-
-            const emptyDays = [];
-
-            days.forEach((day) => {
-                const category = (formData[`kathgoria_ergasias_${day}`] || '').trim();
-
-                if (!category) {
-                    const label = document.getElementById(`day_label_${day}`);
-                    const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
-                    emptyDays.push(dateStr);
-                }
-            });
-
-            if (emptyDays.length > 0) {
-                await Swal.fire({
-                    backdrop: false,
-                    allowOutsideClick: false,
-                    icon: 'error',
-                    title: 'Ελλιπές Εβδομαδιαίο Ωράριο',
-                    html: `
-            <p><strong>${emptyDays.length}</strong> ημέρες δεν έχουν Κατηγορία Εργασίας:</p>
-            <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
-                ${emptyDays.map((date) => `<li><strong>${date}</strong></li>`).join('')}
-            </ul>
-            <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
-                Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και συμπλήρωσε την κατηγορία για όλες τις ημέρες (ΕΡΓ, ΤΗΛ, ΑΝ, ΜΕ).
-            </p>
-        `,
-                    confirmButtonText: 'OK',
-                    customClass: {
-                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                        title: 'custom-title',
-                        popup: 'custom-swal-popup'
-                    }
-                });
-                return; // ❌ Stop submission
-            }
-
-            console.log('✅ [PRE-VALIDATION] All days have categories');
-
-            // =====================================================================
-            // ✅ CHECK 2: Validate each day's times
-            // =====================================================================
-
-            days.forEach((day) => {
-                const category = (formData[`kathgoria_ergasias_${day}`] || '').trim().toUpperCase();
-
-                const label = document.getElementById(`day_label_${day}`);
-                const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
-
-                // ✅ Get all 6 time fields
-                const apo1 = (formData[`apo_ora_01_${day}`] || '').trim();
-                const eos1 = (formData[`eos_ora_01_${day}`] || '').trim();
-                const apo2 = (formData[`apo_ora_02_${day}`] || '').trim();
-                const eos2 = (formData[`eos_ora_02_${day}`] || '').trim();
-                const apo3 = (formData[`apo_ora_03_${day}`] || '').trim();
-                const eos3 = (formData[`eos_ora_03_${day}`] || '').trim();
-
-                const isEmpty = (val) => !val || val === '--:--' || val === '';
-                const isValidTime = (val) => val && val.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-
-                const allTimes = [apo1, eos1, apo2, eos2, apo3, eos3];
-                const nonEmptyTimes = allTimes.filter((t) => !isEmpty(t));
-
-                // ✅ RULE 1: ΕΡΓ/ΤΗΛ → Must have at least ONE complete shift
-                if (category === 'ΕΡΓ' || category === 'ΤΗΛ') {
-                    const shift1Valid = isValidTime(apo1) && isValidTime(eos1);
-                    const shift2Valid = isValidTime(apo2) && isValidTime(eos2);
-                    const shift3Valid = isValidTime(apo3) && isValidTime(eos3);
-
-                    if (!shift1Valid && !shift2Valid && !shift3Valid) {
-                        scheduleErrors.push(
-                            `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> χωρίς ώρες (από-έως)`
-                        );
-                    }
-                }
-
-                // ✅ RULE 2: ΜΕ/ΑΝ → Must NOT have ANY times
-                if (category === 'ΜΕ' || category === 'ΑΝ') {
-                    if (nonEmptyTimes.length > 0) {
-                        scheduleErrors.push(
-                            `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> ΔΕΝ πρέπει να έχει ώρες (βρέθηκαν ${nonEmptyTimes.length} πεδία με τιμές)`
-                        );
-                    }
-                }
-            });
-
-            // =====================================================================
-            // ✅ Show schedule errors if any
-            // =====================================================================
-
-            if (scheduleErrors.length > 0) {
-                await Swal.fire({
-                    backdrop: false,
-                    allowOutsideClick: false,
-                    icon: 'error',
-                    title: 'Λάθη στο Εβδομαδιαίο Ωράριο',
-                    html: `
-            <p>Βρέθηκαν <strong>${scheduleErrors.length}</strong> λάθη στο ωράριο:</p>
-            <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
-                ${scheduleErrors.map((err) => `<li>${err}</li>`).join('')}
-            </ul>
-            <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
-                Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και διόρθωσε τα πεδία.
-            </p>
-        `,
-                    confirmButtonText: 'OK',
-                    customClass: {
-                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                        title: 'custom-title',
-                        popup: 'custom-swal-popup',
-                        htmlContainer: 'custom-html-container'
-                    }
-                });
-                return; // ❌ Stop submission
-            }
-
-            console.log('✅ [PRE-VALIDATION] All schedule checks passed');
-
-            // =========================================================================
-            // ✅ ΕΡΓΑΝΗ FILES SELECTION (Only shown if validation passes)
+            // ✅ ΕΡΓΑΝΗ FILES SELECTION
             // =========================================================================
 
             const result = await Swal.fire({
@@ -450,51 +729,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
                 html: `
-        <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
-            <!-- ✅ TOGGLE: Προσωρινή/Οριστική -->
-            <div class="display-flex align-items-center gap-0_75rem">
-                <input type="checkbox" 
-                       id="temporary_permanent_storage" 
-                       name="files" 
-                       value="temporary_permanent_storage" 
-                       class="custom-checkbox" />
-                <label for="temporary_permanent_storage" 
-                       id="storage_mode_label"
-                       class="margin-0 cursor-pointer font-size-rem-1_05"
-                       style="transition: all 0.2s; color: #000000">
-                    Προσωρινή Αποθήκευση
-                </label>
-            </div>
+                    <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" 
+                                   id="temporary_permanent_storage" 
+                                   name="files" 
+                                   value="temporary_permanent_storage" 
+                                   class="custom-checkbox"
+                                   ${skipScheduleValidation ? 'disabled' : ''} />
+                            <label for="temporary_permanent_storage" 
+                                   id="storage_mode_label"
+                                   class="margin-0 cursor-pointer font-size-rem-1_05"
+                                   style="transition: all 0.2s; color: ${skipScheduleValidation ? '#aaaaaa' : '#000000'}">
+                                Προσωρινή Αποθήκευση
+                            </label>
+                        </div>
 
-            <!-- ✅ E3 CHECKBOX -->
-            <div class="display-flex align-items-center gap-0_75rem">
-                <input type="checkbox" 
-                       id="e3_anaggelia_proslhpshs" 
-                       name="files" 
-                       value="e3_anaggelia_proslhpshs" 
-                       checked 
-                       class="custom-checkbox" />
-                <label for="e3_anaggelia_proslhpshs" 
-                       class="margin-0 cursor-pointer font-size-rem-1_05">
-                    Αναγγελία Πρόσληψης (E3)
-                </label>
-            </div>
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" 
+                                   id="e3_anaggelia_proslhpshs" 
+                                   name="files" 
+                                   value="e3_anaggelia_proslhpshs" 
+                                   ${skipScheduleValidation ? '' : 'checked'}
+                                   ${skipScheduleValidation ? 'disabled' : ''}
+                                   class="custom-checkbox" />
+                            <label for="e3_anaggelia_proslhpshs" 
+                                   class="margin-0 cursor-pointer font-size-rem-1_05"
+                                   style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
+                                Αναγγελία Πρόσληψης (E3)
+                            </label>
+                        </div>
 
-            <!-- ✅ WTO CHECKBOX -->
-            <div class="display-flex align-items-center gap-0_75rem">
-                <input type="checkbox" 
-                       id="schedules" 
-                       name="files" 
-                       value="schedules" 
-                       checked 
-                       class="custom-checkbox" />
-                <label for="schedules" 
-                       class="margin-0 cursor-pointer font-size-rem-1_05">
-                    Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
-                </label>
-            </div>
-        </div>
-    `,
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="checkbox" 
+                                   id="schedules" 
+                                   name="files" 
+                                   value="schedules" 
+                                   ${skipScheduleValidation ? '' : 'checked'}
+                                   ${skipScheduleValidation ? 'disabled' : ''}
+                                   class="custom-checkbox" />
+                            <label for="schedules" 
+                                   class="margin-0 cursor-pointer font-size-rem-1_05"
+                                   style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
+                                Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
+                            </label>
+                        </div>
+                    </div>
+                `,
+
                 focusConfirm: false,
 
                 // ✅ ATTACH EVENT LISTENER AFTER MODAL OPENS (CSP-safe)
@@ -555,108 +837,124 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const payload = {
                 formData: formData,
-                filesToUpdate: result.value
+                filesToUpdate: result.value,
+                skipContract: skipScheduleValidation // ✅ ΝΕΟ: αν "Συνέχεια", δεν φτιάχνουμε σύμβαση
             };
 
             // ============================================================================
             // ✅ SHOW PROGRESS BAR MODAL
             // ============================================================================
 
-            Swal.fire({
-                title: 'Δημιουργία Σύμβασης Εργασίας',
-                html: `
-                    <div class="pdf-generation-progress">
-                        <div class="progress-spinner">
-                            <div class="spinner-border text-success" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                        
-                        <div class="progress-step-text" id="progress-step-text">
-                            Προετοιμασία...
-                        </div>
-                        
-                        <div class="progress-bar-container">
-                            <div class="custom-progress">
-                                <div class="custom-progress-bar progress-bar-striped progress-bar-animated" 
-                                    id="pdf-progress-bar" 
-                                    role="progressbar"
-                                    aria-valuenow="0"
-                                    aria-valuemin="0"
-                                    aria-valuemax="100"
-                                    style="width: 0%">
-                                    0%
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="progress-info-text">
-                            <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
-                            <ul class="progress-steps-list">
-                                <li>Αποθήκευση στοιχείων εργαζόμενου</li>
-                                <li>Δημιουργία εγγράφου από template</li>
-                                <li>Μετατροπή σε PDF</li>
-                                <li>Ασφαλή αποθήκευση στο cloud</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="progress-time-estimate">
-                            <span style="margin-right: 8px;">⏱️</span>
-                            <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
-                        </div>
-                    </div>
-                `,
-                backdrop: false,
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                customClass: {
-                    popup: 'custom-swal-popup',
-                    title: 'custom-title'
-                },
-                didOpen: () => {
-                    // ✅ Start progress simulation
-                    startProgressAnimation();
-                }
-            });
+            // Swal.fire({
+            //     title: 'Δημιουργία Σύμβασης Εργασίας',
+            //     html: `
+            //         <div class="pdf-generation-progress">
+            //             <div class="progress-spinner">
+            //                 <div class="spinner-border text-success" role="status">
+            //                     <span class="visually-hidden">Loading...</span>
+            //                 </div>
+            //             </div>
 
-            // ============================================================================
-            // ✅ PROGRESS ANIMATION FUNCTION
-            // ============================================================================
-            function startProgressAnimation() {
-                const steps = [
-                    { percent: 15, text: 'Αποθήκευση στοιχείων εργαζόμενου...', duration: 800 },
-                    { percent: 30, text: 'Δημιουργία DOCX από template...', duration: 1500 },
-                    { percent: 50, text: 'Συμπλήρωση στοιχείων σύμβασης...', duration: 2000 },
-                    { percent: 70, text: 'Μετατροπή DOCX σε PDF...', duration: 3000 },
-                    { percent: 85, text: 'Ανέβασμα στο S3 Cloud...', duration: 1500 },
-                    { percent: 95, text: 'Δημιουργία presigned URL...', duration: 800 }
-                ];
+            //             <div class="progress-step-text" id="progress-step-text">
+            //                 Προετοιμασία...
+            //             </div>
 
-                let currentStepIndex = 0;
+            //             <div class="progress-bar-container">
+            //                 <div class="custom-progress">
+            //                     <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+            //                         id="pdf-progress-bar"
+            //                         role="progressbar"
+            //                         aria-valuenow="0"
+            //                         aria-valuemin="0"
+            //                         aria-valuemax="100"
+            //                         style="width: 0%">
+            //                         0%
+            //                     </div>
+            //                 </div>
+            //             </div>
 
-                function updateProgress() {
-                    if (currentStepIndex >= steps.length) return;
+            //             <div class="progress-info-text">
+            //                 <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+            //                 <ul class="progress-steps-list">
+            //                     <li>Αποθήκευση στοιχείων εργαζόμενου</li>
+            //                     <li>Δημιουργία εγγράφου από template</li>
+            //                     <li>Μετατροπή σε PDF</li>
+            //                     <li>Ασφαλή αποθήκευση στο cloud</li>
+            //                 </ul>
+            //             </div>
 
-                    const step = steps[currentStepIndex];
-                    const progressBar = document.getElementById('pdf-progress-bar');
-                    const progressText = document.getElementById('progress-step-text');
+            //             <div class="progress-time-estimate">
+            //                 <span style="margin-right: 8px;">⏱️</span>
+            //                 <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
+            //             </div>
+            //         </div>
+            //     `,
+            //     backdrop: false,
+            //     allowOutsideClick: false,
+            //     showConfirmButton: false,
+            //     customClass: {
+            //         popup: 'custom-swal-popup',
+            //         title: 'custom-title'
+            //     },
+            //     didOpen: () => {
+            //         // ✅ Start progress simulation
+            //         startProgressAnimation();
+            //     }
+            // });
 
-                    if (progressBar && progressText) {
-                        progressBar.style.width = `${step.percent}%`;
-                        progressBar.textContent = `${step.percent}%`;
-                        progressBar.setAttribute('aria-valuenow', step.percent);
-                        progressText.textContent = step.text;
+            // const response = await fetch('/ergazomenoi/ergazomenoi/add', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'CSRF-Token': csrfToken
+            //     },
+            //     credentials: 'include',
+            //     body: JSON.stringify(payload)
+            // });
+
+            // // ============================================================================
+            // // ✅ SMOOTH PROGRESS COMPLETION
+            // // ============================================================================
+
+            // // Calculate minimum wait time (sum of all animation durations: ~9.6s)
+            // const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
+
+            // // Wait minimum 3 seconds so user can see the progress animation
+            // await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            // // Smoothly transition to 100%
+            // const progressBar = document.getElementById('pdf-progress-bar');
+            // const progressText = document.getElementById('progress-step-text');
+
+            // if (progressBar && progressText) {
+            //     // Force 100% completion
+            //     progressBar.style.width = '100%';
+            //     progressBar.textContent = '100%';
+            //     progressBar.classList.remove('progress-bar-animated');
+            //     progressBar.setAttribute('aria-valuenow', 100);
+            //     progressText.textContent = 'Ολοκλήρωση...';
+
+            //     // Show completion message for 1 second
+            //     await new Promise((resolve) => setTimeout(resolve, 1000));
+            // }
+            // // Close progress modal smoothly
+            // Swal.close();
+
+            if (!skipScheduleValidation) {
+                Swal.fire({
+                    title: 'Δημιουργία Σύμβασης Εργασίας',
+                    html: `...`, // ίδιο όπως είναι
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    showConfirmButton: false,
+                    customClass: {
+                        popup: 'custom-swal-popup',
+                        title: 'custom-title'
+                    },
+                    didOpen: () => {
+                        startProgressAnimation();
                     }
-
-                    currentStepIndex++;
-
-                    if (currentStepIndex < steps.length) {
-                        setTimeout(updateProgress, step.duration);
-                    }
-                }
-
-                // Start animation
-                setTimeout(updateProgress, 250);
+                });
             }
 
             const response = await fetch('/ergazomenoi/ergazomenoi/add', {
@@ -670,32 +968,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // ============================================================================
-            // ✅ SMOOTH PROGRESS COMPLETION
+            // ✅ SMOOTH PROGRESS COMPLETION (μόνο αν ΔΕΝ είναι skip)
             // ============================================================================
 
-            // Calculate minimum wait time (sum of all animation durations: ~9.6s)
-            const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
+            if (!skipScheduleValidation) {
+                await new Promise((resolve) => setTimeout(resolve, 3000));
 
-            // Wait minimum 3 seconds so user can see the progress animation
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+                const progressBar = document.getElementById('pdf-progress-bar');
+                const progressText = document.getElementById('progress-step-text');
 
-            // Smoothly transition to 100%
-            const progressBar = document.getElementById('pdf-progress-bar');
-            const progressText = document.getElementById('progress-step-text');
+                if (progressBar && progressText) {
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.setAttribute('aria-valuenow', 100);
+                    progressText.textContent = 'Ολοκλήρωση...';
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
 
-            if (progressBar && progressText) {
-                // Force 100% completion
-                progressBar.style.width = '100%';
-                progressBar.textContent = '100%';
-                progressBar.classList.remove('progress-bar-animated');
-                progressBar.setAttribute('aria-valuenow', 100);
-                progressText.textContent = 'Ολοκλήρωση...';
-
-                // Show completion message for 1 second
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+                Swal.close();
             }
-            // Close progress modal smoothly
-            Swal.close();
 
             // =========================================================================
             // RESPONSE HANDLING

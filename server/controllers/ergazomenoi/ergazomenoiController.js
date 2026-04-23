@@ -1028,33 +1028,39 @@ class ergazomenoiController {
 
         let contractPdfData = null;
 
-        try {
-            const userContext = await getUserContext(req);
+        const skipContract = req.body.skipContract === true;
 
-            const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
+        if (!skipContract) {
+            try {
+                const userContext = await getUserContext(req);
 
-            // ✅ Generate signed URL (10 minutes expiration)
-            const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
+                const contractS3Key = await generateContractPDF(savedErgazomenos, userContext);
 
-            // Save S3 key στο document
-            savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path = contractS3Key;
-            await savedErgazomenos.save();
+                // ✅ Generate signed URL (10 minutes expiration)
+                const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
 
-            contractPdfData = {
-                url: pdfUrl,
-                s3Key: contractS3Key,
-                showPreview: true
-            };
-        } catch (pdfError) {
-            console.error('⚠️ Error generating contract PDF:', pdfError);
-            console.error('Stack:', pdfError.stack);
+                // Save S3 key στο document
+                savedErgazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path = contractS3Key;
+                await savedErgazomenos.save();
 
-            contractPdfData = {
-                error: 'PDF generation failed: ' + pdfError.message,
-                showPreview: false
-            };
+                contractPdfData = {
+                    url: pdfUrl,
+                    s3Key: contractS3Key,
+                    showPreview: true
+                };
+            } catch (pdfError) {
+                console.error('⚠️ Error generating contract PDF:', pdfError);
+                console.error('Stack:', pdfError.stack);
+
+                contractPdfData = {
+                    error: 'PDF generation failed: ' + pdfError.message,
+                    showPreview: false
+                };
+            }
+        } else {
+            console.log('⏭️ [CONTRACT] Skipped (skipContract=true)');
+            contractPdfData = { showPreview: false };
         }
-
         const orarioValidation = validateOrarioFields(formData);
 
         if (orarioValidation.valid) {
