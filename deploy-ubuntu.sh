@@ -31,7 +31,7 @@ CDN_URL="https://cdn.webpayrollsolutions.com"
 
 # EC2 Configuration
 EC2_KEY="$HOME/.ssh/Payroll_NodeJS_Server_Frankfurt.pem"
-EC2_USER_HOST="ubuntu@63.178.15.216"
+EC2_USER_HOST="ubuntu@18.199.180.229"
 REMOTE_DIR="~/Payroll-NodeJs"
 EXCLUDES_FILE="$PROJECT_DIR/rsync-excludes.txt"
 
@@ -467,7 +467,7 @@ process_file() {
         return 1
     fi
     
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━���━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 }
 
@@ -963,7 +963,7 @@ for file in "${no_obfuscate[@]}"; do
     if [[ -f "$file" ]]; then
         PROCESSED=$((PROCESSED + 1))
         echo "[$PROCESSED/$TOTAL_FILES_EXPECTED]"
-        process_file "$file" false  # false = not a module, but obfuscation is disabled
+        process_file "$file" false
     else
         log_warning "File not found: $file"
         TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED + 1))
@@ -1453,9 +1453,6 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
 
     echo "[EC2] Flushing old PM2 logs..."
     pm2 flush
-
-    # rm -f /home/ubuntu/.pm2/logs/payroll-error.log
-    # rm -f /home/ubuntu/.pm2/logs/payroll-out.log
 
     echo "[EC2] Reloading PM2..."
     if pm2 describe payroll > /dev/null 2>&1; then

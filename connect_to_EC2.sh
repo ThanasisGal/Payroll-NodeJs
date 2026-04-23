@@ -14,8 +14,8 @@ NC='\033[0m'
 
 # Configuration
 EC2_KEY="$HOME/Utilities/AWS-EC2-S3/pair-key-pem/Payroll_NodeJS_Server_Frankfurt.pem"
-EC2_USER_HOST="ubuntu@63.178.15.216"
-EC2_HOST="63.178.15.216"
+EC2_USER_HOST="ubuntu@18.199.180.229"
+EC2_HOST="18.199.180.229"
 
 # =============================================================================
 # MAIN

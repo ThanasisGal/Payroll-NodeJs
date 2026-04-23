@@ -23,9 +23,9 @@ AWS_REGION="eu-central-1"
 CDN_URL="https://cdn.webpayrollsolutions.com"
 CLOUDFRONT_DIST_ID="E2FVQEZRP01HIX"
 
-# EC2 Configuration - FIX: Use consistent path
+# EC2 Configuration
 EC2_KEY="$HOME/.ssh/Payroll_NodeJS_Server_Frankfurt.pem"
-EC2_USER_HOST="ubuntu@63.178.15.216"
+EC2_USER_HOST="ubuntu@18.199.180.229"
 
 # Colors
 RED='\033[0;31m'
@@ -350,18 +350,18 @@ if [[ "$DEPLOY_EC2" == "y" || "$DEPLOY_EC2" == "Y" ]]; then
         echo "[EC2] Navigating to project directory..."
         cd ~/Payroll-NodeJs
         
- 	echo "[EC2] Checking git remote configuration..."
-	CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+        echo "[EC2] Checking git remote configuration..."
+        CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
 
-	if [[ "$CURRENT_REMOTE" == https://* ]]; then
-	    echo "[EC2] Converting HTTPS remote to SSH..."
-	    git remote set-url origin git@github.com:ThanasisGal/Payroll-NodeJs.git
-	    echo "[EC2] ✅ Remote changed to SSH"
-	fi
+        if [[ "$CURRENT_REMOTE" == https://* ]]; then
+            echo "[EC2] Converting HTTPS remote to SSH..."
+            git remote set-url origin git@github.com:ThanasisGal/Payroll-NodeJs.git
+            echo "[EC2] ✅ Remote changed to SSH"
+        fi
 
-	echo "[EC2] Pulling latest changes from GitHub..."
-	git pull origin main
-	
+        echo "[EC2] Pulling latest changes from GitHub..."
+        git pull origin main
+        
         echo "[EC2] Restarting application with PM2..."
         pm2 restart all --update-env
         
