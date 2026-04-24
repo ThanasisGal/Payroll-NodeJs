@@ -1,4 +1,4 @@
-const { Schema: _Schema, model } = require("mongoose");
+const { Schema: _Schema, model } = require('mongoose');
 
 const Schema = _Schema;
 
@@ -59,22 +59,22 @@ const CompaniesSchema = new Schema(
         users: [
             {
                 type: Schema.Types.ObjectId,
-                ref: "User",
-            },
+                ref: 'User'
+            }
         ],
         sfragida: String,
-        imagePath: { type: String, trim: true },
+        imagePath: { type: String, trim: true }
     },
     {
         timestamps: {
-            createdAt: "createdAt",
-            updatedAt: "updatedAt",
-            currentTime: () => Date.now(), // προαιρετικό: ενιαία πηγή χρόνου
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+            currentTime: () => Date.now() // προαιρετικό: ενιαία πηγή χρόνου
         },
-        collection: "Companies"
+        collection: 'Companies'
     }
 );
-const CompaniesModel = model("Companies", CompaniesSchema);
+const CompaniesModel = model('Companies', CompaniesSchema);
 
 const YpokatasthmataSchema = new Schema(
     {
@@ -120,14 +120,14 @@ const YpokatasthmataSchema = new Schema(
         username_ypergol_ergoy: { type: String, trim: true },
         password_ypergol_ergoy: { type: String, trim: true },
         createdAt: { type: Date, default: Date.now() },
-        updatedAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
     },
     {
-        collection: "Ypokatasthmata"
+        collection: 'Ypokatasthmata'
     }
 );
 
-const YpokatasthmataModel = model("Ypokatasthmata", YpokatasthmataSchema);
+const YpokatasthmataModel = model('Ypokatasthmata', YpokatasthmataSchema);
 
 const NomimoiEkprosopoiSchema = new Schema(
     {
@@ -163,18 +163,18 @@ const NomimoiEkprosopoiSchema = new Schema(
         doy: { type: String, trim: true },
         ame: { type: String, trim: true },
         idiothta: { type: String, trim: true },
-        hmnia_enarjhs_idiothtas: { type: Date },
+        hmnia_enarjhs_idiothtas: { type: Date }
     },
     {
         timestamps: {
-            createdAt: "createdAt",
-            updatedAt: "updatedAt",
-            currentTime: () => Date.now(),
+            createdAt: 'createdAt',
+            updatedAt: 'updatedAt',
+            currentTime: () => Date.now()
         },
-        collection: "Nomimoi_Ekprosopoi"
+        collection: 'Nomimoi_Ekprosopoi'
     }
 );
-const NomimoiEkprosopoiModel = model("NomimoiEkprosopoi", NomimoiEkprosopoiSchema);
+const NomimoiEkprosopoiModel = model('NomimoiEkprosopoi', NomimoiEkprosopoiSchema);
 
 const PasswordsSchema = new Schema(
     {
@@ -186,61 +186,68 @@ const PasswordsSchema = new Schema(
         username: { type: String, trim: true },
         password: { type: String, trim: true },
         createdAt: { type: Date, default: Date.now() },
-        updatedAt: { type: Date, default: Date.now() },
-    },
-    { 
-        collection: "Passwords"
-    }
-);
-const PasswordsModel = model("Passwords", PasswordsSchema);
-
-const AntistoixiseisSchema = new Schema({
-    team: { type: String, trim: true },
-    companyId: { 
-                    type: Schema.Types.ObjectId, 
-                    ref: 'Companies' 
-               },
-    companyKod: { type: String, trim: true }, // Το kod από το CompaniesModel
-    krathshId: { 
-                    type: Schema.Types.ObjectId, 
-                    ref: 'Krathseis' 
-               },
-    krathshKod: { type: String, trim: true },
-    aa_eggrafhs: { type: String, trim: true },
-    kpk: { type: String, trim: true }, 
-    apo_typos_apodoxon: { type: String, trim: true, length: 3 }, 
-    se_typos_apodoxon: { type: String, trim: true, length: 3 }, 
-    kad: { type: String, trim: true }, 
-    eidikothta: { type: String, trim: true },
-    epa: { type: String, trim: true }, 
-    createdAt: { type: Date, default: Date.now() },
-    updatedAt: { type: Date, default: Date.now() },
-});
-const AntistoixiseisModel = model("Antistoixiseis", AntistoixiseisSchema);
-
-const BanksPerCompanySchema = new Schema({
-    team: { type: String, trim: true }, // Το team από το CompaniesModel
-    companykod_object: { type: String, trim: true }, // Το company_id από το CompaniesModel
-    companykod: { type: String, trim: true }, // Το kod από το CompaniesModel
-    kodikos: { type: String, trim: true }, 
-    kodikos_dias: { type: String, trim: true, length: 3 },
-    perigrafh: { type: String, trim: true }, 
-    logariasmos_1: { type: String, trim: true }, 
-    logariasmos_2: { type: String, trim: true }, 
-    logariasmos_3: { type: String, trim: true }, 
-    createdAt: { type: Date, default: Date.now() },
-    updatedAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
     },
     {
-        collection: "trapezes_ana_etaireia"
+        collection: 'Passwords'
     }
 );
-const BanksPerCompanyModel = model("BanksPerCompany", BanksPerCompanySchema);
+const PasswordsModel = model('Passwords', PasswordsSchema);
 
-module.exports = {  CompaniesModel, 
-                    YpokatasthmataModel, 
-                    NomimoiEkprosopoiModel, 
-                    PasswordsModel,
-                    AntistoixiseisModel,
-                    BanksPerCompanyModel,
-                 };
+const AntistoixiseisSchema = new Schema(
+    {
+        team: { type: String, trim: true },
+        companyId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Companies'
+        },
+        companyKod: { type: String, trim: true }, // Το kod από το CompaniesModel
+        krathshId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Krathseis'
+        },
+        krathshKod: { type: String, trim: true },
+        aa_eggrafhs: { type: String, trim: true },
+        kpk: { type: String, trim: true },
+        apo_typos_apodoxon: { type: String, trim: true, length: 3 },
+        se_typos_apodoxon: { type: String, trim: true, length: 3 },
+        kad: { type: String, trim: true },
+        eidikothta: { type: String, trim: true },
+        epa: { type: String, trim: true },
+        createdAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
+    },
+    {
+        collection: 'Antistoixiseis'
+    }
+);
+const AntistoixiseisModel = model('Antistoixiseis', AntistoixiseisSchema);
+
+const BanksPerCompanySchema = new Schema(
+    {
+        team: { type: String, trim: true }, // Το team από το CompaniesModel
+        companykod_object: { type: String, trim: true }, // Το company_id από το CompaniesModel
+        companykod: { type: String, trim: true }, // Το kod από το CompaniesModel
+        kodikos: { type: String, trim: true },
+        kodikos_dias: { type: String, trim: true, length: 3 },
+        perigrafh: { type: String, trim: true },
+        logariasmos_1: { type: String, trim: true },
+        logariasmos_2: { type: String, trim: true },
+        logariasmos_3: { type: String, trim: true },
+        createdAt: { type: Date, default: Date.now() },
+        updatedAt: { type: Date, default: Date.now() }
+    },
+    {
+        collection: 'trapezes_ana_etaireia'
+    }
+);
+const BanksPerCompanyModel = model('BanksPerCompany', BanksPerCompanySchema);
+
+module.exports = {
+    CompaniesModel,
+    YpokatasthmataModel,
+    NomimoiEkprosopoiModel,
+    PasswordsModel,
+    AntistoixiseisModel,
+    BanksPerCompanyModel
+};

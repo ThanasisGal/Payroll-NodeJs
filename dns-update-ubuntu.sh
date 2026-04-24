@@ -2,15 +2,15 @@
 set -euo pipefail
 
 # =============================================================================
-# DNS Auto-Update - FIXED VERSION (EC2 IP Only)
+# DNS Auto-Update - ELASTIC IP VERSION
 # =============================================================================
 
 DOMAIN="webpayrollsolutions.com"
 LOG_FILE="/tmp/dns-update-$(date +%Y%m%d).log"
 JSON_FILE="/tmp/route53-change-batch.json"
 
-# Target EC2 IP (STATIC - won't change based on where script runs)
-EC2_PUBLIC_IP="63.178.15.216"
+# ✅ ELASTIC IP - ΣΤΑΘΕΡΗ - ΔΕΝ ΑΛΛΑΖΕΙ ΠΟΤΕ
+EC2_PUBLIC_IP="18.199.180.229"
 
 # Colors
 GREEN='\033[0;32m'
@@ -45,21 +45,12 @@ log_step() {
 
 echo ""
 echo "=========================================="
-echo "🌐 DNS AUTO-UPDATE (EC2 SAFE MODE)"
+echo "🌐 DNS AUTO-UPDATE (ELASTIC IP MODE)"
 echo "=========================================="
 
-log_info "Target Domain: $DOMAIN"
-log_info "Target EC2 IP: $EC2_PUBLIC_IP"
+log_info "Target Domain:    $DOMAIN"
+log_info "Elastic IP (EC2): $EC2_PUBLIC_IP"
 echo ""
-
-# Detect where script is running
-CURRENT_MACHINE_IP=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]' || echo "unknown")
-log_info "Current machine IP: $CURRENT_MACHINE_IP"
-
-if [[ "$CURRENT_MACHINE_IP" != "$EC2_PUBLIC_IP" ]]; then
-    log_warning "⚠️  Running from local machine (not EC2)"
-    log_info "💡 DNS will be set to EC2 IP ($EC2_PUBLIC_IP), not local IP"
-fi
 
 # Check AWS CLI
 if ! command -v aws &> /dev/null; then
@@ -80,46 +71,49 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
     --query "HostedZones[?Name == '${DOMAIN}.'].Id | [0]" \
     --output text 2>/dev/null || echo "")
 
-# Remove /hostedzone/ prefix
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID#/hostedzone/}"
 
 if [[ -z "$HOSTED_ZONE_ID" || "$HOSTED_ZONE_ID" == "None" ]]; then
     log_error "Hosted Zone for $DOMAIN not found"
-    log_info "Available zones:"
-    aws route53 list-hosted-zones --query "HostedZones[*].[Name,Id]" --output table 2>/dev/null || true
     exit 1
 fi
 
 log_info "✅ Hosted Zone ID: $HOSTED_ZONE_ID"
 
-# Get current DNS IP
-log_step "Fetching current DNS record..."
-CURRENT_DNS_IP=$(aws route53 list-resource-record-sets \
+# Get current DNS IPs
+log_step "Fetching current DNS records..."
+
+CURRENT_ROOT_IP=$(aws route53 list-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
     --query "ResourceRecordSets[?Name == '${DOMAIN}.' && Type == 'A'].ResourceRecords[0].Value | [0]" \
     --output text 2>/dev/null || echo "")
 
-if [[ -z "$CURRENT_DNS_IP" || "$CURRENT_DNS_IP" == "None" ]]; then
-    log_warning "No A record found - will create new one"
-    CURRENT_DNS_IP="Not set"
-fi
+CURRENT_WWW_IP=$(aws route53 list-resource-record-sets \
+    --hosted-zone-id "$HOSTED_ZONE_ID" \
+    --query "ResourceRecordSets[?Name == 'www.${DOMAIN}.' && Type == 'A'].ResourceRecords[0].Value | [0]" \
+    --output text 2>/dev/null || echo "")
 
-log_info "Current DNS IP: $CURRENT_DNS_IP"
-log_info "Target EC2 IP:  $EC2_PUBLIC_IP"
+log_info "Current $DOMAIN IP:     ${CURRENT_ROOT_IP:-Not set}"
+log_info "Current www.$DOMAIN IP: ${CURRENT_WWW_IP:-Not set}"
+log_info "Target Elastic IP:       $EC2_PUBLIC_IP"
 
 # Check if update is needed
-if [[ "$EC2_PUBLIC_IP" == "$CURRENT_DNS_IP" ]]; then
-    log_info "✅ DNS already points to EC2 - no update needed"
+ROOT_NEEDS_UPDATE=false
+WWW_NEEDS_UPDATE=false
+
+[[ "$CURRENT_ROOT_IP" != "$EC2_PUBLIC_IP" ]] && ROOT_NEEDS_UPDATE=true
+[[ "$CURRENT_WWW_IP"  != "$EC2_PUBLIC_IP" ]] && WWW_NEEDS_UPDATE=true
+
+if [[ "$ROOT_NEEDS_UPDATE" == "false" && "$WWW_NEEDS_UPDATE" == "false" ]]; then
+    log_info "✅ DNS already correct - no update needed"
     echo ""
     exit 0
 fi
 
-log_warning "⚠️  DNS mismatch detected!"
-log_warning "   Current: $CURRENT_DNS_IP"
-log_warning "   Target:  $EC2_PUBLIC_IP"
-log_step "Updating Route 53..."
+log_warning "DNS update needed!"
+log_step "Updating Route 53 records..."
 
-# Create JSON change batch
+# Create JSON change batch (both root and www)
 cat > "$JSON_FILE" <<EOF
 {
     "Changes": [
@@ -129,18 +123,21 @@ cat > "$JSON_FILE" <<EOF
                 "Name": "${DOMAIN}",
                 "Type": "A",
                 "TTL": 300,
-                "ResourceRecords": [
-                    {
-                        "Value": "$EC2_PUBLIC_IP"
-                    }
-                ]
+                "ResourceRecords": [{"Value": "$EC2_PUBLIC_IP"}]
+            }
+        },
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "www.${DOMAIN}",
+                "Type": "A",
+                "TTL": 300,
+                "ResourceRecords": [{"Value": "$EC2_PUBLIC_IP"}]
             }
         }
     ]
 }
 EOF
-
-log_info "JSON change batch created"
 
 # Update Route 53
 CHANGE_RESULT=$(aws route53 change-resource-record-sets \
@@ -150,8 +147,8 @@ CHANGE_RESULT=$(aws route53 change-resource-record-sets \
 
 if [[ $? -eq 0 ]]; then
     CHANGE_ID=$(echo "$CHANGE_RESULT" | grep -o '"Id": "[^"]*"' | head -1 | cut -d'"' -f4)
-    log_info "✅ DNS updated to $EC2_PUBLIC_IP"
-    
+    log_info "✅ DNS updated → $EC2_PUBLIC_IP"
+
     if [[ -n "$CHANGE_ID" ]]; then
         log_info "Change ID: $CHANGE_ID"
         log_step "Waiting for DNS propagation..."
@@ -161,15 +158,16 @@ if [[ $? -eq 0 ]]; then
 else
     log_error "Failed to update DNS"
     log_error "$CHANGE_RESULT"
+    rm -f "$JSON_FILE"
     exit 1
 fi
 
-# Cleanup
 rm -f "$JSON_FILE"
 
 echo ""
 log_info "🎉 DNS Auto-Update complete!"
-log_info "Domain $DOMAIN now points to EC2: $EC2_PUBLIC_IP"
+log_info "✅ $DOMAIN       → $EC2_PUBLIC_IP"
+log_info "✅ www.$DOMAIN   → $EC2_PUBLIC_IP"
 echo "=========================================="
 echo ""
 
