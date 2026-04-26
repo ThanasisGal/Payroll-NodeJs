@@ -1401,9 +1401,12 @@ class ergazomenoiController {
             let wtoXmlData = { success: false };
 
             // ✅ CRITICAL: Only generate WTO XML if:
-            //    1. schedules checkbox is checked
+            //    1. wto_pshfiakh_organosh_xronoy_ergasias checkbox is checked
             //    2. isPermanent is TRUE (Οριστική Ενημέρωση)
-            if (filesToUpdate?.schedules === true && filesToUpdate?.isPermanent === true) {
+            if (
+                filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true &&
+                filesToUpdate?.isPermanent === true
+            ) {
                 try {
                     logger.info('WTO XML generation requested (Οριστική)', {
                         module: 'WTO-XML',
@@ -3081,7 +3084,11 @@ class ergazomenoiController {
         // =========================================================================
         let wtoXmlData = { success: false };
 
-        if (filesToUpdate?.schedules === true && filesToUpdate?.isPermanent === true) {
+        if (
+            (filesToUpdate?.schedules === true ||
+                filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true) &&
+            filesToUpdate?.isPermanent === true
+        ) {
             try {
                 logger.info('WTO XML generation requested (UPDATE — Οριστική)', {
                     module: 'WTO-XML',

@@ -520,6 +520,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             Αναγγελία Πρόσληψης (E3N)
                         </label>
                     </div>
+
+                    <div class="display-flex align-items-center gap-0_75rem">
+                        <input type="checkbox" 
+                            id="wto_pshfiakh_organosh_xronoy_ergasias" 
+                            name="files" 
+                            value="wto_pshfiakh_organosh_xronoy_ergasias" 
+                            class="custom-checkbox" />
+                        <label for="wto_pshfiakh_organosh_xronoy_ergasias" 
+                            class="margin-0 cursor-pointer font-size-rem-1_05">
+                            Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
+                        </label>
+                    </div>
                 `
                 : '';
 
@@ -586,6 +598,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('create_contract')?.checked ?? false;
                     const e3AnaggeliaProslhpshs =
                         document.getElementById('e3_anaggelia_proslhpshs')?.checked ?? false;
+                    const wtoPshfiakhOrganoshXronoy =
+                        document.getElementById('wto_pshfiakh_organosh_xronoy_ergasias')?.checked ??
+                        false;
                     const e3Enabled_1 =
                         document.getElementById('e3_metaboles_ergasiakhs_sxeshs')?.checked ?? false;
                     const e3Enabled_2 =
@@ -635,6 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         isPermanent,
                         create_contract: createContract,
                         e3_anaggelia_proslhpshs: e3AnaggeliaProslhpshs,
+                        wto_pshfiakh_organosh_xronoy_ergasias: wtoPshfiakhOrganoshXronoy,
                         e3_metaboles_ergasiakhs_sxeshs: e3Enabled_1,
                         e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy: e3Enabled_2,
                         ma_222: wtoEnabled_222,
@@ -951,6 +967,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     result.value?.e3_anaggelia_proslhpshs === true ||
                     result.value?.e3_metaboles_ergasiakhs_sxeshs === true;
 
+                const userWantsWto = result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true;
+
                 // ✅ BUILD HTML STRINGS (ONCE)
                 const e3XmlHtml = hasE3Xml
                     ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
@@ -1010,7 +1028,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const storeErganhUploadOptions = () => {
                     window.__erganhUploadOptions = {
                         isPermanent: result.value?.isPermanent || false,
+
                         e3_anaggelia_proslhpshs: result.value?.e3_anaggelia_proslhpshs || false,
+                        wto_pshfiakh_organosh_xronoy_ergasias:
+                            result.value?.wto_pshfiakh_organosh_xronoy_ergasias || false,
+
                         e3Enabled_1: result.value?.e3_metaboles_ergasiakhs_sxeshs !== false,
                         e3Enabled_2:
                             result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy !==
@@ -1078,23 +1100,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     let wtoResult = { success: true };
 
-                    if (
-                        wtoXmlData?.success &&
-                        (wtoXmlData?.s3Url ||
-                            wtoXmlData?.downloadUrl ||
-                            wtoXmlData?.relativePath) &&
-                        data.data?._id
-                    ) {
-                        const wtoUrlToSend =
-                            wtoXmlData?.s3Url ||
-                            wtoXmlData?.downloadUrl ||
-                            wtoXmlData?.relativePath ||
-                            null;
+                    if (userWantsWto && data.data?._id) {
+                        if (result.value?.isPermanent === true) {
+                            // ✅ ΟΡΙΣΤΙΚΗ → XML upload
+                            if (
+                                wtoXmlData?.success &&
+                                (wtoXmlData?.s3Url ||
+                                    wtoXmlData?.downloadUrl ||
+                                    wtoXmlData?.relativePath)
+                            ) {
+                                const wtoUrlToSend =
+                                    wtoXmlData?.s3Url ||
+                                    wtoXmlData?.downloadUrl ||
+                                    wtoXmlData?.relativePath ||
+                                    null;
 
-                        if (wtoUrlToSend && typeof wtoUrlToSend === 'string') {
+                                if (wtoUrlToSend && typeof wtoUrlToSend === 'string') {
+                                    try {
+                                        console.log('[WTO-UPLOAD] Uploading WTO XML (Οριστική)...');
+                                        wtoResult = await uploadWtoToErganh(
+                                            data.data._id,
+                                            wtoUrlToSend
+                                        );
+                                        console.log('[WTO-UPLOAD] Result:', wtoResult);
+                                    } catch (e) {
+                                        console.error(
+                                            '[WTO-UPLOAD] ❌ Exception:',
+                                            e?.message || e
+                                        );
+                                        wtoResult = { success: false, error: e?.message };
+                                    }
+                                }
+                            }
+                        } else {
+                            // ✅ ΠΡΟΣΩΡΙΝΗ → manual form
                             try {
-                                console.log('[WTO-UPLOAD] Uploading WTO XML...');
-                                wtoResult = await uploadWtoToErganh(data.data._id, wtoUrlToSend);
+                                console.log('[WTO-UPLOAD] Uploading WTO Temporary (Προσωρινή)...');
+                                wtoResult = await uploadWtoTemporary(data.data._id, null);
                                 console.log('[WTO-UPLOAD] Result:', wtoResult);
                             } catch (e) {
                                 console.error('[WTO-UPLOAD] ❌ Exception:', e?.message || e);
@@ -1425,7 +1467,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ergazomenosId
                 );
 
-                const needsWtoUpload = !!(wtoEnabled_217 && ergazomenosId);
+                const wtoPshfiakhOrganosh =
+                    filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true;
+                const needsWtoUpload = !!(wtoPshfiakhOrganosh && ergazomenosId);
 
                 console.group('[CONTRACT-DEBUG] CLOSE MODAL DECISION');
                 console.log('isPermanent:', isPermanent);

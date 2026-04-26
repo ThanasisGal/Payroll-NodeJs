@@ -756,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <label for="e3_anaggelia_proslhpshs" 
                                    class="margin-0 cursor-pointer font-size-rem-1_05"
                                    style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
-                                Αναγγελία Πρόσληψης (E3)
+                                Αναγγελία Πρόσληψης (E3N)
                             </label>
                         </div>
 
