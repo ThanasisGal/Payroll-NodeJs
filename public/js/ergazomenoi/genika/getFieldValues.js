@@ -310,45 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // if (errors.length) {
-            //     const hasNonCriticalErrors = errors.some((error) => !error.critical);
-
-            //     if (hasNonCriticalErrors) {
-            //         const errorItems = errors
-            //             .map((error, index) => {
-            //                 const cssClass = error.critical
-            //                     ? 'error-item error-critical'
-            //                     : 'error-item';
-            //                 return `<div class="${cssClass}"><strong>${index + 1}</strong>.${error.text}</div>`;
-            //             })
-            //             .join('');
-
-            //         const gridHTML = `
-            //             <div class="error-grid-container">
-            //                 <div class="error-grid">${errorItems}</div>
-            //             </div>
-            //         `;
-
-            //         await Swal.fire({
-            //             backdrop: false,
-            //             allowOutsideClick: false,
-            //             icon: 'warning',
-            //             title: 'ΠΡΟΣΟΧΗ !!!',
-            //             html: `<p class="error-header">Τα παρακάτω ${errors.length} πεδία είναι υποχρεωτικά για την πρόσληψη:</p>
-            //             <p class="warning-header">Τα πεδία με το εικονίδιο ⚠️ είναι προειδοποιητικά και μόνο για επανέλεγχο</p>${gridHTML}`,
-            //             heightAuto: true,
-            //             confirmButtonText: 'Κλείσιμο',
-            //             customClass: {
-            //                 confirmButton: 'class-warning custom-confirm-button custom-swal-button',
-            //                 title: 'custom-title',
-            //                 popup: 'custom-swal-popup',
-            //                 htmlContainer: 'custom-html-container'
-            //             }
-            //         });
-            //         return;
-            //     }
-            // }
-
             if (errors.length) {
                 const hasNonCriticalErrors = errors.some((error) => !error.critical);
 
