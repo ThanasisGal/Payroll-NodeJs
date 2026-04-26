@@ -10956,3 +10956,25 @@ body.loader-active > *:not(.app-loader) {
     padding: 0.75rem 1rem;
     width: 100%;
 }
+
+.btn-refresh-custom {
+    background-color: #2d6a4f;
+    border-color: #2d6a4f;
+    color: #fff;
+}
+.btn-refresh-custom:hover {
+    background-color: #1b4332;
+    border-color: #1b4332;
+    color: #fff;
+}
+
+.btn-message-custom {
+    background-color: #1d3557;
+    border-color: #1d3557;
+    color: #fff;
+}
+.btn-message-custom:hover {
+    background-color: #0d1b2a;
+    border-color: #0d1b2a;
+    color: #fff;
+}

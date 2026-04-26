@@ -99,6 +99,8 @@ router.get('/admin/delete/:id', userController.checkAndDeletePostUser);
 router.post('/admin/search', userController.searchPostUser);
 router.get('/admin/search', userController.searchGetUser);
 router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', checkAuth, adminController.anoigmaNeasXrhshs);
+router.get('/admin/active-sessions', checkAuth, userController.activeSessionsPage);
+router.post('/admin/send-message', checkAuth, userController.sendMessageToUser);
 
 // ============================================================================
 // MAIN APP ROUTES
@@ -831,6 +833,9 @@ router.post('/api/ektyposeis/symbaseis/ergazomenoi', ektyposhSymbaseonController
 router.post('/api/update_session_typosApodoxon', kinhseisController.update_session_typosApodoxon);
 router.post('/api/update_session_periodos', kinhseisController.update_session_periodos);
 
+router.post('/api/usage/heartbeat', checkAuth, userController.heartbeat);
+router.get('/admin/usage-report', checkAuth, userController.usageReportPage);
+router.get('/admin/usage-report/export', checkAuth, userController.exportUsageReport);
 // ============================================================================
 // ✅ ERROR HANDLING - Multer & PDF Errors
 // ============================================================================

@@ -10,6 +10,8 @@ const Models_A = require('../models/param');
 const Models_B = require('../models/privileges');
 const Models_C = require('../models/companies');
 
+const UsageLogModel = require('../models/usageLog');
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const jwtDecode = require('jwt-decode').jwtDecode;
@@ -402,6 +404,259 @@ class userController {
         }
     };
 
+    static activeSessionsPage = async (req, res) => {
+        try {
+            const currentUser = await UserModel.findById(req.session.userId).lean();
+            if (!currentUser || !currentUser.isAdmin) {
+                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+            }
+            const sessions = await mongoose.connection.db.collection('sessions').find({}).toArray();
+
+            const activeUsers = [];
+
+            for (const s of sessions) {
+                try {
+                    const data = JSON.parse(s.session);
+                    if (!data.userId) continue;
+
+                    const user = await UserModel.findById(data.userId)
+                        .select('firstName lastName email team privileges')
+                        .lean();
+
+                    activeUsers.push({
+                        userId: data.userId,
+                        firstName: user?.firstName || 'Άγνωστος',
+                        lastName: user?.lastName || '',
+                        email: user?.email || '',
+                        team: user?.team || data.userTeam || '',
+                        privileges: user?.privileges || '',
+                        companyInUse: data.companyInUse || '',
+                        companyDescription: data.companyDescription || '',
+                        periodInUseDescr: data.periodInUseDescr || '',
+                        yearInUse: data.yearInUse || '',
+                        expires: s.expires
+                    });
+                } catch (e) {
+                    // skip invalid session
+                }
+            }
+
+            res.render('admin/activeSessions', {
+                locals: {
+                    title: 'Ενεργοί Χρήστες',
+                    description: 'Web Payroll Solutions'
+                },
+                activeUsers,
+                currentUserId: String(req.session.userId)
+            });
+        } catch (error) {
+            logger.error(error);
+            res.status(500).send('Σφάλμα');
+        }
+    };
+
+    static sendMessageToUser = async (req, res) => {
+        try {
+            const currentUser = await UserModel.findById(req.session.userId).lean();
+            // if (!currentUser || currentUser.privileges !== 'A') {
+            if (!currentUser || !currentUser.isAdmin) {
+                return res.status(403).json({ success: false, message: 'Unauthorized' });
+            }
+            const { toUserId, message } = req.body;
+
+            if (!toUserId || !message?.trim()) {
+                return res.status(400).json({ success: false, message: 'Missing data' });
+            }
+
+            // ✅ Στείλε το μήνυμα μέσω Socket.io
+            const { getIO } = require('../socket');
+            const io = getIO();
+            const roomName = `user_${String(toUserId)}`;
+
+            io.to(roomName).emit('admin:message', {
+                from: `${currentUser.firstName} ${currentUser.lastName}`,
+                message: message.trim(),
+                sentAt: new Date().toISOString()
+            });
+
+            return res.json({ success: true });
+        } catch (error) {
+            logger.error(error);
+            return res.status(500).json({ success: false, message: 'Server error' });
+        }
+    };
+
+    static heartbeat = async (req, res) => {
+        try {
+            const userId = req.session?.userId;
+            if (!userId) return res.status(401).json({ ok: false });
+
+            const now = new Date();
+            const closing = req.body?.closing === true;
+
+            const log = await UsageLogModel.findOne({
+                userId,
+                logoutAt: null
+            }).sort({ loginAt: -1 });
+
+            if (log) {
+                if (closing) {
+                    // ✅ Κλείσιμο browser
+                    const durationMs = now - log.loginAt;
+                    await UsageLogModel.findByIdAndUpdate(log._id, {
+                        logoutAt: now,
+                        durationMs,
+                        lastSeen: now,
+                        closedBy: 'browser_close'
+                    });
+                } else {
+                    // ✅ Απλό heartbeat -- ενημέρωσε μόνο lastSeen
+                    await UsageLogModel.findByIdAndUpdate(log._id, {
+                        lastSeen: now
+                    });
+                }
+            }
+
+            return res.json({ ok: true });
+        } catch (error) {
+            logger.error('❌ Heartbeat error:', error);
+            return res.status(500).json({ ok: false });
+        }
+    };
+
+    static usageReportPage = async (req, res) => {
+        try {
+            const currentUser = await UserModel.findById(req.session.userId).lean();
+            if (!currentUser || !currentUser.isAdmin) {
+                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+            }
+
+            const greekMonths = [
+                'ΙΑΝΟΥΑΡΙΟΣ',
+                'ΦΕΒΡΟΥΑΡΙΟΣ',
+                'ΜΑΡΤΙΟΣ',
+                'ΑΠΡΙΛΙΟΣ',
+                'ΜΑΪΟΣ',
+                'ΙΟΥΝΙΟΣ',
+                'ΙΟΥΛΙΟΣ',
+                'ΑΥΓΟΥΣΤΟΣ',
+                'ΣΕΠΤΕΜΒΡΙΟΣ',
+                'ΟΚΤΩΒΡΙΟΣ',
+                'ΝΟΕΜΒΡΙΟΣ',
+                'ΔΕΚΕΜΒΡΙΟΣ'
+            ];
+
+            const month = req.query.month || new Date().toISOString().slice(0, 7);
+            const [year, monthIndex] = month.split('-');
+            const monthLabel = `${greekMonths[parseInt(monthIndex, 10) - 1]} ${year}`;
+
+            const logs = await UsageLogModel.aggregate([
+                { $match: { date: month } },
+                {
+                    $group: {
+                        _id: { userId: '$userId', team: '$team' },
+                        totalMs: { $sum: '$durationMs' },
+                        sessionCount: { $sum: 1 },
+                        firstLogin: { $min: '$loginAt' },
+                        lastLogin: { $max: '$loginAt' }
+                    }
+                },
+                { $sort: { '_id.team': 1 } }
+            ]);
+
+            const enriched = await Promise.all(
+                logs.map(async (l) => {
+                    const user = await UserModel.findById(l._id.userId)
+                        .select('firstName lastName')
+                        .lean();
+
+                    const totalMinutes = Math.round(l.totalMs / 60000);
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+
+                    return {
+                        userId: String(l._id.userId),
+                        team: l._id.team,
+                        firstName: user?.firstName || '—',
+                        lastName: user?.lastName || '—',
+                        totalMs: l.totalMs,
+                        totalHours: `${hours}ω ${minutes}λ`,
+                        sessionCount: l.sessionCount,
+                        firstLogin: l.firstLogin,
+                        lastLogin: l.lastLogin
+                    };
+                })
+            );
+
+            // ✅ Ομαδοποίηση ανά team
+            const byTeam = enriched.reduce((acc, u) => {
+                if (!acc[u.team]) acc[u.team] = [];
+                acc[u.team].push(u);
+                return acc;
+            }, {});
+
+            res.render('admin/usageReport', {
+                locals: { title: 'Αναφορά Χρήσης', description: 'Web Payroll Solutions' },
+                byTeam,
+                month,
+                monthLabel,
+                nonce: res.locals.nonce
+            });
+        } catch (error) {
+            logger.error(error);
+            res.status(500).send('Σφάλμα');
+        }
+    };
+
+    static exportUsageReport = async (req, res) => {
+        try {
+            const currentUser = await UserModel.findById(req.session.userId).lean();
+            if (!currentUser || !currentUser.isAdmin) {
+                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+            }
+
+            const month = req.query.month || new Date().toISOString().slice(0, 7);
+            const logs = await UsageLogModel.find({ date: month }).sort({ loginAt: 1 }).lean();
+
+            const rows = [
+                'Team,Χρήστης,Ημ/νία Login,Ημ/νία Logout,Διάρκεια (λεπτά),Τρόπος Κλεισίματος'
+            ];
+
+            for (const log of logs) {
+                const user = await UserModel.findById(log.userId)
+                    .select('firstName lastName team')
+                    .lean();
+
+                const minutes = log.durationMs ? Math.round(log.durationMs / 60000) : 0;
+                const closedBy =
+                    {
+                        logout: 'Κανονική αποσύνδεση',
+                        browser_close: 'Κλείσιμο browser',
+                        session_expired: 'Λήξη session',
+                        null: 'Ακόμα online'
+                    }[log.closedBy] || '—';
+
+                rows.push(
+                    [
+                        user?.team || '—',
+                        `${user?.firstName} ${user?.lastName}`,
+                        log.loginAt ? new Date(log.loginAt).toLocaleString('el-GR') : '—',
+                        log.logoutAt ? new Date(log.logoutAt).toLocaleString('el-GR') : 'Online',
+                        minutes,
+                        closedBy
+                    ].join(',')
+                );
+            }
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="usage_${month}.csv"`);
+            res.send('\uFEFF' + rows.join('\n')); // BOM για σωστή εμφάνιση στο Excel
+        } catch (error) {
+            logger.error(error);
+            res.status(500).send('Σφάλμα');
+        }
+    };
+
     static verifyEmailForm = async (req, res) => {
         const locals = { title: 'Verify Email', description: 'Web Payroll Solutions' };
         try {
@@ -771,6 +1026,17 @@ class userController {
                 templateId: templateUserId,
                 uniqueKey: 'li_Id',
                 projection: { _id: 0, userId: 0 }
+            });
+
+            // Υπολόγισε το sessionExpires από το maxAge του session
+            const sessionMaxAge = req.session?.cookie?.maxAge || 1800000; // default 30 λεπτά
+
+            await UsageLogModel.create({
+                userId: user._id,
+                team: user.team,
+                loginAt: new Date(),
+                date: new Date().toISOString().slice(0, 7), // 'YYYY-MM'
+                sessionExpires: new Date(Date.now() + sessionMaxAge)
             });
 
             // Load user parameters
@@ -1892,7 +2158,7 @@ class userController {
         }
     };
 
-    static logout = (req, res) => {
+    static logout = async (req, res) => {
         // ✅ 1.Έλεγχος authentication
         if (!req.session || !req.session.userId) {
             // logger.warn('⚠️ Logout attempted without session:', {
@@ -2019,6 +2285,27 @@ class userController {
         const sid = req.sessionID;
         const userId = req.session.userId;
         const userEmail = req.session.userEmail || 'unknown';
+
+        // Καταγραφή logout ΠΡΙΝ το destroy
+        try {
+            const log = await UsageLogModel.findOne({
+                userId,
+                logoutAt: null
+            }).sort({ loginAt: -1 });
+
+            if (log) {
+                const logoutAt = new Date();
+                const durationMs = logoutAt - log.loginAt;
+                await UsageLogModel.findByIdAndUpdate(log._id, {
+                    logoutAt,
+                    durationMs,
+                    closedBy: 'logout'
+                });
+            }
+        } catch (usageErr) {
+            logger.error('❌ UsageLog logout error:', usageErr);
+            // ✅ Δεν σταματάμε το logout αν αποτύχει η καταγραφή
+        }
 
         // ✅ 2.Destroy session
         req.session.destroy((err) => {

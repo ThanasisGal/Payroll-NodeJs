@@ -2508,141 +2508,141 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ============================================================================
-    // ✅ SOCKET.IO - ERGANH REAL-TIME STATUS UPDATES
-    // ============================================================================
+    // // ============================================================================
+    // // ✅ SOCKET.IO - ERGANH REAL-TIME STATUS UPDATES
+    // // ============================================================================
 
-    if (typeof socket !== 'undefined' && socket) {
-        console.log('✅ [ERGANH] Socket.io event listeners initialized');
+    // if (typeof socket !== 'undefined' && socket) {
+    //     console.log('✅ [ERGANH] Socket.io event listeners initialized');
 
-        // ================================================================
-        // ✅ ERGANH: UPLOAD STARTED
-        // ================================================================
-        socket.on('erganh:started', function (data) {
-            console.log('📡 [ERGANH] Upload started:', data);
+    //     // ================================================================
+    //     // ✅ ERGANH: UPLOAD STARTED
+    //     // ================================================================
+    //     socket.on('erganh:started', function (data) {
+    //         console.log('📡 [ERGANH] Upload started:', data);
 
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'info',
-                title: 'ΕΡΓΑΝΗ ΙΙ',
-                text: data.message || 'Έναρξη αποστολής...',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup',
-                    title: 'swal-toast-title'
-                }
-            });
-        });
+    //         Swal.fire({
+    //             toast: true,
+    //             position: 'top-end',
+    //             icon: 'info',
+    //             title: 'ΕΡΓΑΝΗ ΙΙ',
+    //             text: data.message || 'Έναρξη αποστολής...',
+    //             showConfirmButton: false,
+    //             timer: 3000,
+    //             timerProgressBar: true,
+    //             customClass: {
+    //                 popup: 'swal-toast-popup',
+    //                 title: 'swal-toast-title'
+    //             }
+    //         });
+    //     });
 
-        // ================================================================
-        // ✅ ERGANH: PROGRESS UPDATE
-        // ================================================================
-        socket.on('erganh:progress', function (data) {
-            console.log('📡 [ERGANH] Progress:', data);
+    //     // ================================================================
+    //     // ✅ ERGANH: PROGRESS UPDATE
+    //     // ================================================================
+    //     socket.on('erganh:progress', function (data) {
+    //         console.log('📡 [ERGANH] Progress:', data);
 
-            const stepIcons = {
-                credentials: 'info',
-                browser: 'info',
-                login: 'info',
-                login_success: 'success',
-                uploading: 'info',
-                processing: 'info'
-            };
+    //         const stepIcons = {
+    //             credentials: 'info',
+    //             browser: 'info',
+    //             login: 'info',
+    //             login_success: 'success',
+    //             uploading: 'info',
+    //             processing: 'info'
+    //         };
 
-            const icon = stepIcons[data.step] || 'info';
+    //         const icon = stepIcons[data.step] || 'info';
 
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: icon,
-                title: 'ΕΡΓΑΝΗ ΙΙ',
-                text: data.message || 'Σε εξέλιξη...',
-                showConfirmButton: false,
-                timer: data.step === 'login_success' ? 2000 : 3000,
-                timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup',
-                    title: 'swal-toast-title'
-                }
-            });
-        });
+    //         Swal.fire({
+    //             toast: true,
+    //             position: 'top-end',
+    //             icon: icon,
+    //             title: 'ΕΡΓΑΝΗ ΙΙ',
+    //             text: data.message || 'Σε εξέλιξη...',
+    //             showConfirmButton: false,
+    //             timer: data.step === 'login_success' ? 2000 : 3000,
+    //             timerProgressBar: true,
+    //             customClass: {
+    //                 popup: 'swal-toast-popup',
+    //                 title: 'swal-toast-title'
+    //             }
+    //         });
+    //     });
 
-        // ================================================================
-        // ✅ ERGANH: SUCCESS
-        // ================================================================
-        socket.on('erganh:success', function (data) {
-            console.log('📡 [ERGANH] Success:', data);
+    //     // ================================================================
+    //     // ✅ ERGANH: SUCCESS
+    //     // ================================================================
+    //     socket.on('erganh:success', function (data) {
+    //         console.log('📡 [ERGANH] Success:', data);
 
-            const protocolHtml = data.protocol
-                ? `<p style="margin-top: 10px; font-size: 0.95rem;">
-                 <strong>Πρωτόκολλο:</strong> 
-                 <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
-               </p>`
-                : '';
+    //         const protocolHtml = data.protocol
+    //             ? `<p style="margin-top: 10px; font-size: 0.95rem;">
+    //              <strong>Πρωτόκολλο:</strong>
+    //              <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
+    //            </p>`
+    //             : '';
 
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: '✅ ΕΡΓΑΝΗ ΙΙ - Επιτυχία',
-                html: `
-                <p>${data.message || 'Επιτυχής αποστολή!'}</p>
-                ${protocolHtml}
-            `,
-                showConfirmButton: true,
-                confirmButtonText: 'OK',
-                timer: 8000,
-                timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup swal-toast-success',
-                    title: 'swal-toast-title',
-                    confirmButton: 'swal-toast-confirm-btn'
-                },
-                didOpen: (toast) => {
-                    toast.addEventListener('mouseenter', Swal.stopTimer);
-                    toast.addEventListener('mouseleave', Swal.resumeTimer);
-                }
-            });
-        });
+    //         Swal.fire({
+    //             toast: true,
+    //             position: 'top-end',
+    //             icon: 'success',
+    //             title: '✅ ΕΡΓΑΝΗ ΙΙ - Επιτυχία',
+    //             html: `
+    //             <p>${data.message || 'Επιτυχής αποστολή!'}</p>
+    //             ${protocolHtml}
+    //         `,
+    //             showConfirmButton: true,
+    //             confirmButtonText: 'OK',
+    //             timer: 8000,
+    //             timerProgressBar: true,
+    //             customClass: {
+    //                 popup: 'swal-toast-popup swal-toast-success',
+    //                 title: 'swal-toast-title',
+    //                 confirmButton: 'swal-toast-confirm-btn'
+    //             },
+    //             didOpen: (toast) => {
+    //                 toast.addEventListener('mouseenter', Swal.stopTimer);
+    //                 toast.addEventListener('mouseleave', Swal.resumeTimer);
+    //             }
+    //         });
+    //     });
 
-        // ================================================================
-        // ✅ ERGANH: ERROR
-        // ================================================================
-        socket.on('erganh:error', function (data) {
-            console.error('📡 [ERGANH] Error:', data);
+    //     // ================================================================
+    //     // ✅ ERGANH: ERROR
+    //     // ================================================================
+    //     socket.on('erganh:error', function (data) {
+    //         console.error('📡 [ERGANH] Error:', data);
 
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'error',
-                title: '❌ ΕΡΓΑΝΗ ΙΙ - Αποτυχία',
-                html: `
-                <p>${data.message || 'Η αποστολή απέτυχε'}</p>
-                ${
-                    data.error
-                        ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>`
-                        : ''
-                }
-            `,
-                showConfirmButton: true,
-                confirmButtonText: 'Κλείσιμο',
-                timer: 10000,
-                timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup swal-toast-error',
-                    title: 'swal-toast-title',
-                    confirmButton: 'swal-toast-confirm-btn'
-                },
-                didOpen: (toast) => {
-                    toast.addEventListener('mouseenter', Swal.stopTimer);
-                    toast.addEventListener('mouseleave', Swal.resumeTimer);
-                }
-            });
-        });
-    } else {
-        console.warn('⚠️  [ERGANH] Socket.io not available - real-time updates disabled');
-    }
+    //         Swal.fire({
+    //             toast: true,
+    //             position: 'top-end',
+    //             icon: 'error',
+    //             title: '❌ ΕΡΓΑΝΗ ΙΙ - Αποτυχία',
+    //             html: `
+    //             <p>${data.message || 'Η αποστολή απέτυχε'}</p>
+    //             ${
+    //                 data.error
+    //                     ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>`
+    //                     : ''
+    //             }
+    //         `,
+    //             showConfirmButton: true,
+    //             confirmButtonText: 'Κλείσιμο',
+    //             timer: 10000,
+    //             timerProgressBar: true,
+    //             customClass: {
+    //                 popup: 'swal-toast-popup swal-toast-error',
+    //                 title: 'swal-toast-title',
+    //                 confirmButton: 'swal-toast-confirm-btn'
+    //             },
+    //             didOpen: (toast) => {
+    //                 toast.addEventListener('mouseenter', Swal.stopTimer);
+    //                 toast.addEventListener('mouseleave', Swal.resumeTimer);
+    //             }
+    //         });
+    //     });
+    // } else {
+    //     console.warn('⚠️  [ERGANH] Socket.io not available - real-time updates disabled');
+    // }
 });

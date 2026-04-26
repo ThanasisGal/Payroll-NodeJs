@@ -139,6 +139,7 @@
         <!-- <script src="<%= script('dates/date_format_fix') %>"></script>
         <script src="<%= script('dates/time_format_fix') %>"></script> -->
         <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
+        <script src="<%= script('common/heartbeat') %>"></script>
 
         <!-- Vendors -->
         <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/jquery.min.js"></script>
@@ -425,6 +426,27 @@
 
                 socket.on('erganh:error', function (data) {
                     window.finishProgressError(data?.message || 'Σφάλμα');
+                });
+
+                // ✅ Admin message listener
+                socket.on('admin:message', function (data) {
+                    if (!window.Swal) return;
+                    Swal.fire({
+                        icon: 'info',
+                        title: '📢 Μήνυμα από Admin',
+                        html:
+                            '<strong>' +
+                            (data.from || 'Admin') +
+                            ':</strong><br><br>' +
+                            data.message,
+                        confirmButtonText: 'Εντάξει',
+                        allowOutsideClick: false,
+                        customClass: {
+                            popup: 'custom-swal-popup',
+                            title: 'custom-title',
+                            confirmButton: 'class-info custom-confirm-button custom-swal-button'
+                        }
+                    });
                 });
             })();
         </script>

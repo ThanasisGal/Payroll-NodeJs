@@ -1,0 +1,251 @@
+<%# ============================================================================
+    Active Sessions Page - CSP/CSRF Safe
+    - Χωρίς inline event handlers (onclick, onload κλπ)
+    - Όλα τα scripts με nonce
+    - escapeHtml για XSS protection
+    ============================================================================ %>
+
+<div class="container-fluid mt-4">
+
+    <%# ── Header ── %>
+    <div class="row mb-4">
+        <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+            <h2 class="mb-0">
+                <i class="bi bi-people-fill text-success"></i>
+                Ενεργοί Χρήστες
+            </h2>
+            <span class="badge bg-success fs-6">
+                <%= activeUsers.length %> Online
+            </span>
+            <button id="btnRefresh" type="button" class="btn btn-refresh-custom btn-sm ms-auto">
+                <i class="bi bi-arrow-clockwise"></i> Ανανέωση
+            </button>
+        </div>
+        <div class="col-12"><hr /></div>
+    </div>
+
+    <%# ── No users ── %>
+    <% if (activeUsers.length === 0) { %>
+        <div class="alert alert-info d-flex align-items-center gap-2">
+            <i class="bi bi-info-circle-fill fs-5"></i>
+            <span>Δεν υπάρχουν ενεργοί χρήστες αυτή τη στιγμή.</span>
+        </div>
+    <% } else { %>
+
+        <%# ── Cards ── %>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            <% activeUsers.forEach(function(u) {
+                const isMe = String(u.userId) === String(currentUserId);
+                const initials = (u.firstName.charAt(0) + u.lastName.charAt(0)).toUpperCase();
+                const badgeColor = u.privileges === 'A' ? '#dc3545'
+                                 : u.privileges === 'C' ? '#0d6efd'
+                                 : '#6c757d';
+            %>
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0 <%= isMe ? 'border border-success border-2' : '' %>"
+                         style="border-radius:12px; overflow:hidden;">
+
+                        <%# Card Header %>
+                        <div class="card-header d-flex align-items-center gap-2 py-3"
+                             style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);">
+
+                            <div class="rounded-circle d-flex align-items-center justify-content-center
+                                        text-white fw-bold flex-shrink-0 user-avatar"
+                                 data-color="<%= badgeColor %>"
+                                 style="width:42px;height:42px;font-size:1.1rem;">
+                                <%= initials %>
+                            </div>
+
+                            <div class="flex-grow-1 text-white overflow-hidden">
+                                <div class="fw-bold text-truncate">
+                                    <%= u.firstName %> <%= u.lastName %>
+                                </div>
+                                <div class="small opacity-75 text-truncate"><%= u.email %></div>
+                            </div>
+
+                            <div class="flex-shrink-0">
+                                <% if (u.privileges === 'A') { %>
+                                    <span class="badge bg-danger">Admin</span>
+                                <% } else if (u.privileges === 'C') { %>
+                                    <span class="badge bg-primary">Customer</span>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">Visitor</span>
+                                <% } %>
+                            </div>
+                        </div>
+
+                        <%# Card Body %>
+                        <div class="card-body py-3">
+                            <ul class="list-unstyled mb-0 small">
+                                <li class="d-flex align-items-start gap-2 mb-2">
+                                    <i class="bi bi-people text-muted mt-1"></i>
+                                    <span class="text-muted me-1">Team:</span>
+                                    <strong><%= u.team || '—' %></strong>
+                                </li>
+                                <li class="d-flex align-items-start gap-2 mb-2">
+                                    <i class="bi bi-building text-muted mt-1"></i>
+                                    <span class="text-muted me-1">Εταιρεία:</span>
+                                    <strong><%= u.companyDescription || '—' %></strong>
+                                </li>
+                                <li class="d-flex align-items-start gap-2 mb-2">
+                                    <i class="bi bi-calendar3 text-muted mt-1"></i>
+                                    <span class="text-muted me-1">Περίοδος:</span>
+                                    <strong>
+                                        <%= u.periodInUseDescr || '—' %>
+                                        <%= u.yearInUse ? ' ' + u.yearInUse : '' %>
+                                    </strong>
+                                </li>
+                                <li class="d-flex align-items-start gap-2">
+                                    <i class="bi bi-clock text-muted mt-1"></i>
+                                    <span class="text-muted me-1">Λήξη:</span>
+                                    <strong class="text-danger" data-expires="<%= u.expires %>">
+                                        —
+                                    </strong>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <%# Card Footer %>
+                        <div class="card-footer bg-light d-flex align-items-center gap-2 py-2">
+                            <span class="badge bg-success rounded-pill">
+                                <i class="bi bi-circle-fill me-1" style="font-size:0.45rem;"></i>
+                                Online
+                            </span>
+                            <% if (isMe) { %>
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-person-check me-1"></i> Εσύ
+                                </span>
+                            <% } %>
+
+                            <%# ── Κουμπί Μήνυμα ── %>
+                            <button type="button"
+                                    class="btn btn-message-custom btn-sm ms-auto btn-send-message"
+                                    data-userid="<%= u.userId %>"
+                                    data-username="<%= u.firstName %> <%= u.lastName %>">
+                                <i class="bi bi-chat-dots"></i> Μήνυμα
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+
+    <% } %>
+</div>
+
+<%# ── JavaScript: CSP-safe (nonce), χωρίς inline handlers ── %>
+<script nonce="<%= nonce %>">
+(function () {
+    'use strict';
+
+    // ── Refresh button ──────────────────────────────────────────────
+    const btnRefresh = document.getElementById('btnRefresh');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', function () {
+            window.location.reload();
+        });
+    }
+
+    // ── Avatar background colors (αντί για inline EJS σε CSS) ──────
+    document.querySelectorAll('.user-avatar[data-color]').forEach(function (el) {
+        el.style.background = el.getAttribute('data-color');
+    });
+
+    // ── Format expires dates (client-side locale) ───────────────────
+    document.querySelectorAll('[data-expires]').forEach(function (el) {
+        const raw = el.getAttribute('data-expires');
+        if (!raw) return;
+        try {
+            const d = new Date(raw);
+            if (isNaN(d.getTime())) return;
+            el.textContent = d.toLocaleString('el-GR', {
+                day:    '2-digit',
+                month:  '2-digit',
+                year:   'numeric',
+                hour:   '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            // leave as —
+        }
+    });
+
+    // ── Send Message buttons ────────────────────────────────────────
+    document.querySelectorAll('.btn-send-message').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const userId   = this.getAttribute('data-userid');
+            const username = this.getAttribute('data-username');
+
+            const result = await Swal.fire({
+                title: 'Μήνυμα σε ' + username,
+                input: 'textarea',
+                inputPlaceholder: 'Γράψε το μήνυμά σου...',
+                inputAttributes: { maxlength: 500 },
+                inputValue: 'Θα θέλαμε να σας ενημερώσουμε ότι μέσα στα επόμενα 5 λεπτά θα χρειαστεί να αποσυνδεθείτε από την εφαρμογή (επιστρέφοντας στον browser), λόγω προγραμματισμένων βελτιώσεων.\n\nΚατά την επανασύνδεσή σας, παρακαλούμε να κάνετε ανανέωση της σελίδας χρησιμοποιώντας τον συνδυασμό πλήκτρων Ctrl + Shift + R.\n\nΣας ευχαριστούμε για την κατανόηση!',
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-send"></i> Αποστολή',
+                cancelButtonText: 'Ακύρωση',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                    cancelButton:  'class-secondary custom-cancel-button custom-swal-button',
+                    title:  'custom-title',
+                    popup:  'custom-swal-popup'
+                },
+                inputValidator: function (value) {
+                    if (!value || !value.trim()) {
+                        return 'Γράψε κάτι πριν στείλεις!';
+                    }
+                }
+            });
+
+            if (!result.isConfirmed) return;
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+            try {
+                const response = await fetch('/admin/send-message', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        toUserId: userId,
+                        message:  result.value.trim()
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    await Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: '✅ Το μήνυμα στάλθηκε στον ' + username,
+                        showConfirmButton: false,
+                        timer: 3000,
+                        timerProgressBar: true
+                    });
+                } else {
+                    throw new Error(data.message || 'Σφάλμα');
+                }
+            } catch (err) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Αποτυχία',
+                    text: err.message || 'Δεν στάλθηκε το μήνυμα.',
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                        popup: 'custom-swal-popup'
+                    }
+                });
+            }
+        });
+    });
+
+})();
+</script>

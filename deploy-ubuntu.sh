@@ -551,6 +551,7 @@ declare -a common_files=(
     "public/js/common/getUser.js"
     "public/js/common/getUserRole.js"
     "public/js/common/getXrhsh.js"
+    "public/js/common/heartbeat.js"
     "public/js/common/hideTooltips.js"
     "public/js/common/ibanChecker.js"
     "public/js/common/input_auto_select.js"

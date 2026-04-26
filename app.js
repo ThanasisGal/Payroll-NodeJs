@@ -905,6 +905,15 @@ async function startServer() {
         const { initializeSocket } = require('./server/socket');
         initializeSocket(server);
 
+        // ✅ Usage Cleanup Job -- τρέχει κάθε 5 λεπτά
+        const { cleanupOrphanedSessions } = require('./server/utils/usageCleanup');
+
+        // Τρέξε αμέσως κατά την εκκίνηση
+        cleanupOrphanedSessions();
+
+        // Και μετά κάθε 5 λεπτά
+        setInterval(cleanupOrphanedSessions, 5 * 60 * 1000);
+
         // ============================================================================
         // ✅ START SERVER (changed from app.listen to server.listen)
         // ============================================================================
