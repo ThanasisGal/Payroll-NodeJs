@@ -92,15 +92,6 @@ exports.uploadTemplates = async (req, res) => {
             }
         }
 
-        // // ✅ Reload text cache after successful uploads
-        // if (results.length > 0) {
-        //     try {
-        //         const refreshResult = await textCacheManager.refresh();
-        //     } catch (error) {
-        //         console.error('❌ Cache reload error:', error.message);
-        //     }
-        // }
-
         // Return summary
         const response = {
             success: errors.length === 0,
@@ -116,10 +107,13 @@ exports.uploadTemplates = async (req, res) => {
 
         // ✅ Μετά refresh cache ασύγχρονα (fire and forget)
         if (results.length > 0) {
-            textCacheManager
-                .refresh()
-                .then((r) => console.log(`✅ Cache refreshed: ${r.totalFiles} files`))
-                .catch((e) => console.error('❌ Cache refresh error:', e.message));
+            try {
+                const refreshResult = await textCacheManager.refresh();
+                console.log(`✅ Cache refreshed: ${refreshResult.totalFiles} files`);
+            } catch (e) {
+                console.error('❌ Cache refresh error:', e.message);
+                // Μη σταματάς — το upload έγινε, απλά το cache δεν ανανεώθηκε
+            }
         }
     } catch (error) {
         console.error('❌ Template upload error:', error);
