@@ -17,7 +17,7 @@ exports.uploadTemplates = async (req, res) => {
         // console.log('   Body:', req.body);
         // console.log('   Files:', req.files ? req.files.length : 0);
 
-        const { team, company, category } = req.body;  // company = _id από frontend
+        const { team, company, category } = req.body; // company = _id από frontend
         const files = req.files;
 
         // Validation: Check files
@@ -83,7 +83,6 @@ exports.uploadTemplates = async (req, res) => {
                 });
 
                 // console.log(`✅ ${filename} uploaded successfully`);
-
             } catch (error) {
                 errors.push({
                     filename: file.originalname,
@@ -93,20 +92,14 @@ exports.uploadTemplates = async (req, res) => {
             }
         }
 
-        // ✅ Reload text cache after successful uploads
-        if (results.length > 0) {
-            // console.log('🔄 Reloading text cache system...');
-            try {
-                const refreshResult = await textCacheManager.refresh();
-                // if (refreshResult.success) {
-                //     console.log(`✅ Cache reloaded: ${refreshResult.totalFiles} templates in memory`);
-                // } else {
-                //     console.warn('⚠️ Cache reload failed:', refreshResult.error);
-                // }
-            } catch (error) {
-                console.error('❌ Cache reload error:', error.message);
-            }
-        }
+        // // ✅ Reload text cache after successful uploads
+        // if (results.length > 0) {
+        //     try {
+        //         const refreshResult = await textCacheManager.refresh();
+        //     } catch (error) {
+        //         console.error('❌ Cache reload error:', error.message);
+        //     }
+        // }
 
         // Return summary
         const response = {
@@ -119,10 +112,15 @@ exports.uploadTemplates = async (req, res) => {
             uploadPath: `txt/${team}/${companyFolder}/${category}/`
         };
 
-        // console.log(`📊 Upload complete: ${results.length} success, ${errors.length} failed`);
-
         res.json(response);
 
+        // ✅ Μετά refresh cache ασύγχρονα (fire and forget)
+        if (results.length > 0) {
+            textCacheManager
+                .refresh()
+                .then((r) => console.log(`✅ Cache refreshed: ${r.totalFiles} files`))
+                .catch((e) => console.error('❌ Cache refresh error:', e.message));
+        }
     } catch (error) {
         console.error('❌ Template upload error:', error);
         res.status(500).json({
