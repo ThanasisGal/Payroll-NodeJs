@@ -1,12 +1,17 @@
 (function () {
     'use strict';
 
-    const INTERVAL_MS = 60 * 1000; // κάθε 1 λεπτό
+    const INTERVAL_MS = 60 * 1000;
 
     function sendHeartbeat(closing) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        // ✅ Αν δεν υπάρχει userId, μην στέλνεις
+        const userId = document.querySelector('meta[name="user-id"]')?.content || '';
+        if (!userId) return;
 
-        // ✅ sendBeacon για browser close (πιο αξιόπιστο)
+        // ✅ Αν δεν υπάρχει CSRF token, μην στέλνεις
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        if (!csrfToken) return;
+
         if (closing) {
             const data = JSON.stringify({ closing: true });
             const blob = new Blob([data], { type: 'application/json' });
@@ -14,7 +19,6 @@
             return;
         }
 
-        // ✅ fetch για κανονικό heartbeat
         fetch('/api/usage/heartbeat', {
             method: 'POST',
             credentials: 'same-origin',
@@ -25,19 +29,17 @@
             },
             body: JSON.stringify({ closing: false })
         }).catch(function () {
-            // silent fail -- δεν ενοχλούμε τον χρήστη
+            // silent fail
         });
     }
 
-    // ✅ Ξεκίνα heartbeat μόνο αν υπάρχει session (userId στο DOM)
     document.addEventListener('DOMContentLoaded', function () {
-        sendHeartbeat(false); // αμέσως κατά το load
+        sendHeartbeat(false);
         setInterval(function () {
             sendHeartbeat(false);
         }, INTERVAL_MS);
     });
 
-    // ✅ Browser/tab close
     window.addEventListener('beforeunload', function () {
         sendHeartbeat(true);
     });

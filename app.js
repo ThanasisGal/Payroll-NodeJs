@@ -608,7 +608,8 @@ app.use((req, res, next) => {
         '/js/',
         '/images/',
         '/uploads/',
-        '/static/'
+        '/static/',
+        '/api/usage/heartbeat'
     ];
 
     if (skipPaths.some((path) => req.path.startsWith(path))) {

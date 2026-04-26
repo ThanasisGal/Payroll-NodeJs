@@ -9,6 +9,7 @@
         <meta name="description" content="<%= locals.description %>" />
         <meta name="csrf-token" content="<%= csrfToken %>" />
         <meta name="app-root" content="/mainapp" />
+        <meta name="user-id" content="<%= locals.userId || '' %>" />
 
         <script nonce="<%= nonce %>">
             (function () {
@@ -384,9 +385,18 @@
 
                 socket.on('connect', function () {
                     const userId = '<%= locals.userId || "" %>';
+                    console.log('🔌 Socket connected. userId:', userId); // ✅ ΠΡΟΣΘΕΣΕ
+
                     if (userId && userId.trim() !== '') {
                         socket.emit('join', userId);
+                        console.log('📤 Emitted join for userId:', userId); // ✅ ΠΡΟΣΘΕΣΕ
+                    } else {
+                        console.warn('⚠️ No userId - cannot join room'); // ✅ ΠΡΟΣΘΕΣΕ
                     }
+                });
+
+                socket.on('joined', function (data) {
+                    console.log('✅ Joined room:', data.room); // ✅ ΠΡΟΣΘΕΣΕ
                 });
 
                 // EFKA progress events (percent + message + step/totalSteps)
@@ -430,7 +440,14 @@
 
                 // ✅ Admin message listener
                 socket.on('admin:message', function (data) {
+                    console.log('📢 admin:message received:', data);
                     if (!window.Swal) return;
+
+                    // ✅ Αγνόησε αν είσαι ο αποστολέας
+                    const myUserId = document.querySelector('meta[name="user-id"]')?.content || '';
+                    if (data.fromUserId && myUserId && String(data.fromUserId) === String(myUserId))
+                        return;
+
                     Swal.fire({
                         icon: 'info',
                         title: '📢 Μήνυμα από Admin',
@@ -441,6 +458,7 @@
                             data.message,
                         confirmButtonText: 'Εντάξει',
                         allowOutsideClick: false,
+                        allowEscapeKey: false,
                         customClass: {
                             popup: 'custom-swal-popup',
                             title: 'custom-title',

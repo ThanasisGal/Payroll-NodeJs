@@ -55,10 +55,8 @@ router.get('/aws_s3', requireAdmin, async (req, res) => {
         res.render('admin/uploadTemplates', {
             bodyClass: 'upload-templates-page',
             userPrivileges: userPrivileges?.privileges || {},
-            locals: {
-                title: 'Upload Templates',
-                description: 'Web Payroll Solutions'
-            },
+            title: 'Upload Templates', // ✅ Απευθείας
+            description: 'Web Payroll Solutions', // ✅ Απευθείας
             sessionTeam: sessionUserTeam,
             companyId: companyId,
             companyKod: company.kod,
