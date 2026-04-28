@@ -123,7 +123,7 @@
                 data-bs-title="Επιλέξτε την εταιρεία προς χρήση"
                 data-bs-placement="bottom"
                 data-tooltip-max-width="15vw"
-                class="btn btn-success rounded-4 buttons-content <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
+                class="btn btn-warning rounded-4 buttons-content <%= (!userPrivileges.admin && !userPrivileges.read) ? 'disabled-link' : '' %>"
                 data-allowed="<%= (userPrivileges.admin || userPrivileges.read) ? '1' : '0' %>">
                 <i class="buttons-content bi bi-check2-circle"></i> Επιλογή Εταιρείας
             </a>

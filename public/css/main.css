@@ -10978,3 +10978,28 @@ body.loader-active > *:not(.app-loader) {
     border-color: #0d1b2a;
     color: #fff;
 }
+
+.ergani-swal-popup {
+    width: 600px !important;
+    max-width: 90vw !important;
+}
+
+.ergani-swal-html {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.ergani-swal-content,
+.ergani-swal-details {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    text-align: left;
+    line-height: 1.45;
+}
+
+.ergani-swal-details {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #555;
+}

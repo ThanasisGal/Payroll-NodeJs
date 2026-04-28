@@ -2752,6 +2752,8 @@ class ergazomenoiController {
                 formData.hmeromhnia_katabolhs_ths_apozhmioshs || null,
             shmeioseis_apozhmioshs: formData.shmeioseis_apozhmioshs,
             parathrhseis: formData.parathrhseis,
+            typos_metabolhs: formData.typos_metabolhs || null,
+            typos_metabolhs_table: formData.typos_metabolhs_table || '[]',
             symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
             symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
             paketo_apodoxon: formData.paketo_apodoxon,

@@ -55,9 +55,9 @@
 					type="hidden" 
 					id="typos_metabolhs_table" 
 					name="typos_metabolhs_table" 
-					value="[]"
+					value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>"
 				/>
-				
+
 				<div class="col-9-5">
 					<select
 						id="typos_metabolhs"

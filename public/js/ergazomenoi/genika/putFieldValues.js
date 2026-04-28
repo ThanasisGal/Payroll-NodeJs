@@ -2549,7 +2549,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 await Swal.fire({
                     icon: 'warning',
                     title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
-                    text: payload?.userMessage || 'Αποτυχία υποβολής ΜΑ',
+                    customClass: {
+                        popup: 'ergani-swal-popup',
+                        htmlContainer: 'ergani-swal-html'
+                    },
+                    html: `
+    <div class="ergani-swal-content">
+      <p>${payload?.userMessage || 'Αποτυχία υποβολής ΜΑ'}</p>
+      ${payload?.errorDetails ? `<p class="ergani-swal-details">${payload.errorDetails}</p>` : ''}
+    </div>
+  `,
                     confirmButtonText: 'OK'
                 });
             }

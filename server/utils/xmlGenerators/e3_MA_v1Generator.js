@@ -47,19 +47,31 @@ async function generateMAXML(ergazomenos, companyData, ypokatasthmataData, optio
                 } else if (Array.isArray(rawData)) {
                     parsed = rawData;
                 }
+
+                // ✅ Log ΠΡΙΝ τον έλεγχο — πάντα ασφαλές
+                console.log('🔍 [MA] rawData:', JSON.stringify(rawData));
+                console.log('🔍 [MA] parsed:', JSON.stringify(parsed ?? null));
+
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     typesMetabolon = parsed
                         .filter((item) => item)
                         .map((item) => {
-                            const typos =
-                                typeof item === 'object'
-                                    ? item.typos_metabolhs || item.typos || item.value || item
-                                    : item;
-                            return { typos_metabolhs: String(typos) };
-                        });
-                    console.log(
-                        `✅ [MA-GENERATOR-v1] Found ${typesMetabolon.length} metaboles types`
-                    );
+                            let typos;
+                            if (typeof item === 'object') {
+                                typos =
+                                    item.typos_metabolhs ??
+                                    item.typos ??
+                                    item.value ??
+                                    item.code ??
+                                    Object.values(item)[0];
+                            } else {
+                                typos = item;
+                            }
+                            return { typos_metabolhs: String(typos || '') };
+                        })
+                        .filter((item) => item.typos_metabolhs !== '');
+
+                    console.log('🔍 [MA] typesMetabolon:', JSON.stringify(typesMetabolon));
                 }
             }
         } catch (parseError) {
@@ -358,11 +370,12 @@ async function generateMAXML(ergazomenos, companyData, ypokatasthmataData, optio
             f_borrow_company_eponimia: ergazomenos.eponimia_epixeirishs_daneismoy || '',
 
             // ── FILES (ίδιο με E3N + MA-ONLY f_epibolh_file) ──
-            f_basics_acceptance: typesMetabolon.some(
-                (t) => String(t.typos_metabolhs).padStart(3, '0') === '001'
-            )
-                ? '2'
-                : ergazomenos.oysiodeis_oroi || '2',
+            // ✅ '2' ΜΟΝΟ αν υπάρχει ακριβώς ΕΝΑ type ΚΑΙ είναι '001'
+            f_basics_acceptance:
+                typesMetabolon.length === 1 &&
+                String(typesMetabolon[0].typos_metabolhs).padStart(3, '0') === '001'
+                    ? '2'
+                    : ergazomenos.oysiodeis_oroi || '2',
             f_file: contractPdfBase64,
             f_comments: ergazomenos.parathrhseis || '',
             f_foreign_file: foreignPdfBase64,
