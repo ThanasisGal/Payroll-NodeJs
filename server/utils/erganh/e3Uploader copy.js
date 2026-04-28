@@ -1,11 +1,10 @@
-// server/utils/erganh/wtoUploader.js
+// e3Uploader.js
 'use strict';
 
 const fs = require('fs-extra');
 const path = require('path');
 const { chromium } = require('playwright');
 const sessionManager = require('./sessionManager');
-const { resolveProcessCode } = require('./e3Uploader');
 
 const DEBUG = String(process.env.ERGANH_DEBUG || '').toLowerCase() === 'true';
 const HEADLESS = !DEBUG;
@@ -19,10 +18,12 @@ const TIMEOUTS = {
     long: 20000,
     nav: 25000,
     modalAppear: 20000,
-    modalSettle: 5000,
+
+    modalSettle: 5000, // ✅ NEW: wait 5s for modal body to populate
     modalClose: 5000
 };
 
+// Login inputs (fallbacks)
 const SEL_LOGIN_USERNAME_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName',
     'input[type="text"][name*="UserName"]',
@@ -45,6 +46,7 @@ const SEL_LOGIN_SUBMIT_ANY = [
     'input[type="submit"]'
 ].join(', ');
 
+// Upload page selectors
 const SEL_UPLOAD_PROCESS_SELECT_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SKYpobolesList',
     'select[id*="SKYpobolesList"]',
@@ -73,6 +75,7 @@ const SEL_UPLOAD_SUBMIT_ANY = [
     'input[type="button"][value="Ενημέρωση"]'
 ].join(', ');
 
+// Modal OK
 const SEL_MODAL_OK_ANY = [
     '.swal2-confirm',
     'button:has-text("OK")',
@@ -88,13 +91,13 @@ const SEL_MODAL_OK_ANY = [
 ].join(', ');
 
 function log(...a) {
-    console.log('[WTO-ERGANH]', ...a);
+    console.log('[ERGANH]', ...a);
 }
 function warn(...a) {
-    console.warn('[WTO-ERGANH][WARN]', ...a);
+    console.warn('[ERGANH][WARN]', ...a);
 }
 function dbg(...a) {
-    if (DEBUG) console.log('[WTO-ERGANH][DEBUG]', ...a);
+    if (DEBUG) console.log('[ERGANH][DEBUG]', ...a);
 }
 
 function cleanText(s) {
@@ -107,12 +110,15 @@ function cleanText(s) {
 }
 
 function normalizeForExactCompare(s) {
-    return String(s || '')
-        .replace(/\r/g, '')
-        .replace(/['']/g, "'")
-        .replace(/[""]/g, '"')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return (
+        String(s || '')
+            .replace(/\r/g, '')
+            .replace(/[’‘]/g, "'")
+            .replace(/[“”]/g, '"')
+            // ✅ collapse ALL whitespace (spaces, tabs, newlines) to single spaces
+            .replace(/\s+/g, ' ')
+            .trim()
+    );
 }
 
 const SUCCESS_MODAL_TEXT_EXACT = normalizeForExactCompare(
@@ -131,7 +137,7 @@ async function ensureScreensDir() {
 async function snap(page, label) {
     try {
         await ensureScreensDir();
-        const p = path.join(process.cwd(), 'screenshots', `${Date.now()}-wto-${label}.png`);
+        const p = path.join(process.cwd(), 'screenshots', `${Date.now()}-${label}.png`);
         await page.screenshot({ path: p, fullPage: true });
         warn('[SCREENSHOT]', p);
         return p;
@@ -267,6 +273,7 @@ async function ensureOnUploadPage(page, creds) {
     throw new Error(`Login/Upload page not reachable. Screenshot: ${shot || 'N/A'}`);
 }
 
+// ✅ fallback text when no modal: try to find likely error snippets on the page
 async function captureFallbackPageErrorText(page) {
     try {
         const t = cleanText(
@@ -281,11 +288,13 @@ async function captureFallbackPageErrorText(page) {
                     'Ημερομηνία',
                     'δεν συμφων'
                 ];
+
                 const bodyText = document.body?.innerText || '';
                 const lines = bodyText
                     .split('\n')
                     .map((l) => l.trim())
                     .filter(Boolean);
+
                 const hits = [];
                 for (const line of lines) {
                     if (keywords.some((k) => line.includes(k))) hits.push(line);
@@ -294,13 +303,21 @@ async function captureFallbackPageErrorText(page) {
                 return hits.join('\n');
             })
         );
+
         return t;
     } catch {
         return '';
     }
 }
 
+/**
+ * Robust modal capture:
+ * - Waits for ANY dialog/swal2 or keyword presence
+ * - ✅ NEW: waits extra 5s for modal content to fully populate
+ * - Extracts text from dialog while filtering noise ("x", "Επιλογή", "OK")
+ */
 async function captureModalTextAndClose(page) {
+    // 1) Wait for a VISIBLE OK button (this is modal-specific and won't match <option>)
     const okBtn = await (async () => {
         const loc = page.locator(SEL_MODAL_OK_ANY);
         const start = Date.now();
@@ -317,12 +334,17 @@ async function captureModalTextAndClose(page) {
 
     if (!okBtn) return { text: '' };
 
+    // 2) Find the container that actually holds the dialog text.
+    // We climb ancestors until we find a "big" text block (heuristic).
     let container = okBtn.locator('xpath=ancestor::div[1]').first();
 
     for (let level = 1; level <= 14; level++) {
         const anc = okBtn.locator(`xpath=ancestor::div[${level}]`).first();
         const ancText = await anc.innerText().catch(() => '');
         const t = cleanText(ancText);
+
+        // Heuristic: modal text in your screenshot is definitely > 40 chars
+        // and contains either "Ειδοποίηση" or "Σφάλματα" or "xsd" or "Για το ΑΦΜ"
         const low = t.toLowerCase();
         const looksLikeModal =
             t.length > 40 &&
@@ -332,13 +354,17 @@ async function captureModalTextAndClose(page) {
                 t.includes('Για το ΑΦΜ') ||
                 t.includes('Για τον ΑΦΜ') ||
                 low.includes('pattern constraint'));
+
         if (looksLikeModal) {
             container = anc;
             break;
         }
     }
 
+    // 3) Read text, and clean obvious noise
     let text = cleanText(await container.innerText().catch(() => ''));
+
+    // remove isolated noise lines
     text = text
         .split('\n')
         .map((l) => l.trim())
@@ -348,6 +374,7 @@ async function captureModalTextAndClose(page) {
         )
         .join('\n');
 
+    // 4) Click OK fast (closing modal in <= ~1s)
     await okBtn.click({ timeout: 1000, force: true }).catch(() => {});
     await page.waitForTimeout(150).catch(() => {});
 
@@ -355,6 +382,13 @@ async function captureModalTextAndClose(page) {
 }
 
 async function uploadXml(page, xmlPath, creds, options = {}) {
+    // ✅ DEBUG: Log received parameters
+    log('[uploadXml] Parameters:', {
+        xmlPath: xmlPath ? path.basename(xmlPath) : 'MISSING',
+        hasCreds: !!(creds?.username && creds?.password),
+        options: options || 'UNDEFINED'
+    });
+
     await ensureOnUploadPage(page, creds);
 
     if (!xmlPath) throw new Error('Missing xmlPath');
@@ -363,7 +397,6 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     const dropdown = page.locator(SEL_UPLOAD_PROCESS_SELECT_ANY).first();
     const fileInput = page.locator(SEL_UPLOAD_FILE_INPUT_ANY).first();
     const submitBtn = page.locator(SEL_UPLOAD_SUBMIT_ANY).first();
-    // ✅ FIX 1: Προσθήκη submissionCheckbox για Οριστική/Προσωρινή
     const submissionCheckbox = page
         .locator('#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SubmitBox')
         .first();
@@ -384,30 +417,20 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
     await waitForOptionsOnSelect(dropdown, TIMEOUTS.long);
 
-    // ✅ FIX 2: Βελτιωμένο logging με rawProcessCode → processCode
-    const rawProcessCode = options?.processCode || 'wto_pshfiakh_organosh_xronoy_ergasias';
-    const processCode = resolveProcessCode(rawProcessCode);
-    // resolveProcessCode('wto_pshfiakh_organosh_xronoy_ergasias') → '182' ✅
-    // resolveProcessCode('182') → '182' ✅
-
-    log(`   WTO Process code: ${rawProcessCode} → ${processCode}`);
-
     let selected = false;
     try {
-        await dropdown.selectOption({ value: processCode });
+        await dropdown.selectOption({ value: '213' });
         selected = true;
     } catch {}
     if (!selected) {
         try {
-            await dropdown.selectOption(processCode);
+            await dropdown.selectOption('213');
             selected = true;
         } catch {}
     }
     if (!selected) {
-        const shot = await snap(page, `wto-process-select-failed-${processCode}`);
-        throw new Error(
-            `Could not select WTO process [${rawProcessCode}] → ${processCode}. Screenshot: ${shot || 'N/A'}`
-        );
+        const shot = await snap(page, 'process-select-failed');
+        throw new Error(`Could not select process 213. Screenshot: ${shot || 'N/A'}`);
     }
 
     await page.waitForTimeout(250).catch(() => {});
@@ -424,19 +447,22 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     await fileInput.setInputFiles(xmlPath);
     await dialogPromise;
 
-    // ✅ FIX 1 (συνέχεια): Χειρισμός checkbox Προσωρ��νή/Οριστική
+    // =====================================================================
+    // ✅ CHECK/UNCHECK SUBMISSION CHECKBOX BASED ON OPTIONS
+    // =====================================================================
     const isPermanent = options?.isPermanent === true;
     log(`   Submission mode: ${isPermanent ? 'Οριστική' : 'Προσωρινή'}`);
 
     if (await submissionCheckbox.count().catch(() => 0)) {
         try {
             const isChecked = await submissionCheckbox.isChecked().catch(() => false);
+
             if (isPermanent && !isChecked) {
                 log('✅ Checking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Οριστική mode)');
                 await submissionCheckbox.check({ timeout: TIMEOUTS.short });
                 await page.waitForTimeout(300);
             } else if (!isPermanent && isChecked) {
-                log('⏸  Unchecking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Προσωρινή mode)');
+                log('⏸️  Unchecking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Προσωρινή mode)');
                 await submissionCheckbox.uncheck({ timeout: TIMEOUTS.short });
                 await page.waitForTimeout(300);
             } else {
@@ -446,6 +472,7 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
             }
         } catch (checkboxError) {
             warn('Failed to toggle submission checkbox:', checkboxError.message);
+            // Non-fatal - continue with upload
         }
     } else {
         warn('Submission checkbox not found on page (may not exist for this ERGANH version)');
@@ -471,30 +498,31 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     return modalText || '';
 }
 
+// ------------------------------ MAIN EXPORT ---------------------------------
 async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
     let session = null;
     let page = null;
 
     try {
-        log('Getting or creating session (WTO will reuse E3 session)...', { companyId });
+        log('Getting or creating session...', { companyId });
+        // ✅ Log options for debugging
+        log('Options received:', options);
 
         session = await sessionManager.getOrCreateSession(companyId, creds);
         page = session.page;
 
+        // ✅ Pass options (isPermanent) to uploadXml
         const modalText = cleanText(await uploadXml(page, xmlPath, creds, options));
-
-        log('[WTO MODAL TEXT]', JSON.stringify(modalText));
-        log('[WTO MODAL OK?]', normalizeForExactCompare(modalText) === SUCCESS_MODAL_TEXT_EXACT);
 
         if (!modalText) {
             const fallback = `Δεν ελήφθη απάντηση από το ΕΡΓΑΝΗ μέσα σε ${Math.round(
                 TIMEOUTS.modalAppear / 1000
-            )} δευτερόλεπτα.\n\nΗ υποβολή WTO απέτυχε ή δεν εμφανίστηκε modal.`;
+            )} δευτερόλεπτα.\n\nΗ υποβολή απέτυχε ή δεν εμφανίστηκε modal.`;
             const shot = await snap(page, 'no-modal');
             return {
                 success: false,
                 protocol: null,
-                userMessage: 'Η υποβολή WTO απέτυχε.',
+                userMessage: 'Η υποβολή απέτυχε.',
                 errorDetails: fallback,
                 error: fallback,
                 messages: [],
@@ -508,7 +536,7 @@ async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
             return {
                 success: true,
                 protocol: null,
-                userMessage: 'Επιτυχής Αποθήκευση WTO (Προσωρινή)',
+                userMessage: 'Επιτυχής Αποθήκευση (Προσωρινή)',
                 errorDetails: modalText,
                 messages: [],
                 screenshot: null
@@ -518,7 +546,7 @@ async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
         return {
             success: false,
             protocol: null,
-            userMessage: 'Η υποβολή WTO απέτυχε.',
+            userMessage: 'Η υποβολή απέτυχε.',
             errorDetails: modalText,
             error: modalText,
             messages: [],
@@ -526,40 +554,37 @@ async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
         };
     } catch (e) {
         const msg = String(e?.message || e);
-        warn('WTO Run failed:', msg);
+        warn('Run failed:', msg);
         const shot = page && !page.isClosed() ? await snap(page, 'final-fail') : null;
         return {
             success: false,
             protocol: null,
-            userMessage: 'Αποτυχία επικοινωνίας με το ΕΡΓΑΝΗ (WTO). Δοκιμάστε ξανά.',
+            userMessage: 'Αποτυχία επικοινωνίας με το ΕΡΓΑΝΗ. Δοκιμάστε ξανά.',
             errorDetails: msg,
             error: msg,
             messages: [],
             screenshot: shot
         };
     } finally {
-        log('WTO upload completed (session will be closed by caller)');
+        log('E3 upload completed (session kept open for WTO)');
     }
 }
 
 const inflightByCompany = new Map();
 
-async function uploadWtoToErganh(companyId, xmlPath, userId = null, creds = null, options = {}) {
-    const key = `wto_${String(companyId ?? 'default')}`;
+async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null, options = {}) {
+    const key = String(companyId ?? 'default');
     if (inflightByCompany.has(key)) {
-        warn('WTO Upload already inflight for company:', key);
+        warn('Upload already inflight for company:', key);
         return await inflightByCompany.get(key);
     }
 
     const p = (async () => {
         try {
+            // ✅ Pass options (isPermanent) to runOnce
             return await runOnce(companyId, xmlPath, userId, creds, options);
         } finally {
             inflightByCompany.delete(key);
-            log('WTO upload finished, closing shared session...');
-            await sessionManager.closeSession(companyId).catch((e) => {
-                warn('Failed to close session:', e.message);
-            });
         }
     })();
 
@@ -567,4 +592,4 @@ async function uploadWtoToErganh(companyId, xmlPath, userId = null, creds = null
     return await p;
 }
 
-module.exports = { uploadWtoToErganh };
+module.exports = { uploadE3ToErganh };

@@ -1,25 +1,24 @@
-const mongoose = require("mongoose");
-const Models_B = require("../../models/privileges");
-const Models_C = require("../../models/companies");
-const Models = require("../../models/stathera_arxeia");
+const mongoose = require('mongoose');
+const Models_B = require('../../models/privileges');
+const Models_C = require('../../models/companies');
+const Models = require('../../models/stathera_arxeia');
 
 const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
 const { PerifereiesModel } = Models;
 
-let nextPageSearchTerm = "";
+let nextPageSearchTerm = '';
 
 function formatNumber(number, totalLength) {
     return number.toString().padStart(totalLength, '0');
 }
 
 class nomimoiekprosopoiController {
-
     static mainNomimoiEkprosopoiForm = async (req, res) => {
-        const locals = { title: "Νόμιμοι Εκπρόσωποι", description: "Web Payroll Solutions" };
+        const locals = { title: 'Νόμιμοι Εκπρόσωποι', description: 'Web Payroll Solutions' };
 
         const sessionCompanyInUse = req.session.companyInUse;
-        const sessionUserId       = req.session.userId;
+        const sessionUserId = req.session.userId;
         const basePer = Number(process.env.EGGRAFES) || 10;
         const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
         const perPage = basePer * perx;
@@ -31,36 +30,39 @@ class nomimoiekprosopoiController {
 
             const userPrivilegesDoc = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "NomimoiEkprosopoi",
+                form: 'NomimoiEkprosopoi'
             }).lean();
             const userPrivileges = userPrivilegesDoc ? userPrivilegesDoc.privileges : {};
 
             // Count
             const [{ total } = { total: 0 }] = await NomimoiEkprosopoiModel.aggregate([
                 { $match: { companykod_object: companyIdAsString } },
-                { $count: "total" },
+                { $count: 'total' }
             ]);
 
             const totalRecords = total;
-            const totalPages   = Math.max(1, Math.ceil(totalRecords / Math.max(perPage, 1)));
-            const skipRecords  = Math.max(0, (page - 1) * perPage);
-            const limitPerPage = Math.max(1, Math.min(perPage, totalRecords - skipRecords || perPage));
+            const totalPages = Math.max(1, Math.ceil(totalRecords / Math.max(perPage, 1)));
+            const skipRecords = Math.max(0, (page - 1) * perPage);
+            const limitPerPage = Math.max(
+                1,
+                Math.min(perPage, totalRecords - skipRecords || perPage)
+            );
 
             const queryPipeline = [
                 { $match: { companykod_object: companyIdAsString } },
                 {
                     $lookup: {
-                        from: "idiothtes",
-                        localField: "idiothta",
-                        foreignField: "kodikos",
-                        as: "idiothtaInfo",
-                    },
+                        from: 'idiothtes',
+                        localField: 'idiothta',
+                        foreignField: 'kodikos',
+                        as: 'idiothtaInfo'
+                    }
                 },
                 {
                     $unwind: {
-                        path: "$idiothtaInfo",
-                        preserveNullAndEmptyArrays: true,
-                    },
+                        path: '$idiothtaInfo',
+                        preserveNullAndEmptyArrays: true
+                    }
                 },
                 {
                     $addFields: {
@@ -68,23 +70,23 @@ class nomimoiekprosopoiController {
                             $cond: {
                                 if: {
                                     $and: [
-                                        { $ne: ["$idiothtaInfo", null] },
-                                        { $ne: ["$idiothtaInfo.kodikos", null] }
+                                        { $ne: ['$idiothtaInfo', null] },
+                                        { $ne: ['$idiothtaInfo.kodikos', null] }
                                     ]
                                 },
                                 then: {
                                     $concat: [
-                                        { $toString: "$idiothtaInfo.kodikos" },
-                                        " - ",
-                                        { $ifNull: ["$idiothtaInfo.perigrafh", ""] }
+                                        { $toString: '$idiothtaInfo.kodikos' },
+                                        ' - ',
+                                        { $ifNull: ['$idiothtaInfo.perigrafh', ''] }
                                     ]
                                 },
-                                else: ""
+                                else: ''
                             }
                         }
                     }
                 },
-                { $sort: { "idiothtaInfo.perigrafh": 1, _id: 1 } },
+                { $sort: { 'idiothtaInfo.perigrafh': 1, _id: 1 } },
                 { $skip: skipRecords },
                 { $limit: limitPerPage },
                 // Προβολή μόνο των πεδίων που χρειάζεσαι στο template
@@ -121,35 +123,36 @@ class nomimoiekprosopoiController {
                         afm: 1,
                         doy: 1,
                         ame: 1,
-                        idiothta: 1,                 // ο κωδικός που κρατάς στο hidden
-                        idiothtaInfo: {               // πλήρες αντικείμενο για tooltip/προβολή
+                        idiothta: 1, // ο κωδικός που κρατάς στο hidden
+                        idiothtaInfo: {
+                            // πλήρες αντικείμενο για tooltip/προβολή
                             kodikos: 1,
-                            perigrafh: 1,
+                            perigrafh: 1
                         },
-                        idiothta_label: 1,            // αν το θες έτοιμο
+                        idiothta_label: 1, // αν το θες έτοιμο
                         createdAt: 1,
-                        updatedAt: 1,
-                    },
-                },
+                        updatedAt: 1
+                    }
+                }
             ];
 
             const nomimoiekprosopoi = await NomimoiEkprosopoiModel.aggregate(queryPipeline).exec();
 
-            res.render("companies/nomimoi_ekprosopoi/nomimoi_ekprosopoi", {
+            res.render('companies/nomimoi_ekprosopoi/nomimoi_ekprosopoi', {
                 userPrivileges,
                 locals,
                 current: page,
                 pages: totalPages,
                 company,
                 nomimoiekprosopoi,
-                perx,                       // <-- για το UI πολλαπλασιαστή
-                basePer,                    // (προαιρετικό, αν το δείχνεις)
-                entries: perPage,           // (προαιρετικό: πόσα/σελίδα)
-                totalRecs: totalRecords,    // (προαιρετικό: συνολικά)
+                perx, // <-- για το UI πολλαπλασιαστή
+                basePer, // (προαιρετικό, αν το δείχνεις)
+                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.error(error);
-            res.status(500).send("Σφάλμα");
+            res.status(500).send('Σφάλμα');
         }
     };
 
@@ -157,21 +160,21 @@ class nomimoiekprosopoiController {
         const sessionUserTeam = req.session.userTeam;
         const sessionCompanyInUse = req.session.companyInUse;
         const locals = {
-            title: "Προσθήκη Νέου Νόμιμου Εκπρόσωπου",
-            description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέου Νόμιμου Εκπρόσωπου',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             const company = await CompaniesModel.findOne({ _id: sessionCompanyInUse }).lean();
 
-            const data = await PerifereiesModel.find().sort("kodikos").lean();
-            res.render("companies/nomimoi_ekprosopoi/add", {
+            const data = await PerifereiesModel.find().sort('kodikos').lean();
+            res.render('companies/nomimoi_ekprosopoi/add', {
                 locals,
                 company,
                 data,
                 mode: 'add',
-                context: "legal_representative",
-                rec: {},
+                context: 'legal_representative',
+                rec: {}
             });
         } catch (error) {
             console.log(error);
@@ -185,12 +188,13 @@ class nomimoiekprosopoiController {
         try {
             const lastRecord = await NomimoiEkprosopoiModel.find({
                 team: formData.companyTeam,
-                companykod: formData.companyKodikos,
+                companykod: formData.companyKodikos
             })
-            .sort({ _id: -1 })
-            .limit(1);
+                .sort({ _id: -1 })
+                .limit(1);
 
-            let kodValue = lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
+            let kodValue =
+                lastRecord[0] && lastRecord[0].kodikos ? parseInt(lastRecord[0].kodikos, 10) : null;
             if (kodValue !== null) {
                 kodValue++;
             } else {
@@ -198,7 +202,7 @@ class nomimoiekprosopoiController {
             }
             aa_kod = kodValue;
         } catch (error) {
-            console.log("Σφάλμα :", error);
+            console.log('Σφάλμα :', error);
         }
 
         const newNomimosEkprosopos = NomimoiEkprosopoiModel({
@@ -207,7 +211,10 @@ class nomimoiekprosopoiController {
             companykod: formatNumber(parseInt(formData.companyKodikos), 4),
             kodikos: formatNumber(aa_kod, 4),
             nomiko_prosopo: formData.nomiko_prosopo,
-            nomikh_morfh: (formData.nomikhmorfh_stathera = formData.nomikhmorfh_stathera === null || formData.nomikhmorfh_stathera === "" ? "" : formData.nomikhmorfh_stathera),
+            nomikh_morfh: (formData.nomikhmorfh_stathera =
+                formData.nomikhmorfh_stathera === null || formData.nomikhmorfh_stathera === ''
+                    ? ''
+                    : formData.nomikhmorfh_stathera),
             eponymia: formData.eponymia,
             onoma: formData.onoma,
             eponymo_patera: formData.eponymo_patera,
@@ -217,31 +224,46 @@ class nomimoiekprosopoiController {
             onoma_syzygoy: formData.onoma_syzygoy,
             hmnia_gennhshs: formData.hmnia_gennhshs,
             topos_gennhshs: formData.topos_gennhshs,
-            perifereia: (formData.perifereies = formData.perifereies === null || formData.perifereies === "" ? "00" : formData.perifereies),
-            nomos: (formData.nomos = formData.nomos === null || formData.nomos === "" ? "0000" : formData.nomos),
-            dhmos: (formData.dhmos = formData.dhmos === null || formData.dhmos === "" ? "0000" : formData.dhmos),
-            polh: (formData.polh = formData.polh === null || formData.polh === "" ? "00000000" : formData.polh),
+            perifereia: (formData.perifereies =
+                formData.perifereies === null || formData.perifereies === ''
+                    ? ''
+                    : formData.perifereies),
+            nomos: (formData.nomos =
+                formData.nomos === null || formData.nomos === '' ? '' : formData.nomos),
+            dhmos: (formData.dhmos =
+                formData.dhmos === null || formData.dhmos === '' ? '' : formData.dhmos),
+            polh: (formData.polh =
+                formData.polh === null || formData.polh === '' ? '' : formData.polh),
             odos: formData.odos,
             arithmos: formData.arithmos,
             tk: formData.tk,
             thlefono: formData.thlefono,
             email: formData.email,
-            typos_taytothtas: (formData.taytothta_stathera = formData.taytothta_stathera === null || formData.taytothta_stathera === "" ? "" : formData.taytothta_stathera),
+            typos_taytothtas: (formData.taytothta_stathera =
+                formData.taytothta_stathera === null || formData.taytothta_stathera === ''
+                    ? ''
+                    : formData.taytothta_stathera),
             arithmos_taytothtas: formData.arithmos_taytothtas,
             hmnia_ekdoshs: formData.hmnia_ekdoshs,
             arxh_ekdoshs: formData.arxh_ekdoshs,
             afm: formData.afm,
-            doy: (formData.doy_stathera = formData.doy_stathera === null || formData.doy_stathera === "" ? "" : formData.doy_stathera),
+            doy: (formData.doy_stathera =
+                formData.doy_stathera === null || formData.doy_stathera === ''
+                    ? ''
+                    : formData.doy_stathera),
             ame: formData.ame,
-            idiothta: (formData.idiothta_stathera = formData.idiothta_stathera === null || formData.idiothta_stathera === "" ? "" : formData.idiothta_stathera),
+            idiothta: (formData.idiothta_stathera =
+                formData.idiothta_stathera === null || formData.idiothta_stathera === ''
+                    ? ''
+                    : formData.idiothta_stathera),
             hmnia_enarjhs_idiothtas: formData.hmnia_enarjhs_idiothtas,
             createdAt: Date.now(),
-            updatedAt: Date.now(),
+            updatedAt: Date.now()
         });
 
         try {
             await NomimoiEkprosopoiModel.create(newNomimosEkprosopos);
-            res.json({ success: true, redirectUrl: "/companies/nomimoi_ekprosopoi" });
+            res.json({ success: true, redirectUrl: '/companies/nomimoi_ekprosopoi' });
         } catch (error) {
             console.log(error);
         }
@@ -249,12 +271,12 @@ class nomimoiekprosopoiController {
 
     static searchGetNomimoiEkprosopoi = async (req, res) => {
         const locals = {
-            title: "Αναζήτηση Νόμιμων Εκπροσώπων",
-            description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Νόμιμων Εκπροσώπων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            let searchTerm = nextPageSearchTerm      //req.body.searchTerm;
+            let searchTerm = nextPageSearchTerm; //req.body.searchTerm;
 
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
@@ -265,22 +287,22 @@ class nomimoiekprosopoiController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "NomimoiEkprosopoi",
+                form: 'NomimoiEkprosopoi'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $lookup: {
-                        from: "idiothtes",
-                        localField: "idiothta",
-                        foreignField: "kodikos",
-                        as: "idiothtaInfo"
+                        from: 'idiothtes',
+                        localField: 'idiothta',
+                        foreignField: 'kodikos',
+                        as: 'idiothtaInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$idiothtaInfo",
+                        path: '$idiothtaInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -289,17 +311,17 @@ class nomimoiekprosopoiController {
                         // team: sessionUserTeam,
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                            { eponymia: { $regex: new RegExp(searchTerm, "i") } },
-                            { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                            { onoma_patera: { $regex: new RegExp(searchTerm, "i") } },
-                            { "idiothtaInfo.perigrafh": { $regex: new RegExp(searchTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { eponymia: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma_patera: { $regex: new RegExp(searchTerm, 'i') } },
+                            { 'idiothtaInfo.perigrafh': { $regex: new RegExp(searchTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await NomimoiEkprosopoiModel.aggregate(countPipeline).exec();
@@ -307,39 +329,42 @@ class nomimoiekprosopoiController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const nomimoiekprosopoiFilteredRecs = await NomimoiEkprosopoiModel.aggregate([
                 {
                     $lookup: {
-                        from: "idiothtes",
-                        localField: "idiothta",
-                        foreignField: "kodikos",
-                        as: "idiothtaInfo"
+                        from: 'idiothtes',
+                        localField: 'idiothta',
+                        foreignField: 'kodikos',
+                        as: 'idiothtaInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$idiothtaInfo",
+                        path: '$idiothtaInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
                 {
                     $match: {
                         $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                            { eponymia: { $regex: new RegExp(searchTerm, "i") } },
-                            { onoma: { $regex: new RegExp(searchTerm, "i") } },
-                            { onoma_patera: { $regex: new RegExp(searchTerm, "i") } },
-                            { "idiothtaInfo.perigrafh": { $regex: new RegExp(searchTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { eponymia: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
+                            { onoma_patera: { $regex: new RegExp(searchTerm, 'i') } },
+                            { 'idiothtaInfo.perigrafh': { $regex: new RegExp(searchTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της πόλης
                         ]
                     }
                 }
             ])
-            .skip(skipRecords)
-            .limit(limitPerPage);
-        
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = nomimoiekprosopoiFilteredRecs.map((record) => ({
                 ...record,
@@ -347,10 +372,12 @@ class nomimoiekprosopoiController {
                 eponymia: this.highlightText(record.eponymia, searchTerm),
                 onoma: this.highlightText(record.onoma, searchTerm),
                 onoma_patera: this.highlightText(record.onoma_patera, searchTerm),
-                idiothtaPerigrafh: record.idiothtaInfo ? this.highlightText(record.idiothtaInfo.perigrafh, searchTerm) : ""
+                idiothtaPerigrafh: record.idiothtaInfo
+                    ? this.highlightText(record.idiothtaInfo.perigrafh, searchTerm)
+                    : ''
             }));
-        
-            res.render("companies/nomimoi_ekprosopoi/search", {
+
+            res.render('companies/nomimoi_ekprosopoi/search', {
                 nomimoiekprosopoiFilteredRecs: highlightedRecords,
                 locals,
                 current: page,
@@ -358,7 +385,7 @@ class nomimoiekprosopoiController {
                 userPrivileges,
                 sTerm: searchTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
             console.log(error);
@@ -367,8 +394,8 @@ class nomimoiekprosopoiController {
 
     static searchPostNomimoiEkprosopoi = async (req, res) => {
         const locals = {
-            title: "Αναζήτηση Νομίμων Εκπρόσώπων",
-            description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Νομίμων Εκπρόσώπων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
@@ -377,7 +404,7 @@ class nomimoiekprosopoiController {
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
             const sessionCompanyInUse = req.session.companyInUse;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, '');
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
 
@@ -387,22 +414,22 @@ class nomimoiekprosopoiController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "NomimoiEkprosopoi",
+                form: 'NomimoiEkprosopoi'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
                     $lookup: {
-                        from: "idiothtes",
-                        localField: "idiothta",
-                        foreignField: "kodikos",
-                        as: "idiothtaInfo"
+                        from: 'idiothtes',
+                        localField: 'idiothta',
+                        foreignField: 'kodikos',
+                        as: 'idiothtaInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$idiothtaInfo",
+                        path: '$idiothtaInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -410,17 +437,17 @@ class nomimoiekprosopoiController {
                     $match: {
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                            { eponymia: { $regex: new RegExp(sTerm, "i") } },
-                            { onoma: { $regex: new RegExp(sTerm, "i") } },
-                            { onoma_patera: { $regex: new RegExp(sTerm, "i") } },
-                            { "idiothtaInfo.perigrafh": { $regex: new RegExp(sTerm, "i") } }
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { eponymia: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma_patera: { $regex: new RegExp(sTerm, 'i') } },
+                            { 'idiothtaInfo.perigrafh': { $regex: new RegExp(sTerm, 'i') } }
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await NomimoiEkprosopoiModel.aggregate(countPipeline).exec();
@@ -428,21 +455,24 @@ class nomimoiekprosopoiController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const nomimoiekprosopoiFilteredRecs = await NomimoiEkprosopoiModel.aggregate([
                 {
                     $lookup: {
-                        from: "idiothtes",
-                        localField: "idiothta",
-                        foreignField: "kodikos",
-                        as: "idiothtaInfo"
+                        from: 'idiothtes',
+                        localField: 'idiothta',
+                        foreignField: 'kodikos',
+                        as: 'idiothtaInfo'
                     }
                 },
                 {
                     $unwind: {
-                        path: "$idiothtaInfo",
+                        path: '$idiothtaInfo',
                         preserveNullAndEmptyArrays: true
                     }
                 },
@@ -450,18 +480,18 @@ class nomimoiekprosopoiController {
                     $match: {
                         companykod_object: sessionCompanyInUse,
                         $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                            { eponymia: { $regex: new RegExp(sTerm, "i") } },
-                            { onoma: { $regex: new RegExp(sTerm, "i") } },
-                            { onoma_patera: { $regex: new RegExp(sTerm, "i") } },
-                            { "idiothtaInfo.perigrafh": { $regex: new RegExp(sTerm, "i") } } // Συμπερίληψη της αναζήτησης στο perigrafh της ιδιότητας
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { eponymia: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
+                            { onoma_patera: { $regex: new RegExp(sTerm, 'i') } },
+                            { 'idiothtaInfo.perigrafh': { $regex: new RegExp(sTerm, 'i') } } // Συμπερίληψη της αναζήτησης στο perigrafh της ιδιότητας
                         ]
                     }
                 }
             ])
-            .skip(skipRecords)
-            .limit(limitPerPage);
-        
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = nomimoiekprosopoiFilteredRecs.map((record) => ({
                 ...record,
@@ -469,10 +499,12 @@ class nomimoiekprosopoiController {
                 eponymia: this.highlightText(record.eponymia, sTerm),
                 onoma: this.highlightText(record.onoma, sTerm),
                 onoma_patera: this.highlightText(record.onoma_patera, sTerm),
-                idiothtaPerigrafh: record.idiothtaInfo ? this.highlightText(record.idiothtaInfo.perigrafh, sTerm) : ""
+                idiothtaPerigrafh: record.idiothtaInfo
+                    ? this.highlightText(record.idiothtaInfo.perigrafh, sTerm)
+                    : ''
             }));
 
-            res.render("companies/nomimoi_ekprosopoi/search", {
+            res.render('companies/nomimoi_ekprosopoi/search', {
                 userPrivileges,
                 locals,
                 current: page,
@@ -480,7 +512,7 @@ class nomimoiekprosopoiController {
                 sTerm: sTerm,
                 entries: perPage,
                 totalRecs: totalRecords,
-                nomimoiekprosopoiFilteredRecs: highlightedRecords,
+                nomimoiekprosopoiFilteredRecs: highlightedRecords
             });
         } catch (error) {
             console.log(error);
@@ -489,26 +521,29 @@ class nomimoiekprosopoiController {
 
     static editNomimoiEkprosopoiForm = async (req, res) => {
         const locals = {
-            title: "Συντήρηση Νομ.Εκπροσώπων",
-            description: "Web Payroll Solutions",
+            title: 'Συντήρηση Νομ.Εκπροσώπων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            const perifereies = await PerifereiesModel.find().sort("perigrafh").lean();
+            const perifereies = await PerifereiesModel.find().sort('perigrafh').lean();
             const nomimoiekprosopoiId = req.params.id;
-            
-            const nomimosEkprosopos = await NomimoiEkprosopoiModel.findById(nomimoiekprosopoiId).lean();
-            
-            const company = await CompaniesModel.findOne({ _id: nomimosEkprosopos.companykod_object }).lean();
 
-            res.render("companies/nomimoi_ekprosopoi/edit", {
+            const nomimosEkprosopos =
+                await NomimoiEkprosopoiModel.findById(nomimoiekprosopoiId).lean();
+
+            const company = await CompaniesModel.findOne({
+                _id: nomimosEkprosopos.companykod_object
+            }).lean();
+
+            res.render('companies/nomimoi_ekprosopoi/edit', {
                 locals,
                 perifereies,
-                company, 
+                company,
                 nomimosEkprosopos,
-                mode   : "edit",
-                context: "legal_representative",
-                rec    : {}, 
+                mode: 'edit',
+                context: 'legal_representative',
+                rec: {}
             });
         } catch (error) {
             console.log(error);
@@ -523,7 +558,10 @@ class nomimoiekprosopoiController {
         const filteredDataNomimoiEkprosopoi = {
             companykod: formatNumber(parseInt(formData.companyKodikos), 4),
             nomiko_prosopo: formData.nomiko_prosopo,
-            nomikh_morfh: (formData.nomikhmorfh_stathera = formData.nomikhmorfh_stathera === null || formData.nomikhmorfh_stathera === "" ? "" : formData.nomikhmorfh_stathera),
+            nomikh_morfh: (formData.nomikhmorfh_stathera =
+                formData.nomikhmorfh_stathera === null || formData.nomikhmorfh_stathera === ''
+                    ? ''
+                    : formData.nomikhmorfh_stathera),
             eponymia: formData.eponymia,
             onoma: formData.onoma,
             eponymo_patera: formData.eponymo_patera,
@@ -533,25 +571,40 @@ class nomimoiekprosopoiController {
             onoma_syzygoy: formData.onoma_syzygoy,
             hmnia_gennhshs: formData.hmnia_gennhshs,
             topos_gennhshs: formData.topos_gennhshs,
-            perifereia: (formData.perifereies = formData.perifereies === null || formData.perifereies === "" ? "00" : formData.perifereies),
-            nomos: (formData.nomos = formData.nomos === null || formData.nomos === "" ? "0000" : formData.nomos),
-            dhmos: (formData.dhmos = formData.dhmos === null || formData.dhmos === "" ? "0000" : formData.dhmos),
-            polh: (formData.polh = formData.polh === null || formData.polh === "" ? "00000000" : formData.polh),
+            perifereia: (formData.perifereies =
+                formData.perifereies === null || formData.perifereies === ''
+                    ? ''
+                    : formData.perifereies),
+            nomos: (formData.nomos =
+                formData.nomos === null || formData.nomos === '' ? '' : formData.nomos),
+            dhmos: (formData.dhmos =
+                formData.dhmos === null || formData.dhmos === '' ? '' : formData.dhmos),
+            polh: (formData.polh =
+                formData.polh === null || formData.polh === '' ? '' : formData.polh),
             odos: formData.odos,
             arithmos: formData.arithmos,
             tk: formData.tk,
             thlefono: formData.thlefono,
             email: formData.email,
-            typos_taytothtas: (formData.taytothta_stathera = formData.taytothta_stathera === null || formData.taytothta_stathera === "" ? "" : formData.taytothta_stathera),
+            typos_taytothtas: (formData.taytothta_stathera =
+                formData.taytothta_stathera === null || formData.taytothta_stathera === ''
+                    ? ''
+                    : formData.taytothta_stathera),
             arithmos_taytothtas: formData.arithmos_taytothtas,
             hmnia_ekdoshs: formData.hmnia_ekdoshs,
             arxh_ekdoshs: formData.arxh_ekdoshs,
             afm: formData.afm,
-            doy: (formData.doy_stathera = formData.doy_stathera === null || formData.doy_stathera === "" ? "" : formData.doy_stathera),
+            doy: (formData.doy_stathera =
+                formData.doy_stathera === null || formData.doy_stathera === ''
+                    ? ''
+                    : formData.doy_stathera),
             ame: formData.ame,
-            idiothta: (formData.idiothta_stathera = formData.idiothta_stathera === null || formData.idiothta_stathera === "" ? "" : formData.idiothta_stathera),
+            idiothta: (formData.idiothta_stathera =
+                formData.idiothta_stathera === null || formData.idiothta_stathera === ''
+                    ? ''
+                    : formData.idiothta_stathera),
             hmnia_enarjhs_idiothtas: formData.hmnia_enarjhs_idiothtas,
-            updatedAt:  Date.now(),
+            updatedAt: Date.now()
         };
 
         // Τώρα μπορώ να χρησιμοποιήσω το filteredDataCompany στη $set: για ενημέρωση
@@ -562,7 +615,7 @@ class nomimoiekprosopoiController {
         );
 
         try {
-            res.json({ success: true, redirectUrl: "/companies/nomimoi_ekprosopoi" });
+            res.json({ success: true, redirectUrl: '/companies/nomimoi_ekprosopoi' });
         } catch (error) {
             throw error;
         }
@@ -571,17 +624,17 @@ class nomimoiekprosopoiController {
     static deleteNomimoiEkprosopoi = async (req, res) => {
         try {
             await NomimoiEkprosopoiModel.deleteOne({ _id: req.params.id });
-            res.json({ success: true, redirectUrl: "/companies/nomimoi_ekprosopoi" });
+            res.json({ success: true, redirectUrl: '/companies/nomimoi_ekprosopoi' });
         } catch (error) {
             throw error;
         }
     };
 
     static highlightText(text, term) {
-        if (!text) return ""; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
+        if (!text) return ''; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
         const highlightStartTag = "<span class='highlight'>";
-        const highlightEndTag = "</span>";
-        const regex = new RegExp(`(${term})`, "gi");
+        const highlightEndTag = '</span>';
+        const regex = new RegExp(`(${term})`, 'gi');
         return text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
     }
 }

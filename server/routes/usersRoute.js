@@ -316,6 +316,11 @@ router.post(
     ergazomenoiController.uploadE3ToErganh
 );
 router.post(
+    '/ergazomenoi/ergazomenoi/upload-ma-to-erganh',
+    checkAuth,
+    ergazomenoiController.uploadMAToErganh
+);
+router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-to-erganh',
     checkAuth,
     ergazomenoiController.uploadWtoToErganh

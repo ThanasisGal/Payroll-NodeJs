@@ -382,207 +382,154 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const hasMetaboles = typosMetabolhsData.length > 0;
 
-            // -------------------------------------------------------------------------
-            // Radio group: Μεταβολές (εμφανίζεται μόνο αν hasMetaboles)
-            // -------------------------------------------------------------------------
             const metabolesHtml = hasMetaboles
                 ? `
-                    <hr class="hr-style" />
-                    <p class="font-weight-600 margin-bottom-0_5rem">Μεταβολές Εργασιακής Σχέσης:</p>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="metaboles_none" name="metaboles_action"
-                            value="none" class="custom-radio" checked />
-                        <label for="metaboles_none" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            Χωρίς Μεταβολή ΕΡΓΑΝΗ
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs" name="metaboles_action"
-                            value="e3_metaboles_ergasiakhs_sxeshs" class="custom-radio" />
+                        <input type="checkbox" id="e3_metaboles_ergasiakhs_sxeshs" name="files"
+                            value="e3_metaboles_ergasiakhs_sxeshs" class="custom-checkbox" />
                         <label for="e3_metaboles_ergasiakhs_sxeshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            name="metaboles_action"
-                            value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            class="custom-radio" />
-                        <label for="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            class="margin-0 cursor-pointer font-size-rem-1_05">
+                        <input type="checkbox" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy" name="files"
+                            value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy" class="custom-checkbox" />
+                        <label for="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ - Δανειζόμενου Προσωπικού
                         </label>
                     </div>
                 `
                 : '';
 
-            // -------------------------------------------------------------------------
-            // Radio group: Λήξεις (εμφανίζεται μόνο αν hasApoxorhsh)
-            // -------------------------------------------------------------------------
             const lhxeisHtml = hasApoxorhsh
                 ? `
                     <hr class="hr-style" />
-                    <p class="font-weight-600 margin-bottom-0_5rem">Τύπος Λήξης Εργασίας:</p>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="lhxh_none" name="lhxh_type"
-                            value="none" class="custom-radio" checked />
-                        <label for="lhxh_none" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            Χωρίς Λήξη ΕΡΓΑΝΗ
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_222_lysh_symbashs_orismenoy_xronoy" name="lhxh_type"
-                            value="ma_222" class="custom-radio" />
+                        <input type="checkbox" id="ma_222_lysh_symbashs_orismenoy_xronoy" name="files"
+                            value="ma_222_lysh_symbashs_orismenoy_xronoy" class="custom-checkbox" />
                         <label for="ma_222_lysh_symbashs_orismenoy_xronoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             Λύση Σύμβασης Ορισμένου Χρόνου (E7N)
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_227_lysh_dokimastikhs_periodoy" name="lhxh_type"
-                            value="ma_227" class="custom-radio" />
+                        <input type="checkbox" id="ma_227_lysh_dokimastikhs_periodoy" name="files"
+                            value="ma_227_lysh_dokimastikhs_periodoy" class="custom-checkbox" />
                         <label for="ma_227_lysh_dokimastikhs_periodoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Αυτοδίκαιη Λύση Δοκιμαστικής Περιόδου
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_217_oikeiothelhs_apoxorhsh" name="lhxh_type"
-                            value="ma_217" class="custom-radio" />
+                        <input type="checkbox" id="ma_217_oikeiothelhs_apoxorhsh" name="files"
+                            value="ma_217_oikeiothelhs_apoxorhsh" class="custom-checkbox" />
                         <label for="ma_217_oikeiothelhs_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_221_lysh_kataggelia_me_proeidopoihsh" name="lhxh_type"
-                            value="ma_221" class="custom-radio" />
+                        <input type="checkbox" id="ma_221_lysh_kataggelia_me_proeidopoihsh" name="files"
+                            value="ma_221_lysh_kataggelia_me_proeidopoihsh" class="custom-checkbox" />
                         <label for="ma_221_lysh_kataggelia_me_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης με Προειδοποίηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_220_lysh_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
-                            value="ma_220" class="custom-radio" />
+                        <input type="checkbox" id="ma_220_lysh_kataggelia_xoris_proeidopoihsh" name="files"
+                            value="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="custom-checkbox" />
                         <label for="ma_220_lysh_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_218_lysh_dhloshs_oxlhshs" name="lhxh_type"
-                            value="ma_218" class="custom-radio" />
+                        <input type="checkbox" id="ma_218_lysh_dhloshs_oxlhshs" name="files"
+                            value="ma_218_lysh_dhloshs_oxlhshs" class="custom-checkbox" />
                         <label for="ma_218_lysh_dhloshs_oxlhshs" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Δήλωση Όχλησης για δυνατότητα Οικειοθελούς Αποχώρησης
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" name="lhxh_type"
-                            value="ma_219" class="custom-radio" />
+                        <input type="checkbox" id="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" name="files"
+                            value="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" class="custom-checkbox" />
                         <label for="ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση μετά από Όχληση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_223_lysh_ethelousia_exodos" name="lhxh_type"
-                            value="ma_223" class="custom-radio" />
+                        <input type="checkbox" id="ma_223_lysh_ethelousia_exodos" name="files"
+                            value="ma_223_lysh_ethelousia_exodos" class="custom-checkbox" />
                         <label for="ma_223_lysh_ethelousia_exodos" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Εθελούσια Έξοδος
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_229_lhxh_daneismoy" name="lhxh_type"
-                            value="ma_229" class="custom-radio" />
+                        <input type="checkbox" id="ma_229_lhxh_daneismoy" name="files"
+                            value="ma_229_lhxh_daneismoy" class="custom-checkbox" />
                         <label for="ma_229_lhxh_daneismoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη Δανεισμού από επιχείρηση/Τοποθέτησης από ΕΠΑ
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_226_lhxh_logo_thanatoy" name="lhxh_type"
-                            value="ma_226" class="custom-radio" />
+                        <input type="checkbox" id="ma_226_lhxh_logo_thanatoy" name="files"
+                            value="ma_226_lhxh_logo_thanatoy" class="custom-checkbox" />
                         <label for="ma_226_lhxh_logo_thanatoy" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Λήξη λόγω Θανάτου
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_228_metavivash_se_epixeirish" name="lhxh_type"
-                            value="ma_228" class="custom-radio" />
+                        <input type="checkbox" id="ma_228_metavivash_se_epixeirish" name="files"
+                            value="ma_228_metavivash_se_epixeirish" class="custom-checkbox" />
                         <label for="ma_228_metavivash_se_epixeirish" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Μεταβίβαση σε Επιχείρηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" name="lhxh_type"
-                            value="ma_224" class="custom-radio" />
+                        <input type="checkbox" id="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" name="files"
+                            value="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" class="custom-checkbox" />
                         <label for="ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Οικειοθελή Αποχώρηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" name="lhxh_type"
-                            value="ma_225" class="custom-radio" />
+                        <input type="checkbox" id="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" name="files"
+                            value="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" class="custom-checkbox" />
                         <label for="ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh" class="margin-0 cursor-pointer font-size-rem-1_05">
                             ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Καταγγελία Σύμβασης Χωρίς Προειδοποίηση
                         </label>
                     </div>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" name="lhxh_type"
-                            value="ma_236" class="custom-radio" />
+                        <input type="checkbox" id="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" name="files"
+                            value="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" class="custom-checkbox" />
                         <label for="ma_236_oikeiothelhs_apoxorhsh_logo_15etias" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            ΛΗΞΗ ΕΡΓΑΣΙΑΣ - Οικειοθελής αποχώρηση μισθωτού λόγω συμπλήρωσης δεκαπενταετίας στον ίδιο εργοδότη ή υπέρβασης του ορίου ηλικίας συνταξιοδότησης με τη συγκατάθεση του εργοδότη
+                            ΛΗΞΗ ΕΡΓΑΣΙΑΣ- Οικειοθελής αποχώρηση μισθωτού λόγω συμπλήρωσης δεκαπενταετίας στον ίδιο εργοδότη ή υπέρβασης του ορίου ηλικίας συνταξιοδότησης με τη συγκατάθεση του εργοδότη
                         </label>
                     </div>
                 `
                 : '';
 
-            // -------------------------------------------------------------------------
-            // Radio group: κύρια ενέργεια ΕΡΓΑΝΗ για νέα πρόσληψη (χωρίς μεταβολές/λήξεις)
-            // -------------------------------------------------------------------------
             const noErganiUpdates = !hasMetaboles && !hasApoxorhsh;
 
             const noUpdatesHtml = noErganiUpdates
                 ? `
-                    <hr class="hr-style" />
-                    <p class="font-weight-600 margin-bottom-0_5rem">Ενέργεια ΕΡΓΑΝΗ:</p>
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio"
-                            id="ergani_action_none"
-                            name="ergani_main_action"
-                            value="none"
-                            class="custom-radio"
-                            checked />
-                        <label for="ergani_action_none"
-                            class="margin-0 cursor-pointer font-size-rem-1_05">
-                            Χωρίς ενέργεια ΕΡΓΑΝΗ
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio"
-                            id="e3_anaggelia_proslhpshs"
-                            name="ergani_main_action"
-                            value="e3_anaggelia_proslhpshs"
-                            class="custom-radio" />
-                        <label for="e3_anaggelia_proslhpshs"
+                        <input type="checkbox" 
+                            id="e3_anaggelia_proslhpshs" 
+                            name="files" 
+                            value="e3_anaggelia_proslhpshs" 
+                            class="custom-checkbox" />
+                        <label for="e3_anaggelia_proslhpshs" 
                             class="margin-0 cursor-pointer font-size-rem-1_05">
                             Αναγγελία Πρόσληψης (E3N)
                         </label>
                     </div>
+
                     <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio"
-                            id="wto_pshfiakh_organosh_xronoy_ergasias"
-                            name="ergani_main_action"
-                            value="wto"
-                            class="custom-radio" />
-                        <label for="wto_pshfiakh_organosh_xronoy_ergasias"
+                        <input type="checkbox" 
+                            id="wto_pshfiakh_organosh_xronoy_ergasias" 
+                            name="files" 
+                            value="wto_pshfiakh_organosh_xronoy_ergasias" 
+                            class="custom-checkbox" />
+                        <label for="wto_pshfiakh_organosh_xronoy_ergasias" 
                             class="margin-0 cursor-pointer font-size-rem-1_05">
                             Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio"
-                            id="ergani_action_both"
-                            name="ergani_main_action"
-                            value="both"
-                            class="custom-radio" />
-                        <label for="ergani_action_both"
-                            class="margin-0 cursor-pointer font-size-rem-1_05">
-                            Αναγγελία Πρόσληψης (E3N) + WTO
                         </label>
                     </div>
                 `
@@ -595,46 +542,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
                 html: `
                     <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem swal-overflow">
-
-                        <!-- ── Radio group: Τρόπος Αποθήκευσης ── -->
-                        <p class="font-weight-600 margin-bottom-0_5rem">Τρόπος Αποθήκευσης:</p>
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="radio"
-                                id="storage_temporary"
-                                name="storage_mode"
-                                value="temporary"
-                                class="custom-radio"
-                                ${noErganiUpdates ? 'disabled' : ''}
-                                checked />
-                            <label for="storage_temporary"
+                            <input type="checkbox" 
+                                id="temporary_permanent_storage" 
+                                name="files" 
+                                value="temporary_permanent_storage" 
+                                class="custom-checkbox"
+                                ${noErganiUpdates ? 'disabled' : ''} />
+                            <label for="temporary_permanent_storage" 
+                                id="storage_mode_label"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
-                                style="color: ${noErganiUpdates ? '#aaaaaa' : '#000000'}">
+                                style="transition: all 0.2s; color: ${noErganiUpdates ? '#aaaaaa' : '#000000'}">
                                 Προσωρινή Αποθήκευση
                             </label>
                         </div>
-                        <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="radio"
-                                id="storage_permanent"
-                                name="storage_mode"
-                                value="permanent"
-                                class="custom-radio"
-                                ${noErganiUpdates ? 'disabled' : ''} />
-                            <label for="storage_permanent"
-                                class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
-                                style="color: ${noErganiUpdates ? '#aaaaaa' : '#184d00'}">
-                                <strong>Οριστική Ενημέρωση</strong>
-                            </label>
-                        </div>
 
-                        <!-- ── Checkbox: Δημιουργία Σύμβασης (ανεξάρτητη επιλογή) ── -->
-                        <hr class="hr-style" />
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox"
-                                id="create_contract"
-                                name="files"
-                                value="create_contract"
+                            <input type="checkbox" 
+                                id="create_contract" 
+                                name="files" 
+                                value="create_contract" 
                                 class="custom-checkbox" />
-                            <label for="create_contract"
+                            <label for="create_contract" 
+                                id="create_contract_label"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-400">
                                 Δημιουργία Σύμβασης
                             </label>
@@ -647,52 +577,74 @@ document.addEventListener('DOMContentLoaded', () => {
                 `,
                 focusConfirm: false,
                 didOpen: () => {
-                    // Προαιρετικό visual feedback κατά την αλλαγή storage mode
-                    document.querySelectorAll('input[name="storage_mode"]').forEach((radio) => {
-                        radio.addEventListener('change', function () {
-                            document.querySelectorAll('label.temp_perm').forEach((lbl) => {
-                                lbl.style.fontWeight = '400';
-                            });
-                            const selectedLabel = document.querySelector(`label[for="${this.id}"]`);
-                            if (selectedLabel) selectedLabel.style.fontWeight = '700';
+                    const checkbox = document.getElementById('temporary_permanent_storage');
+                    const label = document.getElementById('storage_mode_label');
+                    if (checkbox && label) {
+                        checkbox.addEventListener('change', function () {
+                            if (this.checked) {
+                                label.innerHTML = '<strong>Οριστική Ενημέρωση</strong>';
+                                label.style.color = '#184d00';
+                            } else {
+                                label.innerHTML = 'Προσωρινή Αποθήκευση';
+                                label.style.color = '#000000';
+                            }
                         });
-                    });
+                    }
                 },
                 preConfirm: () => {
-                    // ── storage mode ──
-                    const storageModeRadio = document.querySelector(
-                        'input[name="storage_mode"]:checked'
-                    );
-                    const isPermanent = storageModeRadio?.value === 'permanent';
-
-                    // ── create contract ──
+                    const isPermanent =
+                        document.getElementById('temporary_permanent_storage')?.checked ?? false;
                     const createContract =
                         document.getElementById('create_contract')?.checked ?? false;
-
-                    // ── κύρια ενέργεια ΕΡΓΑΝΗ (μόνο για νέα πρόσληψη) ──
-                    const erganiMainActionRadio = document.querySelector(
-                        'input[name="ergani_main_action"]:checked'
-                    );
-                    const erganiMainAction = erganiMainActionRadio?.value || 'none';
                     const e3AnaggeliaProslhpshs =
-                        erganiMainAction === 'e3_anaggelia_proslhpshs' ||
-                        erganiMainAction === 'both';
+                        document.getElementById('e3_anaggelia_proslhpshs')?.checked ?? false;
                     const wtoPshfiakhOrganoshXronoy =
-                        erganiMainAction === 'wto' || erganiMainAction === 'both';
-
-                    // ── μεταβολές ──
-                    const metabolesActionRadio = document.querySelector(
-                        'input[name="metaboles_action"]:checked'
-                    );
-                    const metabolesAction = metabolesActionRadio?.value || 'none';
-                    const e3Enabled_1 = metabolesAction === 'e3_metaboles_ergasiakhs_sxeshs';
+                        document.getElementById('wto_pshfiakh_organosh_xronoy_ergasias')?.checked ??
+                        false;
+                    const e3Enabled_1 =
+                        document.getElementById('e3_metaboles_ergasiakhs_sxeshs')?.checked ?? false;
                     const e3Enabled_2 =
-                        metabolesAction ===
-                        'e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy';
-
-                    // ── λήξεις ──
-                    const lhxhTypeRadio = document.querySelector('input[name="lhxh_type"]:checked');
-                    const lhxhType = lhxhTypeRadio?.value || 'none';
+                        document.getElementById(
+                            'e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy'
+                        )?.checked ?? false;
+                    const wtoEnabled_222 =
+                        document.getElementById('ma_222_lysh_symbashs_orismenoy_xronoy')?.checked ??
+                        false;
+                    const wtoEnabled_227 =
+                        document.getElementById('ma_227_lysh_dokimastikhs_periodoy')?.checked ??
+                        false;
+                    const wtoEnabled_217 =
+                        document.getElementById('ma_217_oikeiothelhs_apoxorhsh')?.checked ?? false;
+                    const wtoEnabled_221 =
+                        document.getElementById('ma_221_lysh_kataggelia_me_proeidopoihsh')
+                            ?.checked ?? false;
+                    const wtoEnabled_220 =
+                        document.getElementById('ma_220_lysh_kataggelia_xoris_proeidopoihsh')
+                            ?.checked ?? false;
+                    const wtoEnabled_218 =
+                        document.getElementById('ma_218_lysh_dhloshs_oxlhshs')?.checked ?? false;
+                    const wtoEnabled_219 =
+                        document.getElementById('ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh')
+                            ?.checked ?? false;
+                    const wtoEnabled_223 =
+                        document.getElementById('ma_223_lysh_ethelousia_exodos')?.checked ?? false;
+                    const wtoEnabled_229 =
+                        document.getElementById('ma_229_lhxh_daneismoy')?.checked ?? false;
+                    const wtoEnabled_226 =
+                        document.getElementById('ma_226_lhxh_logo_thanatoy')?.checked ?? false;
+                    const wtoEnabled_228 =
+                        document.getElementById('ma_228_metavivash_se_epixeirish')?.checked ??
+                        false;
+                    const wtoEnabled_224 =
+                        document.getElementById('ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh')
+                            ?.checked ?? false;
+                    const wtoEnabled_225 =
+                        document.getElementById(
+                            'ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh'
+                        )?.checked ?? false;
+                    const wtoEnabled_236 =
+                        document.getElementById('ma_236_oikeiothelhs_apoxorhsh_logo_15etias')
+                            ?.checked ?? false;
 
                     const filesToUpdate = {
                         isPermanent,
@@ -701,23 +653,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         wto_pshfiakh_organosh_xronoy_ergasias: wtoPshfiakhOrganoshXronoy,
                         e3_metaboles_ergasiakhs_sxeshs: e3Enabled_1,
                         e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy: e3Enabled_2,
-                        ma_222: lhxhType === 'ma_222',
-                        ma_227: lhxhType === 'ma_227',
-                        ma_217: lhxhType === 'ma_217',
-                        ma_221: lhxhType === 'ma_221',
-                        ma_220: lhxhType === 'ma_220',
-                        ma_218: lhxhType === 'ma_218',
-                        ma_219: lhxhType === 'ma_219',
-                        ma_223: lhxhType === 'ma_223',
-                        ma_229: lhxhType === 'ma_229',
-                        ma_226: lhxhType === 'ma_226',
-                        ma_228: lhxhType === 'ma_228',
-                        ma_224: lhxhType === 'ma_224',
-                        ma_225: lhxhType === 'ma_225',
-                        ma_236: lhxhType === 'ma_236'
+                        ma_222: wtoEnabled_222,
+                        ma_227: wtoEnabled_227,
+                        ma_217: wtoEnabled_217,
+                        ma_221: wtoEnabled_221,
+                        ma_220: wtoEnabled_220,
+                        ma_218: wtoEnabled_218,
+                        ma_219: wtoEnabled_219,
+                        ma_223: wtoEnabled_223,
+                        ma_229: wtoEnabled_229,
+                        ma_226: wtoEnabled_226,
+                        ma_228: wtoEnabled_228,
+                        ma_224: wtoEnabled_224,
+                        ma_225: wtoEnabled_225,
+                        ma_236: wtoEnabled_236
                     };
 
-                    console.log('🔍 [FRONTEND] Radio selections:', filesToUpdate);
+                    console.log('🔍 [FRONTEND] Checkboxes:', filesToUpdate);
                     return filesToUpdate;
                 },
                 confirmButtonText: 'Ενημέρωση',
@@ -854,6 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Start animation
                 setTimeout(updateProgress, 250);
             }
 
@@ -931,7 +884,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('[CONTRACT-DEBUG] 403 Forbidden / CSRF blocked');
                 throw new Error('CSRF blocked (403) — η συνεδρία έληξε ή λείπει token.');
             }
-
             // 4) 204 No Content
             if (response.status === 204) {
                 console.warn('[CONTRACT-DEBUG] 204 No Content branch hit');
@@ -1010,9 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wtoXmlData = data?.wtoXmlData || null;
                 const hasWtoXml = wtoXmlData && wtoXmlData.success === true;
 
-                const maXmlData = data?.maXmlData || null;
-                const hasMAXml = maXmlData && maXmlData.success === true;
-
+                // ✅ userWantsE3 — ελέγχει και τους 2 τύπους E3
                 const userWantsE3 =
                     result.value?.e3_anaggelia_proslhpshs === true ||
                     result.value?.e3_metaboles_ergasiakhs_sxeshs === true;
@@ -1038,17 +988,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     </a>`
                     : '';
 
-                const maXmlHtml = hasMAXml
-                    ? `<p class="text-success mt-3">✅ MA XML (Μεταβολή) δημιουργήθηκε επιτυχώς!</p>
-                    <a href="${maXmlData.downloadUrl}"
-                        download="${maXmlData.filename}"
-                        class="btn btn-sm btn-outline-warning mt-2">
-                        <i class="bi bi-download"></i> Λήψη MA XML
-                    </a>`
-                    : '';
-
+                // ✅ CHECK: Did we send PDFs?
                 const hadPdfs = window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload();
 
+                // ✅ CHECK: Did backend save the PDFs?
                 const pdfResults = data?.pdfResults || [];
                 const successfulPdfs = pdfResults.filter((r) => r.success);
                 const failedPdfs = pdfResults.filter((r) => !r.success);
@@ -1064,10 +1007,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('hadPdfs:', hadPdfs);
                 console.groupEnd();
 
+                // ✅ Clear in-memory PDFs
                 if (hadPdfs && window.pdfUploadModule.clearAllFiles) {
                     window.pdfUploadModule.clearAllFiles();
                 }
 
+                // ✅ Helper: employee name + company data
                 const employeeName =
                     `${formData.eponymoHidden || ''} ${formData.onomaHidden || ''}`.trim() ||
                     'UNKNOWN';
@@ -1082,40 +1027,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 // ✅ Helper: store __erganhUploadOptions
                 const storeErganhUploadOptions = () => {
                     window.__erganhUploadOptions = {
-                        isPermanent: result.value?.isPermanent === true,
+                        isPermanent: result.value?.isPermanent || false,
 
-                        e3_anaggelia_proslhpshs: result.value?.e3_anaggelia_proslhpshs === true,
+                        e3_anaggelia_proslhpshs: result.value?.e3_anaggelia_proslhpshs || false,
                         wto_pshfiakh_organosh_xronoy_ergasias:
-                            result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true,
+                            result.value?.wto_pshfiakh_organosh_xronoy_ergasias || false,
 
-                        e3Enabled_1: result.value?.e3_metaboles_ergasiakhs_sxeshs === true,
+                        e3Enabled_1: result.value?.e3_metaboles_ergasiakhs_sxeshs !== false,
                         e3Enabled_2:
-                            result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy ===
-                            true,
-
-                        wtoEnabled_222: result.value?.ma_222 === true,
-                        wtoEnabled_227: result.value?.ma_227 === true,
-                        wtoEnabled_217: result.value?.ma_217 === true,
-                        wtoEnabled_221: result.value?.ma_221 === true,
-                        wtoEnabled_220: result.value?.ma_220 === true,
-                        wtoEnabled_218: result.value?.ma_218 === true,
-                        wtoEnabled_219: result.value?.ma_219 === true,
-                        wtoEnabled_223: result.value?.ma_223 === true,
-                        wtoEnabled_229: result.value?.ma_229 === true,
-                        wtoEnabled_226: result.value?.ma_226 === true,
-                        wtoEnabled_228: result.value?.ma_228 === true,
-                        wtoEnabled_224: result.value?.ma_224 === true,
-                        wtoEnabled_225: result.value?.ma_225 === true,
-                        wtoEnabled_236: result.value?.ma_236 === true
+                            result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy !==
+                            false,
+                        wtoEnabled_222:
+                            result.value?.ma_222_lysh_symbashs_orismenoy_xronoy !== false,
+                        wtoEnabled_227: result.value?.ma_227_lysh_dokimastikhs_periodoy !== false,
+                        wtoEnabled_217: result.value?.ma_217_oikeiothelhs_apoxorhsh !== false,
+                        wtoEnabled_221:
+                            result.value?.ma_221_lysh_kataggelia_me_proeidopoihsh !== false,
+                        wtoEnabled_220:
+                            result.value?.ma_220_lysh_kataggelia_xoris_proeidopoihsh !== false,
+                        wtoEnabled_218: result.value?.ma_218_lysh_dhloshs_oxlhshs !== false,
+                        wtoEnabled_219:
+                            result.value?.ma_219_oikeiothelhs_apoxorhsh_meta_apo_oxlhsh !== false,
+                        wtoEnabled_223: result.value?.ma_223_lysh_ethelousia_exodos !== false,
+                        wtoEnabled_229: result.value?.ma_229_lhxh_daneismoy !== false,
+                        wtoEnabled_226: result.value?.ma_226_lhxh_logo_thanatoy !== false,
+                        wtoEnabled_228: result.value?.ma_228_metavivash_se_epixeirish !== false,
+                        wtoEnabled_224:
+                            result.value?.ma_224_syntaxiodothsh_me_oikeiothelh_apoxorhsh !== false,
+                        wtoEnabled_225:
+                            result.value
+                                ?.ma_225_syntaxiodothsh_me_kataggelia_xoris_proeidopoihsh !== false,
+                        wtoEnabled_236:
+                            result.value?.ma_236_oikeiothelhs_apoxorhsh_logo_15etias !== false
                     };
                     console.log('[MAIN] Stored upload options:', window.__erganhUploadOptions);
                 };
-
                 // ✅ Helper: E3 + WTO uploads
                 const runXmlUploads = async () => {
                     let e3Result = { success: true };
-                    let maResult = { success: true };
-                    let wtoResult = { success: true };
 
                     if (
                         userWantsE3 &&
@@ -1149,44 +1098,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const userWantsMA =
-                        result.value?.e3_metaboles_ergasiakhs_sxeshs === true ||
-                        result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy ===
-                            true;
-
-                    if (
-                        userWantsMA &&
-                        maXmlData?.success &&
-                        (maXmlData?.s3Url ||
-                            maXmlData?.downloadUrl ||
-                            maXmlData?.relativePath ||
-                            maXmlData?.s3Key) &&
-                        data.data?._id
-                    ) {
-                        const maUrlToSend =
-                            maXmlData?.s3Url ||
-                            maXmlData?.downloadUrl ||
-                            maXmlData?.relativePath ||
-                            maXmlData?.s3Key ||
-                            null;
-                        if (maUrlToSend) {
-                            try {
-                                console.log('[MA-UPLOAD] Uploading MA XML...');
-                                maResult = await uploadMaToErganh(
-                                    data.data._id,
-                                    maUrlToSend,
-                                    result.value?.isPermanent === true
-                                );
-                                console.log('[MA-UPLOAD] Result:', maResult);
-                            } catch (e) {
-                                console.error('[MA-UPLOAD] ❌ Exception:', e?.message || e);
-                                maResult = { success: false, error: e?.message };
-                            }
-                        }
-                    }
+                    let wtoResult = { success: true };
 
                     if (userWantsWto && data.data?._id) {
                         if (result.value?.isPermanent === true) {
+                            // ✅ ΟΡΙΣΤΙΚΗ → XML upload
                             if (
                                 wtoXmlData?.success &&
                                 (wtoXmlData?.s3Url ||
@@ -1217,6 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                             }
                         } else {
+                            // ✅ ΠΡΟΣΩΡΙΝΗ → manual form
                             try {
                                 console.log('[WTO-UPLOAD] Uploading WTO Temporary (Προσωρινή)...');
                                 wtoResult = await uploadWtoTemporary(data.data._id, null);
@@ -1235,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
 
-                    return { e3Result, maResult, wtoResult };
+                    return { e3Result, wtoResult };
                 };
 
                 // =====================================================================
@@ -1337,7 +1254,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                                 ${e3XmlHtml}
                                 ${wtoXmlHtml}
-                                ${maXmlHtml}
                             `,
                             timer: hasE3Xml || hasWtoXml ? null : 1500,
                             showConfirmButton: hasE3Xml || hasWtoXml,
@@ -1543,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const e3Enabled_1 = filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs === true;
                 const e3Enabled_2 =
                     filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true;
-                const wtoEnabled_217 = filesToUpdate?.ma_217 === true;
+                const wtoEnabled_217 = filesToUpdate?.ma_217_oikeiothelhs_apoxorhsh === true;
 
                 const needsE3Upload = !!(
                     (e3Enabled_1 || e3AnaggeliaProslhpshs) &&
@@ -1571,7 +1487,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.location.href = redirectUrl;
                     return;
                 }
-
                 // ✅ UPLOAD E3
                 let e3UploadSuccess = false;
 
@@ -1725,6 +1640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     console.log('[WTO-UPLOAD] ⏸️ Skipped (not enabled or no employee ID)');
                 }
+
                 console.log('[CLOSE-MODAL] All uploads completed. Redirecting...');
                 resolve();
                 window.location.href = redirectUrl;
@@ -1748,7 +1664,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     timerProgressBar: true
                 });
             };
-
             // =====================================================================
             // ✅ DOWNLOAD + EMAIL HANDLER
             // =====================================================================
@@ -1890,7 +1805,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     modalBody.appendChild(e3Container);
                 }
             }
-
             // =====================================================================
             // ✅ ADD WTO XML DOWNLOAD BUTTON
             // =====================================================================
@@ -2001,11 +1915,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? `
                         <details style="margin-top:8px;">
                             <summary style="cursor:pointer;">Λεπτομέρειες</summary>
-                            <pre style="max-height:220px; overflow:auto; white-space:pre-wrap;
-                                        overflow-wrap:anywhere; word-break:break-word;
-                                        padding:10px 12px; border:1px solid rgba(0,0,0,.10);
-                                        border-radius:10px; background:#fff;
-                                        font-size:12px;">${escapeHtml(details)}</pre>
+                            <pre style="max-height:220px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; padding:10px 12px; border:1px solid rgba(0,0,0,.10); border-radius:10px; background:#fff; font-size:12px;">${escapeHtml(details)}</pre>
                         </details>
                     `
                             : ''
@@ -2088,11 +1998,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     html: `
                         <div style="text-align:left;">
                             <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
-                            ${
-                                payload?.protocol
-                                    ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>`
-                                    : ''
-                            }
+                            ${payload?.protocol ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>` : ''}
                         </div>
                     `,
                     confirmButtonText: 'OK'
@@ -2180,11 +2086,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? `
                         <details style="margin-top:8px;">
                             <summary style="cursor:pointer;">Λεπτομέρειες</summary>
-                            <pre style="max-height:220px; overflow:auto; white-space:pre-wrap;
-                                        overflow-wrap:anywhere; word-break:break-word;
-                                        padding:10px 12px; border:1px solid rgba(0,0,0,.10);
-                                        border-radius:10px; background:#fff;
-                                        font-size:12px;">${escapeHtml(details)}</pre>
+                            <pre style="max-height:220px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; padding:10px 12px; border:1px solid rgba(0,0,0,.10); border-radius:10px; background:#fff; font-size:12px;">${escapeHtml(details)}</pre>
                         </details>
                     `
                             : ''
@@ -2263,11 +2165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     html: `
                         <div style="text-align:left;">
                             <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
-                            ${
-                                payload?.protocol
-                                    ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>`
-                                    : ''
-                            }
+                            ${payload?.protocol ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>` : ''}
                         </div>
                     `,
                     confirmButtonText: 'OK'
@@ -2340,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'CSRF-Token': csrfToken
                     },
                     credentials: 'include',
-                    body: JSON.stringify({ ergazomenosId })
+                    body: JSON.stringify({ ergazomenosId: ergazomenosId })
                 }
             );
 
@@ -2373,9 +2271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ? `
                             <details style="margin-top: 10px;">
                                 <summary style="cursor: pointer;">Λεπτομέρειες</summary>
-                                <pre style="max-height: 200px; overflow: auto; padding: 10px;
-                                            background: #f5f5f5; border-radius: 5px;
-                                            font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
+                                <pre style="max-height: 200px; overflow: auto; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
                             </details>
                         `
                                 : ''
@@ -2406,8 +2302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="text-align: left;">
                             <p style="font-weight: 600; margin-bottom: 10px;">${escapeHtml(userMsg)}</p>
                             <p class="text-muted" style="font-size: 0.9rem;">
-                                Η φόρμα WTO συμπληρώθηκε αυτόματα. Ολοκλήρωσε την υποβολή
-                                στο παράθυρο του ΕΡΓΑΝΗ.
+                                Η φόρμα WTO συμπληρώθηκε αυτόματα. Ολοκλήρωσε την υποβολή στο παράθυρο του ΕΡΓΑΝΗ.
                             </p>
                         </div>
                     `,
@@ -2437,9 +2332,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ? `
                             <details style="margin-top: 10px;">
                                 <summary style="cursor: pointer;">Λεπτομέρειες</summary>
-                                <pre style="max-height: 200px; overflow: auto; padding: 10px;
-                                            background: #f5f5f5; border-radius: 5px;
-                                            font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
+                                <pre style="max-height: 200px; overflow: auto; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px;">${escapeHtml(payload.errorDetails)}</pre>
                             </details>
                         `
                                 : ''
@@ -2482,95 +2375,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================================================================
-    // ✅ HELPER FUNCTION: Upload MA to ERGANH (Μεταβολή Στοιχείων)
-    // ============================================================================
-    async function uploadMaToErganh(ergazomenosId, s3Url, isPermanent = false) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-        if (!s3Url || typeof s3Url !== 'string') {
-            throw new Error('uploadMaToErganh: s3Url must be a string');
-        }
-
-        if (erganiUploadInProgress) {
-            if (window.hideLoader) window.hideLoader();
-            await Swal.fire({
-                icon: 'info',
-                title: 'ΕΡΓΑΝΗ (ΜΑ)',
-                text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
-                confirmButtonText: 'OK'
-            });
-            return { success: false, userMessage: 'Upload already in progress' };
-        }
-
-        erganiUploadInProgress = true;
-
-        try {
-            if (window.applyServerProgress) {
-                window.applyServerProgress(0, 'Υποβολή Μεταβολής στο ΕΡΓΑΝΗ ΙΙ', 1, 4);
-            } else if (window.showLoader) {
-                window.showLoader('Υποβολή Μεταβολής στο ΕΡΓΑΝΗ ΙΙ');
-            }
-
-            const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-ma-to-erganh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
-                credentials: 'include',
-                body: JSON.stringify({ ergazomenosId, s3Url, isPermanent: isPermanent === true })
-            });
-
-            let payload;
-            try {
-                payload = await uploadResponse.json();
-            } catch {
-                payload = { success: false, userMessage: await uploadResponse.text() };
-            }
-
-            if (window.hideLoader) window.hideLoader();
-
-            if (!uploadResponse.ok) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
-                    text: payload?.userMessage || `HTTP ${uploadResponse.status}`,
-                    confirmButtonText: 'OK'
-                });
-                return { success: false, ...payload };
-            }
-
-            if (payload.success) {
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'ΕΡΓΑΝΗ ΙΙ - Μεταβολή',
-                    html: `<p>${payload?.userMessage || 'Επιτυχής υποβολή Μεταβολής'}</p>
-                    ${payload?.protocol ? `<p>Πρωτόκολλο: <b>${payload.protocol}</b></p>` : ''}`,
-                    confirmButtonText: 'OK'
-                });
-            } else {
-                await Swal.fire({
-                    icon: 'warning',
-                    title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
-                    text: payload?.userMessage || 'Αποτυχία υποβολής ΜΑ',
-                    confirmButtonText: 'OK'
-                });
-            }
-
-            return payload;
-        } catch (err) {
-            if (window.hideLoader) window.hideLoader();
-            console.error('[MA-UPLOAD] ❌ fetch error:', err);
-            await Swal.fire({
-                icon: 'error',
-                title: 'ΜΑ XML - ΕΡΓΑΝΗ ΙΙ',
-                text: err?.message || 'Αποτυχία αποστολής ΜΑ XML.',
-                confirmButtonText: 'OK'
-            });
-            return { success: false, error: err?.message };
-        } finally {
-            erganiUploadInProgress = false;
-        }
-    }
-
-    // ============================================================================
     // ✅ SOCKET.IO - ERGANH REAL-TIME STATUS UPDATES
     // ============================================================================
 
@@ -2588,10 +2392,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showConfirmButton: false,
                 timer: 3000,
                 timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup',
-                    title: 'swal-toast-title'
-                }
+                customClass: { popup: 'swal-toast-popup', title: 'swal-toast-title' }
             });
         });
 
@@ -2615,10 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showConfirmButton: false,
                 timer: data.step === 'login_success' ? 2000 : 3000,
                 timerProgressBar: true,
-                customClass: {
-                    popup: 'swal-toast-popup',
-                    title: 'swal-toast-title'
-                }
+                customClass: { popup: 'swal-toast-popup', title: 'swal-toast-title' }
             });
         });
 
@@ -2626,7 +2424,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('📡 [ERGANH] Success:', data);
             const protocolHtml = data.protocol
                 ? `<p style="margin-top: 10px; font-size: 0.95rem;">
-                     <strong>Πρωτόκολλο:</strong>
+                     <strong>Πρωτόκολλο:</strong> 
                      <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
                    </p>`
                 : '';
@@ -2661,11 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: '❌ ΕΡΓΑΝΗ ΙΙ - Αποτυχία',
                 html: `
                     <p>${data.message || 'Η αποστολή απέτυχε'}</p>
-                    ${
-                        data.error
-                            ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>`
-                            : ''
-                    }
+                    ${data.error ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>` : ''}
                 `,
                 showConfirmButton: true,
                 confirmButtonText: 'Κλείσιμο',
