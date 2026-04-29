@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Event listeners
     proslhpshsInput.addEventListener('blur', handleProslhpshChange);
-    allaghsSymbashsInput.addEventListener('change', handleAllaghsChange);
+    // allaghsSymbashsInput.addEventListener('change', handleAllaghsChange);
     allaghsSymbashsInput.addEventListener('blur', handleAllaghsChange);
 
     orarioyApoInput.addEventListener('change', handleOrarioyApoChange);

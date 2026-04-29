@@ -914,7 +914,8 @@ class ergazomenoiController {
             formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
-        newErgazomenos.typos_metabolhs = [];
+        // newErgazomenos.typos_metabolhs = [];
+        // newErgazomenos.typos_metabolhs_table = [];
 
         let savedErgazomenos = null; // ✅ Δήλωση
 
@@ -1218,7 +1219,7 @@ class ergazomenoiController {
             }
 
             // ✅ Extract company contact info
-            const companyTeam = company?.email || null;
+            const companyTeam = company?.team || null;
             const companyEmail = company?.email || null;
             const companyPhone = company?.thlefono || null;
             const companyName = company
@@ -1399,6 +1400,7 @@ class ergazomenoiController {
             // =====================================================================
 
             let wtoXmlData = { success: false };
+            let maXmlData = null;
 
             // ✅ CRITICAL: Only generate WTO XML if:
             //    1. wto_pshfiakh_organosh_xronoy_ergasias checkbox is checked
