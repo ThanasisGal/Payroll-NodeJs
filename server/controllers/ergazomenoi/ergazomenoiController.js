@@ -851,8 +851,8 @@ class ergazomenoiController {
         newErgazomenos.idiothta_sto_ergo_39 = formData.idiothta_sto_ergo_39 || null;
 
         newErgazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia =
-            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
-        newErgazomenos.εidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
+            formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia;
+        newErgazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
             formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera;
         newErgazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia =
             formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia;
@@ -2704,7 +2704,7 @@ class ergazomenoiController {
             adeia_diamonhs_me_amesh_prosbash_gia_ergasia:
                 formData.adeia_diamonhs_me_amesh_prosbash_gia_ergasia,
             eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
-                formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
+                formData.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia_stathera,
             arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
                 formData.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia,
             hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia:
@@ -2712,7 +2712,7 @@ class ergazomenoiController {
             adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia:
                 formData.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia,
             eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
-                formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
+                formData.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia_stathera,
             arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:
                 formData.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia,
             hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia:

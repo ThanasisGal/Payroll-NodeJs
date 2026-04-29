@@ -10,13 +10,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // ✅ ΝΕΟΣ: Κρατάμε το προηγούμενο value της λήξης σύμβασης
     let previousLhxhsValue = lhxhsSymbashsInput?.value || '';
 
-    // ✅ ΝΕΟΣ: Debounce timer
+    // ✅ ΝΕΟΣ: Debounce timers
     let lhxhsChangeTimer = null;
+    // ✅ ΝΕΟ: Debounce timer για allaghs_symbashs
+    let allaghsChangeTimer = null;
 
-    // Event listeners
+    // ✅ ΔΙΟΡΘΩΣΗ: proslhpshs μόνο blur
     proslhpshsInput.addEventListener('blur', handleProslhpshChange);
-    // allaghsSymbashsInput.addEventListener('change', handleAllaghsChange);
-    allaghsSymbashsInput.addEventListener('blur', handleAllaghsChange);
+
+    // ✅ ΔΙΟΡΘΩΣΗ: allaghs_symbashs μόνο change (ΟΧΙ blur) + debounced
+    allaghsSymbashsInput.addEventListener('change', handleAllaghsChangeDebounced);
 
     orarioyApoInput.addEventListener('change', handleOrarioyApoChange);
     orarioyApoInput.addEventListener('blur', handleOrarioyApoChange);
@@ -165,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     allowOutsideClick: false,
                     icon: 'error',
                     title: 'Προσοχή !!! ',
-                    text: 'Ο Μ.Ο. ωρών ημερήσιας εργασίας δεν μπορεί να υπερβαίνει τις 10 ώρες.  Παρακαλώ ελέγξτε τις τιμές που εισάγατε.',
+                    text: 'Ο Μ.Ο. ωρών ημερ��σιας εργασίας δεν μπορεί να υπερβαίνει τις 10 ώρες.  Παρακαλώ ελέγξτε τις τιμές που εισάγατε.',
                     showConfirmButton: true,
                     confirmButtonText: 'Εντάξει',
                     customClass: {
@@ -184,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }, 100);
                 });
 
-                // return; Δεν κάνουμε return γιατί θέλουμε να εμφανίσουμε το σωστό moOron στο πεδίο, αλλά ενημερώνουμε τον χρήστη για το πρόβλημα
+                return;
             }
 
             const finalCheck = parseFloat((moOron * hmeres).toFixed(4));
@@ -449,16 +452,42 @@ document.addEventListener('DOMContentLoaded', function () {
     // =========================================================================
 
     async function handleProslhpshChange() {
-        setAllDates(this.value);
-        await updateOrarioyEosDate(this.value);
+        const value = this.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        setAllDates(value);
+        await updateOrarioyEosDate(value);
+    }
+
+    // ✅ ΝΕΟ: Debounced handler για allaghs_symbashs
+    function handleAllaghsChangeDebounced() {
+        if (allaghsChangeTimer) clearTimeout(allaghsChangeTimer);
+        allaghsChangeTimer = setTimeout(() => {
+            handleAllaghsChange();
+        }, 500);
     }
 
     function handleAllaghsChange() {
-        setAllDates(this.value);
+        const value = allaghsSymbashsInput.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική (4 ψηφία πλήρη)
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        setAllDates(value);
     }
 
     async function handleOrarioyApoChange() {
-        await updateOrarioyEosDate(this.value);
+        const value = this.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        await updateOrarioyEosDate(value);
     }
 
     /**
@@ -482,6 +511,12 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleLhxhsChange() {
         const currentValue = lhxhsSymbashsInput?.value || '';
 
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        if (currentValue) {
+            const year = new Date(currentValue).getFullYear();
+            if (year < 1900 || year > 2100) return;
+        }
+
         // ✅ ΕΛΕΓΧΟΣ:  Αν το value ΔΕΝ άλλαξε, μην κάνεις τίποτα
         if (currentValue === previousLhxhsValue) {
             return;
@@ -493,12 +528,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // ✅ Re-calculate eos date ΜΟΝΟ αν υπάρχει apoDate
         const apoDate = orarioyApoInput?.value;
         if (apoDate) {
-            // ✅ ΣΗΜΑΝΤΙΚΟ: Καλούμε ΜΟΝΟ την updateOrarioyEosDate
-            // ΔΕΝ χρειάζεται να ξαναδημιουργήσουμε τα fields!
             const startDateParsed = new Date(apoDate);
             if (isNaN(startDateParsed.getTime())) {
                 return;
             }
+
+            // ✅ Guard apoDate χρονιά
+            const apoYear = startDateParsed.getFullYear();
+            if (apoYear < 1900 || apoYear > 2100) return;
 
             let eosDateParsed = new Date(startDateParsed);
             eosDateParsed.setDate(eosDateParsed.getDate() + 6);
@@ -513,8 +550,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            // Cap στο τέλος έτους
-            const yearEnd = new Date(startDateParsed.getFullYear(), 11, 31);
+            // ✅ ΔΙΟΡΘΩΣΗ yearEnd: χρήση setFullYear/setMonth/setDate αντί new Date(year, 11, 31)
+            const yearEnd = new Date(startDateParsed);
+            yearEnd.setMonth(11);
+            yearEnd.setDate(31);
+
             if (eosDateParsed > yearEnd) {
                 eosDateParsed = yearEnd;
             }
@@ -522,15 +562,18 @@ document.addEventListener('DOMContentLoaded', function () {
             // Format και Update
             const eosDate = formatDateToISO(eosDateParsed);
             orarioyEosInput.value = eosDate;
-
-            // ✅ ΚΡΙΤΙΚΟ: ΔΕΝ καλούμε updateDateDifference εδώ!
-            // Το eos date ενημερώθηκε, αλλά ΔΕΝ χρειάζεται να ξαναδημιουργήσουμε τα fields
         }
     }
 
     async function handleOrarioyEosChange() {
         const eosDate = this.value;
         const apoDate = orarioyApoInput.value;
+
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        if (eosDate) {
+            const year = new Date(eosDate).getFullYear();
+            if (year < 1900 || year > 2100) return;
+        }
 
         let isValidDateChange = await validateDateChange(apoDate, eosDate);
 
@@ -565,6 +608,7 @@ document.addEventListener('DOMContentLoaded', function () {
      * ✅ ΔΙΟΡΘΩΣΗ: Υπολογισμός ΕΩΣ = ΑΠΟ + 7 ημέρες
      * ✅ ΕΛΕΓΧΟΣ 1: Cap στη λήξη σύμβασης
      * ✅ ΕΛΕΓΧΟΣ 2: Cap στο τέλος έτους
+     * ✅ ΕΛΕΓΧΟΣ 3: Guard για μη λογικές χρονιές (π.χ. 0002 κατά πληκτρολόγηση)
      */
     async function updateOrarioyEosDate(startDate) {
         if (!startDate) {
@@ -575,6 +619,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const startDateParsed = new Date(startDate);
 
         if (isNaN(startDateParsed.getTime())) {
+            return;
+        }
+
+        // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
+        // Όταν ο χρήστης πληκτρολογεί π.χ. "2" στο year, το Chrome δημιουργεί "0002-MM-DD"
+        // new Date("0002-09-11").getFullYear() === 2  →  αποφεύγουμε τον υπολογισμό
+        const year = startDateParsed.getFullYear();
+        if (year < 1900 || year > 2100) {
             return;
         }
 
@@ -601,8 +653,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // =====================================================================
         // ΈΛΕΓΧΟΣ 2: Cap στο τέλος έτους (31 Δεκεμβρίου)
+        // ✅ ΔΙΟΡΘΩΣΗ: χρήση setMonth/setDate αντί new Date(year, 11, 31)
+        // Το new Date(2, 11, 31) επιστρέφει 1902 λόγω JavaScript quirk για χρονιές 0-99!
         // =====================================================================
-        const yearEnd = new Date(startDateParsed.getFullYear(), 11, 31); // December 31st
+        const yearEnd = new Date(startDateParsed);
+        yearEnd.setMonth(11);
+        yearEnd.setDate(31);
 
         if (eosDateParsed > yearEnd) {
             eosDateParsed = yearEnd;
@@ -631,6 +687,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const apoDateObj = new Date(apoDate);
         const eosDateObj = new Date(eosDate);
 
+        // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
+        if (apoDateObj.getFullYear() < 1900 || apoDateObj.getFullYear() > 2100) return false;
+        if (eosDateObj.getFullYear() < 1900 || eosDateObj.getFullYear() > 2100) return false;
+
         // Check 1: eos δεν μπορεί να είναι πριν από apo
         if (eosDateObj < apoDateObj) {
             const formattedApoDate = formatDate(apoDateObj);
@@ -651,7 +711,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Check 3: eos δεν μπορεί να είναι μετά το τέλος του έτους
-        const yearEnd = new Date(apoDateObj.getFullYear(), 11, 31);
+        // ✅ ΔΙΟΡΘΩΣΗ: χρήση setMonth/setDate
+        const yearEnd = new Date(apoDateObj);
+        yearEnd.setMonth(11);
+        yearEnd.setDate(31);
         if (eosDateObj > yearEnd) {
             const formattedYearEnd = formatDate(yearEnd);
             alert(`Η Ημερ/νία ΕΩΣ δεν μπορεί να είναι μετά την ${formattedYearEnd}.`);
@@ -681,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let isUpdatingDateDifference = false;
 
     async function updateDateDifference(startDate, endDate) {
-        // ✅ Έλεγχος: Αν τρέχει ήδη, μην ξανατρέξεις
+        // ✅ Έλεγχος: Αν τρέχει ήδη, ��ην ξανατρέξεις
         if (isUpdatingDateDifference) {
             console.warn('⚠️ updateDateDifference already running, skipping...');
             return;

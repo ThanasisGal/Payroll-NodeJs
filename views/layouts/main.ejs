@@ -384,7 +384,7 @@
                 const socket = window.socket;
 
                 socket.on('connect', function () {
-                    const userId = '<%= locals.userId || "" %>';
+                    const userId = '<%= userId || "" %>';
                     console.log('🔌 Socket connected. userId:', userId); // ✅ ΠΡΟΣΘΕΣΕ
 
                     if (userId && userId.trim() !== '') {

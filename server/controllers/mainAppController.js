@@ -23,6 +23,7 @@ class mainAppController {
         };
         res.render('mainapp', {
             locals,
+            userId: req.session.userId,
             bodyClass: 'home-bg-cdn'
         });
     };

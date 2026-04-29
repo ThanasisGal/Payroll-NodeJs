@@ -77,6 +77,50 @@ const calculateMonthsDifference = (startDate, endDate) => {
     return yearsDifference * 12 + monthsDifference;
 };
 
+const calculateDateDifference = (startDate, endDate) => {
+    if (!endDate) return '';
+
+    const [sd, sm, sy] = startDate.split('/').map(Number);
+    const [ed, em, ey] = endDate.split('/').map(Number);
+
+    const daysInEndMonth = new Date(ey, em, 0).getDate();
+    const isStartFirstDay = sd === 1;
+    const isEndLastDay = ed === daysInEndMonth;
+
+    let calcEd = ed,
+        calcEm = em,
+        calcEy = ey;
+
+    if (isStartFirstDay && isEndLastDay) {
+        const nextMonth = new Date(ey, em, 1);
+        calcEd = 1;
+        calcEm = nextMonth.getMonth() + 1;
+        calcEy = nextMonth.getFullYear();
+    }
+
+    let years = calcEy - sy;
+    let months = calcEm - sm;
+    let days = calcEd - sd;
+
+    if (days < 0) {
+        months--;
+        const daysInPrevMonth = new Date(calcEy, calcEm - 1, 0).getDate();
+        days += daysInPrevMonth;
+    }
+
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    const parts = [];
+    if (years > 0) parts.push(`${years} ${years === 1 ? 'έτους' : 'ετών'}`);
+    if (months > 0) parts.push(`${months} ${months === 1 ? 'μηνός' : 'μηνών'}`);
+    if (days > 0) parts.push(`${days} ${days === 1 ? 'ημέρας' : 'ημερών'}`);
+
+    return parts.join(', ');
+};
+
 const numbersToWords = (n) => {
     const ones = [
         '',
@@ -710,14 +754,24 @@ async function generateContractPDF(ergazomenos, userContext) {
                 break;
         }
 
-        const differenceInMonths = calculateMonthsDifference(
-            ergazomenos.hmeromhnia_allaghs_symbashs,
-            ergazomenos.hmeromhnia_lhxhs_symbashs
+        // const differenceInMonths = calculateMonthsDifference(
+        //     ergazomenos.hmeromhnia_allaghs_symbashs,
+        //     ergazomenos.hmeromhnia_lhxhs_symbashs
+        // );
+
+        // let diarkeia = '.';
+        // if (differenceInMonths !== 0) {
+        //     diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
+        // }
+
+        const diarkeia_text = calculateDateDifference(
+            formatDate(ergazomenos.hmeromhnia_allaghs_symbashs),
+            formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)
         );
 
         let diarkeia = '.';
-        if (differenceInMonths !== 0) {
-            diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
+        if (diarkeia_text) {
+            diarkeia = `, διάρκειας ${diarkeia_text} και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
         }
 
         const hmeres_lektika = daysToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');

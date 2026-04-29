@@ -1,4 +1,4 @@
-// /public/js/ergazomenoi/genika/date_sync_add.js
+// /public/js/ergazomenoi/genika/date_sync_edit.js
 
 document.addEventListener('DOMContentLoaded', function () {
     const proslhpshsInput = document.getElementById('hmeromhnia_proslhpshs');
@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let previousLhxhsValue = lhxhsSymbashsInput?.value || '';
     let lhxhsChangeTimer = null;
+    // ✅ ΝΕΟ: Debounce timer για allaghs_symbashs
+    let allaghsChangeTimer = null;
 
     document.addEventListener(
         'click',
@@ -23,8 +25,9 @@ document.addEventListener('DOMContentLoaded', function () {
     );
 
     proslhpshsInput.addEventListener('blur', handleProslhpshChange);
-    allaghsSymbashsInput.addEventListener('change', handleAllaghsChange);
-    allaghsSymbashsInput.addEventListener('blur', handleAllaghsChange);
+
+    // ✅ ΔΙΟΡΘΩΣΗ: μόνο 'change' + debounced (ΟΧΙ blur)
+    allaghsSymbashsInput.addEventListener('change', handleAllaghsChangeDebounced);
 
     orarioyApoInput.addEventListener('change', handleOrarioyApoChange);
     orarioyApoInput.addEventListener('blur', handleOrarioyApoChange);
@@ -210,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }, 300);
     }
-    // Βάλ’ το μέσα στο DOMContentLoaded scope, μετά το validateOrarioErgasiasTab()
 
     async function bootstrapOrarioOnFormLoad() {
         const apoDate = orarioyApoInput?.value?.trim();
@@ -222,6 +224,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const eosObj = new Date(eosDate);
 
         if (isNaN(apoObj.getTime()) || isNaN(eosObj.getTime())) return;
+
+        // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
+        if (apoObj.getFullYear() < 1900 || apoObj.getFullYear() > 2100) return;
+        if (eosObj.getFullYear() < 1900 || eosObj.getFullYear() > 2100) return;
+
         if (eosObj < apoObj) return;
 
         await updateDateDifference(apoDate, eosDate);
@@ -243,6 +250,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('bootstrapOrarioOnFormLoad failed:', err);
         }
     }
+
     validateOrarioErgasiasTab();
 
     setTimeout(() => {
@@ -345,6 +353,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     return;
                 }
+
                 if (hasInitializedOrariaTab) {
                     return;
                 }
@@ -406,17 +415,47 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // =========================================================================
+    // HANDLERS
+    // =========================================================================
+
     async function handleProslhpshChange() {
-        setAllDates(this.value);
-        await updateOrarioyEosDate(this.value);
+        const value = this.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        setAllDates(value);
+        await updateOrarioyEosDate(value);
+    }
+
+    // ✅ ΝΕΟ: Debounced handler για allaghs_symbashs
+    function handleAllaghsChangeDebounced() {
+        if (allaghsChangeTimer) clearTimeout(allaghsChangeTimer);
+        allaghsChangeTimer = setTimeout(() => {
+            handleAllaghsChange();
+        }, 500);
     }
 
     function handleAllaghsChange() {
-        setAllDates(this.value);
+        const value = allaghsSymbashsInput.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        setAllDates(value);
     }
 
     async function handleOrarioyApoChange() {
-        await updateOrarioyEosDate(this.value);
+        const value = this.value;
+        if (!value) return;
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        const year = new Date(value).getFullYear();
+        if (year < 1900 || year > 2100) return;
+
+        await updateOrarioyEosDate(value);
     }
 
     function handleLhxhsChangeDebounced() {
@@ -427,6 +466,12 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleLhxhsChange() {
         const currentValue = lhxhsSymbashsInput?.value || '';
 
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        if (currentValue) {
+            const year = new Date(currentValue).getFullYear();
+            if (year < 1900 || year > 2100) return;
+        }
+
         if (currentValue === previousLhxhsValue) return;
         previousLhxhsValue = currentValue;
 
@@ -435,6 +480,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const startDateParsed = new Date(apoDate);
         if (isNaN(startDateParsed.getTime())) return;
+
+        // ✅ Guard: χρονιά apoDate
+        const apoYear = startDateParsed.getFullYear();
+        if (apoYear < 1900 || apoYear > 2100) return;
 
         let eosDateParsed = new Date(startDateParsed);
         eosDateParsed.setDate(eosDateParsed.getDate() + 6);
@@ -446,7 +495,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const yearEnd = new Date(startDateParsed.getFullYear(), 11, 31);
+        // ✅ ΔΙΟΡΘΩΣΗ yearEnd: setMonth/setDate αντί new Date(year, 11, 31)
+        const yearEnd = new Date(startDateParsed);
+        yearEnd.setMonth(11);
+        yearEnd.setDate(31);
         if (eosDateParsed > yearEnd) eosDateParsed = yearEnd;
 
         orarioyEosInput.value = formatDateToISO(eosDateParsed);
@@ -455,6 +507,12 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleOrarioyEosChange() {
         const eosDate = this.value;
         const apoDate = orarioyApoInput.value;
+
+        // ✅ Guard: χρονιά πρέπει να είναι λογική
+        if (eosDate) {
+            const year = new Date(eosDate).getFullYear();
+            if (year < 1900 || year > 2100) return;
+        }
 
         let isValidDateChange = await validateDateChange(apoDate, eosDate);
 
@@ -470,17 +528,29 @@ document.addEventListener('DOMContentLoaded', function () {
         await updateDateDifference(startDate, endDate);
     }
 
+    // =========================================================================
+    // CORE FUNCTIONS
+    // =========================================================================
+
     function setAllDates(value) {
         allaghsSymbashsInput.value = value;
         orarioyApoInput.value = value;
         updateOrarioyEosDate(value);
     }
 
+    /**
+     * ✅ ΔΙΟΡΘΩΣΗ: Guard για μη λογικές χρονιές + fix yearEnd
+     */
     async function updateOrarioyEosDate(startDate) {
         if (!startDate) return;
 
         const startDateParsed = new Date(startDate);
         if (isNaN(startDateParsed.getTime())) return;
+
+        // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
+        // Όταν ο χρήστης πληκτρολογεί π.χ. "2" στο year, το Chrome φτιάχνει "0002-MM-DD"
+        const year = startDateParsed.getFullYear();
+        if (year < 1900 || year > 2100) return;
 
         let eosDateParsed = new Date(startDateParsed);
         eosDateParsed.setDate(eosDateParsed.getDate() + 6);
@@ -492,7 +562,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const yearEnd = new Date(startDateParsed.getFullYear(), 11, 31);
+        // ✅ ΔΙΟΡΘΩΣΗ: χρήση setMonth/setDate αντί new Date(year, 11, 31)
+        // new Date(2, 11, 31) επιστρέφει 1902 λόγω JavaScript quirk για χρονιές 0-99!
+        const yearEnd = new Date(startDateParsed);
+        yearEnd.setMonth(11);
+        yearEnd.setDate(31);
         if (eosDateParsed > yearEnd) eosDateParsed = yearEnd;
 
         orarioyEosInput.value = formatDateToISO(eosDateParsed);
@@ -505,6 +579,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const apoDateObj = new Date(apoDate);
         const eosDateObj = new Date(eosDate);
+
+        // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
+        if (apoDateObj.getFullYear() < 1900 || apoDateObj.getFullYear() > 2100) return false;
+        if (eosDateObj.getFullYear() < 1900 || eosDateObj.getFullYear() > 2100) return false;
 
         if (eosDateObj < apoDateObj) {
             alert(`Η Ημερ/νία ΕΩΣ δεν μπορεί να είναι πριν από την ${formatDate(apoDateObj)}.`);
@@ -521,7 +599,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        const yearEnd = new Date(apoDateObj.getFullYear(), 11, 31);
+        // ✅ ΔΙΟΡΘΩΣΗ yearEnd: setMonth/setDate
+        const yearEnd = new Date(apoDateObj);
+        yearEnd.setMonth(11);
+        yearEnd.setDate(31);
         if (eosDateObj > yearEnd) {
             alert(`Η Ημερ/νία ΕΩΣ δεν μπορεί να είναι μετά την ${formatDate(yearEnd)}.`);
             return false;
@@ -538,6 +619,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return true;
     }
+
+    // =========================================================================
+    // API CALLS
+    // =========================================================================
 
     let isUpdatingDateDifference = false;
 
@@ -770,23 +855,23 @@ document.addEventListener('DOMContentLoaded', function () {
                             <div class="col-1-2-1">
                                 <input type="time" class="date-control clearableInput text-center"
                                     id="apo_ora_03_${i1}" name="apo_ora_03_${i1}"
-                                    value="${pApoOra03}" />
+                                    value="${pApoOra03}" ${disabledAttr} />
                             </div>
                             <div class="col-1-2-01">
                                 <input type="time" class="date-control clearableInput text-center"
                                     id="eos_ora_03_${i1}" name="eos_ora_03_${i1}"
-                                    value="${pEosOra03}" />
+                                    value="${pEosOra03}" ${disabledAttr} />
                             </div>
                             <div class="col-0-5"></div>
                                 <div class="col-1-2 ml-0_3rem">
                                 <input type="time" class="date-control clearableInput text-center"
                                     id="dialleima_apo_ora_03_${i1}" name="dialleima_apo_ora_03_${i1}"
-                                    value="${pDialApo03}" />
+                                    value="${pDialApo03}" ${disabledAttr} />
                             </div>
                             <div class="col-1-2 ml--0_1rem">
                                 <input type="time" class="date-control clearableInput text-center"
-                                    id="dialleima_eos_ora_03_${i1}" name="dialleima_eos_ora_01_${i1}"
-                                    value="${pDialEos03}" />
+                                    id="dialleima_eos_ora_03_${i1}" name="dialleima_eos_ora_03_${i1}"
+                                    value="${pDialEos03}" ${disabledAttr} />
                             </div>
                         </div>
 
@@ -824,6 +909,10 @@ document.addEventListener('DOMContentLoaded', function () {
             isUpdatingDateDifference = false;
         }
     }
+
+    // =========================================================================
+    // UTILITY FUNCTIONS
+    // =========================================================================
 
     function updateKathgoriaBackgroundColor() {
         const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
@@ -902,9 +991,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 selectElement.dataset.bgListenerBound = '1';
             }
 
-            // updateBackground();
             updateBackground();
-            // ✅ Εφάρμοσε και disabled/enabled κατά φόρτωση
+
             const initialValue =
                 selectElement.value ||
                 document.getElementById(`kathgoria_ergasias_stathera_${i1}`)?.value ||
@@ -1153,6 +1241,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+
         if (allKathgoriesCompleted) {
             const oresErgasiasInput = document.getElementById('ores_ergasias_ebdomadas');
             if (oresErgasiasInput?.value) {
