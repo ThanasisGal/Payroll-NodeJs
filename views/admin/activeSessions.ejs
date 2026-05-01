@@ -20,6 +20,9 @@
             <button id="btnRefresh" type="button" class="btn btn-refresh-custom btn-sm ms-auto">
                 <i class="bi bi-arrow-clockwise"></i> Ανανέωση
             </button>
+            <button id="btnClose" type="button" class="btn btn-secondary btn-sm">
+                <i class="bi bi-x-lg"></i> Κλείσιμο
+            </button>
         </div>
         <div class="col-12"><hr /></div>
     </div>
@@ -111,22 +114,21 @@
                                 <i class="bi bi-circle-fill me-1" style="font-size:0.45rem;"></i>
                                 Online
                             </span>
+
                             <% if (isMe) { %>
                                 <span class="badge bg-warning text-dark">
                                     <i class="bi bi-person-check me-1"></i> Εσύ
                                 </span>
-                            <% } %>
-
-                            <%# ── Κουμπί Μήνυμα ── %>
-                            <% if (!isMe) { %>                            
+                            <% } else { %>
+                                <%# ── Κουμπί Μήνυμα (μόνο για άλλους χρήστες) ── %>
                                 <button type="button"
                                         class="btn btn-message-custom btn-sm ms-auto btn-send-message"
                                         data-userid="<%= u.userId %>"
                                         data-username="<%= u.firstName %> <%= u.lastName %>">
                                     <i class="bi bi-chat-dots"></i> Μήνυμα
                                 </button>
-                            </div>
-                        <% } %>
+                            <% } %>
+                        </div>
                     </div>
                 </div>
             <% }); %>
@@ -145,6 +147,14 @@
     if (btnRefresh) {
         btnRefresh.addEventListener('click', function () {
             window.location.reload();
+        });
+    }
+
+    // ── Close button ────────────────────────────────────────────────
+    const btnClose = document.getElementById('btnClose');
+    if (btnClose) {
+        btnClose.addEventListener('click', function () {
+            window.location.href = '/mainapp';
         });
     }
 

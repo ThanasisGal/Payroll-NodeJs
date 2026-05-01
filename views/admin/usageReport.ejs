@@ -28,10 +28,26 @@
             </form>
 
             <%# ── Export ── %>
-            <a href="/admin/usage-report/export?month=<%= month %>"
-               class="btn btn-sm btn-message-custom">
+            <!-- <a href="/admin/usage-report/export?month=<%= month %>"
+            class="btn btn-sm btn-message-custom"
+            target="_blank"
+            rel="noopener"
+            download>
                 <i class="bi bi-file-earmark-excel"></i> Export CSV
-            </a>
+            </a> -->
+
+            <%# ── Export ── %>
+            <button id="btnExportCsv"
+                    type="button"
+                    class="btn btn-sm btn-message-custom"
+                    data-month="<%= month %>">
+                <i class="bi bi-file-earmark-excel"></i> Export CSV
+            </button>
+
+            <%# ── Close (redirect στο /mainapp) ── %>
+            <button id="btnCloseUsage" type="button" class="btn btn-sm btn-secondary">
+                <i class="bi bi-x-lg"></i> Κλείσιμο
+            </button>
         </div>
         <div class="col-12"><hr /></div>
     </div>
@@ -144,6 +160,65 @@
         } catch (e) { /* leave as — */ }
     });
 
+// ── Close button ───────────────────────────────────────────────
+    const btnCloseUsage = document.getElementById('btnCloseUsage');
+    if (btnCloseUsage) {
+        btnCloseUsage.addEventListener('click', function () {
+            window.location.href = '/mainapp';
+        });
+    }
+
+    const btnExportCsv = document.getElementById('btnExportCsv');
+    if (btnExportCsv) {
+        btnExportCsv.addEventListener('click', async function () {
+            const month = this.getAttribute('data-month') || '';
+            const url   = '/admin/usage-report/export?month=' + encodeURIComponent(month);
+
+            // Δείξε loader άμεσα (delay 0 για να φανεί σίγουρα)
+            window.AppLoader.begin('Δημιουργία αρχείου CSV...', 0);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    skipLoader: true   // ← για να μην τρέξει και ο global fetch loader
+                });
+
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+
+                // Πάρε filename από Content-Disposition αν υπάρχει
+                let filename = 'usage-report-' + month + '.csv';
+                const cd = response.headers.get('Content-Disposition') || '';
+                const m  = cd.match(/filename="?([^"]+)"?/i);
+                if (m && m[1]) filename = m[1];
+
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(blobUrl);
+
+            } catch (err) {
+                console.error('[ExportCSV] error:', err);
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Σφάλμα',
+                        text: 'Δεν ήταν δυνατή η εξαγωγή CSV.',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            } finally {
+                window.AppLoader.hide();
+            }
+        });
+    }
+            
     // ── Team totals (ms → ώρες/λεπτά) ──────────────────────────────
     const teamData = JSON.parse(
         document.getElementById('teamDataJson').textContent
