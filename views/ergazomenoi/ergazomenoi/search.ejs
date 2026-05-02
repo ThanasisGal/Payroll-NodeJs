@@ -1,155 +1,171 @@
-<div class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-5 pb-2 mb-3 border-bottom" style="background-image: url('https://cdn.webpayrollsolutions.com/assets/img/wps1.png'); background-repeat: no-repeat; background-position: 0% 50%;"></div>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-5 mb-3 border-bottom bg-hero-cdn">
+    <form
+        class="nav col-12 col-md-auto flex-end mb-2 ms-auto mb-md-0">
 
-<div class="card z-depth-5" style="width: 94%; margin-left: 3%">
-  <div class="card-header p-0" style="height: 3.5rem !important;">
-    <label class="text-center w-100 headers-content mt-2">
-    Εμφάνιση Εργαζομένων ( με κριτήριο αναζήτησης "<%= sTerm %>" )</label>
-  </div>
-  <div>
-    <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
-      <thead style="font-size: 0.9vw;">
-        <tr>
-          <th scope="col" class="color-brown col-0_5">Κωδ.<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-3_5">Επώνυμο<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-2">Όνομα<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-2">Πατρώνυμο<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1">Α.M.K.A.<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1">Α.Δ.Τ.<i class="sort-icon bi"></i></th>
-        </tr>
-      </thead>
-    </table>
-  </div>
-
-  <div class="card-body p-0 overflow-auto flex-grow-1" style="height: 59vh; background-color: #ffffff;">
-    <div class="table-responsive">
-      <% if (ergazomenoiFilteredRecs && ergazomenoiFilteredRecs.length > 0) { %>
-        <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
-          <tbody>
-            <% ergazomenoiFilteredRecs.forEach(element => { %>
-              <tr style="font-size: 0.9vw;" data-id="<%= element._id %>" data-kod="<%= element.kodikos %>">
-                <td class="col-1"><%- element.kodikos %></td>
-                <td class="col-3"><%- element.eponymo %></td>
-                <td class="col-2"><%- element.onoma %></td>
-                <td class="col-2"><%- element.patronymo %></td>
-                <td class="col-1"><%- element.afm %></td>
-                <td class="col-1"><%- element.amka %></td>
-                <td class="col-1"><%- element.adt %></td>
-              </tr>
-            <% }) %> 
-
-            <% if (ergazomenoiFilteredRecs.length === 0) { %>
-              <tr>
-                <td colspan="6">Δεν βρέθηκαν εγγραφές.</td>
-              </tr>
-            <% } %>
-          </tbody>
-        </table>
-      <% } else { %>
-        <p class="records-not-found">Δεν βρέθηκαν Εργαζόμενοι που να ταιριάζουν με το κριτήριο αναζήτησης "<%= sTerm %>"</p>
-      <% } %>
-    </div>
-  </div>
-
-  <div class="card-footer mt-auto">
-    <div class="d-flex" style="margin: -0.5rem 0.625rem 2rem;">
-
-      <!-- Κουμπιά ενεργειών -->
-      <div class="d-flex" style="width: 60%; justify-content: space-around;">
-        <a 
-          id="edit-btn"
-          href="#" 
-          role="button" style="font-size: 0.8vw;"
-          data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom" 
-          class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>disabled-link<% } %>"
-          <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.update) { %>onclick="event.preventDefault();" <% } %>>
-          <i class="bi bi-pencil-square"></i> Συντήρηση
-        </a>
-        
-        <a 
-          id="delete-btn"
-          href="#"
-          role="button"
-          data-bs-toggle="tooltip" data-bs-title="Διαγραφή των στοιχείων του επιλεγμένου εργαζόμενου" data-bs-placement="bottom"  style="font-size: 0.8vw;" 
-          class="btn btn-brown rounded-4 mb-3 mt-2 mr-2 col-2-5 <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>disabled-link<% } %>"
-          <% if (!userPrivileges.privileges.admin && !userPrivileges.privileges.delete) { %>onclick="event.preventDefault();" <% } %>>
-          <i class="bi bi-trash"></i> Διαγραφή
-        </a>
-
-        <a 
-          href="/ergazomenoi/ergazomenoi"
-          role="button"
-          class="btn btn-brown rounded-4 mb-3 mt-2 col-2-5" style="font-size: 0.8vw;">
-          <i class="bi bi-chevron-double-left"></i> Επιστροφή
-        </a>
-      </div>
-
-      <div class="d-flex" style="width: 15%;"></div>
-
-      <!-- Pagination -->
-      <div class="ms-auto" style="flex-grow: 1; max-width: 25%; font_size: 0.8vw !important">
-        <nav aria-label="Page navigation">
-          <ul class="pagination justify-content-end">
-            <% if (Number(current) > 1) { %>
-              <li class="page-item">
-                <a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=1" aria-label="First">
-                  <i class="bi bi-chevron-bar-left"></i>
-                </a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=<%= Number(current) - 1 %>" aria-label="Previous">
-                  <i class="bi bi-chevron-left"></i>
-                </a>
-              </li>
-            <% } %>
-  
-            <!-- Number(current) Page -->
-            <li class="page-item active"><a class="page-link" href="#"><%= Number(current) %></a></li>
-  
-            <!-- Dynamic "next pages" and "..." logic -->
-            <% if (Number(current) < pages) { %>
-              <% let upTo = Math.min(Number(current) + 2, pages); %>
-              <% for(let i = Number(current) + 1; i <= upTo; i++) { %>
-                <li class="page-item"><a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=<%= i %>"><%= i %></a></li>
-              <% } %>
-              <% if (upTo < pages) { %>
-                <li class="page-item disabled"><span class="page-link">...</span></li>
-                <li class="page-item"><a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=<%= pages %>"><%= pages %></a></li>
-              <% } %>
-            <% } %>
-  
-            <% if (Number(current) < pages) { %>
-              <li class="page-item">
-                <a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=<%= Number(current) + 1 %>" aria-label="Next">
-                  <i class="bi bi-chevron-right"></i>
-                </a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="/ergazomenoi/ergazomenoi/search/?page=<%= pages %>" aria-label="Last">
-                  <i class="bi bi-chevron-bar-right"></i>
-                </a>
-              </li>
-            <% } else { %>
-              <li class="page-item disabled"><span class="page-link">
-                <i class="bi bi-chevron-right"></i></span></li>
-              <li class="page-item disabled"><span class="page-link">
-                <i class="bi bi-chevron-bar-right"></i></span></li>
-            <% } %>
-          </ul>
-        </nav>
-      </div>
-    </div>
-  </div>
+        <%- include('../../partials/_csrfField') %>
+    </form>
 </div>
 
-<% if (process.env.NODE_ENV === 'production') { %>
-  <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/ergazomenoi/ergazomenoi_search_ejs.min.js"></script>
-<% } else { %>
-  <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/getXrhsh.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/getPeriod.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/getUser.js"></script>
-  <script nonce="<%= nonce %>" src="/static/js/common/sortTable.js"></script>
-  <!-- <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script> -->
-  <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRowInTable.js"></script>
-<% } %>
+<div class="card d-flex flex-column z-depth-5 w-99 margin-left-0_5rem overflow-hidden"">
+
+    <div class="card-header p-0 height-rem-3_5">
+        <label class="text-center w-100 headers-content mt-2"> 
+	    Εμφάνιση Εργαζομένων ( με κριτήριο αναζήτησης "<%= sTerm %>" )</label>
+  	</div>
+
+  	<div>
+        <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
+            <thead class="backgroundColor-brown font-size-rem-1_1 center-align">
+                <tr class="color-brown">
+					<th scope="col" class="color-brown col-1">Κωδ.<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-3-5">Επώνυμο<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-2">Όνομα<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-2">Πατρώνυμο<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-1">Α.Φ.Μ.<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-1-5">Α.M.K.A.<i class="sort-icon bi"></i></th>
+					<th scope="col" class="color-brown col-1">Α.Δ.Τ.<i class="sort-icon bi"></i></th>
+        		</tr>
+      		</thead>
+    	</table>
+  	</div>
+
+    <div class="card-body p-0 overflow-auto flex-grow-1 height-vh-61 bg-white">
+        <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
+            <tbody>
+                <% if (ergazomenoiFilteredRecs && ergazomenoiFilteredRecs.length > 0) { %>
+                    <% ergazomenoiFilteredRecs.forEach(element => { %>
+                        <tr class="input-content-regular" data-id="<%- element._id %>" id="myTableRow">
+                            <td class="col-1 padding-left-rem-0_5"><%- element.kodikos %></td>
+							<td class="col-3-5"><%- element.eponymo %></td>
+							<td class="col-2"><%- element.onoma %></td>
+							<td class="col-2"><%- element.patronymo %></td>
+							<td class="col-1"><%- element.afm %></td>
+							<td class="col-1-5"><%- element.amka %></td>
+							<td class="col-1"><%- element.adt %></td>
+						</tr>
+		            <% }) %> 
+                <% } else { %>  
+                    <tr>
+                        <td colspan="5" class="records-not-found">Δεν βρέθηκαν εγγραφές.</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card-footer cardFooter">
+        <div class="d-inline-block d-flex cardFooter01">
+            <div class="d-flex cardFooter02">
+                <a
+                    id="edit-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" data-bs-title="Εμφάνιση - Διόρθωση των στοιχείων του επιλεγμένου εργαζόμενου"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.update) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.update) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-pencil-square"></i> Συντήρηση
+                </a>
+
+                <a
+                    id="delete-btn"
+                    href="#"
+                    role="button"
+                    data-bs-toggle="tooltip" data-bs-title="Διαγραφή του επιλεγμένου εργαζόμενου"
+                    data-bs-placement="top"
+                    data-tooltip-max-width="15vw"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2 col-2 <%= (!userPrivileges.privileges?.admin && !userPrivileges.privileges?.delete) ? 'disabled-link' : '' %>"
+                    data-allowed="<%= (userPrivileges.privileges?.admin || userPrivileges.privileges?.delete) ? '1' : '0' %>">
+                    <i class="buttons-content bi bi-trash"></i> Διαγραφή
+                </a>
+
+                <a
+                    href="/ergazomenoi/ergazomenoi"
+                    role="button"
+                    class="btn btn-brown rounded-4 buttons-content mb-3 mt-2  col-2">
+                    <i class="buttons-content bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+            </div>
+
+            <div class="d-flex width-percent-15"></div>
+
+            <% if (ergazomenoiFilteredRecs) { %>
+                <!-- Pagination -->
+                <nav class="col-2" aria-label="Dashboard Pagination">
+                    <ul class="pagination pagination-sm justify-content-end mt-2">
+                        <% if (Number(current) === 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link"><i class="bi bi-chevron-left font-size-vw-0_5"></i></a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a href="/ergazomenoi/ergazomenoi/search/?page=1" class="page-link"><i class="bi bi-chevron-bar-left font-size-vw-0_5"></i></a>
+                            </li>
+                            <li class="page-item">
+                                <a href="/ergazomenoi/ergazomenoi/search/?page=<%= Number(current) - 1 %>" class="page-link"><i class="bi bi-chevron-left font-size-vw-0_5"></i></a>
+                            </li>
+                        <% } %>
+
+                        <% var i = Number(current) > 2 ? Number(current) - 1 : 1; %>
+
+                        <% if (i !== 1) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link font-size-vw-0_5">...</a>
+                            </li>
+                        <% } %>
+
+                        <% for (; i <= (Number(current) + 1) && i <= pages; i++) { %>
+                            <% if (i === Number(current)) { %>
+                                <li class="page-item is-current" aria-current="page">
+                                    <span class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></span>
+                                </li>
+                            <% } else { %>
+                                <li class="page-item fsvw-0_7">
+                                    <a href="/ergazomenoi/ergazomenoi/search/?page=<%= i %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= i %></a>
+                                </li>
+                            <% } %>
+
+                            <% if (i === Number(current) + 1 && i < pages) { %>
+                                <li class="page-item disabled">
+                                    <a href="#" class="page-link font-size-vw-0_5">...</a>
+                                </li>
+                                <li class="page-item">
+                                    <a href="/ergazomenoi/ergazomenoi/search/?page=<%= pages %>" class="page-link font-size-vw-0_5 padding-top-px-8 fw500"><%= pages %></a>
+                                </li>
+                            <% } %>
+                        <% } %>
+
+                        <% if (Number(current) === Number(pages)) { %>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
+                            </li>
+                            <li class="page-item disabled">
+                                <a href="#" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i></a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item">
+                                <a href="/ergazomenoi/ergazomenoi/search/?page=<%= Number(current) + 1 %>" class="page-link"><i class="bi bi-chevron-right font-size-vw-0_5"></i></a>
+                            </li>
+                            <li class="page-item fsvw-0_7">
+                                <a href="/ergazomenoi/ergazomenoi/search/?page=<%= pages %>" class="page-link"><i class="bi bi-chevron-bar-right font-size-vw-0_5"></i></a>
+                            </li>
+                        <% } %>
+                    </ul>
+                </nav>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script src="<%= script('common/blockInvalidClick') %>"></script>
+<script src="<%= script('common/sortTable') %>"></script>
+<script src="<%= script('ergazomenoi/genika/selectRowInTable') %>"></script>

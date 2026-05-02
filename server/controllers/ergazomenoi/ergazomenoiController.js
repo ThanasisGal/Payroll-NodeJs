@@ -329,6 +329,14 @@ class ergazomenoiController {
             let searchTerm = req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
+            const sessionUserTeam = req.session.userTeam;
+            const sessionCompanyInUse = req.session.companyInUse;
+
+            // Έλεγχος ότι υπάρχει επιλεγμένη εταιρεία/ομάδα στο session
+            if (!sessionCompanyInUse || !sessionUserTeam) {
+                return res.redirect('/'); // ή ό,τι handling θες
+            }
+
             const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, '');
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
@@ -342,56 +350,44 @@ class ergazomenoiController {
                 form: 'Ergazomenoi'
             }).exec();
 
-            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-            const countPipeline = [
-                {
-                    $match: {
-                        $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
-                            { eponymo: { $regex: new RegExp(sTerm, 'i') } },
-                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
-                            { patronymo: { $regex: new RegExp(sTerm, 'i') } },
-                            { afm: { $regex: new RegExp(sTerm, 'i') } },
-                            { amka: { $regex: new RegExp(sTerm, 'i') } },
-                            { adt: { $regex: new RegExp(sTerm, 'i') } }
-                        ]
-                    }
-                },
-                {
-                    $count: 'total'
+            // Κοινό φίλτρο: συνδυασμός αναζήτησης + εταιρείας + ομάδας
+            const matchStage = {
+                $match: {
+                    $and: [
+                        { company_kod: sessionCompanyInUse },
+                        { team: sessionUserTeam },
+                        {
+                            $or: [
+                                { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                                { eponymo: { $regex: new RegExp(sTerm, 'i') } },
+                                { onoma: { $regex: new RegExp(sTerm, 'i') } },
+                                { patronymo: { $regex: new RegExp(sTerm, 'i') } },
+                                { afm: { $regex: new RegExp(sTerm, 'i') } },
+                                { amka: { $regex: new RegExp(sTerm, 'i') } },
+                                { adt: { $regex: new RegExp(sTerm, 'i') } }
+                            ]
+                        }
+                    ]
                 }
-            ];
+            };
+
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [matchStage, { $count: 'total' }];
 
             const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
 
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
-            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
-            let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
+            let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1));
+            let skipRecords = Math.max(0, (page - 1) * perPage);
             let limitPerPage = Math.min(
                 perPage,
                 totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
-            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            );
 
             // Αναζήτηση και επισήμανση
             const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-                {
-                    $match: {
-                        $or: [
-                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
-                            { eponymo: { $regex: new RegExp(sTerm, 'i') } },
-                            { onoma: { $regex: new RegExp(sTerm, 'i') } },
-                            { patronymo: { $regex: new RegExp(sTerm, 'i') } },
-                            { afm: { $regex: new RegExp(sTerm, 'i') } },
-                            { amka: { $regex: new RegExp(sTerm, 'i') } },
-                            { adt: { $regex: new RegExp(sTerm, 'i') } }
-                        ]
-                    }
-                },
-                {
-                    $sort: {
-                        kodikos: 1
-                    }
-                }
+                matchStage,
+                { $sort: { kodikos: 1 } }
             ])
                 .skip(skipRecords)
                 .limit(limitPerPage);
@@ -433,6 +429,14 @@ class ergazomenoiController {
             let searchTerm = nextPageSearchTerm; //req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
+            const sessionUserTeam = req.session.userTeam;
+            const sessionCompanyInUse = req.session.companyInUse;
+
+            // Έλεγχος ότι υπάρχει επιλεγμένη εταιρεία/ομάδα στο session
+            if (!sessionCompanyInUse || !sessionUserTeam) {
+                return res.redirect('/'); // ή ό,τι handling θες
+            }
+
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
 
@@ -442,25 +446,29 @@ class ergazomenoiController {
                 form: 'Ergazomenoi'
             }).exec();
 
-            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
-            const countPipeline = [
-                {
-                    $match: {
-                        $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
-                            { eponymo: { $regex: new RegExp(searchTerm, 'i') } },
-                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
-                            { patronymo: { $regex: new RegExp(searchTerm, 'i') } },
-                            { afm: { $regex: new RegExp(searchTerm, 'i') } },
-                            { amka: { $regex: new RegExp(searchTerm, 'i') } },
-                            { adt: { $regex: new RegExp(searchTerm, 'i') } }
-                        ]
-                    }
-                },
-                {
-                    $count: 'total'
+            // Κοινό φίλτρο: συνδυασμός αναζήτησης + εταιρείας + ομάδας
+            const matchStage = {
+                $match: {
+                    $and: [
+                        { company_kod: sessionCompanyInUse },
+                        { team: sessionUserTeam },
+                        {
+                            $or: [
+                                { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                                { eponymo: { $regex: new RegExp(searchTerm, 'i') } },
+                                { onoma: { $regex: new RegExp(searchTerm, 'i') } },
+                                { patronymo: { $regex: new RegExp(searchTerm, 'i') } },
+                                { afm: { $regex: new RegExp(searchTerm, 'i') } },
+                                { amka: { $regex: new RegExp(searchTerm, 'i') } },
+                                { adt: { $regex: new RegExp(searchTerm, 'i') } }
+                            ]
+                        }
+                    ]
                 }
-            ];
+            };
+
+            // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
+            const countPipeline = [matchStage, { $count: 'total' }];
 
             const countResults = await ErgazomenoiModel.aggregate(countPipeline).exec();
 
@@ -474,24 +482,8 @@ class ergazomenoiController {
 
             // Αναζήτηση και επισήμανση
             const ergazomenoiFilteredRecs = await ErgazomenoiModel.aggregate([
-                {
-                    $match: {
-                        $or: [
-                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
-                            { eponymo: { $regex: new RegExp(searchTerm, 'i') } },
-                            { onoma: { $regex: new RegExp(searchTerm, 'i') } },
-                            { patronymo: { $regex: new RegExp(searchTerm, 'i') } },
-                            { afm: { $regex: new RegExp(searchTerm, 'i') } },
-                            { amka: { $regex: new RegExp(searchTerm, 'i') } },
-                            { adt: { $regex: new RegExp(searchTerm, 'i') } }
-                        ]
-                    }
-                },
-                {
-                    $sort: {
-                        kodikos: 1
-                    }
-                }
+                matchStage,
+                { $sort: { kodikos: 1 } }
             ])
                 .skip(skipRecords)
                 .limit(limitPerPage);

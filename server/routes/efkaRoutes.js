@@ -64,22 +64,18 @@ router.post('/efka/apd/continue', async (req, res) => {
         const password = rec.password || rec.pass || rec.value2;
 
         if (!username || !password) {
-            return res
-                .status(500)
-                .json({
-                    success: false,
-                    error: 'Credentials record missing username/password fields'
-                });
+            return res.status(500).json({
+                success: false,
+                error: 'Credentials record missing username/password fields'
+            });
         }
 
-        // helper: safe emit (room + fallback broadcast)
+        // helper: emit ΜΟΝΟ στον χρήστη που τρέχει τη διαδικασία
         const emitProgressSafe = (event, payload) => {
-            if (roomName) io.to(roomName).emit(event, payload);
-            else io.emit(event, payload);
-
-            // ✅ fallback πάντα (για να μην “χάνονται” τα steps όταν δεν έγινε join σωστά)
-            // Αν θέλεις μετά να το αφαιρέσουμε, το αφαιρούμε όταν σταθεροποιηθεί το userId join.
-            io.emit(event, payload);
+            if (!roomName) {
+                return;
+            }
+            io.to(roomName).emit(event, payload);
         };
 
         const result = await continueApd(sessionId, {

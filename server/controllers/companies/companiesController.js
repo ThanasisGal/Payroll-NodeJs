@@ -149,6 +149,12 @@ class companiesController {
             const searchTerm = normalizeStr(req.body.searchTerm);
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
+
+            // Έλεγχος ότι υπάρχει επιλεγμένη ομάδα στο session
+            if (!sessionUserTeam) {
+                return res.redirect('/');
+            }
+
             const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
             const page = Math.max(Number(req.query.page) || 1, 1);
 
@@ -162,25 +168,32 @@ class companiesController {
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
             const userId = ObjectId.createFromHexString(sessionUserId);
 
-            const countResults = await CompaniesModel.aggregate([
-                { $match: { team: sessionUserTeam, users: userId } },
-                { $count: 'total' }
-            ]).exec();
-            const totalRecords = countResults[0]?.total || 0;
+            const re = new RegExp(searchTerm, 'i');
+
+            // Κοινό φίλτρο: ομάδα χρήστη + users + κριτήρια αναζήτησης
+            const filter = {
+                $and: [
+                    { team: sessionUserTeam },
+                    { users: userId },
+                    {
+                        $or: [
+                            { kod: { $regex: re } },
+                            { eponymia: { $regex: re } },
+                            { firstname: { $regex: re } },
+                            { fathername: { $regex: re } },
+                            { activity: { $regex: re } },
+                            { afm: { $regex: re } }
+                        ]
+                    }
+                ]
+            };
+
+            // Count πάνω στο ίδιο φίλτρο για συνεπή σελιδοποίηση
+            const totalRecords = await CompaniesModel.countDocuments(filter);
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
             const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            const re = new RegExp(searchTerm, 'i');
-            const companyFilteredRecs = await CompaniesModel.find({
-                $or: [
-                    { kod: { $regex: re } },
-                    { eponymia: { $regex: re } },
-                    { firstname: { $regex: re } },
-                    { fathername: { $regex: re } },
-                    { activity: { $regex: re } },
-                    { afm: { $regex: re } }
-                ]
-            })
+            const companyFilteredRecs = await CompaniesModel.find(filter)
                 .skip(skipRecords)
                 .limit(perPage)
                 .lean();
@@ -217,6 +230,12 @@ class companiesController {
             const searchTerm = normalizeStr(req.body?.searchTerm || '');
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
+
+            // Έλεγχος ότι υπάρχει επιλεγμένη ομάδα στο session
+            if (!sessionUserTeam) {
+                return res.redirect('/');
+            }
+
             const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
             const page = Math.max(Number(req.query.page) || 1, 1);
 
@@ -228,25 +247,31 @@ class companiesController {
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
             const userId = ObjectId.createFromHexString(sessionUserId);
 
-            const countResults = await CompaniesModel.aggregate([
-                { $match: { team: sessionUserTeam, users: userId } },
-                { $count: 'total' }
-            ]).exec();
-            const totalRecords = countResults[0]?.total || 0;
+            const re = new RegExp(searchTerm, 'i');
+
+            // Κοινό φίλτρο: ομάδα χρήστη + users + κριτήρια αναζήτησης
+            const filter = {
+                $and: [
+                    { team: sessionUserTeam },
+                    { users: userId },
+                    {
+                        $or: [
+                            { kod: { $regex: re } },
+                            { eponymia: { $regex: re } },
+                            { firstname: { $regex: re } },
+                            { fathername: { $regex: re } },
+                            { activity: { $regex: re } },
+                            { afm: { $regex: re } }
+                        ]
+                    }
+                ]
+            };
+
+            const totalRecords = await CompaniesModel.countDocuments(filter);
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
             const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
 
-            const re = new RegExp(searchTerm, 'i');
-            const companyFilteredRecs = await CompaniesModel.find({
-                $or: [
-                    { kod: { $regex: re } },
-                    { eponymia: { $regex: re } },
-                    { firstname: { $regex: re } },
-                    { fathername: { $regex: re } },
-                    { activity: { $regex: re } },
-                    { afm: { $regex: re } }
-                ]
-            })
+            const companyFilteredRecs = await CompaniesModel.find(filter)
                 .skip(skipRecords)
                 .limit(perPage)
                 .lean();

@@ -1,11 +1,16 @@
+// /public/js/common/blockInvalidClick.js
+
 document.addEventListener('DOMContentLoaded', () => {
     // μπλόκαρε τα links που δεν επιτρέπονται
-    document.querySelectorAll('a[data-allowed="0"]').forEach(a => {
-        a.classList.add('is-disabled');            // hook για styling
-        a.setAttribute('aria-disabled', 'true');   // προσβασιμότητα
-        a.setAttribute('tabindex', '-1');          // βγάλ’ το από tab order (προαιρετικό)
+    document.querySelectorAll('a[data-allowed="0"]').forEach((a) => {
+        a.classList.add('is-disabled'); // hook για styling
+        a.setAttribute('aria-disabled', 'true'); // προσβασιμότητα
+        a.setAttribute('tabindex', '-1'); // βγάλ’ το από tab order (προαιρετικό)
 
-        const block = (e) => { e.preventDefault(); e.stopPropagation(); };
+        const block = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
 
         // ποντίκι
         a.addEventListener('click', block);

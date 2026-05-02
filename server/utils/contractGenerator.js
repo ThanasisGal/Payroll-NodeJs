@@ -645,9 +645,14 @@ async function generateContractPDF(ergazomenos, userContext) {
 
         let categoryParts = {};
         let _COMBINED_TEXT = '';
+        let _GENIKH_PM = '';
+
+        const patronymo = (ergazomenos.patronymo ?? '').trim();
+        const mhtronymo = (ergazomenos.mhtronymo ?? '').trim();
 
         const categoryToLoad = ergazomenos.eidikh_kathgoria_ergazomenoy || '0000';
         const isDefaultCategory = categoryToLoad === '0000';
+        const useMhtronymoAsPatronymo = ['', 'ΑΠΠΟ', 'ΑΠΟ', 'ΑΝΕΥ'].includes(patronymo);
 
         if (userContext) {
             try {
@@ -764,9 +769,6 @@ async function generateContractPDF(ergazomenos, userContext) {
             diarkeia = `, διάρκειας ${diarkeia_text} και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
         }
 
-        const patronymo = (ergazomenos.patronymo ?? '').trim();
-        const mhtronymo = (ergazomenos.mhtronymo ?? '').trim();
-
         const hmeres_lektika = daysToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');
         const ores_lektika = daysToText(parseInt(ergazomenos.ores_ergasias_ebdomadas || 0), '');
         const currentYear = new Date().getFullYear();
@@ -832,7 +834,7 @@ async function generateContractPDF(ergazomenos, userContext) {
             //       ).trim()
             //     : '..........',
 
-            _PATRONYMO_ERGAZOMENOY: ['', 'ΑΠΠΟ', 'ΑΠΟ', 'ΑΝΕΥ'].includes(patronymo)
+            _PATRONYMO_ERGAZOMENOY: useMhtronymoAsPatronymo
                 ? (mhtronymo.endsWith('Α')
                       ? mhtronymo + 'Σ'
                       : mhtronymo.endsWith('Ω')
@@ -849,6 +851,9 @@ async function generateContractPDF(ergazomenos, userContext) {
                             : patronymo
                     ).trim()
                   : '..........',
+
+            _GENIKH_PM: useMhtronymoAsPatronymo ? 'ης' : 'ου',
+
             _POLH_ERGAZOMENOY: polh?.perigrafh ? polh.perigrafh.trim() : '..........',
             _ODOS_ERGAZOMENOY: ergazomenos.odos || '..........',
             _ARITHMOS_ERGAZOMENOY: ergazomenos.arithmos || '..........',
