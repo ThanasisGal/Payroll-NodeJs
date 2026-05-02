@@ -754,16 +754,6 @@ async function generateContractPDF(ergazomenos, userContext) {
                 break;
         }
 
-        // const differenceInMonths = calculateMonthsDifference(
-        //     ergazomenos.hmeromhnia_allaghs_symbashs,
-        //     ergazomenos.hmeromhnia_lhxhs_symbashs
-        // );
-
-        // let diarkeia = '.';
-        // if (differenceInMonths !== 0) {
-        //     diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
-        // }
-
         const diarkeia_text = calculateDateDifference(
             formatDate(ergazomenos.hmeromhnia_allaghs_symbashs),
             formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)
@@ -773,6 +763,9 @@ async function generateContractPDF(ergazomenos, userContext) {
         if (diarkeia_text) {
             diarkeia = `, διάρκειας ${diarkeia_text} και η οποία λήγει την ${formatDate(ergazomenos.hmeromhnia_lhxhs_symbashs)}.`;
         }
+
+        const patronymo = (ergazomenos.patronymo ?? '').trim();
+        const mhtronymo = (ergazomenos.mhtronymo ?? '').trim();
 
         const hmeres_lektika = daysToText(parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 0), '');
         const ores_lektika = daysToText(parseInt(ergazomenos.ores_ergasias_ebdomadas || 0), '');
@@ -828,16 +821,34 @@ async function generateContractPDF(ergazomenos, userContext) {
             _ANTONYMIA_A,
 
             _EPONYMIA_ERGAZOMENOY: (ergazomenos.eponymo || '') + ' ' + (ergazomenos.onoma || ''),
-            _PATRONYMO_ERGAZOMENOY: ergazomenos.patronymo
-                ? (ergazomenos.patronymo.endsWith('ΟΣ')
-                      ? ergazomenos.patronymo.slice(0, -2) + 'ΟΥ'
-                      : ergazomenos.patronymo.endsWith('Σ')
-                        ? ergazomenos.patronymo.slice(0, -1).trim()
-                        : ergazomenos.patronymo.endsWith('ΥΣ')
-                          ? ergazomenos.patronymo.slice(0, -2) + 'Α'
-                          : ergazomenos.patronymo
+            // _PATRONYMO_ERGAZOMENOY: ergazomenos.patronymo
+            //     ? (ergazomenos.patronymo.endsWith('ΟΣ')
+            //           ? ergazomenos.patronymo.slice(0, -2) + 'ΟΥ'
+            //           : ergazomenos.patronymo.endsWith('Σ')
+            //             ? ergazomenos.patronymo.slice(0, -1).trim()
+            //             : ergazomenos.patronymo.endsWith('ΥΣ')
+            //               ? ergazomenos.patronymo.slice(0, -2) + 'Α'
+            //               : ergazomenos.patronymo
+            //       ).trim()
+            //     : '..........',
+
+            _PATRONYMO_ERGAZOMENOY: ['', 'ΑΠΠΟ', 'ΑΠΟ', 'ΑΝΕΥ'].includes(patronymo)
+                ? (mhtronymo.endsWith('Α')
+                      ? mhtronymo + 'Σ'
+                      : mhtronymo.endsWith('Ω')
+                        ? mhtronymo.slice(0, -1) + 'ΟΥΣ'
+                        : mhtronymo
                   ).trim()
-                : '..........',
+                : patronymo
+                  ? (patronymo.endsWith('ΟΣ')
+                        ? patronymo.slice(0, -2) + 'ΟΥ'
+                        : patronymo.endsWith('ΥΣ')
+                          ? patronymo.slice(0, -2) + 'Α'
+                          : patronymo.endsWith('Σ')
+                            ? patronymo.slice(0, -1).trim()
+                            : patronymo
+                    ).trim()
+                  : '..........',
             _POLH_ERGAZOMENOY: polh?.perigrafh ? polh.perigrafh.trim() : '..........',
             _ODOS_ERGAZOMENOY: ergazomenos.odos || '..........',
             _ARITHMOS_ERGAZOMENOY: ergazomenos.arithmos || '..........',
