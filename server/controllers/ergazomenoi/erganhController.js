@@ -964,6 +964,63 @@ class erganhController {
             console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
         }
     };
+
+    static openErganh = async (req, res) => {
+        try {
+            const selectedCompany = req.session.companyInUse;
+
+            if (!selectedCompany) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει επιλεγμένη εταιρεία.'
+                });
+            }
+
+            const passwordRecord = await PasswordsModel.findOne({
+                companykod_object: selectedCompany,
+                kodikos: '0002'
+            });
+
+            if (!passwordRecord) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials για ΕΡΓΑΝΗ.'
+                });
+            }
+
+            return res.json({
+                success: true,
+                username: passwordRecord.username,
+                password: passwordRecord.password,
+                url: 'https://eservices.yeka.gr/'
+            });
+        } catch (err) {
+            console.error(err);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάγνωση credentials ΕΡΓΑΝΗ.'
+            });
+        }
+    };
+
+    // static showErganhCredentials = async (req, res) => {
+    //     try {
+    //         const creds = req.session.erganhCredentials;
+
+    //         if (!creds) {
+    //             return res.status(404).send('Δεν βρέθηκαν προσωρινά credentials ΕΡΓΑΝΗ.');
+    //         }
+
+    //         return res.render('ergazomenoi/erganh/credentials', {
+    //             username: creds.username,
+    //             password: creds.password
+    //         });
+    //     } catch (err) {
+    //         console.error(err);
+    //         return res.status(500).send('Σφάλμα εμφάνισης credentials ΕΡΓΑΝΗ.');
+    //     }
+    // };
 }
 
 async function downloadOrariaToBuffer(username, password, fromDate, toDate, pararthma) {

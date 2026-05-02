@@ -713,57 +713,56 @@ async function handleStoixeioChange(rowIndex, selectedValue) {
     const hmeromhniaEl = document.getElementById('hmeromhnia_allaghs_symbashs');
     const hmeromhnia = hmeromhniaEl?.value || '';
 
-    try {
-        data = await fetchApodoxesData(
-            contract,
-            category,
-            specialty,
-            selectedValue.padStart(4, '0'),
-            klimakio,
-            hmeromhnia
-        );
+    data = await fetchApodoxesData(
+        contract,
+        category,
+        specialty,
+        selectedValue.padStart(4, '0'),
+        klimakio,
+        hmeromhnia
+    );
 
-        if (!data.success) {
-            showAlert({
-                icon: 'warning',
-                title: 'Προσοχή !!!',
-                html: 'Δεν έχουν ενημερωθεί <strong>τα κλιμάκια</strong> της επιλεγείσας σύμβασης'
-            });
-            return;
-        }
+    if (!data.success) {
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή !!!',
+            html: 'Δεν έχουν ενημερωθεί <strong>τα κλιμάκια</strong> της επιλεγείσας σύμβασης'
+        });
+        return;
+    }
 
-        const posoFieldId = `poso_symbashs_${rowIndex}`;
-        const posoBasedOnHoursFieldId = `poso_symbashs_basei_oron_ergasias_${rowIndex}`;
-        const posoField = document.getElementById(posoFieldId);
+    const posoFieldId = `poso_symbashs_${rowIndex}`;
+    const posoBasedOnHoursFieldId = `poso_symbashs_basei_oron_ergasias_${rowIndex}`;
+    const posoField = document.getElementById(posoFieldId);
 
-        if (posoField) {
-            posoField.value = formatDecimal(data.poso, 2);
-        }
+    if (posoField) {
+        posoField.value = formatDecimal(data.poso, 2);
+    }
 
-        let extraApodoxes = false;
-        updateGeneralParameters(data.genikesParametroi);
-        updatePosoBasedOnHours(parseInt(rowIndex), data, posoBasedOnHoursFieldId, extraApodoxes);
+    let extraApodoxes = false;
+    updateGeneralParameters(data.genikesParametroi);
+    updatePosoBasedOnHours(parseInt(rowIndex), data, posoBasedOnHoursFieldId, extraApodoxes);
 
-        const posoValue = toDecimal(data.poso);
-        if (!posoValue.isZero()) {
+    const posoValue = toDecimal(data.poso);
+    if (!posoValue.isZero()) {
+        calculateTotal();
+        applyNomimaFromSymbashTotals();
+
+        // await runFullRecalculation();
+
+        // Τελικό σφράγισμα
+        setTimeout(() => {
             calculateTotal();
             applyNomimaFromSymbashTotals();
-
-            // await runFullRecalculation();
-
-            // Τελικό σφράγισμα
-            setTimeout(() => {
-                calculateTotal();
-                applyNomimaFromSymbashTotals();
-            }, 500);
-        }
-    } catch (error) {
-        console.error('❌ Σφάλμα κατά την ενημέρωση αποδοχών:', error);
-    } finally {
-        setTimeout(() => {
-            _isStoixeioChangeInProgress = false;
-        }, 600);
+        }, 500);
     }
+    // } catch (error) {
+    //     console.error('❌ Σφάλμα κατά την ενημέρωση αποδοχών:', error);
+    // } finally {
+    //     setTimeout(() => {
+    //         _isStoixeioChangeInProgress = false;
+    //     }, 600);
+    // }
 }
 
 // ========================================================================

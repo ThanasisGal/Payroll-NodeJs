@@ -10,18 +10,16 @@
             <h2 class="mb-0">
                 <i class="bi bi-bar-chart-fill text-primary"></i>
                 Αναφορά Χρήσης
-                <span class="text-muted fs-5"><%= monthLabel %></span>
+                <!-- <span class="text-muted fs-5"><%= monthLabel %></span> -->
             </h2>
 
             <%# ── Month picker ── %>
             <form method="GET" action="/admin/usage-report"
-                  class="d-flex align-items-center gap-2 ms-auto">
+                class="d-flex align-items-center gap-2 ms-auto">
                 <input type="month"
-                       name="month"
-                       value="<%= month %>"
-                       class="form-control form-control-sm"
-                       style="width:160px;"
-                       class="d-none" />
+                    name="month"
+                    value="<%= month %>"
+                    class="form-control form-control-sm usage-month-input" />
                 <button type="submit" class="btn btn-sm btn-refresh-custom">
                     <i class="bi bi-search"></i> Εμφάνιση
                 </button>

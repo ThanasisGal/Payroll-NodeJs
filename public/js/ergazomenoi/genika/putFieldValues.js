@@ -1243,7 +1243,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 // =====================================================================
                 if (failedPdfs.length === 0) {
                     // =====================================================================
-                    // ✅ CASE A: showPreview = true → modal
+                    // ✅ COMMON SUCCESS SWAL (εμφανίζεται σε CASE A, B, C)
+                    // =====================================================================
+                    const showSuccessSwal = async () => {
+                        await Swal.fire({
+                            backdrop: false,
+                            allowOutsideClick: false,
+                            icon: 'success',
+                            title: 'Επιτυχής καταχώριση!',
+                            html: `
+                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
+                ${
+                    successfulPdfs.length > 0
+                        ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
+                        : ''
+                }
+                ${e3XmlHtml}
+                ${wtoXmlHtml}
+                ${maXmlHtml}
+            `,
+                            timer: hasE3Xml || hasWtoXml || hasMAXml ? null : 1500,
+                            showConfirmButton: hasE3Xml || hasWtoXml || hasMAXml,
+                            confirmButtonText: 'OK',
+                            customClass: {
+                                confirmButton:
+                                    'class-success custom-confirm-button custom-swal-button',
+                                title: 'custom-title',
+                                popup: 'custom-swal-popup'
+                            }
+                        });
+                    };
+
+                    // =====================================================================
+                    // ✅ CASE A: showPreview = true → swal + modal
                     // =====================================================================
                     if (data.contractPdf && data.contractPdf.showPreview && data.contractPdf.url) {
                         console.log('[CONTRACT-DEBUG] ENTER CASE A: showPreview=true + url');
@@ -1256,9 +1288,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 icon: 'warning',
                                 title: 'PDF Δημιουργήθηκε',
                                 html: `
-                                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
-                                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
-                                `,
+                    <p>Το PDF δημιουργήθηκε επιτυχώς!</p>
+                    <p class="text-warning">⚠️ Η αποστολή email δεν είναι διαθέσιμη (missing S3 key)</p>
+                `,
                                 confirmButtonText: 'OK'
                             }).then(() => {
                                 window.location.href =
@@ -1266,6 +1298,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                             return;
                         }
+
+                        await showSuccessSwal();
 
                         console.log('📄 Opening PDF modal (showPreview=true)...');
                         storeErganhUploadOptions();
@@ -1283,7 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         );
 
                         // =====================================================================
-                        // ✅ CASE B: createContract=true αλλά showPreview=false → modal
+                        // ✅ CASE B: createContract=true αλλά showPreview=false → swal + modal
                         // =====================================================================
                     } else if (createContract && data.contractPdf?.url) {
                         console.log(
@@ -1292,9 +1326,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         if (!data.contractPdf.s3Key) {
                             console.warn('⚠️ [FRONTEND] Missing s3Key — skipping modal');
+                            await showSuccessSwal();
                             await runXmlUploads();
                             window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         } else {
+                            await showSuccessSwal();
+
                             console.log(
                                 '📄 Opening PDF modal (createContract=true, showPreview=false)...'
                             );
@@ -1315,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
 
                         // =====================================================================
-                        // ✅ CASE C: NO PDF → κανονικό success
+                        // ✅ CASE C: NO PDF → swal + redirect
                         // =====================================================================
                     } else {
                         console.warn('[CONTRACT-DEBUG] ENTER CASE C: NO MODAL PATH', {
@@ -1323,32 +1360,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             contractPdf: data?.contractPdf || null
                         });
 
-                        await Swal.fire({
-                            backdrop: false,
-                            allowOutsideClick: false,
-                            icon: 'success',
-                            title: 'Επιτυχής καταχώριση!',
-                            html: `
-                                <p>Ο εργαζόμενος αποθηκεύτηκε!</p>
-                                ${
-                                    successfulPdfs.length > 0
-                                        ? `<p class="text-success">✅ ${successfulPdfs.length} PDF αποθηκεύτηκαν επιτυχώς</p>`
-                                        : ''
-                                }
-                                ${e3XmlHtml}
-                                ${wtoXmlHtml}
-                                ${maXmlHtml}
-                            `,
-                            timer: hasE3Xml || hasWtoXml ? null : 1500,
-                            showConfirmButton: hasE3Xml || hasWtoXml,
-                            confirmButtonText: 'OK',
-                            customClass: {
-                                confirmButton:
-                                    'class-success custom-confirm-button custom-swal-button',
-                                title: 'custom-title',
-                                popup: 'custom-swal-popup'
-                            }
-                        });
+                        await showSuccessSwal();
 
                         await runXmlUploads();
 
@@ -1358,43 +1370,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         );
                         window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                     }
-                } else {
-                    // =====================================================================
-                    // ⚠️ SOME PDFs FAILED TO SAVE
-                    // =====================================================================
-                    const failedTypes = failedPdfs.map((f) => f.documentType).join(', ');
-
-                    console.warn('[CONTRACT-DEBUG] SOME PDFs FAILED TO SAVE', {
-                        failedCount: failedPdfs.length,
-                        failedTypes
-                    });
-
-                    await Swal.fire({
-                        backdrop: false,
-                        allowOutsideClick: false,
-                        icon: 'warning',
-                        title: 'Ο εργαζόμενος αποθηκεύτηκε',
-                        html: `
-                            <p><strong>Αλλά ${failedPdfs.length} PDF απέτυχαν!</strong></p>
-                            <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">
-                                Αποτυχία: ${failedTypes}
-                            </p>
-                            <p style="color: #999; font-size: 0.85rem; margin-top: 10px;">
-                                Μπορείτε να τα ανεβάσετε αργότερα από την επεξεργασία.
-                            </p>
-                            ${e3XmlHtml}
-                            ${wtoXmlHtml}
-                        `,
-                        confirmButtonText: 'OK',
-                        customClass: {
-                            confirmButton: 'class-warning custom-confirm-button custom-swal-button',
-                            title: 'custom-title',
-                            popup: 'custom-swal-popup'
-                        }
-                    });
-                    await runXmlUploads();
-
-                    window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                 }
                 return;
             }
@@ -1490,7 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!modal || !iframe) {
                 console.error('❌ PDF preview modal elements not found!');
                 resolve();
-                window.location.href = redirectUrl;
+                // window.location.href = redirectUrl;
                 return;
             }
 

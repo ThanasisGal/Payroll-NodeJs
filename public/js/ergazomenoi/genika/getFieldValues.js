@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Start animation
-        setTimeout(updateProgress, 250);
+        setTimeout(updateProgress, 150);
     }
 
     async function handleFormSubmit(event) {
@@ -904,7 +904,48 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!skipScheduleValidation) {
                 Swal.fire({
                     title: 'Δημιουργία Σύμβασης Εργασίας',
-                    html: `...`, // ίδιο όπως είναι
+                    html: `
+                        <div class="pdf-generation-progress">
+                            <div class="progress-spinner">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+
+                            <div class="progress-step-text" id="progress-step-text">
+                                Προετοιμασία...
+                            </div>
+
+                            <div class="progress-bar-container">
+                                <div class="custom-progress">
+                                    <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                        id="pdf-progress-bar"
+                                        role="progressbar"
+                                        aria-valuenow="0"
+                                        aria-valuemin="0"
+                                        aria-valuemax="100"
+                                        style="width: 0%">
+                                        0%
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="progress-info-text">
+                                <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                                <ul class="progress-steps-list">
+                                    <li>Αποθήκευση στοιχείων εργαζόμενου</li>
+                                    <li>Δημιουργία εγγράφου από template</li>
+                                    <li>Μετατροπή σε PDF</li>
+                                    <li>Ασφαλή αποθήκευση στο cloud</li>
+                                </ul>
+                            </div>
+
+                            <div class="progress-time-estimate">
+                                <span style="margin-right: 8px;">⏱️</span>
+                                <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
+                            </div>
+                        </div>
+                    `,
                     backdrop: false,
                     allowOutsideClick: false,
                     showConfirmButton: false,

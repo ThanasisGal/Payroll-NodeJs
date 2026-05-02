@@ -330,6 +330,7 @@ router.post(
     checkAuth,
     ergazomenoiController.uploadWtoTemporaryToErganh
 );
+router.post('/ergazomenoi/erganh/openErganh', checkAuth, erganhController.openErganh);
 
 // ============================================================================
 // ERGAZOMENOI - PROGRAMMATA ROUTES

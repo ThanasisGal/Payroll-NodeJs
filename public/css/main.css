@@ -1,5 +1,5 @@
 :root {
-    --aaa: #1a500144;
+    --aaa: #2b2b2b;
     --dark: #292c4f;
     --info: #0dcaf0;
     --light: #adb5bd;
@@ -6653,7 +6653,7 @@ body {
 }
 
 /* ===== Logout: σταθερό ακριβώς πάνω από το footer ===== */
-#sidebarMenu .logout-section {
+/* #sidebarMenu .logout-section {
     position: fixed;
     left: 0;
     bottom: var(--footerH);
@@ -6661,15 +6661,45 @@ body {
     height: calc(var(--logoutH) - 2px);
     background: #c7c7c781;
     display: flex;
+    flex-direction: column;
     align-items: center;
     padding: 0.9rem;
     box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
     z-index: 1030;
+} */
+
+#sidebarMenu .logout-section {
+    position: fixed;
+    left: 0;
+    bottom: var(--footerH);
+    width: var(--leftW);
+
+    height: auto;
+    min-height: var(--logoutH);
+
+    background: #c7c7c781;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    padding: 6px 12px;
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.08);
+    z-index: 1030;
 }
-#sidebarMenu .logout-btn {
+
+/* #sidebarMenu .logout-btn {
     width: 100%;
     font-weight: 600 !important;
     font-size: 1.05rem !important;
+    background-color: #51dda39c !important;
+    color: #00000093;
+} */
+
+#sidebarMenu .logout-btn {
+    width: 100%;
+    height: 34px;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
     background-color: #51dda39c !important;
     color: #00000093;
 }
@@ -6688,7 +6718,10 @@ body {
     /* ακριβώς κάτω από το toolbar … */
     top: calc(var(--navH) + var(--toolbarH));
     /* … και ακριβώς πάνω από το logout + footer */
-    bottom: calc(var(--footerH) + var(--logoutH));
+
+    /* bottom: calc(var(--footerH) + var(--logoutH)); */
+    bottom: calc(var(--footerH) + var(--logoutH) + 40px);
+
     overflow-y: auto; /* πάντα ορατή κάθετη μπάρα */
     overflow-x: hidden;
     scrollbar-gutter: stable both-edges;
@@ -11002,4 +11035,93 @@ body.loader-active > *:not(.app-loader) {
     margin-top: 10px;
     font-size: 0.9em;
     color: #555;
+}
+
+.sidebar-bottom-buttons {
+    display: flex;
+    width: 100%;
+    gap: 4px;
+}
+
+.sidebar-mini-btn {
+    flex: 1;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+}
+
+.sidebar-mini-img {
+    max-width: 100%;
+    max-height: 58px;
+    object-fit: contain;
+}
+
+.erganh-swal-body {
+    text-align: left;
+}
+
+.erganh-copy-btn,
+.erganh-main-btn {
+    background-color: #51dda356 !important;
+    border: 1px solid #3bbf8b !important;
+    color: #000000b5 !important;
+    font-weight: 400;
+}
+
+.erganh-copy-btn:hover,
+.erganh-main-btn:hover {
+    background-color: #3fc892 !important;
+    border-color: #2fac7c !important;
+    color: #000 !important;
+}
+
+.erganh-close-btn {
+    background-color: #6c757d !important;
+    border: 1px solid #6c757d !important;
+    color: #fff !important;
+    font-weight: 400;
+}
+
+.erganh-close-btn:hover {
+    background-color: #5c636a !important;
+    border-color: #565e64 !important;
+}
+
+.erganh-open-btn {
+    background-color: #0dcaf0 !important;
+    border: 1px solid #0dcaf0 !important;
+    color: #2b2b2b !important;
+    font-weight: 400;
+}
+
+.erganh-open-btn:hover {
+    background-color: #0c7f96 !important;
+    border-color: #0c7f96 !important;
+    color: #fff !important;
+}
+
+.erganh-swal-actions {
+    width: 100%;
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 0 2.4rem;
+}
+
+.erganh-swal-actions .swal2-confirm {
+    margin-right: auto !important;
+}
+
+.erganh-swal-actions .swal2-cancel {
+    margin-left: auto !important;
+}
+
+.usage-month-input {
+    width: 160px;
+    height: 40px;
+    line-height: 36px;
+    padding-top: 6px;
+    padding-bottom: 6px;
 }

@@ -1,9 +1,12 @@
+// /public/js/common/sidebar.js
+
 document.addEventListener('DOMContentLoaded', () => {
     const TREE_SEL = '#nav-tree';
     const SCROLL_SEL = '#sidebarMenu .sidebar-scroll';
     const BTN_COLL_SEL = '#btn-collapse-all';
     const BTN_EXPD_SEL = '#btn-expand-all';
     const SEARCH_SEL = '#sidebarMenu .sidebar-search';
+    const BTN_ERGANI_SEL = '#btn-open-ergani';
 
     const USER_ID = (window.WPS_USER_ID || '').trim();
     const STATE_KEY = (id) => `wps.sidebar.state.v1.${id || 'guest'}`;
@@ -14,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCollapse = document.querySelector(BTN_COLL_SEL);
     const btnExpand = document.querySelector(BTN_EXPD_SEL);
     const searchInput = document.querySelector(SEARCH_SEL);
+    const btnErgani = document.querySelector(BTN_ERGANI_SEL);
 
     if (!tree) return;
 
@@ -214,4 +218,86 @@ document.addEventListener('DOMContentLoaded', () => {
             filterTree(e.target.value);
         }, 150)
     );
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    btnErgani?.addEventListener('click', async () => {
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+            const res = await fetch('/ergazomenoi/erganh/openErganh', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'CSRF-Token': csrfToken
+                }
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                Swal.fire('Σφάλμα', data.message || 'Σφάλμα ανοίγματος ΕΡΓΑΝΗ.', 'error');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Σύνδεση ΕΡΓΑΝΗ ΙΙ',
+                html: `
+        <div class="erganh-swal-body">
+            <div class="mb-2">
+                <strong>Username:</strong>
+                <code>${data.username}</code>
+            </div>
+
+            <div class="mb-3">
+                <strong>Password:</strong>
+                <code>${data.password}</code>
+            </div>
+
+            <button id="copy-erganh-username" class="btn btn-sm erganh-copy-btn">
+                Αντιγραφή username
+            </button>
+
+            <button id="copy-erganh-password" class="btn btn-sm erganh-copy-btn">
+                Αντιγραφή password
+            </button>
+        </div>
+    `,
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showCancelButton: true,
+                confirmButtonText: 'Άνοιγμα ΕΡΓΑΝΗ',
+                cancelButtonText: 'Κλείσιμο',
+                customClass: {
+                    actions: 'erganh-swal-actions',
+                    confirmButton: 'btn erganh-open-btn',
+                    cancelButton: 'btn erganh-close-btn'
+                },
+                buttonsStyling: false,
+
+                preConfirm: () => {
+                    window.open(data.url, '_blank', 'noopener,noreferrer');
+                    return false; // ΔΕΝ κλείνει το Swal
+                },
+
+                didOpen: () => {
+                    document
+                        .getElementById('copy-erganh-username')
+                        ?.addEventListener('click', () => {
+                            navigator.clipboard.writeText(data.username);
+                        });
+
+                    document
+                        .getElementById('copy-erganh-password')
+                        ?.addEventListener('click', () => {
+                            navigator.clipboard.writeText(data.password);
+                        });
+                }
+            });
+        } catch (err) {
+            console.error(err);
+            Swal.fire('Σφάλμα', 'Σφάλμα επικοινωνίας με τον server.', 'error');
+        }
+    });
 });
