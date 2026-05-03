@@ -1833,13 +1833,6 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // ============================================================
     const [_apoDay, _apoMonth, _apoYear] = apoHmeromhnia.split('/').map(Number);
 
-    // ============================================================
-    // Εξαγωγή μήνα/έτους φίλτρου από apoHmeromhnia "dd/mm/yyyy"
-    // ============================================================
-    const [_apoDay, _apoMonth, _apoYear] = apoHmeromhnia.split('/').map(Number);
-
-    // ⬇️⬇️⬇️ ΑΠΟ ΕΔΩ ΑΡΧΙΖΕΙ ΤΟ ΠΑΛΙΟ BLOCK ΠΟΥ ΘΑ ΑΝΤΙΚΑΤΑΣΤΗΣΕΙΣ ⬇️⬇️⬇️
-
     let i = 0;
     while (i < arxikoRows.length) {
         const cur = arxikoRows[i];
