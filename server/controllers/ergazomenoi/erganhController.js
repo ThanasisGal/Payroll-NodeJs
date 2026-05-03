@@ -1872,7 +1872,6 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // F κενό, G έχει τιμή, ίδια ημερομηνία με επόμενη γραμμή
     // ============================================================
     const telikoRowsForCheck = [];
-    const telikoRowsForCheck = [];
     sheetTeliko.eachRow((row, rowNumber) => {
         telikoRowsForCheck.push({
             rowNumber,
