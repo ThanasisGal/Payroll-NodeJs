@@ -19,8 +19,13 @@ const { UserPrivilegesModel } = Models_B;
 
 const { CompaniesModel, PasswordsModel, YpokatasthmataModel } = Models_C;
 
-const { ErgazomenoiModel, OrariaFromErganhModel, OrariaFromCardsModel, OrariaApologistikaModel } =
-    Models_D;
+const {
+    ErgazomenoiModel,
+    OrariaFromErganhModel,
+    OrariaFromCardsModel,
+    OrariaApologistikaModel,
+    ProdhlomenaOrariaModel
+} = Models_D;
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -39,6 +44,22 @@ if (isProduction) {
 }
 
 let team, company, username, _pdfUrlPath;
+
+// ============================================================
+// Διαφορά σε ώρες (decimal) μεταξύ "HH:MM" - "HH:MM"
+// Αν eos < apo → θεωρεί ότι περνάει μεσάνυχτα (+24h)
+// ============================================================
+function diffHours(apo, eos) {
+    if (!apo || !eos) return 0;
+    const [ah, am] = apo.split(':').map(Number);
+    const [eh, em] = eos.split(':').map(Number);
+    if (isNaN(ah) || isNaN(am) || isNaN(eh) || isNaN(em)) return 0;
+
+    let apoMin = ah * 60 + am;
+    let eosMin = eh * 60 + em;
+    if (eosMin < apoMin) eosMin += 24 * 60; // crosses midnight
+    return (eosMin - apoMin) / 60;
+}
 
 // Συνάρτηση για ανάγνωση του Excel αρχείου
 async function readXLSFile(filePath) {
@@ -765,7 +786,7 @@ class erganhController {
             console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε τοπικά: ${savePath}`);
 
             // 8. Επεξεργασία xlsx ← ΠΡΩΤΑ
-            await processOrariaXlsx(savePath);
+            await processOrariaXlsx(savePath, req.session.yearInUse);
 
             // 7β. ✅ Αποθήκευση στο S3 ← ΜΕΤΑ με το επεξεργασμένο αρχείο
             try {
@@ -1172,7 +1193,7 @@ async function downloadOrariaToBuffer(username, password, fromDate, toDate, para
     }
 }
 
-async function processOrariaXlsx(filePath, sessionTeam) {
+async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
@@ -1306,9 +1327,9 @@ async function processOrariaXlsx(filePath, sessionTeam) {
     console.log(`[processOrariaXlsx] Επεξεργασία ολοκληρώθηκε: ${filePath}`);
 
     // ============================================================
-    // 4) Αποθήκευση στο OrariaFromErganhModel
+    // 4) Αποθήκευση στο ProdhlomenaOrariaModel
     // ============================================================
-    await saveTelikoToMongo(sheetTeliko, sessionTeam);
+    await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse);
 }
 
 // ============================================================
@@ -1351,7 +1372,144 @@ function parseGRDate(value) {
     return null;
 }
 
-async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
+// async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
+//     const rows = [];
+//     sheetTeliko.eachRow((row, rowNumber) => {
+//         rows.push({
+//             rowNumber,
+//             afm: row.getCell(2).text?.trim(),
+//             eponimo: row.getCell(3).text?.trim(),
+//             onoma: row.getCell(4).text?.trim(),
+//             hmeromhnia_raw: row.getCell(5).value,
+//             kathgoria: row.getCell(6).text?.trim(),
+//             apo_ora: row.getCell(7).text?.trim(),
+//             eos_ora: row.getCell(8).text?.trim()
+//         });
+//     });
+
+//     // ✅ ΒΗΜΑ 1: Μάζεψε όλα τα μοναδικά AFM
+//     const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
+
+//     // ✅ ΒΗΜΑ 2: Φόρτωσε όλους τους εργαζόμενους με ΜΙΑ query
+//     const ergazomenoiList = await ErgazomenoiModel.find({
+//         afm: { $in: uniqueAfms }
+//     }).lean();
+
+//     // ✅ ΒΗΜΑ 3: Map afm → ergazomenos για γρήγορη αναζήτηση
+//     const ergazomenoiMap = {};
+//     ergazomenoiList.forEach((e) => {
+//         ergazomenoiMap[e.afm] = e;
+//     });
+
+//     // ✅ ΒΗΜΑ 4: Φτιάξε τα records
+//     const bulkOps = [];
+//     let i = 0;
+
+//     while (i < rows.length) {
+//         const current = rows[i];
+
+//         if (!current.afm) {
+//             i++;
+//             continue;
+//         }
+
+//         const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
+
+//         if (!hmeromhnia) {
+//             console.warn(
+//                 `[saveTelikoToMongo] ⚠️ Άκυρη ημερομηνία στη γραμμή ${current.rowNumber} ` +
+//                     `(raw: "${current.hmeromhnia_raw}") για ΑΦΜ: ${current.afm} — παραλείπεται`
+//             );
+//             i++;
+//             continue;
+//         }
+
+//         const hmeromhniaStr = hmeromhnia.toISOString().split('T')[0];
+
+//         const ergazomenos = ergazomenoiMap[current.afm];
+
+//         if (!ergazomenos) {
+//             // console.log(`[saveTelikoToMongo] ⚠️ Δεν βρέθηκε εργαζόμενος με ΑΦΜ: ${current.afm}`);
+//             i++;
+//             continue;
+//         }
+
+//         const record = {
+//             team: ergazomenos.team,
+//             company_kod: ergazomenos.company_kod,
+//             kodikos: ergazomenos.kodikos,
+//             hmeromhnia: hmeromhnia,
+//             kathgoria_ergasias: current.kathgoria,
+//             apo_ora_01: current.apo_ora || '',
+//             eos_ora_01: current.eos_ora || '',
+//             apo_ora_02: '',
+//             eos_ora_02: '',
+//             apo_ora_03: '',
+//             eos_ora_03: ''
+//         };
+
+//         // Έλεγξε επόμενη γραμμή — ίδια ημερομηνία;
+//         if (i + 1 < rows.length) {
+//             const next1 = rows[i + 1];
+//             const next1Date = parseGRDate(next1.hmeromhnia_raw);
+
+//             if (next1Date && next1Date.getTime() === hmeromhnia.getTime()) {
+//                 record.apo_ora_02 = next1.apo_ora || '';
+//                 record.eos_ora_02 = next1.eos_ora || '';
+//                 i++;
+
+//                 if (i + 1 < rows.length) {
+//                     const next2 = rows[i + 1];
+//                     const next2Date = parseGRDate(next2.hmeromhnia_raw);
+
+//                     if (next2Date && next2Date.getTime() === hmeromhnia.getTime()) {
+//                         record.apo_ora_03 = next2.apo_ora || '';
+//                         record.eos_ora_03 = next2.eos_ora || '';
+//                         i++;
+//                     }
+//                 }
+//             }
+//         }
+
+//         // ✅ Προσθήκη στο bulkOps array — ΟΧΙ await εδώ
+//         bulkOps.push({
+//             updateOne: {
+//                 filter: {
+//                     team: ergazomenos.team,
+//                     company_kod: ergazomenos.company_kod,
+//                     kodikos: ergazomenos.kodikos,
+//                     hmeromhnia: hmeromhnia
+//                 },
+//                 update: { $set: record },
+//                 upsert: true
+//             }
+//         });
+
+//         // console.log(
+//         //     `[saveTelikoToMongo] 📋 ${ergazomenos.kodikos} | ${hmeromhniaStr} | ${record.kathgoria_ergasias}`
+//         // );
+
+//         i++;
+//     }
+
+//     // ✅ ΒΗΜΑ 5: ΜΙΑ μόνο κλήση στη ΒΔ για ΟΛΑ τα records
+//     if (bulkOps.length > 0) {
+//         const result = await OrariaFromErganhModel.bulkWrite(bulkOps, { ordered: false });
+//     }
+// }
+
+// ============================================================
+// Αποθήκευση στο ProdhlomenaOrariaModel
+// - merge ζευγών ωρών ίδιας ημερομηνίας (έως 3)
+// - argia / perigrafh_argias από ArgiesModel
+// - repo = true αν F = "ΑΝ"
+// - parallel bulkWrite σε chunks
+// ============================================================
+async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
+    const CHUNK_SIZE = 1000; // ops ανά bulkWrite
+    const PARALLEL_CHUNKS = 5; // πόσα bulkWrites τρέχουν παράλληλα
+
+    // -------- 1) Διάβασε όλες τις γραμμές --------
     const rows = [];
     sheetTeliko.eachRow((row, rowNumber) => {
         rows.push({
@@ -1360,27 +1518,56 @@ async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
             eponimo: row.getCell(3).text?.trim(),
             onoma: row.getCell(4).text?.trim(),
             hmeromhnia_raw: row.getCell(5).value,
-            kathgoria: row.getCell(6).text?.trim(),
+            kathgoria: row.getCell(6).text?.trim(), // ΜΕ / ΑΝ / ΕΡΓ / ΤΗΛ
             apo_ora: row.getCell(7).text?.trim(),
             eos_ora: row.getCell(8).text?.trim()
         });
     });
 
-    // ✅ ΒΗΜΑ 1: Μάζεψε όλα τα μοναδικά AFM
+    // -------- 2) Φόρτωσε εργαζόμενους ΜΙΑ φορά --------
     const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
-
-    // ✅ ΒΗΜΑ 2: Φόρτωσε όλους τους εργαζόμενους με ΜΙΑ query
     const ergazomenoiList = await ErgazomenoiModel.find({
         afm: { $in: uniqueAfms }
     }).lean();
 
-    // ✅ ΒΗΜΑ 3: Map afm → ergazomenos για γρήγορη αναζήτηση
     const ergazomenoiMap = {};
     ergazomenoiList.forEach((e) => {
         ergazomenoiMap[e.afm] = e;
     });
 
-    // ✅ ΒΗΜΑ 4: Φτιάξε τα records
+    // -------- 3) Φόρτωσε ΟΛΕΣ τις Αργίες των (team, company_kod, etos) ΜΙΑ φορά --------
+    const teamCompanyPairs = new Set();
+    ergazomenoiList.forEach((e) => {
+        if (e.team && e.company_kod) {
+            teamCompanyPairs.add(`${e.team}|${e.company_kod}`);
+        }
+    });
+
+    const argiesOr = [...teamCompanyPairs].map((pair) => {
+        const [team, company_kod] = pair.split('|');
+        return { team, company_kod, etos: String(sessionYearInUse) };
+    });
+
+    let argiesList = [];
+    if (argiesOr.length > 0) {
+        argiesList = await ArgiesModel.find({ $or: argiesOr }).lean();
+    }
+
+    // Map: "team|company_kod|<timestamp ημερομηνίας UTC>" -> perigrafh
+    const argiesMap = {};
+    argiesList.forEach((a) => {
+        if (!a.hmeromhnia) return;
+        // Κανονικοποίηση σε UTC midnight για ασφαλή σύγκριση
+        const d = new Date(a.hmeromhnia);
+        const key = `${a.team}|${a.company_kod}|${Date.UTC(
+            d.getUTCFullYear(),
+            d.getUTCMonth(),
+            d.getUTCDate()
+        )}`;
+        argiesMap[key] = a.perigrafh || '';
+    });
+
+    // -------- 4) Φτιάξε τα bulk ops --------
     const bulkOps = [];
     let i = 0;
 
@@ -1393,25 +1580,28 @@ async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
         }
 
         const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
-
         if (!hmeromhnia) {
             console.warn(
-                `[saveTelikoToMongo] ⚠️ Άκυρη ημερομηνία στη γραμμή ${current.rowNumber} ` +
-                    `(raw: "${current.hmeromhnia_raw}") για ΑΦΜ: ${current.afm} — παραλείπεται`
+                `[saveTelikoToProdhlomena] ⚠️ Άκυρη ημερομηνία γραμμή ${current.rowNumber} ` +
+                    `(raw: "${current.hmeromhnia_raw}") ΑΦΜ: ${current.afm} — παραλείπεται`
             );
             i++;
             continue;
         }
 
-        const hmeromhniaStr = hmeromhnia.toISOString().split('T')[0];
-
         const ergazomenos = ergazomenoiMap[current.afm];
-
         if (!ergazomenos) {
-            // console.log(`[saveTelikoToMongo] ⚠️ Δεν βρέθηκε εργαζόμενος με ΑΦΜ: ${current.afm}`);
             i++;
             continue;
         }
+
+        // ✅ Αργία;
+        const argiaKey = `${ergazomenos.team}|${ergazomenos.company_kod}|${hmeromhnia.getTime()}`;
+        const argiaPerigrafh = argiesMap[argiaKey];
+        const isArgia = argiaPerigrafh !== undefined;
+
+        // ✅ ΡΕΠΟ; (στήλη F = "ΑΝ")
+        let isRepo = current.kathgoria === 'ΑΝ';
 
         const record = {
             team: ergazomenos.team,
@@ -1424,57 +1614,92 @@ async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
             apo_ora_02: '',
             eos_ora_02: '',
             apo_ora_03: '',
-            eos_ora_03: ''
+            eos_ora_03: '',
+            repo: isRepo,
+            argia: isArgia,
+            perigrafh_argias: isArgia ? argiaPerigrafh : '',
+            ores_ergasias: diffHours(current.apo_ora, current.eos_ora) // ✅ 1ο ζεύγος
         };
 
-        // Έλεγξε επόμενη γραμμή — ίδια ημερομηνία;
+        // Συγχώνευση με τις 1-2 επόμενες γραμμές αν είναι ίδια ημ/νία & ΑΦΜ
         if (i + 1 < rows.length) {
             const next1 = rows[i + 1];
             const next1Date = parseGRDate(next1.hmeromhnia_raw);
-
-            if (next1Date && next1Date.getTime() === hmeromhnia.getTime()) {
+            if (
+                next1Date &&
+                next1Date.getTime() === hmeromhnia.getTime() &&
+                next1.afm === current.afm
+            ) {
                 record.apo_ora_02 = next1.apo_ora || '';
                 record.eos_ora_02 = next1.eos_ora || '';
+                record.ores_ergasias += diffHours(next1.apo_ora, next1.eos_ora); // ✅ 2ο ζεύγος
+                if (next1.kathgoria === 'ΑΝ') record.repo = true;
                 i++;
 
                 if (i + 1 < rows.length) {
                     const next2 = rows[i + 1];
                     const next2Date = parseGRDate(next2.hmeromhnia_raw);
-
-                    if (next2Date && next2Date.getTime() === hmeromhnia.getTime()) {
+                    if (
+                        next2Date &&
+                        next2Date.getTime() === hmeromhnia.getTime() &&
+                        next2.afm === current.afm
+                    ) {
                         record.apo_ora_03 = next2.apo_ora || '';
                         record.eos_ora_03 = next2.eos_ora || '';
+                        record.ores_ergasias += diffHours(next2.apo_ora, next2.eos_ora); // ✅ 3ο ζεύγος
+                        if (next2.kathgoria === 'ΑΝ') record.repo = true;
                         i++;
                     }
                 }
             }
         }
 
-        // ✅ Προσθήκη στο bulkOps array — ΟΧΙ await εδώ
         bulkOps.push({
             updateOne: {
                 filter: {
-                    team: ergazomenos.team,
-                    company_kod: ergazomenos.company_kod,
-                    kodikos: ergazomenos.kodikos,
-                    hmeromhnia: hmeromhnia
+                    team: record.team,
+                    company_kod: record.company_kod,
+                    kodikos: record.kodikos,
+                    hmeromhnia: record.hmeromhnia
                 },
                 update: { $set: record },
                 upsert: true
             }
         });
 
-        // console.log(
-        //     `[saveTelikoToMongo] 📋 ${ergazomenos.kodikos} | ${hmeromhniaStr} | ${record.kathgoria_ergasias}`
-        // );
-
         i++;
     }
 
-    // ✅ ΒΗΜΑ 5: ΜΙΑ μόνο κλήση στη ΒΔ για ΟΛΑ τα records
-    if (bulkOps.length > 0) {
-        const result = await OrariaFromErganhModel.bulkWrite(bulkOps, { ordered: false });
+    if (bulkOps.length === 0) {
+        console.log('[saveTelikoToProdhlomena] Δεν υπάρχουν εγγραφές προς αποθήκευση');
+        return;
     }
+
+    // -------- 5) Σπάσε σε chunks --------
+    const chunks = [];
+    for (let k = 0; k < bulkOps.length; k += CHUNK_SIZE) {
+        chunks.push(bulkOps.slice(k, k + CHUNK_SIZE));
+    }
+
+    // -------- 6) Παράλληλη εκτέλεση με όριο concurrency --------
+    let totalUpserted = 0;
+    let totalModified = 0;
+
+    for (let k = 0; k < chunks.length; k += PARALLEL_CHUNKS) {
+        const batch = chunks.slice(k, k + PARALLEL_CHUNKS);
+        const results = await Promise.all(
+            batch.map((chunk) => ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false }))
+        );
+        results.forEach((r) => {
+            totalUpserted += r.upsertedCount || 0;
+            totalModified += r.modifiedCount || 0;
+        });
+    }
+
+    console.log(
+        `[saveTelikoToProdhlomena] ✅ ${totalUpserted} inserted, ${totalModified} updated ` +
+            `(records: ${bulkOps.length}, chunks: ${chunks.length}, parallel: ${PARALLEL_CHUNKS})`
+    );
 }
 
 async function processKartesXlsx(filePath, apoHmeromhnia) {
@@ -1608,6 +1833,13 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // ============================================================
     const [_apoDay, _apoMonth, _apoYear] = apoHmeromhnia.split('/').map(Number);
 
+    // ============================================================
+    // Εξαγωγή μήνα/έτους φίλτρου από apoHmeromhnia "dd/mm/yyyy"
+    // ============================================================
+    const [_apoDay, _apoMonth, _apoYear] = apoHmeromhnia.split('/').map(Number);
+
+    // ⬇️⬇️⬇️ ΑΠΟ ΕΔΩ ΑΡΧΙΖΕΙ ΤΟ ΠΑΛΙΟ BLOCK ΠΟΥ ΘΑ ΑΝΤΙΚΑΤΑΣΤΗΣΕΙΣ ⬇️⬇️⬇️
+
     let i = 0;
     while (i < arxikoRows.length) {
         const cur = arxikoRows[i];
@@ -1635,38 +1867,7 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
         }
 
         // 9.2) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ❌, G ✅
-        if (hasF && !hasG && next) {
-            const nextHasF = !!next.F;
-            const nextHasG = !!next.G;
-            const diffDate = !sameDate(cur.E, next.E);
-
-            if (diffDate && !nextHasF && nextHasG) {
-                // Συγχώνευση: cur.F + next.G
-                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, next.G);
-                i += 2; // skip next
-                continue;
-            }
-
-            // 9.3) F ✅  G ❌ → επόμενη: διαφ. ημ/νία, F ✅
-            if (diffDate && nextHasF) {
-                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, '');
-                i++;
-                continue;
-            }
-        }
-
-        // 9.4) F ❌  G ✅ → επόμενη: διαφ. ημ/νία, F ✅, G ✅
-        if (!hasF && hasG && next) {
-            const nextHasF = !!next.F;
-            const nextHasG = !!next.G;
-            const diffDate = !sameDate(cur.E, next.E);
-
-            if (diffDate && nextHasF && nextHasG) {
-                writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, '', cur.G);
-                i++;
-                continue;
-            }
-        }
+        // ... (όλο το υπόλοιπο default block)
 
         // Default: γράψε ό,τι έχεις
         writeTelikoKartes(cur.A, cur.B, cur.C, cur.D, cur.E, cur.F, cur.G);
@@ -1677,6 +1878,7 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // ✅ Έλεγχος και διαγραφή γραμμών από Κάρτες_Τελικό:
     // F κενό, G έχει τιμή, ίδια ημερομηνία με επόμενη γραμμή
     // ============================================================
+    const telikoRowsForCheck = [];
     const telikoRowsForCheck = [];
     sheetTeliko.eachRow((row, rowNumber) => {
         telikoRowsForCheck.push({

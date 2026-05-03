@@ -29,11 +29,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Έλεγχος ίδιου μήνα/έτους
         const from = new Date(fromDateField.value);
         const to = new Date(toDateField.value);
-        if (from.getMonth() !== to.getMonth() || from.getFullYear() !== to.getFullYear()) {
-            alert('Οι ημερομηνίες πρέπει να ανήκουν στον ίδιο μήνα και στο ίδιο έτος');
-            toDateField.focus();
-            return false;
-        }
+        // if (from.getMonth() !== to.getMonth() || from.getFullYear() !== to.getFullYear()) {
+        //     alert('Οι ημερομηνίες πρέπει να ανήκουν στον ίδιο μήνα και στο ίδιο έτος');
+        //     toDateField.focus();
+        //     return false;
+        // }
 
         return true;
     }
