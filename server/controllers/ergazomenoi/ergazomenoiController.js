@@ -2620,7 +2620,7 @@ class ergazomenoiController {
             eidikh_kathgoria_ergazomenoy: formData.eidikh_kathgoria_ergazomenoy,
             oikogeneiakh_katastash: formData.oikogeneiakh_katastash,
             arithmos_teknon: formData.arithmos_teknon,
-            eidikothta: formData.eidikothta,
+            eidikothta: formData.eidikothta_stathera,
             antikeimeno_ergasion: formData.antikeimeno_ergasion,
             typos_ergazomenon: formData.typos_ergazomenon,
             ypokatasthma: formData.ypokatasthma,

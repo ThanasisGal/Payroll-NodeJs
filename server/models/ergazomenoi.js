@@ -347,7 +347,15 @@ const ProdhlomenaOrariaSchema = new Schema(
         adeia: { type: Boolean, default: false },
         kathgoria_adeias: { type: String, trim: true },
         astheneia: { type: Boolean, default: false },
-        ores_ergasias: { type: Number, default: 0 }
+        ores_ergasias: { type: Number, default: 0 },
+        cards_apo_ora_01: { type: String },
+        cards_eos_ora_01: { type: String },
+        cards_apo_ora_02: { type: String },
+        cards_eos_ora_02: { type: String },
+        cards_apo_ora_03: { type: String },
+        cards_eos_ora_03: { type: String },
+        cards_ores_ergasias: { type: Number, default: 0 },
+        check_ergasia: { type: Boolean, default: false }
     },
     {
         collection: 'Prodhlomena_Oraria'

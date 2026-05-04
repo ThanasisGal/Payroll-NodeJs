@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // ✅ Στο downloadCardsButton.js — διάβασε από cookie
                 const csrfToken = document.cookie
                     .split('; ')
-                    .find((row) => row.startsWith('XSRF-TOKEN=')) // ← βρες το σωστό όνομα του cookie
+                    .find((row) => row.startsWith('XSRF-TOKEN='))
                     ?.split('=')[1];
 
                 const response = await fetch('/ergazomenoi/programmata/downloadCards', {
@@ -108,14 +108,60 @@ document.addEventListener('DOMContentLoaded', async function () {
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-
                 if (loader) loader.style.display = 'none';
 
-                const data = await response.json();
+                // ✅ Διάβασε ΠΑΝΤΑ το JSON (ακόμη κι αν !response.ok)
+                const data = await response.json().catch(() => ({}));
 
+                // ============================================================
+                // ✅ Timeout από ΕΡΓΑΝΗ ΙΙ → προειδοποίηση, ΧΩΡΙΣ redirect
+                // ============================================================
+                if (response.status === 504 || data.code === 'ERGANH_TIMEOUT') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Λήξη χρόνου σύνδεσης με ΕΡΓΑΝΗ ΙΙ',
+                        html:
+                            data.message ||
+                            'Η σύνδεση με το πληροφοριακό σύστη��α <strong>ΕΡΓΑΝΗ ΙΙ</strong> δεν ολοκληρώθηκε εγκαίρως.<br>' +
+                                'Παρακαλούμε δοκιμάστε ξανά σε λίγα λεπτά.',
+                        confirmButtonText: 'Κλείσιμο',
+                        customClass: {
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup',
+                            confirmButton: 'class-normal custom-confirm-button custom-swal-button'
+                        }
+                        // ❗ Κανένα willClose / redirect — ο χρήστης μένει στη φόρμα
+                    });
+                    return;
+                }
+
+                // ============================================================
+                // ❌ Άλλο σφάλμα
+                // ============================================================
+                if (!response.ok || !data.success) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
+                        html:
+                            data.message ||
+                            `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
+                        timer: 5000,
+                        confirmButtonText: 'Κλείσιμο',
+                        customClass: {
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup',
+                            confirmButton: 'class-normal custom-confirm-button custom-swal-button'
+                        },
+                        willClose: () => {
+                            window.location.href = '/mainapp';
+                        }
+                    });
+                    return;
+                }
+
+                // ============================================================
+                // ✅ Επιτυχία
+                // ============================================================
                 Swal.fire({
                     icon: 'success',
                     title: 'Επιτυχής Λήψη Απασχολήσεων',
@@ -132,23 +178,21 @@ document.addEventListener('DOMContentLoaded', async function () {
                     }
                 });
             } catch (error) {
+                // ❌ Δικτυακό σφάλμα (server down, no internet κ.λπ.)
                 const loader = document.querySelector('.loader-container');
                 if (loader) loader.style.display = 'none';
 
                 Swal.fire({
                     icon: 'error',
-                    title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
-                    html: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
-                    timer: 5000,
+                    title: 'Σφάλμα δικτύου',
+                    html: 'Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή.<br>Παρακαλούμε δοκιμάστε ξανά.',
                     confirmButtonText: 'Κλείσιμο',
                     customClass: {
                         title: 'custom-title',
                         popup: 'custom-swal-popup',
                         confirmButton: 'class-normal custom-confirm-button custom-swal-button'
-                    },
-                    willClose: () => {
-                        window.location.href = '/mainapp';
                     }
+                    // ❗ Χωρίς redirect — μένει στη φόρμα
                 });
             }
         }

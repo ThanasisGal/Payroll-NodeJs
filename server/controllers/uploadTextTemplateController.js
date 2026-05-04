@@ -5,19 +5,14 @@
 
 const { uploadBufferToS3 } = require('../utils/s3Helper');
 const textCacheManager = require('../utils/textCacheManager');
-const { getCompanyFolder } = require('../utils/userContext'); // ✅ Import!
+const { getCompanyFolder } = require('../utils/userContext');
 
 // ============================================================================
 // Upload Text Templates to S3
 // ============================================================================
 exports.uploadTemplates = async (req, res) => {
     try {
-        // console.log('🔥 POST /api/admin/templates/upload received');
-        // console.log('   Headers:', req.headers);
-        // console.log('   Body:', req.body);
-        // console.log('   Files:', req.files ? req.files.length : 0);
-
-        const { team, company, category } = req.body; // company = _id από frontend
+        const { team, company, category, prefix } = req.body;
         const files = req.files;
 
         // Validation: Check files
@@ -29,21 +24,22 @@ exports.uploadTemplates = async (req, res) => {
         }
 
         // Validation: Required fields
-        if (!team || !company || !category) {
+        if (!team || !company || !category || !prefix) {
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields: team, company, category'
+                error: 'Missing required fields: team, company, category, prefix'
             });
         }
 
-        // ✅ ΔΙΟΡΘΩΣΗ: Get company folder με slug
-        // console.log(`🔍 Resolving company folder for: ${company}`);
-        const companyFolder = await getCompanyFolder(company, team);
-        // console.log(`✅ Company folder resolved: ${companyFolder}`);
-        // Π.χ. "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ"
+        // Validation: Prefix format
+        if (!prefix.match(/^_[A-Z0-9_]+_$/)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid prefix format. Expected: _PREFIX_'
+            });
+        }
 
-        // console.log(`📤 Uploading ${files.length} templates to ${category}`);
-        // console.log(`📁 Target path: txt/${team}/${companyFolder}/${category}/`);
+        const companyFolder = await getCompanyFolder(company, team);
 
         // Process all files
         const results = [];
@@ -62,13 +58,20 @@ exports.uploadTemplates = async (req, res) => {
                     continue;
                 }
 
-                // ✅ ΔΙΟΡΘΩΣΗ: Construct S3 key με slug
-                const s3Key = `txt/${team}/${companyFolder}/${category}/${filename}`;
-                // Π.χ. txt/THA/0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ/symbash/_HOTEL_0001.txt ✅
+                // Optional αλλά προτείνεται:
+                // Επιτρέπει upload μόνο αρχείων που ξεκινούν με το selected prefix
+                if (!filename.startsWith(prefix)) {
+                    errors.push({
+                        filename,
+                        error: `Filename does not match selected prefix ${prefix}`
+                    });
+                    continue;
+                }
 
-                // console.log(`📤 Uploading: ${s3Key}`);
+                // ✅ ΝΕΟ path με prefix folder
+                const s3Key = `txt/${team}/${companyFolder}/${category}/${prefix}/${filename}`;
+                // Π.χ. txt/THA/0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ/symbash/_HOTEL_/_HOTEL_0001.txt
 
-                // Upload to S3 using buffer
                 const result = await uploadBufferToS3(
                     file.buffer,
                     s3Key,
@@ -81,42 +84,38 @@ exports.uploadTemplates = async (req, res) => {
                     s3Url: result.s3Url,
                     success: true
                 });
-
-                // console.log(`✅ ${filename} uploaded successfully`);
             } catch (error) {
                 errors.push({
                     filename: file.originalname,
                     error: error.message
                 });
+
                 console.error(`❌ ${file.originalname} failed:`, error.message);
             }
         }
 
-        // Return summary
         const response = {
             success: errors.length === 0,
             uploaded: results.length,
             failed: errors.length,
             results,
             errors,
-            // ✅ Include για debugging
-            uploadPath: `txt/${team}/${companyFolder}/${category}/`
+            uploadPath: `txt/${team}/${companyFolder}/${category}/${prefix}/`
         };
 
         res.json(response);
 
-        // ✅ Μετά refresh cache ασύγχρονα (fire and forget)
         if (results.length > 0) {
             try {
                 const refreshResult = await textCacheManager.refresh();
                 console.log(`✅ Cache refreshed: ${refreshResult.totalFiles} files`);
             } catch (e) {
                 console.error('❌ Cache refresh error:', e.message);
-                // Μη σταματάς — το upload έγινε, απλά το cache δεν ανανεώθηκε
             }
         }
     } catch (error) {
         console.error('❌ Template upload error:', error);
+
         res.status(500).json({
             success: false,
             error: error.message
