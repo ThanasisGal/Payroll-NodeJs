@@ -22,7 +22,6 @@ const Models_A = require('../models/stathera_arxeia');
 const Models_C = require('../models/companies');
 
 const { PoleisModel, SxeseisErgasiasModel, DoyModel, EidikothtesEfarmoghsModel } = Models_A;
-
 const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
 
 const execAsync = promisify(exec);
@@ -315,12 +314,6 @@ const daysToText = (num, type = 'money') => {
 // ✅ FIXED: Parse Table as Formatted Text String
 // ============================================================================
 
-/**
- * Κάνει parse πίνακα και επιστρέφει formatted string με fixed-width columns
- * @param {string} text - Raw text με | separators
- * @returns {string} Formatted table as text
- */
-// ✅ Helper function: Word wrap
 function wordWrap(text, maxWidth) {
     if (!text) return '';
     if (text.length <= maxWidth) return text;
@@ -335,9 +328,7 @@ function wordWrap(text, maxWidth) {
         if (testLine.length <= maxWidth) {
             currentLine = testLine;
         } else {
-            if (currentLine) {
-                lines.push(currentLine);
-            }
+            if (currentLine) lines.push(currentLine);
 
             if (word.length > maxWidth) {
                 currentLine = word.substring(0, maxWidth - 3) + '...';
@@ -347,23 +338,18 @@ function wordWrap(text, maxWidth) {
         }
     }
 
-    if (currentLine) {
-        lines.push(currentLine);
-    }
+    if (currentLine) lines.push(currentLine);
 
     return lines.join('\n');
 }
 
-/**
- * Parse table με bullets και word-wrap
- */
 function parseTableColumns(text) {
     const lines = (text || '').trim().split('\n');
     const formattedRows = [];
 
     const MAX_COL1_WIDTH = 55;
-    const BULLET = '• '; // ✅ Bullet character (change this for different styles)
-    const INDENT = '  '; // ✅ Indent για wrapped lines
+    const BULLET = '• ';
+    const INDENT = '  ';
 
     for (const line of lines) {
         const l = line.trim();
@@ -371,11 +357,9 @@ function parseTableColumns(text) {
 
         const parts = l.split('|');
 
-        // Word-wrap col1
         const col1Text = (parts[0] || '').trim();
         const col1Wrapped = wordWrap(col1Text, MAX_COL1_WIDTH);
 
-        // Add bullet to first line only
         const col1Lines = col1Wrapped.split('\n');
         const col1WithBullet = col1Lines
             .map((line, index) => {
@@ -393,18 +377,13 @@ function parseTableColumns(text) {
         formattedRows.push(row);
     }
 
-    const result = formattedRows.join('\n');
-
-    return result;
+    return formattedRows.join('\n');
 }
 
 // ============================================================================
-// Image Insertion Helpers (από ektyposhSymbaseonController.js)
+// Image Insertion Helpers
 // ============================================================================
 
-/**
- * Find text position in PDF
- */
 async function findTextInPdf(pdfPath, searchText) {
     const pdfjsLib = require('pdfjs-dist');
 
@@ -434,23 +413,16 @@ async function findTextInPdf(pdfPath, searchText) {
     return position;
 }
 
-/**
- * Replace text with image in PDF
- */
 async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) {
-    if (!position) {
-        return false;
-    }
+    if (!position) return false;
 
     try {
         const existingPdfBytes = await fs.readFile(pdfPath);
         const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-        // Decode base64 image
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
         const imageBytes = Buffer.from(base64Data, 'base64');
 
-        // Embed image (support PNG and JPG)
         let image;
         try {
             image = await pdfDoc.embedPng(imageBytes);
@@ -465,7 +437,6 @@ async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) 
 
         const page = pdfDoc.getPages()[position.pageIndex - 1];
 
-        // Cover text with white rectangle
         page.drawRectangle({
             x: position.x,
             y: position.y,
@@ -475,7 +446,6 @@ async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) 
             opacity: 1
         });
 
-        // Draw image
         page.drawImage(image, {
             x: position.x,
             y: position.y - position.height + 28.35,
@@ -493,18 +463,9 @@ async function replaceTextWithImage(pdfPath, outputPath, imageBase64, position) 
     }
 }
 
-/**
- * Δημιουργεί placeholders για όλα τα templates μιας κατηγορίας
- * ✅ Tables rendered as formatted text (NOT arrays)
- *
- * @param {Object} categoryParts - Templates object από loadTextsByCategory
- * @param {Object} ergazomenos - Employee data
- * @returns {Object} Placeholders για DOCX
- */
 function generateCategoryPlaceholders(categoryParts, ergazomenos) {
     const placeholders = {};
 
-    // ✅ Validation
     if (!categoryParts || typeof categoryParts !== 'object') {
         console.warn('⚠️ generateCategoryPlaceholders: categoryParts is invalid');
         return placeholders;
@@ -515,17 +476,14 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
     }
 
     try {
-        // 1️⃣ Βασικά placeholders (απλά templates)
         for (const [key, value] of Object.entries(categoryParts)) {
             if (key && typeof key === 'string' && key.trim().length > 0) {
-                // Skip _0004 keys (handled separately)
                 if (!key.endsWith('_0004')) {
                     placeholders[key] = value !== undefined && value !== null ? String(value) : '';
                 }
             }
         }
 
-        // 2️⃣ Special handling για _XXXX_0004 (πίνακες - as formatted text)
         let hasTable = false;
         for (const [key, value] of Object.entries(categoryParts)) {
             if (key && key.endsWith('_0004')) {
@@ -533,19 +491,14 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
                     const tableText = parseTableColumns(value);
                     const prefix = key.replace('_0004', '');
 
-                    // ✅ Store as STRING (simple text replacement)
                     placeholders[`${prefix}_0004_TABLE`] = tableText || '';
-
                     hasTable = tableText && tableText.length > 0;
-
-                    const rowCount = tableText ? tableText.split('\n').length : 0;
                 } catch (error) {
                     console.error(`   ❌ Error parsing table ${key}:`, error.message);
                 }
             }
         }
 
-        // 3️⃣ Special handling για _XXXX_0005 & _XXXX_0006 (conditional - διάλειμμα)
         for (const [key, value] of Object.entries(categoryParts)) {
             if (key && key.endsWith('_0005')) {
                 const prefix = key.replace('_0005', '');
@@ -562,7 +515,6 @@ function generateCategoryPlaceholders(categoryParts, ergazomenos) {
             }
         }
 
-        // 4️⃣ ✅ Set _SHOW_TABLE flag
         placeholders._SHOW_TABLE = hasTable;
 
         return placeholders;
@@ -645,7 +597,6 @@ async function generateContractPDF(ergazomenos, userContext) {
 
         let categoryParts = {};
         let _COMBINED_TEXT = '';
-        let _GENIKH_PM = '';
 
         const patronymo = (ergazomenos.patronymo ?? '').trim();
         const mhtronymo = (ergazomenos.mhtronymo ?? '').trim();
@@ -667,10 +618,18 @@ async function generateContractPDF(ergazomenos, userContext) {
                     categoryToLoad
                 );
 
+                console.log('[CONTRACT-DEBUG] categoryToLoad:', categoryToLoad);
+                console.log('[CONTRACT-DEBUG] templates keys:', Object.keys(templates || {}));
+                console.log(
+                    '[CONTRACT-DEBUG] templates count:',
+                    Object.keys(templates || {}).length
+                );
+
                 categoryParts = templates || {};
 
                 if (templates && Object.keys(templates).length > 0) {
                     _COMBINED_TEXT = combineTexts(templates);
+                    console.log('[CONTRACT-DEBUG] _COMBINED_TEXT length:', _COMBINED_TEXT.length);
                     console.log(`✅ [CONTRACT] Loaded ${Object.keys(templates).length} templates`);
                 } else {
                     console.warn(`⚠️ [CONTRACT] No templates found for category ${categoryToLoad}`);
@@ -823,17 +782,6 @@ async function generateContractPDF(ergazomenos, userContext) {
             _ANTONYMIA_A,
 
             _EPONYMIA_ERGAZOMENOY: (ergazomenos.eponymo || '') + ' ' + (ergazomenos.onoma || ''),
-            // _PATRONYMO_ERGAZOMENOY: ergazomenos.patronymo
-            //     ? (ergazomenos.patronymo.endsWith('ΟΣ')
-            //           ? ergazomenos.patronymo.slice(0, -2) + 'ΟΥ'
-            //           : ergazomenos.patronymo.endsWith('Σ')
-            //             ? ergazomenos.patronymo.slice(0, -1).trim()
-            //             : ergazomenos.patronymo.endsWith('ΥΣ')
-            //               ? ergazomenos.patronymo.slice(0, -2) + 'Α'
-            //               : ergazomenos.patronymo
-            //       ).trim()
-            //     : '..........',
-
             _PATRONYMO_ERGAZOMENOY: useMhtronymoAsPatronymo
                 ? (mhtronymo.endsWith('Α')
                       ? mhtronymo + 'Σ'
@@ -1050,6 +998,7 @@ async function generateContractPDF(ergazomenos, userContext) {
         throw error;
     }
 }
+
 module.exports = {
     generateContractPDF
 };

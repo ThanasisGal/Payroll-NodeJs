@@ -8,6 +8,7 @@ const { S3Client, GetObjectCommand, ListObjectsV2Command } = require('@aws-sdk/c
 const fs = require('fs-extra');
 const path = require('path');
 const logger = require('./logger');
+const { USE_LOCAL_STORAGE } = require('./s3Helper');
 
 /**
  * ============================================================================
@@ -15,9 +16,6 @@ const logger = require('./logger');
  * ============================================================================
  */
 class TextCacheManager {
-    // ========================================================================
-    // ΜΕΡΟΣ 1: Constructor
-    // ========================================================================
     constructor() {
         this.s3Client = new S3Client({
             region: process.env.AWS_REGION || 'eu-central-1'
@@ -25,6 +23,7 @@ class TextCacheManager {
 
         this.bucket = process.env.TEXT_S3_BUCKET || process.env.S3_BUCKET;
         this.cacheDir = path.join(__dirname, '..', '..', 'public', 'txt-cache');
+        this.localS3MockDir = path.join(__dirname, '..', '..', 'uploads', 's3-mock');
         this.memoryCache = new Map();
         this.refreshInterval = null;
         this.isRefreshing = false;
@@ -32,23 +31,28 @@ class TextCacheManager {
     }
 
     // ========================================================================
-    // ΜΕΡΟΣ 2: Initialize & Sync Methods
+    // Initialize & Sync Methods
     // ========================================================================
 
-    /**
-     * initialize() - Καλείται από app.js κατά την εκκίνηση
-     */
     async initialize() {
         try {
             await fs.ensureDir(this.cacheDir);
 
+            logger.info(`📦 Text cache source: ${USE_LOCAL_STORAGE ? 'LOCAL S3 MOCK' : 'AWS S3'}`);
+            logger.info(`📁 Cache directory: ${this.cacheDir}`);
+
+            if (USE_LOCAL_STORAGE) {
+                logger.info(`📁 Local mock source: ${this.localS3MockDir}`);
+            } else {
+                logger.info(`☁️ S3 bucket: ${this.bucket}`);
+            }
+
             await this.syncFromS3();
             await this.loadToMemory();
 
-            // ✅ ΕΝΗΜΕΡΩΣΗ: Διαβάζει από .env
             const refreshInterval = process.env.TEXT_CACHE_REFRESH_INTERVAL
                 ? parseInt(process.env.TEXT_CACHE_REFRESH_INTERVAL, 10)
-                : 5 * 60 * 1000; // Default: 5 minutes
+                : 5 * 60 * 1000;
 
             this.startAutoRefresh(refreshInterval);
         } catch (error) {
@@ -57,64 +61,46 @@ class TextCacheManager {
         }
     }
 
-    /**
-     * syncFromS3() - Κατεβάζει όλα τα files από S3
-     */
-    // async syncFromS3() {
-    //     if (this.isRefreshing) return;
-
-    //     try {
-    //         this.isRefreshing = true;
-
-    //         // 1) Πάρε ΟΛΑ τα S3 keys (pagination)
-    //         const s3KeysSet = await this.listAllS3Keys("txt/");
-
-    //         if (!s3KeysSet || s3KeysSet.size === 0) {
-    //             logger.warn("⚠️ No txt/ files found in S3");
-    //             return;
-    //         }
-
-    //         // 2) Σβήσε orphans από local cache
-    //         const { deleted, kept } = await this.deleteOrphanCacheFiles(s3KeysSet);
-    //         logger.info(`🧹 Cache cleanup: deleted ${deleted} orphan files, kept ${kept}`);
-
-    //         // 3) Κατέβασε/ενημέρωσε όλα τα υπάρχοντα keys
-    //         let syncedCount = 0;
-    //         for (const key of s3KeysSet) {
-    //             await this.downloadFile(key);
-    //             syncedCount++;
-    //         }
-
-    //         this.lastRefresh = new Date();
-    //         logger.info(`✅ Synced ${syncedCount} files from S3`);
-
-    //     } catch (error) {
-    //         logger.error("❌ Σφάλμα κατά το sync από S3:", error.message);
-    //     } finally {
-    //         this.isRefreshing = false;
-    //     }
-    // }
-
     async syncFromS3() {
         if (this.isRefreshing) return;
+
         try {
             this.isRefreshing = true;
-            const s3KeysSet = await this.listAllS3Keys('txt/');
-            if (!s3KeysSet || s3KeysSet.size === 0) return;
 
-            const { deleted, kept } = await this.deleteOrphanCacheFiles(s3KeysSet);
+            const keysSet = await this.listAllS3Keys('txt/');
 
-            // ✅ Parallel downloads (max 10 concurrent)
-            const keys = [...s3KeysSet];
+            if (!keysSet || keysSet.size === 0) {
+                logger.warn('⚠️ No txt/ files found in source storage');
+                return;
+            }
+
+            const { deleted, kept } = await this.deleteOrphanCacheFiles(keysSet);
+            logger.info(`🧹 Cache cleanup: deleted ${deleted} orphan files, kept ${kept}`);
+
+            const keys = [...keysSet];
             const BATCH_SIZE = 10;
+            let successCount = 0;
 
             for (let i = 0; i < keys.length; i += BATCH_SIZE) {
                 const batch = keys.slice(i, i + BATCH_SIZE);
-                await Promise.all(batch.map((key) => this.downloadFile(key)));
+
+                const results = await Promise.all(
+                    batch.map(async (key) => {
+                        try {
+                            await this.downloadFile(key);
+                            return true;
+                        } catch (err) {
+                            logger.error(`❌ Download failed for ${key}:`, err.message);
+                            return false;
+                        }
+                    })
+                );
+
+                successCount += results.filter(Boolean).length;
             }
 
             this.lastRefresh = new Date();
-            logger.info(`✅ Synced ${s3KeysSet.size} files from S3`);
+            logger.info(`✅ Synced ${successCount}/${keysSet.size} files from source storage`);
         } catch (error) {
             logger.error('❌ Σφάλμα sync:', error.message);
         } finally {
@@ -122,11 +108,26 @@ class TextCacheManager {
         }
     }
 
-    /**
-     * downloadFile() - Κατεβάζει ένα αρχείο από S3
-     */
     async downloadFile(key) {
         try {
+            const localPath = path.join(this.cacheDir, key);
+
+            await fs.ensureDir(path.dirname(localPath));
+
+            // DEV MODE: Copy from local mock storage
+            if (USE_LOCAL_STORAGE) {
+                const sourcePath = path.join(this.localS3MockDir, key);
+
+                const exists = await fs.pathExists(sourcePath);
+                if (!exists) {
+                    throw new Error(`Local mock source file not found: ${sourcePath}`);
+                }
+
+                await fs.copyFile(sourcePath, localPath);
+                return;
+            }
+
+            // PRODUCTION: Download from AWS S3
             const command = new GetObjectCommand({
                 Bucket: this.bucket,
                 Key: key
@@ -135,17 +136,13 @@ class TextCacheManager {
             const response = await this.s3Client.send(command);
             const content = await this.streamToString(response.Body);
 
-            const localPath = path.join(this.cacheDir, key);
-            await fs.ensureDir(path.dirname(localPath));
             await fs.writeFile(localPath, content, 'utf-8');
         } catch (error) {
             logger.error(`❌ Αποτυχία download: ${key}`, error.message);
+            throw error;
         }
     }
 
-    /**
-     * streamToString() - Helper για S3 streams
-     */
     async streamToString(stream) {
         return new Promise((resolve, reject) => {
             const chunks = [];
@@ -153,18 +150,40 @@ class TextCacheManager {
             stream.on('error', reject);
             stream.on('end', () => {
                 const buffer = Buffer.concat(chunks);
-                const string = buffer.toString('utf-8');
-                resolve(string);
+                resolve(buffer.toString('utf-8'));
             });
         });
     }
 
-    /**
-     * Λίστα όλων των S3 keys κάτω από ένα Prefix (με pagination)
-     * @returns {Promise<Set<string>>}
-     */
     async listAllS3Keys(prefix = 'txt/') {
         const keys = new Set();
+
+        // DEV MODE: Read from local mock directory
+        if (USE_LOCAL_STORAGE) {
+            const baseDir = path.join(this.localS3MockDir, prefix);
+
+            const exists = await fs.pathExists(baseDir);
+            if (!exists) {
+                logger.warn(`⚠️ Local mock path does not exist: ${baseDir}`);
+                return keys;
+            }
+
+            const files = await this.getAllCachedFiles(baseDir);
+
+            for (const filePath of files) {
+                const relativeToMockRoot = path
+                    .relative(this.localS3MockDir, filePath)
+                    .replace(/\\/g, '/');
+
+                if (!relativeToMockRoot.endsWith('.txt')) continue;
+
+                keys.add(relativeToMockRoot);
+            }
+
+            return keys;
+        }
+
+        // PRODUCTION: Read from AWS S3
         let continuationToken = undefined;
 
         while (true) {
@@ -180,7 +199,7 @@ class TextCacheManager {
             if (response.Contents) {
                 for (const item of response.Contents) {
                     if (!item?.Key) continue;
-                    if (item.Key.endsWith('/')) continue; // ignore "folders"
+                    if (item.Key.endsWith('/')) continue;
                     keys.add(item.Key);
                 }
             }
@@ -194,56 +213,27 @@ class TextCacheManager {
     }
 
     // ========================================================================
-    // ΜΕΡΟΣ 3: Memory Cache & Fast Access
+    // Memory Cache & Fast Access
     // ========================================================================
 
-    /**
-     * ========================================================================
-     * loadToMemory()
-     * ========================================================================
-     *
-     * Φορτώνει όλα τα cached files από το filesystem στη RAM
-     *
-     * ΣΚΟΠΟΣ:
-     * Όταν ο controller ζητάει ένα template, διαβάζει από RAM (Map)
-     * αντί από filesystem → ULTRA FAST (0ms I/O)
-     *
-     * ΡΟΗ:
-     * 1. Βρίσκει όλα τα .txt files στο cache directory (αναδρομικά)
-     * 2. Διαβάζει το καθένα
-     * 3. Αποθηκεύει στο Map με key = relative path
-     *
-     * ΠΑΡΑΔΕΙΓΜΑ:
-     * File: public/txt-cache/txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt
-     * Key:  "txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt"
-     * Value: "Το περιεχόμενο του αρχείου..."
-     */
     async loadToMemory() {
         try {
-            // Clear existing cache
             this.memoryCache.clear();
 
-            // Βρίσκουμε όλα τα .txt files αναδρομικά
             const files = await this.getAllCachedFiles(this.cacheDir);
-
             let invalidCount = 0;
 
             for (const filePath of files) {
-                // Παίρνουμε το relative path από το cache directory
-                // π.χ. "txt/THA/0001_COMPANY/symbash/_HOTEL_0001.txt"
                 const relativePath = path.relative(this.cacheDir, filePath).replace(/\\/g, '/');
 
-                // 🚨 Guard: company folder χωρίς slug (π.χ. txt/THA/0001/symbash)
+                // Guard for invalid company folder format
                 if (/^txt\/THA\/\d{4}\/symbash\//.test(relativePath)) {
                     logger.error(`🚨 INVALID CACHE PATH DETECTED (ignored): ${relativePath}`);
                     invalidCount++;
-                    continue; // ❗ δεν το φορτώνουμε στη μνήμη
+                    continue;
                 }
 
-                // Διαβάζουμε το περιεχόμενο
                 const content = await fs.readFile(filePath, 'utf-8');
-
-                // Αποθηκεύουμε στο Map
                 this.memoryCache.set(relativePath, content.trim());
             }
 
@@ -254,37 +244,17 @@ class TextCacheManager {
             logger.info(`🧠 Memory cache loaded: ${this.memoryCache.size} files`);
         } catch (error) {
             logger.error('❌ Σφάλμα κατά τη φόρτωση στη μνήμη:', error);
-            // Δεν κάνουμε throw – το app μπορεί να τρέξει
         }
     }
 
-    /**
-     * ========================================================================
-     * getAllCachedFiles()
-     * ========================================================================
-     *
-     * Helper: Βρίσκει όλα τα .txt files αναδρομικά σε έναν κατάλογο
-     *
-     * @param {string} dir - Ο κατάλογος προς σάρωση
-     * @returns {Promise<string[]>} Array με full paths των .txt files
-     *
-     * ΛΟΓΙΚΗ:
-     * 1. Διαβάζει τα items του directory
-     * 2. Για κάθε item:
-     *    - Αν είναι directory → αναδρομική κλήση
-     *    - Αν είναι .txt file → προσθήκη στο array
-     * 3. Επιστρέφει συγκεντρωτικά όλα τα files
-     */
     async getAllCachedFiles(dir) {
         const files = [];
 
-        // Check αν υπάρχει ο κατάλογος
         const exists = await fs.pathExists(dir);
         if (!exists) {
             return files;
         }
 
-        // Διάβασε τα items
         const items = await fs.readdir(dir);
 
         for (const item of items) {
@@ -292,11 +262,9 @@ class TextCacheManager {
             const stat = await fs.stat(fullPath);
 
             if (stat.isDirectory()) {
-                // Αναδρομική κλήση για subdirectories
                 const subFiles = await this.getAllCachedFiles(fullPath);
                 files.push(...subFiles);
             } else if (item.endsWith('.txt')) {
-                // Προσθήκη .txt file
                 files.push(fullPath);
             }
         }
@@ -304,29 +272,19 @@ class TextCacheManager {
         return files;
     }
 
-    /**
-     * Διαγράφει από το disk cache ό,τι ΔΕΝ υπάρχει στο S3 (orphans)
-     *
-     * @param {Set<string>} s3KeysSet - Set με όλα τα keys που υπάρχουν στο S3 (π.χ. "txt/THA/0001_.../symbash/_HOTEL_0001.txt")
-     * @returns {Promise<{deleted: number, kept: number}>}
-     */
-    async deleteOrphanCacheFiles(s3KeysSet) {
+    async deleteOrphanCacheFiles(sourceKeysSet) {
         let deleted = 0;
         let kept = 0;
 
-        // Βρίσκουμε όλα τα cached .txt files (αναδρομικά)
         const localFiles = await this.getAllCachedFiles(this.cacheDir);
 
         for (const filePath of localFiles) {
-            // Μετατρέπουμε σε key μορφή "txt/THA/...."
             const relativePath = path.relative(this.cacheDir, filePath).replace(/\\/g, '/');
 
-            // Αν δεν υπάρχει στο S3 → delete
-            if (!s3KeysSet.has(relativePath)) {
+            if (!sourceKeysSet.has(relativePath)) {
                 try {
                     await fs.remove(filePath);
                     deleted++;
-                    // logger.warn(`🗑️ Deleted orphan cache file: ${relativePath}`);
                 } catch (err) {
                     logger.error(`❌ Failed to delete orphan file: ${relativePath}`, err.message);
                 }
@@ -338,53 +296,18 @@ class TextCacheManager {
         return { deleted, kept };
     }
 
-    /**
-     * ========================================================================
-     * getText()
-     * ========================================================================
-     *
-     * Διαβάζει ένα template από το in-memory cache
-     *
-     * @param {string} team - Team name (π.χ. "THA")
-     * @param {string} companyFolder - Company folder (π.χ. "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ")
-     * @param {string} category - Category (π.χ. "symbash")
-     * @param {string} filename - Filename χωρίς .txt (π.χ. "_HOTEL_0001")
-     * @returns {string} Το περιεχόμενο του template ή κενό string
-     *
-     * ΧΡΗΣΗ ΣΕ CONTROLLER:
-     * const text = cacheManager.getText("THA", "0001_COMPANY", "symbash", "_HOTEL_0001");
-     *
-     * PERFORMANCE:
-     * - Map.get() = O(1) complexity
-     * - Χωρίς I/O → Ultra fast (< 1ms)
-     * - Thread-safe (JavaScript single-threaded)
-     */
     getText(team, companyFolder, category, filename) {
-        // Φτιάχνουμε το key
-        const key = `txt/${team}/${companyFolder}/${category}/${filename}.txt`;
+        const normalizedFilename = String(filename || '').replace(/\\/g, '/');
+        const key = `txt/${team}/${companyFolder}/${category}/${normalizedFilename}.txt`;
 
-        // Lookup στο Map
         if (this.memoryCache.has(key)) {
             return this.memoryCache.get(key);
         }
 
-        // Not found
         logger.warn(`⚠️ Template δεν βρέθηκε στο cache: ${key}`);
         return '';
     }
 
-    /**
-     * ========================================================================
-     * getStats()
-     * ========================================================================
-     *
-     * Επιστρέφει statistics για το cache
-     *
-     * @returns {Object} Stats object
-     *
-     * ΧΡΗΣΗ:
-     * Για admin dashboard ή monitoring
-     */
     getStats() {
         const teamsMap = new Map();
 
@@ -396,7 +319,6 @@ class TextCacheManager {
             }
         }
 
-        // 💾 Memory calculation
         let totalBytes = 0;
         for (const value of this.memoryCache.values()) {
             totalBytes += Buffer.byteLength(value, 'utf-8');
@@ -412,7 +334,9 @@ class TextCacheManager {
             isRefreshing: this.isRefreshing,
             autoRefreshEnabled: !!this.refreshInterval,
             cacheDirectory: this.cacheDir,
-            bucket: this.bucket,
+            sourceMode: USE_LOCAL_STORAGE ? 'local-mock' : 'aws-s3',
+            bucket: USE_LOCAL_STORAGE ? 'LOCAL_MOCK' : this.bucket,
+            localMockDir: USE_LOCAL_STORAGE ? this.localS3MockDir : null,
             memory: {
                 cacheSizeMB: memoryMB,
                 heapUsedMB: heapUsed,
@@ -424,21 +348,6 @@ class TextCacheManager {
         };
     }
 
-    /**
-     * ========================================================================
-     * refresh()
-     * ========================================================================
-     *
-     * Manual refresh trigger
-     *
-     * ΧΡΗΣΗ:
-     * Από API endpoint για instant update
-     *
-     * ΡΟΗ:
-     * 1. Sync από S3
-     * 2. Reload στη μνήμη
-     * 3. Return result
-     */
     async refresh() {
         try {
             await this.syncFromS3();
@@ -460,59 +369,25 @@ class TextCacheManager {
     }
 
     // ========================================================================
-    // ΜΕΡΟΣ 4: Auto-Refresh & Lifecycle Management
+    // Auto-Refresh & Lifecycle Management
     // ========================================================================
 
-    /**
-     * ========================================================================
-     * startAutoRefresh()
-     * ========================================================================
-     *
-     * Ξεκινάει περιοδικό auto-refresh
-     *
-     * @param {number} intervalMs - Διάστημα σε milliseconds (default: 5 min)
-     *
-     * ΛΟΓΙΚΗ:
-     * Κάθε X λεπτά:
-     * 1. Sync από S3 (κατεβάζει νέα/updated files)
-     * 2. Reload στη μνήμη
-     * 3. Continue...
-     *
-     * ΧΡΗΣΗ:
-     * Καλείται αυτόματα από το initialize()
-     */
     startAutoRefresh(intervalMs = 5 * 60 * 1000) {
-        // Stop existing interval (αν υπάρχει)
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
         }
 
-        const minutes = intervalMs / 1000 / 60;
-        // Ξεκινά το interval
         this.refreshInterval = setInterval(async () => {
             try {
                 await this.refresh();
             } catch (error) {
                 logger.error('❌ Auto-refresh error:', error);
-                // Δεν σταματάμε το interval - θα δοκιμάσει ξανά
             }
         }, intervalMs);
 
-        // Αποτρέπει το interval να κρατάει το process alive
-        // (σημαντικό για graceful shutdown)
         this.refreshInterval.unref();
     }
 
-    /**
-     * ========================================================================
-     * stopAutoRefresh()
-     * ========================================================================
-     *
-     * Σταματάει το auto-refresh
-     *
-     * ΧΡΗΣΗ:
-     * Κατά το graceful shutdown του app
-     */
     stopAutoRefresh() {
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
@@ -520,30 +395,11 @@ class TextCacheManager {
         }
     }
 
-    /**
-     * ========================================================================
-     * clearCache()
-     * ========================================================================
-     *
-     * Καθαρίζει το cache (memory + disk)
-     *
-     * ΧΡΗΣΗ:
-     * - Testing
-     * - Troubleshooting
-     * - Manual cleanup
-     *
-     * ⚠️ ΠΡΟΣΟΧΗ: Destructive operation!
-     */
     async clearCache() {
         try {
             logger.warn('🗑️ Καθαρισμός cache...');
-
-            // Clear memory
             this.memoryCache.clear();
-
-            // Clear disk
             await fs.emptyDir(this.cacheDir);
-
             return { success: true };
         } catch (error) {
             logger.error('❌ Σφάλμα καθαρισμού cache:', error);
@@ -551,59 +407,50 @@ class TextCacheManager {
         }
     }
 
-    /**
-     * ========================================================================
-     * healthCheck()
-     * ========================================================================
-     *
-     * Έλεγχος υγείας του cache system
-     *
-     * @returns {Object} Health status
-     *
-     * ΧΡΗΣΗ:
-     * Για monitoring / health endpoints
-     */
     async healthCheck() {
         const health = {
             status: 'unknown',
             checks: {
                 memoryCache: false,
                 diskCache: false,
-                s3Connection: false,
+                sourceConnection: false,
                 autoRefresh: false
             },
             details: {}
         };
 
         try {
-            // 1. Memory cache check
             health.checks.memoryCache = this.memoryCache.size > 0;
             health.details.cachedFiles = this.memoryCache.size;
 
-            // 2. Disk cache check
             const exists = await fs.pathExists(this.cacheDir);
             health.checks.diskCache = exists;
             health.details.cacheDir = this.cacheDir;
 
-            // 3. S3 connection check (quick list)
-            try {
-                const listCommand = new ListObjectsV2Command({
-                    Bucket: this.bucket,
-                    Prefix: 'txt/',
-                    MaxKeys: 1
-                });
-                await this.s3Client.send(listCommand);
-                health.checks.s3Connection = true;
-            } catch (s3Error) {
-                health.checks.s3Connection = false;
-                health.details.s3Error = s3Error.message;
+            if (USE_LOCAL_STORAGE) {
+                const mockExists = await fs.pathExists(this.localS3MockDir);
+                health.checks.sourceConnection = mockExists;
+                health.details.localMockDir = this.localS3MockDir;
+            } else {
+                try {
+                    const listCommand = new ListObjectsV2Command({
+                        Bucket: this.bucket,
+                        Prefix: 'txt/',
+                        MaxKeys: 1
+                    });
+                    await this.s3Client.send(listCommand);
+                    health.checks.sourceConnection = true;
+                } catch (s3Error) {
+                    health.checks.sourceConnection = false;
+                    health.details.s3Error = s3Error.message;
+                }
+                health.details.bucket = this.bucket;
             }
 
-            // 4. Auto-refresh check
             health.checks.autoRefresh = !!this.refreshInterval;
             health.details.lastRefresh = this.lastRefresh;
+            health.details.sourceMode = USE_LOCAL_STORAGE ? 'local-mock' : 'aws-s3';
 
-            // Overall status
             const allChecks = Object.values(health.checks);
             const passedChecks = allChecks.filter(Boolean).length;
 

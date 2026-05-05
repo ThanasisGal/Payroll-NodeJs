@@ -1,11 +1,71 @@
 // ============================================================================
-// Upload Text Template Controller - FIXED
+// Upload Text Template Controller - FINAL CANONICAL VERSION
 // Handles multi-file .txt uploads to AWS S3
+// Canonical structure:
+// txt/{team}/{companyFolder}/{category}/{prefix}/_FIELD_XXXX.txt
 // ============================================================================
 
 const { uploadBufferToS3 } = require('../utils/s3Helper');
 const textCacheManager = require('../utils/textCacheManager');
 const { getCompanyFolder } = require('../utils/userContext');
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function normalizePrefix(prefix) {
+    if (!prefix) return null;
+
+    let normalized = String(prefix).trim().toUpperCase();
+    normalized = normalized.replace(/[^A-Z0-9_]/g, '');
+    normalized = normalized.replace(/_+/g, '_');
+
+    if (!normalized.startsWith('_')) normalized = '_' + normalized;
+    if (!normalized.endsWith('_')) normalized = normalized + '_';
+
+    if (normalized === '__' || normalized.length < 3) {
+        return null;
+    }
+
+    return normalized;
+}
+
+/**
+ * Δέχεται legacy filename τύπου:
+ *   _GENIKOI_OROI_0001.txt
+ * και το μετατρέπει σε canonical:
+ *   _FIELD_0001.txt
+ *
+ * Επίσης δέχεται ήδη canonical:
+ *   _FIELD_0001.txt
+ */
+function toCanonicalFieldFilename(originalFilename, selectedPrefix) {
+    const normalizedPrefix = normalizePrefix(selectedPrefix);
+    if (!normalizedPrefix) {
+        throw new Error('Invalid selected prefix');
+    }
+
+    const filename = String(originalFilename || '')
+        .trim()
+        .toUpperCase();
+
+    // Ήδη canonical
+    if (/^_FIELD_\d{4}\.TXT$/.test(filename)) {
+        return filename.replace(/\.TXT$/, '.txt');
+    }
+
+    // Legacy format: _PREFIX_0001.txt
+    const legacyRegex = new RegExp(`^${normalizedPrefix.replace(/_/g, '\\_')}(\\d{4})\\.TXT$`);
+    const legacyMatch = filename.match(legacyRegex);
+
+    if (legacyMatch) {
+        return `_FIELD_${legacyMatch[1]}.txt`;
+    }
+
+    throw new Error(
+        'Invalid filename format. Expected either _FIELD_XXXX.txt or selected-prefix format _PREFIX_XXXX.txt'
+    );
+}
 
 // ============================================================================
 // Upload Text Templates to S3
@@ -15,7 +75,6 @@ exports.uploadTemplates = async (req, res) => {
         const { team, company, category, prefix } = req.body;
         const files = req.files;
 
-        // Validation: Check files
         if (!files || files.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -23,7 +82,6 @@ exports.uploadTemplates = async (req, res) => {
             });
         }
 
-        // Validation: Required fields
         if (!team || !company || !category || !prefix) {
             return res.status(400).json({
                 success: false,
@@ -31,46 +89,31 @@ exports.uploadTemplates = async (req, res) => {
             });
         }
 
-        // Validation: Prefix format
-        if (!prefix.match(/^_[A-Z0-9_]+_$/)) {
+        const normalizedPrefix = normalizePrefix(prefix);
+
+        if (!normalizedPrefix) {
             return res.status(400).json({
                 success: false,
-                error: 'Invalid prefix format. Expected: _PREFIX_'
+                error: 'Invalid prefix format. Expected something like _GENIKOI_OROI_'
             });
         }
 
         const companyFolder = await getCompanyFolder(company, team);
 
-        // Process all files
         const results = [];
         const errors = [];
 
         for (const file of files) {
             try {
-                const filename = file.originalname;
+                const originalFilename = file.originalname;
+                const canonicalFilename = toCanonicalFieldFilename(
+                    originalFilename,
+                    normalizedPrefix
+                );
 
-                // Server-side filename validation
-                if (!filename.match(/^_[A-Z0-9_]+_\d{4}\.txt$/)) {
-                    errors.push({
-                        filename,
-                        error: 'Invalid filename format. Expected: _PREFIX_XXXX.txt'
-                    });
-                    continue;
-                }
-
-                // Optional αλλά προτείνεται:
-                // Επιτρέπει upload μόνο αρχείων που ξεκινούν με το selected prefix
-                if (!filename.startsWith(prefix)) {
-                    errors.push({
-                        filename,
-                        error: `Filename does not match selected prefix ${prefix}`
-                    });
-                    continue;
-                }
-
-                // ✅ ΝΕΟ path με prefix folder
-                const s3Key = `txt/${team}/${companyFolder}/${category}/${prefix}/${filename}`;
-                // Π.χ. txt/THA/0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ/symbash/_HOTEL_/_HOTEL_0001.txt
+                // Canonical final path:
+                // txt/{team}/{companyFolder}/{category}/{prefix}/_FIELD_XXXX.txt
+                const s3Key = `txt/${team}/${companyFolder}/${category}/${normalizedPrefix}/${canonicalFilename}`;
 
                 const result = await uploadBufferToS3(
                     file.buffer,
@@ -79,7 +122,8 @@ exports.uploadTemplates = async (req, res) => {
                 );
 
                 results.push({
-                    filename,
+                    originalFilename,
+                    storedFilename: canonicalFilename,
                     s3Key: result.s3Key,
                     s3Url: result.s3Url,
                     success: true
@@ -94,17 +138,6 @@ exports.uploadTemplates = async (req, res) => {
             }
         }
 
-        const response = {
-            success: errors.length === 0,
-            uploaded: results.length,
-            failed: errors.length,
-            results,
-            errors,
-            uploadPath: `txt/${team}/${companyFolder}/${category}/${prefix}/`
-        };
-
-        res.json(response);
-
         if (results.length > 0) {
             try {
                 const refreshResult = await textCacheManager.refresh();
@@ -113,10 +146,19 @@ exports.uploadTemplates = async (req, res) => {
                 console.error('❌ Cache refresh error:', e.message);
             }
         }
+
+        return res.json({
+            success: errors.length === 0,
+            uploaded: results.length,
+            failed: errors.length,
+            results,
+            errors,
+            uploadPath: `txt/${team}/${companyFolder}/${category}/${normalizedPrefix}/`
+        });
     } catch (error) {
         console.error('❌ Template upload error:', error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: error.message
         });
