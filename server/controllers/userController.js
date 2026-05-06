@@ -389,7 +389,7 @@ class userController {
                     if (!data.userId) continue;
 
                     const user = await UserModel.findById(data.userId)
-                        .select('firstName lastName email team privileges')
+                        .select('firstName lastName email tel team privileges')
                         .lean();
 
                     activeUsers.push({
@@ -397,6 +397,7 @@ class userController {
                         firstName: user?.firstName || 'Άγνωστος',
                         lastName: user?.lastName || '',
                         email: user?.email || '',
+                        tel: user?.tel || '',
                         team: user?.team || data.userTeam || '',
                         privileges: user?.privileges || '',
                         companyInUse: data.companyInUse || '',

@@ -22,7 +22,7 @@ const Models_A = require('../models/stathera_arxeia');
 const Models_C = require('../models/companies');
 
 const { PoleisModel, SxeseisErgasiasModel, DoyModel, EidikothtesEfarmoghsModel } = Models_A;
-const { CompaniesModel, NomimoiEkprosopoiModel } = Models_C;
+const { CompaniesModel, NomimoiEkprosopoiModel, YpokatasthmataModel } = Models_C;
 
 const execAsync = promisify(exec);
 
@@ -548,9 +548,23 @@ async function generateContractPDF(ergazomenos, userContext) {
             kodikos: '0001'
         }).lean();
 
-        console.log('[CONTRACT-DEBUG] company_kod:', ergazomenos.company_kod);
-        console.log('[CONTRACT-DEBUG] company:', company?._id, company?.eponymia);
-        console.log('[CONTRACT-DEBUG] nomimoiEkprosopoi:', nomimoiEkprosopoi);
+        const ypokatasthmaKodikos = String(ergazomenos.ypokatasthma || '0000');
+
+        const ypokatasthma = await YpokatasthmataModel.findOne({
+            team: userContext.team,
+            companykod_object: ergazomenos.company_kod,
+            kodikos: ypokatasthmaKodikos
+        }).lean();
+
+        const _ypokDiey =
+            ypokatasthma && ypokatasthma.odos && ypokatasthma.arithmos
+                ? `(${ypokatasthma.odos} ${ypokatasthma.arithmos}, Δ.Δ. ${poleis?.perigrafh || ''})`
+                : '........................';
+
+        const _YPOKATASTHMA_EDRA =
+            ypokatasthmaKodikos === '0000'
+                ? `η έδρα της εταιρείας / επιχείρησης ${_ypokDiey}`
+                : `το υποκατάστημα ${ypokatasthmaKodikos} της εταιρείας / επιχείρησης ${_ypokDiey}`;
 
         const ekprosopos = nomimoiEkprosopoi || {};
 
@@ -819,20 +833,11 @@ async function generateContractPDF(ergazomenos, userContext) {
             _ORES_APASXOLHSHS: ergazomenos.ores_ergasias_ebdomadas || '....',
             _EYELIKTH_PROSELEYSH: ergazomenos.evelikth_proselefsh || '0',
 
-            _ANTIKEIMENO:
-                ergazomenos.antikeimeno_ergasion ||
-                eidikothta?.perigrafh ||
-                '........................',
+            _ANTIKEIMENO: ergazomenos.antikeimeno_ergasion || '........................',
             _XRONOS_KATABOLHS_APODOXON:
                 ergazomenos.xronos_katabolhs_apodoxon || 'την τελευταία εργάσιμη ημέρα του μήνα',
-            _YPOKATASTHMA_EDRA:
-                ergazomenos.ypokatasthma ||
-                (poleis?.perigrafh ? `την ${poleis.perigrafh}` : 'την έδρα της εταιρείας'),
-            _YPOKATASTHMA_ADDRESS:
-                ergazomenos.ypokatasthma_address ||
-                (company.odos && company.arithmos
-                    ? `${company.odos} ${company.arithmos}, ${poleis?.perigrafh || ''}`
-                    : '........................'),
+
+            _YPOKATASTHMA_EDRA,
 
             _COMBINED_TEXT,
             _HOTEL: _COMBINED_TEXT,

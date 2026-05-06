@@ -745,8 +745,34 @@ class erganhController {
             const userTeam = req.session.userTeam;
             const companyKodikos = req.session.companyKodikos;
             const companyDescription = req.session.companyDescription;
-            const periodInUseDescr = req.session.periodInUseDescr;
+            let periodInUseDescr = req.session.periodInUseDescr;
             const yearInUse = req.session.yearInUse;
+
+            // ============================================================
+            // ✅ Έλεγχος μήνα από fromDate ("dd/mm/yyyy")
+            // Αν ο μήνας ταιριάζει με το session.periodInUseDescr → χρήση session.
+            // Αλλιώς → ανάκτηση perigrafh από PeriodsModel (xrhsh + kodikos).
+            // ============================================================
+
+            const _monthStr = fromDate ? fromDate.split('/')[1].padStart(2, '0') : null;
+
+            // Βρες το αντίστοιχο Period για να ξέρουμε το "σωστό" perigrafh του μήνα
+            let _periodForMonth = null;
+            if (_monthStr) {
+                _periodForMonth = await PeriodsModel.findOne({
+                    xrhsh: yearInUse,
+                    kodikos: _monthStr
+                }).lean();
+            }
+
+            if (_periodForMonth && _periodForMonth.perigrafh !== req.session.periodInUseDescr) {
+                // Ο μήνας του apo_hmeromhnia ΔΕΝ είναι ίδιος με την περίοδο της session
+                periodInUseDescr = _periodForMonth.perigrafh;
+                console.log(
+                    `[lhpshOrarionApoErganh] ℹ️ Χρήση periodInUseDescr από PeriodsModel: "${periodInUseDescr}" ` +
+                        `(session ήταν: "${req.session.periodInUseDescr}")`
+                );
+            }
 
             // 3. savePath
             const fileName = `${periodInUseDescr}_${yearInUse}.xlsx`;
@@ -882,8 +908,34 @@ class erganhController {
             const userTeam = req.session.userTeam;
             const companyKodikos = req.session.companyKodikos;
             const companyDescription = req.session.companyDescription;
-            const periodInUseDescr = req.session.periodInUseDescr;
+            let periodInUseDescr = req.session.periodInUseDescr;
             const yearInUse = req.session.yearInUse;
+
+            // ============================================================
+            // ✅ Έλεγχος μήνα από fromDate ("dd/mm/yyyy")
+            // Αν ο μήνας ταιριάζει με το session.periodInUseDescr → χρήση session.
+            // Αλλιώς → ανάκτηση perigrafh από PeriodsModel (xrhsh + kodikos).
+            // ============================================================
+
+            const _monthStr = apoHmeromhnia ? apoHmeromhnia.split('/')[1].padStart(2, '0') : null;
+
+            // Βρες το αντίστοιχο Period για να ξέρουμε το "σωστό" perigrafh του μήνα
+            let _periodForMonth = null;
+            if (_monthStr) {
+                _periodForMonth = await PeriodsModel.findOne({
+                    xrhsh: yearInUse,
+                    kodikos: _monthStr
+                }).lean();
+            }
+
+            if (_periodForMonth && _periodForMonth.perigrafh !== req.session.periodInUseDescr) {
+                // Ο μήνας του apo_hmeromhnia ΔΕΝ είναι ίδιος με την περίοδο της session
+                periodInUseDescr = _periodForMonth.perigrafh;
+                console.log(
+                    `[lhpshOrarionApoErganh] ℹ️ Χρήση periodInUseDescr από PeriodsModel: "${periodInUseDescr}" ` +
+                        `(session ήταν: "${req.session.periodInUseDescr}")`
+                );
+            }
 
             // 3. savePath (local s3-mock)
             const fileName = `${periodInUseDescr}_${yearInUse}.xlsx`;
