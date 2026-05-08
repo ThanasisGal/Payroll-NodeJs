@@ -69,18 +69,28 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
                 e5PdfBase64 = pdfBuffer.toString('base64');
                 console.log(`✅ [E5N-GENERATOR-v1] E5N PDF: ${e5PdfBase64.length} chars`);
             } catch (pdfError) {
-                console.error('❌ [E5N-GENERATOR-v1] Failed to download E5N PDF:', pdfError.message);
+                console.error(
+                    '❌ [E5N-GENERATOR-v1] Failed to download E5N PDF:',
+                    pdfError.message
+                );
             }
         }
 
         if (ergazomenos.arxeio_nomimopoihtikon_eggrafon_path) {
             try {
                 const { downloadFileFromS3 } = require('../s3Helper');
-                const pdfBuffer = await downloadFileFromS3(ergazomenos.arxeio_nomimopoihtikon_eggrafon_path);
+                const pdfBuffer = await downloadFileFromS3(
+                    ergazomenos.arxeio_nomimopoihtikon_eggrafon_path
+                );
                 foreignPdfBase64 = pdfBuffer.toString('base64');
-                console.log(`✅ [E5N-GENERATOR-v1] Foreign docs PDF: ${foreignPdfBase64.length} chars`);
+                console.log(
+                    `✅ [E5N-GENERATOR-v1] Foreign docs PDF: ${foreignPdfBase64.length} chars`
+                );
             } catch (pdfError) {
-                console.error('❌ [E5N-GENERATOR-v1] Failed to download foreign docs PDF:', pdfError.message);
+                console.error(
+                    '❌ [E5N-GENERATOR-v1] Failed to download foreign docs PDF:',
+                    pdfError.message
+                );
             }
         }
 
@@ -89,9 +99,14 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
                 const { downloadFileFromS3 } = require('../s3Helper');
                 const pdfBuffer = await downloadFileFromS3(ergazomenos.bibliario_anhlikoy_path);
                 youngPdfBase64 = pdfBuffer.toString('base64');
-                console.log(`✅ [E5N-GENERATOR-v1] Young worker docs PDF: ${youngPdfBase64.length} chars`);
+                console.log(
+                    `✅ [E5N-GENERATOR-v1] Young worker docs PDF: ${youngPdfBase64.length} chars`
+                );
             } catch (pdfError) {
-                console.error('❌ [E5N-GENERATOR-v1] Failed to download young docs PDF:', pdfError.message);
+                console.error(
+                    '❌ [E5N-GENERATOR-v1] Failed to download young docs PDF:',
+                    pdfError.message
+                );
             }
         }
 
@@ -105,8 +120,15 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
             f_rel_date: formatDateForErganh(options.f_rel_date || ergazomenos.f_rel_date),
             f_ypiresia_sepe: ypokatasthmataData?.sepe_ergoy || '00000',
             f_ypiresia_oaed: ypokatasthmataData?.dypa_ergoy || '000000',
-            f_kad_pararthmatos: getKad4(ypokatasthmataData?.kad6 || ypokatasthmataData?.kad || companyData?.kad6 || companyData?.kad) || '0000',
-            f_kallikratis_pararthmatos: ypokatasthmataData?.polh || ypokatasthmataData?.kallikratis || '00000000',
+            f_kad_pararthmatos:
+                getKad4(
+                    ypokatasthmataData?.kad6 ||
+                        ypokatasthmataData?.kad ||
+                        companyData?.kad6 ||
+                        companyData?.kad
+                ) || '0000',
+            f_kallikratis_pararthmatos:
+                ypokatasthmataData?.polh || ypokatasthmataData?.kallikratis || '00000000',
 
             f_eponymo: upper(ergazomenos.eponymo),
             f_onoma: upper(ergazomenos.onoma),
@@ -119,20 +141,36 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
             f_ar_taytothtas: ergazomenos.adt || '',
             f_ekdousa_arxh: ergazomenos.arxh_ekdoshs || '',
             f_date_ekdosis: formatDateForErganh(ergazomenos.hmeromhnia_ekdoshs),
-            f_date_ekdosis_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy),
+            f_date_ekdosis_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy
+            ),
 
             f_res_permit_inst: ergazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? '1' : '0',
-            f_res_permit_inst_type: ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_inst_ar: ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_inst_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia),
-            f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia ? '1' : '0',
-            f_res_permit_ap_type: ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_ap_ar: ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
-            f_res_permit_ap_lixi: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia),
+            f_res_permit_inst_type:
+                ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_ar:
+                ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia
+            ),
+            f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia
+                ? '1'
+                : '0',
+            f_res_permit_ap_type:
+                ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_ar:
+                ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia
+            ),
             f_res_permit_visa: ergazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh ? '1' : '0',
             f_res_permit_visa_ar: ergazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh || '',
-            f_res_permit_visa_from: formatDateForErganh(ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh),
-            f_res_permit_visa_to: formatDateForErganh(ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh),
+            f_res_permit_visa_from: formatDateForErganh(
+                ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
+            f_res_permit_visa_to: formatDateForErganh(
+                ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
 
             f_marital_status: ergazomenos.oikogeneiakh_katastash || '0',
             f_arithmos_teknon: String(ergazomenos.arithmos_teknon || 0),
@@ -146,13 +184,24 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
 
             f_xaraktirismos: ergazomenos.xarakthrismos_ergazomenon ? '1' : '0',
             f_sxeshapasxolisis: ergazomenos.sxesh_ergasias || '0',
-            f_orismenou_apo: ergazomenos.sxesh_ergasias === '1' ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs) : '',
-            f_orismenou_ews: ergazomenos.sxesh_ergasias === '1' ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs) : '',
+            f_orismenou_apo:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs)
+                    : '',
+            f_orismenou_ews:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs)
+                    : '',
             f_kathestosapasxolisis: ergazomenos.kathestos_apasxolhshs || '0',
             f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
             f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
             f_apoxwrisidate: formatDateForErganh(apoxwrisiDate),
-            f_apodoxes: formatCurrency(ergazomenos.pragmatikosMisthos || ergazomenos.synolo_symbashs || ergazomenos.apodoxes_apoxwrhshs || 0),
+            f_apodoxes: formatCurrency(
+                ergazomenos.pragmatikosMisthos ||
+                    ergazomenos.synolo_symbashs ||
+                    ergazomenos.apodoxes_apoxwrhshs ||
+                    0
+            ),
             f_comments: ergazomenos.parathrhseis || options.comments || '',
 
             f_file: e5PdfBase64,
