@@ -207,45 +207,88 @@ document.addEventListener('DOMContentLoaded', function () {
         checkAndUpdateAllodapoiButton();
     }
 
+    // // =========================================================================
+    // // ✅ ΑΝΗΛΙΚΟΙ - BUTTON CONTROL (POLLING)
+    // // =========================================================================
+    // const arithmosBibliarioyAnhlikoy = document.getElementById('arithmos_bibliarioy_anhlikoy');
+    // const customButtonAnhlikoi = document.getElementById('customButton_anhlikoi');
+
+    // if (arithmosBibliarioyAnhlikoy && customButtonAnhlikoi) {
+    //     let lastDisabledState = arithmosBibliarioyAnhlikoy.disabled;
+
+    //     // Function που ελέγχει και ενημερώνει το button
+    //     function checkAndUpdateAnhlikoiButton() {
+    //         const currentDisabledState = arithmosBibliarioyAnhlikoy.disabled;
+
+    //         // Αν άλλαξε η κατάσταση disabled
+    //         if (currentDisabledState !== lastDisabledState) {
+    //             lastDisabledState = currentDisabledState;
+
+    //             // Αν το πεδίο είναι enabled (disabled=false), τότε enable το button
+    //             const shouldEnable = !currentDisabledState;
+    //             customButtonAnhlikoi.disabled = !shouldEnable;
+    //             customButtonAnhlikoi.style.opacity = shouldEnable ? '1' : '0.4';
+    //             customButtonAnhlikoi.style.cursor = shouldEnable ? 'pointer' : 'not-allowed';
+    //         }
+    //     }
+
+    //     // ✅ Initial disabled state
+    //     customButtonAnhlikoi.disabled = true;
+    //     customButtonAnhlikoi.style.opacity = '0.4';
+    //     customButtonAnhlikoi.style.cursor = 'not-allowed';
+
+    //     // ✅ Check κάθε 100ms (polling)
+    //     setInterval(checkAndUpdateAnhlikoiButton, 100);
+
+    //     // ✅ Επίσης άκουσε για events (για ταχύτερη ανταπόκριση)
+    //     arithmosBibliarioyAnhlikoy.addEventListener('change', checkAndUpdateAnhlikoiButton);
+    //     arithmosBibliarioyAnhlikoy.addEventListener('input', checkAndUpdateAnhlikoiButton);
+
+    //     // Initial check
+    //     checkAndUpdateAnhlikoiButton();
+    // }
+
     // =========================================================================
-    // ✅ ΑΝΗΛΙΚΟΙ - BUTTON CONTROL (POLLING)
+    // ✅ ΑΝΗΛΙΚΟΙ - BUTTON CONTROL
+    // Enable όταν το arithmos_bibliarioy_anhlikoy ΔΕΝ είναι κενό/null.
+    // Αν υπάρχει ήδη PDF, το customButton_anhlikoi είναι <a> και δεν το κάνουμε disabled.
     // =========================================================================
     const arithmosBibliarioyAnhlikoy = document.getElementById('arithmos_bibliarioy_anhlikoy');
     const customButtonAnhlikoi = document.getElementById('customButton_anhlikoi');
 
     if (arithmosBibliarioyAnhlikoy && customButtonAnhlikoi) {
-        let lastDisabledState = arithmosBibliarioyAnhlikoy.disabled;
+        const isViewerLink = customButtonAnhlikoi.tagName.toLowerCase() === 'a';
 
-        // Function που ελέγχει και ενημερώνει το button
         function checkAndUpdateAnhlikoiButton() {
-            const currentDisabledState = arithmosBibliarioyAnhlikoy.disabled;
+            const hasBibliarioNumber = arithmosBibliarioyAnhlikoy.value.trim() !== '';
 
-            // Αν άλλαξε η κατάσταση disabled
-            if (currentDisabledState !== lastDisabledState) {
-                lastDisabledState = currentDisabledState;
-
-                // Αν το πεδίο είναι enabled (disabled=false), τότε enable το button
-                const shouldEnable = !currentDisabledState;
-                customButtonAnhlikoi.disabled = !shouldEnable;
-                customButtonAnhlikoi.style.opacity = shouldEnable ? '1' : '0.4';
-                customButtonAnhlikoi.style.cursor = shouldEnable ? 'pointer' : 'not-allowed';
+            // Αν είναι link προβολής PDF, δεν το κάνουμε disabled.
+            if (isViewerLink) {
+                customButtonAnhlikoi.style.opacity = '1';
+                customButtonAnhlikoi.style.cursor = 'pointer';
+                customButtonAnhlikoi.removeAttribute('disabled');
+                return;
             }
+
+            // Αν είναι upload button, ενεργοποιείται μόνο όταν υπάρχει αριθμός βιβλιαρίου.
+            customButtonAnhlikoi.disabled = !hasBibliarioNumber;
+            customButtonAnhlikoi.style.opacity = hasBibliarioNumber ? '1' : '0.4';
+            customButtonAnhlikoi.style.cursor = hasBibliarioNumber ? 'pointer' : 'not-allowed';
         }
 
-        // ✅ Initial disabled state
-        customButtonAnhlikoi.disabled = true;
-        customButtonAnhlikoi.style.opacity = '0.4';
-        customButtonAnhlikoi.style.cursor = 'not-allowed';
-
-        // ✅ Check κάθε 100ms (polling)
-        setInterval(checkAndUpdateAnhlikoiButton, 100);
-
-        // ✅ Επίσης άκουσε για events (για ταχύτερη ανταπόκριση)
         arithmosBibliarioyAnhlikoy.addEventListener('change', checkAndUpdateAnhlikoiButton);
         arithmosBibliarioyAnhlikoy.addEventListener('input', checkAndUpdateAnhlikoiButton);
 
-        // Initial check
         checkAndUpdateAnhlikoiButton();
+    }
+    // =========================================================================
+    // ✅ ΑΝΗΛΙΚΟΙ - VIEWER LINK STYLE
+    // Αν υπάρχει ήδη PDF, το customButton_anhlikoi είναι <a>, όχι button.
+    // =========================================================================
+    if (customButtonAnhlikoi && customButtonAnhlikoi.tagName.toLowerCase() === 'a') {
+        customButtonAnhlikoi.style.opacity = '1';
+        customButtonAnhlikoi.style.cursor = 'pointer';
+        customButtonAnhlikoi.removeAttribute('disabled');
     }
 
     // =========================================================================

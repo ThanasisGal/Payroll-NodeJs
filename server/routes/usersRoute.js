@@ -28,6 +28,8 @@ const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
 const ektyposhApasxolhseonController = require('../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js');
 
+// const { savePdfFromBase64, deletePdf } = require('../utils/pdfHandler');
+
 // ============================================================================
 // IMPORTS - Middleware
 // ============================================================================
@@ -286,6 +288,36 @@ router.get(
     '/ergazomenoi/ergazomenoi/edit/:id',
     checkAuth,
     ergazomenoiController.editErgazomenoiForm
+);
+router.get(
+    '/api/ergazomenoi/:id/documents/allodapoi/view',
+    checkAuth,
+    ergazomenoiController.viewAllodapoiPdf
+);
+router.delete(
+    '/api/ergazomenoi/:id/documents/allodapoi',
+    checkAuth,
+    ergazomenoiController.deleteAllodapoiPdf
+);
+router.get(
+    '/api/ergazomenoi/:id/documents/anhlikoi/view',
+    checkAuth,
+    ergazomenoiController.viewBibliarioAnhlikoyPdf
+);
+router.delete(
+    '/api/ergazomenoi/:id/documents/anhlikoi',
+    checkAuth,
+    ergazomenoiController.deleteBibliarioAnhlikoyPdf
+);
+router.get(
+    '/api/ergazomenoi/:id/documents/symbash-daneismoy/view',
+    checkAuth,
+    ergazomenoiController.viewSymbashDaneismoyPdf
+);
+router.delete(
+    '/api/ergazomenoi/:id/documents/symbash-daneismoy',
+    checkAuth,
+    ergazomenoiController.deleteSymbashDaneismoyPdf
 );
 router.get('/api/ergazomenoi/:id', ergazomenoiController.getErgazomenosById);
 router.get('/api/ergazomenoi', ergazomenoiController.getAllErgazomenoiWithUrls);

@@ -647,6 +647,9 @@ declare -a symbaseis=(
 )
 
 declare -a ergazomenoi=(
+    "public/js/ergazomenoi/genika/allodapoiPdfViewer.js"
+    "public/js/ergazomenoi/genika/anhlikoiPdfViewer.js"
+    "public/js/ergazomenoi/genika/symbashDaneismoyPdfViewer.js"
     "public/js/ergazomenoi/genika/getFieldValues.js"
     "public/js/ergazomenoi/genika/putFieldValues.js"
     "public/js/ergazomenoi/genika/selectRowInTable.js"

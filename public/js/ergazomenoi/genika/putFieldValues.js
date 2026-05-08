@@ -126,6 +126,52 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await Promise.all(filePromises);
 
+            // ============================================================================
+            // ✅ PDF UPLOAD MODAL FILES → formData
+            // ============================================================================
+            if (
+                window.pdfUploadModule &&
+                typeof window.pdfUploadModule.getAllFiles === 'function'
+            ) {
+                const pendingPdfFiles = window.pdfUploadModule.getAllFiles();
+
+                for (const pdfFile of pendingPdfFiles) {
+                    if (!pdfFile || !pdfFile.documentType) continue;
+
+                    const base64 = await window.pdfUploadModule.getFileAsBase64(
+                        pdfFile.documentType
+                    );
+
+                    if (!base64) continue;
+
+                    switch (pdfFile.documentType) {
+                        case 'allodapoi':
+                            formData.arxeio_nomimopoihtikon_eggrafon_base64 = base64;
+                            break;
+
+                        case 'bibliario_anhlikoy':
+                            formData.bibliario_anhlikoy_base64 = base64;
+                            break;
+
+                        case 'symbash_daneismoy':
+                            formData.arxeio_symbashs_daneismoy_base64 = base64;
+                            break;
+
+                        case 'arxeio_symbashs':
+                            formData.arxeio_apodoxhs_oron_atomikhs_symbashs_base64 = base64;
+                            break;
+
+                        case 'oysiodeis_oroi':
+                            formData.arxeio_apodoxhs_oysiodon_oron_base64 = base64;
+                            break;
+
+                        default:
+                            formData[`${pdfFile.documentType}_base64`] = base64;
+                            break;
+                    }
+                }
+            }
+
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const ergazomenoiId = document.getElementById('ergazomenoiId')?.value?.trim() || '';
 
@@ -387,33 +433,47 @@ document.addEventListener('DOMContentLoaded', () => {
             // -------------------------------------------------------------------------
             const metabolesHtml = hasMetaboles
                 ? `
-                    <hr class="hr-style" />
-                    <p class="font-weight-600 margin-bottom-0_5rem">Μεταβολές Εργασιακής Σχέσης:</p>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="metaboles_none" name="metaboles_action"
-                            value="none" class="custom-radio" checked />
-                        <label for="metaboles_none" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            Χωρίς Μεταβολή ΕΡΓΑΝΗ
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs" name="metaboles_action"
-                            value="e3_metaboles_ergasiakhs_sxeshs" class="custom-radio" />
-                        <label for="e3_metaboles_ergasiakhs_sxeshs" class="margin-0 cursor-pointer font-size-rem-1_05">
-                            ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ
-                        </label>
-                    </div>
-                    <div class="display-flex align-items-center gap-0_75rem">
-                        <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            name="metaboles_action"
-                            value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            class="custom-radio" />
-                        <label for="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
-                            class="margin-0 cursor-pointer font-size-rem-1_05">
-                            ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ - Δανειζόμενου Προσωπικού
-                        </label>
-                    </div>
-                `
+        <hr class="hr-style" />
+        <p class="font-weight-600 margin-bottom-0_5rem">Μεταβολές Εργασιακής Σχέσης:</p>
+
+        <!-- ── Checkbox: Ψηφιακή Οργάνωση Χρόνου Εργασίας για Μεταβολές ── -->
+        <div class="display-flex align-items-center gap-0_75rem">
+            <input type="checkbox"
+                id="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
+                name="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
+                value="wto"
+                class="custom-checkbox" />
+            <label for="wto_pshfiakh_organosh_xronoy_ergasias_metaboles"
+                class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-400">
+                Ψηφιακή Οργάνωση Χρόνου Εργασίας
+            </label>
+        </div>
+
+        <div class="display-flex align-items-center gap-0_75rem">
+            <input type="radio" id="metaboles_none" name="metaboles_action"
+                value="none" class="custom-radio" checked />
+            <label for="metaboles_none" class="margin-0 cursor-pointer font-size-rem-1_05">
+                Χωρίς Μεταβολή ΕΡΓΑΝΗ
+            </label>
+        </div>
+        <div class="display-flex align-items-center gap-0_75rem">
+            <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs" name="metaboles_action"
+                value="e3_metaboles_ergasiakhs_sxeshs" class="custom-radio" />
+            <label for="e3_metaboles_ergasiakhs_sxeshs" class="margin-0 cursor-pointer font-size-rem-1_05">
+                ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ
+            </label>
+        </div>
+        <div class="display-flex align-items-center gap-0_75rem">
+            <input type="radio" id="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
+                name="metaboles_action"
+                value="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
+                class="custom-radio" />
+            <label for="e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy"
+                class="margin-0 cursor-pointer font-size-rem-1_05">
+                ΜΕΤΑΒΟΛΗ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ - Δανειζόμενου Προσωπικού
+            </label>
+        </div>
+    `
                 : '';
 
             // -------------------------------------------------------------------------
@@ -674,11 +734,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         'input[name="ergani_main_action"]:checked'
                     );
                     const erganiMainAction = erganiMainActionRadio?.value || 'none';
+
+                    // ── WTO checkbox για Μεταβολές ──
+                    const wtoMetabolesCheckbox = document.getElementById(
+                        'wto_pshfiakh_organosh_xronoy_ergasias_metaboles'
+                    );
+                    const wtoMetabolesChecked = wtoMetabolesCheckbox?.checked === true;
+
                     const e3AnaggeliaProslhpshs =
                         erganiMainAction === 'e3_anaggelia_proslhpshs' ||
                         erganiMainAction === 'both';
+
                     const wtoPshfiakhOrganoshXronoy =
-                        erganiMainAction === 'wto' || erganiMainAction === 'both';
+                        erganiMainAction === 'wto' ||
+                        erganiMainAction === 'both' ||
+                        wtoMetabolesChecked;
 
                     // ── μεταβολές ──
                     const metabolesActionRadio = document.querySelector(

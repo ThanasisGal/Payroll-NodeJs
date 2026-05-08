@@ -48,15 +48,17 @@
 					id="typos_metabolhs_stathera" 
 					name="typos_metabolhs_stathera"
 					class="form-control input-contents" 
-					value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>"
+					value=[]
 				/>
+					<!-- value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>" -->
 
 				<input 
 					type="hidden" 
 					id="typos_metabolhs_table" 
 					name="typos_metabolhs_table" 
-					value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>"
-				/>
+					value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>" 
+					/>
+					<!-- value="<%= JSON.stringify(safe('typos_metabolhs') || []) %>" -->
 
 				<div class="col-9-5">
 					<select

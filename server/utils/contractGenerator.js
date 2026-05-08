@@ -541,8 +541,8 @@ async function generateContractPDF(ergazomenos, userContext) {
             throw new Error(`Company not found for _id ${ergazomenos.company_kod}`);
         }
 
-        const poleis = await PoleisModel.findOne({ kodikos: company.polh }).lean();
         const doy = await DoyModel.findOne({ kodikos: company.doy_company }).lean();
+
         const nomimoiEkprosopoi = await NomimoiEkprosopoiModel.findOne({
             companykod_object: ergazomenos.company_kod,
             kodikos: '0001'
@@ -555,6 +555,8 @@ async function generateContractPDF(ergazomenos, userContext) {
             companykod_object: ergazomenos.company_kod,
             kodikos: ypokatasthmaKodikos
         }).lean();
+
+        const poleis = await PoleisModel.findOne({ kodikos: ypokatasthma.polh }).lean();
 
         const _ypokDiey =
             ypokatasthma && ypokatasthma.odos && ypokatasthma.arithmos

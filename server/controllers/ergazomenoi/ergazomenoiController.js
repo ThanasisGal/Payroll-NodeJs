@@ -33,7 +33,7 @@ const { ErgazomenoiModel, ProdhlomenaOrariaModel, IstorikoProslhpseonAllagonMode
 const { pdfDocumentl } = Models_E;
 
 // ✅ IMPORTS
-const { savePdfFromBase64 } = require('../../utils/pdfHandler');
+const { savePdfFromBase64, deletePdf } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
 const { generatePresignedUrl, downloadS3UriToTempFile, isS3Url } = require('../../utils/s3Helper');
@@ -934,24 +934,63 @@ class ergazomenoiController {
 
         const { savePdfFromBase64 } = require('../../utils/pdfHandler');
 
+        console.log(
+            '📎 PDF DEBUG formData keys:',
+            Object.keys(formData).filter(
+                (key) =>
+                    key.toLowerCase().includes('pdf') ||
+                    key.toLowerCase().includes('base64') ||
+                    key.toLowerCase().includes('bibliario') ||
+                    key.toLowerCase().includes('symbash') ||
+                    key.toLowerCase().includes('nomimopoihtikon')
+            )
+        );
+
+        console.log('📎 PDF DEBUG expected fields:', {
+            bibliario_anhlikoy_base64: !!formData.bibliario_anhlikoy_base64,
+            arxeio_symbashs_daneismoy_base64: !!formData.arxeio_symbashs_daneismoy_base64,
+            symbash_daneismoy_base64: !!formData.symbash_daneismoy_base64,
+            arxeio_nomimopoihtikon_eggrafon_base64:
+                !!formData.arxeio_nomimopoihtikon_eggrafon_base64
+        });
+
         const pdfFieldMappings = {
             arxeio_apodoxhs_oron_atomikhs_symbashs_base64: {
                 documentType: 'arxeio_symbashs',
                 dbField: 'arxeio_apodoxhs_oron_atomikhs_symbashs_path'
             },
+
             arxeio_apodoxhs_oysiodon_oron_base64: {
                 documentType: 'oysiodeis_oroi',
                 dbField: 'arxeio_apodoxhs_oysiodon_oron_path'
             },
+
             bibliario_anhlikoy_base64: {
                 documentType: 'anhlikoi',
                 dbField: 'bibliario_anhlikoy_path'
             },
+
+            bibliario_anhlikoy: {
+                documentType: 'anhlikoi',
+                dbField: 'bibliario_anhlikoy_path'
+            },
+
             arxeio_symbashs_daneismoy_base64: {
                 documentType: 'symbash_daneismoy',
                 dbField: 'arxeio_symbashs_daneismoy_path'
             },
+
+            symbash_daneismoy: {
+                documentType: 'symbash_daneismoy',
+                dbField: 'arxeio_symbashs_daneismoy_path'
+            },
+
             arxeio_nomimopoihtikon_eggrafon_base64: {
+                documentType: 'allodapoi',
+                dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
+            },
+
+            allodapoi: {
                 documentType: 'allodapoi',
                 dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
             }
@@ -968,9 +1007,14 @@ class ergazomenoiController {
                     const s3Key = await savePdfFromBase64(
                         base64Data,
                         mapping.documentType,
-                        ergazomenosId
+                        ergazomenosId,
+                        {
+                            userTeam: req.session.userTeam,
+                            companyKodikos: req.session.companyKodikos || req.session.companyInUse,
+                            eponymo: savedErgazomenos.eponymo,
+                            onoma: savedErgazomenos.onoma
+                        }
                     );
-
                     savedErgazomenos[mapping.dbField] = s3Key;
 
                     pdfResults.push({
@@ -3107,19 +3151,38 @@ class ergazomenoiController {
                 documentType: 'arxeio_symbashs',
                 dbField: 'arxeio_apodoxhs_oron_atomikhs_symbashs_path'
             },
+
             arxeio_apodoxhs_oysiodon_oron_base64: {
                 documentType: 'oysiodeis_oroi',
                 dbField: 'arxeio_apodoxhs_oysiodon_oron_path'
             },
+
             bibliario_anhlikoy_base64: {
                 documentType: 'anhlikoi',
                 dbField: 'bibliario_anhlikoy_path'
             },
+
+            bibliario_anhlikoy: {
+                documentType: 'anhlikoi',
+                dbField: 'bibliario_anhlikoy_path'
+            },
+
             arxeio_symbashs_daneismoy_base64: {
                 documentType: 'symbash_daneismoy',
                 dbField: 'arxeio_symbashs_daneismoy_path'
             },
+
+            symbash_daneismoy: {
+                documentType: 'symbash_daneismoy',
+                dbField: 'arxeio_symbashs_daneismoy_path'
+            },
+
             arxeio_nomimopoihtikon_eggrafon_base64: {
+                documentType: 'allodapoi',
+                dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
+            },
+
+            allodapoi: {
                 documentType: 'allodapoi',
                 dbField: 'arxeio_nomimopoihtikon_eggrafon_path'
             }
@@ -3136,9 +3199,14 @@ class ergazomenoiController {
                     const s3Key = await savePdfFromBase64(
                         base64Data,
                         mapping.documentType,
-                        ergazomenoiId
+                        ergazomenoiId,
+                        {
+                            userTeam: req.session.userTeam,
+                            companyKodikos: req.session.companyKodikos || req.session.companyInUse,
+                            eponymo: updatedErgazomenos.eponymo,
+                            onoma: updatedErgazomenos.onoma
+                        }
                     );
-
                     pdfPathUpdates[mapping.dbField] = s3Key;
                     // ✅ Ενημέρωσε και το local object για χρήση στο contract PDF
                     updatedErgazomenos[mapping.dbField] = s3Key;
@@ -3165,6 +3233,16 @@ class ergazomenoiController {
                 console.log(`⏭️  [UPDATE] Skipping ${mapping.documentType} (no new data)`);
             }
         }
+
+        // ✅ ΠΡΟΣΤΑΣΙΑ PDF PATHS
+        // Τα PDF paths ενημερώνονται μόνο από το ειδικό pdfPathUpdates block.
+        // Δεν πρέπει το γενικό update της φόρμας να τα μηδενίζει.
+        delete filteredDataErgazomenoi.arxeio_nomimopoihtikon_eggrafon_path;
+        delete filteredDataErgazomenoi.bibliario_anhlikoy_path;
+        delete filteredDataErgazomenoi.arxeio_symbashs_daneismoy_path;
+
+        delete filteredDataErgazomenoi.arxeio_apodoxhs_oron_atomikhs_symbashs_path;
+        delete filteredDataErgazomenoi.arxeio_apodoxhs_oysiodon_oron_path;
 
         // ✅ Αποθήκευση S3 keys στη ΒΔ (μόνο αν υπάρχουν νέα PDFs)
         if (Object.keys(pdfPathUpdates).length > 0) {
@@ -3729,6 +3807,673 @@ class ergazomenoiController {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Διαφυγή όλων των ειδικών χαρακτήρων
     }
 
+    static viewAllodapoiPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
+                return res.status(400).send('Μη έγκυρο ID εργαζόμενου.');
+            }
+
+            const query = {
+                _id: ergazomenosId
+            };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
+                .select('arxeio_nomimopoihtikon_eggrafon_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
+            }
+
+            const s3Key = ergazomenos.arxeio_nomimopoihtikon_eggrafon_path;
+
+            if (!s3Key || String(s3Key).trim() === '') {
+                return res.status(404).send('Δεν βρέθηκε PDF νομιμοποιητικών εγγράφων.');
+            }
+
+            let pdfUrl;
+
+            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
+                pdfUrl = String(s3Key).trim();
+            } else {
+                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
+            }
+
+            const escapeHtml = (value) =>
+                String(value ?? '').replace(/[&<>"']/g, (char) => {
+                    return {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;'
+                    }[char];
+                });
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+
+            return res.send(`
+<!doctype html>
+<html lang="el">
+    <head>
+        <meta charset="utf-8">
+        <title>Προβολή PDF Αρχείου</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                font-family: Arial, sans-serif;
+                background: #2f2f2f;
+            }
+
+            .pdf-toolbar {
+                height: 52px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px;
+                box-sizing: border-box;
+                background: #212529;
+                color: #ffffff;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            }
+
+            .pdf-title {
+                font-size: 15px;
+                font-weight: 600;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+
+            .pdf-close-btn {
+                border: 0;
+                border-radius: 8px;
+                padding: 8px 16px;
+                background: #dc3545;
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            .pdf-close-btn:hover {
+                background: #bb2d3b;
+            }
+
+            .pdf-frame {
+                width: 100%;
+                height: calc(100vh - 52px);
+                border: 0;
+                background: #ffffff;
+            }
+
+            .close-warning {
+                display: none;
+                position: fixed;
+                top: 64px;
+                right: 16px;
+                max-width: 360px;
+                padding: 12px 14px;
+                border-radius: 10px;
+                background: #fff3cd;
+                color: #664d03;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+                font-size: 14px;
+                z-index: 1000;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="pdf-toolbar">
+            <div class="pdf-title">
+                Προβολή pdf Αρχείου Νομιμοποιητικών Εγγράφων
+            </div>
+
+            <button
+                type="button"
+                id="closePdfTab"
+                class="pdf-close-btn">
+                Κλείσιμο
+            </button>
+        </div>
+
+        <div id="closeWarning" class="close-warning">
+            Ο browser δεν επέτρεψε το αυτόματο κλείσιμο του tab. Κλείσε το tab από το X του browser.
+        </div>
+
+        <iframe
+            class="pdf-frame"
+            src="${escapeHtml(pdfUrl)}"
+            title="PDF Αρχείο Νομιμοποιητικών Εγγράφων">
+        </iframe>
+
+        <script src="/static/js/ergazomenoi/genika/allodapoiPdfViewer.js" defer></script>
+    </body>
+</html>
+        `);
+        } catch (error) {
+            console.error('❌ [VIEW-ALLODAPOI-PDF] Error:', error);
+
+            return res.status(500).send('Σφάλμα κατά την προβολή του PDF.');
+        }
+    };
+
+    static deleteAllodapoiPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εργαζόμενου.'
+                });
+            }
+
+            const query = {
+                _id: ergazomenosId
+            };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
+                .select('arxeio_nomimopoihtikon_eggrafon_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος.'
+                });
+            }
+
+            const oldS3Key = ergazomenos.arxeio_nomimopoihtikon_eggrafon_path;
+
+            await ErgazomenoiModel.updateOne(query, {
+                $set: {
+                    arxeio_nomimopoihtikon_eggrafon_path: ''
+                }
+            });
+
+            if (
+                oldS3Key &&
+                String(oldS3Key).trim() !== '' &&
+                !String(oldS3Key).startsWith('http://') &&
+                !String(oldS3Key).startsWith('https://')
+            ) {
+                try {
+                    await deletePdf(String(oldS3Key).trim());
+                } catch (deleteError) {
+                    console.error('⚠️ [DELETE-ALLODAPOI-PDF] S3 delete failed:', deleteError);
+                }
+            }
+
+            return res.json({
+                success: true,
+                message: 'Το PDF διαγράφηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('❌ [DELETE-ALLODAPOI-PDF] Error:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά τη διαγραφή του PDF.'
+            });
+        }
+    };
+
+    static viewBibliarioAnhlikoyPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId) {
+                return res.status(400).send('Μη έγκυρο ID εργαζόμενου.');
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId)
+                .select('bibliario_anhlikoy_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
+            }
+
+            const s3Key = ergazomenos.bibliario_anhlikoy_path;
+
+            if (!s3Key || String(s3Key).trim() === '') {
+                return res.status(404).send('Δεν βρέθηκε PDF βιβλιαρίου ανηλίκου.');
+            }
+
+            let pdfUrl;
+            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
+                pdfUrl = String(s3Key).trim();
+            } else {
+                // generatePresignedUrl πρέπει να υπάρχει στο s3Helper import
+                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
+            }
+
+            const escapeHtml = (value) =>
+                String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+
+            // Στέλνουμε HTML viewer (όπως κάναμε για allodapoi), με loader-close messaging support
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+
+            return res.send(`
+<!doctype html>
+<html lang="el">
+    <head>
+        <meta charset="utf-8">
+        <title>Προβολή PDF Βιβλιαρίου Ανηλίκου</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                font-family: Arial, sans-serif;
+                background: #2f2f2f;
+            }
+
+            .pdf-toolbar {
+                height: 52px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px;
+                box-sizing: border-box;
+                background: #212529;
+                color: #ffffff;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            }
+
+            .pdf-title {
+                font-size: 15px;
+                font-weight: 600;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+
+            .pdf-close-btn {
+                border: 0;
+                border-radius: 8px;
+                padding: 8px 16px;
+                background: #dc3545;
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            .pdf-close-btn:hover {
+                background: #bb2d3b;
+            }
+
+            .pdf-frame {
+                width: 100%;
+                height: calc(100vh - 52px);
+                border: 0;
+                background: #ffffff;
+            }
+
+            .close-warning {
+                display: none;
+                position: fixed;
+                top: 64px;
+                right: 16px;
+                max-width: 360px;
+                padding: 12px 14px;
+                border-radius: 10px;
+                background: #fff3cd;
+                color: #664d03;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+                font-size: 14px;
+                z-index: 1000;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="pdf-toolbar">
+            <div class="pdf-title">Προβολή PDF Βιβλιαρίου Ανηλίκου</div>
+            <button id="closePdfTab" class="pdf-close-btn">Κλείσιμο</button>
+        </div>
+
+        <div id="closeWarning" class="close-warning">
+            Ο browser δεν επέτρεψε το αυτόματο κλείσιμο του tab. Κλείσε το tab από το X του browser.
+        </div>
+
+        <iframe class="pdf-frame" src="${escapeHtml(pdfUrl)}" title="PDF Βιβλιαρίου Ανηλίκου"></iframe>
+
+        <script src="/static/js/ergazomenoi/genika/anhlikoiPdfViewer.js" defer></script>
+    </body>
+</html>
+    `);
+        } catch (error) {
+            console.error('❌ [VIEW-BIBLIARIO-ANHLIKOU-PDF] Error:', error);
+            return res.status(500).send('Σφάλμα κατά την προβολή του PDF.');
+        }
+    };
+
+    static deleteBibliarioAnhlikoyPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εργαζόμενου.'
+                });
+            }
+
+            const query = { _id: ergazomenosId };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
+                .select('bibliario_anhlikoy_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος.'
+                });
+            }
+
+            const oldS3Key = ergazomenos.bibliario_anhlikoy_path;
+
+            await ErgazomenoiModel.updateOne(query, {
+                $set: {
+                    bibliario_anhlikoy_path: ''
+                }
+            });
+
+            if (
+                oldS3Key &&
+                String(oldS3Key).trim() !== '' &&
+                !String(oldS3Key).startsWith('http://') &&
+                !String(oldS3Key).startsWith('https://')
+            ) {
+                try {
+                    await deletePdf(String(oldS3Key).trim());
+                } catch (deleteError) {
+                    console.error('⚠️ [DELETE-ANHLIKOI-PDF] S3 delete failed:', deleteError);
+                }
+            }
+
+            return res.json({
+                success: true,
+                message: 'Το PDF βιβλιαρίου ανηλίκου διαγράφηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('❌ [DELETE-ANHLIKOI-PDF] Error:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά τη διαγραφή του PDF βιβλιαρίου ανηλίκου.'
+            });
+        }
+    };
+
+    static viewSymbashDaneismoyPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
+                return res.status(400).send('Μη έγκυρο ID εργαζόμενου.');
+            }
+
+            const query = {
+                _id: ergazomenosId
+            };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
+                .select('arxeio_symbashs_daneismoy_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
+            }
+
+            const s3Key = ergazomenos.arxeio_symbashs_daneismoy_path;
+
+            if (!s3Key || String(s3Key).trim() === '') {
+                return res.status(404).send('Δεν βρέθηκε PDF σύμβασης δανεισμού.');
+            }
+
+            let pdfUrl;
+
+            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
+                pdfUrl = String(s3Key).trim();
+            } else {
+                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
+            }
+
+            const escapeHtml = (value) =>
+                String(value ?? '').replace(/[&<>"']/g, (char) => {
+                    return {
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;'
+                    }[char];
+                });
+
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+
+            return res.send(`
+<!doctype html>
+<html lang="el">
+    <head>
+        <meta charset="utf-8">
+        <title>Προβολή PDF Σύμβασης Δανεισμού</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                font-family: Arial, sans-serif;
+                background: #2f2f2f;
+            }
+
+            .pdf-toolbar {
+                height: 52px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 16px;
+                box-sizing: border-box;
+                background: #212529;
+                color: #ffffff;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            }
+
+            .pdf-title {
+                font-size: 15px;
+                font-weight: 600;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+
+            .pdf-close-btn {
+                border: 0;
+                border-radius: 8px;
+                padding: 8px 16px;
+                background: #dc3545;
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            .pdf-close-btn:hover {
+                background: #bb2d3b;
+            }
+
+            .pdf-frame {
+                width: 100%;
+                height: calc(100vh - 52px);
+                border: 0;
+                background: #ffffff;
+            }
+
+            .close-warning {
+                display: none;
+                position: fixed;
+                top: 64px;
+                right: 16px;
+                max-width: 360px;
+                padding: 12px 14px;
+                border-radius: 10px;
+                background: #fff3cd;
+                color: #664d03;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+                font-size: 14px;
+                z-index: 1000;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="pdf-toolbar">
+            <div class="pdf-title">
+                Προβολή pdf Αρχείου Σύμβασης Δανεισμού
+            </div>
+
+            <button
+                type="button"
+                id="closePdfTab"
+                class="pdf-close-btn">
+                Κλείσιμο
+            </button>
+        </div>
+
+        <div id="closeWarning" class="close-warning">
+            Ο browser δεν επέτρεψε το αυτόματο κλείσιμο του tab. Κλείσε το tab από το X του browser.
+        </div>
+
+        <iframe
+            class="pdf-frame"
+            src="${escapeHtml(pdfUrl)}"
+            title="PDF Αρχείο Σύμβασης Δανεισμού">
+        </iframe>
+
+        <script src="/static/js/ergazomenoi/genika/symbashDaneismoyPdfViewer.js" defer></script>
+    </body>
+</html>
+        `);
+        } catch (error) {
+            console.error('❌ [VIEW-SYMBASH-DANEISMOY-PDF] Error:', error);
+
+            return res.status(500).send('Σφάλμα κατά την προβολή του PDF σύμβασης δανεισμού.');
+        }
+    };
+
+    static deleteSymbashDaneismoyPdf = async (req, res) => {
+        try {
+            const ergazomenosId = req.params.id;
+            const companyId = req.session?.companyInUse;
+
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εργαζόμενου.'
+                });
+            }
+
+            const query = { _id: ergazomenosId };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
+                .select('arxeio_symbashs_daneismoy_path')
+                .lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος.'
+                });
+            }
+
+            const oldS3Key = ergazomenos.arxeio_symbashs_daneismoy_path;
+
+            await ErgazomenoiModel.updateOne(query, {
+                $set: {
+                    arxeio_symbashs_daneismoy_path: ''
+                }
+            });
+
+            if (
+                oldS3Key &&
+                String(oldS3Key).trim() !== '' &&
+                !String(oldS3Key).startsWith('http://') &&
+                !String(oldS3Key).startsWith('https://')
+            ) {
+                try {
+                    await deletePdf(String(oldS3Key).trim());
+                } catch (deleteError) {
+                    console.error(
+                        '⚠️ [DELETE-SYMBASH-DANEISMOY-PDF] S3 delete failed:',
+                        deleteError
+                    );
+                }
+            }
+
+            return res.json({
+                success: true,
+                message: 'Το PDF σύμβασης δανεισμού διαγράφηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('❌ [DELETE-SYMBASH-DANEISMOY-PDF] Error:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά τη διαγραφή του PDF σύμβασης δανεισμού.'
+            });
+        }
+    };
+
     static highlightText(text, term) {
         if (!text) return ''; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
         const highlightStartTag = "<span class='highlight'>";
@@ -3748,3 +4493,11 @@ module.exports.getErgazomenosById = ergazomenoiController.getErgazomenosById;
 module.exports.getAllErgazomenoiWithUrls = ergazomenoiController.getAllErgazomenoiWithUrls;
 module.exports.uploadE3ToErganh = ergazomenoiController.uploadE3ToErganh;
 module.exports.uploadMAToErganh = ergazomenoiController.uploadMAToErganh;
+
+module.exports.viewAllodapoiPdf = ergazomenoiController.viewAllodapoiPdf;
+module.exports.viewBibliarioAnhlikoyPdf = ergazomenoiController.viewBibliarioAnhlikoyPdf;
+module.exports.viewSymbashDaneismoyPdf = ergazomenoiController.viewSymbashDaneismoyPdf;
+
+module.exports.deleteAllodapoiPdf = ergazomenoiController.deleteAllodapoiPdf;
+module.exports.deleteBibliarioAnhlikoyPdf = ergazomenoiController.deleteBibliarioAnhlikoyPdf;
+module.exports.deleteSymbashDaneismoyPdf = ergazomenoiController.deleteSymbashDaneismoyPdf;

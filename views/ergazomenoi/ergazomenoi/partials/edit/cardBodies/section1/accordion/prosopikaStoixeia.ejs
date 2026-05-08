@@ -25,6 +25,14 @@
     };
 
 	const safeCheck = (k) => safe(k) ? 'checked' : '';
+
+	const bibliarioPdfPath = ergazomenoiData?.bibliario_anhlikoy_path || '';	
+    const hasBibliarioPdf = !isEmpty(bibliarioPdfPath);
+    const ergazomenosId = ergazomenoiData?._id || ergazomenoiData?.id || '';
+
+    const bibliarioPdfViewUrl = hasBibliarioPdf && ergazomenosId
+        ? `/api/ergazomenoi/${ergazomenosId}/documents/anhlikoi/view`
+        : '';
 %>
 
 <div class="accordion-item margin-top--2_5rem">
@@ -260,38 +268,53 @@
 					Αριθ. Βιβλ. Ανηλίκου
 					</label>
 				</div>
-				<div class="col-2">
+				<div class="col-1-5">
 					<input type="text" name="arithmos_bibliarioy_anhlikoy" id="arithmos_bibliarioy_anhlikoy" class="form-control input-contents" value="<%= safe('arithmos_bibliarioy_anhlikoy') %>" autocomplete="off" />
 				</div>
 
-				<div class="col-2 margin-bottom-0_2rem">
-					<div class="pdf-button-wrapper">
-						<button 
-							type="button" 
-							id="customButton_anhlikoi" 
-							class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
-							data-document-type="anhlikoi"
-							data-data-bs-title="Βιβλιάριο Ανηλίκου"
-							disabled>
-							<i class="bi bi-cloud-arrow-up"></i> 
-							Βιβλιάριο Ανηλίκου (pdf)
-						</button>
-						<div 
-							class="pdf-badge-replacement hidden" 
-							data-document-type="anhlikoi"
-							data-bs-title="Κλικ για αλλαγή αρχείου">
-							<div class="badge-content">
-								<i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
-								<span class="badge-filename text-left">file.pdf</span>
-							</div>
-							<button 
-								type="button" 
-								class="badge-remove-btn" 
-								data-bs-title="Αφαίρεση αρχείου"
-								data-document-type="anhlikoi">
-								<i class="bi bi-x-circle-fill"></i>
+				<div class="col-2-5 margin-bottom-0_2rem">
+					<div class="pdf-button-wrapper d-flex gap-1 align-items-stretch">
+						<div class="pdf-badge-replacement d-none"></div>
+						
+						<% if (hasBibliarioPdf) { %>
+							
+							<a
+								id="customButton_anhlikoi"
+								href="<%= bibliarioPdfViewUrl %>"
+								class="btn btn-brown rounded-4 buttons-content flex-grow-1"
+								data-document-type="anhlikoi"
+								data-bs-title="Βιβλιάριο Ανηλίκου"
+								data-data-bs-title="Έγγραφα Ανηλίκων"
+								data-pdf-viewer-link="true">
+								<i class="bi bi-file-earmark-pdf"></i>
+								Προβολή pdf Αρχείου
+							</a>
+
+							<button
+								type="button"
+								id="deleteButton_anhlikoi"
+								class="btn btn-danger rounded-4 buttons-content d-flex align-items-center justify-content-center px-2"
+								data-ergazomenos-id="<%= ergazomenosId %>"
+								title="Διαγραφή PDF">
+
+								<i class="bi bi-trash3"></i>
 							</button>
-						</div>
+
+						<% } else { %>
+
+							<button
+								type="button"
+								id="customButton_anhlikoi"
+								class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+								data-document-type="bibliario_anhlikoy"
+								data-data-bs-title="Βιβλιάριο Ανηλίκου">
+
+								<i class="bi bi-cloud-arrow-up"></i>
+								Αρχείο Βιβλιαρίου Ανηλίκου (pdf)
+							</button>
+
+						<% } %>
+
 					</div>
 				</div>
 

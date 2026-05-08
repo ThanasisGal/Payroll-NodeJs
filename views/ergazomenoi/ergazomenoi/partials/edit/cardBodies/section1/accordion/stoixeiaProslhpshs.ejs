@@ -25,6 +25,14 @@
     };
 
 	const safeCheck = (k) => safe(k) ? 'checked' : '';
+
+    const ergazomenosId = ergazomenoiData?._id || ergazomenoiData?.id || '';
+    const symbashDaneismoyPdfPath = safe('arxeio_symbashs_daneismoy_path');
+    const hasSymbashDaneismoyPdf = !isEmpty(symbashDaneismoyPdfPath);
+
+    const symbashDaneismoyPdfViewUrl = hasSymbashDaneismoyPdf && ergazomenosId
+        ? `/api/ergazomenoi/${ergazomenosId}/documents/symbash-daneismoy/view`
+        : '';
 %>
 
 <div class="accordion-item margin-top--2_5rem">
@@ -119,37 +127,40 @@
                 </div>
 
                 <div class="col-3 margin-bottom-0_2rem">
-                    <!-- Wrapper για button + badge toggle -->
-                    <div class="pdf-button-wrapper">
-                        <!-- Original Button (εμφανίζεται όταν ΔΕΝ έχει file) -->
-                        <button 
-                            type="button" 
-                            id="customButton_symbash_daneismoy" 
-                            class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
-                            data-document-type="symbash_daneismoy"
-                            data-data-bs-title="Αρχείο Σύμβασης Δανεισμού"
-                            disabled>
-                            <i class="bi bi-cloud-arrow-up"></i> 
-                            Αρχείο Σύμβασης Δανεισμού (pdf)
-                        </button>
-                        
-                        <!-- Badge Replacement (εμφανίζεται όταν έχει αρχείο) -->
-                        <div 
-                            class="pdf-badge-replacement hidden" 
-                            data-document-type="symbash_daneismoy"
-                            data-bs-title="Κλικ για αλλαγή αρχείου">
-                            <div class="badge-content">
-                                <i class="bi bi-file-earmark-pdf-fill badge-icon"></i>
-                                <span class="badge-filename text-left">file.pdf</span>
-                            </div>
-                            <button 
-                                type="button" 
-                                class="badge-remove-btn" 
-                                data-bs-title="Αφαίρεση αρχείου"
-                                data-document-type="symbash_daneismoy">
-                                <i class="bi bi-x-circle-fill"></i>
+                    <div class="pdf-button-wrapper d-flex gap-1 align-items-stretch">
+                        <div class="pdf-badge-replacement d-none"></div>
+                        <% if (hasSymbashDaneismoyPdf) { %>
+                            <a
+                                id="customButton_symbash_daneismoy"
+                                href="<%= symbashDaneismoyPdfViewUrl %>"
+                                class="btn btn-brown rounded-4 buttons-content flex-grow-1 d-flex align-items-center justify-content-center"
+                                data-document-type="symbash_daneismoy"
+                                data-bs-title="Σύμβαση Δανεισμού"
+                                data-symbash-daneismoy-pdf-viewer-link="true">
+                                <i class="bi bi-file-earmark-pdf me-1"></i>
+                                Προβολή pdf Αρχείου
+                            </a>
+
+                            <button
+                                type="button"
+                                id="deleteButton_symbash_daneismoy"
+                                class="btn btn-danger rounded-4 buttons-content d-flex align-items-center justify-content-center px-2"
+                                data-ergazomenos-id="<%= ergazomenosId %>"
+                                title="Διαγραφή PDF">
+                                <i class="bi bi-trash3"></i>
                             </button>
-                        </div>
+                        <% } else { %>
+                            <button
+                                type="button"
+                                id="customButton_symbash_daneismoy"
+                                class="btn btn-brown rounded-4 buttons-content w-100 pdf-upload-btn"
+                                data-document-type="arxeio_symbashs_daneismoy"
+                                data-data-bs-title="Αρχείο Σύμβασης Δανεισμού">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                                Αρχείο Σύμβασης Δανεισμού (pdf)
+                            </button>
+                        <% } %>
+
                     </div>
                 </div>
 
