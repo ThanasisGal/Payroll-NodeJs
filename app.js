@@ -31,6 +31,8 @@ const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./server/config/db');
+const mongoose = require('mongoose');
+mongoose.set('sanitizeFilter', true);
 const geoGuard = require('./server/middlewares/geoGuard');
 const usersRoute = require('./server/routes/usersRoute');
 const dropdownRoutes = require('./server/routes/dropdownRoutes');
@@ -855,7 +857,6 @@ async function initializeTextCacheSystem() {
 async function startServer() {
     try {
         // Wait for MongoDB
-        const mongoose = require('mongoose');
         if (mongoose.connection.readyState !== 1) {
             // logger.info('⏳ Waiting for MongoDB connection...');
             await new Promise((resolve) => {
@@ -916,7 +917,6 @@ async function gracefulShutdown(signal) {
         textCacheManager.stopAutoRefresh();
         // logger.info('✅ Text cache auto-refresh stopped');
 
-        const mongoose = require('mongoose');
         await mongoose.connection.close();
         // logger.info('✅ MongoDB connection closed');
 
