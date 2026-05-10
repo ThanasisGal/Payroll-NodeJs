@@ -1,1 +1,1 @@
-document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x22date\x22]')['forEach'](function(V){const z=V['getAttribute']('value');z&&(V['value']=window['formatISODate'](z));});});
+document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x22date\x22]')['forEach'](function(j){const G=j['getAttribute']('value');G&&(j['value']=window['formatISODate'](G));});});
