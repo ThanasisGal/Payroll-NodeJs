@@ -145,62 +145,6 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
-# =============================================================================
-# GIT BRANCH SAFETY CHECK
-# =============================================================================
-# Το deploy πρέπει να καταλήγει πάντα στο main.
-# Αν είσαι σε άλλο branch, σου δίνει επιλογή να σταματήσεις ή να κάνεις:
-# push current branch -> checkout main -> pull main -> merge current branch -> continue.
-
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ -z "$CURRENT_BRANCH" ]]; then
-    log_error "Could not detect current Git branch."
-    exit 1
-fi
-
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    log_warning "You are currently on branch: $CURRENT_BRANCH"
-    log_warning "Deployment expects branch: main"
-    echo ""
-    echo "Choose what to do:"
-    echo "  1) Stop deployment"
-    echo "  2) Push current branch, switch to main, merge it, then continue"
-    echo ""
-
-    read -p "Choice [1]: " BRANCH_CHOICE
-    BRANCH_CHOICE=${BRANCH_CHOICE:-1}
-
-    case "$BRANCH_CHOICE" in
-        2)
-            log_info "Pushing current branch: $CURRENT_BRANCH"
-            git push -u origin "$CURRENT_BRANCH"
-
-            log_info "Switching to main..."
-            git checkout main
-
-            log_info "Pulling latest main..."
-            git pull origin main
-
-            log_info "Merging branch $CURRENT_BRANCH into main..."
-            if git merge "$CURRENT_BRANCH"; then
-                log_success "Branch $CURRENT_BRANCH merged into main"
-            else
-                log_error "Merge failed. Resolve conflicts manually, then run deploy again."
-                exit 1
-            fi
-            ;;
-        *)
-            log_error "Deployment stopped. Please switch to main first:"
-            echo "cd $PROJECT_DIR"
-            echo "git checkout main"
-            echo "git pull origin main"
-            exit 1
-            ;;
-    esac
-fi
-
-
 check_command "node"
 check_command "npm"
 check_command "git"
@@ -1237,13 +1181,6 @@ echo "📦 GIT COMMIT & PUSH"
 echo "=========================================="
 
 log_info "Fetching remote changes..."
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    log_error "Current branch is $CURRENT_BRANCH, not main. Aborting before Git push."
-    exit 1
-fi
-
 git fetch origin main
 
 LOCAL=$(git rev-parse @ 2>/dev/null || echo "local")
