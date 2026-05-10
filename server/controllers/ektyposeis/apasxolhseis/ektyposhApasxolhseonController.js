@@ -477,7 +477,7 @@ class ektyposhApasxolhseonController {
             const employees = await ErgazomenoiModel.find({
                 team: team,
                 company_kod: company,
-                kodikos: { $in: kodikoi },
+                kodikos: mongoose.trusted({ $in: kodikoi }),
                 ...(ypokatasthma ? { ypokatasthma: ypokatasthma } : {})
             }).lean();
         

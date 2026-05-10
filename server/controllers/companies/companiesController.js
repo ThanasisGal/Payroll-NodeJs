@@ -677,7 +677,9 @@ class companiesController {
     static getKadForEditForm = async (req, res) => {
         try {
             const prefix = normalizeStr(req.query.prefix);
-            const results = await KadModel.find({ kodikos: { $regex: `^${prefix}` } });
+            const results = await KadModel.find({
+                kodikos: mongoose.trusted({ $regex: `^${prefix}` })
+            });
             res.json(results);
         } catch (error) {
             console.error(error);

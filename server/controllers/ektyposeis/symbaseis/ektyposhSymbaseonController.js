@@ -1,46 +1,35 @@
-const mongoose = require("mongoose");
-const PizZip = require("pizzip");
-const Docxtemplater = require("docxtemplater");
-const { exec } = require("child_process");
-const { promisify } = require("util");
-const path = require("path");
-const fs = require("fs-extra");
-const { PDFDocument, rgb } = require("pdf-lib");
-const fontkit = require("@pdf-lib/fontkit");
-const { getDocument } = require("pdfjs-dist");
-const pdfjsLib = require("pdfjs-dist");
+const mongoose = require('mongoose');
+const PizZip = require('pizzip');
+const Docxtemplater = require('docxtemplater');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
+const fs = require('fs-extra');
+const { PDFDocument, rgb } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit');
+const { getDocument } = require('pdfjs-dist');
+const pdfjsLib = require('pdfjs-dist');
 
 // ✅ TEXT CACHE SYSTEM IMPORTS
 const { loadTextsByCategory, combineTexts, CATEGORIES } = require('../../../utils/textLoader');
-const { getCompanyFolder } = require('../../../utils/userContext');  // ✅ Import at top!
+const { getCompanyFolder } = require('../../../utils/userContext'); // ✅ Import at top!
 
-const Models_A = require("../../../models/stathera_arxeia");
-const Models_B = require("../../../models/privileges");
-const Models_C = require("../../../models/companies");
-const Models_D = require("../../../models/ergazomenoi");
+const Models_A = require('../../../models/stathera_arxeia');
+const Models_B = require('../../../models/privileges');
+const Models_C = require('../../../models/companies');
+const Models_D = require('../../../models/ergazomenoi');
 
-const { PoleisModel, 
-        SxeseisErgasiasModel,
-        DoyModel,
-        EidikothtesEfarmoghsModel,
-      } = Models_A; 
+const { PoleisModel, SxeseisErgasiasModel, DoyModel, EidikothtesEfarmoghsModel } = Models_A;
 
 const { UserPrivilegesModel } = Models_B;
 
-const { CompaniesModel,
-        NomimoiEkprosopoiModel,
-        PasswordsModel,
-        YpokatasthmataModel,
-      } = Models_C;
+const { CompaniesModel, NomimoiEkprosopoiModel, PasswordsModel, YpokatasthmataModel } = Models_C;
 
-const { ErgazomenoiModel,
-        OrariaModel,
-        OrariaFromCardsModel,
-      } = Models_D;
+const { ErgazomenoiModel, OrariaModel, OrariaFromCardsModel } = Models_D;
 
 const execAsync = promisify(exec);
 
-const fileName = "ΑΡΧΙΚΗ ΣΥΜΒΑΣΗ ΕΡΓΑΖΟΜΕΝΩΝ.docx"
+const fileName = 'ΑΡΧΙΚΗ ΣΥΜΒΑΣΗ ΕΡΓΑΖΟΜΕΝΩΝ.docx';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const host = process.env.HOST || 'localhost';
@@ -52,15 +41,15 @@ const docxPath = isWindows
     : '/home/ubuntu/Payroll-NodeJs/public/templates/' + fileName;
 
 const outputFolder = isWindows
-    ? "C:/Payroll-NodeJs/public/pdf/"
-    : "/home/ubuntu/Payroll-NodeJs/public/pdf/";
+    ? 'C:/Payroll-NodeJs/public/pdf/'
+    : '/home/ubuntu/Payroll-NodeJs/public/pdf/';
 
 const ensureOutputFolder = async () => {
-  try {
-    await fs.access(outputFolder);
-  } catch {
-    await fs.mkdir(outputFolder, { recursive: true });
-  }
+    try {
+        await fs.access(outputFolder);
+    } catch {
+        await fs.mkdir(outputFolder, { recursive: true });
+    }
 };
 
 // ============================================================================
@@ -77,7 +66,9 @@ async function findTextInPdf(pdfPath, searchText) {
         const textContent = await page.getTextContent();
         textContent.items.forEach((item) => {
             if (item.str.includes(searchText)) {
-                console.log(`Found text on page ${pageNum} at item ${JSON.stringify(item.transform)}`);
+                console.log(
+                    `Found text on page ${pageNum} at item ${JSON.stringify(item.transform)}`
+                );
                 position = {
                     pageIndex: pageNum,
                     x: item.transform[4],
@@ -97,7 +88,7 @@ async function replaceTextWithImage(pdfPath, outputPath, imagePath, position) {
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
     if (!position) {
-        console.log("Text not found or position not provided");
+        console.log('Text not found or position not provided');
         return false;
     }
 
@@ -109,14 +100,14 @@ async function replaceTextWithImage(pdfPath, outputPath, imagePath, position) {
         x: position.x,
         y: position.y,
         width: position.width + 5,
-        height: 10,  
+        height: 10,
         color: rgb(1, 1, 1),
         opacity: 1
     });
 
     page.drawImage(image, {
         x: position.x,
-        y: position.y - position.height + 28.35, 
+        y: position.y - position.height + 28.35,
         width: position.width,
         height: position.height
     });
@@ -150,60 +141,101 @@ const calculateMonthsDifference = (startDate, endDate) => {
 };
 
 const numbersToWords = (n) => {
-    const ones = ['', 'ένα', 'δύο', 'τρία', 'τέσσερα', 'πέντε', 'έξι', 'επτά', 'οκτώ', 'εννέα', 'δέκα', 
-        'έντεκα', 'δώδεκα', 'δεκατρία', 'δεκατέσσερα', 'δεκαπέντε', 'δεκαέξι', 'δεκαεπτά', 'δεκαοκτώ', 'δεκαεννέα'];
-    const tens = ['', '', 'είκοσι', 'τριάντα', 'σαράντα', 'πενήντα', 'εξήντα', 'εβδομήντα', 'ογδόντα', 'ενενήντα'];
-    
+    const ones = [
+        '',
+        'ένα',
+        'δύο',
+        'τρία',
+        'τέσσερα',
+        'πέντε',
+        'έξι',
+        'επτά',
+        'οκτώ',
+        'εννέα',
+        'δέκα',
+        'έντεκα',
+        'δώδεκα',
+        'δεκατρία',
+        'δεκατέσσερα',
+        'δεκαπέντε',
+        'δεκαέξι',
+        'δεκαεπτά',
+        'δεκαοκτώ',
+        'δεκαεννέα'
+    ];
+    const tens = [
+        '',
+        '',
+        'είκοσι',
+        'τριάντα',
+        'σαράντα',
+        'πενήντα',
+        'εξήντα',
+        'εβδομήντα',
+        'ογδόντα',
+        'ενενήντα'
+    ];
+
     if (n < 20) return ones[n];
     if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
-    
+
     if (n < 1000) {
         const hundreds = Math.floor(n / 100);
         const remainder = n % 100;
 
-        const hundredsText = 
-        hundreds === 1 ? 'εκατό' + (remainder ? 'ν' : '') :
-        hundreds === 2 ? 'διακόσια' :
-        hundreds === 3 ? 'τριακόσια' :
-        hundreds === 4 ? 'τετρακόσια' :
-        hundreds === 5 ? 'πεντακόσια' :
-        hundreds === 6 ? 'εξακόσια' :
-        hundreds === 7 ? 'επτακόσια' :
-        hundreds === 8 ? 'οκτακόσια' :
-        hundreds === 9 ? 'εννιακόσια' : '';
+        const hundredsText =
+            hundreds === 1
+                ? 'εκατό' + (remainder ? 'ν' : '')
+                : hundreds === 2
+                  ? 'διακόσια'
+                  : hundreds === 3
+                    ? 'τριακόσια'
+                    : hundreds === 4
+                      ? 'τετρακόσια'
+                      : hundreds === 5
+                        ? 'πεντακόσια'
+                        : hundreds === 6
+                          ? 'εξακόσια'
+                          : hundreds === 7
+                            ? 'επτακόσια'
+                            : hundreds === 8
+                              ? 'οκτακόσια'
+                              : hundreds === 9
+                                ? 'εννιακόσια'
+                                : '';
 
         return hundredsText + (remainder ? ' ' + numbersToWords(remainder) : '');
     }
 
     if (n < 1000000) {
-        return numbersToWords(Math.floor(n / 1000)) + ' χιλιάδες' + 
-             (n % 1000 ? ' ' + numbersToWords(n % 1000) : '');
+        return (
+            numbersToWords(Math.floor(n / 1000)) +
+            ' χιλιάδες' +
+            (n % 1000 ? ' ' + numbersToWords(n % 1000) : '')
+        );
     }
-  
-    return numbersToWords(Math.floor(n / 1000000)) + ' εκατομμύρια' + 
-        (n % 1000000 ? ' ' + numbersToWords(n % 1000000) : '');
+
+    return (
+        numbersToWords(Math.floor(n / 1000000)) +
+        ' εκατομμύρια' +
+        (n % 1000000 ? ' ' + numbersToWords(n % 1000000) : '')
+    );
 };
 
 const numberToText = (num, type = 'money') => {
-    const whole = Math.floor(num); 
-    const decimal = Math.round((num - whole) * 100); 
+    const whole = Math.floor(num);
+    const decimal = Math.round((num - whole) * 100);
 
     let wholeText = numbersToWords(whole);
     let decimalText = decimal > 0 ? numbersToWords(decimal) : '';
 
-    switch(type) {
+    switch (type) {
         case 'money':
-            return decimalText 
-                ? `${wholeText} ευρώ και ${decimalText} λεπτά` 
-                : `${wholeText} ευρώ`;
+            return decimalText ? `${wholeText} ευρώ και ${decimalText} λεπτά` : `${wholeText} ευρώ`;
         case 'time':
-            return decimalText 
-                ? `${wholeText} ώρες και ${decimalText} λεπτά` 
-                : `${wholeText} ώρες`;
+            return decimalText ? `${wholeText} ώρες και ${decimalText} λεπτά` : `${wholeText} ώρες`;
         default:
-            return decimalText 
-                ? `${wholeText} και ${decimalText}` 
-                : `${wholeText}`;
+            return decimalText ? `${wholeText} και ${decimalText}` : `${wholeText}`;
     }
 };
 
@@ -218,9 +250,9 @@ async function removeUnwantedPages(pdfPath) {
     for (let i = 1; i <= numPages; i++) {
         const page = await pdfDoc.getPage(i);
         const textContent = await page.getTextContent();
-        
+
         if (textContent.items.length < 23) {
-            let inHeaderOrFooter = textContent.items.every(item => {
+            let inHeaderOrFooter = textContent.items.every((item) => {
                 return item.transform[5] > 750 || item.transform[5] < 100;
             });
             if (inHeaderOrFooter) {
@@ -234,8 +266,11 @@ async function removeUnwantedPages(pdfPath) {
         const existingPdfDoc = await PDFDocument.load(existingPdfBytes);
         const newPdfDoc = await PDFDocument.create();
 
-        const copiedPages = await newPdfDoc.copyPages(existingPdfDoc, existingPdfDoc.getPageIndices().filter(i => !pagesToRemove.includes(i)));
-        copiedPages.forEach(page => newPdfDoc.addPage(page));
+        const copiedPages = await newPdfDoc.copyPages(
+            existingPdfDoc,
+            existingPdfDoc.getPageIndices().filter((i) => !pagesToRemove.includes(i))
+        );
+        copiedPages.forEach((page) => newPdfDoc.addPage(page));
 
         const pdfBytes = await newPdfDoc.save();
         await fs.writeFile(pdfPath, pdfBytes);
@@ -259,7 +294,7 @@ async function updateFooter(pdfPath, fontPath) {
 
     const pages = pdfDoc.getPages();
 
-    pages.forEach(page => {
+    pages.forEach((page) => {
         i++;
         const { width, height } = page.getSize();
         const text = `Σελ. ${i} από ${pages.length}`;
@@ -274,13 +309,13 @@ async function updateFooter(pdfPath, fontPath) {
             height: textHeight + 5,
             color: rgb(1, 1, 1)
         });
-        
+
         page.drawText(text, {
             x: width - textWidth - 33,
             y: 61,
             size: textSize,
             font: customFont,
-            color: rgb(0.50, 0.50, 0.50)
+            color: rgb(0.5, 0.5, 0.5)
         });
     });
 
@@ -294,7 +329,7 @@ async function compressAndSavePdf(pdfPath, company) {
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
     const pdfBytes = await pdfDoc.save({
-        useObjectStreams: true,
+        useObjectStreams: true
     });
     const finalPdfPath = path.join(outputFolder, `${company}_contract_merged_compressed.pdf`);
     try {
@@ -312,7 +347,7 @@ async function compressAndSavePdf(pdfPath, company) {
 async function getUserContext(req) {
     const team = req.session?.userTeam || req.body?.team;
     const companyId = req.session?.companyInUse || req.body?.company;
-    
+
     if (!team || !companyId) {
         console.error('❌ Missing team or companyId in getUserContext');
         return {
@@ -320,15 +355,15 @@ async function getUserContext(req) {
             companyFolder: '0000_UNKNOWN'
         };
     }
-    
+
     // ✅ Use getCompanyFolder to get proper slug
     const companyFolder = await getCompanyFolder(companyId, team);
-    
+
     console.log(`📁 Resolved company folder: ${companyFolder}`);
-    
+
     return {
         team: team,
-        companyFolder: companyFolder  // ✅ "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ"
+        companyFolder: companyFolder // ✅ "0001_ΞΕΝΟΔΟΧΕΙΟ_ΙΚΑΡΙΑ"
     };
 }
 
@@ -339,48 +374,51 @@ async function getUserContext(req) {
 class ektyposhSymbaseonController {
     static mainSymbaseisErgazomenonForm = async (req, res) => {
         const locals = {
-            title: "Εκτύπωση Συμβάσεων Εργαζόμενων",
-            description: "Web Payroll Solutions",
+            title: 'Εκτύπωση Συμβάσεων Εργαζόμενων',
+            description: 'Web Payroll Solutions'
         };
 
         await ensureOutputFolder();
-        
+
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
         const sessionTeam = req.session.userTeam;
-    
+
         try {
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "EktyposhSymbaseonErgazomenon",
+                form: 'EktyposhSymbaseonErgazomenon'
             }).lean();
-    
-            const ergazomenoi = await ErgazomenoiModel.find({ 
-                team: sessionTeam, 
-                company_kod: companyId, 
-                energos: true 
+
+            const ergazomenoi = await ErgazomenoiModel.find({
+                team: sessionTeam,
+                company_kod: companyId,
+                energos: true
             });
 
-            const passwordsData = await PasswordsModel.find({ 
-                companykod_object: companyId, 
-                kodikos: "0001" 
+            const passwordsData = await PasswordsModel.find({
+                companykod_object: companyId,
+                kodikos: '0001'
             });
             const cleanedPasswordsData = passwordsData.map((data) => data._doc);
 
-            res.render("ektyposeis/symbaseis/symbaseisErgazomenon", {
+            res.render('ektyposeis/symbaseis/symbaseisErgazomenon', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
                 passwords: cleanedPasswordsData,
-                ergazomenoi: ergazomenoi,
-            });   
+                ergazomenoi: ergazomenoi
+            });
         } catch (error) {
-            console.log("Error into ektyposhSymbaseonController -> mainSymbaseisErgazomenonForm :", error);
+            console.log(
+                'Error into ektyposhSymbaseonController -> mainSymbaseisErgazomenonForm :',
+                error
+            );
         }
-    }
+    };
 
-    static createPdf = async (req, res) => { 
+    static createPdf = async (req, res) => {
         const { team, company, kodikoi, username, password, ypokatasthma } = req.body;
 
         try {
@@ -413,8 +451,8 @@ class ektyposhSymbaseonController {
                 return res.json({
                     success: false,
                     fileLink: '',
-                    redirectUrl: "/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon",
-                    checkMessage: "EBUSY",
+                    redirectUrl: '/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon',
+                    checkMessage: 'EBUSY',
                     warningMessage: `❌ Δεν είναι δυνατή η δημιουργία νέων αρχείων. Κλείσε πρώτα τα παρακάτω αρχεία:\n${failedInitialDeletes.join(', ')}`
                 });
             }
@@ -422,20 +460,23 @@ class ektyposhSymbaseonController {
             const companies = await CompaniesModel.findOne({ _id: company }).lean();
             const poleis = await PoleisModel.findOne({ kodikos: companies.polh }).lean();
             const doy = await DoyModel.findOne({ kodikos: companies.doy_company }).lean();
-            const nomimoiEkprosopoi = await NomimoiEkprosopoiModel.findOne({ 
-                companykod_object: company, 
-                kodikos: "0001" 
+            const nomimoiEkprosopoi = await NomimoiEkprosopoiModel.findOne({
+                companykod_object: company,
+                kodikos: '0001'
             }).lean();
             const employees = await ErgazomenoiModel.find({
                 team: team,
                 company_kod: company,
-                kodikos: { $in: kodikoi },
+                kodikos: mongoose.trusted({ $in: kodikoi }),
                 ...(ypokatasthma ? { ypokatasthma: ypokatasthma } : {})
             }).lean();
-        
-            let eponymia_Etairias = (companies.eponymia ? companies.eponymia.trim() : "") + " " 
-                                    + (companies.fathername ? companies.fathername.substring(0, 3).trim() : "") + " " 
-                                    + (companies.firstname ? companies.firstname.trim() : "");
+
+            let eponymia_Etairias =
+                (companies.eponymia ? companies.eponymia.trim() : '') +
+                ' ' +
+                (companies.fathername ? companies.fathername.substring(0, 3).trim() : '') +
+                ' ' +
+                (companies.firstname ? companies.firstname.trim() : '');
 
             const content = await fs.readFile(docxPath, 'binary');
             const zip = new PizZip(content);
@@ -445,125 +486,154 @@ class ektyposhSymbaseonController {
                 const doc = new Docxtemplater(zip.clone());
 
                 // Gender-based variables
-                let _CAPITAL_ONOMASTIKH_A, _ONOMASTIKH_A, _CAPITAL_ONOMASTIKH_K, _ONOMASTIKH_K, 
-                    _GENIKH_A, _CAPITAL_GENIKH_A, _AITIATIKH_A, _CAPITAL_AITIATIKH_A,
-                    _ANTONYMIA_O, _ANTONYMIA_G, _ANTONYMIA_A;
+                let _CAPITAL_ONOMASTIKH_A,
+                    _ONOMASTIKH_A,
+                    _CAPITAL_ONOMASTIKH_K,
+                    _ONOMASTIKH_K,
+                    _GENIKH_A,
+                    _CAPITAL_GENIKH_A,
+                    _AITIATIKH_A,
+                    _CAPITAL_AITIATIKH_A,
+                    _ANTONYMIA_O,
+                    _ANTONYMIA_G,
+                    _ANTONYMIA_A;
 
-                _CAPITAL_ONOMASTIKH_A = symbash.fylo ? "Ο"  : "Η";
-                _CAPITAL_ONOMASTIKH_K = symbash.fylo ? "ΟΣ" : "Η";
-                _CAPITAL_GENIKH_A     = symbash.fylo ? "ΟΥ" : "ΗΣ";
-                _CAPITAL_AITIATIKH_A  = symbash.fylo ? "ΟΝ" : "ΗΝ";
-                _ONOMASTIKH_A         = symbash.fylo ? "ο"  : "η";
-                _ONOMASTIKH_K         = symbash.fylo ? "ος" : "η";
-                _GENIKH_A             = symbash.fylo ? "ου" : "ης";
-                _AITIATIKH_A          = symbash.fylo ? "ον" : "ην";
-                _ANTONYMIA_O          = symbash.fylo ? "ός" : "ή";
-                _ANTONYMIA_G          = symbash.fylo ? "ού" : "ής";
-                _ANTONYMIA_A          = symbash.fylo ? "όν" : "ήν";
+                _CAPITAL_ONOMASTIKH_A = symbash.fylo ? 'Ο' : 'Η';
+                _CAPITAL_ONOMASTIKH_K = symbash.fylo ? 'ΟΣ' : 'Η';
+                _CAPITAL_GENIKH_A = symbash.fylo ? 'ΟΥ' : 'ΗΣ';
+                _CAPITAL_AITIATIKH_A = symbash.fylo ? 'ΟΝ' : 'ΗΝ';
+                _ONOMASTIKH_A = symbash.fylo ? 'ο' : 'η';
+                _ONOMASTIKH_K = symbash.fylo ? 'ος' : 'η';
+                _GENIKH_A = symbash.fylo ? 'ου' : 'ης';
+                _AITIATIKH_A = symbash.fylo ? 'ον' : 'ην';
+                _ANTONYMIA_O = symbash.fylo ? 'ός' : 'ή';
+                _ANTONYMIA_G = symbash.fylo ? 'ού' : 'ής';
+                _ANTONYMIA_A = symbash.fylo ? 'όν' : 'ήν';
 
                 // ✅✅✅ DYNAMIC TEXT LOADING FROM S3 CACHE ✅✅✅
-                let _HOTEL = "";
-                let _ADDITIONAL_CLAUSES = "";
+                let _HOTEL = '';
+                let _ADDITIONAL_CLAUSES = '';
 
                 if (symbash.eidikh_kathgoria_ergazomenoy) {
                     try {
-                        console.log(`📚 Loading templates for ${symbash.onoma} ${symbash.eponymo} (category: ${symbash.eidikh_kathgoria_ergazomenoy})`);
-                        
+                        console.log(
+                            `📚 Loading templates for ${symbash.onoma} ${symbash.eponymo} (category: ${symbash.eidikh_kathgoria_ergazomenoy})`
+                        );
+
                         // Load όλα τα templates για αυτή την ειδική κατηγορία
                         const templates = loadTextsByCategory(
                             userContext.team,
                             userContext.companyFolder,
-                            CATEGORIES.SYMBASH,  // "symbash"
+                            CATEGORIES.SYMBASH, // "symbash"
                             symbash.eidikh_kathgoria_ergazomenoy
                         );
-                        
+
                         if (Object.keys(templates).length > 0) {
                             // Combine όλα τα templates σε ένα κείμενο
                             _HOTEL = combineTexts(templates);
-                            console.log(`✅ Loaded ${Object.keys(templates).length} templates (${_HOTEL.length} chars)`);
+                            console.log(
+                                `✅ Loaded ${Object.keys(templates).length} templates (${_HOTEL.length} chars)`
+                            );
                         } else {
-                            console.warn(`⚠️ No templates found for category ${symbash.eidikh_kathgoria_ergazomenoy}`);
-                            
+                            console.warn(
+                                `⚠️ No templates found for category ${symbash.eidikh_kathgoria_ergazomenoy}`
+                            );
+
                             // Fallback στο hardcoded (για safety)
-                            if (symbash.eidikh_kathgoria_ergazomenoy === "0009") {
-                                _HOTEL = "Ειδικότερα συμφωνείται ότι, με μονομερή ενέργεια ο εργοδότης έχει τη δυνατότητα εφαρμογής των ρυθμίσεων της δεσμευτικής για όλους τους εργοδότες ΣΣΕ Ξενοδοχειακών επιχειρήσεων όλης της χώρας 2023 -2024, άρθρο 5 και τυχόν ισχύουσα δεσμευτική τοπική σε κάποια εγκατάσταση για την εφαρμογή του 5νθημέρου και την εργασία της έκτης ημέρας, κατά περίπτωση.";
+                            if (symbash.eidikh_kathgoria_ergazomenoy === '0009') {
+                                _HOTEL =
+                                    'Ειδικότερα συμφωνείται ότι, με μονομερή ενέργεια ο εργοδότης έχει τη δυνατότητα εφαρμογής των ρυθμίσεων της δεσμευτικής για όλους τους εργοδότες ΣΣΕ Ξενοδοχειακών επιχειρήσεων όλης της χώρας 2023 -2024, άρθρο 5 και τυχόν ισχύουσα δεσμευτική τοπική σε κάποια εγκατάσταση για την εφαρμογή του 5νθημέρου και την εργασία της έκτης ημέρας, κατά περίπτωση.';
                                 console.log('⚠️ Using fallback hardcoded text for hotel');
                             }
                         }
-                        
                     } catch (error) {
                         console.error('❌ Error loading dynamic texts:', error);
                         // Fallback στο hardcoded
-                        if (symbash.eidikh_kathgoria_ergazomenoy === "0009") {
-                            _HOTEL = "Ειδικότερα συμφωνείται ότι, με μονομερή ενέργεια ο εργοδότης έχει τη δυνατότητα εφαρμογής των ρυθμίσεων της δεσμευτικής για όλους τους εργοδότες ΣΣΕ Ξενοδοχειακών επιχειρήσεων όλης της χώρας 2023 -2024, άρθρο 5 και τυχόν ισχύουσα δεσμευτική τοπική σε κάποια εγκατάσταση για την εφαρμογή του 5νθημέρου και την εργασία της έκτης ημέρας, κατά περίπτωση.";
+                        if (symbash.eidikh_kathgoria_ergazomenoy === '0009') {
+                            _HOTEL =
+                                'Ειδικότερα συμφωνείται ότι, με μονομερή ενέργεια ο εργοδότης έχει τη δυνατότητα εφαρμογής των ρυθμίσεων της δεσμευτικής για όλους τους εργοδότες ΣΣΕ Ξενοδοχειακών επιχειρήσεων όλης της χώρας 2023 -2024, άρθρο 5 και τυχόν ισχύουσα δεσμευτική τοπική σε κάποια εγκατάσταση για την εφαρμογή του 5νθημέρου και την εργασία της έκτης ημέρας, κατά περίπτωση.';
                         }
                     }
                 }
-            
+
                 // Epoxikothta
                 let epoxikothta;
                 if (symbash.epoxikos) {
-                    epoxikothta = "Συμφωνείται ότι, λόγω εποχικότητας και ειδικών συνθηκών λειτουργίας της μονάδας, να χορηγείται τμήμα της άδειας κατά τις περιόδους που υπάρχει περιορισμένη ή και ανύπαρκτη πληρότητα (νεκρή περίοδο).";
+                    epoxikothta =
+                        'Συμφωνείται ότι, λόγω εποχικότητας και ειδικών συνθηκών λειτουργίας της μονάδας, να χορηγείται τμήμα της άδειας κατά τις περιόδους που υπάρχει περιορισμένη ή και ανύπαρκτη πληρότητα (νεκρή περίοδο).';
                 } else {
-                    epoxikothta = "";
+                    epoxikothta = '';
                 }
 
                 const polh = await PoleisModel.findOne({ kodikos: symbash.polh }).lean();
-                const eidikothta = await EidikothtesEfarmoghsModel.findOne({ kodikos: symbash.eidikothta }).lean();
+                const eidikothta = await EidikothtesEfarmoghsModel.findOne({
+                    kodikos: symbash.eidikothta
+                }).lean();
 
-                let apasxolhsh, typos, typos_erg, typos_erg_genikh, diarkeia, typos_erg_genikh_capital, typos_erg_aitiatikh;
-                
-                const sxeshErgasias = await SxeseisErgasiasModel.findOne({ kodikos: symbash.sxesh_ergasias}).lean();
-                const ypokatasthmata = await YpokatasthmataModel.findOne({ 
-                    companykod_object: company, 
-                    kodikos: symbash.ypokatasthma 
+                let apasxolhsh,
+                    typos,
+                    typos_erg,
+                    typos_erg_genikh,
+                    diarkeia,
+                    typos_erg_genikh_capital,
+                    typos_erg_aitiatikh;
+
+                const sxeshErgasias = await SxeseisErgasiasModel.findOne({
+                    kodikos: symbash.sxesh_ergasias
+                }).lean();
+                const ypokatasthmata = await YpokatasthmataModel.findOne({
+                    companykod_object: company,
+                    kodikos: symbash.ypokatasthma
                 }).lean();
 
                 let polh_ypok, ypok_address, edra_ypok;
 
                 if (ypokatasthmata) {
                     polh_ypok = await PoleisModel.findOne({ kodikos: ypokatasthmata.polh }).lean();
-                    if (symbash.ypokatasthma !== "0000") {
-                        edra_ypok = " το " + ypokatasthmata.perigrafh;
-                        ypok_address = "( " 
-                            + (ypokatasthmata.odos ? ypokatasthmata.odos.trim() : "") + " "
-                            + (ypokatasthmata.arithmos ? ypokatasthmata.arithmos.trim() : "") + " "
-                            + (polh_ypok && polh_ypok.onoma ? polh_ypok.onoma.trim() : "") 
-                            + " )";
+                    if (symbash.ypokatasthma !== '0000') {
+                        edra_ypok = ' το ' + ypokatasthmata.perigrafh;
+                        ypok_address =
+                            '( ' +
+                            (ypokatasthmata.odos ? ypokatasthmata.odos.trim() : '') +
+                            ' ' +
+                            (ypokatasthmata.arithmos ? ypokatasthmata.arithmos.trim() : '') +
+                            ' ' +
+                            (polh_ypok && polh_ypok.onoma ? polh_ypok.onoma.trim() : '') +
+                            ' )';
                     } else {
-                        edra_ypok = "η " + ypokatasthmata.perigrafh;
-                        ypok_address = "";
+                        edra_ypok = 'η ' + ypokatasthmata.perigrafh;
+                        ypok_address = '';
                     }
                 }
 
                 switch (symbash.kathestos_apasxolhshs) {
-                    case "0":
-                        apasxolhsh = "ΠΛΗΡΟΥΣ";
-                        typos = "μισθωτός";
+                    case '0':
+                        apasxolhsh = 'ΠΛΗΡΟΥΣ';
+                        typos = 'μισθωτός';
                         typos_erg = typos;
-                        typos_erg_genikh = "μισθωτού";
-                        typos_erg_genikh_capital = "ΜΙΣΘΩΤΟΥ";
-                        typos_erg_aitiatikh = "μισθωτό";
+                        typos_erg_genikh = 'μισθωτού';
+                        typos_erg_genikh_capital = 'ΜΙΣΘΩΤΟΥ';
+                        typos_erg_aitiatikh = 'μισθωτό';
                         break;
-                    case "1":
-                        apasxolhsh = "ΜΕΡΙΚΗΣ";
-                        typos = "εργαζόμεν" + _ONOMASTIKH_K;
+                    case '1':
+                        apasxolhsh = 'ΜΕΡΙΚΗΣ';
+                        typos = 'εργαζόμεν' + _ONOMASTIKH_K;
                         typos_erg = typos;
-                        typos_erg_genikh = "εργαζόμεν" + _GENIKH_A;
-                        typos_erg_genikh_capital = "ΕΡΓΑΖΟΜΕΝ" + _CAPITAL_GENIKH_A;
-                        typos_erg_aitiatikh = "εργαζόμεν" + _AITIATIKH_A;
+                        typos_erg_genikh = 'εργαζόμεν' + _GENIKH_A;
+                        typos_erg_genikh_capital = 'ΕΡΓΑΖΟΜΕΝ' + _CAPITAL_GENIKH_A;
+                        typos_erg_aitiatikh = 'εργαζόμεν' + _AITIATIKH_A;
                         break;
-                    case "2":
-                        apasxolhsh = "ΕΚ ΠΕΡΙΤΡΟΠΗΣ";
-                        typos = "εργαζόμεν" + _ONOMASTIKH_K;
+                    case '2':
+                        apasxolhsh = 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ';
+                        typos = 'εργαζόμεν' + _ONOMASTIKH_K;
                         typos_erg = typos;
-                        typos_erg_genikh = "εργαζόμεν" + _GENIKH_A;
-                        typos_erg_genikh_capital = "ΕΡΓΑΖΟΜΕΝ" + _CAPITAL_GENIKH_A;
-                        typos_erg_aitiatikh = "εργαζόμεν" + _AITIATIKH_A;
+                        typos_erg_genikh = 'εργαζόμεν' + _GENIKH_A;
+                        typos_erg_genikh_capital = 'ΕΡΓΑΖΟΜΕΝ' + _CAPITAL_GENIKH_A;
+                        typos_erg_aitiatikh = 'εργαζόμεν' + _AITIATIKH_A;
                         break;
                     default:
-                        apasxolhsh = "..........";
-                        typos = "..........";
+                        apasxolhsh = '..........';
+                        typos = '..........';
                         typos_erg = typos;
                         typos_erg_genikh = typos;
                         typos_erg_genikh_capital = typos;
@@ -572,63 +642,80 @@ class ektyposhSymbaseonController {
                 }
 
                 const differenceInMonths = calculateMonthsDifference(
-                    symbash.hmeromhnia_allaghs_symbashs, 
+                    symbash.hmeromhnia_allaghs_symbashs,
                     symbash.hmeromhnia_lhxhs_symbashs
                 );
                 if (differenceInMonths !== 0) {
                     diarkeia = `, διάρκειας ${differenceInMonths} μηνών και η οποία λήγει την ${formatDate(symbash.hmeromhnia_lhxhs_symbashs)}.`;
                 } else {
-                    diarkeia = ".";
+                    diarkeia = '.';
                 }
 
-                const hmeres_lektika = numberToText(parseInt(symbash.hmeres_ergasias_ebdomadas), '')
-                const ores_lektika = numberToText(parseInt(symbash.ores_ergasias_ebdomadas), '')
+                const hmeres_lektika = numberToText(
+                    parseInt(symbash.hmeres_ergasias_ebdomadas),
+                    ''
+                );
+                const ores_lektika = numberToText(parseInt(symbash.ores_ergasias_ebdomadas), '');
                 const currentYear = new Date().getFullYear();
 
                 // ✅ DATA OBJECT με dynamic texts
                 const data = {
                     _YEAR: currentYear,
-                    _SXESH_ERGASIAS: sxeshErgasias?.perigrafh ? sxeshErgasias.perigrafh : "..........",
+                    _SXESH_ERGASIAS: sxeshErgasias?.perigrafh
+                        ? sxeshErgasias.perigrafh
+                        : '..........',
                     _KATHESTOS_APASXOLHSHS: apasxolhsh,
-                    _POLH: poleis?.perigrafh ? poleis.perigrafh : "..........",
+                    _POLH: poleis?.perigrafh ? poleis.perigrafh : '..........',
                     _HMEROMHNIA_PROSLHPSHS: formatDate(symbash.hmeromhnia_proslhpshs),
 
-                    _ETAIREIA: companies.firstname == "" ? "εταιρία" : "επιχείρηση",
-                    _ERGODOTHS: companies.firstname == "" ? "η εταιρία" : "η εργοδότρια",
-                    _ERGODOTHS_XORIS_ARTHRO: companies.firstname == "" ? "εταιρία" : "εργοδότρια",
-                    _ERGODOTHS_CAPITAL_A: companies.firstname == "" ? "Η εταιρία" : "Η εργοδότρια",
-                    _ERGODOTHS_GENIKH: companies.firstname == "" ? "της εταιρίας" : "της εργοδότριας",
-                    _ERGODOTHS_AITIATIKH: companies.firstname == "" ? "την εταιρία" : "την εργοδότρια",
+                    _ETAIREIA: companies.firstname == '' ? 'εταιρία' : 'επιχείρηση',
+                    _ERGODOTHS: companies.firstname == '' ? 'η εταιρία' : 'η εργοδότρια',
+                    _ERGODOTHS_XORIS_ARTHRO: companies.firstname == '' ? 'εταιρία' : 'εργοδότρια',
+                    _ERGODOTHS_CAPITAL_A: companies.firstname == '' ? 'Η εταιρία' : 'Η εργοδότρια',
+                    _ERGODOTHS_GENIKH:
+                        companies.firstname == '' ? 'της εταιρίας' : 'της εργοδότριας',
+                    _ERGODOTHS_AITIATIKH:
+                        companies.firstname == '' ? 'την εταιρία' : 'την εργοδότρια',
                     _EPONYMIA: eponymia_Etairias,
-                    _ODOS: companies.odos ? companies.odos.trim() : "..........",
-                    _ARITHMOS: companies.arithmos ? companies.arithmos.trim() : ".....",
-                    _AFM: companies.afm ? companies.afm.trim() : "..........",
-                    _DOY: doy?.perigrafh ? doy.perigrafh.trim() : "..........",
+                    _ODOS: companies.odos ? companies.odos.trim() : '..........',
+                    _ARITHMOS: companies.arithmos ? companies.arithmos.trim() : '.....',
+                    _AFM: companies.afm ? companies.afm.trim() : '..........',
+                    _DOY: doy?.perigrafh ? doy.perigrafh.trim() : '..........',
                     _DIALLEIMA: symbash.dialleima_se_lepta,
                     _DIALLEIMA_LEKTIKA: numberToText(parseInt(symbash.dialleima_se_lepta), ''),
-                    _EKTOS_ENTOS_ORARIOY: symbash.dialleima_entos_ektos_orarioy 
-                        ? "ΕΝΤΟΣ ΩΡΑΡΙΟΥ (αποτελεί χρόνο εργασίας και δεν επεκτείνει το ωράριο εργασίας)" 
-                        : "ΕΚΤΟΣ ΩΡΑΡΙΟΥ (δεν αποτελεί χρόνο εργασίας και επεκτείνει το ωράριο εργασίας)",
+                    _EKTOS_ENTOS_ORARIOY: symbash.dialleima_entos_ektos_orarioy
+                        ? 'ΕΝΤΟΣ ΩΡΑΡΙΟΥ (αποτελεί χρόνο εργασίας και δεν επεκτείνει το ωράριο εργασίας)'
+                        : 'ΕΚΤΟΣ ΩΡΑΡΙΟΥ (δεν αποτελεί χρόνο εργασίας και επεκτείνει το ωράριο εργασίας)',
 
-                    _EPONYMO_EKPROSOPOY: nomimoiEkprosopoi?.eponymia 
-                        ? (nomimoiEkprosopoi.eponymia.endsWith("Σ") 
-                            ? nomimoiEkprosopoi.eponymia.slice(0, -1).trim() 
-                            : nomimoiEkprosopoi.eponymia).trim() 
-                        : "..........",
-                    _ONOMA_EKPROSOPOY: nomimoiEkprosopoi?.onoma 
-                        ? (nomimoiEkprosopoi.onoma.endsWith("Σ") 
-                            ? nomimoiEkprosopoi.onoma.slice(0, -1).trim() 
-                            : nomimoiEkprosopoi.onoma).trim() 
-                        : "..........",
-                    _YPOGRAFON_EKPROSOPOS: nomimoiEkprosopoi 
-                        ? (nomimoiEkprosopoi.eponymia.trim() + " " + nomimoiEkprosopoi.onoma.trim()) 
-                        : "..........",
-                    _DT_EKPROSOPOY: nomimoiEkprosopoi?.typos_taytothtas ? nomimoiEkprosopoi.typos_taytothtas.trim() : ".....",
-                    _ADT_EKPROSOPOY: nomimoiEkprosopoi?.arithmos_taytothtas ? nomimoiEkprosopoi.arithmos_taytothtas.trim() : "..........",
-                    _AFM_EKPROSOPOY: nomimoiEkprosopoi?.afm ? nomimoiEkprosopoi.afm : "..........",
-                    _THLEFONO_EKPROSOPOY: nomimoiEkprosopoi?.thlefono ? nomimoiEkprosopoi.thlefono.trim() : "..........",
-                    _EMAIL_EKPROSOPOY: nomimoiEkprosopoi?.email ? nomimoiEkprosopoi.email.trim() : "..........",
-                    
+                    _EPONYMO_EKPROSOPOY: nomimoiEkprosopoi?.eponymia
+                        ? (nomimoiEkprosopoi.eponymia.endsWith('Σ')
+                              ? nomimoiEkprosopoi.eponymia.slice(0, -1).trim()
+                              : nomimoiEkprosopoi.eponymia
+                          ).trim()
+                        : '..........',
+                    _ONOMA_EKPROSOPOY: nomimoiEkprosopoi?.onoma
+                        ? (nomimoiEkprosopoi.onoma.endsWith('Σ')
+                              ? nomimoiEkprosopoi.onoma.slice(0, -1).trim()
+                              : nomimoiEkprosopoi.onoma
+                          ).trim()
+                        : '..........',
+                    _YPOGRAFON_EKPROSOPOS: nomimoiEkprosopoi
+                        ? nomimoiEkprosopoi.eponymia.trim() + ' ' + nomimoiEkprosopoi.onoma.trim()
+                        : '..........',
+                    _DT_EKPROSOPOY: nomimoiEkprosopoi?.typos_taytothtas
+                        ? nomimoiEkprosopoi.typos_taytothtas.trim()
+                        : '.....',
+                    _ADT_EKPROSOPOY: nomimoiEkprosopoi?.arithmos_taytothtas
+                        ? nomimoiEkprosopoi.arithmos_taytothtas.trim()
+                        : '..........',
+                    _AFM_EKPROSOPOY: nomimoiEkprosopoi?.afm ? nomimoiEkprosopoi.afm : '..........',
+                    _THLEFONO_EKPROSOPOY: nomimoiEkprosopoi?.thlefono
+                        ? nomimoiEkprosopoi.thlefono.trim()
+                        : '..........',
+                    _EMAIL_EKPROSOPOY: nomimoiEkprosopoi?.email
+                        ? nomimoiEkprosopoi.email.trim()
+                        : '..........',
+
                     _CAPITAL_ONOMASTIKH_A,
                     _ONOMASTIKH_A,
                     _CAPITAL_ONOMASTIKH_K,
@@ -637,56 +724,70 @@ class ektyposhSymbaseonController {
                     _GENIKH_A,
                     _CAPITAL_AITIATIKH_A,
                     _AITIATIKH_A,
-                    _ANTONYMIA_O, 
-                    _ANTONYMIA_G, 
-                    _ANTONYMIA_A, 
-                
-                    _EPONYMIA_ERGAZOMENOY: 
-                        (symbash.eponymo ? symbash.eponymo.trim() : "") 
-                        + " " 
-                        + (symbash.onoma ? symbash.onoma.trim() : ""),
-                    _PATRONYMO_ERGAZOMENOY: symbash.patronymo 
-                        ? (symbash.patronymo.endsWith("ΟΣ") 
-                            ? symbash.patronymo.slice(0, -2) + "ΟΥ"
-                            : symbash.patronymo.endsWith("Σ") 
-                            ? symbash.patronymo.slice(0, -1).trim() 
-                            : symbash.patronymo).trim()
-                        : "..........",
-                    _POLH_ERGAZOMENOY: polh?.perigrafh ? polh.perigrafh.trim() : "..........",
-                    _ODOS_ERGAZOMENOY: symbash.odos ? symbash.odos.trim() : "..........",
-                    _ARITHMOS_ERGAZOMENOY: symbash.arithmos ? symbash.arithmos.trim() : "..........",
-                    _DT_ERGAZOMENOY: symbash.typos_taytothtas ? symbash.typos_taytothtas.trim() : "..........",
-                    _ADT_ERGAZOMENOY: symbash.adt ? symbash.adt.trim() : "..........",
-                    _AFM_ERGAZOMENOY: symbash.afm ? symbash.afm.trim() : "..........",
-                    _THLEFONO_ERGAZOMENOY: symbash.thlefono ? symbash.thlefono.trim() : "..........",
-                    _EMAIL_ERGAZOMENOY: symbash.thlefono ? symbash.thlefono.trim() : "..........",
+                    _ANTONYMIA_O,
+                    _ANTONYMIA_G,
+                    _ANTONYMIA_A,
+
+                    _EPONYMIA_ERGAZOMENOY:
+                        (symbash.eponymo ? symbash.eponymo.trim() : '') +
+                        ' ' +
+                        (symbash.onoma ? symbash.onoma.trim() : ''),
+                    _PATRONYMO_ERGAZOMENOY: symbash.patronymo
+                        ? (symbash.patronymo.endsWith('ΟΣ')
+                              ? symbash.patronymo.slice(0, -2) + 'ΟΥ'
+                              : symbash.patronymo.endsWith('Σ')
+                                ? symbash.patronymo.slice(0, -1).trim()
+                                : symbash.patronymo
+                          ).trim()
+                        : '..........',
+                    _POLH_ERGAZOMENOY: polh?.perigrafh ? polh.perigrafh.trim() : '..........',
+                    _ODOS_ERGAZOMENOY: symbash.odos ? symbash.odos.trim() : '..........',
+                    _ARITHMOS_ERGAZOMENOY: symbash.arithmos
+                        ? symbash.arithmos.trim()
+                        : '..........',
+                    _DT_ERGAZOMENOY: symbash.typos_taytothtas
+                        ? symbash.typos_taytothtas.trim()
+                        : '..........',
+                    _ADT_ERGAZOMENOY: symbash.adt ? symbash.adt.trim() : '..........',
+                    _AFM_ERGAZOMENOY: symbash.afm ? symbash.afm.trim() : '..........',
+                    _THLEFONO_ERGAZOMENOY: symbash.thlefono
+                        ? symbash.thlefono.trim()
+                        : '..........',
+                    _EMAIL_ERGAZOMENOY: symbash.thlefono ? symbash.thlefono.trim() : '..........',
                     _TYPOS_ERGAZOMENOY: typos,
                     _DIARKEIA: diarkeia,
 
                     _HMERES_LEKTIKA: hmeres_lektika,
-                    _HMERES_APASXOLHSHS: symbash.hmeres_ergasias_ebdomadas ? symbash.hmeres_ergasias_ebdomadas : "....",
+                    _HMERES_APASXOLHSHS: symbash.hmeres_ergasias_ebdomadas
+                        ? symbash.hmeres_ergasias_ebdomadas
+                        : '....',
 
                     _ORES_LEKTIKA: ores_lektika,
-                    _ORES_APASXOLHSHS: symbash.ores_ergasias_ebdomadas ? symbash.ores_ergasias_ebdomadas : "....",
-                    _EYELIKTH_PROSELEYSH: symbash.evelikth_proselefsh ? symbash.evelikth_proselefsh : '0',
+                    _ORES_APASXOLHSHS: symbash.ores_ergasias_ebdomadas
+                        ? symbash.ores_ergasias_ebdomadas
+                        : '....',
+                    _EYELIKTH_PROSELEYSH: symbash.evelikth_proselefsh
+                        ? symbash.evelikth_proselefsh
+                        : '0',
 
                     // ✅✅✅ DYNAMIC TEXTS FROM S3 CACHE ✅✅✅
                     _HOTEL,
                     _ADDITIONAL_CLAUSES,
                     _EPOXIKOTHTA: epoxikothta,
-                    
+
                     _TYPOS_ERG: typos_erg,
                     _TYPOS_ERG_GENIKH: typos_erg_genikh,
                     _TYPOS_ERG_GENIKH_CAPITAL: typos_erg_genikh_capital,
                     _YPOKATASTHMA_EDRA: edra_ypok,
                     _YPOKATASTHMA_ADDRESS: ypok_address,
                     _TYPOS_ERG_AITIATIKH: typos_erg_aitiatikh,
-                    _EIDIKOTHTA: eidikothta?.perigrafh ? eidikothta.perigrafh : "..........",
+                    _EIDIKOTHTA: eidikothta?.perigrafh ? eidikothta.perigrafh : '..........',
 
                     _MIKTES_APODOXES: symbash.synolo_symbashs_basei_oron_ergasias,
                     _MIKTES_APODOXES_LEKTIKA: numberToText(
-                        parseFloat(symbash.synolo_symbashs_basei_oron_ergasias), ''
-                    ),
+                        parseFloat(symbash.synolo_symbashs_basei_oron_ergasias),
+                        ''
+                    )
                 };
 
                 // Render το document
@@ -697,7 +798,7 @@ class ektyposhSymbaseonController {
                 const updatedDocx = doc.getZip().generate({ type: 'nodebuffer' });
                 await fs.writeFile(tempDocxPath, updatedDocx);
 
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise((resolve) => setTimeout(resolve, 300));
 
                 try {
                     await fs.access(tempDocxPath);
@@ -706,15 +807,15 @@ class ektyposhSymbaseonController {
                     index++;
                     continue;
                 }
-            
+
                 // LibreOffice conversion
                 const libreOfficePath = isWindows
                     ? `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`
                     : `/usr/bin/libreoffice`;
-            
+
                 const libreOfficeCommand = `${libreOfficePath} --headless --convert-to pdf "${tempDocxPath}" --outdir "${outputFolder}"`;
 
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 await execAsync(libreOfficeCommand);
 
                 const tempPdfPath = path.join(outputFolder, `${company}_contract_${index}.pdf`);
@@ -731,19 +832,21 @@ class ektyposhSymbaseonController {
                     if (position) {
                         await replaceTextWithImage(tempPdfPath, tempPdfPath, imagePath, position);
                     } else {
-                        console.log("No position found for text");
+                        console.log('No position found for text');
                     }
 
                     await removeUnwantedPages(tempPdfPath);
                 } catch (error) {
                     console.error(`Error: Το αρχείο PDF ${tempPdfPath} δεν δημιουργήθηκε.`);
                 }
-        
+
                 setTimeout(async () => {
                     try {
                         await fs.unlink(tempDocxPath);
                     } catch (unlinkError) {
-                        console.error(`Error κατά τη διαγραφή του προσωρινού .docx: ${unlinkError.message}`);
+                        console.error(
+                            `Error κατά τη διαγραφή του προσωρινού .docx: ${unlinkError.message}`
+                        );
                     }
                 }, 500);
 
@@ -752,54 +855,68 @@ class ektyposhSymbaseonController {
 
             // Merge PDFs
             let pdfFiles = [];
-            for (let i = 1; i < index; i++) { 
+            for (let i = 1; i < index; i++) {
                 const tempPdfPath = path.join(outputFolder, `${company}_contract_${i}.pdf`);
-                if (await fs.access(tempPdfPath).then(() => true).catch(() => false)) {
+                if (
+                    await fs
+                        .access(tempPdfPath)
+                        .then(() => true)
+                        .catch(() => false)
+                ) {
                     pdfFiles.push(tempPdfPath);
                 } else {
                     console.error(`Το αρχείο PDF ${company}_contract_${i}.pdf δεν βρέθηκε.`);
                 }
             }
-        
+
             async function mergePdfs(pdfPaths) {
                 if (pdfPaths.length === 1) {
                     const singlePdfPath = pdfPaths[0];
                     const finalPdfPath = path.join(outputFolder, `${company}_contract_merged.pdf`);
                     try {
                         await fs.rename(singlePdfPath, finalPdfPath);
-                        console.log(`Το αρχείο ${singlePdfPath} μετονομάστηκε επιτυχώς σε ${finalPdfPath}`);
+                        console.log(
+                            `Το αρχείο ${singlePdfPath} μετονομάστηκε επιτυχώς σε ${finalPdfPath}`
+                        );
                     } catch (error) {
                         console.error(`Error κατά τη μετονομασία του αρχείου: ${error.message}`);
                     }
                     return finalPdfPath;
                 } else if (pdfPaths.length > 1) {
                     const mergedPdfDoc = await PDFDocument.create();
-        
+
                     for (const pdfPath of pdfPaths) {
                         let pdfBytes;
                         try {
                             pdfBytes = await fs.readFile(pdfPath);
                         } catch (error) {
-                            console.error(`Error κατά την ανάγνωση του αρχείου PDF: ${error.message}`);
+                            console.error(
+                                `Error κατά την ανάγνωση του αρχείου PDF: ${error.message}`
+                            );
                         }
                         const pdfDoc = await PDFDocument.load(pdfBytes);
-                        const copiedPages = await mergedPdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
-                        copiedPages.forEach(page => mergedPdfDoc.addPage(page)); 
+                        const copiedPages = await mergedPdfDoc.copyPages(
+                            pdfDoc,
+                            pdfDoc.getPageIndices()
+                        );
+                        copiedPages.forEach((page) => mergedPdfDoc.addPage(page));
                     }
-                
-                    const finalPdfPath = path.join(outputFolder, `${company}_contract_merged.pdf`); 
+
+                    const finalPdfPath = path.join(outputFolder, `${company}_contract_merged.pdf`);
                     try {
                         await fs.writeFile(finalPdfPath, await mergedPdfDoc.save());
                         console.log(`Το αρχείο PDF αποθηκεύτηκε επιτυχώς στο ${finalPdfPath}`);
                     } catch (error) {
-                        console.error(`Error κατά την αποθήκευση του PDF αρχείου: ${error.message}`);
+                        console.error(
+                            `Error κατά την αποθήκευση του PDF αρχείου: ${error.message}`
+                        );
                     }
                     return finalPdfPath;
                 }
             }
 
             const mergedPdfPath = await mergePdfs(pdfFiles);
-            const checkMessage = "ok";
+            const checkMessage = 'ok';
 
             const finalPdfPath = path.join(outputFolder, `${company}_contract_merged.pdf`);
 
@@ -810,52 +927,51 @@ class ektyposhSymbaseonController {
             const pdfLink = `${baseUrl}/pdf/${pdfFilename}`;
 
             const htmlLink = `Το PDF αρχείο των συμβάσεων έχει δημιουργηθεί. </br> Κάντε κλικ <a href="${pdfLink}" target="_blank" style="font-weight: 700 !important;">εδώ</a> για να το εκτυπώσετε. </br> <strong>ΠΡΟΣΟΧΗ!!!</strong> </br> Τα αρχεία που δημιουργήθηκαν θα διαγραφούν σε 3 λεπτά.`;
-        
+
             const failedDeletes = [];
 
             setTimeout(async () => {
-              try {
-                const allFiles = await fs.readdir(outputFolder);
-                const filesToDelete = allFiles.filter(file =>
-                  file.startsWith(`${company}_contract_`) &&
-                  (file.endsWith('.docx') || file.endsWith('.pdf'))
-                );
-            
-                for (const file of filesToDelete) {
-                  const filePath = path.join(outputFolder, file);
-                  try {
-                    await fs.unlink(filePath);
-                    console.log(`✅ Διαγράφηκε: ${filePath}`);
-                  } catch (err) {
-                    if (err.code === 'EBUSY' || err.code === 'EPERM') {
-                      console.warn(`❌ Δεν διαγράφηκε (ανοικτό): ${filePath}`);
-                      failedDeletes.push(file);
+                try {
+                    const allFiles = await fs.readdir(outputFolder);
+                    const filesToDelete = allFiles.filter(
+                        (file) =>
+                            file.startsWith(`${company}_contract_`) &&
+                            (file.endsWith('.docx') || file.endsWith('.pdf'))
+                    );
+
+                    for (const file of filesToDelete) {
+                        const filePath = path.join(outputFolder, file);
+                        try {
+                            await fs.unlink(filePath);
+                            console.log(`✅ Διαγράφηκε: ${filePath}`);
+                        } catch (err) {
+                            if (err.code === 'EBUSY' || err.code === 'EPERM') {
+                                console.warn(`❌ Δεν διαγράφηκε (ανοικτό): ${filePath}`);
+                                failedDeletes.push(file);
+                            }
+                        }
                     }
-                  }
+
+                    if (failedDeletes.length > 0) {
+                        res.locals.warningMessage = `⚠ Ορισμένα αρχεία (${failedDeletes.length}) δεν διαγράφηκαν επειδή είναι ανοικτά.`;
+                    }
+                } catch (err) {
+                    console.error('❌ Σφάλμα κατά τη διαγραφή αρχείων:', err);
                 }
-            
-                if (failedDeletes.length > 0) {
-                  res.locals.warningMessage = `⚠ Ορισμένα αρχεία (${failedDeletes.length}) δεν διαγράφηκαν επειδή είναι ανοικτά.`;
-                }
-            
-              } catch (err) {
-                console.error("❌ Σφάλμα κατά τη διαγραφή αρχείων:", err);
-              }
             }, 180000);
-            
-            res.json({ 
-                success: true, 
-                redirectUrl: "/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon", 
+
+            res.json({
+                success: true,
+                redirectUrl: '/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon',
                 fileLink: htmlLink,
                 checkMessage: checkMessage,
                 warningMessage: res.locals.warningMessage || null
             });
-
         } catch (error) {
             console.error('Error fetching contracts:', error);
             res.status(500).send('Error fetching contracts');
         }
-    }
+    };
 }
 
 module.exports = ektyposhSymbaseonController;

@@ -1,4 +1,4 @@
-const { Schema: _Schema, model } = require('mongoose');
+const { Schema: _Schema, model, mongoose } = require('mongoose');
 
 const Schema = _Schema;
 
@@ -199,8 +199,8 @@ EmmesosErgodothsSchema.index(
     {
         unique: true,
         partialFilterExpression: {
-            team: { $exists: true, $type: 'string', $gt: '' },
-            kodikos: { $exists: true, $type: 'string', $gt: '' }
+            team: mongoose.trusted({ $exists: true, $type: 'string', $gt: '' }),
+            kodikos: mongoose.trusted({ $exists: true, $type: 'string', $gt: '' })
         }
     }
 );

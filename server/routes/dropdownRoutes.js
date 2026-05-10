@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const express = require('express');
 const router = express.Router();
 
@@ -313,16 +314,18 @@ router.get(
         sort: { kodikos: 1 },
         extraQueryBuilder: (q) => {
             if (!q._dateApo || !q._dateEos) return {};
-            const dA = new Date(q._dateApo),
-                dE = new Date(q._dateEos);
-            return {
+
+            const dA = new Date(q._dateApo);
+            const dE = new Date(q._dateEos);
+
+            return mongoose.trusted({
                 isxyei_apo: { $lte: dA },
                 $or: [
                     { isxyei_eos: { $exists: false } },
                     { isxyei_eos: null },
                     { isxyei_eos: { $gte: dE } }
                 ]
-            };
+            });
         },
 
         // --- ΜΟΝΟ ΓΙΑ asfalistikh_klash ---

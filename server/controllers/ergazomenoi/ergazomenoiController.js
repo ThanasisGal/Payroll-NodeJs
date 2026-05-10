@@ -202,10 +202,10 @@ class ergazomenoiController {
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod,
-                hmeromhnia: {
+                hmeromhnia: mongoose.trusted({
                     $gte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_apo),
                     $lte: new Date(ergazomenoiData.hmeromhnia_allaghs_orarioy_eos)
-                }
+                })
             })
                 .sort({ hmeromhnia: 1 })
                 .exec();
@@ -2487,7 +2487,7 @@ class ergazomenoiController {
                         team: team,
                         company_kod: company_kod,
                         kodikos: kodikos,
-                        hmeromhnia: { $gte: startDate, $lte: endDate }
+                        hmeromhnia: mongoose.trusted({ $gte: startDate, $lte: endDate })
                     }
                 },
                 {

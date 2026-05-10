@@ -444,11 +444,11 @@ class genikaAPIsController {
                 if (searchValue) {
                     if (!isNaN(searchValue.substring(0, 2))) {
                         results = await KadModel.find({
-                            kodikos: { $regex: searchValue, $options: 'i' }
+                            kodikos: mongoose.trusted({ $regex: searchValue, $options: 'i' })
                         }).select('kodikos perigrafh');
                     } else {
                         results = await KadModel.find({
-                            perigrafh: { $regex: searchValue, $options: 'i' }
+                            perigrafh: mongoose.trusted({ $regex: searchValue, $options: 'i' })
                         }).select('kodikos perigrafh');
                     }
                     searchData.push(...results);
@@ -819,12 +819,14 @@ class genikaAPIsController {
             // Δημιουργία του query object με βάση το searchTerm
             let query = {};
             if (searchTerm) {
-                query = {
+                const safeSearchTerm = String(searchTerm).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                query = mongoose.trusted({
                     $or: [
-                        { kodikos: { $regex: searchTerm, $options: 'i' } }, // Αναζήτηση με βάση τον κωδικό
-                        { perigrafh: { $regex: searchTerm, $options: 'i' } } // Αναζήτηση με βάση την περιγραφή
+                        { kodikos: { $regex: safeSearchTerm, $options: 'i' } },
+                        { perigrafh: { $regex: safeSearchTerm, $options: 'i' } }
                     ]
-                };
+                });
             }
 
             const eidikothtes = await EidikothtesErganhModel.find(query); // Χρήση του query object για την αναζήτηση
@@ -878,7 +880,7 @@ class genikaAPIsController {
 
             // Ανάκτηση εγγραφών από το EidikothtesEfkaModel
             const eidikothta_efka = await EidikothtesEfkaModel.find({
-                kodikos: { $in: kodikoiEidikothtas }
+                kodikos: mongoose.trusted({ $in: kodikoiEidikothtas })
             })
                 .sort('kodikos')
                 .lean();
@@ -1136,7 +1138,7 @@ class genikaAPIsController {
         try {
             const dates = req.body.dates;
             const argies = await ArgiesModel.find({
-                hmeromhnia: { $in: dates }
+                hmeromhnia: mongoose.trusted({ $in: dates })
             }).exec();
             const holidays = argies.map((argia) => ({
                 date: argia.hmeromhnia.toISOString().split('T')[0],
@@ -1225,7 +1227,7 @@ class genikaAPIsController {
                 team: team,
                 company_kod: company_kod,
                 kodikos: kodikos,
-                hmeromhnia: { $gte: start, $lte: end }
+                hmeromhnia: mongoose.trusted({ $gte: start, $lte: end })
             }).sort({ hmeromhnia: 1 });
 
             res.json(records);

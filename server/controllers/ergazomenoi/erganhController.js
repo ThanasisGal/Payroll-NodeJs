@@ -1442,138 +1442,6 @@ function parseGRDate(value) {
     return null;
 }
 
-// async function saveTelikoToMongo(sheetTeliko, sessionTeam) {
-//     const rows = [];
-//     sheetTeliko.eachRow((row, rowNumber) => {
-//         rows.push({
-//             rowNumber,
-//             afm: row.getCell(2).text?.trim(),
-//             eponimo: row.getCell(3).text?.trim(),
-//             onoma: row.getCell(4).text?.trim(),
-//             hmeromhnia_raw: row.getCell(5).value,
-//             kathgoria: row.getCell(6).text?.trim(),
-//             apo_ora: row.getCell(7).text?.trim(),
-//             eos_ora: row.getCell(8).text?.trim()
-//         });
-//     });
-
-//     // ✅ ΒΗΜΑ 1: Μάζεψε όλα τα μοναδικά AFM
-//     const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
-
-//     // ✅ ΒΗΜΑ 2: Φόρτωσε όλους τους εργαζόμενους με ΜΙΑ query
-//     const ergazomenoiList = await ErgazomenoiModel.find({
-//         afm: { $in: uniqueAfms }
-//     }).lean();
-
-//     // ✅ ΒΗΜΑ 3: Map afm → ergazomenos για γρήγορη αναζήτηση
-//     const ergazomenoiMap = {};
-//     ergazomenoiList.forEach((e) => {
-//         ergazomenoiMap[e.afm] = e;
-//     });
-
-//     // ✅ ΒΗΜΑ 4: Φτιάξε τα records
-//     const bulkOps = [];
-//     let i = 0;
-
-//     while (i < rows.length) {
-//         const current = rows[i];
-
-//         if (!current.afm) {
-//             i++;
-//             continue;
-//         }
-
-//         const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
-
-//         if (!hmeromhnia) {
-//             console.warn(
-//                 `[saveTelikoToMongo] ⚠️ Άκυρη ημερομηνία στη γραμμή ${current.rowNumber} ` +
-//                     `(raw: "${current.hmeromhnia_raw}") για ΑΦΜ: ${current.afm} — παραλείπεται`
-//             );
-//             i++;
-//             continue;
-//         }
-
-//         const hmeromhniaStr = hmeromhnia.toISOString().split('T')[0];
-
-//         const ergazomenos = ergazomenoiMap[current.afm];
-
-//         if (!ergazomenos) {
-//             // console.log(`[saveTelikoToMongo] ⚠️ Δεν βρέθηκε εργαζόμενος με ΑΦΜ: ${current.afm}`);
-//             i++;
-//             continue;
-//         }
-
-//         const record = {
-//             team: ergazomenos.team,
-//             company_kod: ergazomenos.company_kod,
-//             kodikos: ergazomenos.kodikos,
-//             hmeromhnia: hmeromhnia,
-//             kathgoria_ergasias: current.kathgoria,
-//             apo_ora_01: current.apo_ora || '',
-//             eos_ora_01: current.eos_ora || '',
-//             apo_ora_02: '',
-//             eos_ora_02: '',
-//             apo_ora_03: '',
-//             eos_ora_03: ''
-//         };
-
-//         // Έλεγξε επόμενη γραμμή — ίδια ημερομηνία;
-//         if (i + 1 < rows.length) {
-//             const next1 = rows[i + 1];
-//             const next1Date = parseGRDate(next1.hmeromhnia_raw);
-
-//             if (next1Date && next1Date.getTime() === hmeromhnia.getTime()) {
-//                 record.apo_ora_02 = next1.apo_ora || '';
-//                 record.eos_ora_02 = next1.eos_ora || '';
-//                 i++;
-
-//                 if (i + 1 < rows.length) {
-//                     const next2 = rows[i + 1];
-//                     const next2Date = parseGRDate(next2.hmeromhnia_raw);
-
-//                     if (next2Date && next2Date.getTime() === hmeromhnia.getTime()) {
-//                         record.apo_ora_03 = next2.apo_ora || '';
-//                         record.eos_ora_03 = next2.eos_ora || '';
-//                         i++;
-//                     }
-//                 }
-//             }
-//         }
-
-//         // ✅ Προσθήκη στο bulkOps array — ΟΧΙ await εδώ
-//         bulkOps.push({
-//             updateOne: {
-//                 filter: {
-//                     team: ergazomenos.team,
-//                     company_kod: ergazomenos.company_kod,
-//                     kodikos: ergazomenos.kodikos,
-//                     hmeromhnia: hmeromhnia
-//                 },
-//                 update: { $set: record },
-//                 upsert: true
-//             }
-//         });
-
-//         // console.log(
-//         //     `[saveTelikoToMongo] 📋 ${ergazomenos.kodikos} | ${hmeromhniaStr} | ${record.kathgoria_ergasias}`
-//         // );
-
-//         i++;
-//     }
-
-//     // ✅ ΒΗΜΑ 5: ΜΙΑ μόνο κλήση στη ΒΔ για ΟΛΑ τα records
-//     if (bulkOps.length > 0) {
-//         const result = await OrariaFromErganhModel.bulkWrite(bulkOps, { ordered: false });
-//     }
-// }
-
-// ============================================================
-// Αποθήκευση στο ProdhlomenaOrariaModel
-// - merge ζευγών ωρών ίδιας ημερομηνίας (έως 3)
-// - argia / perigrafh_argias από ArgiesModel
-// - repo = true αν F = "ΑΝ"
-// - parallel bulkWrite σε chunks
 // ============================================================
 async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     const CHUNK_SIZE = 1000; // ops ανά bulkWrite
@@ -1597,7 +1465,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     // -------- 2) Φόρτωσε εργαζόμενους ΜΙΑ φορά --------
     const uniqueAfms = [...new Set(rows.map((r) => r.afm).filter(Boolean))];
     const ergazomenoiList = await ErgazomenoiModel.find({
-        afm: { $in: uniqueAfms }
+        afm: mongoose.trusted({ $in: uniqueAfms })
     }).lean();
 
     const ergazomenoiMap = {};
@@ -1620,7 +1488,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
 
     let argiesList = [];
     if (argiesOr.length > 0) {
-        argiesList = await ArgiesModel.find({ $or: argiesOr }).lean();
+        argiesList = await ArgiesModel.find({ $or: mongoose.trusted(argiesOr) }).lean();
     }
 
     // Map: "team|company_kod|<timestamp ημερομηνίας UTC>" -> perigrafh
@@ -2218,7 +2086,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
     // -------- 3) Φόρτωσε ergazomenoi με ΜΙΑ query --------
     const uniqueAfms = [...new Set([...groups.values()].map((g) => g.afm))];
     const ergazomenoiList = await ErgazomenoiModel.find({
-        afm: { $in: uniqueAfms }
+        afm: mongoose.trusted({ $in: uniqueAfms })
     }).lean();
 
     const ergazomenoiMap = {};

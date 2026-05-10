@@ -1,7 +1,7 @@
-// module.exports = { uploadWtoTemporary };
-
-// wtoTemporaryUploader.js
+/// wtoTemporaryUploader.js
 'use strict';
+
+const mongoose = require('mongoose');
 
 const fs = require('fs-extra');
 const path = require('path');
@@ -529,15 +529,29 @@ async function fetchWeeklySchedule(ergazomenosData) {
             kodikos: ergazomenosData.kodikos
         };
 
+        // if (ergazomenosData.hmeromhnia_allaghs_orarioy_apo) {
+        //     query.hmeromhnia = {
+        //         $gte: new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_apo)
+        //     };
+        // }
+
+        // if (ergazomenosData.hmeromhnia_allaghs_orarioy_eos) {
+        //     query.hmeromhnia = query.hmeromhnia || {};
+        //     query.hmeromhnia.$lte = new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_eos);
+        // }
+
+        const hmeromhniaFilter = {};
+
         if (ergazomenosData.hmeromhnia_allaghs_orarioy_apo) {
-            query.hmeromhnia = {
-                $gte: new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_apo)
-            };
+            hmeromhniaFilter.$gte = new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_apo);
         }
 
         if (ergazomenosData.hmeromhnia_allaghs_orarioy_eos) {
-            query.hmeromhnia = query.hmeromhnia || {};
-            query.hmeromhnia.$lte = new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_eos);
+            hmeromhniaFilter.$lte = new Date(ergazomenosData.hmeromhnia_allaghs_orarioy_eos);
+        }
+
+        if (Object.keys(hmeromhniaFilter).length > 0) {
+            query.hmeromhnia = mongoose.trusted(hmeromhniaFilter);
         }
 
         log('   Query:', JSON.stringify(query, null, 2));
