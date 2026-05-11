@@ -1222,7 +1222,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const userWantsMA =
                         result.value?.e3_metaboles_ergasiakhs_sxeshs === true ||
                         result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy ===
-                            true;
+                            true ||
+                        result.value?.ma_217 === true;
 
                     if (
                         userWantsMA &&
@@ -1242,11 +1243,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (maUrlToSend) {
                             try {
                                 console.log('[MA-UPLOAD] Uploading MA XML...');
+
                                 maResult = await uploadMaToErganh(
                                     data.data._id,
                                     maUrlToSend,
-                                    result.value?.isPermanent === true
+                                    result.value?.isPermanent === true,
+                                    maXmlData?.processCode ||
+                                        (result.value?.ma_217 === true ? '217' : undefined)
                                 );
+
                                 console.log('[MA-UPLOAD] Result:', maResult);
                             } catch (e) {
                                 console.error('[MA-UPLOAD] ❌ Exception:', e?.message || e);
@@ -2529,7 +2534,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================================
     // ✅ HELPER FUNCTION: Upload MA to ERGANH (Μεταβολή Στοιχείων)
     // ============================================================================
-    async function uploadMaToErganh(ergazomenosId, s3Url, isPermanent = false) {
+    async function uploadMaToErganh(ergazomenosId, s3Url, isPermanent = false, processCode = null) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
         if (!s3Url || typeof s3Url !== 'string') {
@@ -2560,7 +2565,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
                 credentials: 'include',
-                body: JSON.stringify({ ergazomenosId, s3Url, isPermanent: isPermanent === true })
+                body: JSON.stringify({
+                    ergazomenosId,
+                    s3Url,
+                    isPermanent: isPermanent === true,
+                    processCode
+                })
             });
 
             let payload;

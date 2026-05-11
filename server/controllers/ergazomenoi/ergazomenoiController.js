@@ -2011,7 +2011,7 @@ class ergazomenoiController {
                 { username: erganhUsername, password: erganhPassword },
                 {
                     isPermanent: isPermanent === true,
-                    processCode: processCode || 'e3_metaboles_ergasiakhs_sxeshs' // → '230'
+                    processCode: String(processCode || '230')
                 }
             );
 
@@ -3506,7 +3506,8 @@ class ergazomenoiController {
 
         const wantsMA =
             filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs === true ||
-            filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true;
+            filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true ||
+            filesToUpdate?.ma_217 === true;
 
         if (wantsMA) {
             logger.info('MA XML generation requested', {
@@ -3520,14 +3521,60 @@ class ergazomenoiController {
             });
 
             try {
-                const { generateMAXML } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
+                const formData = req.body.formData || {};
 
-                const { hmeromhnia_metabolhs } = req.body.formData || {};
+                let maResult;
+                let maProcessCode;
 
-                const maResult = await generateMAXML(updatedErgazomenos, company, ypokatasthmata, {
-                    hmeromhnia_metabolhs: hmeromhnia_metabolhs || '',
-                    processCode: filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs ? '230' : '231'
-                });
+                if (filesToUpdate?.ma_217 === true) {
+                    const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
+                    const {
+                        generateE5NPdf
+                    } = require('../utils/pdfGenerators/e5nTemplatePdfGenerator');
+                    maProcessCode = '217';
+
+                    const hmeromhniaApoxwrhshs =
+                        formData.hmeromhnia_apoxorhshs ||
+                        formData.hmeromhnia_apoxwrhshs ||
+                        updatedErgazomenos.hmeromhnia_apoxorhshs ||
+                        updatedErgazomenos.hmeromhnia_apoxwrhshs ||
+                        updatedErgazomenos.hmeromhnia_apoxorisis ||
+                        updatedErgazomenos.apoxwrisidate ||
+                        '';
+
+                    const e5PdfResult = await generateE5NPdf(
+                        updatedErgazomenos,
+                        company,
+                        ypokatasthmata,
+                        {
+                            hmeromhnia_apoxwrhshs: hmeromhniaApoxwrhshs
+                        }
+                    );
+
+                    if (!e5PdfResult?.success || !e5PdfResult?.s3Key) {
+                        throw new Error(
+                            e5PdfResult?.error ||
+                                'Αποτυχία δημιουργίας PDF εντύπου Ε5Ν για επισύναψη στο XML.'
+                        );
+                    }
+
+                    maResult = await generateE5NXML(updatedErgazomenos, company, ypokatasthmata, {
+                        hmeromhnia_apoxwrhshs: hmeromhniaApoxwrhshs,
+                        e5_pdf_path: e5PdfResult.s3Key,
+                        processCode: maProcessCode
+                    });
+                } else {
+                    const {
+                        generateMAXML
+                    } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
+
+                    maProcessCode = filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs ? '230' : '231';
+
+                    maResult = await generateMAXML(updatedErgazomenos, company, ypokatasthmata, {
+                        hmeromhnia_metabolhs: formData.hmeromhnia_metabolhs || '',
+                        processCode: maProcessCode
+                    });
+                }
 
                 maXmlData = {
                     success: true,
@@ -3536,11 +3583,13 @@ class ergazomenoiController {
                     s3Url: maResult.s3Url,
                     relativePath: maResult.relativePath,
                     downloadUrl: maResult.downloadUrl,
-                    filename: maResult.filename
+                    filename: maResult.filename,
+                    processCode: maProcessCode
                 };
 
                 logger.info('MA XML generated successfully', {
                     module: 'MA-XML',
+                    processCode: maProcessCode,
                     s3_key: maResult.s3Key,
                     filename: maResult.filename
                 });

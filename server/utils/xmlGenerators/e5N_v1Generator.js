@@ -63,6 +63,7 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
 
         if (pdfPath) {
             try {
+                console.log('[E5N-GENERATOR-v1] pdfPath:', pdfPath);
                 console.log('📥 [E5N-GENERATOR-v1] Downloading E5N PDF from S3...');
                 const { downloadFileFromS3 } = require('../s3Helper');
                 const pdfBuffer = await downloadFileFromS3(pdfPath);
@@ -113,6 +114,15 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
         // =====================================================================
         // ✅ FIELD MAPPING βάσει E5N_v1.xsd και testApoxwrhshsNew.xml
         // =====================================================================
+
+        // =====================================================================
+        // ✅ REQUIRED BUSINESS ATTACHMENT CHECK
+        // Το ΕΡΓΑΝΗ ΙΙ απαιτεί πραγματικό PDF στο f_file,
+        // ακόμα και για προσωρινή αποθήκευση.
+        // =====================================================================
+        if (!e5PdfBase64 || e5PdfBase64.trim() === '') {
+            throw new Error('[E5N-GENERATOR-v1] Λείπει το υποχρεωτικό PDF Εντύπου Ε5Ν (f_file).');
+        }
 
         const xmlData = {
             f_aa_pararthmatos: String(ypokatasthmataData?.kodikos || '0'),
