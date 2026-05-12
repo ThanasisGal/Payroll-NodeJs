@@ -1058,6 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('contractPdf.s3Key:', data?.contractPdf?.s3Key || null);
                 console.log('pdfResults:', data?.pdfResults || []);
                 console.log('e3XmlData:', data?.e3XmlData || null);
+                console.log('maXmlData:', data?.maXmlData || null);
                 console.log('wtoXmlData:', data?.wtoXmlData || null);
                 console.groupEnd();
 

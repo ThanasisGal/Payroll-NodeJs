@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { ObjectId } = require('mongodb');
+const { ObjectId } = mongoose.Types;
+
 const fs = require('fs-extra');
 
 const Models_A = require('../../models/param');

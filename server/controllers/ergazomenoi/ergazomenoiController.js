@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { ObjectId } = require('mongodb');
+const { ObjectId } = mongoose.Types;
+
 const path = require('path');
 const fs = require('fs-extra');
 const logger = require('../../utils/logger');
@@ -3530,7 +3531,7 @@ class ergazomenoiController {
                     const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
                     const {
                         generateE5NPdf
-                    } = require('../utils/pdfGenerators/e5nTemplatePdfGenerator');
+                    } = require('../../utils/pdfGenerators/e5nTemplatePdfGenerator');
                     maProcessCode = '217';
 
                     const hmeromhniaApoxwrhshs =
