@@ -86,7 +86,17 @@
                     </label>
                 </div>
                 <div class="col-1-5">
-                    <input type="date" name="hmeromhnia_allaghs_orarioy_eos" id="hmeromhnia_allaghs_orarioy_eos" class="date-control" value="<%= safe('hmeromhnia_allaghs_orarioy_eos') ? new Date(safe('hmeromhnia_allaghs_orarioy_eos')).toISOString().split('T')[0] : '' %>" />
+                    <input type="date"
+                        name="hmeromhnia_allaghs_orarioy_eos"
+                        id="hmeromhnia_allaghs_orarioy_eos"
+                        class="date-control"
+                        value="<%= safe('hmeromhnia_allaghs_orarioy_eos') ? new Date(safe('hmeromhnia_allaghs_orarioy_eos')).toISOString().split('T')[0] : '' %>" />
+
+                    <!-- Αρχική τιμή κατά το load της φόρμας -->
+                    <input type="text"
+                        name="hmeromhnia_allaghs_orarioy_eos_hidden"
+                        id="hmeromhnia_allaghs_orarioy_eos_hidden"
+                        value="" />
                 </div>
             </div>
 

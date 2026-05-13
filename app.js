@@ -69,18 +69,18 @@ const mongoUrl = process.env.MONGODB_URL;
 const EGGRAFES = Number.parseInt(process.env.EGGRAFES ?? '15', 10) || 15;
 
 // Εκκίνηση - καταγραφή ρυθμίσεων
-// logger.info('========================================');
-// logger.info('🔧 ENVIRONMENT CONFIG');
-// logger.info('========================================');
-// logger.info(`NODE_ENV:          ${node_env}`);
-// logger.info(`STATIC_BASE:       ${STATIC_BASE}`);
-// logger.info(`isProd:            ${isProd}`);
-// logger.info(`CDN_DOMAIN:        ${CDN_DOMAIN}`);
-// logger.info(`S3_BUCKET:         ${S3_BUCKET}`);
-// if (CLOUDFRONT_DOMAIN) {
-//     logger.info(`CloudFront:         ${CLOUDFRONT_DOMAIN}`);
-// }
-// logger.info('========================================');
+logger.info('========================================');
+logger.info('🔧 ENVIRONMENT CONFIG');
+logger.info('========================================');
+logger.info(`NODE_ENV:          ${node_env}`);
+logger.info(`STATIC_BASE:       ${STATIC_BASE}`);
+logger.info(`isProd:            ${isProd}`);
+logger.info(`CDN_DOMAIN:        ${CDN_DOMAIN}`);
+logger.info(`S3_BUCKET:         ${S3_BUCKET}`);
+if (CLOUDFRONT_DOMAIN) {
+    logger.info(`CloudFront:         ${CLOUDFRONT_DOMAIN}`);
+}
+logger.info('========================================');
 
 if (isProd) app.set('trust proxy', 1);
 
@@ -232,11 +232,6 @@ app.use(
     })
 );
 
-// app.locals.script = (path) => {
-//     const cleanPath = path.replace(/\.js$/i, '').trim().replace(/\s+/g, '');
-//     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
-//     return `${baseURL}/${cleanPath}.js`.replace(/\s+/g, '');
-// };
 try {
     const packageJsonPath = path.join(__dirname, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -282,9 +277,9 @@ app.use((req, res, next) => {
     next();
 });
 
-// logger.info(
-//     `Sessions: ${mongoUrl ? 'MongoStore' : 'MemoryStore'} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`
-// );
+logger.info(
+    `Sessions: ${mongoUrl ? 'MongoStore' : 'MemoryStore'} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`
+);
 
 app.use(flash({ sessionKeyName: 'flashMessage' }));
 app.use(getSessionVars);
@@ -400,11 +395,11 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
         const timeSinceLastActivity = now - lastActivity;
         const remainingMs = Math.max(0, INACTIVITY_TIMEOUT - timeSinceLastActivity);
 
-        // logger.info('[SESSION REFRESH] Request received', {
-        //     userId: req.session.userId,
-        //     timeSinceLastActivity: Math.floor(timeSinceLastActivity / 60000) + ' min',
-        //     remainingMs: Math.floor(remainingMs / 60000) + ' min'
-        // });
+        logger.info('[SESSION REFRESH] Request received', {
+            userId: req.session.userId,
+            timeSinceLastActivity: Math.floor(timeSinceLastActivity / 60000) + ' min',
+            remainingMs: Math.floor(remainingMs / 60000) + ' min'
+        });
 
         // ═══════════════════════════════════════════════════════════════════════
         // ✅ CHECK: If remaining time > grace period → ALLOW REFRESH
@@ -429,10 +424,10 @@ app.post('/api/session/refresh', isAuthenticated, async (req, res) => {
                 // ✅ Reset to full INACTIVITY_TIMEOUT (60 min)
                 const newRemainingMs = INACTIVITY_TIMEOUT;
 
-                // logger.info('[SESSION REFRESH] ✅ Session refreshed', {
-                //     userId: req.session.userId,
-                //     newRemaining: Math.floor(newRemainingMs / 60000) + ' min'
-                // });
+                logger.info('[SESSION REFRESH] ✅ Session refreshed', {
+                    userId: req.session.userId,
+                    newRemaining: Math.floor(newRemainingMs / 60000) + ' min'
+                });
 
                 return res.json({
                     success: true,
@@ -512,7 +507,7 @@ const buildCSPDirectives = () => {
         cdnDomains.push(`https://${CLOUDFRONT_DOMAIN}`);
     }
 
-    // logger.info(`CSP: Επιτρέπονται scripts από: ${cdnDomains.join(', ')}`);
+    logger.info(`CSP: Επιτρέπονται scripts από: ${cdnDomains.join(', ')}`);
 
     const directives = {
         'default-src': ["'self'"],
@@ -638,26 +633,22 @@ app.use((req, res, next) => {
     }
 
     if (!validateSimpleCsrfToken(req)) {
-        // logger.error('❌ CSRF validation FAILED:');
-        // logger.error(`  Path: ${req.path}`);
-        // logger.error(`  Method: ${req.method}`);
-        // logger.error(`  Cookie token : ${req.cookies['psifl.x-csrf-token'] || 'MISSING'}`);
-        // logger.error(`  Body _csrf   : ${req.body?._csrf || 'MISSING'}`);
-        // logger.error(`  Header csrf  : ${req.headers['csrf-token'] || 'MISSING'}`);
-        // logger.error(`  Header x-csrf: ${req.headers['x-csrf-token'] || 'MISSING'}`);
-        // logger.error(`  Query _csrf  : ${req.query?._csrf || 'MISSING'}`);
-        // logger.error(
-        //     `  Match?       : cookie===body → ${req.cookies['psifl.x-csrf-token'] === req.body?._csrf}`
-        // );
+        logger.error('❌ CSRF validation FAILED:');
+        logger.error(`  Path: ${req.path}`);
+        logger.error(`  Method: ${req.method}`);
+        logger.error(`  Cookie token : ${req.cookies['psifl.x-csrf-token'] || 'MISSING'}`);
+        logger.error(`  Body _csrf   : ${req.body?._csrf || 'MISSING'}`);
+        logger.error(`  Header csrf  : ${req.headers['csrf-token'] || 'MISSING'}`);
+        logger.error(`  Header x-csrf: ${req.headers['x-csrf-token'] || 'MISSING'}`);
+        logger.error(`  Query _csrf  : ${req.query?._csrf || 'MISSING'}`);
+        logger.error(
+            `  Match?       : cookie===body → ${req.cookies['psifl.x-csrf-token'] === req.body?._csrf}`
+        );
         return res.status(403).json({
             error: 'CSRF validation failed',
             message: 'Invalid or missing CSRF token'
         });
     }
-
-    // if (req.path.includes('/api/forologikes-klimakes')) {
-    //     logger.info('✅ CSRF validation PASSED');
-    // }
 
     next();
 });
@@ -731,21 +722,11 @@ app.locals.css = (path) => {
     }
 };
 
-// try {
-//     const packageJsonPath = path.join(__dirname, 'package.json');
-//     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-//     app.locals.appVersion = packageJson.version;
-//     // logger.info(`✅ App Version: ${packageJson.version}`);
-// } catch (error) {
-//     // logger.error('⚠️ Failed to read version from package.json:', error.message);
-//     app.locals.appVersion = '1.0.0';
-// }
-
 app.locals.nodeEnv = process.env.NODE_ENV || 'development';
 app.locals.isProduction = process.env.NODE_ENV === 'production';
 app.locals.isDevelopment = process.env.NODE_ENV !== 'production';
 
-// logger.info(`✅ Environment: ${app.locals.nodeEnv}`);
+logger.info(`✅ Environment: ${app.locals.nodeEnv}`);
 
 /* -------------------------------------------------------------------------- */
 /*                             Views / layouts (EJS)                          */
@@ -814,12 +795,12 @@ app.use((req, res) => {
 // ============================================================================
 async function initializeTextCacheSystem() {
     try {
-        // logger.info('\n' + '='.repeat(70));
-        // logger.info('🚀 INITIALIZING TEXT CACHE SYSTEM');
-        // logger.info('='.repeat(70) + '\n');
+        logger.info('\n' + '='.repeat(70));
+        logger.info('🚀 INITIALIZING TEXT CACHE SYSTEM');
+        logger.info('='.repeat(70) + '\n');
 
         // STEP 1: Load Eidikes Kathgories από MongoDB
-        // logger.info('📚 STEP 1/2: Loading Eidikes Kathgories from MongoDB...\n');
+        logger.info('📚 STEP 1/2: Loading Eidikes Kathgories from MongoDB...\n');
 
         await textLoader.initializeConditionsMap();
 
@@ -830,41 +811,41 @@ async function initializeTextCacheSystem() {
             throw new Error('No valid categories loaded from MongoDB!');
         }
 
-        // logger.info(`\n✅ STEP 1/2 COMPLETE: ${categoryCount} categories loaded\n`);
+        logger.info(`\n✅ STEP 1/2 COMPLETE: ${categoryCount} categories loaded\n`);
 
         // STEP 2: Initialize Text Cache Manager
-        // logger.info('☁️  STEP 2/2: Syncing templates from S3 and loading to RAM...\n');
+        logger.info('☁️  STEP 2/2: Syncing templates from S3 and loading to RAM...\n');
 
         await textCacheManager.initialize();
 
         const cacheStats = textCacheManager.getStats();
 
-        // if (cacheStats.totalFiles === 0) {
-        // logger.warn('⚠️  WARNING: No template files found in S3 cache!');
-        // logger.warn('⚠️  Make sure you have uploaded txt files to S3.');
-        // } else {
-        // logger.info(
-        //     `\n✅ STEP 2/2 COMPLETE: ${cacheStats.totalFiles} templates loaded to RAM\n`
-        // );
-        // }
+        if (cacheStats.totalFiles === 0) {
+            logger.warn('⚠️  WARNING: No template files found in S3 cache!');
+            logger.warn('⚠️  Make sure you have uploaded txt files to S3.');
+        } else {
+            logger.info(
+                `\n✅ STEP 2/2 COMPLETE: ${cacheStats.totalFiles} templates loaded to RAM\n`
+            );
+        }
 
-        // logger.info('='.repeat(70));
-        // logger.info('✅ TEXT CACHE SYSTEM INITIALIZED SUCCESSFULLY');
-        // logger.info('='.repeat(70));
-        // logger.info(`📊 Categories: ${categoryCount}`);
-        // logger.info(`📊 Templates:  ${cacheStats.totalFiles}`);
-        // logger.info(`📊 Memory:     ${cacheStats.memory?.cacheSizeMB || 'N/A'} MB`);
-        // logger.info(`📊 Teams:      ${Object.keys(cacheStats.teams || {}).join(', ') || 'None'}`);
-        // logger.info('='.repeat(70) + '\n');
+        logger.info('='.repeat(70));
+        logger.info('✅ TEXT CACHE SYSTEM INITIALIZED SUCCESSFULLY');
+        logger.info('='.repeat(70));
+        logger.info(`📊 Categories: ${categoryCount}`);
+        logger.info(`📊 Templates:  ${cacheStats.totalFiles}`);
+        logger.info(`📊 Memory:     ${cacheStats.memory?.cacheSizeMB || 'N/A'} MB`);
+        logger.info(`📊 Teams:      ${Object.keys(cacheStats.teams || {}).join(', ') || 'None'}`);
+        logger.info('='.repeat(70) + '\n');
     } catch (error) {
-        // logger.error('\n' + '='.repeat(70));
-        // logger.error('❌ FATAL ERROR: Text Cache System initialization failed!');
-        // logger.error('='.repeat(70));
-        // logger.error('Error:', error.message);
-        // logger.error('Stack:', error.stack);
-        // logger.error('='.repeat(70) + '\n');
+        logger.error('\n' + '='.repeat(70));
+        logger.error('❌ FATAL ERROR: Text Cache System initialization failed!');
+        logger.error('='.repeat(70));
+        logger.error('Error:', error.message);
+        logger.error('Stack:', error.stack);
+        logger.error('='.repeat(70) + '\n');
 
-        // logger.error('❌ Application cannot start without text cache system.');
+        logger.error('❌ Application cannot start without text cache system.');
         process.exit(1);
     }
 }
@@ -873,7 +854,7 @@ async function startServer() {
     try {
         // Wait for MongoDB
         if (mongoose.connection.readyState !== 1) {
-            // logger.info('⏳ Waiting for MongoDB connection...');
+            logger.info('⏳ Waiting for MongoDB connection...');
             await new Promise((resolve) => {
                 mongoose.connection.once('open', resolve);
             });
@@ -910,14 +891,14 @@ async function startServer() {
             logger.info('\n' + '='.repeat(70));
             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
             logger.info('='.repeat(70));
-            // logger.info(`📍 HTTP URL: http://${host}:${port}`);
-            // logger.info(`📍 Socket.io URL: ws://${host}:${port}/socket.io/`);
-            // logger.info(`🌍 Environment: ${node_env}`);
-            // logger.info(`🔌 Socket.io: ENABLED`);
-            // logger.info('='.repeat(70) + '\n');
+            logger.info(`📍 HTTP URL: http://${host}:${port}`);
+            logger.info(`📍 Socket.io URL: ws://${host}:${port}/socket.io/`);
+            logger.info(`🌍 Environment: ${node_env}`);
+            logger.info(`🔌 Socket.io: ENABLED`);
+            logger.info('='.repeat(70) + '\n');
         });
     } catch (error) {
-        // logger.error('❌ Failed to start server:', error);
+        logger.error('❌ Failed to start server:', error);
         process.exit(1);
     }
 }
@@ -926,19 +907,19 @@ async function startServer() {
 // Graceful Shutdown
 // ============================================================================
 async function gracefulShutdown(signal) {
-    // logger.info(`\n⚠️  Received ${signal}, starting graceful shutdown...`);
+    logger.info(`\n⚠️  Received ${signal}, starting graceful shutdown...`);
 
     try {
         textCacheManager.stopAutoRefresh();
-        // logger.info('✅ Text cache auto-refresh stopped');
+        logger.info('✅ Text cache auto-refresh stopped');
 
         await mongoose.connection.close();
-        // logger.info('✅ MongoDB connection closed');
+        logger.info('✅ MongoDB connection closed');
 
-        // logger.info('✅ Graceful shutdown complete');
+        logger.info('✅ Graceful shutdown complete');
         process.exit(0);
     } catch (error) {
-        // logger.error('❌ Error during graceful shutdown:', error);
+        logger.error('❌ Error during graceful shutdown:', error);
         process.exit(1);
     }
 }

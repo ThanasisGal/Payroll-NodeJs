@@ -569,9 +569,19 @@ document.addEventListener('DOMContentLoaded', function () {
         yearEnd.setDate(31);
         if (eosDateParsed > yearEnd) eosDateParsed = yearEnd;
 
-        orarioyEosInput.value = formatDateToISO(eosDateParsed);
+        const calculatedEosDate = formatDateToISO(eosDateParsed);
 
-        await updateDateDifference(startDate, formatDateToISO(eosDateParsed));
+        orarioyEosInput.value = calculatedEosDate;
+
+        // ✅ Κρατάμε το αρχικό αυτόματο ΕΩΣ μετά την αλλαγή του ΑΠΟ
+        const orarioyEosHiddenInput = document.getElementById(
+            'hmeromhnia_allaghs_orarioy_eos_hidden'
+        );
+        if (orarioyEosHiddenInput) {
+            orarioyEosHiddenInput.value = calculatedEosDate;
+        }
+
+        await updateDateDifference(startDate, calculatedEosDate);
     }
 
     async function validateDateChange(apoDate, eosDate) {
@@ -640,6 +650,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error('CSRF token missing. Please refresh the page.');
             }
 
+            const originalHiddenEos =
+                document.getElementById('hmeromhnia_allaghs_orarioy_eos_hidden')?.value || '';
+
+            const effectiveEndDate =
+                originalHiddenEos && endDate < originalHiddenEos ? originalHiddenEos : endDate;
+
             const response = await fetch('/api/dateDifference', {
                 method: 'POST',
                 headers: {
@@ -648,7 +664,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     'X-CSRF-Token': csrfToken
                 },
                 credentials: 'include',
-                body: JSON.stringify({ startDate, endDate })
+                body: JSON.stringify({ startDate, endDate: effectiveEndDate })
             });
 
             const data = await response.json();
@@ -678,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         'X-CSRF-Token': csrfToken
                     },
                     credentials: 'include',
-                    body: JSON.stringify({ kodikos, startDate, endDate })
+                    body: JSON.stringify({ kodikos, startDate, endDate: effectiveEndDate })
                 });
 
                 if (prodhlomenaResponse.ok) {
@@ -703,9 +719,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 const dd = String(currentDateObj.getDate()).padStart(2, '0');
                 const currentDateKey = `${yyyy}-${mm}-${dd}`;
 
-                const prod = prodhlomenaMap[currentDateKey] || null;
+                const isTrailingME =
+                    originalHiddenEos &&
+                    endDate < originalHiddenEos &&
+                    currentDateKey > endDate &&
+                    currentDateKey <= originalHiddenEos;
 
-                const pKathgoria = prod?.kathgoria_ergasias || '';
+                const prod = isTrailingME ? null : prodhlomenaMap[currentDateKey] || null;
+
+                const pKathgoria = isTrailingME ? 'ΜΕ' : prod?.kathgoria_ergasias || '';
                 const pApoOra01 = prod?.apo_ora_01 || '';
                 const pEosOra01 = prod?.eos_ora_01 || '';
                 const pDialApo01 = prod?.dialleima_apo_ora_01 || '';
