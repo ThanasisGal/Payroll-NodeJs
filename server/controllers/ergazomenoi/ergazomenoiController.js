@@ -109,7 +109,7 @@ class ergazomenoiController {
 
         const companyId = req.session.companyInUse;
         const sessionUserId = req.session.userId;
-        const basePer = Number(process.env.EGGRAFES) || 10;
+        const basePer = 1000; // Number(process.env.EGGRAFES) || 10;
         const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
         const perPage = basePer * perx;
         const page = Math.max(Number(req.query.page) || 1, 1);
@@ -551,15 +551,36 @@ class ergazomenoiController {
         try {
             const { afm } = req.body;
 
-            const doc = await ErgazomenoiModel.findOne({ afm: afm });
+            const companyKod = req.session?.companyInUse;
+
+            if (!companyKod) {
+                return res.status(400).json({
+                    error: 'Δεν έχει επιλεγεί εταιρεία στο session'
+                });
+            }
+
+            if (!afm) {
+                return res.status(400).json({
+                    error: 'Δεν δόθηκε ΑΦΜ εργαζομένου'
+                });
+            }
+
+            const doc = await ErgazomenoiModel.findOne({
+                company_kod: companyKod,
+                afm: String(afm).trim()
+            }).lean();
 
             if (doc) {
                 return res.json(doc);
-            } else {
-                return res.json(null);
             }
+
+            return res.json(null);
         } catch (err) {
-            return res.status(500).json({ error: 'Σφάλμα κατά την αναζήτηση στη βάση δεδομένων' });
+            console.error('checkAfmErgazomenoy error:', err);
+
+            return res.status(500).json({
+                error: 'Σφάλμα κατά την αναζήτηση στη βάση δεδομένων'
+            });
         }
     };
 
@@ -2671,11 +2692,11 @@ class ergazomenoiController {
             ypokatasthma: formData.ypokatasthma,
             xarakthrismos_ergazomenon: formData.xarakthrismos_ergazomenon,
             eidikothta_erganh: formData.eidikothta_erganh,
-            kad_efka: formData.kad_efka,
-            eidikothta_efka: formData.eidikothta_efka,
-            kpk_efka: formData.kpk_efka,
-            kpk_efka_basei_symbashs: formData.kpk_efka_basei_symbashs,
-            epa_efka: formData.epa_efka,
+            kad_efka: formData.kad_efka_stathera,
+            eidikothta_efka: formData.eidikothta_efka_stathera,
+            kpk_efka: formData.kpk_efka_stathera,
+            kpk_efka_basei_symbashs: formData.tmp_kpk_efka_stathera,
+            epa_efka: formData.epa_efka_stathera,
             prosthetes_asfalistikes_apodoxes: formData.prosthetes_asfalistikes_apodoxes,
             meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
             kodikos_meioshs: formData.kodikos_meioshs,

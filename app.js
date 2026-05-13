@@ -232,10 +232,25 @@ app.use(
     })
 );
 
-app.locals.script = (path) => {
-    const cleanPath = path.replace(/\.js$/i, '').trim().replace(/\s+/g, '');
+// app.locals.script = (path) => {
+//     const cleanPath = path.replace(/\.js$/i, '').trim().replace(/\s+/g, '');
+//     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
+//     return `${baseURL}/${cleanPath}.js`.replace(/\s+/g, '');
+// };
+try {
+    const packageJsonPath = path.join(__dirname, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    app.locals.appVersion = packageJson.version;
+} catch (error) {
+    app.locals.appVersion = '1.0.0';
+}
+
+app.locals.script = (scriptPath) => {
+    const cleanPath = scriptPath.replace(/\.js$/i, '').trim().replace(/\s+/g, '');
     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
-    return `${baseURL}/${cleanPath}.js`.replace(/\s+/g, '');
+    const version = app.locals.appVersion || '1.0.0';
+
+    return `${baseURL}/${cleanPath}.js?v=${version}`.replace(/\s+/g, '');
 };
 
 app.locals.STATIC_BASE = STATIC_BASE;
@@ -716,15 +731,15 @@ app.locals.css = (path) => {
     }
 };
 
-try {
-    const packageJsonPath = path.join(__dirname, 'package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-    app.locals.appVersion = packageJson.version;
-    // logger.info(`✅ App Version: ${packageJson.version}`);
-} catch (error) {
-    // logger.error('⚠️ Failed to read version from package.json:', error.message);
-    app.locals.appVersion = '1.0.0';
-}
+// try {
+//     const packageJsonPath = path.join(__dirname, 'package.json');
+//     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+//     app.locals.appVersion = packageJson.version;
+//     // logger.info(`✅ App Version: ${packageJson.version}`);
+// } catch (error) {
+//     // logger.error('⚠️ Failed to read version from package.json:', error.message);
+//     app.locals.appVersion = '1.0.0';
+// }
 
 app.locals.nodeEnv = process.env.NODE_ENV || 'development';
 app.locals.isProduction = process.env.NODE_ENV === 'production';
