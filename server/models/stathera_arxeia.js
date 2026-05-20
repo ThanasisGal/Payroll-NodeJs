@@ -898,6 +898,17 @@ const XronosProetoimasiasSchema = new Schema(
 );
 const XronosProetoimasiasModel = model('XronosProetoimasias', XronosProetoimasiasSchema);
 
+const ProorhApoxorhshSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Proorh_Apoxorhsh'
+    }
+);
+const ProorhApoxorhshModel = model('ProorhApoxorhsh', ProorhApoxorhshSchema);
+
 module.exports = {
     AdeiesDiamonhsModel,
     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
@@ -951,6 +962,7 @@ module.exports = {
     PoleisModel,
     PosostaKrathseonModel,
     ProgrammataDypaModel,
+    ProorhApoxorhshModel,
     SepeModel,
     SxeseisErgasiasModel,
     SyggenikesSxeseisModel,

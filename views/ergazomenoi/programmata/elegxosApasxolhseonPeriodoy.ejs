@@ -1,0 +1,189 @@
+<div class="container-fluid mt-3">
+    <meta name="csrf-token" content="<%= csrfToken %>" />
+
+    <div class="card shadow-sm rounded-4">
+        <div class="card-header text-center">
+            <h3 class="mb-0">Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ</h3>
+        </div>
+
+        <div class="card-body review-card-body">
+            <div class="review-filters-sticky">
+                <div class="row g-1 mb-2" id="reviewFiltersEnterScope">
+                    <div class="col-md-2">
+                        <label class="form-label">Από Ημερομηνία</label>
+                        <input
+                            type="date"
+                            id="apo_hmeromhnia"
+                            class="form-control date-tall move-by-enter"
+                        />
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Έως Ημερομηνία</label>
+                        <input
+                            type="date"
+                            id="eos_hmeromhnia"
+                            class="form-control date-tall move-by-enter"
+                        />
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Παράρτημα</label>
+                        <input
+                            type="text"
+                            id="ypokatasthma"
+                            class="form-control date-tall move-by-enter"
+                            placeholder="0000"
+                        />
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">Κωδικός</label>
+                        <input
+                            type="text"
+                            id="kodikos"
+                            class="form-control date-tall move-by-enter"
+                        />
+                    </div>
+                </div>
+
+                <div class="row form-group g-3 align-items-center mb-4">
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <label for="only_apologistiko" class="col-form-label label-font-size mb-0">
+                            Μόνο Απολογιστικό
+                        </label>
+                        <input
+                            type="checkbox"
+                            class="form-check-input custom-checkbox checkbox-class mt-0"
+                            id="only_apologistiko"
+                            name="only_apologistiko"
+                            value=""
+                        />
+                    </div>
+
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <label for="only_nyxta" class="col-form-label label-font-size mb-0">
+                            Μόνο Νύχτα
+                        </label>
+                        <input
+                            type="checkbox"
+                            class="form-check-input custom-checkbox checkbox-class mt-0"
+                            id="only_nyxta"
+                            name="only_nyxta"
+                            value=""
+                        />
+                    </div>
+
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <label for="only_argia" class="col-form-label label-font-size mb-0">
+                            Μόνο Αργία
+                        </label>
+                        <input
+                            type="checkbox"
+                            class="form-check-input custom-checkbox checkbox-class mt-0"
+                            id="only_argia"
+                            name="only_argia"
+                            value=""
+                        />
+                    </div>
+
+                    <div class="col-auto d-flex align-items-center gap-2">
+                        <label for="only_yperergasia" class="col-form-label label-font-size mb-0">
+                            Μόνο Υπερεργασία
+                        </label>
+                        <input
+                            type="checkbox"
+                            class="form-check-input custom-checkbox checkbox-class mt-0"
+                            id="only_yperergasia"
+                            name="only_yperergasia"
+                            value=""
+                        />
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <button type="button" class="btn btn-brown rounded-4" id="searchBtn">
+                        <i class="bi bi-search"></i>
+                        Αναζήτηση
+                    </button>
+
+                    <button type="button" class="btn btn-brown rounded-4 ms-2" id="exportExcelBtn">
+                        <i class="bi bi-file-earmark-excel"></i>
+                        Export Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive results-table-wrapper">
+                <table class="table table-bordered table-hover align-middle" id="resultsTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Ημ/νία</th>
+                            <th>Παράρτημα</th>
+                            <th>Κωδικός</th>
+                            <th>Εργαζόμενος</th>
+                            <th>Προδηλωμένο</th>
+                            <th>Κάρτες</th>
+                            <th>Απολογιστικό</th>
+                            <th>Ώρες</th>
+                            <th>Νύχτα</th>
+                            <th>Αργία</th>
+                            <th>Πρόσθ.</th>
+                            <th>Υπερεργ.</th>
+                            <th>Υπερωρ.</th>
+                        </tr>
+                    </thead>
+
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-footer">
+            <a class="btn btn-brown rounded-4" href="/mainapp">
+                <i class="bi bi-chevron-double-left"></i>
+                Επιστροφή
+            </a>
+        </div>
+    </div>
+
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="modal-title mb-0">Λεπτομέρειες Απασχόλησης</h5>
+                        <span id="detailsLockBadge" class="review-lock-badge d-none">
+                            🔒 LOCKED
+                        </span>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                    ></button>
+                </div>
+
+                <div class="modal-body">
+                    <div id="detailsContainer"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Κλείσιμο
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input
+        type="hidden"
+        id="canReviewEdit"
+        value="<%= userRole === 'A' || userRole === 'S' ? '1' : '0' %>"
+    />
+
+    <script src="<%= script('ergazomenoi/programmata/elegxosApasxolhseonPeriodoy') %>"></script>
+</div>

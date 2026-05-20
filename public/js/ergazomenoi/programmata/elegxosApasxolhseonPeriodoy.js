@@ -1,0 +1,1299 @@
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function userCanReviewEdit() {
+    return document.getElementById('canReviewEdit')?.value === '1';
+}
+
+function num(value) {
+    return Number(value || 0);
+}
+
+function hours(value) {
+    return num(value).toFixed(2);
+}
+
+function hasMeaningfulValue(value) {
+    if (value === null || value === undefined) return false;
+
+    const v = String(value).trim();
+
+    return v !== '' && v !== '-' && v !== '0' && v !== '0.0' && v !== '0.00';
+}
+
+function hasPositiveNumber(value) {
+    return Number(value || 0) > 0;
+}
+
+function intervalText(apo, eos) {
+    const a = String(apo || '').trim();
+    const e = String(eos || '').trim();
+
+    if (!a && !e) return '-';
+
+    return `${a || ''} - ${e || ''}`;
+}
+
+function tdClass(className) {
+    return className ? ` class="${className}"` : '';
+}
+
+function isApologistikoIntervalPresent(row) {
+    return (
+        hasMeaningfulValue(row.apo_ora_01_apologistika) ||
+        hasMeaningfulValue(row.eos_ora_01_apologistika) ||
+        hasMeaningfulValue(row.apo_ora_02_apologistika) ||
+        hasMeaningfulValue(row.eos_ora_02_apologistika) ||
+        hasMeaningfulValue(row.apo_ora_03_apologistika) ||
+        hasMeaningfulValue(row.eos_ora_03_apologistika)
+    );
+}
+
+function yperoriaCellClass(row) {
+    if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
+    if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
+
+    return '';
+}
+
+function timeToMinutes(value) {
+    const v = String(value || '').trim();
+
+    if (!/^\d{2}:\d{2}$/.test(v)) return null;
+
+    const [hh, mm] = v.split(':').map(Number);
+
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+
+    return hh * 60 + mm;
+}
+
+function dateKey(value) {
+    if (!value) return '';
+
+    const dt = new Date(value);
+
+    if (isNaN(dt.getTime())) return '';
+
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+function addDaysKey(value, daysToAdd) {
+    const dt = new Date(value);
+
+    if (isNaN(dt.getTime())) return '';
+
+    dt.setDate(dt.getDate() + daysToAdd);
+
+    return dateKey(dt);
+}
+
+function isSundayDate(value) {
+    const dt = new Date(value);
+
+    if (isNaN(dt.getTime())) return false;
+
+    return dt.getDay() === 0;
+}
+
+function isHolidayLikeRow(row) {
+    return row.argia === true || row.kyriakes_apologistika === true || isSundayDate(row.hmeromhnia);
+}
+
+function buildHolidayLikeDateSet(rows) {
+    const set = new Set();
+
+    (rows || []).forEach((row) => {
+        if (isHolidayLikeRow(row)) {
+            const key = dateKey(row.hmeromhnia);
+
+            if (key) set.add(key);
+        }
+    });
+
+    return set;
+}
+
+function calculateHolidayDisplayHours(row, holidayLikeDateSet = new Set()) {
+    const recordedHolidayHours =
+        num(row.ores_argion_prosayxhsh_apologistika) + num(row.ores_argion_ergasia_apologistika);
+
+    if (recordedHolidayHours > 0) {
+        return recordedHolidayHours;
+    }
+
+    const rowDateKey = dateKey(row.hmeromhnia);
+    const nextDateKey = addDaysKey(row.hmeromhnia, 1);
+
+    const currentDayIsHoliday = isHolidayLikeRow(row) || holidayLikeDateSet.has(rowDateKey);
+    const nextDayIsHoliday = holidayLikeDateSet.has(nextDateKey);
+
+    const fullCardsHours = num(row.cards_ores_ergasias);
+
+    let partialHolidayMinutes = 0;
+
+    [1, 2, 3].forEach((n) => {
+        const p = pairNo(n);
+        const start = timeToMinutes(row[`cards_apo_ora_${p}`]);
+        const end = timeToMinutes(row[`cards_eos_ora_${p}`]);
+
+        if (start === null || end === null) return;
+
+        const crossesMidnight = end <= start;
+
+        if (currentDayIsHoliday) {
+            if (!crossesMidnight) {
+                partialHolidayMinutes += end - start;
+                return;
+            }
+
+            if (nextDayIsHoliday) {
+                // Η τρέχουσα μέρα είναι Κυριακή/αργία και η επόμενη είναι επίσης αργία:
+                // όλο το διάστημα θεωρείται αργία.
+                partialHolidayMinutes += 1440 - start + end;
+                return;
+            }
+
+            // Η τρέχουσα μέρα είναι Κυριακή/αργία αλλά η επόμενη όχι:
+            // μετράμε μόνο μέχρι 23:59/24:00.
+            partialHolidayMinutes += 1440 - start;
+            return;
+        }
+
+        if (crossesMidnight && nextDayIsHoliday) {
+            // Η τρέχουσα μέρα δεν είναι αργία, αλλά μετά τα μεσάνυχτα μπαίνουμε
+            // σε Κυριακή/αργία: μετράμε 00:00 έως ώρα αποχώρησης.
+            partialHolidayMinutes += end;
+        }
+    });
+
+    const calculatedHours = +(partialHolidayMinutes / 60).toFixed(2);
+
+    if (calculatedHours > 0) {
+        if (currentDayIsHoliday && nextDayIsHoliday && fullCardsHours > 0) {
+            return fullCardsHours;
+        }
+
+        return calculatedHours;
+    }
+
+    if (currentDayIsHoliday && fullCardsHours > 0) {
+        return fullCardsHours;
+    }
+
+    return 0;
+}
+
+function formatDate(value) {
+    if (!value) return '';
+
+    const dt = new Date(value);
+
+    if (isNaN(dt.getTime())) return '';
+
+    const days = ['Κυ', 'Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα'];
+    const dayName = days[dt.getDay()];
+
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const year = dt.getFullYear();
+
+    return `${dayName}   ${day}/${month}/${year}`;
+}
+
+function employeeGroupKey(row) {
+    return [row.ypokatasthma || '', row.kodikos || ''].join('|');
+}
+
+function createEmptyTotals() {
+    return {
+        cards_ores_ergasias: 0,
+        ores_nyxtas_apologistika: 0,
+        ores_argion_prosayxhsh_apologistika: 0,
+        ores_argion_ergasia_apologistika: 0,
+        ores_prostheths_ergasias_apologistika: 0,
+        yperergasia: 0,
+        nomimiYperoria: 0,
+        paranomiYperoria: 0
+    };
+}
+
+function sumYperergasia(row) {
+    return (
+        num(row.ores_yperergasias_apologistika) +
+        num(row.ores_yperergasias_nyxtas_apologistika) +
+        num(row.ores_yperergasias_argion_apologistika) +
+        num(row.ores_yperergasias_argion_nyxtas_apologistika)
+    );
+}
+
+function sumNomimiYperoria(row) {
+    return (
+        num(row.ores_nominhs_yperorias_apologistika) +
+        num(row.ores_nominhs_yperorias_nyxtas_apologistika) +
+        num(row.ores_nominhs_yperorias_argion_apologistika) +
+        num(row.ores_nominhs_yperorias_argion_nyxtas_apologistika)
+    );
+}
+
+function sumParanomiYperoria(row) {
+    return (
+        num(row.ores_paranomhs_yperorias_apologistika) +
+        num(row.ores_paranomhs_yperorias_nyxtas_apologistika) +
+        num(row.ores_paranomhs_yperorias_argion_apologistika) +
+        num(row.ores_paranomhs_yperorias_argion_nyxtas_apologistika)
+    );
+}
+
+function addRowToTotals(totals, row) {
+    totals.cards_ores_ergasias += num(row.cards_ores_ergasias);
+    totals.ores_nyxtas_apologistika += num(row.ores_nyxtas_apologistika);
+    totals.ores_argion_prosayxhsh_apologistika += num(row.ores_argion_prosayxhsh_apologistika);
+    totals.ores_argion_ergasia_apologistika += num(row.ores_argion_ergasia_apologistika);
+    totals.ores_prostheths_ergasias_apologistika += num(row.ores_prostheths_ergasias_apologistika);
+    totals.yperergasia += sumYperergasia(row);
+    totals.nomimiYperoria += sumNomimiYperoria(row);
+    totals.paranomiYperoria += sumParanomiYperoria(row);
+}
+
+function appendEmployeeTotalsRow(tbody, totals, groupId) {
+    const tr = document.createElement('tr');
+    tr.classList.add('employee-subtotal-row');
+    tr.classList.add('d-none');
+    tr.dataset.groupId = groupId;
+
+    tr.innerHTML = `
+        <td colspan="7" class="fw-bold text-end">
+            Σύνολα εργαζομένου
+        </td>
+        <td class="fw-bold">${hours(totals.cards_ores_ergasias)}</td>
+        <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.yperergasia)}</td>
+        <td class="fw-bold">${hours(totals.nomimiYperoria + totals.paranomiYperoria)}</td>
+    `;
+
+    tbody.appendChild(tr);
+}
+
+function appendGrandTotalsRow(tbody, totals) {
+    const tr = document.createElement('tr');
+    tr.classList.add('grand-total-row');
+
+    tr.innerHTML = `
+        <td colspan="7" class="fw-bold text-end">
+            Γενικά σύνολα φίλτρου
+        </td>
+        <td class="fw-bold">${hours(totals.cards_ores_ergasias)}</td>
+        <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
+        <td class="fw-bold">${hours(totals.yperergasia)}</td>
+        <td class="fw-bold">${hours(totals.nomimiYperoria + totals.paranomiYperoria)}</td>
+    `;
+
+    tbody.appendChild(tr);
+}
+
+async function loadResults() {
+    try {
+        const params = new URLSearchParams({
+            apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
+            eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
+            ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
+            kodikos: document.getElementById('kodikos')?.value || '',
+            only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
+            only_nyxta: document.getElementById('only_nyxta')?.checked || false,
+            only_argia: document.getElementById('only_argia')?.checked || false,
+            only_yperergasia: document.getElementById('only_yperergasia')?.checked || false,
+            page: 1,
+            limit: 5000
+        });
+
+        const response = await fetch(`/api/prodhlomena-oraria/review?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'CSRF-Token': csrfToken
+            }
+        });
+
+        const payload = await response.json();
+
+        if (!payload.success) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Σφάλμα',
+                text: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
+            });
+            return;
+        }
+
+        const rows = payload.rows || [];
+        const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
+
+        const tbody = document.querySelector('#resultsTable tbody');
+        tbody.innerHTML = '';
+
+        let currentGroup = '';
+        let currentGroupId = '';
+        let employeeTotals = createEmptyTotals();
+        let grandTotals = createEmptyTotals();
+
+        for (const row of rows) {
+            const groupKey = employeeGroupKey(row);
+
+            if (groupKey !== currentGroup) {
+                if (currentGroup !== '') {
+                    appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+                    employeeTotals = createEmptyTotals();
+                }
+
+                currentGroup = groupKey;
+
+                const groupId = `group-${String(groupKey).replace(/[^a-zA-Z0-9]/g, '-')}`;
+                currentGroupId = groupId;
+
+                const groupTr = document.createElement('tr');
+                groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
+                groupTr.dataset.groupId = groupId;
+                groupTr.style.cursor = 'pointer';
+
+                groupTr.innerHTML = `
+                    <td colspan="13" class="fw-bold">
+                        ${row.ypokatasthma || ''}
+                        |
+                        ${row.kodikos || ''}
+                        |
+                        ${row.eponymo || ''}
+                        ${row.onoma || ''}
+                    </td>
+                `;
+
+                groupTr.addEventListener('click', () => {
+                    groupTr.classList.toggle('collapsed');
+
+                    const rows = document.querySelectorAll(
+                        `tr.employee-detail-row[data-group-id="${groupId}"],
+                         tr.employee-subtotal-row[data-group-id="${groupId}"]`
+                    );
+
+                    rows.forEach((r) => {
+                        r.classList.toggle('d-none');
+                    });
+                });
+
+                tbody.appendChild(groupTr);
+            }
+
+            const tr = document.createElement('tr');
+            tr.classList.add('employee-detail-row');
+            tr.classList.add('d-none');
+            tr.dataset.groupId = currentGroupId;
+
+            if (row.is_locked) {
+                tr.classList.add('row-locked');
+            }
+
+            // Cell-level coloring is applied below in the <td> elements.
+
+            tr.style.cursor = 'pointer';
+
+            const apologistikoText = intervalText(
+                row.apo_ora_01_apologistika,
+                row.eos_ora_01_apologistika
+            );
+
+            const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
+
+            const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
+
+            tr.innerHTML = `
+                <td>${formatDate(row.hmeromhnia)}</td>
+                <td>${row.ypokatasthma || ''}</td>
+                <td>${row.kodikos || ''}</td>
+                <td>
+                    <div>${row.eponymo || ''}</div>
+                    <div>${row.onoma || ''}</div>
+                </td>
+                <td>${intervalText(row.apo_ora_01, row.eos_ora_01)}</td>
+                <td>${intervalText(row.cards_apo_ora_01, row.cards_eos_ora_01)}</td>
+                <td${tdClass(isApologistikoIntervalPresent(row) ? 'cell-apologistiko' : '')}>
+                    ${apologistikoText}
+                </td>
+                <td>${hours(row.cards_ores_ergasias)}</td>
+                <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
+                    ${hours(row.ores_nyxtas_apologistika)}
+                </td>
+                <td${tdClass(hasPositiveNumber(argiaHoursValue) ? 'cell-argia' : '')}>
+                    ${argiaHoursValue}
+                </td>
+                <td${tdClass(hasPositiveNumber(row.ores_prostheths_ergasias_apologistika) ? 'cell-prostheti' : '')}>
+                    ${hours(row.ores_prostheths_ergasias_apologistika)}
+                </td>
+                <td${tdClass(sumYperergasia(row) > 0 ? 'cell-yperergasia' : '')}>
+                    ${hours(sumYperergasia(row))}
+                </td>
+                <td${tdClass(yperoriaCellClass(row))}>
+                    ${hours(yperoriaTotal)}
+                </td>
+            `;
+
+            tr.addEventListener('click', () => {
+                showDetailsModal(row);
+            });
+
+            addRowToTotals(employeeTotals, row);
+            addRowToTotals(grandTotals, row);
+
+            tbody.appendChild(tr);
+        }
+
+        if (currentGroup !== '') {
+            appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+            appendGrandTotalsRow(tbody, grandTotals);
+        }
+    } catch (error) {
+        console.error(error);
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Σφάλμα',
+            text: error.message
+        });
+    }
+}
+
+function pairNo(n) {
+    return String(n).padStart(2, '0');
+}
+
+function renderReadOnlyTimeRows(row, apoPrefix, eosPrefix) {
+    return [1, 2, 3]
+        .map((n) => {
+            const p = pairNo(n);
+            const apo = row[`${apoPrefix}_${p}`] || '';
+            const eos = row[`${eosPrefix}_${p}`] || '';
+
+            return `
+                <div class="review-time-row">
+                    <div class="review-time-label">${n}</div>
+                    <div>${apo || '-'}</div>
+                    <div>${eos || '-'}</div>
+                </div>
+            `;
+        })
+        .join('');
+}
+
+function renderEditableApologistikaRows(row) {
+    return [1, 2, 3]
+        .map((n) => {
+            const p = pairNo(n);
+
+            return `
+                <div class="review-time-row">
+                    <div class="review-time-label">${n}</div>
+
+                    <input type="time"
+                           class="form-control form-control-sm modal-edit-field modal-time-input"
+                           id="edit_apo_ora_${p}_apologistika"
+                           value="${row[`apo_ora_${p}_apologistika`] || ''}">
+
+                    <input type="time"
+                           class="form-control form-control-sm modal-edit-field modal-time-input"
+                           id="edit_eos_ora_${p}_apologistika"
+                           value="${row[`eos_ora_${p}_apologistika`] || ''}">
+                </div>
+            `;
+        })
+        .join('');
+}
+
+function renderApologistikaFields(row) {
+    const numberFields = [
+        ['Ώρες εργασίας', 'ores_ergasias_apologistika'],
+        ['Ώρες απουσίας', 'ores_apoysias_apologistika'],
+        ['Ώρες νύχτας', 'ores_nyxtas_apologistika'],
+        ['Προσαύξηση αργιών', 'ores_argion_prosayxhsh_apologistika'],
+        ['Εργασία αργιών', 'ores_argion_ergasia_apologistika'],
+        ['Πρόσθετη εργασία', 'ores_prostheths_ergasias_apologistika'],
+
+        ['Υπερεργασία', 'ores_yperergasias_apologistika'],
+        ['Υπερεργασία νύχτας', 'ores_yperergasias_nyxtas_apologistika'],
+        ['Υπερεργασία αργίας', 'ores_yperergasias_argion_apologistika'],
+        ['Υπερεργασία αργίας + νύχτας', 'ores_yperergasias_argion_nyxtas_apologistika'],
+
+        ['Νόμιμη υπερωρία', 'ores_nominhs_yperorias_apologistika'],
+        ['Νόμιμη υπερωρία νύχτας', 'ores_nominhs_yperorias_nyxtas_apologistika'],
+        ['Νόμιμη υπερωρία αργίας', 'ores_nominhs_yperorias_argion_apologistika'],
+        ['Νόμιμη υπερωρία αργίας + νύχτας', 'ores_nominhs_yperorias_argion_nyxtas_apologistika'],
+
+        ['Παράνομη υπερωρία', 'ores_paranomhs_yperorias_apologistika'],
+        ['Παράνομη υπερωρία νύχτας', 'ores_paranomhs_yperorias_nyxtas_apologistika'],
+        ['Παράνομη υπερωρία αργίας', 'ores_paranomhs_yperorias_argion_apologistika'],
+        ['Παράνομη υπερωρία αργίας + νύχτας', 'ores_paranomhs_yperorias_argion_nyxtas_apologistika']
+    ];
+
+    const checkboxFields = [
+        ['Ρεπό', 'repo_apologistika'],
+        ['Άδεια', 'adeia_apologistika'],
+        ['Ασθένεια', 'astheneia_apologistika'],
+        ['Κυριακή', 'kyriakes_apologistika']
+    ];
+
+    return `
+        <div class="row g-2">
+            ${numberFields
+                .map(
+                    ([label, field]) => `
+                        <div class="col-md-3">
+                            <label class="form-label review-total-label">
+                                ${label}
+                            </label>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                class="form-control form-control-sm modal-edit-field modal-number-input apologistika-number-field"
+                                id="edit_${field}"
+                                data-field="${field}"
+                                value="${hours(row[field])}"
+                            />
+                        </div>
+                    `
+                )
+                .join('')}
+        </div>
+
+        <hr>
+
+        <div class="row g-2 align-items-center">
+            ${checkboxFields
+                .map(
+                    ([label, field]) => `
+                        <div class="col-md-3 d-flex align-items-center gap-2">
+                            <label for="edit_${field}" class="form-label mb-0">
+                                ${label}
+                            </label>
+
+                            <input
+                                type="checkbox"
+                                class="form-check-input custom-checkbox checkbox-class apologistika-checkbox-field"
+                                id="edit_${field}"
+                                data-field="${field}"
+                                ${row[field] ? 'checked' : ''}
+                            />
+                        </div>
+                    `
+                )
+                .join('')}
+
+                <div class="col-md-12">
+                    <label class="form-label review-total-label">
+                        Κατηγορία άδειας απολογιστικά
+                    </label>
+
+                    <input
+                        type="hidden"
+                        name="edit_kathgoria_adeias_apologistika_hidden"
+                        id="edit_kathgoria_adeias_apologistika_hidden"
+                        value="${row.kathgoria_adeias_apologistika || ''}"
+                    />
+
+                    <select
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100 modal-edit-field"
+                        name="edit_kathgoria_adeias_apologistika"
+                        id="edit_kathgoria_adeias_apologistika"
+                        data-field="kathgoria_adeias_apologistika"
+                        data-api="/api/dropdown/ergazomenoi/kathgoria_adeias"
+                        data-target-input="edit_kathgoria_adeias_apologistika_hidden"
+                        data-preselect="edit_kathgoria_adeias_apologistika_hidden"
+                        data-preload-all="true"
+                        data-pad-length="6">
+                    </select>
+                </div>
+        </div>
+    `;
+}
+
+async function loadAuditHistory(recordId) {
+    const container = document.getElementById('auditHistoryContainer');
+
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-muted">Φόρτωση...</div>';
+
+    try {
+        const response = await fetch(`/api/prodhlomena-oraria/review/${recordId}/audit`, {
+            method: 'GET',
+            headers: {
+                'CSRF-Token': csrfToken
+            }
+        });
+
+        const payload = await response.json();
+
+        if (!payload.success) {
+            container.innerHTML = `
+                <div class="text-danger">
+                    ${payload.message || 'Αποτυχία φόρτωσης ιστορικού.'}
+                </div>
+            `;
+            return;
+        }
+
+        if (!payload.rows || payload.rows.length === 0) {
+            container.innerHTML = `
+                <div class="text-muted">
+                    Δεν υπάρχει ιστορικό αλλαγών.
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = payload.rows.map((audit) => renderAuditRow(audit)).join('');
+
+        container.querySelectorAll('.restore-audit-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const auditId = btn.dataset.auditId;
+                restoreFromAudit(recordId, auditId);
+            });
+        });
+    } catch (error) {
+        console.error(error);
+
+        container.innerHTML = `
+            <div class="text-danger">
+                ${error.message}
+            </div>
+        `;
+    }
+}
+
+function renderAuditRow(audit) {
+    const changedAt = audit.changedAt ? new Date(audit.changedAt).toLocaleString('el-GR') : '';
+
+    return `
+        <div class="audit-row">
+            <div class="audit-row-header">
+                <strong>${changedAt}</strong>
+                <span>${audit.changedBy || ''}</span>
+            </div>
+
+            <div class="audit-reason">
+                ${audit.reason || '-'}
+            </div>
+
+            <div class="audit-values">
+                ${renderAuditValues(audit.oldValues, audit.newValues)}
+            </div>
+
+            ${
+                userCanReviewEdit()
+                    ? `
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-warning mt-2 restore-audit-btn"
+                            data-audit-id="${audit._id}">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            Επαναφορά
+                        </button>
+                    `
+                    : ''
+            }
+        </div>
+    `;
+}
+
+const auditFieldLabels = {
+    apo_ora_01_apologistika: 'Απολογιστικό Από 1',
+    eos_ora_01_apologistika: 'Απολογιστικό Έως 1',
+    apo_ora_02_apologistika: 'Απολογιστικό Από 2',
+    eos_ora_02_apologistika: 'Απολογιστικό Έως 2',
+    apo_ora_03_apologistika: 'Απολογιστικό Από 3',
+    eos_ora_03_apologistika: 'Απολογιστικό Έως 3',
+
+    ores_ergasias_apologistika: 'Ώρες εργασίας',
+    ores_apoysias_apologistika: 'Ώρες απουσίας',
+    ores_nyxtas_apologistika: 'Ώρες νύχτας',
+    ores_argion_prosayxhsh_apologistika: 'Προσαύξηση αργιών',
+    ores_argion_ergasia_apologistika: 'Εργασία αργιών',
+
+    repo_apologistika: 'Ρεπό',
+    adeia_apologistika: 'Άδεια',
+    kathgoria_adeias_apologistika: 'Κατηγορία άδειας',
+    astheneia_apologistika: 'Ασθένεια',
+    kyriakes_apologistika: 'Κυριακή',
+
+    is_locked: 'Κλειδωμένη εγγραφή',
+    locked_by: 'Κλείδωμα από',
+    locked_at: 'Κλείδωμα στις',
+    unlocked_by: 'Ξεκλείδωμα από'
+};
+
+function auditLabel(field) {
+    return auditFieldLabels[field] || field;
+}
+
+function renderAuditValues(oldValues = {}, newValues = {}) {
+    const fields = Object.keys(newValues || {});
+
+    if (fields.length === 0) {
+        return '<div class="text-muted">Δεν υπάρχουν επιμέρους αλλαγές.</div>';
+    }
+
+    return `
+        <table class="table table-sm table-bordered mb-0">
+            <thead>
+                <tr>
+                    <th>Πεδίο</th>
+                    <th>Πριν</th>
+                    <th>Μετά</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${fields
+                    .map(
+                        (field) => `
+                            <tr>
+                                <td>${auditLabel(field)}</td>
+                                <td>${oldValues?.[field] ?? ''}</td>
+                                <td>${newValues?.[field] ?? ''}</td>
+                            </tr>
+                        `
+                    )
+                    .join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+async function restoreFromAudit(recordId, auditId) {
+    try {
+        const result = await Swal.fire({
+            icon: 'warning',
+            title: 'Επαναφορά εγγραφής',
+            text: 'Θέλετε σίγουρα να επαναφέρετε τις προηγούμενες τιμές;',
+            showCancelButton: true,
+            confirmButtonText: 'Ναι, επαναφορά',
+            cancelButtonText: 'Ακύρωση',
+            reverseButtons: true
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        const response = await fetch(
+            `/api/prodhlomena-oraria/review/${recordId}/restore/${auditId}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                }
+            }
+        );
+
+        const payload = await response.json();
+
+        if (!payload.success) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Σφάλμα',
+                text: payload.message || 'Αποτυχία επαναφοράς.'
+            });
+
+            return;
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Επιτυχία',
+            text: payload.message || 'Η επαναφορά ολοκληρώθηκε.'
+        });
+
+        const modalElement = document.getElementById('detailsModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+
+        modalInstance?.hide();
+
+        await loadResults();
+    } catch (error) {
+        console.error(error);
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Σφάλμα',
+            text: error.message
+        });
+    }
+}
+
+function validateReviewSave(updates) {
+    const errors = [];
+
+    const timeFields = [
+        ['apo_ora_01_apologistika', 'eos_ora_01_apologistika'],
+        ['apo_ora_02_apologistika', 'eos_ora_02_apologistika'],
+        ['apo_ora_03_apologistika', 'eos_ora_03_apologistika']
+    ];
+
+    timeFields.forEach(([apoField, eosField], index) => {
+        const apo = updates[apoField];
+        const eos = updates[eosField];
+
+        if ((apo && !eos) || (!apo && eos)) {
+            errors.push(`Σειρά ${index + 1}: πρέπει να συμπληρωθούν και Από και Έως.`);
+        }
+    });
+
+    document.querySelectorAll('.apologistika-number-field').forEach((input) => {
+        const value = Number(input.value || 0);
+
+        if (Number.isNaN(value)) {
+            errors.push(
+                `Το πεδίο "${input.closest('.col-md-3')?.querySelector('label')?.textContent?.trim()}" δεν είναι αριθμός.`
+            );
+        }
+
+        if (value < 0) {
+            errors.push(
+                `Το πεδίο "${input.closest('.col-md-3')?.querySelector('label')?.textContent?.trim()}" δεν μπορεί να είναι αρνητικό.`
+            );
+        }
+    });
+
+    if (updates.adeia_apologistika === true && !updates.kathgoria_adeias_apologistika) {
+        errors.push('Όταν υπάρχει Άδεια, πρέπει να συμπληρωθεί Κατηγορία άδειας απολογιστικά.');
+    }
+
+    if (updates.repo_apologistika === true && updates.adeia_apologistika === true) {
+        errors.push('Δεν μπορεί να είναι ταυτόχρονα Ρεπό και Άδεια.');
+    }
+
+    return errors;
+}
+
+function showDetailsModal(row) {
+    const html = `
+    <div class="container-fluid">
+
+        <div class="review-modal-section">
+            <div class="review-modal-section-title">Στοιχεία Εγγραφής</div>
+
+            <span class="review-badge">${formatDate(row.hmeromhnia)}</span>
+            <span class="review-badge">Παράρτημα: ${row.ypokatasthma || ''}</span>
+            <span class="review-badge">Κωδικός: ${row.kodikos || ''}</span>
+            <span class="review-badge">${row.eponymo || ''} ${row.onoma || ''}</span>
+        </div>
+
+        <div class="review-modal-grid-3">
+
+            <div class="review-modal-section program-section">
+                <div class="review-modal-section-title">Προδηλωμένο Ωράριο</div>
+                ${renderReadOnlyTimeRows(row, 'apo_ora', 'eos_ora')}
+            </div>
+
+            <div class="review-modal-section cards-section">
+                <div class="review-modal-section-title">Κάρτες</div>
+                ${renderReadOnlyTimeRows(row, 'cards_apo_ora', 'cards_eos_ora')}
+            </div>
+
+            <div class="review-modal-section apologistiko-section">
+                <div class="review-modal-section-title">Απολογιστικό προς Διόρθωση</div>
+                ${renderEditableApologistikaRows(row)}
+            </div>
+
+        </div>
+
+        <div class="review-modal-section">
+            <div class="review-modal-section-title">Flags</div>
+
+            <span class="review-badge">Απολογιστικό: ${row.apologistiko_biblio ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+            <span class="review-badge">Ρεπό: ${row.repo ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+            <span class="review-badge">Αργία: ${row.argia ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+            <span class="review-badge">Κυριακή: ${row.kyriakes_apologistika ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
+        </div>
+
+        <div class="review-modal-section">
+            <div class="review-modal-section-title">Απολογιστικά Πεδία</div>
+            ${renderApologistikaFields(row)}
+        </div>
+
+        <div class="review-modal-section">
+            <div class="review-modal-section-title">Αιτιολογία Αλλαγής</div>
+
+            <textarea id="edit_reason" class="form-control" rows="3"></textarea>
+
+            <div class="d-flex gap-2 mt-3">
+                ${
+                    userCanReviewEdit()
+                        ? `
+                            <button class="btn btn-success" id="saveRecordBtn">
+                                <i class="bi bi-save"></i> Αποθήκευση
+                            </button>
+                        `
+                        : ''
+                }
+
+                ${
+                    row.is_locked && userCanReviewEdit()
+                        ? `
+                            <button class="btn btn-warning" id="unlockRecordBtn">
+                                <i class="bi bi-unlock"></i> Ξεκλείδωμα
+                            </button>
+                        `
+                        : ''
+                }
+            </div>
+        </div>
+
+        <div class="review-modal-section">
+            <div class="review-modal-section-title">Ιστορικό Αλλαγών</div>
+
+            <button class="btn btn-sm mb-2" id="loadAuditBtn">
+                Φόρτωση ιστορικού
+            </button>
+
+            <div id="auditHistoryContainer">
+                <div class="text-muted">
+                    Πατήστε «Φόρτωση ιστορικού» για να εμφανιστούν οι αλλαγές.
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    document.getElementById('detailsContainer').innerHTML = html;
+
+    const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    const lockBadge = document.getElementById('detailsLockBadge');
+
+    if (lockBadge) {
+        lockBadge.classList.toggle('d-none', !row.is_locked);
+    }
+
+    modal.show();
+
+    // initModalKathgoriaAdeiasTomSelect();
+    setTimeout(() => {
+        initModalKathgoriaAdeiasTomSelect();
+    }, 100);
+    initModalMoveByEnter();
+
+    document.getElementById('loadAuditBtn')?.addEventListener('click', () => {
+        loadAuditHistory(row._id);
+    });
+
+    document.getElementById('saveRecordBtn')?.addEventListener('click', async () => {
+        try {
+            const updates = {
+                apo_ora_01_apologistika:
+                    document.getElementById('edit_apo_ora_01_apologistika')?.value || '',
+
+                eos_ora_01_apologistika:
+                    document.getElementById('edit_eos_ora_01_apologistika')?.value || '',
+
+                apo_ora_02_apologistika:
+                    document.getElementById('edit_apo_ora_02_apologistika')?.value || '',
+
+                eos_ora_02_apologistika:
+                    document.getElementById('edit_eos_ora_02_apologistika')?.value || '',
+
+                apo_ora_03_apologistika:
+                    document.getElementById('edit_apo_ora_03_apologistika')?.value || '',
+
+                eos_ora_03_apologistika:
+                    document.getElementById('edit_eos_ora_03_apologistika')?.value || ''
+            };
+
+            document.querySelectorAll('.apologistika-number-field').forEach((input) => {
+                updates[input.dataset.field] = Number(input.value || 0);
+            });
+
+            document.querySelectorAll('.apologistika-checkbox-field').forEach((input) => {
+                updates[input.dataset.field] = input.checked;
+            });
+
+            updates.kathgoria_adeias_apologistika =
+                document.getElementById('edit_kathgoria_adeias_apologistika_hidden')?.value || '';
+
+            const validationErrors = validateReviewSave(updates);
+
+            if (validationErrors.length > 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Έλεγχος πεδίων',
+                    html: validationErrors.map((x) => `<div>${x}</div>`).join('')
+                });
+
+                return;
+            }
+
+            const reason = document.getElementById('edit_reason')?.value || '';
+
+            if (!reason.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Αιτιολογία',
+                    text: 'Παρακαλώ συμπληρώστε αιτιολογία αλλαγής.'
+                });
+
+                return;
+            }
+
+            const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}`, {
+                method: 'PATCH',
+
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                },
+
+                body: JSON.stringify({
+                    updates,
+                    reason
+                })
+            });
+
+            const payload = await response.json();
+
+            if (!payload.success) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    text: payload.message || 'Αποτυχία αποθήκευσης.'
+                });
+
+                return;
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Επιτυχία',
+                text: payload.message || 'Η εγγραφή αποθηκεύτηκε.'
+            });
+
+            modal.hide();
+
+            await loadResults();
+        } catch (error) {
+            console.error(error);
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Σφάλμα',
+                text: error.message
+            });
+        }
+    });
+
+    document.getElementById('unlockRecordBtn')?.addEventListener('click', async () => {
+        try {
+            const reason = document.getElementById('edit_reason')?.value || '';
+
+            if (!reason.trim()) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Αιτιολογία',
+                    text: 'Παρακαλώ συμπληρώστε αιτιολογία ξεκλειδώματος.'
+                });
+
+                return;
+            }
+
+            const response = await fetch(`/api/prodhlomena-oraria/review/${row._id}/unlock`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    reason
+                })
+            });
+
+            const payload = await response.json();
+
+            if (!payload.success) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    text: payload.message || 'Αποτυχία ξεκλειδώματος.'
+                });
+
+                return;
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Επιτυχία',
+                text: payload.message || 'Η εγγραφή ξεκλειδώθηκε.'
+            });
+
+            const modalElement = document.getElementById('detailsModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+
+            modalInstance?.hide();
+
+            await loadResults();
+        } catch (error) {
+            console.error(error);
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Σφάλμα',
+                text: error.message
+            });
+        }
+    });
+}
+
+async function exportExcel() {
+    const params = new URLSearchParams({
+        apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
+        eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
+        ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
+        kodikos: document.getElementById('kodikos')?.value || '',
+        only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
+        only_nyxta: document.getElementById('only_nyxta')?.checked || false,
+        only_argia: document.getElementById('only_argia')?.checked || false,
+        only_yperergasia: document.getElementById('only_yperergasia')?.checked || false
+    });
+
+    window.location.href = `/api/prodhlomena-oraria/review/export-excel?${params.toString()}`;
+}
+
+function initReviewMoveByEnter() {
+    const fields = Array.from(document.querySelectorAll('#reviewFiltersEnterScope .move-by-enter'));
+
+    fields.forEach((field, index) => {
+        field.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+
+            event.preventDefault();
+
+            const nextField = fields[index + 1];
+
+            if (nextField) {
+                nextField.focus();
+                return;
+            }
+
+            document.getElementById('searchBtn')?.focus();
+        });
+    });
+}
+
+function initModalMoveByEnter() {
+    const fields = Array.from(document.querySelectorAll('#detailsModal .modal-edit-field'));
+
+    fields.forEach((field, index) => {
+        field.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+
+            event.preventDefault();
+
+            const nextField = fields[index + 1];
+
+            if (nextField) {
+                nextField.focus();
+                nextField.select?.();
+                return;
+            }
+
+            document.getElementById('edit_reason')?.focus();
+        });
+    });
+}
+
+function initModalKathgoriaAdeiasTomSelect() {
+    const select = document.getElementById('edit_kathgoria_adeias_apologistika');
+    const hidden = document.getElementById('edit_kathgoria_adeias_apologistika_hidden');
+
+    if (!select || !hidden) return;
+
+    if (select.tomselect) {
+        select.tomselect.destroy();
+    }
+
+    if (typeof TomSelect === 'undefined') {
+        console.warn('[initModalKathgoriaAdeiasTomSelect] TomSelect not loaded.');
+        return;
+    }
+
+    new TomSelect(select, {
+        valueField: 'value',
+        labelField: 'label',
+        searchField: ['label', 'text', 'perigrafh', 'kodikos', 'value'],
+        preload: true,
+        maxOptions: 500,
+        // dropdownParent: '#detailsModal .modal-body',
+
+        load: async function (query, callback) {
+            try {
+                const api = select.dataset.api;
+                const url = `${api}?q=${encodeURIComponent(query || '')}`;
+
+                const response = await fetch(url, {
+                    headers: {
+                        'CSRF-Token': csrfToken
+                    }
+                });
+
+                const payload = await response.json();
+
+                const rawOptions = Array.isArray(payload)
+                    ? payload
+                    : payload.results || payload.data || payload.items || payload.options || [];
+
+                const options = rawOptions.map((item) => {
+                    const value = item.value || item.kodikos || item.id || '';
+
+                    const label =
+                        item.label ||
+                        item.text ||
+                        `${item.kodikos || value} - ${item.perigrafh || ''}`;
+
+                    return {
+                        ...item,
+                        value,
+                        label
+                    };
+                });
+
+                callback(options);
+            } catch (error) {
+                console.error(error);
+                callback();
+            }
+        },
+
+        onInitialize: function () {
+            const value = hidden.value || '';
+
+            if (value) {
+                this.addOption({
+                    value,
+                    label: value
+                });
+
+                this.setValue(value, true);
+            }
+        },
+
+        onChange: function (value) {
+            hidden.value = value || '';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
+document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
+document.getElementById('searchBtn')?.addEventListener('click', loadResults);

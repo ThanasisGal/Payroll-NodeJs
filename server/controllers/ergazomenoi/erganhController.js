@@ -24,7 +24,8 @@ const {
     OrariaFromErganhModel,
     OrariaFromCardsModel,
     OrariaApologistikaModel,
-    ProdhlomenaOrariaModel
+    ProdhlomenaOrariaModel,
+    ProdhlomenaOrariaAuditModel
 } = Models_D;
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
@@ -59,6 +60,348 @@ function diffHours(apo, eos) {
     let eosMin = eh * 60 + em;
     if (eosMin < apoMin) eosMin += 24 * 60; // crosses midnight
     return (eosMin - apoMin) / 60;
+}
+
+function timeToMinutesSafe(time) {
+    if (!time) return null;
+
+    const s = String(time).trim();
+    if (!/^\d{2}:\d{2}$/.test(s)) return null;
+
+    const [hh, mm] = s.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm)) return null;
+
+    return hh * 60 + mm;
+}
+
+function minutesToTimeSafe(totalMinutes) {
+    if (totalMinutes === null || totalMinutes === undefined) return '';
+
+    const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+    const hh = Math.floor(normalized / 60);
+    const mm = normalized % 60;
+
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function durationMinutesSafe(apoOra, eosOra) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    if (apo === null || eos === null) return 0;
+
+    let diff = eos - apo;
+    if (diff < 0) diff += 1440;
+
+    return diff;
+}
+
+function calculateNightMinutes(apoOra, eosOra) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    if (apo === null || eos === null) return 0;
+
+    let start = apo;
+    let end = eos;
+
+    // Πέρασε μεσάνυχτα
+    if (end <= start) {
+        end += 1440;
+    }
+
+    const NIGHT_START = 22 * 60; // 22:00
+    const NIGHT_END = 30 * 60; // 06:00 επόμενης
+
+    let overlap = 0;
+
+    const overlapStart = Math.max(start, NIGHT_START);
+    const overlapEnd = Math.min(end, NIGHT_END);
+
+    if (overlapEnd > overlapStart) {
+        overlap += overlapEnd - overlapStart;
+    }
+
+    return overlap;
+}
+
+function checkEarlyOrLateCard(context, pairNo) {
+    const { rec, proorhProseleyshMinutes, evelikthProselefshMinutes } = context;
+
+    const apoField = `apo_ora_0${pairNo}`;
+    const eosField = `eos_ora_0${pairNo}`;
+    const cardApoField = `cards_apo_ora_0${pairNo}`;
+    const apoApologField = `apo_ora_0${pairNo}_apologistika`;
+    const eosApologField = `eos_ora_0${pairNo}_apologistika`;
+
+    const cardApo = timeToMinutesSafe(rec[cardApoField]);
+    const programApo = timeToMinutesSafe(rec[apoField]);
+
+    if (cardApo === null || programApo === null) return {};
+
+    const earlyLimit = programApo - proorhProseleyshMinutes;
+    const lateLimit = programApo + evelikthProselefshMinutes;
+
+    if (cardApo < earlyLimit || cardApo > lateLimit) {
+        const programDuration = durationMinutesSafe(rec[apoField], rec[eosField]);
+        const apologistikoEos = minutesToTimeSafe(cardApo + programDuration);
+
+        return {
+            apologistiko_biblio: true,
+            [apoApologField]: rec[cardApoField] || '',
+            [eosApologField]: apologistikoEos
+        };
+    }
+
+    return {};
+}
+
+function hasTime(value) {
+    return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
+function checkContinuousVsBrokenCards(context) {
+    const { rec } = context;
+
+    const programIsContinuous =
+        hasTime(rec.apo_ora_01) &&
+        hasTime(rec.eos_ora_01) &&
+        !hasTime(rec.apo_ora_02) &&
+        !hasTime(rec.eos_ora_02) &&
+        !hasTime(rec.apo_ora_03) &&
+        !hasTime(rec.eos_ora_03);
+
+    const cardsAreBroken =
+        hasTime(rec.cards_apo_ora_01) &&
+        hasTime(rec.cards_eos_ora_01) &&
+        hasTime(rec.cards_apo_ora_02) &&
+        hasTime(rec.cards_eos_ora_02);
+
+    if (!programIsContinuous || !cardsAreBroken) return {};
+
+    const totalProgramMinutes = Math.round((Number(rec.ores_ergasias) || 0) * 60);
+
+    const card1Minutes = durationMinutesSafe(rec.cards_apo_ora_01, rec.cards_eos_ora_01);
+    const card2Minutes = durationMinutesSafe(rec.cards_apo_ora_02, rec.cards_eos_ora_02);
+
+    const hasThirdCard = hasTime(rec.cards_apo_ora_03) && hasTime(rec.cards_eos_ora_03);
+
+    const update = {
+        apologistiko_biblio: true,
+        apo_ora_01_apologistika: rec.cards_apo_ora_01 || '',
+        eos_ora_01_apologistika: rec.cards_eos_ora_01 || '',
+        apo_ora_02_apologistika: rec.cards_apo_ora_02 || ''
+    };
+
+    if (!hasThirdCard) {
+        const remainingMinutes = totalProgramMinutes - card1Minutes;
+        const card2Start = timeToMinutesSafe(rec.cards_apo_ora_02);
+
+        update.eos_ora_02_apologistika =
+            card2Start === null ? '' : minutesToTimeSafe(card2Start + remainingMinutes);
+
+        update.apo_ora_03_apologistika = '';
+        update.eos_ora_03_apologistika = '';
+
+        return update;
+    }
+
+    update.eos_ora_02_apologistika = rec.cards_eos_ora_02 || '';
+    update.apo_ora_03_apologistika = rec.cards_apo_ora_03 || '';
+
+    const remainingMinutes = totalProgramMinutes - (card1Minutes + card2Minutes);
+    const card3Start = timeToMinutesSafe(rec.cards_apo_ora_03);
+
+    update.eos_ora_03_apologistika =
+        card3Start === null ? '' : minutesToTimeSafe(card3Start + remainingMinutes);
+
+    return update;
+}
+
+function checkBrokenProgramVsContinuousCards(context) {
+    const { rec } = context;
+
+    const programIsBroken =
+        hasTime(rec.apo_ora_01) &&
+        hasTime(rec.eos_ora_01) &&
+        hasTime(rec.apo_ora_02) &&
+        hasTime(rec.eos_ora_02);
+
+    const cardsAreContinuous =
+        hasTime(rec.cards_apo_ora_01) &&
+        hasTime(rec.cards_eos_ora_01) &&
+        !hasTime(rec.cards_apo_ora_02) &&
+        !hasTime(rec.cards_eos_ora_02) &&
+        !hasTime(rec.cards_apo_ora_03) &&
+        !hasTime(rec.cards_eos_ora_03);
+
+    if (!programIsBroken || !cardsAreContinuous) return {};
+
+    const totalProgramMinutes = Math.round((Number(rec.ores_ergasias) || 0) * 60);
+    const card1Start = timeToMinutesSafe(rec.cards_apo_ora_01);
+
+    return {
+        apologistiko_biblio: true,
+        apo_ora_01_apologistika: rec.cards_apo_ora_01 || '',
+        eos_ora_01_apologistika:
+            card1Start === null ? '' : minutesToTimeSafe(card1Start + totalProgramMinutes),
+        apo_ora_02_apologistika: '',
+        eos_ora_02_apologistika: '',
+        apo_ora_03_apologistika: '',
+        eos_ora_03_apologistika: ''
+    };
+}
+
+function checkNightHours(context) {
+    const { rec } = context;
+
+    let totalNightMinutes = 0;
+
+    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_01, rec.cards_eos_ora_01);
+
+    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_02, rec.cards_eos_ora_02);
+
+    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_03, rec.cards_eos_ora_03);
+
+    return {
+        ores_nyxtas_apologistika: +(totalNightMinutes / 60).toFixed(2)
+    };
+}
+
+function addDaysUtc(date, days) {
+    const d = new Date(date);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d;
+}
+
+function dateKeyUtc(date) {
+    const d = new Date(date);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(
+        d.getUTCDate()
+    ).padStart(2, '0')}`;
+}
+
+function isSundayOrHoliday(date, argiesDateSet) {
+    const d = new Date(date);
+
+    // Κυριακή σε UTC
+    const isSunday = d.getUTCDay() === 0;
+
+    // Αργία από ArgiesModel
+    const isHoliday = argiesDateSet.has(dateKeyUtc(d));
+
+    return isSunday || isHoliday;
+}
+
+function calculateSundayHolidayMinutesForInterval(baseDate, apoOra, eosOra, argiesDateSet) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    if (apo === null || eos === null) return 0;
+
+    let start = apo;
+    let end = eos;
+
+    // Αν περνάει μεσάνυχτα
+    if (end <= start) {
+        end += 1440;
+    }
+
+    let totalMinutes = 0;
+
+    // Κομμάτι 1: τρέχουσα ημερομηνία, από start μέχρι max 24:00
+    const firstDayMinutes = Math.max(0, Math.min(end, 1440) - start);
+    if (firstDayMinutes > 0 && isSundayOrHoliday(baseDate, argiesDateSet)) {
+        totalMinutes += firstDayMinutes;
+    }
+
+    // Κομμάτι 2: επόμενη ημερομηνία, από 00:00 μέχρι end αν end > 24:00
+    const secondDayMinutes = Math.max(0, end - 1440);
+    if (secondDayMinutes > 0) {
+        const nextDate = addDaysUtc(baseDate, 1);
+        if (isSundayOrHoliday(nextDate, argiesDateSet)) {
+            totalMinutes += secondDayMinutes;
+        }
+    }
+
+    return totalMinutes;
+}
+
+function checkSundayHolidayHours(context) {
+    const { rec, argiesDateSet } = context;
+
+    const isCurrentDateSunday = new Date(rec.hmeromhnia).getUTCDay() === 0;
+
+    let cardHolidayMinutes = 0;
+
+    [1, 2, 3].forEach((n) => {
+        const p = `0${n}`;
+
+        cardHolidayMinutes += calculateSundayHolidayMinutesForInterval(
+            rec.hmeromhnia,
+            rec[`cards_apo_ora_${p}`],
+            rec[`cards_eos_ora_${p}`],
+            argiesDateSet
+        );
+    });
+
+    const hasDeclaredSchedule =
+        hasTime(rec.apo_ora_01) ||
+        hasTime(rec.eos_ora_01) ||
+        hasTime(rec.apo_ora_02) ||
+        hasTime(rec.eos_ora_02) ||
+        hasTime(rec.apo_ora_03) ||
+        hasTime(rec.eos_ora_03);
+
+    const holidayHours = +(cardHolidayMinutes / 60).toFixed(2);
+
+    return {
+        ores_argion_prosayxhsh_apologistika: hasDeclaredSchedule ? holidayHours : 0,
+        ores_argion_ergasia_apologistika: hasDeclaredSchedule ? 0 : holidayHours,
+        kyriakes_apologistika: isCurrentDateSunday
+    };
+}
+
+function checkRepoAdeiaAstheneiaApologistika(context) {
+    const { rec } = context;
+
+    const declaredHours = Number(rec.ores_ergasias || 0);
+    const cardsHours = Number(rec.cards_ores_ergasias || 0);
+
+    const update = {
+        astheneia_apologistika: false
+    };
+
+    // ΡΕΠΟ / ΜΗ ΕΡΓΑΣΙΑ και δεν υπάρχουν κάρτες
+    if ((rec.repo === true || declaredHours === 0) && cardsHours === 0) {
+        update.repo_apologistika = true;
+        update.adeia_apologistika = false;
+        update.kathgoria_adeias_apologistika = '';
+        return update;
+    }
+
+    // Έχει προδηλωμένη εργασία αλλά δεν υπάρχουν κάρτες
+    if (declaredHours !== 0 && cardsHours === 0) {
+        update.repo_apologistika = false;
+        update.adeia_apologistika = true;
+        update.kathgoria_adeias_apologistika = 'ΑΔΑΛ';
+        return update;
+    }
+
+    // Κανονικά είχε κάρτες
+    update.repo_apologistika = false;
+    update.adeia_apologistika = false;
+    update.kathgoria_adeias_apologistika = '';
+
+    return update;
+}
+
+function canReviewEdit(req) {
+    const userRole = String(req.session?.userRole || '')
+        .trim()
+        .toUpperCase();
+
+    return userRole === 'A' || userRole === 'S';
 }
 
 // Συνάρτηση για ανάγνωση του Excel αρχείου
@@ -330,6 +673,457 @@ function calculateTimePeriodsInPairs(timePeriods, orariaNoCards) {
     }
 
     return timePeriods;
+}
+
+function startOfWeekSundayUtc(date) {
+    const d = new Date(date);
+    const day = d.getUTCDay(); // Κυριακή = 0
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() - day);
+    return d;
+}
+
+function isDateInsideRange(date, fromDate, toDate) {
+    const d = new Date(date).getTime();
+    return d >= fromDate.getTime() && d <= toDate.getTime();
+}
+
+function getWeekKeySunday(date) {
+    return dateKeyUtc(startOfWeekSundayUtc(date));
+}
+
+function getDailyCardsMinutes(rec) {
+    return Math.round((Number(rec.cards_ores_ergasias) || 0) * 60);
+}
+
+function getDailyDeclaredMinutes(rec) {
+    return Math.round((Number(rec.ores_ergasias) || 0) * 60);
+}
+
+function isPartTimeEmployee(ergazomenos) {
+    return (
+        ergazomenos.plhrhs_apasxolhsh === false ||
+        ergazomenos.pliris_apasxolisi === false ||
+        ergazomenos.plhrhs === false ||
+        ergazomenos.merikh_apasxolhsh === true ||
+        ergazomenos.meriki_apasxolisi === true
+    );
+}
+
+function getBreakOffsetMinutes(ergazomenos) {
+    const dialleimaEntos = ergazomenos.dialleima_entos_ektos_orarioy === true;
+    const dialleimaMinutes = parseInt(ergazomenos.dialleima_se_lepta || 0, 10) || 0;
+
+    return dialleimaEntos ? 0 : dialleimaMinutes;
+}
+
+function getWorkTimeRules(ergazomenos) {
+    const hmeres = parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 5, 10);
+    const breakOffset = getBreakOffsetMinutes(ergazomenos);
+
+    if (hmeres === 6) {
+        return {
+            workingDaysPerWeek: 6,
+            contractualDailyLimitMinutes: 6 * 60 + 40 + breakOffset, // 6h40
+            dailyLegalLimitMinutes: 8 * 60 + breakOffset, // 8h
+            weeklyOverworkThresholdMinutes: 40 * 60,
+            weeklyLegalLimitMinutes: 48 * 60,
+            weeklyOverworkCapMinutes: 8 * 60
+        };
+    }
+
+    return {
+        workingDaysPerWeek: 5,
+        contractualDailyLimitMinutes: 8 * 60 + breakOffset, // 8h
+        dailyLegalLimitMinutes: 9 * 60 + breakOffset, // 9h
+        weeklyOverworkThresholdMinutes: 40 * 60,
+        weeklyLegalLimitMinutes: 45 * 60,
+        weeklyOverworkCapMinutes: 5 * 60
+    };
+}
+
+function isRegularWorkingDayForOverwork(rec) {
+    if (rec.repo === true) return false;
+    if (rec.argia === true) return false;
+
+    return getDailyCardsMinutes(rec) > 0;
+}
+
+function emptyClassifiedMinutes() {
+    return {
+        normal: 0,
+        night: 0,
+        holiday: 0,
+        holidayNight: 0
+    };
+}
+
+function addClassifiedMinute(bucket, rec, minuteFromBaseDate, argiesDateSet) {
+    const isNight = isMinuteNight(minuteFromBaseDate);
+    const isHoliday = isMinuteSundayOrHoliday(rec.hmeromhnia, minuteFromBaseDate, argiesDateSet);
+
+    if (isNight && isHoliday) {
+        bucket.holidayNight++;
+    } else if (isHoliday) {
+        bucket.holiday++;
+    } else if (isNight) {
+        bucket.night++;
+    } else {
+        bucket.normal++;
+    }
+}
+
+function toHours(minutes) {
+    return +(minutes / 60).toFixed(2);
+}
+
+function chunkArray(arr, size = 300) {
+    const chunks = [];
+
+    for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
+    }
+
+    return chunks;
+}
+
+function calculateAdditionalAndOverworkForDay(context, weeklyState) {
+    const { rec, ergazomenos, argiesDateSet } = context;
+
+    const rules = getWorkTimeRules(ergazomenos);
+    const partTime = isPartTimeEmployee(ergazomenos);
+
+    const dailyDeclaredMinutes = getDailyDeclaredMinutes(rec);
+    const dailyCardsMinutes = getDailyCardsMinutes(rec);
+
+    const regularDay = isRegularWorkingDayForOverwork(rec);
+
+    let prosthetiMinutes = 0;
+
+    const yperergasia = emptyClassifiedMinutes();
+    const nomimiYperoria = emptyClassifiedMinutes();
+    const paranomiYperoria = emptyClassifiedMinutes();
+
+    if (dailyCardsMinutes <= 0) {
+        return {
+            ores_prostheths_ergasias_apologistika: 0,
+
+            ores_yperergasias_apologistika: 0,
+            ores_yperergasias_nyxtas_apologistika: 0,
+            ores_yperergasias_argion_apologistika: 0,
+            ores_yperergasias_argion_nyxtas_apologistika: 0,
+
+            ores_nominhs_yperorias_apologistika: 0,
+            ores_nominhs_yperorias_nyxtas_apologistika: 0,
+            ores_nominhs_yperorias_argion_apologistika: 0,
+            ores_nominhs_yperorias_argion_nyxtas_apologistika: 0,
+
+            ores_paranomhs_yperorias_apologistika: 0,
+            ores_paranomhs_yperorias_nyxtas_apologistika: 0,
+            ores_paranomhs_yperorias_argion_apologistika: 0,
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0
+        };
+    }
+
+    let workedSoFarToday = 0;
+    let regularWorkedSoFarToday = 0;
+
+    const intervals = getCardIntervals(rec);
+
+    for (const interval of intervals) {
+        const expanded = expandIntervalMinutes(interval.apo, interval.eos);
+        if (!expanded) continue;
+
+        for (let minute = expanded.start; minute < expanded.end; minute++) {
+            workedSoFarToday++;
+
+            let weeklyRegularPosition = null;
+
+            if (regularDay) {
+                regularWorkedSoFarToday++;
+                weeklyRegularPosition =
+                    weeklyState.processedRegularMinutes + regularWorkedSoFarToday;
+            }
+
+            // const isDailyIllegalOvertime = workedSoFarToday > rules.dailyLegalLimitMinutes + 3 * 60;
+
+            const weeklyQualifiesForOverwork =
+                regularDay &&
+                weeklyState.weeklyRegularCardsMinutes >= rules.weeklyOverworkThresholdMinutes;
+
+            // const legalOvertimeStartMinutes = weeklyQualifiesForOverwork
+            //     ? rules.dailyLegalLimitMinutes
+            //     : rules.contractualDailyLimitMinutes;
+            const legalOvertimeStartMinutes = weeklyQualifiesForOverwork
+                ? rules.dailyLegalLimitMinutes
+                : 8 * 60 + getBreakOffsetMinutes(ergazomenos);
+
+            const legalOvertimeEndMinutes = legalOvertimeStartMinutes + 3 * 60;
+
+            const isDailyIllegalOvertime = workedSoFarToday > legalOvertimeEndMinutes;
+
+            const isDailyLegalOvertime =
+                workedSoFarToday > legalOvertimeStartMinutes &&
+                workedSoFarToday <= legalOvertimeEndMinutes;
+
+            const isWeeklyLegalOvertime =
+                regularDay &&
+                weeklyRegularPosition !== null &&
+                weeklyRegularPosition > rules.weeklyLegalLimitMinutes;
+
+            // ========================================================
+            // 1) Παράνομη υπερωρία
+            // Μετά τις 3h νόμιμης ημερήσιας υπερωρίας.
+            // ========================================================
+            if (isDailyIllegalOvertime) {
+                addClassifiedMinute(paranomiYperoria, rec, minute, argiesDateSet);
+                continue;
+            }
+
+            // ========================================================
+            // 1) ΥΠΕΡΕΡΓΑΣΙΑ ΠΡΩΤΑ
+            // 5ήμερο: >8h έως 9h
+            // 6ήμερο: >6h40 έως 8h
+            // ========================================================
+            const canBeOverwork =
+                regularDay &&
+                weeklyQualifiesForOverwork &&
+                workedSoFarToday > rules.contractualDailyLimitMinutes &&
+                workedSoFarToday <= rules.dailyLegalLimitMinutes &&
+                weeklyState.usedOverworkMinutes < rules.weeklyOverworkCapMinutes;
+
+            if (canBeOverwork && !isWeeklyLegalOvertime) {
+                addClassifiedMinute(yperergasia, rec, minute, argiesDateSet);
+                weeklyState.usedOverworkMinutes++;
+                continue;
+            }
+
+            // ========================================================
+            // 2) ΝΟΜΙΜΗ ΥΠΕΡΩΡΙΑ ΜΕΤΑ
+            // ημερήσια ή εβδομαδιαία
+            // ========================================================
+            if (isDailyLegalOvertime || isWeeklyLegalOvertime) {
+                addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
+                continue;
+            }
+
+            // ========================================================
+            // 4) Πρόσθετη εργασία
+            // Μερική απασχόληση:
+            // πάνω από προδηλωμένο μέχρι το πλήρες ημερήσιο όριο.
+            // Δεν απαιτεί weekly >= 40h.
+            // ========================================================
+            const additionalUpperLimit = Math.min(
+                rules.contractualDailyLimitMinutes,
+                8 * 60 + getBreakOffsetMinutes(ergazomenos)
+            );
+
+            if (
+                partTime &&
+                workedSoFarToday > dailyDeclaredMinutes &&
+                workedSoFarToday <= additionalUpperLimit
+            ) {
+                prosthetiMinutes++;
+            }
+        }
+    }
+
+    if (regularDay) {
+        weeklyState.processedRegularMinutes += regularWorkedSoFarToday;
+    }
+
+    return {
+        ores_prostheths_ergasias_apologistika: toHours(prosthetiMinutes),
+
+        ores_yperergasias_apologistika: toHours(yperergasia.normal),
+        ores_yperergasias_nyxtas_apologistika: toHours(yperergasia.night),
+        ores_yperergasias_argion_apologistika: toHours(yperergasia.holiday),
+        ores_yperergasias_argion_nyxtas_apologistika: toHours(yperergasia.holidayNight),
+
+        ores_nominhs_yperorias_apologistika: toHours(nomimiYperoria.normal),
+        ores_nominhs_yperorias_nyxtas_apologistika: toHours(nomimiYperoria.night),
+        ores_nominhs_yperorias_argion_apologistika: toHours(nomimiYperoria.holiday),
+        ores_nominhs_yperorias_argion_nyxtas_apologistika: toHours(nomimiYperoria.holidayNight),
+
+        ores_paranomhs_yperorias_apologistika: toHours(paranomiYperoria.normal),
+        ores_paranomhs_yperorias_nyxtas_apologistika: toHours(paranomiYperoria.night),
+        ores_paranomhs_yperorias_argion_apologistika: toHours(paranomiYperoria.holiday),
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(paranomiYperoria.holidayNight)
+    };
+}
+
+function getCardIntervals(rec) {
+    return [
+        {
+            apo: rec.cards_apo_ora_01,
+            eos: rec.cards_eos_ora_01
+        },
+        {
+            apo: rec.cards_apo_ora_02,
+            eos: rec.cards_eos_ora_02
+        },
+        {
+            apo: rec.cards_apo_ora_03,
+            eos: rec.cards_eos_ora_03
+        }
+    ].filter((x) => timeToMinutesSafe(x.apo) !== null && timeToMinutesSafe(x.eos) !== null);
+}
+
+function expandIntervalMinutes(apoOra, eosOra) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    if (apo === null || eos === null) return null;
+
+    let start = apo;
+    let end = eos;
+
+    if (end <= start) {
+        end += 1440;
+    }
+
+    return { start, end };
+}
+
+function isMinuteNight(minuteFromBaseDate) {
+    const minute = minuteFromBaseDate % 1440;
+
+    // Νύχτα: 22:01 - 06:00.
+    // Πρακτικά σε λεπτά: > 22:00 και <= 06:00.
+    return minute > 22 * 60 || minute < 6 * 60;
+}
+
+function isMinuteSundayOrHoliday(baseDate, minuteFromBaseDate, argiesDateSet) {
+    const dayOffset = Math.floor(minuteFromBaseDate / 1440);
+    const d = addDaysUtc(baseDate, dayOffset);
+
+    return isSundayOrHoliday(d, argiesDateSet);
+}
+
+function calculateOverworkClassifiedMinutes(
+    rec,
+    overworkStartOffset,
+    overworkMinutes,
+    argiesDateSet
+) {
+    if (!overworkMinutes || overworkMinutes <= 0) {
+        return {
+            normal: 0,
+            night: 0,
+            holiday: 0,
+            holidayNight: 0
+        };
+    }
+
+    let workedSoFar = 0;
+    let remaining = overworkMinutes;
+
+    let normal = 0;
+    let night = 0;
+    let holiday = 0;
+    let holidayNight = 0;
+
+    const intervals = getCardIntervals(rec);
+
+    for (const interval of intervals) {
+        const expanded = expandIntervalMinutes(interval.apo, interval.eos);
+        if (!expanded) continue;
+
+        for (let minute = expanded.start; minute < expanded.end; minute++) {
+            workedSoFar++;
+
+            if (workedSoFar < overworkStartOffset) continue;
+            if (remaining <= 0) break;
+
+            const isNight = isMinuteNight(minute);
+            const isHoliday = isMinuteSundayOrHoliday(rec.hmeromhnia, minute, argiesDateSet);
+
+            if (isNight && isHoliday) {
+                holidayNight++;
+            } else if (isHoliday) {
+                holiday++;
+            } else if (isNight) {
+                night++;
+            } else {
+                normal++;
+            }
+
+            remaining--;
+        }
+
+        if (remaining <= 0) break;
+    }
+
+    return { normal, night, holiday, holidayNight };
+}
+
+function calculateWorkSegmentClassifiedMinutes(rec, startOffset, segmentMinutes, argiesDateSet) {
+    if (!segmentMinutes || segmentMinutes <= 0) {
+        return {
+            normal: 0,
+            night: 0,
+            holiday: 0,
+            holidayNight: 0
+        };
+    }
+
+    let workedSoFar = 0;
+    let remaining = segmentMinutes;
+
+    let normal = 0;
+    let night = 0;
+    let holiday = 0;
+    let holidayNight = 0;
+
+    const intervals = getCardIntervals(rec);
+
+    for (const interval of intervals) {
+        const expanded = expandIntervalMinutes(interval.apo, interval.eos);
+        if (!expanded) continue;
+
+        for (let minute = expanded.start; minute < expanded.end; minute++) {
+            workedSoFar++;
+
+            if (workedSoFar < startOffset) continue;
+            if (remaining <= 0) break;
+
+            const isNight = isMinuteNight(minute);
+            const isHoliday = isMinuteSundayOrHoliday(rec.hmeromhnia, minute, argiesDateSet);
+
+            if (isNight && isHoliday) {
+                holidayNight++;
+            } else if (isHoliday) {
+                holiday++;
+            } else if (isNight) {
+                night++;
+            } else {
+                normal++;
+            }
+
+            remaining--;
+        }
+
+        if (remaining <= 0) break;
+    }
+
+    return { normal, night, holiday, holidayNight };
+}
+
+function checkOresApoysias(context) {
+    const { rec, proorhApoxorhshMinutes } = context;
+
+    const declaredHours = Number(rec.ores_ergasias || 0);
+    const cardsHours = Number(rec.cards_ores_ergasias || 0);
+
+    const toleranceHours = Number(proorhApoxorhshMinutes || 0) / 60;
+
+    const absenceHours =
+        declaredHours > cardsHours + toleranceHours ? +(declaredHours - cardsHours).toFixed(2) : 0;
+
+    return {
+        ores_ergasias_apologistika: +declaredHours.toFixed(2),
+        ores_apoysias_apologistika: absenceHours
+    };
 }
 
 function mmToPoints(mm) {
@@ -1056,6 +1850,1274 @@ class erganhController {
         }
     };
 
+    static mainElegxosApasxolhseonPeriodoyForm = async (req, res) => {
+        const locals = {
+            title: 'Έλεγχος Απασχολήσεων Περιόδου',
+            description: 'Web Payroll Solutions'
+        };
+
+        const companyId = req.session.companyInUse;
+        const sessionUserId = req.session.userId;
+        const sessionTeam = req.session.userTeam;
+
+        try {
+            const userPrivileges = await UserPrivilegesModel.findOne({
+                userId: sessionUserId,
+                form: 'ElegxosApasxolhseonPeriodoy'
+            }).exec();
+
+            res.render('ergazomenoi/programmata/elegxosApasxolhseonPeriodoy', {
+                userPrivileges: userPrivileges ? userPrivileges.privileges : {},
+                locals,
+                sessionTeam,
+                companyId,
+                userRole: req.session.userRole,
+                rec: {}
+            });
+        } catch (error) {
+            console.log(
+                'Error into erganhController -> mainElegxosApasxolhseonPeriodoyForm :',
+                error
+            );
+
+            res.status(500).send('Σφάλμα κατά την εμφάνιση της φόρμας ελέγχου απασχολήσεων.');
+        }
+    };
+
+    static getProdhlomenaOrariaForReview = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+
+            const {
+                apo_hmeromhnia,
+                eos_hmeromhnia,
+                ypokatasthma,
+                kodikos,
+                only_apologistiko,
+                only_nyxta,
+                only_argia,
+                only_yperergasia,
+                page = 1,
+                limit = 50
+            } = req.query;
+
+            const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+            const limitNum = Math.min(Math.max(parseInt(limit, 10) || 5000, 10), 10000);
+            const skip = (pageNum - 1) * limitNum;
+
+            const filter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (apo_hmeromhnia && eos_hmeromhnia) {
+                filter.hmeromhnia = mongoose.trusted({
+                    $gte: new Date(`${apo_hmeromhnia}T00:00:00.000Z`),
+                    $lte: new Date(`${eos_hmeromhnia}T23:59:59.999Z`)
+                });
+            }
+
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                filter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+            }
+
+            if (kodikos && String(kodikos).trim() !== '') {
+                filter.kodikos = String(kodikos).trim();
+            }
+
+            const andFilters = [];
+
+            if (only_apologistiko === 'true') {
+                andFilters.push({ apologistiko_biblio: true });
+            }
+
+            if (only_nyxta === 'true') {
+                andFilters.push({
+                    $or: [
+                        { ores_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_nominhs_yperorias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_paranomhs_yperorias_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (only_argia === 'true') {
+                andFilters.push({
+                    $or: [
+                        { argia: true },
+                        { kyriakes_apologistika: true },
+                        { ores_argion_prosayxhsh_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_argion_ergasia_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_argion_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_yperergasias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (only_yperergasia === 'true') {
+                andFilters.push({
+                    $or: [
+                        { ores_prostheths_ergasias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_argion_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_yperergasias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        { ores_nominhs_yperorias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_nominhs_yperorias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        { ores_paranomhs_yperorias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_paranomhs_yperorias_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (andFilters.length > 0) {
+                filter.$and = mongoose.trusted(andFilters);
+            }
+
+            const [rows, total] = await Promise.all([
+                ProdhlomenaOrariaModel.find(filter)
+                    .select(
+                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias ' +
+                            'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                            'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
+                            'repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                            'ores_ergasias cards_ores_ergasias ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                            'ores_prostheths_ergasias_apologistika ' +
+                            'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
+                            'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
+                            'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
+                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
+                            'ores_ergasias_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                            'is_locked locked_by locked_at unlocked_by unlocked_at'
+                    )
+                    .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                    .skip(skip)
+                    .limit(limitNum)
+                    .lean(),
+                ProdhlomenaOrariaModel.countDocuments(filter)
+            ]);
+
+            const kodikoiRows = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+
+            const ergazomenoi = await ErgazomenoiModel.find({
+                team: sessionTeam,
+                company_kod: companyId,
+                kodikos: mongoose.trusted({ $in: kodikoiRows })
+            })
+                .select('kodikos eponymo onoma')
+                .lean();
+
+            const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
+
+            const enrichedRows = rows.map((r) => {
+                const erg = ergByKodikos.get(r.kodikos);
+
+                return {
+                    ...r,
+                    eponymo: erg?.eponymo || '',
+                    onoma: erg?.onoma || ''
+                };
+            });
+
+            return res.json({
+                success: true,
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.ceil(total / limitNum),
+                rows: enrichedRows
+            });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaForReview] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάκτηση των απασχολήσεων.',
+                error: error.message
+            });
+        }
+    };
+
+    static exportProdhlomenaOrariaReviewExcel = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+
+            const {
+                apo_hmeromhnia,
+                eos_hmeromhnia,
+                ypokatasthma,
+                kodikos,
+                only_apologistiko,
+                only_nyxta,
+                only_argia,
+                only_yperergasia
+            } = req.query;
+
+            const filter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (apo_hmeromhnia && eos_hmeromhnia) {
+                filter.hmeromhnia = mongoose.trusted({
+                    $gte: new Date(`${apo_hmeromhnia}T00:00:00.000Z`),
+                    $lte: new Date(`${eos_hmeromhnia}T23:59:59.999Z`)
+                });
+            }
+
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                filter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+            }
+
+            if (kodikos && String(kodikos).trim() !== '') {
+                filter.kodikos = String(kodikos).trim();
+            }
+
+            const andFilters = [];
+
+            if (only_apologistiko === 'true') {
+                andFilters.push({ apologistiko_biblio: true });
+            }
+
+            if (only_nyxta === 'true') {
+                andFilters.push({
+                    $or: [
+                        { ores_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_nominhs_yperorias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_paranomhs_yperorias_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (only_argia === 'true') {
+                andFilters.push({
+                    $or: [
+                        { argia: true },
+                        { kyriakes_apologistika: true },
+                        { ores_argion_prosayxhsh_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_argion_ergasia_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_argion_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_yperergasias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (only_yperergasia === 'true') {
+                andFilters.push({
+                    $or: [
+                        { ores_prostheths_ergasias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        { ores_yperergasias_argion_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_yperergasias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        { ores_nominhs_yperorias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_nominhs_yperorias_nyxtas_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_apologistika: mongoose.trusted({ $gt: 0 })
+                        },
+                        {
+                            ores_nominhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        { ores_paranomhs_yperorias_apologistika: mongoose.trusted({ $gt: 0 }) },
+                        {
+                            ores_paranomhs_yperorias_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        },
+                        {
+                            ores_paranomhs_yperorias_argion_nyxtas_apologistika: mongoose.trusted({
+                                $gt: 0
+                            })
+                        }
+                    ]
+                });
+            }
+
+            if (andFilters.length > 0) {
+                filter.$and = mongoose.trusted(andFilters);
+            }
+
+            const rows = await ProdhlomenaOrariaModel.find(filter)
+                .select(
+                    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias ' +
+                        'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                        'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                        'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
+                        'repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                        'ores_ergasias cards_ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika ' +
+                        'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                        'ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+                        'ores_prostheths_ergasias_apologistika ' +
+                        'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
+                        'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
+                        'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
+                        'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
+                        'is_locked locked_by locked_at unlocked_by unlocked_at'
+                )
+                .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                .lean();
+
+            const kodikoiRows = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+
+            const ergazomenoi = await ErgazomenoiModel.find({
+                team: sessionTeam,
+                company_kod: companyId,
+                kodikos: mongoose.trusted({ $in: kodikoiRows })
+            })
+                .select('kodikos eponymo onoma')
+                .lean();
+
+            const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
+
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Έλεγχος Απασχολήσεων');
+
+            worksheet.columns = [
+                { header: 'Ημ/νία', key: 'hmeromhnia', width: 14 },
+                { header: 'Παράρτημα', key: 'ypokatasthma', width: 12 },
+                { header: 'Κωδικός', key: 'kodikos', width: 10 },
+                { header: 'Επώνυμο', key: 'eponymo', width: 24 },
+                { header: 'Όνομα', key: 'onoma', width: 20 },
+                { header: 'Προδηλωμένο 1', key: 'program1', width: 16 },
+                { header: 'Προδηλωμένο 2', key: 'program2', width: 16 },
+                { header: 'Προδηλωμένο 3', key: 'program3', width: 16 },
+                { header: 'Κάρτες 1', key: 'cards1', width: 16 },
+                { header: 'Κάρτες 2', key: 'cards2', width: 16 },
+                { header: 'Κάρτες 3', key: 'cards3', width: 16 },
+                { header: 'Απολογιστικό 1', key: 'apol1', width: 18 },
+                { header: 'Απολογιστικό 2', key: 'apol2', width: 18 },
+                { header: 'Απολογιστικό 3', key: 'apol3', width: 18 },
+                { header: 'Προδ. Ώρες', key: 'ores_ergasias', width: 12 },
+                { header: 'Κάρτες Ώρες', key: 'cards_ores_ergasias', width: 12 },
+                { header: 'Απολ. Ώρες', key: 'ores_ergasias_apologistika', width: 12 },
+                { header: 'Ώρες Απουσίας', key: 'ores_apoysias_apologistika', width: 14 },
+                { header: 'Νύχτα', key: 'nyxta', width: 10 },
+                { header: 'Αργία/Κυριακή', key: 'argia_text', width: 18 },
+                { header: 'Ώρες Αργιών', key: 'argion', width: 12 },
+                { header: 'Προσαύξηση Αργιών', key: 'argion_prosayxhsh', width: 18 },
+                { header: 'Εργασία Αργιών', key: 'argion_ergasia', width: 18 },
+                { header: 'Πρόσθετη', key: 'prostheti', width: 12 },
+                { header: 'Υπερεργ. Απλή', key: 'yper_apli', width: 14 },
+                { header: 'Υπερεργ. Νύχτας', key: 'yper_nyxta', width: 14 },
+                { header: 'Υπερεργ. Αργίας', key: 'yper_argia', width: 14 },
+                { header: 'Υπερεργ. Αργ.+Νύχ.', key: 'yper_argia_nyxta', width: 18 },
+                { header: 'Νόμιμη Υπερ. Απλή', key: 'nom_apli', width: 18 },
+                { header: 'Νόμιμη Υπερ. Νύχτας', key: 'nom_nyxta', width: 18 },
+                { header: 'Νόμιμη Υπερ. Αργίας', key: 'nom_argia', width: 18 },
+                { header: 'Νόμιμη Υπερ. Αργ.+Νύχ.', key: 'nom_argia_nyxta', width: 22 },
+                { header: 'Παράνομη Υπερ. Απλή', key: 'par_apli', width: 20 },
+                { header: 'Παράνομη Υπερ. Νύχτας', key: 'par_nyxta', width: 22 },
+                { header: 'Παράνομη Υπερ. Αργίας', key: 'par_argia', width: 22 },
+                { header: 'Παράνομη Υπερ. Αργ.+Νύχ.', key: 'par_argia_nyxta', width: 26 },
+                { header: 'Απολογιστικό Βιβλίο', key: 'apologistiko', width: 20 },
+                { header: 'Ρεπό', key: 'repo', width: 8 },
+                { header: 'Ρεπό Απολ.', key: 'repo_apologistika', width: 12 },
+                { header: 'Άδεια Απολ.', key: 'adeia_apologistika', width: 12 },
+                { header: 'Κατηγ. Άδειας Απολ.', key: 'kathgoria_adeias_apologistika', width: 22 },
+                { header: 'Ασθένεια Απολ.', key: 'astheneia_apologistika', width: 16 },
+                { header: 'Αργία Περιγραφή', key: 'perigrafh_argias', width: 30 },
+                { header: 'Locked', key: 'is_locked', width: 12 },
+                { header: 'Locked By', key: 'locked_by', width: 20 },
+                { header: 'Locked At', key: 'locked_at', width: 22 },
+                { header: 'Unlocked By', key: 'unlocked_by', width: 20 },
+                { header: 'Unlocked At', key: 'unlocked_at', width: 22 }
+            ];
+
+            const fmtHours = (v) => Number(v || 0);
+
+            for (const row of rows) {
+                const erg = ergByKodikos.get(row.kodikos);
+
+                const excelRow = worksheet.addRow({
+                    hmeromhnia: row.hmeromhnia ? new Date(row.hmeromhnia) : '',
+                    ypokatasthma: row.ypokatasthma || '',
+                    kodikos: row.kodikos || '',
+                    eponymo: erg?.eponymo || '',
+                    onoma: erg?.onoma || '',
+                    program1: `${row.apo_ora_01 || ''}-${row.eos_ora_01 || ''}`,
+                    program2: `${row.apo_ora_02 || ''}-${row.eos_ora_02 || ''}`,
+                    program3: `${row.apo_ora_03 || ''}-${row.eos_ora_03 || ''}`,
+                    cards1: `${row.cards_apo_ora_01 || ''}-${row.cards_eos_ora_01 || ''}`,
+                    cards2: `${row.cards_apo_ora_02 || ''}-${row.cards_eos_ora_02 || ''}`,
+                    cards3: `${row.cards_apo_ora_03 || ''}-${row.cards_eos_ora_03 || ''}`,
+                    apol1: `${row.apo_ora_01_apologistika || ''}-${row.eos_ora_01_apologistika || ''}`,
+                    apol2: `${row.apo_ora_02_apologistika || ''}-${row.eos_ora_02_apologistika || ''}`,
+                    apol3: `${row.apo_ora_03_apologistika || ''}-${row.eos_ora_03_apologistika || ''}`,
+                    ores_ergasias: fmtHours(row.ores_ergasias),
+                    cards_ores_ergasias: fmtHours(row.cards_ores_ergasias),
+                    ores_ergasias_apologistika: fmtHours(row.ores_ergasias_apologistika),
+                    ores_apoysias_apologistika: fmtHours(row.ores_apoysias_apologistika),
+                    nyxta: fmtHours(row.ores_nyxtas_apologistika),
+                    argia_text:
+                        `${row.argia ? 'ΑΡΓΙΑ ' : ''}${row.kyriakes_apologistika ? 'ΚΥΡΙΑΚΗ' : ''}`.trim(),
+                    argion: fmtHours(
+                        Number(row.ores_argion_prosayxhsh_apologistika || 0) +
+                            Number(row.ores_argion_ergasia_apologistika || 0)
+                    ),
+                    argion_prosayxhsh: fmtHours(row.ores_argion_prosayxhsh_apologistika),
+                    argion_ergasia: fmtHours(row.ores_argion_ergasia_apologistika),
+                    prostheti: fmtHours(row.ores_prostheths_ergasias_apologistika),
+                    yper_apli: fmtHours(row.ores_yperergasias_apologistika),
+                    yper_nyxta: fmtHours(row.ores_yperergasias_nyxtas_apologistika),
+                    yper_argia: fmtHours(row.ores_yperergasias_argion_apologistika),
+                    yper_argia_nyxta: fmtHours(row.ores_yperergasias_argion_nyxtas_apologistika),
+                    nom_apli: fmtHours(row.ores_nominhs_yperorias_apologistika),
+                    nom_nyxta: fmtHours(row.ores_nominhs_yperorias_nyxtas_apologistika),
+                    nom_argia: fmtHours(row.ores_nominhs_yperorias_argion_apologistika),
+                    nom_argia_nyxta: fmtHours(
+                        row.ores_nominhs_yperorias_argion_nyxtas_apologistika
+                    ),
+                    par_apli: fmtHours(row.ores_paranomhs_yperorias_apologistika),
+                    par_nyxta: fmtHours(row.ores_paranomhs_yperorias_nyxtas_apologistika),
+                    par_argia: fmtHours(row.ores_paranomhs_yperorias_argion_apologistika),
+                    par_argia_nyxta: fmtHours(
+                        row.ores_paranomhs_yperorias_argion_nyxtas_apologistika
+                    ),
+                    apologistiko: row.apologistiko_biblio ? 'ΝΑΙ' : 'ΟΧΙ',
+                    repo: row.repo ? 'ΝΑΙ' : 'ΟΧΙ',
+                    repo_apologistika: row.repo_apologistika ? 'ΝΑΙ' : 'ΟΧΙ',
+                    adeia_apologistika: row.adeia_apologistika ? 'ΝΑΙ' : 'ΟΧΙ',
+                    kathgoria_adeias_apologistika: row.kathgoria_adeias_apologistika || '',
+                    astheneia_apologistika: row.astheneia_apologistika ? 'ΝΑΙ' : 'ΟΧΙ',
+                    perigrafh_argias: row.perigrafh_argias || '',
+                    is_locked: row.is_locked ? 'ΝΑΙ' : 'ΟΧΙ',
+                    locked_by: row.locked_by || '',
+                    locked_at: row.locked_at ? new Date(row.locked_at) : '',
+                    unlocked_by: row.unlocked_by || '',
+                    unlocked_at: row.unlocked_at ? new Date(row.unlocked_at) : ''
+                });
+
+                if (row.is_locked) {
+                    excelRow.eachCell((cell) => {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFFFF2CC' }
+                        };
+                    });
+                }
+            }
+
+            worksheet.getRow(1).font = { bold: true };
+            worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+            worksheet.eachRow((row, rowNumber) => {
+                row.eachCell((cell) => {
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                });
+
+                if (rowNumber > 1) {
+                    for (let col = 15; col <= 36; col++) {
+                        row.getCell(col).numFmt = '0.00';
+                    }
+
+                    row.getCell('A').numFmt = 'dd/mm/yyyy';
+                    row.getCell('AW').numFmt = 'dd/mm/yyyy hh:mm';
+                    row.getCell('AY').numFmt = 'dd/mm/yyyy hh:mm';
+                }
+            });
+
+            worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+            worksheet.autoFilter = {
+                from: 'A1',
+                to: 'AY1'
+            };
+
+            const buffer = await workbook.xlsx.writeBuffer();
+
+            const fileName = `elegxos_apasxolhseon_${Date.now()}.xlsx`;
+
+            res.setHeader(
+                'Content-Type',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            );
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+            return res.send(buffer);
+        } catch (error) {
+            console.error('[exportProdhlomenaOrariaReviewExcel] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά το export Excel.',
+                error: error.message
+            });
+        }
+    };
+
+    static calcApasxolhseisPeriodoy = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+
+            const {
+                apo_hmeromhnia,
+                eos_hmeromhnia,
+                ypokatasthmata_stathera,
+                proorh_proseleysh,
+                proorhApoxorhsh_stathera
+            } = req.body;
+
+            if (!apo_hmeromhnia || !eos_hmeromhnia) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Παρακαλώ συμπληρώστε Από και Έως ημερομηνία.'
+                });
+            }
+
+            const apoDate = new Date(`${apo_hmeromhnia}T00:00:00.000Z`);
+            const eosDate = new Date(`${eos_hmeromhnia}T23:59:59.999Z`);
+
+            const calculationStartDate = startOfWeekSundayUtc(apoDate);
+
+            const selectedYpokatasthma =
+                ypokatasthmata_stathera && String(ypokatasthmata_stathera).trim() !== ''
+                    ? String(ypokatasthmata_stathera).trim().padStart(4, '0')
+                    : '';
+
+            const proorhProseleyshMinutes = parseInt(proorh_proseleysh || 0, 10) || 0;
+            const proorhApoxorhshMinutes = parseInt(proorhApoxorhsh_stathera || 0, 10) || 0;
+
+            // ============================================================
+            // 1) Φόρτωσε εργαζόμενους μία φορά
+            // ============================================================
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId,
+                energos: true
+            };
+
+            if (selectedYpokatasthma) {
+                employeeQuery.ypokatasthma = selectedYpokatasthma;
+            }
+
+            const ergazomenoi = await ErgazomenoiModel.find(employeeQuery)
+                .select(
+                    'kodikos eponymo onoma ypokatasthma ' +
+                        'hmeres_ergasias_ebdomadas ' +
+                        'dialleima_entos_ektos_orarioy dialleima_se_lepta ' +
+                        'plhrhs_apasxolhsh pliris_apasxolisi plhrhs ' +
+                        'merikh_apasxolhsh meriki_apasxolisi ' +
+                        'evelikth_proselefsh'
+                )
+                .sort({ kodikos: 1 })
+                .lean();
+            console.log(`[calcApasxolhseisPeriodoy] Εργαζόμενοι: ${ergazomenoi.length}`);
+
+            if (ergazomenoi.length === 0) {
+                return res.json({
+                    success: true,
+                    message: 'Δεν βρέθηκαν εργαζόμενοι για τα κριτήρια επιλογής.',
+                    employeesCount: 0,
+                    recordsChecked: 0,
+                    recordsUpdated: 0
+                });
+            }
+
+            const employeesByKodikos = new Map();
+
+            for (const erg of ergazomenoi) {
+                employeesByKodikos.set(erg.kodikos, erg);
+            }
+
+            const kodikoi = ergazomenoi.map((e) => e.kodikos).filter(Boolean);
+
+            // ============================================================
+            // 2) Φόρτωσε όλα τα προδηλωμένα της περιόδου μία φορά
+            // ============================================================
+            const kodikoiChunks = chunkArray(kodikoi, 300);
+            const prodhlomena = [];
+
+            for (const kodikoiChunk of kodikoiChunks) {
+                const prodhlomenaQuery = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: kodikoiChunk }),
+                    hmeromhnia: mongoose.trusted({
+                        $gte: calculationStartDate,
+                        $lte: eosDate
+                    })
+                };
+
+                if (selectedYpokatasthma) {
+                    prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
+                }
+
+                const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
+                    .select(
+                        'kodikos hmeromhnia repo argia ores_ergasias cards_ores_ergasias ' +
+                            'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 ' +
+                            'cards_apo_ora_02 cards_eos_ora_02 ' +
+                            'cards_apo_ora_03 cards_eos_ora_03'
+                    )
+                    .sort({ kodikos: 1, hmeromhnia: 1 })
+                    .lean();
+
+                prodhlomena.push(...chunkRecords);
+            }
+
+            // Επειδή τα φέραμε σε chunks, τα ξαναταξινομούμε συνολικά
+            prodhlomena.sort((a, b) => {
+                const kodikosCompare = String(a.kodikos || '').localeCompare(
+                    String(b.kodikos || '')
+                );
+                if (kodikosCompare !== 0) return kodikosCompare;
+
+                return new Date(a.hmeromhnia).getTime() - new Date(b.hmeromhnia).getTime();
+            });
+
+            const argies = await ArgiesModel.find({
+                team: sessionTeam,
+                company_kod: companyId,
+                hmeromhnia: mongoose.trusted({
+                    $gte: calculationStartDate,
+                    $lte: eosDate
+                })
+            })
+                .select('hmeromhnia')
+                .lean();
+
+            const argiesDateSet = new Set(argies.map((a) => dateKeyUtc(a.hmeromhnia)));
+
+            console.log(
+                `[calcApasxolhseisPeriodoy] Προδηλωμένα προς έλεγχο: ${prodhlomena.length}`
+            );
+
+            const weeklyStateMap = new Map();
+
+            for (const rec of prodhlomena) {
+                const ergazomenos = employeesByKodikos.get(rec.kodikos);
+                if (!ergazomenos) continue;
+
+                const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
+
+                if (!weeklyStateMap.has(weekKey)) {
+                    const rules = getWorkTimeRules(ergazomenos);
+
+                    weeklyStateMap.set(weekKey, {
+                        weeklyRegularCardsMinutes: 0,
+                        processedRegularMinutes: 0,
+                        weeklyOverworkCapMinutes: rules.weeklyOverworkCapMinutes,
+                        weeklyLegalLimitMinutes: rules.weeklyLegalLimitMinutes,
+                        usedOverworkMinutes: 0
+                    });
+                }
+
+                if (isRegularWorkingDayForOverwork(rec)) {
+                    weeklyStateMap.get(weekKey).weeklyRegularCardsMinutes +=
+                        getDailyCardsMinutes(rec);
+                }
+            }
+
+            // ============================================================
+            // 3) Έλεγχοι + δημιουργία bulk ops
+            // ============================================================
+            const bulkOps = [];
+
+            for (const rec of prodhlomena) {
+                const ergazomenos = employeesByKodikos.get(rec.kodikos);
+                if (!ergazomenos) continue;
+
+                const context = {
+                    rec,
+                    ergazomenos,
+                    argiesDateSet,
+                    proorhProseleyshMinutes,
+                    proorhApoxorhshMinutes,
+                    evelikthProselefshMinutes:
+                        parseInt(ergazomenos.evelikth_proselefsh || 0, 10) || 0
+                };
+                const update = {};
+
+                // Έλεγχος 1 & 2: πρόωρη ή καθυστερημένη προσέλευση
+                Object.assign(update, checkEarlyOrLateCard(context, 1));
+                Object.assign(update, checkEarlyOrLateCard(context, 2));
+                Object.assign(update, checkEarlyOrLateCard(context, 3));
+
+                Object.assign(update, checkContinuousVsBrokenCards(context));
+                Object.assign(update, checkBrokenProgramVsContinuousCards(context));
+
+                Object.assign(update, checkNightHours(context));
+                Object.assign(update, checkSundayHolidayHours(context));
+                Object.assign(update, checkRepoAdeiaAstheneiaApologistika(context));
+
+                Object.assign(update, checkOresApoysias(context));
+
+                const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
+                const weeklyState = weeklyStateMap.get(weekKey);
+
+                if (weeklyState) {
+                    Object.assign(
+                        update,
+                        calculateAdditionalAndOverworkForDay(context, weeklyState)
+                    );
+                }
+
+                if (Object.keys(update).length === 0) continue;
+
+                // Οι προηγούμενες μέρες χρησιμοποιούνται μόνο για το εβδομαδιαίο σύνολο, αλλά δεν ενημερώνονται στη Mongo.
+                if (!isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) continue;
+
+                // Αν η εγγραφή έχει κλειδωθεί από manual edit, δεν την ξαναϋπολογίζουμε.
+                if (rec.is_locked === true) continue;
+
+                bulkOps.push({
+                    updateOne: {
+                        filter: { _id: rec._id },
+                        update: { $set: update },
+                        upsert: false
+                    }
+                });
+            }
+
+            // ============================================================
+            // 4) Εκτέλεση bulkWrite σε chunks
+            // ============================================================
+            const CHUNK_SIZE = 1000;
+            let totalModified = 0;
+
+            for (let i = 0; i < bulkOps.length; i += CHUNK_SIZE) {
+                const chunk = bulkOps.slice(i, i + CHUNK_SIZE);
+
+                const result = await ProdhlomenaOrariaModel.bulkWrite(chunk, {
+                    ordered: false
+                });
+
+                totalModified += result.modifiedCount || 0;
+            }
+
+            console.log(
+                `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}`
+            );
+
+            return res.json({
+                success: true,
+                message: 'Ο υπολογισμός ολοκληρώθηκε επιτυχώς.',
+                employeesCount: ergazomenoi.length,
+                recordsChecked: prodhlomena.length,
+                recordsUpdated: totalModified
+            });
+        } catch (error) {
+            console.error('[calcApasxolhseisPeriodoy] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά τον υπολογισμό απασχολήσεων περιόδου.'
+            });
+        }
+    };
+
+    static updateProdhlomenaOrariaReviewRecord = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+            const changedBy =
+                req.session.userName || req.session.username || req.session.userId || '';
+
+            if (!canReviewEdit(req)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Δεν έχετε δικαίωμα για αποθήκευση αλλαγών.'
+                });
+            }
+
+            const { id } = req.params;
+            const { updates = {}, reason = '' } = req.body;
+
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εγγραφής.'
+                });
+            }
+
+            if (!reason || String(reason).trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Παρακαλώ συμπληρώστε αιτιολογία αλλαγής.'
+                });
+            }
+
+            const allowedFields = [
+                'cards_apo_ora_01',
+                'cards_eos_ora_01',
+                'cards_apo_ora_02',
+                'cards_eos_ora_02',
+                'cards_apo_ora_03',
+                'cards_eos_ora_03',
+
+                'apo_ora_01_apologistika',
+                'eos_ora_01_apologistika',
+                'apo_ora_02_apologistika',
+                'eos_ora_02_apologistika',
+                'apo_ora_03_apologistika',
+                'eos_ora_03_apologistika',
+
+                'apologistiko_biblio',
+                'ores_nyxtas_apologistika',
+                'ores_argion_prosayxhsh_apologistika',
+                'kyriakes_apologistika',
+
+                'ores_prostheths_ergasias_apologistika',
+
+                'ores_yperergasias_apologistika',
+                'ores_yperergasias_nyxtas_apologistika',
+                'ores_yperergasias_argion_apologistika',
+                'ores_yperergasias_argion_nyxtas_apologistika',
+
+                'ores_nominhs_yperorias_apologistika',
+                'ores_nominhs_yperorias_nyxtas_apologistika',
+                'ores_nominhs_yperorias_argion_apologistika',
+                'ores_nominhs_yperorias_argion_nyxtas_apologistika',
+
+                'ores_paranomhs_yperorias_apologistika',
+                'ores_paranomhs_yperorias_nyxtas_apologistika',
+                'ores_paranomhs_yperorias_argion_apologistika',
+                'ores_paranomhs_yperorias_argion_nyxtas_apologistika',
+
+                'repo_apologistika',
+                'adeia_apologistika',
+                'kathgoria_adeias_apologistika',
+                'astheneia_apologistika',
+
+                'kyriakes_apologistika',
+                'ores_ergasias_apologistika',
+                'ores_argion_prosayxhsh_apologistika',
+                'ores_argion_ergasia_apologistika',
+
+                'ores_apoysias_apologistika'
+            ];
+
+            const cleanUpdates = {};
+
+            for (const field of allowedFields) {
+                if (Object.prototype.hasOwnProperty.call(updates, field)) {
+                    cleanUpdates[field] = updates[field];
+                }
+            }
+
+            if (Object.keys(cleanUpdates).length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχουν επιτρεπτά πεδία για ενημέρωση.'
+                });
+            }
+
+            const oldRecord = await ProdhlomenaOrariaModel.findOne({
+                _id: id,
+                team: sessionTeam,
+                company_kod: companyId
+            }).lean();
+
+            if (!oldRecord) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε η εγγραφή.'
+                });
+            }
+
+            const oldValues = {};
+            const newValues = {};
+
+            for (const [field, value] of Object.entries(cleanUpdates)) {
+                const oldValue = oldRecord[field];
+
+                if (String(oldValue ?? '') !== String(value ?? '')) {
+                    oldValues[field] = oldValue ?? '';
+                    newValues[field] = value ?? '';
+                }
+            }
+
+            if (Object.keys(newValues).length === 0) {
+                return res.json({
+                    success: true,
+                    message: 'Δεν υπήρχαν αλλαγές για αποθήκευση.'
+                });
+            }
+
+            cleanUpdates.is_locked = true;
+            cleanUpdates.locked_by = changedBy;
+            cleanUpdates.locked_at = new Date();
+
+            await ProdhlomenaOrariaModel.updateOne(
+                {
+                    _id: id,
+                    team: sessionTeam,
+                    company_kod: companyId
+                },
+                {
+                    $set: cleanUpdates
+                }
+            );
+
+            await ProdhlomenaOrariaAuditModel.create({
+                team: sessionTeam,
+                company_kod: companyId,
+                prodhlomena_oraria_id: oldRecord._id,
+                kodikos: oldRecord.kodikos,
+                ypokatasthma: oldRecord.ypokatasthma,
+                hmeromhnia: oldRecord.hmeromhnia,
+                changedBy,
+                reason: String(reason).trim(),
+                oldValues,
+                newValues
+            });
+
+            return res.json({
+                success: true,
+                message: 'Η εγγραφή ενημερώθηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('[updateProdhlomenaOrariaReviewRecord] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ενημέρωση της εγγραφής.',
+                error: error.message
+            });
+        }
+    };
+
+    static unlockProdhlomenaOrariaReviewRecord = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+            const changedBy =
+                req.session.userName || req.session.username || req.session.userId || '';
+
+            if (!canReviewEdit(req)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Δεν έχετε δικαίωμα για ξεκλείδωμα εγγραφής.'
+                });
+            }
+
+            const { id } = req.params;
+            const { reason = '' } = req.body;
+
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εγγραφής.'
+                });
+            }
+
+            if (!reason || String(reason).trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Παρακαλώ συμπληρώστε αιτιολογία ξεκλειδώματος.'
+                });
+            }
+
+            const oldRecord = await ProdhlomenaOrariaModel.findOne({
+                _id: id,
+                team: sessionTeam,
+                company_kod: companyId
+            }).lean();
+
+            if (!oldRecord) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε η εγγραφή.'
+                });
+            }
+
+            if (oldRecord.is_locked !== true) {
+                return res.json({
+                    success: true,
+                    message: 'Η εγγραφή δεν ήταν κλειδωμένη.'
+                });
+            }
+
+            await ProdhlomenaOrariaModel.updateOne(
+                {
+                    _id: id,
+                    team: sessionTeam,
+                    company_kod: companyId
+                },
+                {
+                    $set: {
+                        is_locked: false,
+                        unlocked_by: changedBy,
+                        unlocked_at: new Date()
+                    },
+                    $unset: {
+                        locked_by: '',
+                        locked_at: ''
+                    }
+                }
+            );
+
+            await ProdhlomenaOrariaAuditModel.create({
+                team: sessionTeam,
+                company_kod: companyId,
+                prodhlomena_oraria_id: oldRecord._id,
+                kodikos: oldRecord.kodikos,
+                ypokatasthma: oldRecord.ypokatasthma,
+                hmeromhnia: oldRecord.hmeromhnia,
+                changedBy,
+                reason: String(reason).trim(),
+                oldValues: {
+                    is_locked: true,
+                    locked_by: oldRecord.locked_by || '',
+                    locked_at: oldRecord.locked_at || ''
+                },
+                newValues: {
+                    is_locked: false,
+                    unlocked_by: changedBy
+                }
+            });
+
+            return res.json({
+                success: true,
+                message: 'Η εγγραφή ξεκλειδώθηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('[unlockProdhlomenaOrariaReviewRecord] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά το ξεκλείδωμα της εγγραφής.',
+                error: error.message
+            });
+        }
+    };
+
+    static restoreProdhlomenaOrariaReviewRecord = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+            const changedBy = req.session.userName || req.session.username || '';
+
+            if (!canReviewEdit(req)) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Δεν έχετε δικαίωμα για επαναφορά εγγραφής.'
+                });
+            }
+
+            const { id, auditId } = req.params;
+
+            if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(auditId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρα IDs.'
+                });
+            }
+
+            const audit = await ProdhlomenaOrariaAuditModel.findOne({
+                _id: auditId,
+                team: sessionTeam,
+                company_kod: companyId,
+                prodhlomena_oraria_id: id
+            }).lean();
+
+            if (!audit) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε audit record.'
+                });
+            }
+
+            const oldRecord = await ProdhlomenaOrariaModel.findOne({
+                _id: id,
+                team: sessionTeam,
+                company_kod: companyId
+            }).lean();
+
+            if (!oldRecord) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε η εγγραφή.'
+                });
+            }
+
+            const restoreValues = audit.oldValues || {};
+
+            restoreValues.is_locked = true;
+            restoreValues.locked_by = changedBy;
+            restoreValues.locked_at = new Date();
+
+            await ProdhlomenaOrariaModel.updateOne(
+                {
+                    _id: id,
+                    team: sessionTeam,
+                    company_kod: companyId
+                },
+                {
+                    $set: restoreValues
+                }
+            );
+
+            await ProdhlomenaOrariaAuditModel.create({
+                team: sessionTeam,
+                company_kod: companyId,
+                prodhlomena_oraria_id: oldRecord._id,
+                kodikos: oldRecord.kodikos,
+                ypokatasthma: oldRecord.ypokatasthma,
+                hmeromhnia: oldRecord.hmeromhnia,
+                changedBy,
+                reason: `RESTORE FROM AUDIT ${auditId}`,
+                oldValues: audit.newValues || {},
+                newValues: restoreValues
+            });
+
+            return res.json({
+                success: true,
+                message: 'Η επαναφορά ολοκληρώθηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('[restoreProdhlomenaOrariaReviewRecord] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την επαναφορά.',
+                error: error.message
+            });
+        }
+    };
+
+    static getProdhlomenaOrariaReviewAudit = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+            const { id } = req.params;
+
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρο ID εγγραφής.'
+                });
+            }
+
+            const rows = await ProdhlomenaOrariaAuditModel.find({
+                team: sessionTeam,
+                company_kod: companyId,
+                prodhlomena_oraria_id: id
+            })
+                .sort({ changedAt: -1 })
+                .limit(100)
+                .lean();
+
+            return res.json({
+                success: true,
+                rows
+            });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaReviewAudit] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάκτηση ιστορικού αλλαγών.',
+                error: error.message
+            });
+        }
+    };
+
     static openErganh = async (req, res) => {
         try {
             const selectedCompany = req.session.companyInUse;
@@ -1443,6 +3505,19 @@ function parseGRDate(value) {
 }
 
 // ============================================================
+function normalizeYpokatasthma(value) {
+    if (value === null || value === undefined) return '';
+
+    let s = String(value).trim();
+
+    // Αν έρθει σαν "1.00" ή number από Excel
+    if (/^\d+(\.0+)?$/.test(s)) {
+        s = String(parseInt(s, 10));
+    }
+
+    return s.padStart(4, '0');
+}
+
 async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     const CHUNK_SIZE = 1000; // ops ανά bulkWrite
     const PARALLEL_CHUNKS = 5; // πόσα bulkWrites τρέχουν παράλληλα
@@ -1452,6 +3527,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     sheetTeliko.eachRow((row, rowNumber) => {
         rows.push({
             rowNumber,
+            ypokatasthma: normalizeYpokatasthma(row.getCell(1).value ?? row.getCell(1).text),
             afm: row.getCell(2).text?.trim(),
             eponimo: row.getCell(3).text?.trim(),
             onoma: row.getCell(4).text?.trim(),
@@ -1533,10 +3609,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
             continue;
         }
 
-        // ✅ Αργία;
+        // ✅ Αργία βάσει της τρέχουσας ημερομηνίας του Εργάνη_Τελικό
         const argiaKey = `${ergazomenos.team}|${ergazomenos.company_kod}|${hmeromhnia.getTime()}`;
-        const argiaPerigrafh = argiesMap[argiaKey];
-        const isArgia = argiaPerigrafh !== undefined;
+        const argiaPerigrafh = argiesMap[argiaKey] || '';
+        const isArgia = Object.prototype.hasOwnProperty.call(argiesMap, argiaKey);
 
         // ✅ ΡΕΠΟ; (στήλη F = "ΑΝ")
         let isRepo = current.kathgoria === 'ΑΝ';
@@ -1544,6 +3620,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
         const record = {
             team: ergazomenos.team,
             company_kod: ergazomenos.company_kod,
+            ypokatasthma: current.ypokatasthma,
             kodikos: ergazomenos.kodikos,
             hmeromhnia: hmeromhnia,
             kathgoria_ergasias: current.kathgoria,
@@ -1556,7 +3633,51 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
             repo: isRepo,
             argia: isArgia,
             perigrafh_argias: isArgia ? argiaPerigrafh : '',
-            ores_ergasias: diffHours(current.apo_ora, current.eos_ora) // ✅ 1ο ζεύγος
+            ores_ergasias: diffHours(current.apo_ora, current.eos_ora), // ✅ 1ο ζεύγος
+            cards_apo_ora_01: '',
+            cards_eos_ora_01: '',
+            cards_apo_ora_02: '',
+            cards_eos_ora_02: '',
+            cards_apo_ora_03: '',
+            cards_eos_ora_03: '',
+            cards_ores_ergasias: 0,
+            check_ergasia: false,
+
+            apologistiko_biblio: false,
+            apo_ora_01_apologistika: '',
+            eos_ora_01_apologistika: '',
+            apo_ora_02_apologistika: '',
+            eos_ora_02_apologistika: '',
+            apo_ora_03_apologistika: '',
+            eos_ora_03_apologistika: '',
+
+            ores_nyxtas_apologistika: 0,
+            ores_argion_prosayxhsh_apologistika: 0,
+            ores_argion_ergasia_apologistika: 0,
+            kyriakes_apologistika: false,
+
+            ores_prostheths_ergasias_apologistika: 0,
+
+            ores_yperergasias_apologistika: 0,
+            ores_yperergasias_nyxtas_apologistika: 0,
+            ores_yperergasias_argion_apologistika: 0,
+            ores_yperergasias_argion_nyxtas_apologistika: 0,
+
+            ores_nominhs_yperorias_apologistika: 0,
+            ores_nominhs_yperorias_nyxtas_apologistika: 0,
+            ores_nominhs_yperorias_argion_apologistika: 0,
+            ores_nominhs_yperorias_argion_nyxtas_apologistika: 0,
+
+            ores_paranomhs_yperorias_apologistika: 0,
+            ores_paranomhs_yperorias_nyxtas_apologistika: 0,
+            ores_paranomhs_yperorias_argion_apologistika: 0,
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
+
+            repo_apologistika: false,
+            adeia_apologistika: false,
+            kathgoria_adeias_apologistika: '',
+            astheneia_apologistika: false,
+            kyriakes_apologistika: false
         };
 
         // Συγχώνευση με τις 1-2 επόμενες γραμμές αν είναι ίδια ημ/νία & ΑΦΜ
@@ -1566,7 +3687,8 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
             if (
                 next1Date &&
                 next1Date.getTime() === hmeromhnia.getTime() &&
-                next1.afm === current.afm
+                next1.afm === current.afm &&
+                next1.ypokatasthma === current.ypokatasthma
             ) {
                 record.apo_ora_02 = next1.apo_ora || '';
                 record.eos_ora_02 = next1.eos_ora || '';
@@ -1580,7 +3702,8 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
                     if (
                         next2Date &&
                         next2Date.getTime() === hmeromhnia.getTime() &&
-                        next2.afm === current.afm
+                        next2.afm === current.afm &&
+                        next2.ypokatasthma === current.ypokatasthma
                     ) {
                         record.apo_ora_03 = next2.apo_ora || '';
                         record.eos_ora_03 = next2.eos_ora || '';
@@ -1597,6 +3720,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
                 filter: {
                     team: record.team,
                     company_kod: record.company_kod,
+                    ypokatasthma: record.ypokatasthma,
                     kodikos: record.kodikos,
                     hmeromhnia: record.hmeromhnia
                 },
@@ -2040,6 +4164,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
     sheetTeliko.eachRow((row, rowNumber) => {
         rows.push({
             rowNumber,
+            ypokatasthma: normalizeYpokatasthma(row.getCell(1).value ?? row.getCell(1).text),
             afm: row.getCell(2).text?.trim(),
             eponimo: row.getCell(3).text?.trim(),
             onoma: row.getCell(4).text?.trim(),
@@ -2065,9 +4190,10 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
             continue;
         }
 
-        const key = `${r.afm}|${hmeromhnia.getTime()}`;
+        const key = `${r.afm}|${r.ypokatasthma}|${hmeromhnia.getTime()}`;
         if (!groups.has(key)) {
             groups.set(key, {
+                ypokatasthma: r.ypokatasthma,
                 afm: r.afm,
                 hmeromhnia: hmeromhnia,
                 pairs: [],
@@ -2106,6 +4232,8 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
         }
 
         const update = {
+            ypokatasthma: g.ypokatasthma,
+
             cards_apo_ora_01: '',
             cards_eos_ora_01: '',
             cards_apo_ora_02: '',
@@ -2121,7 +4249,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
             const suffix = String(idx + 1).padStart(2, '0'); // "01" / "02" / "03"
             update[`cards_apo_ora_${suffix}`] = p.apo;
             update[`cards_eos_ora_${suffix}`] = p.eos;
-            update.cards_ores_ergasias += diffHours(p.apo, p.eos); // ✅ μετονομάστηκε
+            update.cards_ores_ergasias += diffHours(p.apo, p.eos);
         }
 
         if (g.pairs.length > 3) {
@@ -2140,6 +4268,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
                 filter: {
                     team: ergazomenos.team,
                     company_kod: ergazomenos.company_kod,
+                    ypokatasthma: g.ypokatasthma,
                     kodikos: ergazomenos.kodikos,
                     hmeromhnia: g.hmeromhnia
                 },

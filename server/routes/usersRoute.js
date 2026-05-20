@@ -839,6 +839,35 @@ router.get(
     '/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon',
     kinhseisController.getAntistoixiseisByKrathshAndTypoApodoxon
 );
+router.post(
+    '/ergazomenoi/programmata/calcApasxolhseisPeriodoy',
+    erganhController.calcApasxolhseisPeriodoy
+);
+router.get(
+    '/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy',
+    erganhController.mainElegxosApasxolhseonPeriodoyForm
+);
+router.get('/api/prodhlomena-oraria/review', erganhController.getProdhlomenaOrariaForReview);
+router.get(
+    '/api/prodhlomena-oraria/review/export-excel',
+    erganhController.exportProdhlomenaOrariaReviewExcel
+);
+router.patch(
+    '/api/prodhlomena-oraria/review/:id',
+    erganhController.updateProdhlomenaOrariaReviewRecord
+);
+router.get(
+    '/api/prodhlomena-oraria/review/:id/audit',
+    erganhController.getProdhlomenaOrariaReviewAudit
+);
+router.patch(
+    '/api/prodhlomena-oraria/review/:id/unlock',
+    erganhController.unlockProdhlomenaOrariaReviewRecord
+);
+router.post(
+    '/api/prodhlomena-oraria/review/:id/restore/:auditId',
+    erganhController.restoreProdhlomenaOrariaReviewRecord
+);
 router.get('/api/kinhseis/getKlimakiaForoy', forosController.getKlimakiaForoy);
 router.get('/api/kinhseis/getEkptoshForoy', forosController.getEkptoshForoy);
 router.get('/api/kinhseis/getEisodhmaProForoyMeioshs', forosController.getEisodhmaProForoyMeioshs);

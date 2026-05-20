@@ -20,6 +20,7 @@ const doy = require('../dropdowns/doy');
 const tameia = require('../dropdowns/tameia');
 const kad = require('../dropdowns/kad');
 const kathgoriesErgasias = require('../dropdowns/statheraArxeia/kathgoriesErgasias');
+const kathgoriesAdeias = require('../dropdowns/ergazomenoi/kathgoria_adeias');
 
 const sepe = require('../dropdowns/ypokatasthmata/sepe');
 const dypa = require('../dropdowns/ypokatasthmata/dypa');
@@ -92,6 +93,7 @@ const stoixeiaApoEidikothtes = require('../dropdowns/symbaseis/stoixeiaApoEidiko
 
 const ypokatasthmataErganh = require('../dropdowns/erganh/ypokatasthmata');
 const xronosProetoimasias = require('../dropdowns/erganh/xronosProetoimasias');
+const proorhApoxorhsh = require('../dropdowns/erganh/proorhApoxorhsh');
 
 const { YpokatasthmataModel, BanksPerCompanyModel } = companiesModels;
 
@@ -119,6 +121,7 @@ const {
     KadEfkaModel,
     KadModel,
     KathgoriesErgasiasModel,
+    KathgoriesAdeiasModel,
     KentraKostoysModel,
     KrathseisModel,
     KathestosApasxolhshsModel,
@@ -130,6 +133,7 @@ const {
     PerifereiesModel,
     PeriodsModel,
     PoleisModel,
+    ProorhApoxorhshModel,
     SepeModel,
     SxeseisErgasiasModel,
     SyggenikesSxeseisModel,
@@ -443,6 +447,20 @@ router.get('/ergazomenoi/kathgoria_ergasias', async (req, res, next) => {
         next(err);
     }
 });
+
+router.get('/ergazomenoi/kathgoria_adeias', async (req, res, next) => {
+    try {
+        const result = await buildDropdownRoute(KathgoriesAdeiasModel, kathgoriesAdeias.options)(
+            req,
+            res,
+            next
+        );
+    } catch (err) {
+        console.error('❌ Error:', err);
+        next(err);
+    }
+});
+
 // =========================== ΕΡΓΑΖΟΜΕΝΟΙ -> SECTION3 -> ΚΡΑΤΗΣΕΙΣ ==============================
 
 router.get('/ergazomenoi/krathseis', buildDropdownRoute(KrathseisModel, krathseis.options));
@@ -530,6 +548,10 @@ router.get(
 router.get(
     '/erganh/xronosProetoimasias',
     buildDropdownRoute(XronosProetoimasiasModel, xronosProetoimasias.options)
+);
+router.get(
+    '/erganh/proorhApoxorhsh',
+    buildDropdownRoute(ProorhApoxorhshModel, proorhApoxorhsh.options)
 );
 
 module.exports = router;

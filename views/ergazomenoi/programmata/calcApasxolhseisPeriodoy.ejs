@@ -111,13 +111,41 @@
                         data-preselect="xronosProetoimasias_stathera"
                         data-preload-all="true"
                         data-pad-length="2"
-                        data-xrhsh-related="false"
-                        data-team-related="false"
-                        data-company-related="false"
-                        data-mhnas-related="false"
                         placeholder="">
                     </select>
                 </div>
+
+                <div class="col-3-2 left-align mt-n-0-15">
+                    <label for="proorhApoxorhsh" class="col-form-label label-font-size-smaller">
+                        Πρόωρη Αποχώρηση (για απουσίες)
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="proorhApoxorhsh_stathera"
+                    id="proorhApoxorhsh_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('proorhApoxorhsh_stathera') %>"
+                    readonly
+                />
+
+                <div class="col-3-15 mt-2">
+                    <select
+                        id="proorhApoxorhsh"
+                        name="proorhApoxorhsh"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Υποκατάστημα"
+                        data-api="/api/dropdown/erganh/proorhApoxorhsh"
+                        single
+                        data-target-input="proorhApoxorhsh_stathera"
+                        data-preselect="proorhApoxorhsh_stathera"
+                        data-preload-all="true"
+                        data-pad-length="2"
+                        placeholder="">
+                    </select>
+                </div>
+
             </div>
         </div>
 
@@ -147,7 +175,8 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
-<script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/calcApasxolhseisPeriodoy') %>"></script>
+<!-- <script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
 <script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
-<script src="<%= script('ergazomenoi/programmata/downloadCardsButton') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/downloadCardsButton') %>"></script> -->

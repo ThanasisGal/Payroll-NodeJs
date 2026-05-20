@@ -326,6 +326,7 @@ const ProdhlomenaOrariaSchema = new Schema(
     {
         team: { type: String, trim: true },
         company_kod: { type: String, trim: true },
+        ypokatasthma: { type: String, trim: true },
         kodikos: { type: String, trim: true },
         hmeromhnia: { type: Date },
         kathgoria_ergasias: { type: String, trim: true },
@@ -354,25 +355,101 @@ const ProdhlomenaOrariaSchema = new Schema(
         cards_eos_ora_02: { type: String },
         cards_apo_ora_03: { type: String },
         cards_eos_ora_03: { type: String },
+        check_ergasia: { type: Boolean, default: false },
         cards_ores_ergasias: { type: Number, default: 0 },
-        check_ergasia: { type: Boolean, default: false }
+        apo_ora_01_apologistika: { type: String },
+        eos_ora_01_apologistika: { type: String },
+        apo_ora_02_apologistika: { type: String },
+        eos_ora_02_apologistika: { type: String },
+        apo_ora_03_apologistika: { type: String },
+        eos_ora_03_apologistika: { type: String },
+        apologistiko_biblio: { type: Boolean, default: false },
+        ores_ergasias_apologistika: { type: Number, default: 0 },
+        ores_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
+        ores_argion_ergasia_apologistika: { type: Number, default: 0 },
+        ores_yperergasias_apologistika: { type: Number, default: 0 },
+        ores_yperergasias_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_yperergasias_argion_apologistika: { type: Number, default: 0 },
+        ores_yperergasias_argion_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_nominhs_yperorias_apologistika: { type: Number, default: 0 },
+        ores_nominhs_yperorias_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_nominhs_yperorias_argion_apologistika: { type: Number, default: 0 },
+        ores_nominhs_yperorias_argion_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_paranomhs_yperorias_apologistika: { type: Number, default: 0 },
+        ores_paranomhs_yperorias_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_paranomhs_yperorias_argion_apologistika: { type: Number, default: 0 },
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: { type: Number, default: 0 },
+        ores_prostheths_ergasias_apologistika: { type: Number, default: 0 },
+        repo_apologistika: { type: Boolean, default: false },
+        adeia_apologistika: { type: Boolean, default: false },
+        kathgoria_adeias_apologistika: { type: String, trim: true },
+        astheneia_apologistika: { type: Boolean, default: false },
+        kyriakes_apologistika: { type: Boolean, default: false },
+        ores_apoysias_apologistika: { type: Number, default: 0 },
+        is_locked: { type: Boolean, default: false },
+        locked_by: { type: String, trim: true },
+        locked_at: { type: Date },
+        unlocked_by: { type: String, trim: true },
+        unlocked_at: { type: Date }
     },
     {
         collection: 'Prodhlomena_Oraria'
     }
 );
 
-ProdhlomenaOrariaSchema.index(
-    {
-        team: 1,
-        company_kod: 1,
-        kodikos: 1,
-        hmeromhnia: 1
-    },
-    { unique: false }
-);
+ProdhlomenaOrariaSchema.index({
+    team: 1,
+    company_kod: 1,
+    ypokatasthma: 1,
+    kodikos: 1,
+    hmeromhnia: 1
+});
+
+ProdhlomenaOrariaSchema.index({
+    team: 1,
+    company_kod: 1,
+    hmeromhnia: 1,
+    kodikos: 1
+});
 
 const ProdhlomenaOrariaModel = model('ProdhlomenaOraria', ProdhlomenaOrariaSchema);
+
+const ProdhlomenaOrariaAuditSchema = new Schema(
+    {
+        team: { type: String, trim: true },
+        company_kod: { type: String, trim: true },
+
+        prodhlomena_oraria_id: {
+            type: Schema.Types.ObjectId,
+            ref: 'ProdhlomenaOraria'
+        },
+
+        kodikos: { type: String, trim: true },
+        ypokatasthma: { type: String, trim: true },
+        hmeromhnia: { type: Date },
+
+        changedBy: { type: String, trim: true },
+        changedAt: { type: Date, default: Date.now },
+
+        reason: { type: String, trim: true },
+
+        oldValues: { type: Object, default: {} },
+        newValues: { type: Object, default: {} }
+    },
+    {
+        collection: 'Prodhlomena_Oraria_Audit'
+    }
+);
+
+ProdhlomenaOrariaAuditSchema.index({
+    team: 1,
+    company_kod: 1,
+    prodhlomena_oraria_id: 1,
+    changedAt: -1
+});
+
+const ProdhlomenaOrariaAuditModel = model('ProdhlomenaOrariaAudit', ProdhlomenaOrariaAuditSchema);
 
 const OrariaFromErganhSchema = new Schema(
     {
@@ -509,7 +586,7 @@ const OrariaApologistikaSchema = new Schema(
         ores_paranomhs_yperorias_nyxtas_apologistika: { type: Number, default: 0 },
         ores_paranomhs_yperorias_argion_apologistika: { type: Number, default: 0 },
         ores_paranomhs_yperorias_argion_nyxtas_apologistika: { type: Number, default: 0 },
-        apologitiko_biblio: { type: Boolean, default: false }
+        apologistiko_biblio: { type: Boolean, default: false }
     },
     {
         collection: 'Oraria_Apologistika'
@@ -622,6 +699,7 @@ const IstorikoProslhpseonAllagonModel = model(
 module.exports = {
     ErgazomenoiModel,
     ProdhlomenaOrariaModel,
+    ProdhlomenaOrariaAuditModel,
     OrariaFromErganhModel,
     OrariaFromCardsModel,
     OrariaApologistikaModel,
