@@ -105,24 +105,23 @@ function calculateNightMinutes(apoOra, eosOra) {
     let start = apo;
     let end = eos;
 
-    // Πέρασε μεσάνυχτα
     if (end <= start) {
         end += 1440;
     }
 
-    const NIGHT_START = 22 * 60; // 22:00
-    const NIGHT_END = 30 * 60; // 06:00 επόμενης
+    let totalNightMinutes = 0;
 
-    let overlap = 0;
+    for (let minute = start; minute < end; minute++) {
+        const currentMinute = minute % 1440;
 
-    const overlapStart = Math.max(start, NIGHT_START);
-    const overlapEnd = Math.min(end, NIGHT_END);
+        const isNight = currentMinute >= 22 * 60 || currentMinute < 6 * 60;
 
-    if (overlapEnd > overlapStart) {
-        overlap += overlapEnd - overlapStart;
+        if (isNight) {
+            totalNightMinutes++;
+        }
     }
 
-    return overlap;
+    return totalNightMinutes;
 }
 
 function checkEarlyOrLateCard(context, pairNo) {
@@ -253,15 +252,17 @@ function checkBrokenProgramVsContinuousCards(context) {
 }
 
 function checkNightHours(context) {
-    const { rec } = context;
+    const { rec, ergazomenos } = context;
 
     let totalNightMinutes = 0;
 
-    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_01, rec.cards_eos_ora_01);
-
-    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_02, rec.cards_eos_ora_02);
-
-    totalNightMinutes += calculateNightMinutes(rec.cards_apo_ora_03, rec.cards_eos_ora_03);
+    for (const interval of getCardIntervals(rec, ergazomenos)) {
+        for (let minute = interval.start; minute < interval.end; minute++) {
+            if (isMinuteNight(minute)) {
+                totalNightMinutes++;
+            }
+        }
+    }
 
     return {
         ores_nyxtas_apologistika: +(totalNightMinutes / 60).toFixed(2)
@@ -327,23 +328,33 @@ function calculateSundayHolidayMinutesForInterval(baseDate, apoOra, eosOra, argi
     return totalMinutes;
 }
 
+function calculateSundayHolidayMinutesForRange(baseDate, start, end, argiesDateSet) {
+    let totalMinutes = 0;
+
+    for (let minute = start; minute < end; minute++) {
+        if (isMinuteSundayOrHoliday(baseDate, minute, argiesDateSet)) {
+            totalMinutes++;
+        }
+    }
+
+    return totalMinutes;
+}
+
 function checkSundayHolidayHours(context) {
-    const { rec, argiesDateSet } = context;
+    const { rec, ergazomenos, argiesDateSet } = context;
 
     const isCurrentDateSunday = new Date(rec.hmeromhnia).getUTCDay() === 0;
 
     let cardHolidayMinutes = 0;
 
-    [1, 2, 3].forEach((n) => {
-        const p = `0${n}`;
-
-        cardHolidayMinutes += calculateSundayHolidayMinutesForInterval(
+    for (const interval of getCardIntervals(rec, ergazomenos)) {
+        cardHolidayMinutes += calculateSundayHolidayMinutesForRange(
             rec.hmeromhnia,
-            rec[`cards_apo_ora_${p}`],
-            rec[`cards_eos_ora_${p}`],
+            interval.start,
+            interval.end,
             argiesDateSet
         );
-    });
+    }
 
     const hasDeclaredSchedule =
         hasTime(rec.apo_ora_01) ||
@@ -692,10 +703,6 @@ function getWeekKeySunday(date) {
     return dateKeyUtc(startOfWeekSundayUtc(date));
 }
 
-function getDailyCardsMinutes(rec) {
-    return Math.round((Number(rec.cards_ores_ergasias) || 0) * 60);
-}
-
 function getDailyDeclaredMinutes(rec) {
     return Math.round((Number(rec.ores_ergasias) || 0) * 60);
 }
@@ -717,15 +724,114 @@ function getBreakOffsetMinutes(ergazomenos) {
     return dialleimaEntos ? 0 : dialleimaMinutes;
 }
 
+function isDeclaredContinuousSchedule(rec) {
+    return (
+        hasTime(rec.apo_ora_01) &&
+        hasTime(rec.eos_ora_01) &&
+        !hasTime(rec.apo_ora_02) &&
+        !hasTime(rec.eos_ora_02) &&
+        !hasTime(rec.apo_ora_03) &&
+        !hasTime(rec.eos_ora_03)
+    );
+}
+
+function isCardsContinuousSchedule(rec) {
+    return (
+        hasTime(rec.cards_apo_ora_01) &&
+        hasTime(rec.cards_eos_ora_01) &&
+        !hasTime(rec.cards_apo_ora_02) &&
+        !hasTime(rec.cards_eos_ora_02) &&
+        !hasTime(rec.cards_apo_ora_03) &&
+        !hasTime(rec.cards_eos_ora_03)
+    );
+}
+
+function getRawCardIntervals(rec) {
+    return [
+        {
+            index: 1,
+            apo: rec.cards_apo_ora_01,
+            eos: rec.cards_eos_ora_01
+        },
+        {
+            index: 2,
+            apo: rec.cards_apo_ora_02,
+            eos: rec.cards_eos_ora_02
+        },
+        {
+            index: 3,
+            apo: rec.cards_apo_ora_03,
+            eos: rec.cards_eos_ora_03
+        }
+    ]
+        .map((interval) => {
+            const expanded = expandIntervalFromTimes(interval.apo, interval.eos);
+
+            if (!expanded) return null;
+
+            return {
+                ...interval,
+                start: expanded.start,
+                end: expanded.end
+            };
+        })
+        .filter(Boolean);
+}
+
+function getRawDailyCardsMinutes(rec) {
+    return getRawCardIntervals(rec).reduce(
+        (total, interval) => total + Math.max(0, interval.end - interval.start),
+        0
+    );
+}
+
+function shouldSubtractExternalBreak(rec, ergazomenos) {
+    if (!ergazomenos) return false;
+
+    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
+
+    if (breakMinutes <= 0) return false;
+    if (!isDeclaredContinuousSchedule(rec)) return false;
+    if (!isCardsContinuousSchedule(rec)) return false;
+
+    const rawCardsMinutes = getRawDailyCardsMinutes(rec);
+
+    // Αν οι πραγματικές ώρες καρτών μείον το διάλειμμα πέφτουν κάτω από 4 ώρες,
+    // δεν αφαιρούμε διάλειμμα για τη συγκεκριμένη ημερομηνία.
+    return rawCardsMinutes - breakMinutes >= 4 * 60;
+}
+
+function expandIntervalFromTimes(apoOra, eosOra) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    if (apo === null || eos === null) return null;
+
+    let start = apo;
+    let end = eos;
+
+    if (end <= start) {
+        end += 1440;
+    }
+
+    return { start, end };
+}
+
+function getDailyCardsMinutes(rec, ergazomenos = null) {
+    return getCardIntervals(rec, ergazomenos).reduce(
+        (total, interval) => total + Math.max(0, interval.end - interval.start),
+        0
+    );
+}
+
 function getWorkTimeRules(ergazomenos) {
     const hmeres = parseInt(ergazomenos.hmeres_ergasias_ebdomadas || 5, 10);
-    const breakOffset = getBreakOffsetMinutes(ergazomenos);
 
     if (hmeres === 6) {
         return {
             workingDaysPerWeek: 6,
-            contractualDailyLimitMinutes: 6 * 60 + 40 + breakOffset, // 6h40
-            dailyLegalLimitMinutes: 8 * 60 + breakOffset, // 8h
+            contractualDailyLimitMinutes: 6 * 60 + 40, // 6h40
+            dailyLegalLimitMinutes: 8 * 60, // 8h
             weeklyOverworkThresholdMinutes: 40 * 60,
             weeklyLegalLimitMinutes: 48 * 60,
             weeklyOverworkCapMinutes: 8 * 60
@@ -734,19 +840,19 @@ function getWorkTimeRules(ergazomenos) {
 
     return {
         workingDaysPerWeek: 5,
-        contractualDailyLimitMinutes: 8 * 60 + breakOffset, // 8h
-        dailyLegalLimitMinutes: 9 * 60 + breakOffset, // 9h
+        contractualDailyLimitMinutes: 8 * 60, // 8h
+        dailyLegalLimitMinutes: 9 * 60, // 9h
         weeklyOverworkThresholdMinutes: 40 * 60,
         weeklyLegalLimitMinutes: 45 * 60,
         weeklyOverworkCapMinutes: 5 * 60
     };
 }
 
-function isRegularWorkingDayForOverwork(rec) {
+function isRegularWorkingDayForOverwork(rec, ergazomenos = null) {
     if (rec.repo === true) return false;
     if (rec.argia === true) return false;
 
-    return getDailyCardsMinutes(rec) > 0;
+    return getDailyCardsMinutes(rec, ergazomenos) > 0;
 }
 
 function emptyClassifiedMinutes() {
@@ -794,9 +900,9 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const partTime = isPartTimeEmployee(ergazomenos);
 
     const dailyDeclaredMinutes = getDailyDeclaredMinutes(rec);
-    const dailyCardsMinutes = getDailyCardsMinutes(rec);
+    const dailyCardsMinutes = getDailyCardsMinutes(rec, ergazomenos);
 
-    const regularDay = isRegularWorkingDayForOverwork(rec);
+    const regularDay = isRegularWorkingDayForOverwork(rec, ergazomenos);
 
     let prosthetiMinutes = 0;
 
@@ -828,13 +934,10 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     let workedSoFarToday = 0;
     let regularWorkedSoFarToday = 0;
 
-    const intervals = getCardIntervals(rec);
+    const intervals = getCardIntervals(rec, ergazomenos);
 
     for (const interval of intervals) {
-        const expanded = expandIntervalMinutes(interval.apo, interval.eos);
-        if (!expanded) continue;
-
-        for (let minute = expanded.start; minute < expanded.end; minute++) {
+        for (let minute = interval.start; minute < interval.end; minute++) {
             workedSoFarToday++;
 
             let weeklyRegularPosition = null;
@@ -856,7 +959,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             //     : rules.contractualDailyLimitMinutes;
             const legalOvertimeStartMinutes = weeklyQualifiesForOverwork
                 ? rules.dailyLegalLimitMinutes
-                : 8 * 60 + getBreakOffsetMinutes(ergazomenos);
+                : 8 * 60;
 
             const legalOvertimeEndMinutes = legalOvertimeStartMinutes + 3 * 60;
 
@@ -913,10 +1016,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             // πάνω από προδηλωμένο μέχρι το πλήρες ημερήσιο όριο.
             // Δεν απαιτεί weekly >= 40h.
             // ========================================================
-            const additionalUpperLimit = Math.min(
-                rules.contractualDailyLimitMinutes,
-                8 * 60 + getBreakOffsetMinutes(ergazomenos)
-            );
+            const additionalUpperLimit = Math.min(rules.contractualDailyLimitMinutes, 8 * 60);
 
             if (
                 partTime &&
@@ -952,45 +1052,45 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     };
 }
 
-function getCardIntervals(rec) {
-    return [
-        {
-            apo: rec.cards_apo_ora_01,
-            eos: rec.cards_eos_ora_01
-        },
-        {
-            apo: rec.cards_apo_ora_02,
-            eos: rec.cards_eos_ora_02
-        },
-        {
-            apo: rec.cards_apo_ora_03,
-            eos: rec.cards_eos_ora_03
-        }
-    ].filter((x) => timeToMinutesSafe(x.apo) !== null && timeToMinutesSafe(x.eos) !== null);
+function getCardIntervals(rec, ergazomenos = null) {
+    const intervals = getRawCardIntervals(rec);
+
+    if (!shouldSubtractExternalBreak(rec, ergazomenos)) {
+        return intervals;
+    }
+
+    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
+
+    return intervals
+        .map((interval) => {
+            if (interval.index !== 1) return interval;
+
+            const adjustedEnd = interval.end - breakMinutes;
+
+            if (adjustedEnd <= interval.start) {
+                return null;
+            }
+
+            return {
+                ...interval,
+                eos: minutesToTimeSafe(adjustedEnd),
+                end: adjustedEnd,
+                externalBreakSubtractedMinutes: breakMinutes
+            };
+        })
+        .filter(Boolean);
 }
 
 function expandIntervalMinutes(apoOra, eosOra) {
-    const apo = timeToMinutesSafe(apoOra);
-    const eos = timeToMinutesSafe(eosOra);
-
-    if (apo === null || eos === null) return null;
-
-    let start = apo;
-    let end = eos;
-
-    if (end <= start) {
-        end += 1440;
-    }
-
-    return { start, end };
+    return expandIntervalFromTimes(apoOra, eosOra);
 }
 
 function isMinuteNight(minuteFromBaseDate) {
     const minute = minuteFromBaseDate % 1440;
 
     // Νύχτα: 22:01 - 06:00.
-    // Πρακτικά σε λεπτά: > 22:00 και <= 06:00.
-    return minute > 22 * 60 || minute < 6 * 60;
+    // Πρακτικά σε λεπτά: >= 22:00 και <= 06:00.
+    return minute >= 22 * 60 || minute < 6 * 60;
 }
 
 function isMinuteSundayOrHoliday(baseDate, minuteFromBaseDate, argiesDateSet) {
@@ -1023,13 +1123,10 @@ function calculateOverworkClassifiedMinutes(
     let holiday = 0;
     let holidayNight = 0;
 
-    const intervals = getCardIntervals(rec);
+    const intervals = getCardIntervals(rec, ergazomenos);
 
     for (const interval of intervals) {
-        const expanded = expandIntervalMinutes(interval.apo, interval.eos);
-        if (!expanded) continue;
-
-        for (let minute = expanded.start; minute < expanded.end; minute++) {
+        for (let minute = interval.start; minute < interval.end; minute++) {
             workedSoFar++;
 
             if (workedSoFar < overworkStartOffset) continue;
@@ -1110,15 +1207,25 @@ function calculateWorkSegmentClassifiedMinutes(rec, startOffset, segmentMinutes,
 }
 
 function checkOresApoysias(context) {
-    const { rec, proorhApoxorhshMinutes } = context;
+    const { rec, ergazomenos, proorhApoxorhshMinutes } = context;
 
     const declaredHours = Number(rec.ores_ergasias || 0);
-    const cardsHours = Number(rec.cards_ores_ergasias || 0);
 
+    // Για απουσίες χρησιμοποιούμε τις raw ώρες καρτών + ανοχή πρόωρης αποχώρησης.
+    // Δεν αφαιρούμε εδώ διάλειμμα, για να μη δημιουργείται τεχνητή απουσία.
+    const rawCardsHours = Number(rec.cards_ores_ergasias || 0);
     const toleranceHours = Number(proorhApoxorhshMinutes || 0) / 60;
 
     const absenceHours =
-        declaredHours > cardsHours + toleranceHours ? +(declaredHours - cardsHours).toFixed(2) : 0;
+        declaredHours > rawCardsHours + toleranceHours
+            ? +(declaredHours - rawCardsHours).toFixed(2)
+            : 0;
+
+    // return {
+    //     // Για απολογιστικές ώρες εργασίας χρησιμοποιούμε effective paid card minutes.
+    //     ores_ergasias_apologistika: toHours(getDailyCardsMinutes(rec, ergazomenos)),
+    //     ores_apoysias_apologistika: absenceHours
+    // };
 
     return {
         ores_ergasias_apologistika: +declaredHours.toFixed(2),
@@ -2607,9 +2714,11 @@ class erganhController {
                     });
                 }
 
-                if (isRegularWorkingDayForOverwork(rec)) {
-                    weeklyStateMap.get(weekKey).weeklyRegularCardsMinutes +=
-                        getDailyCardsMinutes(rec);
+                if (isRegularWorkingDayForOverwork(rec, ergazomenos)) {
+                    weeklyStateMap.get(weekKey).weeklyRegularCardsMinutes += getDailyCardsMinutes(
+                        rec,
+                        ergazomenos
+                    );
                 }
             }
 

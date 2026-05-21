@@ -208,9 +208,90 @@ function employeeGroupKey(row) {
     return [row.ypokatasthma || '', row.kodikos || ''].join('|');
 }
 
+function effectiveWorkHoursValue(row) {
+    if (row.ores_ergasias_apologistika !== null && row.ores_ergasias_apologistika !== undefined) {
+        return num(row.ores_ergasias_apologistika);
+    }
+
+    return num(row.cards_ores_ergasias);
+}
+
+function breakSubtractedHoursValue(row) {
+    const diff = num(row.cards_ores_ergasias) - effectiveWorkHoursValue(row);
+
+    return diff > 0.004 ? +diff.toFixed(2) : 0;
+}
+
+function renderHoursCell(row) {
+    const effectiveHours = effectiveWorkHoursValue(row);
+    const rawCardHours = num(row.cards_ores_ergasias);
+    const breakHours = breakSubtractedHoursValue(row);
+
+    if (breakHours <= 0) {
+        return `<div class="fw-semibold">${hours(effectiveHours)}</div>`;
+    }
+
+    return `
+        <div class="fw-semibold">${hours(effectiveHours)}</div>
+        <small class="review-hours-note">
+            Κάρτες ${hours(rawCardHours)} − διάλ. ${hours(breakHours)}
+        </small>
+    `;
+}
+
+function ensureReviewTableStructure() {
+    const table = document.getElementById('resultsTable');
+
+    if (!table) return;
+
+    table.querySelectorAll('thead tr').forEach((tr) => {
+        const headers = Array.from(tr.children);
+
+        if (headers.some((th) => th.dataset.autoColumn === 'apoysies')) return;
+
+        const hoursHeader = headers.find((th) => th.textContent.trim() === 'Ώρες');
+
+        if (!hoursHeader) return;
+
+        const th = document.createElement('th');
+        th.dataset.autoColumn = 'apoysies';
+        th.textContent = 'Απουσίες';
+
+        hoursHeader.after(th);
+    });
+
+    if (!document.getElementById('reviewDynamicCellStyles')) {
+        const style = document.createElement('style');
+        style.id = 'reviewDynamicCellStyles';
+        style.textContent = `
+            .cell-apoysia {
+                background-color: #dc3545 !important;
+                color: #ffffff !important;
+                font-weight: 700;
+            }
+
+            .cell-break-subtracted {
+                background-color: #edf6ff !important;
+                color: #12344d !important;
+            }
+
+            .review-hours-note {
+                display: block;
+                margin-top: 2px;
+                font-size: 0.72rem;
+                line-height: 1.1;
+                color: inherit;
+                white-space: nowrap;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 function createEmptyTotals() {
     return {
-        cards_ores_ergasias: 0,
+        ores_ergasias_apologistika: 0,
+        ores_apoysias_apologistika: 0,
         ores_nyxtas_apologistika: 0,
         ores_argion_prosayxhsh_apologistika: 0,
         ores_argion_ergasia_apologistika: 0,
@@ -249,7 +330,8 @@ function sumParanomiYperoria(row) {
 }
 
 function addRowToTotals(totals, row) {
-    totals.cards_ores_ergasias += num(row.cards_ores_ergasias);
+    totals.ores_ergasias_apologistika += effectiveWorkHoursValue(row);
+    totals.ores_apoysias_apologistika += num(row.ores_apoysias_apologistika);
     totals.ores_nyxtas_apologistika += num(row.ores_nyxtas_apologistika);
     totals.ores_argion_prosayxhsh_apologistika += num(row.ores_argion_prosayxhsh_apologistika);
     totals.ores_argion_ergasia_apologistika += num(row.ores_argion_ergasia_apologistika);
@@ -266,10 +348,11 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
     tr.dataset.groupId = groupId;
 
     tr.innerHTML = `
-        <td colspan="7" class="fw-bold text-end">
+        <td colspan="6" class="fw-bold text-end">
             Σύνολα εργαζομένου
         </td>
-        <td class="fw-bold">${hours(totals.cards_ores_ergasias)}</td>
+        <td class="fw-bold">${hours(totals.ores_ergasias_apologistika)}</td>
+        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
@@ -285,10 +368,11 @@ function appendGrandTotalsRow(tbody, totals) {
     tr.classList.add('grand-total-row');
 
     tr.innerHTML = `
-        <td colspan="7" class="fw-bold text-end">
+        <td colspan="6" class="fw-bold text-end">
             Γενικά σύνολα φίλτρου
         </td>
-        <td class="fw-bold">${hours(totals.cards_ores_ergasias)}</td>
+        <td class="fw-bold">${hours(totals.ores_ergasias_apologistika)}</td>
+        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
@@ -331,6 +415,8 @@ async function loadResults() {
             });
             return;
         }
+
+        ensureReviewTableStructure();
 
         const rows = payload.rows || [];
         const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
@@ -415,16 +501,17 @@ async function loadResults() {
                 <td>${formatDate(row.hmeromhnia)}</td>
                 <td>${row.ypokatasthma || ''}</td>
                 <td>${row.kodikos || ''}</td>
-                <td>
-                    <div>${row.eponymo || ''}</div>
-                    <div>${row.onoma || ''}</div>
-                </td>
                 <td>${intervalText(row.apo_ora_01, row.eos_ora_01)}</td>
                 <td>${intervalText(row.cards_apo_ora_01, row.cards_eos_ora_01)}</td>
                 <td${tdClass(isApologistikoIntervalPresent(row) ? 'cell-apologistiko' : '')}>
                     ${apologistikoText}
                 </td>
-                <td>${hours(row.cards_ores_ergasias)}</td>
+                <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
+                    ${renderHoursCell(row)}
+                </td>
+                <td${tdClass(hasPositiveNumber(row.ores_apoysias_apologistika) ? 'cell-apoysia' : '')}>
+                    ${hours(row.ores_apoysias_apologistika)}
+                </td>
                 <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
                     ${hours(row.ores_nyxtas_apologistika)}
                 </td>
