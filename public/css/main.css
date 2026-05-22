@@ -11572,3 +11572,15 @@ body.loader-active > *:not(.app-loader) {
 .cell-apologistiko {
     background: #e3f7df !important;
 }
+
+.cell-apoysia-total {
+    color: #000 !important;
+}
+
+.employee-subtotal-row .cell-apoysia.cell-apoysia-total {
+    color: #000 !important;
+}
+
+.grand-total-row .cell-apoysia.cell-apoysia-total {
+    color: #000 !important;
+}

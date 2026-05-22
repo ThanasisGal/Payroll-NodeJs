@@ -11,7 +11,45 @@
         </div>
 
         <div class="card-body overflow-auto flex-grow-1 height-vh-33 bg-white">
-            <% const safe = (k) => (rec && rec[k]) || ''; %>
+            <%
+                const safe = (k) => (rec && rec[k]) || '';
+
+                const toDateInputValue = (value) => {
+                    if (!value) return '';
+
+                    if (typeof value === 'string') {
+                        const trimmed = value.trim();
+
+                        // HTML input[type=date] θέλει YYYY-MM-DD
+                        if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+                            return trimmed.slice(0, 10);
+                        }
+
+                        // Αν έρθει σε μορφή DD/MM/YYYY
+                        if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+                            const [d, m, y] = trimmed.split('/');
+                            return `${y}-${m}-${d}`;
+                        }
+                    }
+
+                    const dt = new Date(value);
+                    if (Number.isNaN(dt.getTime())) return '';
+
+                    const y = dt.getFullYear();
+                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                    const d = String(dt.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                };
+
+                // Το periodRec πρέπει να έρχεται από τον controller:
+                // PeriodsModel.findOne({ xrhsh: req.session.yearInUse, kodikos: req.session.periodInUse }).lean()
+                const currentPeriod = periodRec || period || null;
+                const apoHmeromhniaValue = toDateInputValue(currentPeriod && currentPeriod.apo);
+                const eosHmeromhniaValue = toDateInputValue(currentPeriod && currentPeriod.eos);
+
+                const xronosProetoimasiasValue = safe('xronosProetoimasias_stathera') || '00';
+                const proorhApoxorhshValue = safe('proorhApoxorhsh_stathera') || '10';
+            %>
 
             <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
             <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
@@ -64,7 +102,7 @@
                     </label>
                 </div>
                 <div class="col-2-5">
-                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" required />
+                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= apoHmeromhniaValue %>" required />
                 </div>
             </div>
 
@@ -77,14 +115,14 @@
                     </label>
                 </div>
                 <div class="col-2-5">
-                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
+                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= eosHmeromhniaValue %>" required />
                 </div>
             </div>
 
             <div class="row form-group g-3 align-items-center mb-4"></div>
 
             <div class="row form-group g-3 align-items-center mb-3">
-                <div class="col-2 left-align mt-n-0-15">
+                <div class="col-2 left-align mt-n-0-15 margin-top-0_5rem">
                     <label for="xronosProetoimasias" class="col-form-label label-font-size-smaller">
                         Πρόωρη Προσέλευση
                     </label>
@@ -95,7 +133,7 @@
                     name="xronosProetoimasias_stathera"
                     id="xronosProetoimasias_stathera"
                     class="form-control input-contents"
-                    value="<%= safe('xronosProetoimasias_stathera') %>"
+                    value="<%= xronosProetoimasiasValue %>"
                     readonly
                 />
 
@@ -115,9 +153,9 @@
                     </select>
                 </div>
 
-                <div class="col-3-2 left-align mt-n-0-15">
+                <div class="col-3-2 left-align mt-n-0-15 text-end margin-top-0_5rem">
                     <label for="proorhApoxorhsh" class="col-form-label label-font-size-smaller">
-                        Πρόωρη Αποχώρηση (για απουσίες)
+                        Πρόωρη Αποχώρηση (απουσίες)
                     </label>
                 </div>
 
@@ -126,7 +164,7 @@
                     name="proorhApoxorhsh_stathera"
                     id="proorhApoxorhsh_stathera"
                     class="form-control input-contents"
-                    value="<%= safe('proorhApoxorhsh_stathera') %>"
+                    value="<%= proorhApoxorhshValue %>"
                     readonly
                 />
 

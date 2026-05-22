@@ -63,7 +63,7 @@
                     </label>
                 </div>
                 <div class="col-2-5">
-                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" required />
+                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required />
                 </div>
             </div>
 
@@ -76,7 +76,7 @@
                     </label>
                 </div>
                 <div class="col-2-5">
-                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
+                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required />
                 </div>
             </div>
         </div>

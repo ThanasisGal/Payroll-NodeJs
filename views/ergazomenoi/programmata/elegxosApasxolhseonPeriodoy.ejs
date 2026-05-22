@@ -1,3 +1,12 @@
+<%
+    const dateInputValue = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        return d.toISOString().slice(0, 10);
+    };
+%>
+
 <div class="container-fluid mt-3">
     <meta name="csrf-token" content="<%= csrfToken %>" />
 
@@ -15,6 +24,7 @@
                             type="date"
                             id="apo_hmeromhnia"
                             class="form-control date-tall move-by-enter"
+                            value="<%= dateInputValue(periodRec?.apo) %>"
                         />
                     </div>
 
@@ -24,6 +34,7 @@
                             type="date"
                             id="eos_hmeromhnia"
                             class="form-control date-tall move-by-enter"
+                            value="<%= dateInputValue(periodRec?.eos) %>"
                         />
                     </div>
 

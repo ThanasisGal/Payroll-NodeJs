@@ -251,6 +251,181 @@ function checkBrokenProgramVsContinuousCards(context) {
     };
 }
 
+function getEmployeeDailyAverageMinutes(ergazomenos) {
+    if (!ergazomenos) return 8 * 60;
+
+    const raw =
+        ergazomenos.mo_oron_hmerhsias_ergasias ??
+        ergazomenos.m_o_hmerhsias_ergasias ??
+        ergazomenos.mesos_oros_hmerhsias_ergasias ??
+        ergazomenos.ores_ergasias ??
+        8;
+
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+
+        if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+            const [hh, mm] = trimmed.split(':').map(Number);
+            return hh * 60 + mm;
+        }
+
+        const normalized = trimmed.replace(',', '.');
+        const numeric = Number(normalized);
+
+        if (!Number.isNaN(numeric) && numeric > 0) {
+            return Math.round(numeric * 60);
+        }
+    }
+
+    const numeric = Number(raw);
+
+    if (!Number.isNaN(numeric) && numeric > 0) {
+        return Math.round(numeric * 60);
+    }
+
+    return 8 * 60;
+}
+
+function hasDeclaredSchedule(rec) {
+    return (
+        hasTime(rec.apo_ora_01) ||
+        hasTime(rec.eos_ora_01) ||
+        hasTime(rec.apo_ora_02) ||
+        hasTime(rec.eos_ora_02) ||
+        hasTime(rec.apo_ora_03) ||
+        hasTime(rec.eos_ora_03)
+    );
+}
+
+function hasCardPairAny(rec, pairNo) {
+    const p = String(pairNo).padStart(2, '0');
+
+    return hasTime(rec[`cards_apo_ora_${p}`]) || hasTime(rec[`cards_eos_ora_${p}`]);
+}
+
+function absoluteMinuteAfter(referenceMinute, timeValue) {
+    const minute = timeToMinutesSafe(timeValue);
+
+    if (minute === null) return null;
+
+    let absoluteMinute = minute;
+
+    while (absoluteMinute <= referenceMinute) {
+        absoluteMinute += 1440;
+    }
+
+    return absoluteMinute;
+}
+
+function checkNoDeclaredScheduleCards(context) {
+    const { rec, ergazomenos } = context;
+
+    if (hasDeclaredSchedule(rec)) return {};
+
+    const hasPair1 = hasCardPairAny(rec, 1);
+    const hasPair2 = hasCardPairAny(rec, 2);
+    const hasPair3 = hasCardPairAny(rec, 3);
+
+    if (!hasPair1 || hasPair3) return {};
+
+    const dailyAverageMinutes = getEmployeeDailyAverageMinutes(ergazomenos);
+
+    if (dailyAverageMinutes <= 0) return {};
+
+    const update = {
+        apologistiko_biblio: true,
+        apo_ora_01_apologistika: '',
+        eos_ora_01_apologistika: '',
+        apo_ora_02_apologistika: '',
+        eos_ora_02_apologistika: '',
+        apo_ora_03_apologistika: '',
+        eos_ora_03_apologistika: ''
+    };
+
+    const card1Start = timeToMinutesSafe(rec.cards_apo_ora_01);
+    const card1End = timeToMinutesSafe(rec.cards_eos_ora_01);
+
+    // A1: υπάρχει μόνο 1ο ζεύγος καρτών.
+    if (!hasPair2) {
+        if (card1Start !== null) {
+            update.apo_ora_01_apologistika = minutesToTimeSafe(card1Start);
+            update.eos_ora_01_apologistika = minutesToTimeSafe(card1Start + dailyAverageMinutes);
+            return update;
+        }
+
+        if (card1End !== null) {
+            update.apo_ora_01_apologistika = minutesToTimeSafe(card1End - dailyAverageMinutes);
+            update.eos_ora_01_apologistika = minutesToTimeSafe(card1End);
+            return update;
+        }
+
+        return {};
+    }
+
+    // B1: υπάρχουν 1ο και 2ο ζεύγος καρτών, χωρίς 3ο.
+    // Η λογική αυτή εφαρμόζεται μόνο όταν το 1ο ζεύγος είναι πλήρες.
+    if (card1Start === null || card1End === null) {
+        return {};
+    }
+
+    let card1EndAbs = card1End;
+
+    if (card1EndAbs <= card1Start) {
+        card1EndAbs += 1440;
+    }
+
+    const firstPairMinutes = Math.max(0, card1EndAbs - card1Start);
+    const remainingMinutes = Math.max(0, dailyAverageMinutes - firstPairMinutes);
+
+    update.apo_ora_01_apologistika = minutesToTimeSafe(card1Start);
+    update.eos_ora_01_apologistika = minutesToTimeSafe(card1EndAbs);
+
+    if (remainingMinutes <= 0) {
+        return update;
+    }
+
+    const card2Start = timeToMinutesSafe(rec.cards_apo_ora_02);
+    const card2EndRaw = timeToMinutesSafe(rec.cards_eos_ora_02);
+
+    // B1α: αν υπάρχει έναρξη στο 2ο ζεύγος, κρατάμε την έναρξη και συμπληρώνουμε το υπόλοιπο.
+    if (card2Start !== null) {
+        let card2StartAbs = card2Start;
+
+        while (card2StartAbs <= card1EndAbs) {
+            card2StartAbs += 1440;
+        }
+
+        update.apo_ora_02_apologistika = minutesToTimeSafe(card2StartAbs);
+        update.eos_ora_02_apologistika = minutesToTimeSafe(card2StartAbs + remainingMinutes);
+
+        return update;
+    }
+
+    // B1β: αν υπάρχει μόνο αποχώρηση στο 2ο ζεύγος, γυρίζουμε προς τα πίσω.
+    if (card2EndRaw !== null) {
+        const card2EndAbs = absoluteMinuteAfter(card1EndAbs, rec.cards_eos_ora_02);
+
+        if (card2EndAbs === null) return update;
+
+        let card2StartAbs = card2EndAbs - remainingMinutes;
+        let finalCard2EndAbs = card2EndAbs;
+
+        // Αν το κενό μεταξύ 1ου τέλους και 2ης έναρξης δεν είναι > 3h,
+        // πιέζουμε την 2η έναρξη στο 1ο τέλος + 3h και ξαναϋπολογίζουμε τη 2η λήξη.
+        if (card2StartAbs - card1EndAbs <= 3 * 60) {
+            card2StartAbs = card1EndAbs + 3 * 60;
+            finalCard2EndAbs = card2StartAbs + remainingMinutes;
+        }
+
+        update.apo_ora_02_apologistika = minutesToTimeSafe(card2StartAbs);
+        update.eos_ora_02_apologistika = minutesToTimeSafe(finalCard2EndAbs);
+
+        return update;
+    }
+
+    return update;
+}
+
 function checkNightHours(context) {
     const { rec, ergazomenos } = context;
 
@@ -704,6 +879,15 @@ function getWeekKeySunday(date) {
 }
 
 function getDailyDeclaredMinutes(rec) {
+    const declaredFromIntervals =
+        durationMinutesSafe(rec.apo_ora_01, rec.eos_ora_01) +
+        durationMinutesSafe(rec.apo_ora_02, rec.eos_ora_02) +
+        durationMinutesSafe(rec.apo_ora_03, rec.eos_ora_03);
+
+    if (declaredFromIntervals > 0) {
+        return declaredFromIntervals;
+    }
+
     return Math.round((Number(rec.ores_ergasias) || 0) * 60);
 }
 
@@ -1206,29 +1390,52 @@ function calculateWorkSegmentClassifiedMinutes(rec, startOffset, segmentMinutes,
     return { normal, night, holiday, holidayNight };
 }
 
+// function checkOresApoysias(context) {
+//     const { rec, ergazomenos, proorhApoxorhshMinutes } = context;
+
+//     const declaredHours = toHours(getDailyDeclaredMinutes(rec));
+
+//     // Για απουσίες χρησιμοποιούμε τις raw ώρες καρτών + ανοχή πρόωρης αποχώρησης.
+//     // Δεν αφαιρούμε εδώ διάλειμμα, για να μη δημιουργείται τεχνητή απουσία.
+//     const rawCardsHours = Number(rec.cards_ores_ergasias || 0);
+//     const toleranceHours = Number(proorhApoxorhshMinutes || 0) / 60;
+
+//     const absenceHours =
+//         declaredHours > rawCardsHours + toleranceHours
+//             ? +(declaredHours - rawCardsHours).toFixed(2)
+//             : 0;
+
+//     // return {
+//     //     // Για απολογιστικές ώρες εργασίας χρησιμοποιούμε effective paid card minutes.
+//     //     ores_ergasias_apologistika: toHours(getDailyCardsMinutes(rec, ergazomenos)),
+//     //     ores_apoysias_apologistika: absenceHours
+//     // };
+
+//     return {
+//         ores_ergasias_apologistika: +declaredHours.toFixed(2),
+//         ores_apoysias_apologistika: absenceHours
+//     };
+// }
+
 function checkOresApoysias(context) {
     const { rec, ergazomenos, proorhApoxorhshMinutes } = context;
 
-    const declaredHours = Number(rec.ores_ergasias || 0);
+    const declaredMinutes = getDailyDeclaredMinutes(rec);
+    const declaredHours = toHours(declaredMinutes);
 
-    // Για απουσίες χρησιμοποιούμε τις raw ώρες καρτών + ανοχή πρόωρης αποχώρησης.
-    // Δεν αφαιρούμε εδώ διάλειμμα, για να μη δημιουργείται τεχνητή απουσία.
+    const effectiveCardsHours = toHours(getDailyCardsMinutes(rec, ergazomenos));
     const rawCardsHours = Number(rec.cards_ores_ergasias || 0);
     const toleranceHours = Number(proorhApoxorhshMinutes || 0) / 60;
 
     const absenceHours =
-        declaredHours > rawCardsHours + toleranceHours
+        declaredHours > 0 && declaredHours > rawCardsHours + toleranceHours
             ? +(declaredHours - rawCardsHours).toFixed(2)
             : 0;
 
-    // return {
-    //     // Για απολογιστικές ώρες εργασίας χρησιμοποιούμε effective paid card minutes.
-    //     ores_ergasias_apologistika: toHours(getDailyCardsMinutes(rec, ergazomenos)),
-    //     ores_apoysias_apologistika: absenceHours
-    // };
-
     return {
-        ores_ergasias_apologistika: +declaredHours.toFixed(2),
+        ores_ergasias_apologistika:
+            declaredHours > 0 ? +declaredHours.toFixed(2) : +effectiveCardsHours.toFixed(2),
+
         ores_apoysias_apologistika: absenceHours
     };
 }
@@ -1609,13 +1816,19 @@ class erganhController {
 
             const cleanedPasswordsData = passwordsData.map((data) => data._doc);
 
+            const periodRec = await PeriodsModel.findOne({
+                xrhsh: req.session.yearInUse,
+                kodikos: req.session.periodInUse
+            }).lean();
+
             res.render('ergazomenoi/programmata/lhpshOrarionApoErganh', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
                 passwords: cleanedPasswordsData,
-                rec: {}
+                rec: {},
+                periodRec
             });
         } catch (error) {
             console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
@@ -1771,13 +1984,19 @@ class erganhController {
 
             const cleanedPasswordsData = passwordsData.map((data) => data._doc);
 
+            const periodRec = await PeriodsModel.findOne({
+                xrhsh: req.session.yearInUse,
+                kodikos: req.session.periodInUse
+            }).lean();
+
             res.render('ergazomenoi/programmata/lhpshOrarionApoKartes', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
                 passwords: cleanedPasswordsData,
-                rec: {}
+                rec: {},
+                periodRec
             });
         } catch (error) {
             console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
@@ -1944,13 +2163,19 @@ class erganhController {
                 form: 'CalcApasxolhseisPeriodoy'
             }).exec();
 
+            const periodRec = await PeriodsModel.findOne({
+                xrhsh: req.session.yearInUse,
+                kodikos: req.session.periodInUse
+            }).lean();
+
             res.render('ergazomenoi/programmata/calcApasxolhseisPeriodoy', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
                 // passwords: cleanedPasswordsData,
-                rec: {}
+                rec: {},
+                periodRec
             });
         } catch (error) {
             console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
@@ -1973,12 +2198,18 @@ class erganhController {
                 form: 'ElegxosApasxolhseonPeriodoy'
             }).exec();
 
+            const periodRec = await PeriodsModel.findOne({
+                xrhsh: req.session.yearInUse,
+                kodikos: req.session.periodInUse
+            }).lean();
+
             res.render('ergazomenoi/programmata/elegxosApasxolhseonPeriodoy', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam,
                 companyId,
                 userRole: req.session.userRole,
+                periodRec,
                 rec: {}
             });
         } catch (error) {
@@ -2577,7 +2808,6 @@ class erganhController {
 
             const apoDate = new Date(`${apo_hmeromhnia}T00:00:00.000Z`);
             const eosDate = new Date(`${eos_hmeromhnia}T23:59:59.999Z`);
-
             const calculationStartDate = startOfWeekSundayUtc(apoDate);
 
             const selectedYpokatasthma =
@@ -2588,9 +2818,6 @@ class erganhController {
             const proorhProseleyshMinutes = parseInt(proorh_proseleysh || 0, 10) || 0;
             const proorhApoxorhshMinutes = parseInt(proorhApoxorhsh_stathera || 0, 10) || 0;
 
-            // ============================================================
-            // 1) Φόρτωσε εργαζόμενους μία φορά
-            // ============================================================
             const employeeQuery = {
                 team: sessionTeam,
                 company_kod: companyId,
@@ -2608,10 +2835,11 @@ class erganhController {
                         'dialleima_entos_ektos_orarioy dialleima_se_lepta ' +
                         'plhrhs_apasxolhsh pliris_apasxolisi plhrhs ' +
                         'merikh_apasxolhsh meriki_apasxolisi ' +
-                        'evelikth_proselefsh'
+                        'evelikth_proselefsh mo_oron_hmerhsias_ergasias'
                 )
                 .sort({ kodikos: 1 })
                 .lean();
+
             console.log(`[calcApasxolhseisPeriodoy] Εργαζόμενοι: ${ergazomenoi.length}`);
 
             if (ergazomenoi.length === 0) {
@@ -2632,9 +2860,6 @@ class erganhController {
 
             const kodikoi = ergazomenoi.map((e) => e.kodikos).filter(Boolean);
 
-            // ============================================================
-            // 2) Φόρτωσε όλα τα προδηλωμένα της περιόδου μία φορά
-            // ============================================================
             const kodikoiChunks = chunkArray(kodikoi, 300);
             const prodhlomena = [];
 
@@ -2649,13 +2874,10 @@ class erganhController {
                     })
                 };
 
-                if (selectedYpokatasthma) {
-                    prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
-                }
-
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(
-                        'kodikos hmeromhnia repo argia ores_ergasias cards_ores_ergasias ' +
+                        'kodikos hmeromhnia repo argia is_locked ' +
+                            'ores_ergasias cards_ores_ergasias ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 ' +
                             'cards_apo_ora_02 cards_eos_ora_02 ' +
@@ -2667,7 +2889,6 @@ class erganhController {
                 prodhlomena.push(...chunkRecords);
             }
 
-            // Επειδή τα φέραμε σε chunks, τα ξαναταξινομούμε συνολικά
             prodhlomena.sort((a, b) => {
                 const kodikosCompare = String(a.kodikos || '').localeCompare(
                     String(b.kodikos || '')
@@ -2722,9 +2943,6 @@ class erganhController {
                 }
             }
 
-            // ============================================================
-            // 3) Έλεγχοι + δημιουργία bulk ops
-            // ============================================================
             const bulkOps = [];
 
             for (const rec of prodhlomena) {
@@ -2740,20 +2958,20 @@ class erganhController {
                     evelikthProselefshMinutes:
                         parseInt(ergazomenos.evelikth_proselefsh || 0, 10) || 0
                 };
+
                 const update = {};
 
-                // Έλεγχος 1 & 2: πρόωρη ή καθυστερημένη προσέλευση
                 Object.assign(update, checkEarlyOrLateCard(context, 1));
                 Object.assign(update, checkEarlyOrLateCard(context, 2));
                 Object.assign(update, checkEarlyOrLateCard(context, 3));
 
                 Object.assign(update, checkContinuousVsBrokenCards(context));
                 Object.assign(update, checkBrokenProgramVsContinuousCards(context));
+                Object.assign(update, checkNoDeclaredScheduleCards(context));
 
                 Object.assign(update, checkNightHours(context));
                 Object.assign(update, checkSundayHolidayHours(context));
                 Object.assign(update, checkRepoAdeiaAstheneiaApologistika(context));
-
                 Object.assign(update, checkOresApoysias(context));
 
                 const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
@@ -2767,11 +2985,7 @@ class erganhController {
                 }
 
                 if (Object.keys(update).length === 0) continue;
-
-                // Οι προηγούμενες μέρες χρησιμοποιούνται μόνο για το εβδομαδιαίο σύνολο, αλλά δεν ενημερώνονται στη Mongo.
                 if (!isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) continue;
-
-                // Αν η εγγραφή έχει κλειδωθεί από manual edit, δεν την ξαναϋπολογίζουμε.
                 if (rec.is_locked === true) continue;
 
                 bulkOps.push({
@@ -2783,9 +2997,6 @@ class erganhController {
                 });
             }
 
-            // ============================================================
-            // 4) Εκτέλεση bulkWrite σε chunks
-            // ============================================================
             const CHUNK_SIZE = 1000;
             let totalModified = 0;
 

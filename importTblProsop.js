@@ -245,7 +245,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         topos_ergasias: false,
         topos_ergasias_parathrhseis:
             'Η ΕΔΡΑ ΤΟΥ ΕΡΓΟΔΟΤΗ ΚΑΘΩΣ ΚΑΙ ΑΛΛΗ ΠΕΡΙΟΧΗ ΕΝΤΟΣ ΤΗΣ ΕΛΛΗΝΙΚΗΣ ΕΠΙΚΡΑΤΕΙΑΣ, ΟΠΟΥ Ο ΕΡΓΟΔΟΤΗΣ ΔΙΑΤΗΡΕΙ Ή ΘΑ ΔΙΑΤΗΡΕΙ ΣΤΟ ΜΕΛΛΟΝ ΕΓΚΑΤΑΣΤΑΣΕΙΣ.',
-        xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΝΘΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
+        xronos_katabolhs_apodoxon: 'ΕΝΤΟΣ 15ΘΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
         efarmostea_sse: true,
         efarmostea_sse_parathrhseis: 'Σ.Σ.Ε. ΞΕΝΟΔΟΧΟΫΠΑΛΛΗΛΩΝ ΟΛΗΣ ΤΗΣ ΧΩΡΑΣ',
 

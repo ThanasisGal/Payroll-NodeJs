@@ -33,6 +33,42 @@ function intervalText(apo, eos) {
     return `${a || ''} - ${e || ''}`;
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function intervalTextHtml(apo, eos) {
+    const a = String(apo || '').trim();
+    const e = String(eos || '').trim();
+
+    if (!a && !e) return '-';
+
+    return `${escapeHtml(a || '')} - ${escapeHtml(e || '')}`;
+}
+
+function renderIntervalCell(row, apoPrefix, eosPrefix, suffix = '') {
+    const lines = [1, 2, 3]
+        .map((n) => {
+            const p = pairNo(n);
+            const apo = row[`${apoPrefix}_${p}${suffix}`];
+            const eos = row[`${eosPrefix}_${p}${suffix}`];
+
+            if (!hasMeaningfulValue(apo) && !hasMeaningfulValue(eos)) {
+                return '';
+            }
+
+            return `<div class="review-interval-line">${intervalTextHtml(apo, eos)}</div>`;
+        })
+        .filter(Boolean);
+
+    return lines.length > 0 ? lines.join('') : '-';
+}
+
 function tdClass(className) {
     return className ? ` class="${className}"` : '';
 }
@@ -205,7 +241,8 @@ function formatDate(value) {
 }
 
 function employeeGroupKey(row) {
-    return [row.ypokatasthma || '', row.kodikos || ''].join('|');
+    // return [row.ypokatasthma || '', row.kodikos || ''].join('|');
+    return String(row.kodikos || '').trim();
 }
 
 function effectiveWorkHoursValue(row) {
@@ -216,10 +253,14 @@ function effectiveWorkHoursValue(row) {
     return num(row.cards_ores_ergasias);
 }
 
-function breakSubtractedHoursValue(row) {
-    const diff = num(row.cards_ores_ergasias) - effectiveWorkHoursValue(row);
+// function breakSubtractedHoursValue(row) {
+//     const diff = num(row.cards_ores_ergasias) - effectiveWorkHoursValue(row);
 
-    return diff > 0.004 ? +diff.toFixed(2) : 0;
+//     return diff > 0.004 ? +diff.toFixed(2) : 0;
+// }
+
+function breakSubtractedHoursValue(row) {
+    return 0;
 }
 
 function renderHoursCell(row) {
@@ -282,6 +323,15 @@ function ensureReviewTableStructure() {
                 line-height: 1.1;
                 color: inherit;
                 white-space: nowrap;
+            }
+
+            .review-interval-line {
+                line-height: 1.2;
+                white-space: nowrap;
+            }
+
+            .review-interval-line + .review-interval-line {
+                margin-top: 2px;
             }
         `;
         document.head.appendChild(style);
@@ -352,7 +402,9 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
             Σύνολα εργαζομένου
         </td>
         <td class="fw-bold">${hours(totals.ores_ergasias_apologistika)}</td>
-        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
+        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia cell-apoysia-total' : 'cell-apoysia-total'}">
+            ${hours(totals.ores_apoysias_apologistika)}
+        </td>        
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
@@ -488,10 +540,7 @@ async function loadResults() {
 
             tr.style.cursor = 'pointer';
 
-            const apologistikoText = intervalText(
-                row.apo_ora_01_apologistika,
-                row.eos_ora_01_apologistika
-            );
+            const apologistikoText = renderIntervalCell(row, 'apo_ora', 'eos_ora', '_apologistika');
 
             const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
 
@@ -501,8 +550,8 @@ async function loadResults() {
                 <td>${formatDate(row.hmeromhnia)}</td>
                 <td>${row.ypokatasthma || ''}</td>
                 <td>${row.kodikos || ''}</td>
-                <td>${intervalText(row.apo_ora_01, row.eos_ora_01)}</td>
-                <td>${intervalText(row.cards_apo_ora_01, row.cards_eos_ora_01)}</td>
+                <td>${renderIntervalCell(row, 'apo_ora', 'eos_ora')}</td>
+                <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
                 <td${tdClass(isApologistikoIntervalPresent(row) ? 'cell-apologistiko' : '')}>
                     ${apologistikoText}
                 </td>
