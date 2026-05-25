@@ -362,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // ✅ "Κλείσιμο" → σταματάμε
                     if (validationResult.isDismissed) {
-                        return;
+                        // return;
                     }
 
                     // ✅ "Συνέχεια" → συνεχίζουμε με skipValidation = true

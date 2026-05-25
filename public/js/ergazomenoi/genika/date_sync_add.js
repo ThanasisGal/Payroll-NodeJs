@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const lhxhsSymbashsInput = document.getElementById('hmeromhnia_lhxhs_symbashs');
     const orarioyApoInput = document.getElementById('hmeromhnia_allaghs_orarioy_apo');
     const orarioyEosInput = document.getElementById('hmeromhnia_allaghs_orarioy_eos');
+    const isxyosOronErgasiasApoInput = document.getElementById(
+        'hmeromhnia_isxyos_oron_ergasias_apo'
+    );
 
     // ✅ ΝΕΟΣ: Κρατάμε το προηγούμενο value της λήξης σύμβασης
     let previousLhxhsValue = lhxhsSymbashsInput?.value || '';
@@ -600,6 +603,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function setAllDates(value) {
         allaghsSymbashsInput.value = value;
         orarioyApoInput.value = value;
+        isxyosOronErgasiasApoInput.value = value;
         // Also trigger update for eos date
         updateOrarioyEosDate(value);
     }

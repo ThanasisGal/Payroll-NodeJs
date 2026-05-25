@@ -122,6 +122,11 @@
                         <i class="bi bi-file-earmark-excel"></i>
                         Export Excel
                     </button>
+
+                    <button type="button" class="btn btn-brown rounded-4 ms-2" id="exportPdfBtn">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        Export PDF
+                    </button>
                 </div>
             </div>
 
@@ -190,6 +195,33 @@
         </div>
     </div>
 
+
+
+    <div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Προεπισκόπηση PDF</h5>
+                    <div class="d-flex gap-2">
+
+                        <button
+                            type="button"
+                            class="btn btn-brown rounded-4"
+                            id="reviewPdfDownloadBtn"
+                            data-no-loader="true">
+                            <i class="bi bi-download"></i>
+                            Αποθήκευση τοπικά
+                        </button>
+
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body p-0">
+                    <iframe id="reviewPdfFrame" title="Προεπισκόπηση PDF" style="width:100%;height:calc(100vh - 70px);border:0;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
     <input
         type="hidden"
         id="canReviewEdit"

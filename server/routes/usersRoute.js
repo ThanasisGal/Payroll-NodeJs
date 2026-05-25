@@ -852,6 +852,10 @@ router.get(
     '/api/prodhlomena-oraria/review/export-excel',
     erganhController.exportProdhlomenaOrariaReviewExcel
 );
+router.get(
+    '/api/prodhlomena-oraria/review/export-pdf',
+    erganhController.exportProdhlomenaOrariaReviewPdf
+);
 router.patch(
     '/api/prodhlomena-oraria/review/:id',
     erganhController.updateProdhlomenaOrariaReviewRecord

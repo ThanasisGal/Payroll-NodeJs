@@ -398,6 +398,8 @@ class companiesController {
                 ypologismos_epi_pragmatikoy_oromisthioy:
                     formData.ypologismos_epi_pragmatikoy_oromisthioy,
                 apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
+                hmeromhnia_payshs_polyetias_apo: formData.hmeromhnia_payshs_polyetias_apo,
+                hmeromhnia_payshs_polyetias_eos: formData.hmeromhnia_payshs_polyetias_eos,
                 keimeno_exoflhshs: formData.keimeno_exoflhshs,
                 users: formData.selectedUsers,
                 sfragida: formData.sfragida
@@ -808,6 +810,8 @@ class companiesController {
             ypologismos_epi_pragmatikoy_oromisthioy:
                 formData.ypologismos_epi_pragmatikoy_oromisthioy,
             apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
+            hmeromhnia_payshs_polyetias_apo: formData.hmeromhnia_payshs_polyetias_apo,
+            hmeromhnia_payshs_polyetias_eos: formData.hmeromhnia_payshs_polyetias_eos,
             keimeno_exoflhshs: formData.keimeno_exoflhshs,
             users: formData.selectedUsers,
             sfragida: formData.sfragida,

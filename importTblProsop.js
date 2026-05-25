@@ -162,7 +162,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
     return {
         // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
         team: 'BLG',
-        company_kod: '69c574ff25255bcae152f16f',
+        company_kod: '69e70d6d74cb535fd4d195ad',
         kodikos: toStr(row['C']),
 
         // ── Προσωπικά στοιχεία ────────────────────────────────────────────────

@@ -648,6 +648,8 @@
                         const a = e.target.closest && e.target.closest('a[href]');
                         if (!a) return;
 
+                        if (a.hasAttribute('data-no-loader')) return;
+
                         // ignore new tab / modifiers
                         if (a.target && a.target !== '_self') return;
                         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

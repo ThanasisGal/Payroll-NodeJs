@@ -1,169 +1,113 @@
-<div class="tadded-container">
-    <div class="container-fluid">
-        <div class="menu_Links">
-            <ul>
-                <li class="active" style="display: none;">Σταθερά Στοιχεία</li>
-            </ul>
-        </div> </br> </br>
-        </br>
-        <div class="sections">
-            <section class="sel_1_section visible" data-section="Σταθερά Στοιχεία">
-                <form class="formRadius" id="transferForm">
+<br> <br> <br>                
+<form class="formRadius" id="transferForm">
 
-                    <div class="card d-flex flex-column z-depth-5" style="width: 60%; margin-left: 15%;">
+    <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
 
-                        <div class="card-header mb-2">
-                            <label class="text-center headers-content">
-                                Εισαγωγή/Δημιουργία Απολογιστικού Πίνακα Από ΕΡΓΑΝΗ
-                            </label>
-                        </div>
-
-                        <hr class="hr-style-1" />
-
-                        <div class="card-body overflow-auto flex-grow-1" style="height: 32vh; background-color: #ffffff;margin-top: -0.5rem; overflow-x: hidden !important;" >
-
-                            <input type="hidden" name="idHidden" id="idHidden" class="form-control input-contents" value="" />
-                            <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
-                            <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
-                            <input type="hidden" name="kodikosHidden" id="kodikosHidden" class="form-control input-contents" value="" />
-                            <input type="hidden" name="afm_ergazomenoyHidden" id="afm_ergazomenoyHidden" class="form-control input-contents" value="" />
-                            <input type="hidden" name="hmeromhnia_proslhpshs_hidden" id="hmeromhnia_proslhpshs_hidden" class="form-control input-contents" value="" />
-                            <input type="hidden" name="eidikh_kathgoria_ergazomenoy" id="eidikh_kathgoria_ergazomenoy" class="form-control input-contents" value="" />
-                            <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
-
-                            </br>
-                            <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="interval" class="col-form-label label-font-size-smaller">
-                                        Στρογ/ποίηση στα 
-                                    </label>
-                                </div>
-                                <div class="col-3-5 mt-2"> 
-                                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="interval" id="interval">
-                                        <option value="1">Χωρίς στρογγυλοποίηση</option>
-                                        <option value="5">5 Λεπτά</option>
-                                        <option value="10" selected>10 Λεπτά</option>
-                                        <option value="15">15 Λεπτά</option>
-                                        <option value="20">20 Λεπτά</option>
-                                        <option value="25">25 Λεπτά</option>
-                                        <option value="30">30 Λεπτά</option>
-                                        <option value="35">35 Λεπτά</option>
-                                        <option value="40">40 Λεπτά</option>
-                                        <option value="45">45 Λεπτά</option>
-                                        <option value="50">50 Λεπτά</option>
-                                        <option value="55">55 Λεπτά</option>
-                                    </select>
-                                </div>
-                                <!-- </div> -->
-                            </div>
-              
-                            <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="ypokatasthmata" class="col-form-label label-font-size-smaller">
-                                        Υποκατάστημα
-                                    </label>
-                                </div>
-                                <div class="col-10 mt-2"> 
-                                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="ypokatasthmata" id="ypokatasthmata">
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="ergazomenos" class="col-form-label label-font-size-smaller">
-                                        Εργαζόμενος
-                                    </label>
-                                </div>
-                                <div class="col-10 mt-2"> 
-                                    <select class="form-select selectpicker-dropdown-small mt-2" data-live-search="true" name="ergazomenos" id="ergazomenos">
-                                    </select>
-                                </div>
-                                <div class="col-5 mt-2" style="display: none;"> 
-                                    <select class="form-select selectpicker-dropdown-small mt-2 " data-live-search="true" name="ergazomenos2" id="ergazomenos2">
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="ergazomenos" class="col-form-label label-font-size-smaller field-required">
-                                        Έως Εργαζόμενο
-                                    </label>
-                                </div>
-                                <div class="col-10 mt-2">
-                                    <select class="form-select selectpicker-dropdown-small mt-2 " data-live-search="true" name="ergazomenos2" id="ergazomenos2">
-                                    </select>
-                                </div>
-                            </div> -->
-
-                            <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller field-required">
-                                        Από Ημερομηνία
-                                    </label>
-                                </div>
-                                <div class="col-2">
-                                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" required />
-                                </div>
-
-                                <label for="username" class="col-form-label" style="font-size: 0.75vw; display: none;">
-                                    Χρήστης
-                                </label>
-                                <input type="hidden" name="username" id="username" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].username %>" readonly />
-                                <label for="password" class="col-form-label" style="font-size: 0.70vw; display: none;">
-                                    Κωδικός Χρήστη
-                                </label>
-                                <input type="hidden" name="password" id="password" tabIndex="-1" class="form-control input-contents" value="<%= passwords[0].password %>" readonly />
-                            </div>
-
-                            <div class="row form-group g-3 align-items-center mb-3" style="margin-top: -1.2rem;">
-                                <div class="col-2 left-align">
-                                    <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller field-required">
-                                        Έως Ημερομηνία
-                                    </label>
-                                </div>
-                                <div class="col-2">
-                                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" required />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-footer mt-auto">
-                            <div class="d-inline-block d-flex" style="margin-top: -0.5rem !important; margin-bottom: -1rem !important; margin-left: 10px !important; margin-right: 10px !important; justify-content: space-around;">
-
-                                <button 
-                                    type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" name="importScheduleButton" id="importScheduleButton"><i class="bi bi-copy"></i> Εισαγωγή
-                                </button>
-                      
-                                <a
-                                    class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp"><i class="bi bi-chevron-double-left"></i> Επιστροφή
-                                </a>
-                                <button type="button" class="btn btn-toTop scroll-to-top"><i class="bi bi-chevron-double-up"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </section>
+        <div class="card-header p-0 height-rem-3_5">
+            <label class="headers-content">
+                Δημιουργία / Αποστολή Απολογιστικού Πίνακα Ωραρίων
+            </label>
         </div>
-    
-        <% if (process.env.NODE_ENV === 'production') { %>
-            <script nonce="<%= nonce %>" src="/static/min.js/ergazomenoi/programmata/apologistikosPinakasOrarion.min.js"></script>
-        <% } else { %>
-            <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/common/getCompanyDescription.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/common/toggleLabel.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/dates/convertDateToISO.js"></script>
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/tooltipsForButtons.js"></script> -->
-            <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/loadDropdowns.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/date-sync-apologistika.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/selectRepo.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/getDaysFromDate.js"></script><!-- Εμφάνιση των ημερών απασχόλησης (Δε, Τρ...) και έλεγχος των ημερών αργίας -->
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/genika/calcOresApasxolhshs.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/putFieldValues.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/ergazomenoi/programmata/deleteButton.js"></script>
-        <% } %>
+
+        <div class="card-body overflow-auto flex-grow-1 height-vh-31 bg-white">
+            <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+            <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
+            <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
+            <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
+
+            </br>
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required">
+                        Παράρτημα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="ypokatasthmata_stathera"
+                    id="ypokatasthmata_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('ypokatasthmata_stathera') %>"
+                    readonly
+                />
+
+                <div class="col-9-5 mt-2">
+                    <select
+                        id="ypokatasthmata"
+                        name="ypokatasthmata"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Υποκατάστημα"
+                        data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
+                        single
+                        data-target-input="ypokatasthmata_stathera"
+                        data-preselect="ypokatasthmata_stathera"
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Υποκαταστήματος">
+                    </select>
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center mb-4"></div>
+
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">
+                        Από Ημερομηνία
+                    </label>
+                </div>
+                <div class="col-2-5">
+                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center mb-4"></div>
+
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">
+                        Έως Ημερομηνία
+                    </label>
+                </div>
+                <div class="col-2-5">
+                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required />
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer">
+            <div class="d-inline-block d-flex cardFooter01">
+                <button 
+                    type="button" 
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" 
+                    name="downloadScheduleButton" 
+                    id="downloadScheduleButton">
+                    <i class="bi bi-download"></i> Λήψη
+                </button>
+                        
+                <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp">
+                    <i class="bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+                <button type="button" class="btn btn-toTop scroll-to-top">
+                    <i class="bi bi-chevron-double-up"></i>
+                </button>
+            </div>
+        </div>
     </div>
-</div>
-  
+</form>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
+<script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/downloadScheduleButton') %>"></script>

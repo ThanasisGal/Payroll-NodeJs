@@ -1291,8 +1291,8 @@ function showDetailsModal(row) {
     });
 }
 
-async function exportExcel() {
-    const params = new URLSearchParams({
+function buildReviewExportParams() {
+    return new URLSearchParams({
         apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
         eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
         ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
@@ -1302,8 +1302,46 @@ async function exportExcel() {
         only_argia: document.getElementById('only_argia')?.checked || false,
         only_yperergasia: document.getElementById('only_yperergasia')?.checked || false
     });
-
+}
+async function exportExcel() {
+    const params = buildReviewExportParams();
     window.location.href = `/api/prodhlomena-oraria/review/export-excel?${params.toString()}`;
+}
+
+let currentPdfBlobUrl = null;
+let currentPdfFileName = null;
+
+async function exportPdf() {
+    try {
+        const response = await fetch(
+            `/api/prodhlomena-oraria/review/export-pdf?${buildReviewExportParams().toString()}`,
+            { method: 'GET', headers: { 'CSRF-Token': csrfToken } }
+        );
+
+        if (!response.ok) throw new Error('Αποτυχία δημιουργίας PDF.');
+
+        const blob = await response.blob();
+
+        if (currentPdfBlobUrl) {
+            URL.revokeObjectURL(currentPdfBlobUrl);
+        }
+
+        currentPdfBlobUrl = URL.createObjectURL(blob);
+        currentPdfFileName = `elegxos_apasxolhseon_${Date.now()}.pdf`;
+
+        const iframe = document.getElementById('reviewPdfFrame');
+        if (iframe) iframe.src = currentPdfBlobUrl;
+
+        const modalEl = document.getElementById('pdfPreviewModal');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else {
+            window.open(currentPdfBlobUrl, '_blank');
+        }
+    } catch (error) {
+        console.error(error);
+        Swal.fire({ icon: 'error', title: 'Σφάλμα', text: error.message });
+    }
 }
 
 function initReviewMoveByEnter() {
@@ -1430,6 +1468,44 @@ function initModalKathgoriaAdeiasTomSelect() {
     });
 }
 
+let suppressLoaderUntil = 0;
+
+if (typeof window.showLoader === 'function' && !window.__reviewPdfShowLoaderPatched) {
+    const originalShowLoader = window.showLoader;
+
+    window.showLoader = function (...args) {
+        if (Date.now() < suppressLoaderUntil) {
+            return;
+        }
+
+        return originalShowLoader.apply(this, args);
+    };
+
+    window.__reviewPdfShowLoaderPatched = true;
+}
+
+document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!currentPdfBlobUrl) return;
+
+    const a = document.createElement('a');
+    a.href = currentPdfBlobUrl;
+    a.download = currentPdfFileName || `elegxos_apasxolhseon_${Date.now()}.pdf`;
+    a.setAttribute('data-no-loader', 'true');
+    a.style.display = 'none';
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    if (typeof window.AppLoader?.hide === 'function') {
+        window.AppLoader.hide();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
+document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);

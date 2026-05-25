@@ -96,6 +96,112 @@ function validateOrarioFields(formData) {
     return { valid: true };
 }
 
+// =========================================================================
+// ✅ HELPERS: Snapshot όρων εργασίας για το ιστορικό
+// =========================================================================
+// Το ιστορικό δεν πρέπει να κρατά μόνο ημερομηνίες μεταβολών.
+// Πρέπει να κρατά και τους όρους εργασίας που ίσχυαν στη συγκεκριμένη περίοδο,
+// ώστε ο απολογιστικός υπολογισμός να ξέρει αν μια ημέρα ανήκε σε 5ήμερο/6ήμερο,
+// 40h/30h κλπ.
+// =========================================================================
+function toNumberOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+
+    const normalized = String(value).replace(',', '.').trim();
+    const n = Number(normalized);
+
+    return Number.isFinite(n) ? n : null;
+}
+
+function toDateOrNull(value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    // Τα input date πεδία έρχονται συνήθως ως YYYY-MM-DD.
+    // Το T00:00:00.000+00:00 βοηθά να αποφεύγονται off-by-one προβλήματα.
+    const d = new Date(String(value).includes('T') ? value : `${value}T00:00:00.000+00:00`);
+
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function getTyposEbdomadasFromHmeres(hmeres) {
+    const n = toNumberOrNull(hmeres);
+
+    if (n === 6) return '6HMERH';
+    if (n === 5) return '5HMERH';
+
+    return '';
+}
+
+function getTyposApasxolhshsFromFormData(formData = {}) {
+    return (
+        formData.typos_apasxolhshs ||
+        formData.apasxolhsh_basei_symbashs_stathera ||
+        formData.apasxolhsh_basei_symbashs ||
+        formData.kathestos_apasxolhshs_stathera ||
+        formData.kathestos_apasxolhshs ||
+        ''
+    );
+}
+
+function buildIstorikoWorkTermsSnapshot(formData = {}) {
+    const hmeres = toNumberOrNull(formData.hmeres_ergasias_ebdomadas);
+    const weeklyHours = toNumberOrNull(formData.ores_ergasias_ebdomadas);
+    const averageDailyHours =
+        toNumberOrNull(formData.mo_oron_hmerhsias_ergasias) ||
+        (hmeres && weeklyHours ? +(weeklyHours / hmeres).toFixed(4) : null);
+
+    const orarioApo = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
+    const orarioEos = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos);
+
+    // Τα παρακάτω δύο πεδία είναι ΑΠΟΚΛΕΙΣΤΙΚΑ για την ισχύ των όρων εργασίας.
+    // Δεν αντικαθιστούν τα hmeromhnia_allaghs_orarioy_* που χρησιμοποιούνται
+    // για τον ορισμό/δημιουργία των εβδομαδιαίων ωραρίων.
+    const oroiApo = toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) || orarioApo;
+    const oroiEos = toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null;
+
+    return {
+        // Ημερομηνίες περιόδου ωραρίων.
+        // Μένουν ως έχουν και συνεχίζουν να αφορούν τα προδηλωμένα/εβδομαδιαία ωράρια.
+        hmeromhnia_allaghs_orarioy_apo: orarioApo,
+        hmeromhnia_allaghs_orarioy_eos: orarioEos,
+
+        // Ημερομηνίες ισχύος όρων εργασίας.
+        // Αυτές διαβάζει ο απολογιστικός υπολογισμός για 5ήμερο/6ήμερο/40h/30h.
+        hmeromhnia_isxyos_oron_ergasias_apo: oroiApo,
+        hmeromhnia_isxyos_oron_ergasias_eos: oroiEos,
+
+        // Snapshot όρων εργασίας.
+        hmeres_ergasias_ebdomadas: hmeres,
+        ores_ergasias_ebdomadas: weeklyHours,
+        mo_oron_hmerhsias_ergasias: averageDailyHours,
+        typos_apasxolhshs: getTyposApasxolhshsFromFormData(formData),
+        typos_ebdomadas: formData.typos_ebdomadas || getTyposEbdomadasFromHmeres(hmeres),
+
+        // Flag ότι η εγγραφή μπορεί να χρησιμοποιηθεί από τον απολογιστικό υπολογισμό.
+        afora_allagh_oron_ergasias: Boolean(oroiApo || hmeres || weeklyHours || averageDailyHours)
+    };
+}
+
+function getIstorikoDateIdentity(formData = {}) {
+    return {
+        hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
+        hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
+        hmeromhnia_allaghs_orarioy_apo: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
+        hmeromhnia_allaghs_orarioy_eos: toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos),
+        hmeromhnia_isxyos_oron_ergasias_apo:
+            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
+            toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo),
+        hmeromhnia_isxyos_oron_ergasias_eos:
+            toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+        hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
+        hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs)
+    };
+}
+
 // Server-side guards (in-memory)
 // Αν έχεις PM2 cluster / multiple instances, αυτό θέλει DB/Redis. Για single instance είναι ΟΚ.
 const erganiInflight = new Map(); // key -> true
@@ -283,15 +389,44 @@ class ergazomenoiController {
                 if (update.deleted) {
                     await IstorikoProslhpseonAllagonModel.findByIdAndDelete(_id);
                 } else {
-                    // Ενημέρωση μόνο των συγκεκριμένων πεδίων
+                    // Ενημέρωση μόνο των συγκεκριμένων πεδίων.
+                    // Πλέον περιλαμβάνει και snapshot όρων εργασίας, ώστε οι χειροκίνητες
+                    // αλλαγές στο ιστορικό να χρησιμοποιούνται σωστά στον απολογιστικό
+                    // υπολογισμό υπερεργασίας/υπερωρίας.
                     const updateData = {
-                        hmeromhnia_proslhpshs: data.hmeromhnia_proslhpshs,
-                        hmeromhnia_allaghs_symbashs: data.hmeromhnia_allaghs_symbashs,
-                        hmeromhnia_lhxhs_symbashs: data.hmeromhnia_lhxhs_symbashs,
-                        hmeromhnia_apoxorhshs: data.hmeromhnia_apoxorhshs
+                        hmeromhnia_proslhpshs: toDateOrNull(data.hmeromhnia_proslhpshs),
+                        hmeromhnia_allaghs_symbashs: toDateOrNull(data.hmeromhnia_allaghs_symbashs),
+                        hmeromhnia_allaghs_orarioy_apo: toDateOrNull(
+                            data.hmeromhnia_allaghs_orarioy_apo
+                        ),
+                        hmeromhnia_allaghs_orarioy_eos: toDateOrNull(
+                            data.hmeromhnia_allaghs_orarioy_eos
+                        ),
+                        hmeromhnia_isxyos_oron_ergasias_apo:
+                            toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_apo) ||
+                            toDateOrNull(data.hmeromhnia_allaghs_orarioy_apo),
+                        hmeromhnia_isxyos_oron_ergasias_eos:
+                            toDateOrNull(data.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+                        hmeromhnia_lhxhs_symbashs: toDateOrNull(data.hmeromhnia_lhxhs_symbashs),
+                        hmeromhnia_apoxorhshs: toDateOrNull(data.hmeromhnia_apoxorhshs),
+
+                        hmeres_ergasias_ebdomadas: toNumberOrNull(data.hmeres_ergasias_ebdomadas),
+                        ores_ergasias_ebdomadas: toNumberOrNull(data.ores_ergasias_ebdomadas),
+                        mo_oron_hmerhsias_ergasias: toNumberOrNull(data.mo_oron_hmerhsias_ergasias),
+                        typos_apasxolhshs: data.typos_apasxolhshs || '',
+                        typos_ebdomadas:
+                            data.typos_ebdomadas ||
+                            getTyposEbdomadasFromHmeres(data.hmeres_ergasias_ebdomadas),
+                        afora_allagh_oron_ergasias:
+                            data.afora_allagh_oron_ergasias === true ||
+                            data.afora_allagh_oron_ergasias === 'true' ||
+                            Boolean(
+                                data.hmeromhnia_isxyos_oron_ergasias_apo ||
+                                data.hmeromhnia_allaghs_orarioy_apo
+                            )
                     };
                     await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(_id, updateData, {
-                        new: true
+                        returnDocument: 'after'
                     });
                 }
             }
@@ -686,6 +821,17 @@ class ergazomenoiController {
             hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs || null,
             hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo || null,
             hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
+
+            // Ημερομηνίες ισχύος όρων εργασίας.
+            // Διατηρούνται και στο ErgazomenoiModel ως current snapshot,
+            // ενώ το αναλυτικό/ιστορικό διάστημα αποθηκεύεται στο Istoriko.
+            hmeromhnia_isxyos_oron_ergasias_apo:
+                formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                formData.hmeromhnia_allaghs_orarioy_apo ||
+                null,
+            hmeromhnia_isxyos_oron_ergasias_eos:
+                formData.hmeromhnia_isxyos_oron_ergasias_eos || null,
+
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
@@ -697,6 +843,7 @@ class ergazomenoiController {
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs_stathera,
             sxesh_ergasias: formData.sxesh_ergasias_stathera,
             proyphresia_se_eth: formData.proyphresia_se_eth,
+            proyphresia_apozhmioshs_se_eth: formData.proyphresia_apozhmioshs_se_eth,
             proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
             proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
             synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
@@ -1195,6 +1342,12 @@ class ergazomenoiController {
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs,
             afora_proslhpsh: true,
+
+            // Snapshot όρων εργασίας κατά την αρχική εισαγωγή εργαζόμενου.
+            // Αυτά τα πεδία είναι απαραίτητα για να μη διαβάζει ο απολογιστικός
+            // υπολογισμός μόνο την τρέχουσα εικόνα του εργαζόμενου.
+            ...buildIstorikoWorkTermsSnapshot(formData),
+
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
             misthologiko_klimakio: formData.misthologiko_klimakio,
 
@@ -2540,7 +2693,8 @@ class ergazomenoiController {
         const kodikosEtaireias = formData.company_kod;
         const kodikosErgazomenoy = formData.kodikosHidden;
         let aa_eggr = null,
-            recExist = false;
+            recExist = false,
+            existingIstorikoRecord = null;
 
         // =========================================================================
         // ✅ 1) ΑΝΑΓΝΩΣΗ ΙΣΤΟΡΙΚΟΥ
@@ -2550,21 +2704,14 @@ class ergazomenoiController {
                 team: omadaErgasias,
                 company_kod: kodikosEtaireias,
                 kodikos: kodikosErgazomenoy,
-                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs
-                    ? new Date(formData.hmeromhnia_proslhpshs + 'T00:00:00.000+00:00')
-                    : null,
-                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs
-                    ? new Date(formData.hmeromhnia_allaghs_symbashs + 'T00:00:00.000+00:00')
-                    : null,
-                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs
-                    ? new Date(formData.hmeromhnia_lhxhs_symbashs + 'T00:00:00.000+00:00')
-                    : null,
-                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs
-                    ? new Date(formData.hmeromhnia_apoxorhshs + 'T00:00:00.000+00:00')
-                    : null
+                // Ταυτότητα ιστορικής εγγραφής.
+                // Περιλαμβάνει πλέον και τις ημερομηνίες αλλαγής ωραρίου, ώστε μία
+                // αλλαγή 5ήμερο->6ήμερο ή 40h->30h να μη θεωρηθεί ίδιο ιστορικό record.
+                ...getIstorikoDateIdentity(formData)
             });
 
             recExist = !!existRecord;
+            existingIstorikoRecord = existRecord;
 
             const lastRecordIstorikoy = await IstorikoProslhpseonAllagonModel.find({
                 team: omadaErgasias,
@@ -2630,6 +2777,17 @@ class ergazomenoiController {
             hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs || null,
             hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo || null,
             hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
+
+            // Ημερομηνίες ισχύος όρων εργασίας.
+            // Διατηρούνται και στο ErgazomenoiModel ως current snapshot,
+            // ενώ το αναλυτικό/ιστορικό διάστημα αποθηκεύεται στο Istoriko.
+            hmeromhnia_isxyos_oron_ergasias_apo:
+                formData.hmeromhnia_isxyos_oron_ergasias_apo ||
+                formData.hmeromhnia_allaghs_orarioy_apo ||
+                null,
+            hmeromhnia_isxyos_oron_ergasias_eos:
+                formData.hmeromhnia_isxyos_oron_ergasias_eos || null,
+
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
@@ -2641,6 +2799,7 @@ class ergazomenoiController {
             kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
             sxesh_ergasias: formData.sxesh_ergasias,
             proyphresia_se_eth: formData.proyphresia_se_eth,
+            proyphresia_apozhmioshs_se_eth: formData.proyphresia_apozhmioshs_se_eth,
             proyphresia_se_mhnes: formData.proyphresia_se_mhnes,
             proyphresia_adeias_se_eth: formData.proyphresia_adeias_se_eth,
             synolo_proyphresias_se_eth: formData.synolo_proyphresias_se_eth,
@@ -2921,7 +3080,7 @@ class ergazomenoiController {
             updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate(
                 { _id: ergazomenoiId },
                 { $set: filteredDataErgazomenoi },
-                { new: true } // ✅ Επιστρέφει το updated document
+                { returnDocument: 'after' } // ✅ Επιστρέφει το updated document
             );
 
             if (!updatedErgazomenos) {
@@ -3069,7 +3228,7 @@ class ergazomenoiController {
                         hmeromhnia: orarioData.hmeromhnia
                     }
                 },
-                { new: true, upsert: true }
+                { returnDocument: 'after', upsert: true }
             );
 
             orarioPromises.push(updatePromise);
@@ -3084,26 +3243,60 @@ class ergazomenoiController {
         }
 
         // =========================================================================
-        // ✅ 7) ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ (μόνο αν δεν υπάρχει ήδη)
+        // ✅ 7) ΕΝΗΜΕΡΩΣΗ ΙΣΤΟΡΙΚΟΥ
         // =========================================================================
-        if (!recExist) {
+        // Λογική:
+        // 1. Αν υπάρχει ήδη εγγραφή με την ίδια ταυτότητα ημερομηνιών, τη θεωρούμε
+        //    διόρθωση της ίδιας μεταβολής και την ενημερώνουμε.
+        // 2. Αν δεν υπάρχει, τότε πρόκειται για νέα ιστορική μεταβολή:
+        //    - κλείνουμε την προηγούμενη ανοιχτή/επικαλυπτόμενη περίοδο μία ημέρα πριν
+        //      από τη νέα ημερομηνία έναρξης
+        //    - δημιουργούμε νέα εγγραφή snapshot.
+        //
+        // Έτσι αποφεύγουμε το λάθος όπου όλος ο μήνας διαβάζει μόνο την τρέχουσα
+        // κατάσταση του εργαζομένου ή όπου υπάρχουν overlapping records.
+        // =========================================================================
+        {
+            const istorikoIdentity = getIstorikoDateIdentity(formData);
+            const effectiveApo =
+                toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_apo) ||
+                toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
+
             const filteredDataIstoriko = {
                 team: formData.team,
                 company_kod: formData.company_kod,
                 kodikos: formData.kodikosHidden,
-                aa_eggrafhs: aa_eggr.toString().padStart(4, '0'),
-                hmeromhnia_proslhpshs: formData.hmeromhnia_proslhpshs || null,
-                createdAt: Date.now()
+                aa_eggrafhs:
+                    recExist && existingIstorikoRecord?.aa_eggrafhs
+                        ? existingIstorikoRecord.aa_eggrafhs
+                        : aa_eggr.toString().padStart(4, '0'),
+                ...istorikoIdentity,
+                createdAt:
+                    recExist && existingIstorikoRecord?.createdAt
+                        ? existingIstorikoRecord.createdAt
+                        : Date.now()
             };
 
             const updateFieldsIstoriko = {
-                hmeromhnia_allaghs_symbashs: formData.hmeromhnia_allaghs_symbashs || null,
-                hmeromhnia_allaghs_orarioy_apo: formData.hmeromhnia_allaghs_orarioy_apo || null,
-                hmeromhnia_allaghs_orarioy_eos: formData.hmeromhnia_allaghs_orarioy_eos || null,
-                hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
-                hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+                hmeromhnia_proslhpshs: toDateOrNull(formData.hmeromhnia_proslhpshs),
+                hmeromhnia_allaghs_symbashs: toDateOrNull(formData.hmeromhnia_allaghs_symbashs),
+                hmeromhnia_allaghs_orarioy_apo: toDateOrNull(
+                    formData.hmeromhnia_allaghs_orarioy_apo
+                ),
+                hmeromhnia_allaghs_orarioy_eos: toDateOrNull(
+                    formData.hmeromhnia_allaghs_orarioy_eos
+                ),
+                hmeromhnia_isxyos_oron_ergasias_apo: effectiveApo,
+                hmeromhnia_isxyos_oron_ergasias_eos:
+                    toDateOrNull(formData.hmeromhnia_isxyos_oron_ergasias_eos) || null,
+                hmeromhnia_lhxhs_symbashs: toDateOrNull(formData.hmeromhnia_lhxhs_symbashs),
+                hmeromhnia_apoxorhshs: toDateOrNull(formData.hmeromhnia_apoxorhshs),
                 afora_proslhpsh:
                     formData.hmeromhnia_proslhpshs === formData.hmeromhnia_allaghs_symbashs,
+
+                // Snapshot όρων εργασίας για τη συγκεκριμένη μεταβολή.
+                ...buildIstorikoWorkTermsSnapshot(formData),
+
                 kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
                 misthologiko_klimakio: formData.misthologiko_klimakio,
                 symbash: formData.symbash,
@@ -3141,18 +3334,87 @@ class ergazomenoiController {
             });
 
             try {
-                await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
-                    {
-                        team: formData.team,
-                        company_kod: formData.company_kod,
-                        kodikos: formData.kodikosHidden
-                    },
-                    {
-                        $set: updateFieldsIstoriko,
-                        $setOnInsert: filteredDataIstoriko
-                    },
-                    { new: true, upsert: true }
-                );
+                if (recExist && existingIstorikoRecord?._id) {
+                    // ------------------------------------------------------------
+                    // Διόρθωση υπάρχουσας ιστορικής εγγραφής.
+                    // Παράδειγμα: ο χρήστης είχε βάλει 5 ημέρες και διορθώνει σε 6
+                    // στην ίδια ημερομηνία αλλαγής.
+                    // ------------------------------------------------------------
+                    await IstorikoProslhpseonAllagonModel.findByIdAndUpdate(
+                        existingIstorikoRecord._id,
+                        { $set: updateFieldsIstoriko },
+                        { returnDocument: 'after' }
+                    );
+                } else {
+                    // ------------------------------------------------------------
+                    // Νέα ιστορική μεταβολή.
+                    // Πριν τη δημιουργήσουμε, κλείνουμε την προηγούμενη περίοδο
+                    // που είναι ανοιχτή ή επικαλύπτει τη νέα ημερομηνία έναρξης.
+                    // ------------------------------------------------------------
+                    if (effectiveApo) {
+                        const previousEos = new Date(effectiveApo);
+                        previousEos.setUTCDate(previousEos.getUTCDate() - 1);
+                        previousEos.setUTCHours(0, 0, 0, 0);
+
+                        if (previousEos.getTime() < effectiveApo.getTime()) {
+                            await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
+                                {
+                                    team: formData.team,
+                                    company_kod: formData.company_kod,
+                                    kodikos: formData.kodikosHidden,
+                                    afora_allagh_oron_ergasias: true,
+                                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
+                                        $lt: effectiveApo
+                                    }),
+                                    $or: [
+                                        { hmeromhnia_isxyos_oron_ergasias_eos: null },
+                                        {
+                                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
+                                                $exists: false
+                                            })
+                                        },
+                                        {
+                                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
+                                                $gte: effectiveApo
+                                            })
+                                        }
+                                    ]
+                                },
+                                {
+                                    $set: {
+                                        hmeromhnia_isxyos_oron_ergasias_eos: previousEos,
+                                        updatedAt: Date.now()
+                                    }
+                                },
+                                {
+                                    sort: { hmeromhnia_isxyos_oron_ergasias_apo: -1 },
+                                    returnDocument: 'after'
+                                }
+                            );
+                        }
+                    }
+
+                    await IstorikoProslhpseonAllagonModel.findOneAndUpdate(
+                        {
+                            team: formData.team,
+                            company_kod: formData.company_kod,
+                            kodikos: formData.kodikosHidden,
+                            ...istorikoIdentity
+                        },
+                        {
+                            // Δεν χρησιμοποιούμε $setOnInsert εδώ με τα ίδια πεδία που
+                            // υπάρχουν και στο $set, γιατί η MongoDB το θεωρεί conflict
+                            // στο ίδιο path, π.χ. hmeromhnia_proslhpshs.
+                            // Για upsert περνάμε όλα τα αναγκαία πεδία μέσα στο $set.
+                            $set: {
+                                ...filteredDataIstoriko,
+                                ...updateFieldsIstoriko,
+                                updatedAt: Date.now()
+                            }
+                        },
+                        { returnDocument: 'after', upsert: true }
+                    );
+                }
             } catch (error) {
                 console.error('❌ Σφάλμα κατά την ενημέρωση ιστορικού:', error);
                 return res.status(500).json({

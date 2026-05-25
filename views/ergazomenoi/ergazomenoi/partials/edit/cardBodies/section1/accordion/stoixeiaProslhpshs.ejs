@@ -102,6 +102,28 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
+                    <label for="hmeromhnia_isxyos_oron_ergasias_apo" class="col-form-label font-size-vw-0_72">
+                    Ημ/νία Ισχύος Όρων Εργασίας ΑΠΟ
+                   </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_isxyos_oron_ergasias_apo" id="hmeromhnia_isxyos_oron_ergasias_apo" class="date-control" value="<%= safe('hmeromhnia_isxyos_oron_ergasias_apo') ? new Date(safe('hmeromhnia_isxyos_oron_ergasias_apo')).toISOString().split('T')[0] : '' %>" />
+                </div>
+
+                <div class="col-2-5"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmeromhnia_isxyos_oron_ergasias_eos" class="col-form-label font-size-vw-0_72">
+                        Ημ/νία Ισχύος Όρων Εργασίας ΕΩΣ
+                    </label>
+                </div>
+                <div class="col-1-5">
+                    <input type="date" name="hmeromhnia_isxyos_oron_ergasias_eos" id="hmeromhnia_isxyos_oron_ergasias_eos" class="date-control" value="<%= safe('hmeromhnia_isxyos_oron_ergasias_eos') ? new Date(safe('hmeromhnia_isxyos_oron_ergasias_eos')).toISOString().split('T')[0] : '' %>" />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
                     <label for="hmeromhnia_lhxhs_symbashs" class="col-form-label label-font-size field-required">
                     Ημ/νία Λήξης Σύμβασης
                     </label>
@@ -363,7 +385,15 @@
                 <div class="col-1 left-align">
                     <input type="number" id="synolo_proyphresias_se_eth" name="synolo_proyphresias_se_eth" class="form-control input-contents right-align" value="<%= safe('synolo_proyphresias_se_eth') %>" readonly />
                 </div>        
-                <div class="col-3"></div>
+
+                <div class="col-2 left-align">
+                    <label for="proyphresia_apozhmioshs_se_eth" class="col-form-label label-font-size">
+                    Έτη Προϋπηρεσίας (Αποζημίωση)
+                    </label>
+                </div>
+                <div class="col-1 left-align">
+                    <input type="number" id="proyphresia_apozhmioshs_se_eth" name="proyphresia_apozhmioshs_se_eth" class="form-control input-contents right-align" value="<%= safe('proyphresia_apozhmioshs_se_eth') %>" />
+                </div>
 
                 <div class="col-2 left-align">
                     <label for="synolo_proyphresias_se_mhnes" class="col-form-label label-font-size-smaller">

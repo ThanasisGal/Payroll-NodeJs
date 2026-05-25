@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             htmlContainer: 'custom-html-container'
                         }
                     });
-                    return;
+                    // return;
                 }
             }
             // =========================================================================
@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         popup: 'custom-swal-popup'
                     }
                 });
-                return;
+                // return;
             }
 
             console.log('✅ [PRE-VALIDATION] All days have categories');
@@ -405,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         htmlContainer: 'custom-html-container'
                     }
                 });
-                return;
+                // return;
             }
 
             console.log('✅ [PRE-VALIDATION] All schedule checks passed');

@@ -49,6 +49,38 @@
         </div>
     </div>
 
+    <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+        <div class="col-4 right-align">
+            <label for="hmeromhnia_payshs_polyetias_apo" class="col-form-label font-size-vw-0_72">
+                Περίοδος "Παγώματος" Ωρίμανσης Πολυετίας: ΑΠΟ
+            </label>
+        </div>
+        <div class="col-1-5">
+            <input
+                type="date"
+                name="hmeromhnia_payshs_polyetias_apo"
+                id="hmeromhnia_payshs_polyetias_apo"
+                class="date-control"
+                value="<%= company.hmeromhnia_payshs_polyetias_apo || '2012-02-14' %>"
+            />
+        </div>
+
+        <div class="col-1 right-align">
+            <label for="hmeromhnia_payshs_polyetias_eos" class="col-form-label font-size-vw-0_72">
+                ΕΩΣ
+            </label>
+        </div>
+        <div class="col-1-5">
+            <input
+                type="date"
+                name="hmeromhnia_payshs_polyetias_eos"
+                id="hmeromhnia_payshs_polyetias_eos"
+                class="date-control"
+                value="<%= company.hmeromhnia_payshs_polyetias_eos || '2023-03-31' %>"
+            />
+        </div>
+    </div>
+
     <div class="row form-group g-3 align-items-center mb-0-5">
         <div class="col-4 right-align">
             <label for="keimeno_exoflhshs" class="col-form-label label-font-size">Κείμενο Εξοφλητικής Απόδειξης</label>

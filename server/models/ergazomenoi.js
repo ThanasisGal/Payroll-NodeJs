@@ -49,6 +49,15 @@ const ErgazomenoiSchema = new Schema(
         hmeromhnia_allaghs_symbashs: { type: Date },
         hmeromhnia_allaghs_orarioy_apo: { type: Date },
         hmeromhnia_allaghs_orarioy_eos: { type: Date },
+
+        hmeromhnia_isxyos_oron_ergasias_apo: {
+            type: Date
+        },
+
+        hmeromhnia_isxyos_oron_ergasias_eos: {
+            type: Date
+        },
+
         hmeromhnia_lhxhs_symbashs: { type: Date },
         hmeromhnia_apoxorhshs: { type: Date },
         afora_daneismo_ergazomenoy: { type: Boolean, default: false },
@@ -60,6 +69,7 @@ const ErgazomenoiSchema = new Schema(
         kathestos_apasxolhshs: { type: String, trim: true },
         sxesh_ergasias: { type: String, trim: true },
         proyphresia_se_eth: { type: Number, default: 0 },
+        proyphresia_apozhmioshs_se_eth: { type: Number, default: 0 },
         proyphresia_se_mhnes: { type: Number, default: 0 },
         proyphresia_adeias_se_eth: { type: Number, default: 0 },
         synolo_proyphresias_se_eth: { type: Number, default: 0 },
@@ -615,10 +625,58 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         hmeromhnia_allaghs_symbashs: { type: Date },
         hmeromhnia_allaghs_orarioy_apo: { type: Date },
         hmeromhnia_allaghs_orarioy_eos: { type: Date },
+
+        hmeromhnia_isxyos_oron_ergasias_apo: {
+            type: Date
+        },
+
+        hmeromhnia_isxyos_oron_ergasias_eos: {
+            type: Date
+        },
+
         hmeromhnia_lhxhs_symbashs: { type: Date },
         hmeromhnia_apoxorhshs: { type: Date },
         afora_proslhpsh: { type: Boolean, default: false },
         kathestos_apasxolhshs: { type: String, trim: true },
+        hmeres_ergasias_ebdomadas: {
+            type: Number,
+            default: 0
+        },
+
+        ores_ergasias_ebdomadas: {
+            type: Number,
+            default: 0
+        },
+
+        mo_oron_hmerhsias_ergasias: {
+            type: Number,
+            default: 0
+        },
+
+        // Π.χ. PLHRHS, MERIKH, EK_PERITROPHS
+        typos_apasxolhshs: {
+            type: String,
+            trim: true,
+            default: ''
+        },
+
+        // Π.χ. 5ήμερο, 6ήμερο κλπ — βοηθάει σε debugging/reports
+        typos_ebdomadas: {
+            type: String,
+            trim: true,
+            default: ''
+        },
+
+        // Για να ξέρουμε ότι η συγκεκριμένη εγγραφή αφορά αλλαγή ωραρίου/ημερών εργασίας
+        afora_allagh_oron_ergasias: {
+            type: Boolean,
+            default: false
+        },
+        typos_apasxolhshs: {
+            type: String,
+            trim: true,
+            default: ''
+        },
         misthologiko_klimakio: { type: Number, default: 0 },
         symbash: { type: String, trim: true },
         kathgoria_symbashs: { type: String, trim: true },
