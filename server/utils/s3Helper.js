@@ -118,86 +118,187 @@ function parseS3Uri(s3Uri) {
 async function downloadS3UriToTempFile(s3Url, companyInUse) {
     console.log('🔍 [S3-DOWNLOAD] Original s3Url:', s3Url);
 
+    // // =====================================================================
+    // // ✅ HTTPS/Presigned URL: Download directly with fetch
+    // // =====================================================================
+    // if (s3Url.startsWith('http://') || s3Url.startsWith('https://')) {
+    //     console.log('[S3-DOWNLOAD] Using direct HTTPS download (presigned URL support)');
+
+    //     // Extract filename from URL
+    //     const urlPath = s3Url.split('?')[0]; // Remove query params
+    //     const filename = path.basename(urlPath);
+    //     const ext = path.extname(filename) || '.xml';
+
+    //     const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+    //     const uniq = crypto.randomBytes(6).toString('hex');
+    //     const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+    //     console.log('[S3-DOWNLOAD] Downloading from HTTPS', {
+    //         url: s3Url.substring(0, 150) + '...',
+    //         tempPath
+    //     });
+
+    //     // =====================================================================
+    //     // DEV MODE: Check if it's a local file:// URL
+    //     // =====================================================================
+    //     if (USE_LOCAL_STORAGE && s3Url.startsWith('file://')) {
+    //         const localPath = s3Url.replace('file://', '');
+    //         console.log(`📁 [S3-DOWNLOAD] DEV MODE: Copying from ${localPath} to ${tempPath}`);
+
+    //         try {
+    //             await fs.copyFile(localPath, tempPath);
+    //             console.log(`✅ [S3-DOWNLOAD] DEV copy complete: ${tempPath}`);
+    //             return tempPath;
+    //         } catch (error) {
+    //             console.error(`❌ [S3-DOWNLOAD] Local file not found: ${localPath}`);
+    //             throw new Error(`Local file not found: ${localPath}`);
+    //         }
+    //     }
+
+    //     // =====================================================================
+    //     // PRODUCTION: Download from HTTPS (works with presigned URLs)
+    //     // =====================================================================
+    //     try {
+    //         const https = require('https');
+    //         const http = require('http');
+    //         const client = s3Url.startsWith('https:') ? https : http;
+
+    //         await new Promise((resolve, reject) => {
+    //             const file = require('fs').createWriteStream(tempPath);
+
+    //             client
+    //                 .get(s3Url, (response) => {
+    //                     if (response.statusCode !== 200) {
+    //                         reject(
+    //                             new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`)
+    //                         );
+    //                         return;
+    //                     }
+
+    //                     response.pipe(file);
+
+    //                     file.on('finish', () => {
+    //                         file.close();
+    //                         resolve();
+    //                     });
+    //                 })
+    //                 .on('error', (err) => {
+    //                     fs.unlink(tempPath).catch(() => {});
+    //                     reject(err);
+    //                 });
+
+    //             file.on('error', (err) => {
+    //                 fs.unlink(tempPath).catch(() => {});
+    //                 reject(err);
+    //             });
+    //         });
+
+    //         console.log('[S3-DOWNLOAD] HTTPS download complete', { tempPath });
+    //         return tempPath;
+    //     } catch (error) {
+    //         console.error('[S3-DOWNLOAD] HTTPS download failed:', error.message);
+    //         throw new Error(`Failed to download from HTTPS: ${error.message}`);
+    //     }
+    // }
+
+    // // =====================================================================
+    // // ✅ s3:// URI: Use AWS SDK
+    // // =====================================================================
+    // const parsed = parseS3Uri(s3Url);
+    // if (!parsed) throw new Error(`Invalid s3:// URI: ${s3Url}`);
+
+    // const ext = path.extname(parsed.key) || '.xml';
+    // const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+    // const uniq = crypto.randomBytes(6).toString('hex');
+    // const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+    // console.log('[S3-DOWNLOAD] Downloading from S3 via SDK', {
+    //     bucket: parsed.bucket,
+    //     key: parsed.key,
+    //     tempPath
+    // });
+
     // =====================================================================
-    // ✅ HTTPS/Presigned URL: Download directly with fetch
+    // ✅ HTTPS / Presigned / S3 URL handling
     // =====================================================================
+
+    // Πρώτα: αν είναι κανονικό HTTPS S3 URL τύπου
+    // https://bucket.s3.region.amazonaws.com/key
+    // το μετατρέπουμε σε s3://bucket/key ώστε να γίνει download με AWS SDK.
+    // Αυτό λύνει το 403 στο EC2 για private S3 objects.
     if (s3Url.startsWith('http://') || s3Url.startsWith('https://')) {
-        console.log('[S3-DOWNLOAD] Using direct HTTPS download (presigned URL support)');
+        const convertedS3Uri = isS3Url(s3Url) ? convertHttpsToS3Uri(s3Url) : null;
 
-        // Extract filename from URL
-        const urlPath = s3Url.split('?')[0]; // Remove query params
-        const filename = path.basename(urlPath);
-        const ext = path.extname(filename) || '.xml';
+        if (convertedS3Uri) {
+            console.log('[S3-DOWNLOAD] Converted HTTPS S3 URL to SDK URI', {
+                from: s3Url.substring(0, 150) + '...',
+                to: convertedS3Uri
+            });
 
-        const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
-        const uniq = crypto.randomBytes(6).toString('hex');
-        const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+            s3Url = convertedS3Uri;
+        } else {
+            console.log('[S3-DOWNLOAD] Using direct HTTPS download');
 
-        console.log('[S3-DOWNLOAD] Downloading from HTTPS', {
-            url: s3Url.substring(0, 150) + '...',
-            tempPath
-        });
+            const urlPath = s3Url.split('?')[0];
+            const filename = path.basename(urlPath);
+            const ext = path.extname(filename) || '.xml';
 
-        // =====================================================================
-        // DEV MODE: Check if it's a local file:// URL
-        // =====================================================================
-        if (USE_LOCAL_STORAGE && s3Url.startsWith('file://')) {
-            const localPath = s3Url.replace('file://', '');
-            console.log(`📁 [S3-DOWNLOAD] DEV MODE: Copying from ${localPath} to ${tempPath}`);
+            const safeCompany = String(companyInUse || 'company').replace(/[^\w\-]+/g, '_');
+            const uniq = crypto.randomBytes(6).toString('hex');
+            const tempPath = path.join(os.tmpdir(), `erganh_${safeCompany}_${uniq}${ext}`);
+
+            console.log('[S3-DOWNLOAD] Downloading from HTTPS', {
+                url: s3Url.substring(0, 150) + '...',
+                tempPath
+            });
 
             try {
-                await fs.copyFile(localPath, tempPath);
-                console.log(`✅ [S3-DOWNLOAD] DEV copy complete: ${tempPath}`);
-                return tempPath;
-            } catch (error) {
-                console.error(`❌ [S3-DOWNLOAD] Local file not found: ${localPath}`);
-                throw new Error(`Local file not found: ${localPath}`);
-            }
-        }
+                const https = require('https');
+                const http = require('http');
+                const client = s3Url.startsWith('https:') ? https : http;
 
-        // =====================================================================
-        // PRODUCTION: Download from HTTPS (works with presigned URLs)
-        // =====================================================================
-        try {
-            const https = require('https');
-            const http = require('http');
-            const client = s3Url.startsWith('https:') ? https : http;
+                await new Promise((resolve, reject) => {
+                    const file = require('fs').createWriteStream(tempPath);
 
-            await new Promise((resolve, reject) => {
-                const file = require('fs').createWriteStream(tempPath);
+                    client
+                        .get(s3Url, (response) => {
+                            if (response.statusCode !== 200) {
+                                file.close(() => {
+                                    fs.unlink(tempPath).catch(() => {});
+                                });
 
-                client
-                    .get(s3Url, (response) => {
-                        if (response.statusCode !== 200) {
-                            reject(
-                                new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`)
-                            );
-                            return;
-                        }
+                                reject(
+                                    new Error(
+                                        `HTTP ${response.statusCode}: ${response.statusMessage}`
+                                    )
+                                );
+                                return;
+                            }
 
-                        response.pipe(file);
+                            response.pipe(file);
 
-                        file.on('finish', () => {
-                            file.close();
-                            resolve();
+                            file.on('finish', () => {
+                                file.close();
+                                resolve();
+                            });
+                        })
+                        .on('error', (err) => {
+                            fs.unlink(tempPath).catch(() => {});
+                            reject(err);
                         });
-                    })
-                    .on('error', (err) => {
+
+                    file.on('error', (err) => {
                         fs.unlink(tempPath).catch(() => {});
                         reject(err);
                     });
-
-                file.on('error', (err) => {
-                    fs.unlink(tempPath).catch(() => {});
-                    reject(err);
                 });
-            });
 
-            console.log('[S3-DOWNLOAD] HTTPS download complete', { tempPath });
-            return tempPath;
-        } catch (error) {
-            console.error('[S3-DOWNLOAD] HTTPS download failed:', error.message);
-            throw new Error(`Failed to download from HTTPS: ${error.message}`);
+                console.log('[S3-DOWNLOAD] HTTPS download complete', { tempPath });
+                return tempPath;
+            } catch (error) {
+                console.error('[S3-DOWNLOAD] HTTPS download failed:', error.message);
+                throw new Error(`Failed to download from HTTPS: ${error.message}`);
+            }
         }
     }
 

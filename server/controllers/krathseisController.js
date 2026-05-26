@@ -1,75 +1,75 @@
-const mongoose = require("mongoose");
-const Models_B = require("../models/privileges");
-const Models = require("../models/stathera_arxeia");
+const mongoose = require('mongoose');
+const Models_B = require('../models/privileges');
+const Models = require('../models/stathera_arxeia');
 
 const { UserPrivilegesModel } = Models_B;
 
-const { KrathseisModel,
-        PosostaKrathseonModel,
-        TameiaModel,
-        KadModel,
-      } = Models;
+const { KrathseisModel, PosostaKrathseonModel, TameiaModel, KadModel } = Models;
 
-let nextPageSearchTerm = "";
+let nextPageSearchTerm = '';
 
 class krathseisController {
-
     static mainKrathseisForm = async (req, res) => {
         const locals = {
-            title: "Κρατήσεις",
-            description: "Web Payroll Solutions",
+            title: 'Κρατήσεις',
+            description: 'Web Payroll Solutions'
         };
 
         const sessionUserId = req.session.userId;
-        const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const basePer = 1000; // Number(process.env.EGGRAFES) || 10;
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perPage = basePer * perx;
+        const page = Math.max(Number(req.query.page) || 1, 1);
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Krathseis",
+                form: 'Krathseis'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
             const countPipeline = [
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
-            const countResults = await KrathseisModel.aggregate(
-                countPipeline
-            ).exec();
+            const countResults = await KrathseisModel.aggregate(countPipeline).exec();
 
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Aggregation query για την ανάκτηση δεδομένων
             const queryPipeline = [
                 {
-                    $sort: { kodikos: 1 },
+                    $sort: { kodikos: 1 }
                 },
                 {
-                    $skip: skipRecords,
+                    $skip: skipRecords
                 },
                 {
-                    $limit: limitPerPage,
-                },
+                    $limit: limitPerPage
+                }
             ];
 
-            const krathseis = await KrathseisModel.aggregate(
-                queryPipeline
-            ).exec();
+            const krathseis = await KrathseisModel.aggregate(queryPipeline).exec();
 
-            res.render("krathseis/krathseis", {
+            res.render('krathseis/krathseis', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 current: page,
                 pages: totalPages,
                 krathseis,
+                perx, // <-- για το UI πολλαπλασιαστή
+                basePer, // (προαιρετικό, αν το δείχνεις)
+                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+                totalRecs: totalRecords // (προαιρετικό: συνολικά)
             });
         } catch (error) {
             console.log(error);
@@ -87,18 +87,18 @@ class krathseisController {
             res.status(500).send(error.message);
         }
     };
-  
+
     static searchPostKrathseis = async (req, res) => {
         const locals = {
-            title: "Αναζήτηση Κρατήσεων",
-            description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Κρατήσεων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             let searchTerm = req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
-            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, "");
+            const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9()]/g, '');
             const perPage = Number(process.env.EGGRAFES);
             let page = req.query.page || 1;
 
@@ -108,7 +108,7 @@ class krathseisController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Krathseis",
+                form: 'Krathseis'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
@@ -116,14 +116,14 @@ class krathseisController {
                 {
                     $match: {
                         $or: [
-                        { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                        { perigrafh: { $regex: new RegExp(sTerm, "i") } },
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(sTerm, 'i') } }
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await KrathseisModel.aggregate(countPipeline).exec();
@@ -131,36 +131,38 @@ class krathseisController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
-            
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
-        // Αναζήτηση και επισήμανση
+            // Αναζήτηση και επισήμανση
             const krathseisFilteredRecs = await KrathseisModel.aggregate([
                 {
                     $match: {
-                    $or: [
-                        { kodikos: { $regex: new RegExp(sTerm, "i") } },
-                        { perigrafh: { $regex: new RegExp(sTerm, "i") } },
-                    ]
+                        $or: [
+                            { kodikos: { $regex: new RegExp(sTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(sTerm, 'i') } }
+                        ]
                     }
                 },
                 {
                     $sort: {
-                        kodikos: 1,
-                    },
-                },
+                        kodikos: 1
+                    }
+                }
             ])
-            .skip(skipRecords)
-            .limit(limitPerPage);
-        
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = krathseisFilteredRecs.map((record) => ({
                 ...record,
                 kodikos: this.highlightText(record.kodikos, sTerm),
-                perigrafh: this.highlightText(record.perigrafh, sTerm),
+                perigrafh: this.highlightText(record.perigrafh, sTerm)
             }));
 
-            res.render("krathseis/search", {
+            res.render('krathseis/search', {
                 krathseisFilteredRecs: highlightedRecords,
                 userPrivileges,
                 locals,
@@ -168,7 +170,7 @@ class krathseisController {
                 pages: totalPages,
                 sTerm: sTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
             console.log(error);
@@ -177,12 +179,12 @@ class krathseisController {
 
     static searchGetKrathseis = async (req, res) => {
         const locals = {
-        title: "Αναζήτηση Κρατήσεων",
-        description: "Web Payroll Solutions",
+            title: 'Αναζήτηση Κρατήσεων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            let searchTerm = nextPageSearchTerm      //req.body.searchTerm;
+            let searchTerm = nextPageSearchTerm; //req.body.searchTerm;
 
             const sessionUserId = req.session.userId;
             const perPage = Number(process.env.EGGRAFES);
@@ -192,7 +194,7 @@ class krathseisController {
             // Έλεγχος C-R-U-D των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: "Krathseis",
+                form: 'Krathseis'
             }).exec();
 
             // Υπολογισμός συνολικού αριθμού εγγραφών για σελιδοποίηση
@@ -200,14 +202,14 @@ class krathseisController {
                 {
                     $match: {
                         $or: [
-                        { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                        { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(searchTerm, 'i') } }
                         ]
-                    },
+                    }
                 },
                 {
-                    $count: "total",
-                },
+                    $count: 'total'
+                }
             ];
 
             const countResults = await KrathseisModel.aggregate(countPipeline).exec();
@@ -215,33 +217,38 @@ class krathseisController {
             let totalRecords = countResults.length > 0 ? countResults[0].total : 0;
             let totalPages = Math.ceil(totalRecords / Math.max(perPage, 1)); // Αποφεύγει διαίρεση με μηδέν ή αρνητικό αριθμό
             let skipRecords = Math.max(0, (page - 1) * perPage); // Εξασφαλίζει ότι skipRecords δεν είναι αρνητικός
-            let limitPerPage = Math.min(perPage, totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
+            let limitPerPage = Math.min(
+                perPage,
+                totalRecords - skipRecords <= 0 ? 1 : totalRecords - skipRecords
+            ); // Υπολογίζει το limit βάσει των διαθέσιμων εγγραφών
 
             // Αναζήτηση και επισήμανση
             const krathseisFilteredRecs = await KrathseisModel.aggregate([
                 {
-                $match: {
-                    $or: [
-                    { kodikos: { $regex: new RegExp(searchTerm, "i") } },
-                    { perigrafh: { $regex: new RegExp(searchTerm, "i") } },
-                    ]
-                }
+                    $match: {
+                        $or: [
+                            { kodikos: { $regex: new RegExp(searchTerm, 'i') } },
+                            { perigrafh: { $regex: new RegExp(searchTerm, 'i') } }
+                        ]
+                    }
                 },
                 {
-                $sort: {
-                    kodikos: 1,
-                },
-                },
-            ]).skip(skipRecords).limit(limitPerPage);
-        
+                    $sort: {
+                        kodikos: 1
+                    }
+                }
+            ])
+                .skip(skipRecords)
+                .limit(limitPerPage);
+
             // Εφαρμογή της επισήμανσης
             const highlightedRecords = krathseisFilteredRecs.map((record) => ({
                 ...record,
                 kodikos: this.highlightText(record.kodikos, searchTerm),
-                perigrafh: this.highlightText(record.perigrafh, searchTerm),
+                perigrafh: this.highlightText(record.perigrafh, searchTerm)
             }));
-        
-            res.render("krathseis/search", {
+
+            res.render('krathseis/search', {
                 krathseisFilteredRecs: highlightedRecords,
                 userPrivileges,
                 locals,
@@ -250,7 +257,7 @@ class krathseisController {
                 userPrivileges,
                 sTerm: searchTerm,
                 entries: perPage,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
             console.log(error);
@@ -259,13 +266,13 @@ class krathseisController {
 
     static addKrathseisForm = async (req, res) => {
         const locals = {
-        title: "Προσθήκη Νέας Κράτησης",
-        description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέας Κράτησης',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            res.render("krathseis/genika/add", {
-                locals,
+            res.render('krathseis/genika/add', {
+                locals
                 // data,
             });
         } catch (error) {
@@ -277,12 +284,12 @@ class krathseisController {
         const { kodikos } = req.body;
         try {
             const exists = await KrathseisModel.findOne({ kodikos: kodikos });
-            if(exists) {
+            if (exists) {
                 return res.json({ exists: true });
             } else {
                 return res.json({ exists: false });
             }
-        } catch(error) {
+        } catch (error) {
             console.error(error);
             res.status(500).json({ message: 'Server error' });
         }
@@ -367,12 +374,12 @@ class krathseisController {
             apaiteitai_kata_thn_adeia_eos: formData.apaiteitai_kata_thn_adeia_eos,
             apaiteitai_hmeres_asfalishs: formData.apaiteitai_hmeres_asfalishs,
             apaiteitai_apodoxes_asfalishs: formData.apaiteitai_apodoxes_asfalishs,
-            ypologismos_epi_plasmatikhs: formData.ypologismos_epi_plasmatikhs,
+            ypologismos_epi_plasmatikhs: formData.ypologismos_epi_plasmatikhs
         });
 
         try {
             await KrathseisModel.create(newKrathsh);
-            res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             console.log(error);
         }
@@ -380,18 +387,18 @@ class krathseisController {
 
     static editKrathseisForm = async (req, res) => {
         const locals = {
-        title: "Συντήρηση Κρατήσεων",
-        description: "Web Payroll Solutions",
+            title: 'Συντήρηση Κρατήσεων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             const tameia = await TameiaModel.find().sort({ kodikos: 1 });
             const krathseisId = req.params.id;
             const krathseis = await KrathseisModel.findById(krathseisId).lean();
-            res.render("krathseis/genika/edit", {
+            res.render('krathseis/genika/edit', {
                 locals,
                 tameia,
-                krathseis,
+                krathseis
             });
         } catch (error) {
             console.log(error);
@@ -477,7 +484,7 @@ class krathseisController {
             apaiteitai_kata_thn_adeia_eos: formData.apaiteitai_kata_thn_adeia_eos,
             apaiteitai_hmeres_asfalishs: formData.apaiteitai_hmeres_asfalishs,
             apaiteitai_apodoxes_asfalishs: formData.apaiteitai_apodoxes_asfalishs,
-            ypologismos_epi_plasmatikhs: formData.ypologismos_epi_plasmatikhs,
+            ypologismos_epi_plasmatikhs: formData.ypologismos_epi_plasmatikhs
         };
 
         // Τώρα μπορώ να χρησιμοποιήσω το filteredDataKrathseis στη $set: για ενημέρωση
@@ -488,7 +495,7 @@ class krathseisController {
         );
 
         try {
-            res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             throw error;
         }
@@ -502,20 +509,20 @@ class krathseisController {
         }
 
         const locals = {
-            title: "Συντήρηση Ποσοστών Κρατήσεων",
-            description: "Web Payroll Solutions",
+            title: 'Συντήρηση Ποσοστών Κρατήσεων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             // const krathseis = await KrathseisModel.find({}, "_id kodikos perigrafh ypologismos_epi_plasmatikhs").sort("kodikos");
             const posostaKrathseonId = req.params.id;
-            
+
             const posostaKrathseon = await PosostaKrathseonModel.findById(posostaKrathseonId);
-            
-            res.render("krathseis/pososta/edit", {
+
+            res.render('krathseis/pososta/edit', {
                 locals,
                 convertDate: convertDateDDMMYYYYtoYYYYMMDD,
-                posostaKrathseon,
+                posostaKrathseon
             });
         } catch (error) {
             console.log(error);
@@ -540,7 +547,7 @@ class krathseisController {
             synolo_poson: formData.synolo_poson,
             poso_plasmatikhs_axias: formData.poso_plasmatikhs_axias,
             anotato_orio_palion: formData.anotato_orio_palion,
-            anotato_orio_neon: formData.anotato_orio_neon,
+            anotato_orio_neon: formData.anotato_orio_neon
         };
 
         // Τώρα μπορώ να χρησιμοποιήσω το filteredDataKrathseis στη $set: για ενημέρωση
@@ -551,7 +558,7 @@ class krathseisController {
         );
 
         try {
-            res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             throw error;
         }
@@ -560,7 +567,7 @@ class krathseisController {
     static deleteKrathseis = async (req, res) => {
         try {
             await KrathseisModel.deleteOne({ _id: req.params.id });
-                res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             throw error;
         }
@@ -569,12 +576,15 @@ class krathseisController {
     static getKrathseis = async (req, res) => {
         let plasmatikhAxia = 0;
         const locals = {
-            title: "Προσθήκη Νέου Ποσοστού Κράτησης",
-            description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέου Ποσοστού Κράτησης',
+            description: 'Web Payroll Solutions'
         };
 
         try {
-            const doc = await KrathseisModel.find({}, "_id kodikos perigrafh ypologismos_epi_plasmatikhs").sort("kodikos");
+            const doc = await KrathseisModel.find(
+                {},
+                '_id kodikos perigrafh ypologismos_epi_plasmatikhs'
+            ).sort('kodikos');
             res.json(doc);
         } catch (error) {
             console.log(error);
@@ -583,39 +593,43 @@ class krathseisController {
 
     static addPosostaKrathseonForm = async (req, res) => {
         const locals = {
-            title: "Προσθήκη Νέων Ποσοστών Κρατήσεων",
-            description: "Web Payroll Solutions",
+            title: 'Προσθήκη Νέων Ποσοστών Κρατήσεων',
+            description: 'Web Payroll Solutions'
         };
 
         try {
             let totalRecords = 0;
-            const countResults = await PosostaKrathseonModel.find({}, "aa_eggrafhs").sort({ aa_eggrafhs: -1 }).limit(1);
-            let x = JSON.stringify(countResults).split(",")[1];
+            const countResults = await PosostaKrathseonModel.find({}, 'aa_eggrafhs')
+                .sort({ aa_eggrafhs: -1 })
+                .limit(1);
+            let x = JSON.stringify(countResults).split(',')[1];
             totalRecords = parseInt(x.split(':"')[1]) + 1;
 
             // Περάστε τα locals στο EJS template ως μέρος του αντικειμένου
-            res.render("krathseis/pososta/add", {
+            res.render('krathseis/pososta/add', {
                 ...locals,
                 // convertDate: convertDateDDMMYYYYtoYYYYMMDD,
-                totalRecs: totalRecords,
+                totalRecs: totalRecords
             });
         } catch (error) {
             console.log(error);
         }
     };
-    
+
     static postPosostaKrathseonForm = async (req, res) => {
         const sessionYearInUse = req.session.yearInUse;
         const formData = req.body;
-        const aa_eggrafhs_str = (formData.aa_eggrafhs).toString().padStart(4, '0');
-        const posoPlasmatikisAxias = !isNaN(parseFloat(formData.poso_plasmatikhs_axias)) ? parseFloat(formData.poso_plasmatikhs_axias).toFixed(2) : '0.00';
-    
+        const aa_eggrafhs_str = formData.aa_eggrafhs.toString().padStart(4, '0');
+        const posoPlasmatikisAxias = !isNaN(parseFloat(formData.poso_plasmatikhs_axias))
+            ? parseFloat(formData.poso_plasmatikhs_axias).toFixed(2)
+            : '0.00';
+
         const newPosostaKrathseon = PosostaKrathseonModel({
             krathshId: formData.krathshId,
             kodikos: formData.kodikos,
             aa_eggrafhs: aa_eggrafhs_str,
             isxyei_apo: formData.isxyei_apo || `${sessionYearInUse}-01-01`,
-            isxyei_eos: formData.isxyei_eos || "2100-12-31",
+            isxyei_eos: formData.isxyei_eos || '2100-12-31',
             pososto_ergazomenoy: parseFloat(formData.pososto_ergazomenoy).toFixed(4),
             pososto_ergodoth: parseFloat(formData.pososto_ergodoth).toFixed(4),
             synolo_pososton: parseFloat(formData.synolo_pososton).toFixed(4),
@@ -624,12 +638,12 @@ class krathseisController {
             synolo_poson: parseFloat(formData.synolo_poson).toFixed(2),
             poso_plasmatikhs_axias: posoPlasmatikisAxias,
             anotato_orio_palion: parseFloat(formData.anotato_orio_palion).toFixed(2),
-            anotato_orio_neon: parseFloat(formData.anotato_orio_neon).toFixed(2),
+            anotato_orio_neon: parseFloat(formData.anotato_orio_neon).toFixed(2)
         });
 
         try {
             await PosostaKrathseonModel.create(newPosostaKrathseon);
-            res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             console.log(error);
         }
@@ -638,17 +652,17 @@ class krathseisController {
     static deletePosostaKrathseon = async (req, res) => {
         try {
             await PosostaKrathseonModel.deleteOne({ _id: req.params.id });
-            res.json({ success: true, redirectUrl: "/krathseis/krathseis" });
+            res.json({ success: true, redirectUrl: '/krathseis/krathseis' });
         } catch (error) {
             throw error;
         }
     };
 
     static highlightText(text, term) {
-        if (!text) return ""; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
+        if (!text) return ''; // Επιστρέφει ένα κενό string αν το text είναι falsy (π.χ., undefined, null, '')
         const highlightStartTag = "<span class='highlight'>";
-        const highlightEndTag = "</span>";
-        const regex = new RegExp(`(${term})`, "gi");
+        const highlightEndTag = '</span>';
+        const regex = new RegExp(`(${term})`, 'gi');
         return text.replace(regex, `${highlightStartTag}$1${highlightEndTag}`);
     }
 
@@ -657,32 +671,32 @@ class krathseisController {
         try {
             const krathseis = await KrathseisModel.find();
 
-            krathseis.forEach(krathsh => {
+            krathseis.forEach((krathsh) => {
                 bulkUpdateOps.push({
                     updateMany: {
-                        filter: { kodikos: krathsh.kodikos },   // Φιλτράρει τις εγγραφές που έχουν το ίδιο "kodikos"
-                        update: { krathshId: krathsh._id }      // Ενημερώνει το πεδίο "krathshId" με το "_id" της κράτησης
+                        filter: { kodikos: krathsh.kodikos }, // Φιλτράρει τις εγγραφές που έχουν το ίδιο "kodikos"
+                        update: { krathshId: krathsh._id } // Ενημερώνει το πεδίο "krathshId" με το "_id" της κράτησης
                     }
-                })
+                });
             });
 
             if (bulkUpdateOps.length) {
                 await PosostaKrathseonModel.bulkWrite(bulkUpdateOps);
                 console.log('Bulk update completed.');
-                res.redirect("/krathseis/krathseis"); 
+                res.redirect('/krathseis/krathseis');
             }
         } catch (err) {
             console.error('Error during bulk update:', err);
-            res.status(500).send("An error occurred during the bulk update.");
+            res.status(500).send('An error occurred during the bulk update.');
         }
-    }
+    };
 
     static kadKodikosSort = async (req, res) => {
         function kodikosToSortable(kodikos) {
             if (!kodikos) return '';
             return kodikos
                 .split('.')
-                .map(segment => segment.padStart(5, '0'))
+                .map((segment) => segment.padStart(5, '0'))
                 .join('.');
         }
 
@@ -699,9 +713,9 @@ class krathseisController {
             }
         } catch (err) {
             console.error('Error during kad update:', err);
-            res.status(500).send("An error occurred during the kad update.");
+            res.status(500).send('An error occurred during the kad update.');
         }
-    }
-};
+    };
+}
 
 module.exports = krathseisController;

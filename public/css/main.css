@@ -1,5 +1,5 @@
 :root {
-    --aaa: #2b2b2b;
+    --aaa: #b8b8b8;
     --dark: #292c4f;
     --info: #0dcaf0;
     --light: #adb5bd;
@@ -1741,7 +1741,7 @@ input.disabled {
 }
 
 .backgroundColor-brown {
-    background-color: #3d4e002f !important;
+    background-color: #e8eadf1e !important;
 }
 
 .z-depth-5 {
@@ -5482,6 +5482,10 @@ input[type='time']::-webkit-calendar-picker-indicator {
     margin-left: 2.5rem !important;
 }
 
+.margin-left-3vw {
+    margin-left: 3vw !important;
+}
+
 .margin-lef-20rem {
     margin-left: 20rem !important;
 }
@@ -5776,6 +5780,15 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .height-vh-64 {
     height: 64vh !important;
 }
+.height-vh-65 {
+    height: 65vh !important;
+}
+.height-vh-66 {
+    height: 66vh !important;
+}
+.height-vh-67 {
+    height: 67vh !important;
+}
 .height-vh-75 {
     height: 75vh !important;
 }
@@ -5950,6 +5963,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .font-size-vw-1_1 {
     font-size: 1.1vw;
 }
+.font-size-vw-1_3 {
+    font-size: 1.3vw;
+}
 .font-size-vw-2 {
     font-size: 2vw;
 }
@@ -6058,7 +6074,7 @@ input[type='time']::-webkit-calendar-picker-indicator {
     font-size: 1.1vw;
 }
 .fsvw-1_3 {
-    font-size: 1.3vw;
+    font-size: 1.3vw !important;
 }
 
 .gap-0_5rem {
@@ -8229,6 +8245,9 @@ tbody .group-row--category:first-of-type > td {
 }
 .colorF39C12 {
     color: #f39c12;
+}
+.color004b00 {
+    color: #004b00;
 }
 
 .button-style-1 {
@@ -11583,4 +11602,66 @@ body.loader-active > *:not(.app-loader) {
 
 .grand-total-row .cell-apoysia.cell-apoysia-total {
     color: #000 !important;
+}
+
+.card,
+.card-footer,
+.dropup {
+    overflow: visible !important;
+}
+
+.custom-dropdown-menu {
+    z-index: 99999 !important;
+}
+
+.table-scroll-container {
+    max-height: 67vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#myTable {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#myTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background-color: #e8eadf !important;
+    box-shadow: inset 0 -1px 0 #dee2e6;
+}
+
+.nested-table-scroll-container {
+    max-height: 17rem; /* περίπου 5 γραμμές */
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+}
+
+.nested-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+.nested-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background-color: #e8eadf !important;
+    box-shadow: inset 0 -1px 0 #dee2e6;
+}
+
+#myTable th,
+#myTable td,
+.nested-table th,
+.nested-table td {
+    border-width: 0.5px !important;
+    border-color: #dfe3e6 !important;
+}
+
+.nested-table-scroll-container {
+    box-shadow: 0 8px 12px -6px rgba(80, 85, 90, 0.8);
+    margin-bottom: 0.35rem;
 }

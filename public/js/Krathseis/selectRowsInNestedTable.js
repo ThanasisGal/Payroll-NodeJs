@@ -1,104 +1,111 @@
-document.addEventListener("DOMContentLoaded", function () {
-  let currentSelectedId = null; // Κρατά το ID της επιλεγμένης γραμμής
+document.addEventListener('DOMContentLoaded', function () {
+    let currentSelectedId = null; // Κρατά το ID της επιλεγμένης γραμμής
 
-  document.querySelector(".card-body.p-0.overflow-auto.flex-grow-1").addEventListener("click", function (event) {
-    if (!event.target.closest(".collapse")) return;
+    document
+        .querySelector('.card-body.p-0.overflow-auto.flex-grow-1')
+        .addEventListener('click', function (event) {
+            if (!event.target.closest('.collapse')) return;
+            event.stopPropagation();
 
-    let targetRow = event.target.closest("tr[data-id]");
-    if (!targetRow) return;
+            let targetRow = event.target.closest('tr[data-id]');
+            if (!targetRow) return;
 
-    if (targetRow.closest(".collapse.show")) {
-    const isSelected = targetRow.classList.contains("selected-row");
-    document.querySelectorAll(".collapse.show .selected-row").forEach(row => row.classList.remove("selected-row"));
+            if (targetRow.closest('.collapse.show')) {
+                const isSelected = targetRow.classList.contains('selected-row');
+                document
+                    .querySelectorAll('.collapse.show .selected-row')
+                    .forEach((row) => row.classList.remove('selected-row'));
 
-    if (!isSelected) {
-      targetRow.classList.add("selected-row");
-      currentSelectedId = targetRow.dataset.id;
-      document.getElementById("edit-btn").href = `/krathseis/posostaKrathseon/edit/${currentSelectedId}`;
-      document.getElementById("edit-btn").innerHTML = `<i class="buttons-content bi bi-pencil-square"></i> Συντήρηση Ποσοστών`;
-      adjustFontSizeToFit("edit-btn", 15);
-      document.getElementById("delete-btn").innerHTML = `<i class="buttons-content bi bi-trash"></i> Διαγραφή Ποσοστών`;
-      adjustFontSizeToFit("delete-btn", 15);
-    } else {
-      currentSelectedId = null;
-      document.getElementById("edit-btn").href = "#";
-      document.getElementById("edit-btn").innerHTML = `<i class="buttons-content bi bi-pencil-square"></i> Συντήρηση`;
-      document.getElementById("delete-btn").href = "#";
-      document.getElementById("delete-btn").innerHTML = `<i class="buttons-content bi bi-trash"></i> Διαγραφή`;
-    }
-  }
-});
-
-  document.getElementById("delete-btn").addEventListener("click", async function (event) {
-    event.preventDefault();
-    if (!currentSelectedId) {
-      return; // Επιστροφή
-    }
-    console.log(currentSelectedId);
-    const deleteUrl = `/krathseis/posostaKrathseon/delete/${currentSelectedId}`;
-
-    const result = await Swal.fire({
-      title: "Είστε σίγουρος/η;",
-      text: "ΠΡΟΣΟΧΗ!!! Δεν θα μπορείτε να αναιρέσετε αυτή την ενέργεια!",
-      icon: "error",
-      showCancelButton: true,
-      focusConfirm: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#3332049a",
-      confirmButtonText: "Διαγραφή",
-      cancelButtonText: "Ακύρωση",
-      customClass: {
-        confirmButton:
-          "class-error custom-confirm-button custom-swal-button",
-        cancelButton: "custom-cancel-button custom-swal-button",
-      },
-      didOpen: () => {
-        // Εστιάζει στο κουμπί "Ακύρωση" μετά το άνοιγμα του SweetAlert
-        Swal.getCancelButton().focus();
-      },
-});
-
-    if (result.isConfirmed) {
-      try {
-        const response = await fetch(deleteUrl, {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
+                if (!isSelected) {
+                    targetRow.classList.add('selected-row');
+                    currentSelectedId = targetRow.dataset.id;
+                    document.getElementById('edit-btn').href =
+                        `/krathseis/posostaKrathseon/edit/${currentSelectedId}`;
+                    document.getElementById('edit-btn').innerHTML =
+                        `<i class="buttons-content bi bi-pencil-square"></i> Συντήρηση Ποσοστών`;
+                    adjustFontSizeToFit('edit-btn', 15);
+                    document.getElementById('delete-btn').innerHTML =
+                        `<i class="buttons-content bi bi-trash"></i> Διαγραφή Ποσοστών`;
+                    adjustFontSizeToFit('delete-btn', 15);
+                } else {
+                    currentSelectedId = null;
+                    document.getElementById('edit-btn').href = '#';
+                    document.getElementById('edit-btn').innerHTML =
+                        `<i class="buttons-content bi bi-pencil-square"></i> Συντήρηση`;
+                    document.getElementById('delete-btn').href = '#';
+                    document.getElementById('delete-btn').innerHTML =
+                        `<i class="buttons-content bi bi-trash"></i> Διαγραφή`;
+                }
+            }
         });
 
-        if (!response.ok) throw new Error("Network response was not ok");
+    document.getElementById('delete-btn').addEventListener('click', async function (event) {
+        event.preventDefault();
+        if (!currentSelectedId) {
+            return; // Επιστροφή
+        }
+        console.log(currentSelectedId);
+        const deleteUrl = `/krathseis/posostaKrathseon/delete/${currentSelectedId}`;
 
-        const data = await response.json();
-        Swal.fire({
-          icon: "success",
-          title: "Επιτυχής Διαγραφή των Ποσοστών της Κράτησης",
-          timer: 3000,
-          confirmButtonText: "Κλείσιμο",
-          customClass: {
-            confirmButton:
-              "class-success custom-confirm-button custom-swal-button",
-          },
-          willClose: () => {
-            window.location.href = data.redirectUrl; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
-          },
+        const result = await Swal.fire({
+            title: 'Είστε σίγουρος/η;',
+            text: 'ΠΡΟΣΟΧΗ!!! Δεν θα μπορείτε να αναιρέσετε αυτή την ενέργεια!',
+            icon: 'error',
+            showCancelButton: true,
+            focusConfirm: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#3332049a',
+            confirmButtonText: 'Διαγραφή',
+            cancelButtonText: 'Ακύρωση',
+            customClass: {
+                confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                cancelButton: 'custom-cancel-button custom-swal-button'
+            },
+            didOpen: () => {
+                // Εστιάζει στο κουμπί "Ακύρωση" μετά το άνοιγμα του SweetAlert
+                Swal.getCancelButton().focus();
+            }
         });
-      } catch (error) {
-        Swal.fire({
-          icon: "error",
-          title: "Σφάλμα κατά τη Διαγραφή των Ποσοστών της Κράτησης",
-          text: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
-          timer: 3000,
-          confirmButtonText: "Κλείσιμο",
-          customClass: {
-            confirmButton:
-              "class-normal custom-confirm-button custom-swal-button",
-          },
-          willClose: () => {
-            window.location.href = "/krathseis/krathseis"; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
-          },
-        });
-      }
-    }
-  });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Επιτυχής Διαγραφή των Ποσοστών της Κράτησης',
+                    timer: 3000,
+                    confirmButtonText: 'Κλείσιμο',
+                    customClass: {
+                        confirmButton: 'class-success custom-confirm-button custom-swal-button'
+                    },
+                    willClose: () => {
+                        window.location.href = data.redirectUrl; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
+                    }
+                });
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Σφάλμα κατά τη Διαγραφή των Ποσοστών της Κράτησης',
+                    text: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
+                    timer: 3000,
+                    confirmButtonText: 'Κλείσιμο',
+                    customClass: {
+                        confirmButton: 'class-normal custom-confirm-button custom-swal-button'
+                    },
+                    willClose: () => {
+                        window.location.href = '/krathseis/krathseis'; // Ανακατεύθυνση μετά το κλείσιμο του SweetAlert
+                    }
+                });
+            }
+        }
+    });
 });
