@@ -730,11 +730,11 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/dokimastikhPeriodos_Blur.js"
     "public/js/ergazomenoi/genika/pdf_Upload_Modal.js"
     "public/js/ergazomenoi/genika/pdfPreviewModule.js"
+    "public/js/ergazomenoi/genika/logos_peratoshs.js"
     "public/js/ergazomenoi/programmata/downloadScheduleButton.js"
     "public/js/ergazomenoi/programmata/downloadCardsButton.js"
     "public/js/ergazomenoi/programmata/calcApasxolhseisPeriodoy.js"
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js"
-    "public/js/ergazomenoi/programmata/logos_peratoshs.js"
 )
 
 declare -a no_obfuscate=(
