@@ -909,6 +909,17 @@ const ProorhApoxorhshSchema = new Schema(
 );
 const ProorhApoxorhshModel = model('ProorhApoxorhsh', ProorhApoxorhshSchema);
 
+const LogoiPeraioshsSchema = new Schema(
+    {
+        kodikos: { type: String, unique: true },
+        perigrafh: { type: String, trim: true }
+    },
+    {
+        collection: 'Logoi_Lyshs_Lhxhs'
+    }
+);
+const LogoiPeraioshshModel = model('LogoiPeraioshs', LogoiPeraioshsSchema);
+
 module.exports = {
     AdeiesDiamonhsModel,
     AntistoixishEidikhsPeriptoshsKpkEfkaModel,
@@ -953,6 +964,7 @@ module.exports = {
     LanguagesModel,
     Klimaka_ForoyModel,
     LogisthsModel,
+    LogoiPeraioshshModel,
     NomikesMorfesModel,
     NomoiModel,
     OikogeneiakhKatastashModel,

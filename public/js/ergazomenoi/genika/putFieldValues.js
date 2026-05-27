@@ -1224,7 +1224,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         result.value?.e3_metaboles_ergasiakhs_sxeshs === true ||
                         result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy ===
                             true ||
-                        result.value?.ma_217 === true;
+                        result.value?.ma_217 === true ||
+                        result.value?.ma_222 === true;
 
                     if (
                         userWantsMA &&
@@ -1250,7 +1251,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     maUrlToSend,
                                     result.value?.isPermanent === true,
                                     maXmlData?.processCode ||
-                                        (result.value?.ma_217 === true ? '217' : undefined)
+                                        (result.value?.ma_222 === true
+                                            ? '222'
+                                            : result.value?.ma_217 === true
+                                              ? '217'
+                                              : undefined)
                                 );
 
                                 console.log('[MA-UPLOAD] Result:', maResult);

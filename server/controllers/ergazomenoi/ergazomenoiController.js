@@ -8,6 +8,9 @@ const os = require('os');
 const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 
+const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
+const { generateE7NXML } = require('../../utils/xmlGenerators/e7N_v1Generator');
+
 const { s3Client } = require('../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 
@@ -730,6 +733,30 @@ class ergazomenoiController {
 
         const { formData, filesToUpdate } = req.body;
 
+        // ============================================================================
+        // ✅ AUTO ENABLE E7N / MA_222
+        // Λύση Σύμβασης Ορισμένου Χρόνου
+        // ============================================================================
+        const hasLhxhSymbashs = !!String(formData?.hmeromhnia_lhxhs_symbashs || '').trim();
+
+        const hasApoxorhsh = !!String(
+            formData?.hmeromhnia_apoxorhshs || formData?.hmeromhnia_apoxwrhshs || ''
+        ).trim();
+
+        const hasLogosPeratoshs = !!String(
+            formData?.logos_peratoshs_stathera ||
+                formData?.logos_peratoshs ||
+                formData?.logos_peratosis ||
+                ''
+        ).trim();
+
+        const isOrismenouXronou =
+            String(formData?.sxesh_ergasias_stathera || formData?.sxesh_ergasias || '') === '1';
+
+        if (hasLhxhSymbashs && hasApoxorhsh && hasLogosPeratoshs && isOrismenouXronou) {
+            filesToUpdate.ma_222 = true;
+        }
+
         try {
             const lastRecord = await ErgazomenoiModel.find({
                 team: sessionUserTeam,
@@ -834,6 +861,7 @@ class ergazomenoiController {
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            logos_peratosis: formData.logos_peratoshs_stathera,
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
             typos_daneismoy: formData.typos_daneismoy_stathera,
             hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
@@ -2790,6 +2818,7 @@ class ergazomenoiController {
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            logos_peratosis: formData.logos_peratoshs_stathera,
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
             typos_daneismoy: formData.typos_daneismoy,
             hmnia_enarxhs_daneismoy: formData.hmnia_enarxhs_daneismoy || null,
@@ -3791,7 +3820,8 @@ class ergazomenoiController {
         const wantsMA =
             filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs === true ||
             filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true ||
-            filesToUpdate?.ma_217 === true;
+            filesToUpdate?.ma_217 === true ||
+            filesToUpdate?.ma_222 === true;
 
         if (wantsMA) {
             logger.info('MA XML generation requested', {
@@ -3799,9 +3829,13 @@ class ergazomenoiController {
                 employee_kod: updatedErgazomenos.kodikos,
                 employee_afm: updatedErgazomenos.afm,
                 company: company?.eponymia || 'N/A',
-                type: filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs
-                    ? 'ΜΕΤΑΒΟΛΗ'
-                    : 'ΜΕΤΑΒΟΛΗ ΔΑΝΕΙΖΟΜΕΝΟΥ'
+                type: filesToUpdate?.ma_222
+                    ? 'ΛΥΣΗ ΣΥΜΒΑΣΗΣ ΟΡΙΣΜΕΝΟΥ ΧΡΟΝΟΥ'
+                    : filesToUpdate?.ma_217
+                      ? 'ΟΙΚΕΙΟΘΕΛΗΣ ΑΠΟΧΩΡΗΣΗ'
+                      : filesToUpdate?.e3_metaboles_ergasiakhs_sxeshs
+                        ? 'ΜΕΤΑΒΟΛΗ'
+                        : 'ΜΕΤΑΒΟΛΗ ΔΑΝΕΙΖΟΜΕΝΟΥ'
             });
 
             try {
@@ -3810,11 +3844,49 @@ class ergazomenoiController {
                 let maResult;
                 let maProcessCode;
 
-                if (filesToUpdate?.ma_217 === true) {
-                    const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
+                if (filesToUpdate?.ma_222 === true) {
+                    maProcessCode = '222';
+
+                    const hmeromhniaApoxorhshs =
+                        formData.hmeromhnia_apoxorhshs ||
+                        formData.hmeromhnia_apoxwrhshs ||
+                        updatedErgazomenos.hmeromhnia_apoxorhshs ||
+                        updatedErgazomenos.hmeromhnia_apoxwrhshs ||
+                        '';
+
+                    const hmeromhniaLhxhsSymbashs =
+                        formData.hmeromhnia_lhxhs_symbashs ||
+                        updatedErgazomenos.hmeromhnia_lhxhs_symbashs ||
+                        '';
+
+                    const logosPeratosis =
+                        formData.logos_peratoshs_stathera ||
+                        formData.logos_peratoshs ||
+                        formData.logos_peratosis ||
+                        updatedErgazomenos.logos_peratosis ||
+                        updatedErgazomenos.logos_peratoshs ||
+                        '0';
+
+                    const logosPeratosisComments =
+                        formData.logos_peratoshs_parathrhseis ||
+                        formData.logos_peratosis_parathrhseis ||
+                        updatedErgazomenos.logos_peratosis_parathrhseis ||
+                        updatedErgazomenos.logos_peratoshs_parathrhseis ||
+                        '';
+
+                    maResult = await generateE7NXML(updatedErgazomenos, company, ypokatasthmata, {
+                        hmeromhnia_lhxhs_symbashs: hmeromhniaLhxhsSymbashs,
+                        hmeromhnia_apoxorhshs: hmeromhniaApoxorhshs,
+                        logosperatosis: logosPeratosis,
+                        logosperatosiscomments: logosPeratosisComments,
+                        processCode: maProcessCode
+                    });
+                } else if (filesToUpdate?.ma_217 === true) {
+                    // const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
                     const {
                         generateE5NPdf
                     } = require('../../utils/pdfGenerators/e5nTemplatePdfGenerator');
+
                     maProcessCode = '217';
 
                     const hmeromhniaApoxwrhshs =

@@ -148,6 +148,50 @@
 
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="col-2 left-align">
+                    <label for="logos_peratoshs" id="logos_peratoshs_label" class="col-form-label label-font-size field-required">
+                    Λόγος Περάτωσης της Σύμβασης
+                    </label>
+                </div>
+
+                <%
+                    const hasLhxhSymbashs = !!safe('hmeromhnia_lhxhs_symbashs');
+                    const hasApoxorhsh = !!safe('hmeromhnia_apoxorhshs');
+                    const enableLogosPeratoshs = hasLhxhSymbashs && hasApoxorhsh;
+                %>                
+
+                <input
+                    type="hidden"
+                    name="logos_peratoshs_stathera"
+                    id="logos_peratoshs_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('logos_peratosis') %>"
+                    />
+
+                <div class="col-9-75">
+                    <select
+                        id="logos_peratoshs"
+                        name="logos_peratoshs"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                        aria-label="Λόγος Περάτωσης της Σύμβασης"
+                        data-api="/api/dropdown/ergazomenoi/logos_peratoshs"
+                        single
+                        data-target-input=<%= `logos_peratoshs_stathera` %>
+                        data-preselect="logos_peratoshs_stathera"
+                        data-preload-all="true"
+                        data-pad-length="1"
+                        placeholder="Αναζήτηση Λόγου Λύσης της Σύμβασης"
+                        <%= enableLogosPeratoshs ? '' : 'disabled' %> 
+                >
+                    </select>
+                </div>
+            </div>
+
+            <hr class="hr-style" />
+
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                <div class="col-2 left-align">
                     <label for="afora_daneismo_ergazomenoy" id="afora_daneismo_ergazomenoy_label" class="col-form-label label-font-size field-required">
                     Αφορά Δανεισμό Εργαζόμενου
                     </label>
@@ -277,6 +321,8 @@
                     <input type="date" id="hmnia_lhxhs_dokimastikhs_periodoy" name="hmnia_lhxhs_dokimastikhs_periodoy" data-bs-toggle="tooltip" data-bs-title="Στην Αορίστου Χρόνου η δοκιμαστική περίοδος είναι έως 6 μήνες ενώ στην ορισμένου χρόνου έως το ¼ της χρονικής διάρκειάς της και σε κάθε περίπτωση έως 6 μήνες." data-bs-placement="bottom" data-tooltip-max-width="15vw" class="date-control" value="<%= safe('hmnia_lhxhs_dokimastikhs_periodoy') ? new Date(safe('hmnia_lhxhs_dokimastikhs_periodoy')).toISOString().split('T')[0] : '' %>" />
                 </div>
             </div>
+
+            <hr class="hr-style" />
 
             <div class="height-vh-0_2"></div>
 
@@ -478,6 +524,8 @@
                     </select>
                 </div>
             </div>
+
+            <hr class="hr-style" />
 
             <div class="height-vh-0_2"></div>
 

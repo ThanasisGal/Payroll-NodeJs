@@ -33,7 +33,10 @@ const yphkoothtes = require('../dropdowns/ergazomenoi/yphkoothtes');
 const eidikesKathgories = require('../dropdowns/ergazomenoi/eidikesKathgories');
 const oikogeneiakesKatastaseis = require('../dropdowns/ergazomenoi/oikogeneiakesKatastaseis');
 const trapezes = require('../dropdowns/ergazomenoi/trapezes');
+
+const logoi_peratoshs_symbashs = require('../dropdowns/ergazomenoi/logoi_peratoshs_symbashs');
 const typoiDaneismoy = require('../dropdowns/ergazomenoi/typoiDaneismoy');
+
 const kathestosApasxolhseon = require('../dropdowns/ergazomenoi/kathestosApasxolhseon');
 const sxeseisErgasias = require('../dropdowns/ergazomenoi/sxeseisErgasias');
 const syggenikesSxeseis = require('../dropdowns/ergazomenoi/syggenikesSxeseis');
@@ -126,6 +129,7 @@ const {
     KrathseisModel,
     KathestosApasxolhshsModel,
     LanguagesModel,
+    LogoiPeraioshshModel,
     NomikesMorfesModel,
     NomoiModel,
     OikogeneiakhKatastashModel,
@@ -280,6 +284,11 @@ router.get(
     buildDropdownRoute(OikogeneiakhKatastashModel, oikogeneiakesKatastaseis.options)
 );
 router.get('/ergazomenoi/trapeza', buildDropdownRoute(BanksPerCompanyModel, trapezes.options));
+
+router.get(
+    '/ergazomenoi/logos_peratoshs',
+    buildDropdownRoute(LogoiPeraioshshModel, logoi_peratoshs_symbashs.options)
+);
 router.get(
     '/ergazomenoi/typos_daneismoy',
     buildDropdownRoute(TypoiDaneismoyModel, typoiDaneismoy.options)
