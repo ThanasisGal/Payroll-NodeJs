@@ -160,6 +160,94 @@ function checkEarlyOrLateCard(context, pairNo) {
     return {};
 }
 
+// ============================================================
+// Ανακατασκευή απολογιστικού όταν υπάρχει ελλιπές ζεύγος κάρτας
+// αλλά υπάρχει προδηλωμένο ωράριο για το ίδιο ζεύγος.
+//
+// Περιπτώσεις:
+// 1) Λείπει cards_apo_ora_NN, υπάρχει cards_eos_ora_NN:
+//    apo_ora_NN_apologistika = apo_ora_NN
+//    eos_ora_NN_apologistika = cards_eos_ora_NN
+//
+// 2) Υπάρχει cards_apo_ora_NN, λείπει cards_eos_ora_NN:
+//    apo_ora_NN_apologistika = cards_apo_ora_NN
+//    eos_ora_NN_apologistika = eos_ora_NN
+//
+// Σημείωση:
+// Το cards_ores_ergasias πρέπει να είναι η ΘΕΤΙΚΗ διάρκεια του
+// ανακατασκευασμένου χρόνου εργασίας. Δηλαδή:
+//    eos - apo
+// και όχι apo - eos ή ores_ergasias - (eos - apo).
+// Αλλιώς παράγονται αρνητικά/λανθασμένα αποτελέσματα.
+// ============================================================
+function checkIncompleteCardPairAgainstDeclared(context) {
+    const { rec } = context;
+
+    const update = {
+        apo_ora_01_apologistika: rec.apo_ora_01_apologistika || '',
+        eos_ora_01_apologistika: rec.eos_ora_01_apologistika || '',
+        apo_ora_02_apologistika: rec.apo_ora_02_apologistika || '',
+        eos_ora_02_apologistika: rec.eos_ora_02_apologistika || '',
+        apo_ora_03_apologistika: rec.apo_ora_03_apologistika || '',
+        eos_ora_03_apologistika: rec.eos_ora_03_apologistika || ''
+    };
+
+    let changed = false;
+
+    for (let pairNo = 1; pairNo <= 3; pairNo++) {
+        const p = String(pairNo).padStart(2, '0');
+
+        const declaredApoField = `apo_ora_${p}`;
+        const declaredEosField = `eos_ora_${p}`;
+        const cardApoField = `cards_apo_ora_${p}`;
+        const cardEosField = `cards_eos_ora_${p}`;
+        const apoApologField = `apo_ora_${p}_apologistika`;
+        const eosApologField = `eos_ora_${p}_apologistika`;
+
+        const declaredApo = rec[declaredApoField];
+        const declaredEos = rec[declaredEosField];
+        const cardApo = rec[cardApoField];
+        const cardEos = rec[cardEosField];
+
+        const hasDeclaredApo = hasTime(declaredApo);
+        const hasDeclaredEos = hasTime(declaredEos);
+        const hasCardApo = hasTime(cardApo);
+        const hasCardEos = hasTime(cardEos);
+
+        // Χωρίς πλήρες προδηλωμένο ζεύγος δεν μπορούμε να ανακατασκευάσουμε ασφαλώς.
+        if (!hasDeclaredApo || !hasDeclaredEos) continue;
+
+        // Λείπει είσοδος κάρτας, υπάρχει έξοδος.
+        if (!hasCardApo && hasCardEos) {
+            update[apoApologField] = declaredApo;
+            update[eosApologField] = cardEos;
+            changed = true;
+            continue;
+        }
+
+        // Υπάρχει είσοδος κάρτας, λείπει έξοδος.
+        if (hasCardApo && !hasCardEos) {
+            update[apoApologField] = cardApo;
+            update[eosApologField] = declaredEos;
+            changed = true;
+        }
+    }
+
+    if (!changed) return {};
+
+    const apologistikaMinutes =
+        durationMinutesSafe(update.apo_ora_01_apologistika, update.eos_ora_01_apologistika) +
+        durationMinutesSafe(update.apo_ora_02_apologistika, update.eos_ora_02_apologistika) +
+        durationMinutesSafe(update.apo_ora_03_apologistika, update.eos_ora_03_apologistika);
+
+    return {
+        apologistiko_biblio: true,
+        ...update,
+        cards_ores_ergasias: toHours(apologistikaMinutes),
+        ores_ergasias_apologistika: toHours(apologistikaMinutes)
+    };
+}
+
 function hasTime(value) {
     return value !== null && value !== undefined && String(value).trim() !== '';
 }
@@ -1328,13 +1416,38 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
                 continue;
             }
 
-            const canBeOverwork =
+            const isOverworkZone =
                 regularDay &&
                 workedSoFarToday > overworkStartMinutes &&
                 workedSoFarToday <= overworkEndMinutes;
 
-            if (canBeOverwork) {
-                addClassifiedMinute(yperergasia, rec, minute, argiesDateSet);
+            // ============================================================
+            // Κανόνας υπερεργασίας / υπερωρίας με εβδομαδιαίο 40ωρο.
+            //
+            // Το weeklyRegularCardsMinutes έχει ήδη υπολογιστεί για ΟΛΗ την
+            // εβδομάδα του record. Για την 1η εβδομάδα της επιλεγμένης περιόδου
+            // φορτώνουμε από την προηγούμενη Κυριακή (calculationStartDate), άρα
+            // ο έλεγχος 40ώρου γίνεται σωστά και για μερική αρχική εβδομάδα.
+            //
+            // Αν η εβδομάδα ΔΕΝ ξεπερνά τις 40h:
+            //   - η 9η ώρα της ημέρας ΔΕΝ είναι υπερεργασία
+            //   - τα λεπτά πάνε σε νόμιμη υπερωρία
+            //
+            // Αν η εβδομάδα ξεπερνά τις 40h:
+            //   - η 9η ώρα παραμένει υπερεργασία
+            //   - πάνω από τη 9η ώρα πάει σε υπερωρία από τα isDailyLegalOvertime checks
+            // ============================================================
+            const weeklyRegularCardsMinutes = Number(weeklyState?.weeklyRegularCardsMinutes || 0);
+
+            const weeklyDoesNotExceed40Hours =
+                weeklyRegularCardsMinutes <= rules.weeklyOverworkThresholdMinutes;
+
+            if (isOverworkZone) {
+                if (weeklyDoesNotExceed40Hours) {
+                    addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
+                } else {
+                    addClassifiedMinute(yperergasia, rec, minute, argiesDateSet);
+                }
                 continue;
             }
 
@@ -3782,12 +3895,21 @@ class erganhController {
                 if (!weeklyStateMap.has(weekKey)) {
                     const rules = getWorkTimeRules(effectiveErgazomenos);
 
+                    const periodStartDate = new Date(apoDate);
+                    const weekStartDate = startOfWeekSundayUtc(rec.hmeromhnia);
+
+                    const isFirstPartialWeek =
+                        weekStartDate < periodStartDate && periodStartDate.getUTCDay() !== 0;
+
                     weeklyStateMap.set(weekKey, {
                         weeklyRegularCardsMinutes: 0,
                         processedRegularMinutes: 0,
                         weeklyOverworkCapMinutes: rules.weeklyOverworkCapMinutes,
                         weeklyLegalLimitMinutes: rules.weeklyLegalLimitMinutes,
-                        usedOverworkMinutes: 0
+                        usedOverworkMinutes: 0,
+
+                        // true μόνο για την 1η εβδομάδα της περιόδου όταν η περίοδος δεν ξεκινά Κυριακή
+                        isFirstPartialWeek
                     });
                 }
 
@@ -3805,6 +3927,10 @@ class erganhController {
                 Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 1));
                 Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
                 Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
+                Object.assign(
+                    preliminaryUpdate,
+                    checkIncompleteCardPairAgainstDeclared(preliminaryContext)
+                );
                 Object.assign(preliminaryUpdate, checkContinuousVsBrokenCards(preliminaryContext));
                 Object.assign(
                     preliminaryUpdate,
@@ -3850,6 +3976,7 @@ class erganhController {
                 Object.assign(update, checkEarlyOrLateCard(context, 1));
                 Object.assign(update, checkEarlyOrLateCard(context, 2));
                 Object.assign(update, checkEarlyOrLateCard(context, 3));
+                Object.assign(update, checkIncompleteCardPairAgainstDeclared(context));
 
                 Object.assign(update, checkContinuousVsBrokenCards(context));
                 Object.assign(update, checkBrokenProgramVsContinuousCards(context));
@@ -4995,7 +5122,27 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // ============================================================
     let telikoRow = 1;
 
+    // ============================================================
+    // Αποφυγή duplicate γραμμών στο Κάρτες_Τελικό
+    // Κόβει μόνο απολύτως ίδιες γραμμές.
+    // Δεν κόβει διαφορετικά ζεύγη καρτών π.χ. 10:00-14:00 και 18:00-22:00.
+    // ============================================================
+    const writtenKartesRows = new Set();
+
     function writeTelikoKartes(colA, colB, colC, colD, colE, colF, colG, colH) {
+        const dedupeKey = [
+            String(colB || '').trim(), // ΑΦΜ
+            String(colE || '').trim(), // Ημερομηνία
+            String(colF || '').trim(), // Ώρα έναρξης κάρτας
+            String(colG || '').trim() // Ώρα λήξης κάρτας
+        ].join('|');
+
+        if (writtenKartesRows.has(dedupeKey)) {
+            console.log(`[processKartesXlsx] ⚠️ Duplicate row skipped: ${dedupeKey}`);
+            return;
+        }
+
+        writtenKartesRows.add(dedupeKey);
         const row = sheetTeliko.getRow(telikoRow++);
         row.getCell(1).value = colA;
         row.getCell(2).value = colB;
@@ -5349,6 +5496,37 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
     // ============================================================
     // ✅ ΤΩΡΑ γράψε το αρχείο (με τη στήλη H συμπληρωμένη)
     // ============================================================
+
+    // ============================================================
+    // FINAL SAFETY DEDUPE στο Κάρτες_Τελικό
+    // Διαγραφή duplicate γραμμών bottom-up
+    // Βάση: ΑΦΜ + Ημερομηνία + Από + Έως
+    // ============================================================
+    const finalSeen = new Set();
+    const finalRowsToDelete = [];
+
+    sheetTeliko.eachRow((row, rowNumber) => {
+        const key = [
+            String(row.getCell(2).text || row.getCell(2).value || '').trim(),
+            String(row.getCell(5).text || row.getCell(5).value || '').trim(),
+            String(row.getCell(6).text || row.getCell(6).value || '').trim(),
+            String(row.getCell(7).text || row.getCell(7).value || '').trim()
+        ].join('|');
+
+        if (finalSeen.has(key)) {
+            finalRowsToDelete.push({ rowNumber, key });
+            return;
+        }
+
+        finalSeen.add(key);
+    });
+
+    finalRowsToDelete
+        .sort((a, b) => b.rowNumber - a.rowNumber)
+        .forEach(({ rowNumber, key }) => {
+            sheetTeliko.spliceRows(rowNumber, 1);
+        });
+
     await workbook.xlsx.writeFile(filePath);
     console.log(`[processKartesXlsx] ✅ Επεξεργασία ολοκληρώθηκε: ${filePath}`);
 

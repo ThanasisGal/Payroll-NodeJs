@@ -59,15 +59,52 @@ function isS3Url(url) {
  * @param {string} httpsUrl - HTTPS S3 URL
  * @returns {string|null} s3:// URI or null if invalid
  */
+// function convertHttpsToS3Uri(httpsUrl) {
+//     // ✅ Remove query parameters (X-Amz-Algorithm, X-Amz-Credential, etc.)
+//     const urlWithoutQuery = httpsUrl.split('?')[0];
+
+//     // Pattern 1: https://bucket.s3.region.amazonaws.com/key
+//     let match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
+//     if (match) {
+//         const bucket = match[1];
+//         const key = match[3];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     // Pattern 2: https://s3.region.amazonaws.com/bucket/key
+//     match = urlWithoutQuery.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
+//     if (match) {
+//         const bucket = match[2];
+//         const key = match[3];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     // Pattern 3: https://bucket.s3.amazonaws.com/key (no region)
+//     match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
+//     if (match) {
+//         const bucket = match[1];
+//         const key = match[2];
+//         return `s3://${bucket}/${key}`;
+//     }
+
+//     return null;
+// }
 function convertHttpsToS3Uri(httpsUrl) {
-    // ✅ Remove query parameters (X-Amz-Algorithm, X-Amz-Credential, etc.)
     const urlWithoutQuery = httpsUrl.split('?')[0];
+
+    const decodeKey = (value) => {
+        try {
+            return decodeURIComponent(value);
+        } catch {
+            return value;
+        }
+    };
 
     // Pattern 1: https://bucket.s3.region.amazonaws.com/key
     let match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3[.-]([\w-]+)\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
-        const key = match[3];
+        const key = decodeKey(match[3]);
         return `s3://${bucket}/${key}`;
     }
 
@@ -75,15 +112,15 @@ function convertHttpsToS3Uri(httpsUrl) {
     match = urlWithoutQuery.match(/^https?:\/\/s3[.-]([\w-]+)\.amazonaws\.com\/([^/]+)\/(.+)$/);
     if (match) {
         const bucket = match[2];
-        const key = match[3];
+        const key = decodeKey(match[3]);
         return `s3://${bucket}/${key}`;
     }
 
-    // Pattern 3: https://bucket.s3.amazonaws.com/key (no region)
+    // Pattern 3: https://bucket.s3.amazonaws.com/key
     match = urlWithoutQuery.match(/^https?:\/\/([^.]+)\.s3\.amazonaws\.com\/(.+)$/);
     if (match) {
         const bucket = match[1];
-        const key = match[2];
+        const key = decodeKey(match[2]);
         return `s3://${bucket}/${key}`;
     }
 
@@ -339,9 +376,34 @@ async function downloadS3UriToTempFile(s3Url, companyInUse) {
     // =====================================================================
     // PRODUCTION: Download from AWS S3
     // =====================================================================
-    const resp = await s3Client.send(
-        new GetObjectCommand({ Bucket: parsed.bucket, Key: parsed.key })
-    );
+    let resp;
+
+    try {
+        resp = await s3Client.send(
+            new GetObjectCommand({
+                Bucket: parsed.bucket,
+                Key: parsed.key
+            })
+        );
+    } catch (error) {
+        if (error.name !== 'NoSuchKey') {
+            throw error;
+        }
+
+        const encodedKey = encodeURI(parsed.key).replace(/#/g, '%23');
+
+        console.warn('[S3-DOWNLOAD] NoSuchKey with decoded key. Retrying with encoded key...', {
+            decodedKey: parsed.key,
+            encodedKey
+        });
+
+        resp = await s3Client.send(
+            new GetObjectCommand({
+                Bucket: parsed.bucket,
+                Key: encodedKey
+            })
+        );
+    }
 
     if (!resp?.Body) throw new Error('S3 GetObject: empty body');
 
