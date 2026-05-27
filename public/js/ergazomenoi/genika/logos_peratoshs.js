@@ -2,24 +2,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const lhxhInput = document.getElementById('hmeromhnia_lhxhs_symbashs');
     const apoxorhshInput = document.getElementById('hmeromhnia_apoxorhshs');
     const logosSelect = document.getElementById('logos_peratoshs');
+    const logosHidden = document.getElementById('logos_peratoshs_stathera');
 
     function hasValue(el) {
         return !!String(el?.value ?? '').trim();
     }
 
+    function clearLogosPeratoshs() {
+        if (logosHidden) logosHidden.value = '';
+
+        if (logosSelect?.tomselect) {
+            logosSelect.tomselect.clear(true);
+        } else if (logosSelect) {
+            logosSelect.value = '';
+        }
+    }
+
     function setLogosEnabled(enabled) {
         if (!logosSelect) return;
 
-        if (logosSelect.tomselect) {
-            if (enabled) {
+        if (enabled) {
+            if (logosSelect.tomselect) {
                 logosSelect.tomselect.enable();
             } else {
-                logosSelect.tomselect.clear(true);
-                logosSelect.tomselect.disable();
+                logosSelect.disabled = false;
             }
         } else {
-            logosSelect.disabled = !enabled;
-            if (!enabled) logosSelect.value = '';
+            clearLogosPeratoshs();
+
+            if (logosSelect.tomselect) {
+                logosSelect.tomselect.disable();
+            } else {
+                logosSelect.disabled = true;
+            }
         }
     }
 
@@ -30,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     [lhxhInput, apoxorhshInput].forEach((input) => {
         if (!input) return;
+
+        input.addEventListener('input', clearLogosPeratoshs);
+        input.addEventListener('change', clearLogosPeratoshs);
 
         input.addEventListener('input', toggleLogosPeratoshs);
         input.addEventListener('change', toggleLogosPeratoshs);
@@ -43,7 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!clearBtn) return;
 
-        setTimeout(toggleLogosPeratoshs, 0);
+        setTimeout(() => {
+            clearLogosPeratoshs();
+            toggleLogosPeratoshs();
+        }, 0);
     });
 
     toggleLogosPeratoshs();
