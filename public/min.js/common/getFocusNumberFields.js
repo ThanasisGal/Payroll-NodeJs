@@ -1,1 +1,1 @@
-document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x27number\x27]')['forEach'](y=>{y['addEventListener']('focus',function(){this['select']();}),y['addEventListener']('blur',function(){''===this['value']&&(this['value']='0');});});});
+document['addEventListener']('DOMContentLoaded',function(){document['querySelectorAll']('input[type=\x27number\x27]')['forEach'](g=>{g['addEventListener']('focus',function(){this['select']();}),g['addEventListener']('blur',function(){''===this['value']&&(this['value']='0');});});});

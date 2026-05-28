@@ -7,9 +7,7 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
-
 const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
-const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generator');
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 
 const Models_A = require('../../models/stathera_arxeia');
@@ -1392,35 +1390,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const nomimiYperoria = emptyClassifiedMinutes();
     const paranomiYperoria = emptyClassifiedMinutes();
 
-    // ============================================================
-    // Διάστημα νόμιμης υπερωρίας για ΕΡΓΑΝΗ.
-    //
-    // Κρατάμε ΜΟΝΟ τα λεπτά που τελικά ταξινομούνται ως νόμιμη
-    // υπερωρία (όχι υπερεργασία και όχι παράνομη υπερωρία).
-    //
-    // Παράδειγμα:
-    // Κάρτες 13:00 - 02:30
-    // 13:00 - 21:00 = κανονική εργασία
-    // 21:00 - 22:00 = υπερεργασία
-    // 22:00 - 01:00 = νόμιμη υπερωρία
-    // 01:00 - 02:30 = παράνομη υπερωρία
-    //
-    // Άρα:
-    // apo_ora_yperories = 22:00
-    // eos_ora_yperories = 01:00
-    // ============================================================
-    let firstLegalOvertimeMinute = null;
-    let totalLegalOvertimeMinutes = 0;
-
-    const addLegalOvertimeMinute = (minute) => {
-        if (firstLegalOvertimeMinute === null) {
-            firstLegalOvertimeMinute = minute;
-        }
-
-        totalLegalOvertimeMinutes++;
-        addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
-    };
-
     if (dailyCardsMinutes <= 0) {
         return {
             ores_prostheths_ergasias_apologistika: 0,
@@ -1438,11 +1407,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             ores_paranomhs_yperorias_apologistika: 0,
             ores_paranomhs_yperorias_nyxtas_apologistika: 0,
             ores_paranomhs_yperorias_argion_apologistika: 0,
-            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
-
-            // Δεν υπάρχουν νόμιμες υπερωρίες, άρα καθαρίζουμε τυχόν παλιές τιμές.
-            apo_ora_yperories: '',
-            eos_ora_yperories: ''
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0
         };
     }
 
@@ -1514,11 +1479,11 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             const weeklyRegularCardsMinutes = Number(weeklyState?.weeklyRegularCardsMinutes || 0);
 
             const weeklyDoesNotExceed40Hours =
-                weeklyRegularCardsMinutes < rules.weeklyOverworkThresholdMinutes;
+                weeklyRegularCardsMinutes <= rules.weeklyOverworkThresholdMinutes;
 
             if (isOverworkZone) {
                 if (weeklyDoesNotExceed40Hours) {
-                    addLegalOvertimeMinute(minute);
+                    addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
                 } else {
                     addClassifiedMinute(yperergasia, rec, minute, argiesDateSet);
                 }
@@ -1526,7 +1491,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
             }
 
             if (isDailyLegalOvertime || isWeeklyLegalOvertime) {
-                addLegalOvertimeMinute(minute);
+                addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
                 continue;
             }
 
@@ -1546,40 +1511,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
         weeklyState.processedRegularMinutes += regularWorkedSoFarToday;
     }
 
-    // ============================================================
-    // Ώρες νόμιμης υπερωρίας για ΕΡΓΑΝΗ.
-    //
-    // Αν το διάλειμμα είναι ΕΚΤΟΣ ωραρίου, ο εργαζόμενος πρέπει να
-    // το καλύψει δουλεύοντας ισόχρονα. Επειδή οι υπολογισμοί buckets
-    // γίνονται ήδη πάνω σε χρόνο όπου αφαιρέθηκε το εξωτερικό διάλειμμα,
-    // μετακινούμε ΚΑΙ την έναρξη ΚΑΙ τη λήξη της νόμιμης υπερωρίας
-    // κατά τα λεπτά του διαλείμματος.
-    //
-    // Παράδειγμα:
-    // Κάρτες 13:09 - 23:58, διάλειμμα εκτός 30'
-    // Κανονική λήξη 21:09 → κάλυψη διαλείμματος έως 21:39
-    // Νόμιμη υπερωρία: 21:39 - 23:58
-    //
-    // Αν το διάλειμμα είναι ΕΝΤΟΣ ωραρίου, δεν προσθέτουμε τίποτα.
-    // ============================================================
-    const legalOvertimeBreakOffsetMinutes = shouldSubtractExternalBreak(rec, ergazomenos)
-        ? getBreakOffsetMinutes(ergazomenos)
-        : 0;
-
-    const legalOvertimeStartTime =
-        totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-            ? minutesToTimeSafe(firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes)
-            : '';
-
-    const legalOvertimeEndTime =
-        totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-            ? minutesToTimeSafe(
-                  firstLegalOvertimeMinute +
-                      legalOvertimeBreakOffsetMinutes +
-                      totalLegalOvertimeMinutes
-              )
-            : '';
-
     return {
         ores_prostheths_ergasias_apologistika: toHours(prosthetiMinutes),
 
@@ -1596,12 +1527,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
         ores_paranomhs_yperorias_apologistika: toHours(paranomiYperoria.normal),
         ores_paranomhs_yperorias_nyxtas_apologistika: toHours(paranomiYperoria.night),
         ores_paranomhs_yperorias_argion_apologistika: toHours(paranomiYperoria.holiday),
-        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(paranomiYperoria.holidayNight),
-
-        // Ώρα έναρξης/λήξης ΜΟΝΟ της νόμιμης υπερωρίας.
-        // Δεν περιλαμβάνει υπερεργασία ούτε παράνομη υπερωρία.
-        apo_ora_yperories: legalOvertimeStartTime,
-        eos_ora_yperories: legalOvertimeEndTime
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(paranomiYperoria.holidayNight)
     };
 }
 
@@ -2463,6 +2389,7 @@ class erganhController {
         const pdfFilePath = path.join(__dirname, '..', '..', '..', 'public', pdfUrl);
         try {
             await fsPromises.unlink(pdfFilePath);
+            console.log('Το PDF αρχείο διαγράφηκε επιτυχώς.');
             res.json({ success: true, message: 'Το PDF διαγράφηκε επιτυχώς' });
         } catch (err) {
             console.error('Σφάλμα κατά τη διαγραφή του PDF αρχείου:', err);
@@ -2614,6 +2541,10 @@ class erganhController {
             if (_periodForMonth && _periodForMonth.perigrafh !== req.session.periodInUseDescr) {
                 // Ο μήνας του apo_hmeromhnia ΔΕΝ είναι ίδιος με την περίοδο της session
                 periodInUseDescr = _periodForMonth.perigrafh;
+                console.log(
+                    `[lhpshOrarionApoErganh] ℹ️ Χρήση periodInUseDescr από PeriodsModel: "${periodInUseDescr}" ` +
+                        `(session ήταν: "${req.session.periodInUseDescr}")`
+                );
             }
 
             // 3. savePath
@@ -4733,6 +4664,8 @@ class erganhController {
                 eos_hmeromhnia
             });
 
+            console.log('🔍 WTO result:', result);
+
             const xmlPath = result.s3Url.replace('file://', '');
 
             const erganhPasswordDoc = await PasswordsModel.findOne({
@@ -4761,6 +4694,8 @@ class erganhController {
                 }
             );
 
+            console.log('📡 WTO uploadResult:', uploadResult);
+
             return res.status(200).json({
                 success: true,
                 message: uploadResult?.success
@@ -4778,180 +4713,6 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: error.message || 'Αποτυχία δημιουργίας XML απολογιστικού πίνακα.'
-            });
-        }
-    };
-
-    static generateWTOApologistikoYperorion = async (req, res) => {
-        try {
-            const { ypokatasthmata, ypokatasthmata_stathera, apo_hmeromhnia, eos_hmeromhnia } =
-                req.body || {};
-
-            const selectedYpokatasthma = ypokatasthmata_stathera || ypokatasthmata || '';
-
-            if (!selectedYpokatasthma || !apo_hmeromhnia || !eos_hmeromhnia) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Λείπουν υποχρεωτικά πεδία: παράρτημα / από / έως ημερομηνία.'
-                });
-            }
-
-            const team = req.session?.userTeam || req.session?.team;
-            const companyInUse = req.session?.companyInUse;
-            const companyKodikos =
-                req.session?.companyKodikos ||
-                req.session?.companykod ||
-                req.session?.company_kod ||
-                req.session?.companyKod ||
-                '';
-
-            const userId = req.session?.user?._id?.toString() || req.session?.userId?.toString();
-
-            const company = await CompaniesModel.findOne({
-                _id: companyInUse
-            }).lean();
-
-            if (!company) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Δεν βρέθηκε η εταιρεία στο session.'
-                });
-            }
-
-            const finalCompanyKodikos =
-                companyKodikos || company?.kod || company?.kodikos || company?.companykod || '';
-
-            const ypokatasthma = await YpokatasthmataModel.findOne({
-                companykod_object: companyInUse,
-                kodikos: selectedYpokatasthma
-            }).lean();
-
-            const fromDate = new Date(`${apo_hmeromhnia}T00:00:00.000Z`);
-            const toDate = new Date(`${eos_hmeromhnia}T23:59:59.999Z`);
-
-            const rows = await ProdhlomenaOrariaModel.find({
-                team,
-                company_kod: companyInUse,
-                ypokatasthma: selectedYpokatasthma,
-                hmeromhnia: mongoose.trusted({
-                    $gte: fromDate,
-                    $lte: toDate
-                }),
-                apo_ora_yperories: mongoose.trusted({ $nin: [null, '', '--:--'] }),
-                eos_ora_yperories: mongoose.trusted({ $nin: [null, '', '--:--'] })
-            })
-                .sort({ hmeromhnia: 1, kodikos: 1 })
-                .lean();
-
-            if (!rows.length) {
-                return res.status(200).json({
-                    success: false,
-                    message:
-                        'Δεν βρέθηκαν εγγραφές υπερωριών με συμπληρωμένα apo_ora_yperories / eos_ora_yperories για το επιλεγμένο διάστημα.'
-                });
-            }
-
-            const employeeCodes = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
-
-            const employees = await ErgazomenoiModel.find({
-                team,
-                company_kod: companyInUse,
-                kodikos: mongoose.trusted({ $in: employeeCodes })
-            })
-                .select('kodikos afm afm_ergazomenoy eponymo onoma')
-                .lean();
-
-            const employeeByKodikos = new Map(
-                employees.map((emp) => [String(emp.kodikos).trim(), emp])
-            );
-
-            const enrichedRows = rows.map((row) => {
-                const emp = employeeByKodikos.get(String(row.kodikos).trim()) || {};
-
-                return {
-                    ...row,
-                    afm: emp.afm || emp.afm_ergazomenoy || row.afm || row.afm_ergazomenoy || '',
-                    eponymo: emp.eponymo || row.eponymo || row.eponymo_ergazomenoy || '',
-                    onoma: emp.onoma || row.onoma || row.onoma_ergazomenoy || ''
-                };
-            });
-
-            const xmlResult = await generateWTOOvXML(company, ypokatasthma, enrichedRows, {
-                team,
-                companyKodikos: finalCompanyKodikos,
-                companyDescription:
-                    req.session?.companyDescription ||
-                    req.session?.companyDescr ||
-                    company?.perigrafh ||
-                    company?.eponymia ||
-                    company?.description ||
-                    'UNKNOWN',
-                ypokatasthma: selectedYpokatasthma,
-                apo_hmeromhnia,
-                eos_hmeromhnia,
-                comments: ''
-            });
-
-            const credentials = await PasswordsModel.findOne({
-                team,
-                companykod_object: companyInUse,
-                kodikos: '0002'
-            }).lean();
-
-            if (!credentials?.username || !credentials?.password) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        'Το XML δημιουργήθηκε, αλλά δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002.',
-                    filename: xmlResult.filename,
-                    s3Key: xmlResult.s3Key,
-                    s3Url: xmlResult.s3Url
-                });
-            }
-
-            let xmlPath =
-                xmlResult.localPath || xmlResult.filePath || xmlResult.fullPath || xmlResult.s3Url;
-
-            if (!xmlPath) {
-                throw new Error('Δεν βρέθηκε local filesystem path για το XML.');
-            }
-
-            // μετατροπή file:/// -> local filesystem path
-            if (xmlPath.startsWith('file://')) {
-                xmlPath = xmlPath.replace('file://', '');
-            }
-
-            const uploadResult = await uploadE3ToErganh(
-                companyInUse,
-                xmlPath,
-                userId,
-                {
-                    username: credentials.username,
-                    password: credentials.password
-                },
-                {
-                    xmlType: 'wto_yperories_apologistiko',
-                    isPermanent: false
-                }
-            );
-
-            return res.status(uploadResult.success ? 200 : 400).json({
-                success: uploadResult.success,
-                message: uploadResult.success
-                    ? 'Το XML απολογιστικού πίνακα υπερωριών δημιουργήθηκε και ανέβηκε προσωρινά στο ΕΡΓΑΝΗ.'
-                    : uploadResult.userMessage ||
-                      'Το XML δημιουργήθηκε αλλά η αποστολή στο ΕΡΓΑΝΗ απέτυχε.',
-                filename: xmlResult.filename,
-                s3Key: xmlResult.s3Key,
-                s3Url: xmlResult.s3Url,
-                erganh: uploadResult
-            });
-        } catch (error) {
-            console.error('[generateWTOApologistikoYperorion] ❌', error);
-
-            return res.status(500).json({
-                success: false,
-                message: error.message || 'Σφάλμα κατά τη δημιουργία/αποστολή XML υπερωριών.'
             });
         }
     };
@@ -5054,8 +4815,10 @@ async function downloadOrariaToBuffer(username, password, fromDate, toDate, para
             if (request.method() === 'POST') {
                 const response = await route.fetch();
                 const contentType = response.headers()['content-type'] || '';
+                console.log(`[INTERCEPT] content-type: ${contentType}`);
 
                 const body = await response.body();
+                console.log(`[INTERCEPT] body size: ${body.length}`);
 
                 // Αν είναι Excel κράτησέ το, αλλιώς άσε το να περάσει κανονικά
                 if (
@@ -5063,6 +4826,7 @@ async function downloadOrariaToBuffer(username, password, fromDate, toDate, para
                     contentType.includes('application/octet-stream') ||
                     contentType.includes('excel')
                 ) {
+                    console.log('[INTERCEPT] ✅ Excel response πιάστηκε!');
                     excelBuffer = body;
                 }
 
@@ -5088,6 +4852,8 @@ async function downloadOrariaToBuffer(username, password, fromDate, toDate, para
         if (!excelBuffer) {
             throw new Error('Δεν ήρθε Excel response μέσα σε 30 δευτερόλεπτα');
         }
+
+        console.log(`[DEBUG] Excel buffer size: ${excelBuffer.length}`);
 
         // ============================================================
         // 5) BUFFER
@@ -5225,6 +4991,10 @@ async function processOrariaXlsx(filePath, sessionTeam, sessionYearInUse) {
             });
             newRow.commit();
         });
+
+        console.log(
+            `[processKartesXlsx] 🗑️ Διαγράφηκαν ${rowsToDelete.size} γραμμές από Κάρτες_Τελικό`
+        );
     }
 
     await workbook.xlsx.writeFile(filePath);
@@ -5569,6 +5339,7 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
         ].join('|');
 
         if (writtenKartesRows.has(dedupeKey)) {
+            console.log(`[processKartesXlsx] ⚠️ Duplicate row skipped: ${dedupeKey}`);
             return;
         }
 
@@ -5852,6 +5623,10 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
             });
             newRow.commit();
         });
+
+        console.log(
+            `[processKartesXlsx] 🗑️ Διαγράφηκαν ${rowsToDelete.size} γραμμές από Κάρτες_Τελικό`
+        );
     }
 
     // ============================================================
@@ -5916,6 +5691,8 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
             row.commit();
         }
     }
+
+    console.log('[processKartesXlsx] ✅ Στήλη H (11ώρο ανάπαυσης) υπολογίστηκε');
 
     // ============================================================
     // ✅ ΤΩΡΑ γράψε το αρχείο (με τη στήλη H συμπληρωμένη)
@@ -6257,6 +6034,7 @@ async function downloadKartesXlsxToBuffer(
                     contentType.includes('application/octet-stream') ||
                     contentType.includes('excel')
                 ) {
+                    console.log('[KARTES-INTERCEPT] ✅ Excel response πιάστηκε!');
                     excelBuffer = body;
                 }
 

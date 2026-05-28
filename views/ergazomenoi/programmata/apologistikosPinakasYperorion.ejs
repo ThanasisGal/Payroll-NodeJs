@@ -1,0 +1,115 @@
+<br> <br> <br>                
+<form class="formRadius" id="transferForm">
+    
+    <input type="hidden" name="_csrf" id="_csrf" value="<%= csrfToken %>">
+    
+    <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
+
+        <div class="card-header p-0 height-rem-3_5">
+            <label class="headers-content">
+                Δημιουργία / Αποστολή Απολογιστικού Πίνακα Υπερωριών
+            </label>
+        </div>
+
+        <div class="card-body overflow-auto flex-grow-1 height-vh-31 bg-white">
+            <% const safe = (k) => (rec && rec[k]) || ''; %>
+
+            <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
+            <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
+            <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
+
+            </br>
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="ypokatasthmata" class="col-form-label label-font-size-smaller field-required">
+                        Παράρτημα
+                    </label>
+                </div>
+
+                <input
+                    type="hidden"
+                    name="ypokatasthmata_stathera"
+                    id="ypokatasthmata_stathera"
+                    class="form-control input-contents"
+                    value="<%= safe('ypokatasthmata_stathera') %>"
+                    readonly
+                />
+
+                <div class="col-9-5 mt-2">
+                    <select
+                        id="ypokatasthmata"
+                        name="ypokatasthmata"
+                        class="tom-dropdown selectpicker-dropdown-normal left-align"
+                        aria-label="Υποκατάστημα"
+                        data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
+                        single
+                        data-target-input="ypokatasthmata_stathera"
+                        data-preselect="ypokatasthmata_stathera"
+                        data-preload-all="true"
+                        data-pad-length="4"
+                        data-xrhsh-related="false"
+                        data-team-related="false"
+                        data-company-related="false"
+                        data-mhnas-related="false"
+                        placeholder="Αναζήτηση Υποκαταστήματος">
+                    </select>
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center mb-4"></div>
+
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">
+                        Από Ημερομηνία
+                    </label>
+                </div>
+                <div class="col-2-5">
+                    <input type="date" name="apo_hmeromhnia" id="apo_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.apo ? new Date(periodRec.apo).toISOString().slice(0, 10) : safe('apo_hmeromhnia') %>" required />
+                </div>
+            </div>
+
+            <div class="row form-group g-3 align-items-center mb-4"></div>
+
+            <div class="row form-group g-3 align-items-center mb-3">
+                <div class="col-2 left-align">
+                    <label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">
+                        Έως Ημερομηνία
+                    </label>
+                </div>
+                <div class="col-2-5">
+                    <input type="date" name="eos_hmeromhnia" id="eos_hmeromhnia" class="date-control" value="<%= periodRec && periodRec.eos ? new Date(periodRec.eos).toISOString().slice(0, 10) : safe('eos_hmeromhnia') %>" required />
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer">
+            <div class="d-inline-block d-flex cardFooter01">
+                <button 
+                    type="button" 
+                    class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" 
+                    name="sendApologistikoButton" 
+                    id="sendApologistikoButton">
+                    <i class="bi bi-send"></i> Αποστολή
+                </button>
+                        
+                <a class="btn btn-brown buttons-content rounded-4 mt-2 w-20" href="/mainapp">
+                    <i class="bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+                <button type="button" class="btn btn-toTop scroll-to-top">
+                    <i class="bi bi-chevron-double-up"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<% const isProduction = NODE_ENV === 'production'; %>
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
+<script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
+<script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/sendApologistikoYperorionButton') %>"></script>

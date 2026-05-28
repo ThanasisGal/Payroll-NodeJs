@@ -398,6 +398,8 @@ const ProdhlomenaOrariaSchema = new Schema(
         astheneia_apologistika: { type: Boolean, default: false },
         kyriakes_apologistika: { type: Boolean, default: false },
         ores_apoysias_apologistika: { type: Number, default: 0 },
+        apo_ora_yperories: { type: String },
+        eos_ora_yperories: { type: String },
         is_locked: { type: Boolean, default: false },
         locked_by: { type: String, trim: true },
         locked_at: { type: Date },

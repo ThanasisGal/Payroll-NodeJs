@@ -411,7 +411,11 @@ router.post(
     checkAuth,
     erganhController.generateWTOApologistiko
 );
-
+router.post(
+    '/ergazomenoi/programmata/wtoApologistikoYperorion',
+    checkAuth,
+    erganhController.generateWTOApologistikoYperorion
+);
 router.post(
     '/ergazomenoi/programmata/downloadCards',
     checkAuth,
@@ -434,6 +438,11 @@ router.get(
     '/ergazomenoi/programmata/apologistikosPinakasOrarion',
     checkAuth,
     erganhController.mainApologistikosPinakasForm
+);
+router.get(
+    '/ergazomenoi/programmata/apologistikosPinakasYperorion',
+    checkAuth,
+    erganhController.mainApologistikosPinakasYperorionForm
 );
 
 // ============================================================================
