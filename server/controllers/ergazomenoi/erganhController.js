@@ -4913,13 +4913,26 @@ class erganhController {
                 xmlResult.localPath || xmlResult.filePath || xmlResult.fullPath || xmlResult.s3Url;
 
             if (!xmlPath) {
-                throw new Error('Δεν βρέθηκε local filesystem path για το XML.');
+                throw new Error('Δεν βρέθηκε filesystem path για το XML.');
             }
 
-            // μετατροπή file:/// -> local filesystem path
+            // file:/// -> local path
             if (xmlPath.startsWith('file://')) {
                 xmlPath = xmlPath.replace('file://', '');
             }
+
+            // S3 URL -> local uploads/s3-mock path
+            if (xmlPath.startsWith('http')) {
+                const xmlsIndex = xmlPath.indexOf('/xmls/');
+
+                if (xmlsIndex !== -1) {
+                    const relativePath = xmlPath.substring(xmlsIndex + 1);
+
+                    xmlPath = path.join(process.cwd(), 'uploads', 's3-mock', relativePath);
+                }
+            }
+
+            console.log('[WTO_OV] FINAL LOCAL XML PATH:', xmlPath);
 
             const uploadResult = await uploadE3ToErganh(
                 companyInUse,
