@@ -407,6 +407,12 @@ router.get(
     erganhController.mainLhpshOrarionApoKartesForm
 );
 router.post(
+    '/ergazomenoi/programmata/wtoApologistiko',
+    checkAuth,
+    erganhController.generateWTOApologistiko
+);
+
+router.post(
     '/ergazomenoi/programmata/downloadCards',
     checkAuth,
     erganhController.lhpshOrarionApoKartes

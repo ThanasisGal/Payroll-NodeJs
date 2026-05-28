@@ -1,6 +1,8 @@
 <br> <br> <br>                
 <form class="formRadius" id="transferForm">
-
+    
+    <input type="hidden" name="_csrf" id="_csrf" value="<%= csrfToken %>">
+    
     <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 overflow-hidden">
 
         <div class="card-header p-0 height-rem-3_5">
@@ -86,8 +88,8 @@
                 <button 
                     type="button" 
                     class="btn btn-brown rounded-4 mt-2 w-20 buttons-content <% if (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) { %>disabled-link<% } %>" 
-                    name="downloadScheduleButton" 
-                    id="downloadScheduleButton">
+                    name="sendApologistikoButton" 
+                    id="sendApologistikoButton">
                     <i class="bi bi-download"></i> Λήψη
                 </button>
                         
@@ -110,4 +112,4 @@
 <script src="<%= script('common/toggleLabelErgazomenon') %>"></script>
 <script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
 <script src="<%= script('ergazomenoi/genika/clearableInputs') %>"></script>
-<script src="<%= script('ergazomenoi/programmata/downloadScheduleButton') %>"></script>
+<script src="<%= script('ergazomenoi/programmata/sendApologistikoButton') %>"></script>

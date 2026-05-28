@@ -11665,3 +11665,13 @@ body.loader-active > *:not(.app-loader) {
     box-shadow: 0 8px 12px -6px rgba(80, 85, 90, 0.8);
     margin-bottom: 0.35rem;
 }
+
+.swal-wide-text {
+    max-width: 42rem !important;
+}
+
+.swal-wide-text .swal2-html-container {
+    word-break: break-word;
+    text-align: left;
+    font-size: 0.9rem;
+}

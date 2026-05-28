@@ -217,18 +217,51 @@ function checkIncompleteCardPairAgainstDeclared(context) {
         // Χωρίς πλήρες προδηλωμένο ζεύγος δεν μπορούμε να ανακατασκευάσουμε ασφαλώς.
         if (!hasDeclaredApo || !hasDeclaredEos) continue;
 
-        // Λείπει είσοδος κάρτας, υπάρχει έξοδος.
+        // Διάρκεια του συγκεκριμένου προδηλωμένου ζεύγους.
+        // Παράδειγμα 16:00 - 00:00 => 8 ώρες.
+        const declaredPairMinutes = durationMinutesSafe(declaredApo, declaredEos);
+        if (declaredPairMinutes <= 0) continue;
+
+        // ============================================================
+        // Λείπει η είσοδος κάρτας, υπάρχει έξοδος.
+        //
+        // apo_ora_NN_apologistika = cards_eos_ora_NN - προδηλωμένη διάρκεια
+        // eos_ora_NN_apologistika = cards_eos_ora_NN
+        //
+        // Παράδειγμα:
+        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
+        // Κάρτα: - 23:58
+        // Απολογιστικό: 15:58 - 23:58
+        // ============================================================
         if (!hasCardApo && hasCardEos) {
-            update[apoApologField] = declaredApo;
+            const cardEosMinutes = timeToMinutesSafe(cardEos);
+            if (cardEosMinutes === null) continue;
+
+            update[apoApologField] = minutesToTimeSafe(cardEosMinutes - declaredPairMinutes);
             update[eosApologField] = cardEos;
+
             changed = true;
             continue;
         }
 
-        // Υπάρχει είσοδος κάρτας, λείπει έξοδος.
+        // ============================================================
+        // Υπάρχει είσοδος κάρτας, λείπει η έξοδος.
+        //
+        // apo_ora_NN_apologistika = cards_apo_ora_NN
+        // eos_ora_NN_apologistika = cards_apo_ora_NN + προδηλωμένη διάρκεια
+        //
+        // Παράδειγμα:
+        // Προδηλωμένο 16:00 - 00:00 = 8 ώρες
+        // Κάρτα: 16:02 -
+        // Απολογιστικό: 16:02 - 00:02
+        // ============================================================
         if (hasCardApo && !hasCardEos) {
+            const cardApoMinutes = timeToMinutesSafe(cardApo);
+            if (cardApoMinutes === null) continue;
+
             update[apoApologField] = cardApo;
-            update[eosApologField] = declaredEos;
+            update[eosApologField] = minutesToTimeSafe(cardApoMinutes + declaredPairMinutes);
+
             changed = true;
         }
     }
@@ -243,6 +276,10 @@ function checkIncompleteCardPairAgainstDeclared(context) {
     return {
         apologistiko_biblio: true,
         ...update,
+
+        // Για ελλιπές ζεύγος κάρτας, αφού ανακατασκευάζουμε απολογιστικό
+        // ίσης διάρκειας με το προδηλωμένο ζεύγος, οι ώρες καρτών της ημέρας
+        // δεν πρέπει να μένουν 0.00 ούτε να γίνονται αρνητικές.
         cards_ores_ergasias: toHours(apologistikaMinutes),
         ores_ergasias_apologistika: toHours(apologistikaMinutes)
     };
@@ -4498,23 +4535,78 @@ class erganhController {
         }
     };
 
-    // static showErganhCredentials = async (req, res) => {
-    //     try {
-    //         const creds = req.session.erganhCredentials;
+    static generateWTOApologistiko = async (req, res) => {
+        try {
+            const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
 
-    //         if (!creds) {
-    //             return res.status(404).send('Δεν βρέθηκαν προσωρινά credentials ΕΡΓΑΝΗ.');
-    //         }
+            const { ypokatasthmata, ypokatasthmata_stathera, apo_hmeromhnia, eos_hmeromhnia } =
+                req.body || {};
 
-    //         return res.render('ergazomenoi/erganh/credentials', {
-    //             username: creds.username,
-    //             password: creds.password
-    //         });
-    //     } catch (err) {
-    //         console.error(err);
-    //         return res.status(500).send('Σφάλμα εμφάνισης credentials ΕΡΓΑΝΗ.');
-    //     }
-    // };
+            const selectedYpokatasthma = ypokatasthmata_stathera || ypokatasthmata || '';
+
+            if (!selectedYpokatasthma || !apo_hmeromhnia || !eos_hmeromhnia) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν υποχρεωτικά πεδία: παράρτημα / από / έως ημερομηνία.'
+                });
+            }
+
+            const companyKodikos = req.session?.companyInUse || req.session?.companyKodikos;
+            const team = req.session?.userTeam || req.session?.team;
+
+            const company = await CompaniesModel.findOne({
+                kod: companyKodikos
+            }).lean();
+
+            const ypokatasthma = await YpokatasthmataModel.findOne({
+                company: companyKodikos,
+                kodikos: selectedYpokatasthma
+            }).lean();
+
+            const rows = await ProdhlomenaOrariaModel.find({
+                team,
+                company_kod: companyKodikos,
+                ypokatasthma: selectedYpokatasthma,
+                apologistiko_biblio: true,
+                hmeromhnia: mongoose.trusted({
+                    $gte: new Date(apo_hmeromhnia),
+                    $lte: new Date(eos_hmeromhnia)
+                })
+            })
+                .sort({ hmeromhnia: 1, kodikos: 1 })
+                .lean();
+
+            if (!rows.length) {
+                return res.status(200).json({
+                    success: false,
+                    message:
+                        'Δεν βρέθηκαν εγγραφές με απολογιστικό βιβλίο για το επιλεγμένο διάστημα.'
+                });
+            }
+
+            const result = await generateWTOXML(company, ypokatasthma, rows, {
+                ypokatasthma: selectedYpokatasthma,
+                apo_hmeromhnia,
+                eos_hmeromhnia
+            });
+
+            console.log(result.xml);
+
+            return res.status(200).json({
+                success: true,
+                message: 'Το XML απολογιστικού πίνακα δημιουργήθηκε επιτυχώς.',
+                xml: result.xml,
+                filename: result.filename
+            });
+        } catch (error) {
+            console.error('❌ [generateWTOApologistiko] Error:', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Αποτυχία δημιουργίας XML απολογιστικού πίνακα.'
+            });
+        }
+    };
 }
 
 async function downloadOrariaToBuffer(username, password, fromDate, toDate, pararthma) {

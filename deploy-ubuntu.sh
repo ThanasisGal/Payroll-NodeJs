@@ -735,6 +735,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/programmata/downloadCardsButton.js"
     "public/js/ergazomenoi/programmata/calcApasxolhseisPeriodoy.js"
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js"
+    "public/js/ergazomenoi/programmata/sendApologistikoButton.js"
 )
 
 declare -a no_obfuscate=(

@@ -13,7 +13,7 @@ router.post('/efka/apd/open', async (req, res) => {
         const { headless, keepSession, ttlMs } = req.body || {};
 
         const result = await loadFromApd({
-            headless: typeof headless === 'boolean' ? headless : undefined,
+            headless: typeof headless === 'boolean' ? headless : true,
             keepSession: typeof keepSession === 'boolean' ? keepSession : undefined,
             ttlMs: typeof ttlMs === 'number' ? ttlMs : undefined
         });
