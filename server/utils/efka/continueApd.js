@@ -406,8 +406,7 @@ async function continueApd(sessionId, opts = {}) {
 
     const apdPage = s.apdPage;
     const isDocker = String(process.env.DOCKER || '').toLowerCase() === 'true';
-    const timeoutMs =
-        typeof opts.timeoutMs === 'number' ? opts.timeoutMs : isDocker ? 60000 : 15000;
+    const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 60000;
 
     const waitForSelector = typeof opts.waitForSelector === 'string' ? opts.waitForSelector : null;
     const closeAfter = !!opts.closeAfter;
@@ -504,12 +503,39 @@ async function continueApd(sessionId, opts = {}) {
         }
 
         // Περιμένουμε είτε να εμφανιστεί ο πίνακας υποβολών, είτε να έχουμε ήδη πάει στο apdCommon (input#ama)
+        // await Promise.race([
+        //     apdPage.waitForSelector('#submissionTable_data', {
+        //         timeout: timeoutMs,
+        //         state: 'attached'
+        //     }),
+        //     apdPage.waitForSelector('input#ama', { timeout: timeoutMs, state: 'visible' })
+        // ]);
+
+        console.log('[EFKA] before submissionTable/input#ama wait URL:', apdPage.url());
+        console.log(
+            '[EFKA] before submissionTable/input#ama wait title:',
+            await apdPage.title().catch(() => 'NO_TITLE')
+        );
+
+        await apdPage.screenshot({
+            path: `./efka-debug-${Date.now()}.png`,
+            fullPage: true
+        });
+
+        await require('fs').promises.writeFile(
+            `./efka-debug-${Date.now()}.html`,
+            await apdPage.content()
+        );
+
         await Promise.race([
             apdPage.waitForSelector('#submissionTable_data', {
-                timeout: timeoutMs,
+                timeout: 60000,
                 state: 'attached'
             }),
-            apdPage.waitForSelector('input#ama', { timeout: timeoutMs, state: 'visible' })
+            apdPage.waitForSelector('input#ama', {
+                timeout: 60000,
+                state: 'visible'
+            })
         ]);
 
         // Αν είμαστε ήδη στο apdCommon, δεν χρειάζεται να πατήσουμε "Συμπλήρωση"

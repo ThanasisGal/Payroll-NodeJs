@@ -2,6 +2,9 @@
 // WTO v1 XML GENERATOR — Απολογιστικός Πίνακας Ωραρίων
 // Source: ProdhlomenaOrariaModel rows with apologistiko_biblio === true
 // ============================================================================
+const fs = require('fs');
+const path = require('path');
+const libxmljs = require('libxmljs2');
 
 async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, options = {}) {
     try {
@@ -42,15 +45,84 @@ async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, 
 
         const xml = buildWTOXML(xmlData);
 
+        const xsdPath = path.join(__dirname, 'xsd', 'WTO_v1.xsd');
+
+        if (!fs.existsSync(xsdPath)) {
+            throw new Error(`[WTO-v1] Δεν βρέθηκε XSD αρχείο: ${xsdPath}`);
+        }
+
+        const xsdContent = fs.readFileSync(xsdPath, 'utf8');
+
+        const xmlDoc = libxmljs.parseXml(xml);
+        const xsdDoc = libxmljs.parseXml(xsdContent);
+
+        const isValid = xmlDoc.validate(xsdDoc);
+
+        if (!isValid) {
+            console.error('❌ [WTO-v1] XSD validation errors:');
+
+            xmlDoc.validationErrors.forEach((err) => {
+                console.error('   •', err.message);
+            });
+
+            throw new Error(
+                `[WTO-v1] Το XML απέτυχε στο XSD validation (${xmlDoc.validationErrors.length} errors).`
+            );
+        }
+
+        console.log('✅ [WTO-v1] XSD validation passed');
+
         console.log('✅ [WTO-v1] XML generated successfully');
         console.log('   XML length:', xml.length, 'bytes');
         console.log('   Source rows:', validRows.length);
         console.log('   Employee/date groups:', xmlData.employees.length);
 
+        const filename = `WTO_APOLOGISTIKOS_${formatDateForFilename(xmlData.f_from_date)}_${formatDateForFilename(xmlData.f_to_date)}.xml`;
+
+        const { uploadBufferToS3 } = require('../s3Helper');
+
+        const companyKodikosClean = safeString(
+            options.companyKodikos ||
+                companyData?.kod ||
+                companyData?.kodikos ||
+                companyData?._id ||
+                'UNKNOWN'
+        );
+
+        const companyDescriptionClean = safeString(
+            options.companyDescription ||
+                options.companyEponymia ||
+                companyData?.eponymia ||
+                companyData?.perigrafh ||
+                'UNKNOWN'
+        )
+            .replace(/\s+/g, '_')
+            .substring(0, 80);
+
+        const teamClean = safeString(options.team || companyData?.team || 'UNKNOWN');
+
+        const s3Key = [
+            'xmls',
+            teamClean,
+            `${companyKodikosClean}_${companyDescriptionClean}`,
+            'WTO_Apologistikos',
+            filename
+        ].join('/');
+
+        console.log('💾 [WTO-v1] Saving XML to:', s3Key);
+
+        const uploadResult = await uploadBufferToS3(
+            Buffer.from(xml, 'utf-8'),
+            s3Key,
+            'application/xml'
+        );
+
         return {
             success: true,
             xml,
-            filename: `WTO_APOLOGISTIKOS_${formatDateForFilename(xmlData.f_from_date)}_${formatDateForFilename(xmlData.f_to_date)}.xml`
+            s3Key: uploadResult.s3Key,
+            s3Url: uploadResult.s3Url || uploadResult.localPath,
+            filename
         };
     } catch (error) {
         console.error('❌ [WTO-v1] Error:', error.message);

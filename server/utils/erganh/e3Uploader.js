@@ -87,9 +87,9 @@ const XML_TYPE_TO_PROCESS_CODE = {
     wto_variable_odigos: '192',
     wto_adeies: '195',
     wto_adeies_orth: '196',
-    wto_yperaories: '232',
-    wto_yperaories_apologistiko: '233',
-    wto_yperaories_odigos: '234'
+    wto_yperories: '232',
+    wto_yperories_apologistiko: '233',
+    wto_yperories_odigos: '234'
 };
 
 // ============================================================================

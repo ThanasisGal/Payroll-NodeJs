@@ -1,6 +1,6 @@
 {
     "name": "payroll_nodejs",
-    "version": "1.0.81",
+    "version": "1.0.82",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -45,6 +45,7 @@
         "jquery": "^3.7.1",
         "jsonwebtoken": "9.0.2",
         "jwt-decode": "4.0.0",
+        "libxmljs2": "^0.37.0",
         "mathjs": "^15.2.0",
         "method-override": "3.0.0",
         "mongoose": "^9.6.2",

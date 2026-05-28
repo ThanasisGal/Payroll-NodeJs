@@ -7,6 +7,8 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
+const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
+const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -4537,8 +4539,6 @@ class erganhController {
 
     static generateWTOApologistiko = async (req, res) => {
         try {
-            const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
-
             const { ypokatasthmata, ypokatasthmata_stathera, apo_hmeromhnia, eos_hmeromhnia } =
                 req.body || {};
 
@@ -4584,19 +4584,82 @@ class erganhController {
                 });
             }
 
-            const result = await generateWTOXML(company, ypokatasthma, rows, {
+            const employeeCodes = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+
+            const employees = await ErgazomenoiModel.find({
+                team,
+                company_kod: companyKodikos,
+                kodikos: mongoose.trusted({ $in: employeeCodes })
+            })
+                .select('kodikos afm eponymo onoma')
+                .lean();
+
+            const employeeByKodikos = new Map(
+                employees.map((emp) => [String(emp.kodikos).trim(), emp])
+            );
+
+            const enrichedRows = rows.map((row) => {
+                const emp = employeeByKodikos.get(String(row.kodikos).trim()) || {};
+
+                return {
+                    ...row,
+                    afm: emp.afm || '',
+                    eponymo: emp.eponymo || '',
+                    onoma: emp.onoma || ''
+                };
+            });
+
+            const result = await generateWTOXML(company, ypokatasthma, enrichedRows, {
+                team,
+                companyKodikos: req.session?.companyKodikos || '',
+                companyDescription: req.session?.companyDescription || '',
                 ypokatasthma: selectedYpokatasthma,
                 apo_hmeromhnia,
                 eos_hmeromhnia
             });
 
-            console.log(result.xml);
+            console.log('🔍 WTO result:', result);
+
+            const xmlPath = result.s3Url.replace('file://', '');
+
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: req.session.userTeam,
+                companykod_object: req.session.companyInUse,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                throw new Error('Δεν βρέθηκαν κωδικοί ΕΡΓΑΝΗ για την εταιρεία.');
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password
+            };
+
+            const uploadResult = await uploadE3ToErganh(
+                req.session.companyInUse,
+                xmlPath,
+                req.session.userId || req.session.user?._id || null,
+                creds,
+                {
+                    xmlType: 'wto_variable_apologistiko',
+                    isPermanent: false
+                }
+            );
+
+            console.log('📡 WTO uploadResult:', uploadResult);
 
             return res.status(200).json({
                 success: true,
-                message: 'Το XML απολογιστικού πίνακα δημιουργήθηκε επιτυχώς.',
+                message: uploadResult?.success
+                    ? 'Το XML δημιουργήθηκε και ανέβηκε στο ΕΡΓΑΝΗ ως προσωρινή υποβολή.'
+                    : 'Το XML δημιουργήθηκε, αλλά η αποστολή στο ΕΡΓΑΝΗ απέτυχε.',
                 xml: result.xml,
-                filename: result.filename
+                filename: result.filename,
+                s3Key: result.s3Key,
+                s3Url: result.s3Url,
+                uploadResult
             });
         } catch (error) {
             console.error('❌ [generateWTOApologistiko] Error:', error);
@@ -4611,7 +4674,7 @@ class erganhController {
 
 async function downloadOrariaToBuffer(username, password, fromDate, toDate, pararthma) {
     const browser = await chromium.launch({
-        headless: false,
+        headless: true,
         args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
     });
 

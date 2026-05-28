@@ -53,7 +53,22 @@ document.addEventListener('DOMContentLoaded', () => {
             Swal.fire({
                 icon: 'success',
                 title: 'Επιτυχία',
-                text: result.message || 'Το XML δημιουργήθηκε επιτυχώς.',
+                html: `
+                    <div style="text-align:left;">
+                        <div>${result.message || 'Το XML δημιουργήθηκε επιτυχώς.'}</div>
+
+                        <hr>
+
+                        <div style="font-size:0.85rem; word-break:break-word;">
+                            <b>XML:</b><br>
+                            ${result.filename || '-'}
+                        </div>
+
+                        <div style="margin-top:8px; font-size:0.8rem; color:#666; word-break:break-word;">
+                            ${result.s3Key || ''}
+                        </div>
+                    </div>
+                `,
                 width: '42rem',
                 customClass: {
                     popup: 'swal-wide-text'

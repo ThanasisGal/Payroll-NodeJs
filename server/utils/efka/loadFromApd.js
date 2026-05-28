@@ -5,8 +5,8 @@ const { createSession } = require('./efkaSessionStore');
 let __sharedBrowser = null;
 let __sharedBrowserLaunching = null;
 
-// simple mutex: one EFKA run at a time (avoids races)
 let __efkaLock = Promise.resolve();
+
 function withEfkaLock(fn) {
     const run = __efkaLock.then(fn, fn);
     __efkaLock = run.catch(() => {});
@@ -16,30 +16,43 @@ function withEfkaLock(fn) {
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const DEBUG = String(process.env.EFKA_DEBUG || '').toLowerCase() === 'true';
 
+const URL_1 = 'https://www.e-efka.gov.gr/el/ilektronikes-ypiresies-%CE%BF';
+const URL_2 = 'https://www.e-efka.gov.gr/el/ergodotes/ilektronikes-ypiresies-gia-ergodotes';
+const URL_3 = 'https://www.e-efka.gov.gr/el/ergodotes/elektronike-ypobole-apd';
+const URL_4 = 'https://services.e-efka.gov.gr/ssp.efka.apd/secure/submissions.xhtml';
+
+function log(...a) {
+    console.log('[EFKA]', ...a);
+}
+
+function err(...a) {
+    console.error('[EFKA][ERROR]', ...a);
+}
+
 async function getSharedBrowser({ slowMo, headless }) {
     if (__sharedBrowser) return __sharedBrowser;
 
     if (!__sharedBrowserLaunching) {
         __sharedBrowserLaunching = (async () => {
-            const b = await chromium.launch({
-                // ✅ ΣΗΜΑΝΤΙΚΟ:
-                // Σε EC2/Linux server χωρίς GUI/XServer πρέπει να είναι true.
-                // Αν είναι false, θα βγάζει: Missing X server or $DISPLAY.
+            const launchOptions = {
                 headless,
-
                 slowMo,
-
                 args: [
-                    // ✅ FIX SSL / ERR_CERT_VERIFIER_CHANGED
+                    '--disable-blink-features=AutomationControlled',
                     '--ignore-certificate-errors',
-
-                    // ✅ Required/safe flags για server/EC2 περιβάλλοντα
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
                     '--disable-gpu'
                 ]
-            });
+            };
+
+            if (!headless) {
+                launchOptions.channel = 'chrome';
+                launchOptions.args.unshift('--start-maximized');
+            }
+
+            const b = await chromium.launch(launchOptions);
 
             b.on('disconnected', () => {
                 __sharedBrowser = null;
@@ -56,22 +69,12 @@ async function getSharedBrowser({ slowMo, headless }) {
     return __sharedBrowserLaunching;
 }
 
-// PERF: direct URLs (avoid multi-click navigation)
-const DIRECT_APD_LANDING_URL = 'https://www.e-efka.gov.gr/el/ergodotes/elektronike-ypobole-apd';
-
-const APD_SUBMISSIONS_URL = 'https://services.e-efka.gov.gr/ssp.efka.apd/secure/submissions.xhtml';
-
-function log(...a) {
-    console.log('[EFKA]', ...a);
-}
-
-function err(...a) {
-    console.error('[EFKA][ERROR]', ...a);
-}
-
 async function loadFromApd(opts = {}) {
     return withEfkaLock(async () => {
-        const defaultHeadless = NODE_ENV === 'production';
+        const defaultHeadless =
+            String(process.env.EFKA_HEADLESS || '').toLowerCase() === 'false'
+                ? false
+                : NODE_ENV === 'production';
 
         const headless = typeof opts.headless === 'boolean' ? opts.headless : defaultHeadless;
 
@@ -98,78 +101,68 @@ async function loadFromApd(opts = {}) {
         let browser;
         let context;
         let page;
+        let apdPage;
 
         try {
             log('Launching...', { NODE_ENV, headless, slowMo, keepSession });
 
-            // ✅ Περνάμε πλέον το headless στο shared browser.
             browser = await getSharedBrowser({ slowMo, headless });
 
             context = await browser.newContext({
-                viewport: { width: 1280, height: 800 },
+                viewport: headless ? { width: 1280, height: 800 } : null,
                 locale: 'el-GR',
                 timezoneId: 'Europe/Athens',
-
-                // ✅ FIX SSL / ERR_CERT_VERIFIER_CHANGED
-                ignoreHTTPSErrors: true
+                ignoreHTTPSErrors: true,
+                userAgent:
+                    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
             });
 
-            // PERF: block heavy resources (images/fonts/media)
-            await context.route('**/*', (route) => {
-                const req = route.request();
-                const rt = req.resourceType();
-                const url = req.url();
+            await context.addInitScript(() => {
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false
+                });
 
-                if (rt === 'image' || rt === 'font' || rt === 'media') {
-                    return route.abort();
-                }
+                window.chrome = {
+                    runtime: {}
+                };
 
-                if (
-                    url.includes('google-analytics') ||
-                    url.includes('googletagmanager') ||
-                    url.includes('doubleclick') ||
-                    url.includes('facebook.net') ||
-                    url.includes('hotjar')
-                ) {
-                    return route.abort();
-                }
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5]
+                });
 
-                return route.continue();
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['el-GR', 'el', 'en-US', 'en']
+                });
             });
 
             page = await context.newPage();
 
-            // 1) Go directly to APD landing
-            await page.goto(DIRECT_APD_LANDING_URL, {
+            await page.goto(URL_1, { waitUntil: 'load', timeout: 90000 });
+            await page.waitForTimeout(1500);
+
+            await page.goto(URL_2, { waitUntil: 'load', timeout: 90000 });
+            await page.waitForTimeout(1500);
+
+            await page.goto(URL_3, { waitUntil: 'load', timeout: 90000 });
+            await page.waitForTimeout(2000);
+
+            await page.goto(URL_4, {
                 waitUntil: 'domcontentloaded',
-                timeout: 60000
+                timeout: 90000
             });
 
-            // 2) Open submissions page
-            let apdPage = null;
+            apdPage = page;
 
-            const link = page.locator(`a[href="${APD_SUBMISSIONS_URL}"]`).first();
-            const linkCount = await link.count().catch(() => 0);
+            await apdPage.waitForLoadState('domcontentloaded', { timeout: 90000 }).catch(() => {});
 
-            if (linkCount > 0) {
-                const [newPage] = await Promise.all([
-                    context.waitForEvent('page', { timeout: 20000 }).catch(() => null),
-                    link.click().catch(() => {})
-                ]);
+            const title = await apdPage.title().catch(() => '');
+            const url = apdPage.url();
 
-                apdPage = newPage;
+            log('APD login/submissions opened:', { url, title });
+
+            if (/blocked/i.test(title)) {
+                throw new Error(`Ο ΕΦΚΑ μπλόκαρε τη σελίδα ΑΠΔ. URL=${url}, title=${title}`);
             }
-
-            if (!apdPage) {
-                apdPage = await context.newPage();
-
-                await apdPage.goto(APD_SUBMISSIONS_URL, {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 60000
-                });
-            }
-
-            await apdPage.waitForLoadState('domcontentloaded', { timeout: 60000 }).catch(() => {});
 
             if (keepSession) {
                 const sessionId = createSession({ browser, context, page, apdPage }, { ttlMs });
