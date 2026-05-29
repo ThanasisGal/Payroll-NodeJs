@@ -12,155 +12,18 @@ const HEADLESS = !DEBUG;
 const LOGIN_URL = 'https://eservices.yeka.gr/login.aspx';
 const UPLOAD_URL = 'https://eservices.yeka.gr/Anaggelies/AnaggeliesXML.aspx';
 
-// ============================================================================
-// ✅ ΑΛΛΑΓΗ Α — Πίνακες αντιστοίχισης κωδικών ΕΡΓΑΝΗ
-// ============================================================================
-
-const ERGANH_PROCESS_CODES = {
-    205: 'Δήλωση Απασχόλησης την Έκτη Ημέρα',
-    173: 'E14: ΔΗΛΩΣΗ ΕΡΓΟΔΟΤΗ ΧΟΡΗΓΗΣΗΣ ΓΟΝΙΚΗΣ ΑΔΕΙΑΣ (Ν.4808/2021)',
-    64: 'ΑΝΑΓΓΕΛΙΑ ΑΠΑΣΧΟΛΟΥΜΕΝΟΥ ΠΡΟΣΩΠΙΚΟΥ ΣΕ ΟΙΚΟΔΟΜΟΤΕΧΝΙΚΑ ΕΡΓΑ',
-    65: 'ΑΠΟΓΡΑΦΙΚΗ ΑΝΑΓΓΕΛΙΑ ΑΠΑΣΧΟΛΟΥΜΕΝΟΥ ΠΡΟΣΩΠΙΚΟΥ ΣΕ ΟΙΚΟΔΟΜΟΤΕΧΝΙΚΑ ΕΡΓΑ',
-    184: 'Δήλωση έναρξης/λήξης εργασίας εργαζόμενων',
-    206: 'Δήλωση Εξαίρεσης από την Υποχρέωση Προαναγγελίας',
-    34: 'E11 ΓΝΩΣΤΟΠΟΙΗΣΗ ΣΤΟΙΧΕΙΩΝ ΕΤΗΣΙΑΣ ΚΑΝΟΝΙΚΗΣ ΑΔΕΙΑΣ',
-    57: 'E3.5: ΕΝΙΑΙΟ ΕΝΤΥΠΟ ΑΝΑΓΓΕΛΙΑΣ/ΜΕΤΑΒΟΛΩΝ ΠΡΑΚΤΙΚΗΣ ΑΣΚΗΣΗΣ ΣΠΟΥΔΑΣΤΩΝ/ΦΟΙΤΗΤΩΝ',
-    // ── Οργάνωση Χρόνου Εργασίας (WTO) ──
-    195: 'Οργάνωση Χρόνου Εργασίας - Άδειες',
-    196: 'Οργάνωση Χρόνου Εργασίας - Άδειες ΟΡΘΗ ΕΠΑΝΑΛΗΨΗ',
-    182: 'Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο',
-    183: 'Οργάνωση Χρόνου Εργασίας - Μεταβαλλόμενο/Τροποποιούμενο ανά Ημέρα',
-    207: 'Οργάνωση Χρόνου Εργασίας - Μεταβαλλόμενο/Τροποποιούμενο ανά Ημέρα - Απολογιστικό',
-    192: 'Οργάνωση Χρόνου Εργασίας - Μεταβαλλόμενο/Τροποποιούμενο ανά Ημέρα - Οδηγοί',
-    232: 'Οργάνωση Χρόνου Εργασίας - Υπερωρίες',
-    233: 'Οργάνωση Χρόνου Εργασίας - Υπερωρίες - Απολογιστικό',
-    234: 'Οργάνωση Χρόνου Εργασίας - Υπερωρίες - Οδηγοί',
-    // ── Ψηφιακή Αναγγελία ΕΝΑΡΞΗΣ Εργασίας ──
-    213: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΑΣ - Πρόσληψη (E3N)',
-    214: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΑΣ - Μεταβίβαση από Επιχείρηση',
-    215: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΑΣ - Δανεισμός από επιχείρηση/Τοποθέτηση από ΕΠΑ',
-    216: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΑΣ - Πρόσληψη για Δανεισμό (αφορά μόνο ΕΠΑ)',
-    // ── Ψηφιακή Αναγγελία ΛΗΞΗΣ Εργασίας ──
-    217: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση',
-    218: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Δήλωση Όχλησης για δυνατότητα Οικειοθελούς Αποχώρησης',
-    219: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Οικειοθελής Αποχώρηση μετά από Όχληση',
-    220: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης Χωρίς Προειδοποίηση',
-    221: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Καταγγελία Σύμβασης με Προειδοποίηση',
-    222: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Λύση Σύμβασης Ορισμένου Χρόνου (E7N)',
-    223: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Εθελούσια Έξοδος',
-    224: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Οικειοθελή Αποχώρηση',
-    225: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Συνταξιοδότηση με Καταγγελία Χωρίς Προειδοποίηση',
-    226: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Λήξη λόγω Θανάτου',
-    227: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Αυτοδίκαιη Λύση Δοκιμαστικής Περιόδου',
-    228: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Μεταβίβαση σε Επιχείρηση',
-    229: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Λήξη Δανεισμού από επιχείρηση/Τοποθέτησης από ΕΠΑ',
-    236: 'ΨΗΦΙΑΚΗ ΑΝΑΓΓΕΛΙΑ ΛΗΞΗΣ ΕΡΓΑΣΙΑΣ - Οικειοθελής αποχώρηση λόγω 15ετίας / ορίου ηλικίας',
-    // ── Μεταβολές ──
-    230: 'ΨΗΦΙΑΚΗ ΔΗΛΩΣΗ ΜΕΤΑΒΟΛΗΣ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ',
-    231: 'ΨΗΦΙΑΚΗ ΔΗΛΩΣΗ ΜΕΤΑΒΟΛΗΣ ΣΤΟΙΧΕΙΩΝ ΕΡΓΑΣΙΑΚΗΣ ΣΧΕΣΗΣ - Δανειζόμενου Προσωπικού'
-};
-
-const XML_TYPE_TO_PROCESS_CODE = {
-    e3n: '213',
-    e3n_metavivasi: '214',
-    e3n_daneismos_epa: '215',
-    e3n_proslipsi_daneismos_epa: '216',
-    ma_metaboles: '230',
-    ma_metaboles_daneizomenos: '231',
-    ma_217: '217',
-    ma_218: '218',
-    ma_219: '219',
-    ma_220: '220',
-    ma_221: '221',
-    ma_222: '222',
-    ma_223: '223',
-    ma_224: '224',
-    ma_225: '225',
-    ma_226: '226',
-    ma_227: '227',
-    ma_228: '228',
-    ma_229: '229',
-    ma_236: '236',
-    wto_stable: '182',
-    wto_variable: '183',
-    wto_variable_apologistiko: '207',
-    wto_variable_odigos: '192',
-    wto_adeies: '195',
-    wto_adeies_orth: '196',
-    wto_yperories: '232',
-    wto_yperories_apologistiko: '233',
-    wto_yperories_odigos: '234'
-};
-
-// ============================================================================
-// ✅ Reverse map: symbolic key name → αριθμός ΕΡΓΑΝΗ
-// ============================================================================
-const ERGANH_PROCESS_CODES_REVERSE = {
-    e3_anaggelia_proslhpshs: '213',
-    e3_anaggelia_proslhpshs_metavivasi: '214',
-    e3_anaggelia_proslhpshs_daneismos_epa: '215',
-    e3_anaggelia_proslhpshs_daneizomenoy_prosopikoy: '216',
-    e3_metaboles_ergasiakhs_sxeshs: '230',
-    e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy: '231',
-    ma_217: '217',
-    ma_218: '218',
-    ma_219: '219',
-    ma_220: '220',
-    ma_221: '221',
-    ma_222: '222',
-    ma_223: '223',
-    ma_224: '224',
-    ma_225: '225',
-    ma_226: '226',
-    ma_227: '227',
-    ma_228: '228',
-    ma_229: '229',
-    ma_236: '236',
-    wto_pshfiakh_organosh_xronoy_ergasias: '182',
-    wto_stable: '182',
-    wto_variable: '183',
-    wto_variable_apologistiko: '207',
-    wto_variable_odigos: '192',
-    wto_adeies: '195',
-    wto_adeies_orth: '196',
-    wto_yperaories: '232',
-    wto_yperaories_apologistiko: '233',
-    wto_yperaories_odigos: '234'
-};
-
-// ============================================================================
-// ✅ resolveProcessCode — symbolic key OR αριθμός → αριθμός ΕΡΓΑΝΗ
-// ============================================================================
-function resolveProcessCode(code) {
-    if (!code) return null;
-    const s = String(code).trim();
-    if (/^\d+$/.test(s)) {
-        if (!ERGANH_PROCESS_CODES[s] && !ERGANH_PROCESS_CODES[Number(s)]) {
-            console.warn(`[resolveProcessCode] ⚠️ Numeric code '${s}' not in ERGANH_PROCESS_CODES`);
-        }
-        return s;
-    }
-    const resolved = ERGANH_PROCESS_CODES_REVERSE[s];
-    if (!resolved) {
-        console.warn(
-            `[resolveProcessCode] ⚠️ Unknown key: '${s}'. ` +
-                `Valid keys: ${Object.keys(ERGANH_PROCESS_CODES_REVERSE).join(', ')}`
-        );
-        return null;
-    }
-    return resolved;
-}
-
 const TIMEOUTS = {
     short: 5000,
     medium: 12000,
     long: 20000,
     nav: 25000,
     modalAppear: 20000,
-    modalSettle: 5000,
+
+    modalSettle: 5000, // ✅ NEW: wait 5s for modal body to populate
     modalClose: 5000
 };
 
+// Login inputs (fallbacks)
 const SEL_LOGIN_USERNAME_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName',
     'input[type="text"][name*="UserName"]',
@@ -183,6 +46,7 @@ const SEL_LOGIN_SUBMIT_ANY = [
     'input[type="submit"]'
 ].join(', ');
 
+// Upload page selectors
 const SEL_UPLOAD_PROCESS_SELECT_ANY = [
     '#ctl00_ctl00_ContentHolder_ContentHolder_AnaggeliesXMLControl_SKYpobolesList',
     'select[id*="SKYpobolesList"]',
@@ -211,6 +75,7 @@ const SEL_UPLOAD_SUBMIT_ANY = [
     'input[type="button"][value="Ενημέρωση"]'
 ].join(', ');
 
+// Modal OK
 const SEL_MODAL_OK_ANY = [
     '.swal2-confirm',
     'button:has-text("OK")',
@@ -245,12 +110,15 @@ function cleanText(s) {
 }
 
 function normalizeForExactCompare(s) {
-    return String(s || '')
-        .replace(/\r/g, '')
-        .replace(/['']/g, "'")
-        .replace(/[""]/g, '"')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return (
+        String(s || '')
+            .replace(/\r/g, '')
+            .replace(/[’‘]/g, "'")
+            .replace(/[“”]/g, '"')
+            // ✅ collapse ALL whitespace (spaces, tabs, newlines) to single spaces
+            .replace(/\s+/g, ' ')
+            .trim()
+    );
 }
 
 const SUCCESS_MODAL_TEXT_EXACT = normalizeForExactCompare(
@@ -312,23 +180,9 @@ async function isOnUploadPage(page) {
     return !!(dd && fi);
 }
 
-// ============================================================================
-// ✅ FIX: classifyModalText — exact match + partial match για native dialogs
-// ============================================================================
 function classifyModalText(text) {
     const normalized = normalizeForExactCompare(text);
-    // Exact match (DOM modal)
-    if (normalized === SUCCESS_MODAL_TEXT_EXACT) return { ok: true };
-    // Partial match (native dialog — συντομότερο κείμενο)
-    if (
-        normalized.includes('διαβάστηκε με επιτυχία') ||
-        normalized.includes('Αναγγελίες βρίσκονται πλέον') ||
-        normalized.includes("κατάσταση υποβολής 'Προσωρινή'") ||
-        normalized.includes('επιτυχώς')
-    ) {
-        return { ok: true };
-    }
-    return { ok: false };
+    return { ok: normalized === SUCCESS_MODAL_TEXT_EXACT };
 }
 
 async function waitForOptionsOnSelect(selectLocator, timeoutMs) {
@@ -419,6 +273,7 @@ async function ensureOnUploadPage(page, creds) {
     throw new Error(`Login/Upload page not reachable. Screenshot: ${shot || 'N/A'}`);
 }
 
+// ✅ fallback text when no modal: try to find likely error snippets on the page
 async function captureFallbackPageErrorText(page) {
     try {
         const t = cleanText(
@@ -433,11 +288,13 @@ async function captureFallbackPageErrorText(page) {
                     'Ημερομηνία',
                     'δεν συμφων'
                 ];
+
                 const bodyText = document.body?.innerText || '';
                 const lines = bodyText
                     .split('\n')
                     .map((l) => l.trim())
                     .filter(Boolean);
+
                 const hits = [];
                 for (const line of lines) {
                     if (keywords.some((k) => line.includes(k))) hits.push(line);
@@ -446,13 +303,21 @@ async function captureFallbackPageErrorText(page) {
                 return hits.join('\n');
             })
         );
+
         return t;
     } catch {
         return '';
     }
 }
 
+/**
+ * Robust modal capture:
+ * - Waits for ANY dialog/swal2 or keyword presence
+ * - ✅ NEW: waits extra 5s for modal content to fully populate
+ * - Extracts text from dialog while filtering noise ("x", "Επιλογή", "OK")
+ */
 async function captureModalTextAndClose(page) {
+    // 1) Wait for a VISIBLE OK button (this is modal-specific and won't match <option>)
     const okBtn = await (async () => {
         const loc = page.locator(SEL_MODAL_OK_ANY);
         const start = Date.now();
@@ -469,12 +334,17 @@ async function captureModalTextAndClose(page) {
 
     if (!okBtn) return { text: '' };
 
+    // 2) Find the container that actually holds the dialog text.
+    // We climb ancestors until we find a "big" text block (heuristic).
     let container = okBtn.locator('xpath=ancestor::div[1]').first();
 
     for (let level = 1; level <= 14; level++) {
         const anc = okBtn.locator(`xpath=ancestor::div[${level}]`).first();
         const ancText = await anc.innerText().catch(() => '');
         const t = cleanText(ancText);
+
+        // Heuristic: modal text in your screenshot is definitely > 40 chars
+        // and contains either "Ειδοποίηση" or "Σφάλματα" or "xsd" or "Για το ΑΦΜ"
         const low = t.toLowerCase();
         const looksLikeModal =
             t.length > 40 &&
@@ -484,13 +354,17 @@ async function captureModalTextAndClose(page) {
                 t.includes('Για το ΑΦΜ') ||
                 t.includes('Για τον ΑΦΜ') ||
                 low.includes('pattern constraint'));
+
         if (looksLikeModal) {
             container = anc;
             break;
         }
     }
 
+    // 3) Read text, and clean obvious noise
     let text = cleanText(await container.innerText().catch(() => ''));
+
+    // remove isolated noise lines
     text = text
         .split('\n')
         .map((l) => l.trim())
@@ -500,6 +374,7 @@ async function captureModalTextAndClose(page) {
         )
         .join('\n');
 
+    // 4) Click OK fast (closing modal in <= ~1s)
     await okBtn.click({ timeout: 1000, force: true }).catch(() => {});
     await page.waitForTimeout(150).catch(() => {});
 
@@ -507,42 +382,11 @@ async function captureModalTextAndClose(page) {
 }
 
 async function uploadXml(page, xmlPath, creds, options = {}) {
-    // ============================================================================
-    // ✅ Βήμα 1: Resolve processCode
-    // ============================================================================
-    const rawProcessCode = options?.processCode ? String(options.processCode) : null;
-    let processCode = rawProcessCode ? resolveProcessCode(rawProcessCode) : null;
-
-    if (!processCode && options?.xmlType) {
-        processCode = XML_TYPE_TO_PROCESS_CODE[options.xmlType] || null;
-        if (!processCode) {
-            throw new Error(
-                `[e3Uploader] Άγνωστο xmlType: "${options.xmlType}". ` +
-                    `Έγκυρες τιμές: ${Object.keys(XML_TYPE_TO_PROCESS_CODE).join(', ')}`
-            );
-        }
-    }
-
-    if (!processCode) {
-        throw new Error(
-            '[e3Uploader] Απαιτείται options.processCode ή options.xmlType. ' +
-                `Έγκυρα xmlTypes: ${Object.keys(XML_TYPE_TO_PROCESS_CODE).join(', ')}`
-        );
-    }
-
-    const processLabel =
-        ERGANH_PROCESS_CODES[processCode] ||
-        ERGANH_PROCESS_CODES[Number(processCode)] ||
-        '(άγνωστη διαδικασία)';
-
+    // ✅ DEBUG: Log received parameters
     log('[uploadXml] Parameters:', {
         xmlPath: xmlPath ? path.basename(xmlPath) : 'MISSING',
         hasCreds: !!(creds?.username && creds?.password),
-        xmlType: options?.xmlType || 'NOT SET',
-        rawProcessCode,
-        processCode,
-        processLabel,
-        isPermanent: options?.isPermanent ?? false
+        options: options || 'UNDEFINED'
     });
 
     await ensureOnUploadPage(page, creds);
@@ -573,35 +417,26 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
     await waitForOptionsOnSelect(dropdown, TIMEOUTS.long);
 
-    log(`   Επιλογή διαδικασίας: [${processCode}] ${processLabel}`);
-
     let selected = false;
     try {
-        await dropdown.selectOption({ value: processCode });
+        await dropdown.selectOption({ value: '213' });
         selected = true;
     } catch {}
     if (!selected) {
         try {
-            await dropdown.selectOption(processCode);
+            await dropdown.selectOption('213');
             selected = true;
         } catch {}
     }
     if (!selected) {
         const shot = await snap(page, 'process-select-failed');
-        throw new Error(
-            `Αδυναμία επιλογής διαδικασίας [${processCode}] "${processLabel}". ` +
-                `Screenshot: ${shot || 'N/A'}`
-        );
+        throw new Error(`Could not select process 213. Screenshot: ${shot || 'N/A'}`);
     }
 
     await page.waitForTimeout(250).catch(() => {});
     await fileInput.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
 
-    // ============================================================================
-    // ✅ FIX: Άκουσε για native dialog ΠΡΙΝ το setInputFiles
-    //         (το ΕΡΓΑΝΗ εμφανίζει confirmation dialog κατά το upload)
-    // ============================================================================
-    const fileDialogPromise = page
+    const dialogPromise = page
         .waitForEvent('dialog', { timeout: TIMEOUTS.short })
         .then(async (d) => {
             dbg('Dialog:', d.message());
@@ -610,23 +445,24 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
         .catch(() => {});
 
     await fileInput.setInputFiles(xmlPath);
-    await fileDialogPromise;
+    await dialogPromise;
 
-    // ============================================================================
-    // Checkbox Προσωρινή / Οριστική
-    // ============================================================================
+    // =====================================================================
+    // ✅ CHECK/UNCHECK SUBMISSION CHECKBOX BASED ON OPTIONS
+    // =====================================================================
     const isPermanent = options?.isPermanent === true;
     log(`   Submission mode: ${isPermanent ? 'Οριστική' : 'Προσωρινή'}`);
 
     if (await submissionCheckbox.count().catch(() => 0)) {
         try {
             const isChecked = await submissionCheckbox.isChecked().catch(() => false);
+
             if (isPermanent && !isChecked) {
                 log('✅ Checking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Οριστική mode)');
                 await submissionCheckbox.check({ timeout: TIMEOUTS.short });
                 await page.waitForTimeout(300);
             } else if (!isPermanent && isChecked) {
-                log('⏸  Unchecking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Προσωρινή mode)');
+                log('⏸️  Unchecking "ΥΠΟΒΟΛΗ ΜΕΤΑ ΤΗΝ ΚΑΤΑΧΩΡΗΣΗ" (Προσωρινή mode)');
                 await submissionCheckbox.uncheck({ timeout: TIMEOUTS.short });
                 await page.waitForTimeout(300);
             } else {
@@ -636,6 +472,7 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
             }
         } catch (checkboxError) {
             warn('Failed to toggle submission checkbox:', checkboxError.message);
+            // Non-fatal - continue with upload
         }
     } else {
         warn('Submission checkbox not found on page (may not exist for this ERGANH version)');
@@ -644,22 +481,6 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
     await page.waitForTimeout(150).catch(() => {});
     await submitBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.long });
 
-    // ============================================================================
-    // ✅ FIX: Άκουσε για native dialog ΜΕΤΑ το submit
-    //         το ΕΡΓΑΝΗ μπορεί να εμφανίσει το αποτέλεσμα ως native alert
-    // ============================================================================
-    let nativeDialogText = null;
-    const submitDialogPromise = page
-        .waitForEvent('dialog', { timeout: TIMEOUTS.modalAppear })
-        .then(async (d) => {
-            nativeDialogText = d.message();
-            dbg('Submit result dialog:', nativeDialogText);
-            await d.accept();
-            return nativeDialogText;
-        })
-        .catch(() => null);
-
-    // Ξεκίνα DOM modal listener παράλληλα
     const modalPromise = captureModalTextAndClose(page);
 
     await Promise.allSettled([
@@ -667,58 +488,14 @@ async function uploadXml(page, xmlPath, creds, options = {}) {
         submitBtn.click({ timeout: TIMEOUTS.medium })
     ]);
 
-    // Περίμενε και τα δύο
-    await submitDialogPromise;
     const { text: modalText } = await modalPromise;
 
-    // ✅ Χρησιμοποίησε native dialog αν δεν υπάρχει DOM modal
-    const finalText = modalText || nativeDialogText || '';
-
-    log('📄 Result text:', finalText || '(empty)');
-
-    if (!finalText) {
-        const debugShot = await snap(page, 'after-submit-no-modal');
-        log('⚠️ No modal/dialog captured. Screenshot:', debugShot);
-
-        // Fallback: inline success check
-        const inlineSuccess = await page
-            .evaluate(() => {
-                const keywords = [
-                    'διαβάστηκε με επιτυχία',
-                    'Αναγγελίες βρίσκονται πλέον',
-                    'Προσωρινή',
-                    'επιτυχώς',
-                    'υποβλήθηκε'
-                ];
-                const bodyText = document.body?.innerText || '';
-                return keywords.some((k) => bodyText.includes(k)) ? bodyText : '';
-            })
-            .catch(() => '');
-
-        if (inlineSuccess) {
-            log('✅ Inline success message detected');
-            return [
-                'Ειδοποίηση',
-                'Το αρχείο διαβάστηκε με επιτυχία. Οι Αναγγελίες βρίσκονται πλέον',
-                "καταχωρημένες σε κατάσταση υποβολής 'Προσωρινή' και μπορείτε να τις",
-                'βρείτε στην Αναζήτηση Αναγγελιών για να τις υποβάλετε εξατομικευμένα.'
-            ].join('\n');
-        }
-
+    if (!modalText) {
         const pageErr = await captureFallbackPageErrorText(page);
-        if (pageErr) {
-            log('📄 Fallback page error:', pageErr);
-            return pageErr;
-        }
-
-        // Τελευταία επιλογή: full body για diagnosis
-        const fullBody = await page
-            .evaluate(() => document.body?.innerText?.substring(0, 500) || '')
-            .catch(() => '');
-        log('📄 Page body (first 500 chars):', fullBody);
+        if (pageErr) return pageErr;
     }
 
-    return finalText;
+    return modalText || '';
 }
 
 // ------------------------------ MAIN EXPORT ---------------------------------
@@ -728,11 +505,13 @@ async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
 
     try {
         log('Getting or creating session...', { companyId });
+        // ✅ Log options for debugging
         log('Options received:', options);
 
         session = await sessionManager.getOrCreateSession(companyId, creds);
         page = session.page;
 
+        // ✅ Pass options (isPermanent) to uploadXml
         const modalText = cleanText(await uploadXml(page, xmlPath, creds, options));
 
         if (!modalText) {
@@ -787,7 +566,7 @@ async function runOnce(companyId, xmlPath, userId, creds, options = {}) {
             screenshot: shot
         };
     } finally {
-        log('Upload completed (session kept open for next use)');
+        log('E3 upload completed (session kept open for WTO)');
     }
 }
 
@@ -802,6 +581,7 @@ async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null,
 
     const p = (async () => {
         try {
+            // ✅ Pass options (isPermanent) to runOnce
             return await runOnce(companyId, xmlPath, userId, creds, options);
         } finally {
             inflightByCompany.delete(key);
@@ -812,10 +592,4 @@ async function uploadE3ToErganh(companyId, xmlPath, userId = null, creds = null,
     return await p;
 }
 
-module.exports = {
-    uploadE3ToErganh,
-    ERGANH_PROCESS_CODES,
-    XML_TYPE_TO_PROCESS_CODE,
-    ERGANH_PROCESS_CODES_REVERSE,
-    resolveProcessCode
-};
+module.exports = { uploadE3ToErganh };

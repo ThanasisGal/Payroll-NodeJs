@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const { Builder, By, Key, until } = require('selenium-webdriver');
 const ExcelJS = require('exceljs');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
@@ -4733,7 +4733,15 @@ class erganhController {
                 eos_hmeromhnia
             });
 
-            const xmlPath = result.s3Url.replace('file://', '');
+            const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');
+
+            if (!fs.existsSync(tmpXmlDir)) {
+                fs.mkdirSync(tmpXmlDir, { recursive: true });
+            }
+
+            const xmlPath = path.join(tmpXmlDir, result.filename);
+
+            fs.writeFileSync(xmlPath, result.xml, 'utf8');
 
             const erganhPasswordDoc = await PasswordsModel.findOne({
                 team: req.session.userTeam,
@@ -4909,28 +4917,15 @@ class erganhController {
                 });
             }
 
-            let xmlPath =
-                xmlResult.localPath || xmlResult.filePath || xmlResult.fullPath || xmlResult.s3Url;
+            const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');
 
-            if (!xmlPath) {
-                throw new Error('Δεν βρέθηκε filesystem path για το XML.');
+            if (!fs.existsSync(tmpXmlDir)) {
+                fs.mkdirSync(tmpXmlDir, { recursive: true });
             }
 
-            // file:/// -> local path
-            if (xmlPath.startsWith('file://')) {
-                xmlPath = xmlPath.replace('file://', '');
-            }
+            const xmlPath = path.join(tmpXmlDir, xmlResult.filename);
 
-            // S3 URL -> local uploads/s3-mock path
-            if (xmlPath.startsWith('http')) {
-                const xmlsIndex = xmlPath.indexOf('/xmls/');
-
-                if (xmlsIndex !== -1) {
-                    const relativePath = xmlPath.substring(xmlsIndex + 1);
-
-                    xmlPath = path.join(process.cwd(), 'uploads', 's3-mock', relativePath);
-                }
-            }
+            fs.writeFileSync(xmlPath, xmlResult.xml, 'utf8');
 
             console.log('[WTO_OV] FINAL LOCAL XML PATH:', xmlPath);
 
