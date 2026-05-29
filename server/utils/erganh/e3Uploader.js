@@ -153,15 +153,12 @@ function resolveProcessCode(code) {
 
 const TIMEOUTS = {
     short: 5000,
-    // medium: 12000,
+    medium: 12000,
     long: 20000,
     nav: 25000,
-    // modalAppear: 20000,
+    modalAppear: 20000,
     modalSettle: 5000,
-    modalClose: 5000,
-
-    medium: 30000,
-    modalAppear: 90000
+    modalClose: 5000
 };
 
 const SEL_LOGIN_USERNAME_ANY = [
@@ -379,34 +376,12 @@ async function doLogin(page, creds) {
     }
 
     log('Submit login...');
-    // await Promise.allSettled([
-    //     page.waitForLoadState('domcontentloaded', { timeout: TIMEOUTS.nav }).catch(() => {}),
-    //     submit.click({ timeout: TIMEOUTS.medium })
-    // ]);
+    await Promise.allSettled([
+        page.waitForLoadState('domcontentloaded', { timeout: TIMEOUTS.nav }).catch(() => {}),
+        submit.click({ timeout: TIMEOUTS.medium })
+    ]);
 
-    // await page.waitForTimeout(400).catch(() => {});
-
-    console.log('[ERGANH] About to click submit...');
-
-    await submitBtn.scrollIntoViewIfNeeded().catch(() => {});
-    await page.waitForTimeout(500);
-
-    const clicked = await submitBtn
-        .click({ timeout: TIMEOUTS.medium, force: true })
-        .then(() => true)
-        .catch(async (e) => {
-            console.warn('[ERGANH][WARN] Normal submit click failed:', e.message);
-
-            await submitBtn.evaluate((el) => el.click()).catch(() => {});
-
-            return true;
-        });
-
-    console.log('[ERGANH] Submit clicked:', clicked);
-
-    await page.waitForTimeout(10000);
-
-    console.log('[ERGANH] After submit wait. URL:', page.url());
+    await page.waitForTimeout(400).catch(() => {});
 }
 
 async function ensureOnUploadPage(page, creds) {
