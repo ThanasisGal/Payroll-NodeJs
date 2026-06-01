@@ -15,6 +15,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // ✅ ΝΕΟ: Debounce timer για allaghs_symbashs
     let allaghsChangeTimer = null;
 
+    // ✅ EDIT MODE:
+    // Αυτό ΔΕΝ συγκρίνει αριθμητικές τιμές/format των ωρών.
+    // Απλώς θυμάται αν ο χρήστης πείραξε πραγματικά το πεδίο των εβδομαδιαίων ωρών.
+    // Αν δεν το πείραξε, οι νέες ημέρες μετά τη λήξη σύμβασης μπορούν να πάρουν default ΜΕ.
+    let weeklyHoursChangedByUser = false;
+
     document.addEventListener(
         'click',
         function (event) {
@@ -64,11 +70,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
 
     if (hmeresInput && oresInput && moOronInput) {
+        oresInput.addEventListener('input', () => {
+            weeklyHoursChangedByUser = true;
+        });
         oresInput.addEventListener('blur', () => {
             calculateMoOron();
             validateOrarioErgasiasTab();
         });
         oresInput.addEventListener('change', () => {
+            weeklyHoursChangedByUser = true;
             calculateMoOron();
             validateOrarioErgasiasTab();
         });
@@ -466,6 +476,13 @@ document.addEventListener('DOMContentLoaded', function () {
         lhxhsChangeTimer = setTimeout(() => handleLhxhsChange(), 500);
     }
 
+    /**
+     * ✅ ΔΙΟΡΘΩΣΗ: Όταν αλλάξει / γίνει blur η λήξη σύμβασης
+     * ΔΕΝ πειράζουμε πλέον το hmeromhnia_allaghs_orarioy_eos.
+     *
+     * Η λήξη σύμβασης χρησιμοποιείται μόνο για να μαρκάρουμε ως ΜΕ
+     * τις δυναμικές ημέρες ωραρίου που είναι ΜΕΤΑ τη λήξη σύμβασης.
+     */
     async function handleLhxhsChange() {
         const currentValue = lhxhsSymbashsInput?.value || '';
 
@@ -478,33 +495,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (currentValue === previousLhxhsValue) return;
         previousLhxhsValue = currentValue;
 
-        const apoDate = orarioyApoInput?.value;
-        if (!apoDate) return;
+        // ❗ ΣΗΜΑΝΤΙΚΟ:
+        // Δεν καλούμε updateOrarioyEosDate() και δεν γράφουμε orarioyEosInput.value.
+        // Άρα το blur/change της λήξης σύμβασης ΔΕΝ αλλάζει πλέον το ΕΩΣ ωραρίου.
 
-        const startDateParsed = new Date(apoDate);
-        if (isNaN(startDateParsed.getTime())) return;
+        // ✅ Αν έχουν ήδη δημιουργηθεί οι δυναμικές ημέρες, ενημέρωσε μόνο τις κατηγορίες.
+        applyDefaultKathgoriaMEAfterContractEnd();
 
-        // ✅ Guard: χρονιά apoDate
-        const apoYear = startDateParsed.getFullYear();
-        if (apoYear < 1900 || apoYear > 2100) return;
-
-        let eosDateParsed = new Date(startDateParsed);
-        eosDateParsed.setDate(eosDateParsed.getDate() + 6);
-
-        if (currentValue && currentValue.trim() !== '') {
-            const lhxhsDate = new Date(currentValue);
-            if (!isNaN(lhxhsDate.getTime()) && eosDateParsed > lhxhsDate) {
-                eosDateParsed = lhxhsDate;
-            }
+        if (typeof updateKathgoriaBackgroundColor === 'function') {
+            updateKathgoriaBackgroundColor();
         }
-
-        // ✅ ΔΙΟΡΘΩΣΗ yearEnd: setMonth/setDate αντί new Date(year, 11, 31)
-        const yearEnd = new Date(startDateParsed);
-        yearEnd.setMonth(11);
-        yearEnd.setDate(31);
-        if (eosDateParsed > yearEnd) eosDateParsed = yearEnd;
-
-        orarioyEosInput.value = formatDateToISO(eosDateParsed);
     }
 
     async function handleOrarioyEosChange() {
@@ -560,12 +560,9 @@ document.addEventListener('DOMContentLoaded', function () {
         let eosDateParsed = new Date(startDateParsed);
         eosDateParsed.setDate(eosDateParsed.getDate() + 6);
 
-        if (lhxhsSymbashsInput?.value && lhxhsSymbashsInput.value.trim() !== '') {
-            const lhxhsDate = new Date(lhxhsSymbashsInput.value);
-            if (!isNaN(lhxhsDate.getTime()) && eosDateParsed > lhxhsDate) {
-                eosDateParsed = lhxhsDate;
-            }
-        }
+        // ✅ Δεν κάνουμε πλέον cap στη λήξη σύμβασης.
+        // Το ΕΩΣ ωραρίου επιτρέπεται να είναι μετά τη λήξη σύμβασης,
+        // ώστε οι επιπλέον ημέρες να δημιουργούνται και να μαρκάρονται ως ΜΕ όπου χρειάζεται.
 
         // ✅ ΔΙΟΡΘΩΣΗ: χρήση setMonth/setDate αντί new Date(year, 11, 31)
         // new Date(2, 11, 31) επιστρέφει 1902 λόγω JavaScript quirk για χρονιές 0-99!
@@ -592,8 +589,13 @@ document.addEventListener('DOMContentLoaded', function () {
     async function validateDateChange(apoDate, eosDate) {
         if (!apoDate || !eosDate) return false;
 
-        const apoDateObj = new Date(apoDate);
-        const eosDateObj = new Date(eosDate);
+        // ✅ Χρησιμοποιούμε local date parsing (YYYY-MM-DDT00:00:00) και όχι new Date('YYYY-MM-DD'),
+        // γιατί το new Date('YYYY-MM-DD') γίνεται UTC και σε timezone Ελλάδας η ίδια ημερομηνία
+        // συγκρίνεται σαν 03:00 αντί για 00:00. Αυτό άφηνε το ίδιο ΕΩΣ με την τελευταία non-ΜΕ ημέρα να περνάει.
+        const apoDateObj = parseISODateOnly(apoDate);
+        const eosDateObj = parseISODateOnly(eosDate);
+
+        if (!apoDateObj || !eosDateObj) return false;
 
         // ✅ ΝΕΟ: Guard για μη λογικές χρονιές
         if (apoDateObj.getFullYear() < 1900 || apoDateObj.getFullYear() > 2100) return false;
@@ -604,15 +606,26 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         }
 
-        if (lhxhsSymbashsInput?.value) {
-            const lhxhsDate = new Date(lhxhsSymbashsInput.value);
-            if (!isNaN(lhxhsDate.getTime()) && eosDateObj > lhxhsDate) {
-                alert(
-                    `Η Ημερ/νία ΕΩΣ δεν μπορεί να είναι μετά τη λήξη της σύμβασης (${formatDate(lhxhsDate)}).`
-                );
-                return false;
-            }
+        // ✅ EDIT MODE:
+        // Δεν επιτρέπουμε το ΕΩΣ ωραρίου να γίνει μικρότερο από την τελευταία
+        // δυναμική ημερομηνία που έχει κατηγορία εργασίας ΔΙΑΦΟΡΗ του ΜΕ.
+        // Έτσι δεν χάνονται ημέρες που ο χρήστης έχει ήδη δηλώσει ως ΕΡΓ/ΤΗΛ/ΑΝ κ.λπ.
+        const lastNonMEDay = getLastDynamicDateWithKathgoriaNotME();
+        if (lastNonMEDay && eosDateObj <= lastNonMEDay.date) {
+            const minAllowedDate = new Date(lastNonMEDay.date);
+            minAllowedDate.setDate(minAllowedDate.getDate() + 1);
+
+            alert(
+                `Η Ημερ/νία ΕΩΣ δεν μπορεί να είναι πριν ή ίση με την ${formatDate(lastNonMEDay.date)}, ` +
+                    `γιατί στις ${formatDate(lastNonMEDay.date)} υπάρχει Κατηγορία Εργασίας ` +
+                    `διαφορετική από ΜΕ (${lastNonMEDay.category}). ` +
+                    `Ελάχιστη επιτρεπόμενη Ημερ/νία ΕΩΣ: ${formatDate(minAllowedDate)}.`
+            );
+            return false;
         }
+
+        // ✅ Δεν απαγορεύουμε πλέον ΕΩΣ μετά τη λήξη σύμβασης.
+        // Η λήξη σύμβασης χρησιμοποιείται μόνο για τη σήμανση των μεταγενέστερων ημερών ως ΜΕ.
 
         // ✅ ΔΙΟΡΘΩΣΗ yearEnd: setMonth/setDate
         const yearEnd = new Date(apoDateObj);
@@ -730,9 +743,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     currentDateKey > endDate &&
                     currentDateKey <= originalHiddenEos;
 
-                const prod = isTrailingME ? null : prodhlomenaMap[currentDateKey] || null;
+                // ✅ EDIT MODE - default ΜΕ για ΝΕΕΣ ημέρες μετά τη λήξη σύμβασης:
+                // Δεν βασιζόμαστε στο row index. Η απόφαση γίνεται με βάση το currentDateKey.
+                // Αν ο χρήστης δεν πείραξε τις εβδομαδιαίες ώρες και η συγκεκριμένη ημερομηνία
+                // δεν υπάρχει στα προδηλωμένα, τότε μετά τη λήξη σύμβασης μπαίνει ΜΕ.
+                // ΝΕΑ ΑΠΛΗ ΛΟΓΙΚΗ:
+                // Δεν κάνουμε πλέον auto-preselect ΜΕ στις νέες γραμμές.
+                // Οι γραμμές δημιουργούνται enabled και κενές, ώστε ο χρήστης να επιλέξει ο ίδιος.
+                const shouldDefaultMEAfterContractEnd = false;
 
-                const pKathgoria = isTrailingME ? 'ΜΕ' : prod?.kathgoria_ergasias || '';
+                const prod =
+                    isTrailingME || shouldDefaultMEAfterContractEnd
+                        ? null
+                        : prodhlomenaMap[currentDateKey] || null;
+
+                const pKathgoria =
+                    isTrailingME || shouldDefaultMEAfterContractEnd
+                        ? 'ΜΕ'
+                        : prod?.kathgoria_ergasias || '';
                 const pApoOra01 = prod?.apo_ora_01 || '';
                 const pEosOra01 = prod?.eos_ora_01 || '';
                 const pDialApo01 = prod?.dialleima_apo_ora_01 || '';
@@ -787,7 +815,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             <input type="hidden"
                                 name="kathgoria_ergasias_sthathera_${i1}"
                                 id="kathgoria_ergasias_stathera_${i1}"
-                                value="${pKathgoria}" />
+                                value="${pKathgoria}"
+                                data-auto-default-me="${shouldDefaultMEAfterContractEnd ? '1' : '0'}" />
                             <select
                                 class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
                                 name="kathgoria_ergasias_${i1}"
@@ -910,12 +939,26 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             updateDates();
+
+            // ✅ Αφού μπουν οι ημερομηνίες στα hmeromhnia_XX,
+            // όσα rows είναι ΜΕΤΑ τη λήξη σύμβασης παίρνουν default ΜΕ.
+            // Το κάνουμε πριν το reinitTomDropdowns ώστε το data-preselect να βρει ήδη τιμή
+            // στο hidden kathgoria_ergasias_stathera_XX.
+            applyDefaultKathgoriaMEAfterContractEnd();
+
             setupEnterKeyNavigation();
 
             setTimeout(() => {
                 if (window.reinitTomDropdowns) window.reinitTomDropdowns(container);
                 if (window.initClearableInputs) window.initClearableInputs(container);
                 initializeSelectListeners();
+
+                // ✅ Extra pass και ΜΕΤΑ το TomSelect init, ώστε να ενημερωθεί και το visual control.
+                applyDefaultKathgoriaMEAfterContractEnd();
+
+                if (typeof updateKathgoriaBackgroundColor === 'function') {
+                    updateKathgoriaBackgroundColor();
+                }
             }, 200);
 
             for (let i = 1; i <= data.differenceInDays; i++) {
@@ -923,12 +966,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 for (let j = 1; j <= 3; j++) {
                     const jj = j < 10 ? '0' + j : String(j);
-                    const eosOraEl = document.getElementById(`eos_ora_${jj}_${i1}`);
-                    if (eosOraEl) {
-                        eosOraEl.addEventListener('blur', () => calculateWeeklyTotalHours());
-                    }
+
+                    [
+                        `apo_ora_${jj}_${i1}`,
+                        `eos_ora_${jj}_${i1}`,
+                        `dialleima_apo_ora_${jj}_${i1}`,
+                        `dialleima_eos_ora_${jj}_${i1}`
+                    ].forEach((fieldId) => {
+                        const field = document.getElementById(fieldId);
+                        if (!field || field.dataset.weeklyTotalListenerBound === '1') return;
+
+                        field.dataset.weeklyTotalListenerBound = '1';
+                        field.addEventListener('input', () => calculateWeeklyTotalHours());
+                        field.addEventListener('change', () => calculateWeeklyTotalHours());
+                        field.addEventListener('blur', () => calculateWeeklyTotalHours());
+                    });
+                }
+
+                const kathgoriaSelect = document.getElementById(`kathgoria_ergasias_${i1}`);
+                if (kathgoriaSelect && kathgoriaSelect.dataset.weeklyTotalListenerBound !== '1') {
+                    kathgoriaSelect.dataset.weeklyTotalListenerBound = '1';
+                    kathgoriaSelect.addEventListener('change', () => calculateWeeklyTotalHours());
                 }
             }
+
+            calculateWeeklyTotalHours();
         } catch (error) {
             console.error('❌ Error in updateDateDifference:', error);
             throw error;
@@ -940,6 +1002,129 @@ document.addEventListener('DOMContentLoaded', function () {
     // =========================================================================
     // UTILITY FUNCTIONS
     // =========================================================================
+
+    function parseISODateOnly(value) {
+        if (!value) return null;
+
+        const parsed = new Date(`${value}T00:00:00`);
+
+        if (isNaN(parsed.getTime())) return null;
+
+        return parsed;
+    }
+
+    /**
+     * Επιστρέφει την τελευταία δυναμική ημερομηνία όπου η κατηγορία εργασίας
+     * έχει τιμή και είναι διαφορετική από ΜΕ.
+     *
+     * Χρησιμοποιείται για να μην επιτρέπεται μείωση του
+     * hmeromhnia_allaghs_orarioy_eos κάτω από ημέρα που έχει ήδη ουσιαστική
+     * κατηγορία εργασίας (π.χ. ΕΡΓ, ΤΗΛ, ΑΝ).
+     */
+    function getLastDynamicDateWithKathgoriaNotME() {
+        const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+        if (!differenceInDays || differenceInDays <= 0) return null;
+
+        let lastMatch = null;
+
+        for (let i = 1; i <= differenceInDays; i++) {
+            const i1 = i < 10 ? '0' + i : String(i);
+
+            const dayInput = document.getElementById(`hmeromhnia_${i1}`);
+            if (!dayInput?.value) continue;
+
+            const hiddenInput = document.getElementById(`kathgoria_ergasias_stathera_${i1}`);
+            const selectElement = document.getElementById(`kathgoria_ergasias_${i1}`);
+
+            const category = String(
+                hiddenInput?.value ||
+                    selectElement?.value ||
+                    selectElement?.tomselect?.getValue?.() ||
+                    ''
+            )
+                .trim()
+                .toUpperCase();
+
+            if (!category || category === 'ΜΕ') continue;
+
+            const rowDate = parseISODateOnly(dayInput.value);
+            if (!rowDate) continue;
+
+            if (!lastMatch || rowDate > lastMatch.date) {
+                lastMatch = { date: rowDate, category, index: i1 };
+            }
+        }
+
+        return lastMatch;
+    }
+
+    /**
+     * Θέτει την κατηγορία εργασίας σε ΜΕ για όλες τις δυναμικές ημέρες
+     * που είναι ΜΕΤΑ την hmeromhnia_lhxhs_symbashs.
+     *
+     * Δεν πειράζει τις ημέρες πριν/ίσες με τη λήξη σύμβασης, ώστε να μην
+     * σβήνονται επιλογές που έχει ήδη κάνει ο χρήστης.
+     */
+    function applyDefaultKathgoriaMEAfterContractEnd() {
+        // ΝΕΑ ΑΠΛΗ ΛΟΓΙΚΗ:
+        // Δεν εφαρμόζουμε αυτόματο ΜΕ στις δυναμικές γραμμές.
+        // Οι νέες γραμμές μένουν με κενή κατηγορία και enabled πεδία.
+        return;
+    }
+
+    /**
+     * Ενημερώνει και το hidden field και το select/TomSelect control.
+     */
+    function setKathgoriaErgasiasValue(selectElement, hiddenInput, value) {
+        hiddenInput.value = value;
+
+        if (selectElement.tomselect) {
+            const ts = selectElement.tomselect;
+
+            // Αν για οποιονδήποτε λόγο δεν έχει φορτωθεί ακόμη option ΜΕ,
+            // το προσθέτουμε προσωρινά ώστε να μπορεί να εμφανιστεί.
+            if (!ts.options[value]) {
+                // ✅ Για το default ΜΕ θέλουμε να φαίνεται όπως στο dropdown:
+                // "ΜΕ  -  ΜΗ ΕΡΓΑΣΙΑ" και όχι σκέτο "ΜΕ".
+                const fallbackText = value === 'ΜΕ' ? 'ΜΕ  -  ΜΗ ΕΡΓΑΣΙΑ' : value;
+                ts.addOption({ value, text: fallbackText });
+            }
+
+            ts.setValue(value, true);
+            ts.refreshOptions(false);
+        } else {
+            selectElement.value = value;
+        }
+
+        // Ειδοποιούμε τυχόν listeners ότι άλλαξε η τιμή.
+        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    /**
+     * Κλειδώνει και καθαρίζει τα πεδία ωρών/διαλείμματος μιας δυναμικής ημέρας.
+     * Χρησιμοποιείται για ημέρες μετά τη λήξη σύμβασης, όπου η κατηγορία
+     * μπαίνει αυτόματα σε ΜΕ - ΜΗ ΕΡΓΑΣΙΑ.
+     */
+    function disableAndClearTimeFieldsForDay(i1) {
+        for (let j = 1; j <= 3; j++) {
+            const fieldIds = [
+                `apo_ora_0${j}_${i1}`,
+                `eos_ora_0${j}_${i1}`,
+                `dialleima_apo_ora_0${j}_${i1}`,
+                `dialleima_eos_ora_0${j}_${i1}`
+            ];
+
+            fieldIds.forEach((fieldId) => {
+                const field = document.getElementById(fieldId);
+                if (!field) return;
+
+                field.value = '';
+                field.setAttribute('disabled', 'disabled');
+                field.style.setProperty('background-color', '', 'important');
+                field.style.setProperty('border-color', '#cccccc', 'important');
+            });
+        }
+    }
 
     function updateKathgoriaBackgroundColor() {
         const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
@@ -1146,6 +1331,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const dailyHoursValue = dailyMinutes / 60;
             dailyHours[i1] = dailyHoursValue;
 
+            const dailyTotalInput = document.getElementById(`total_hours_day_${i1}`);
+            if (dailyTotalInput) {
+                dailyTotalInput.value = dailyHoursValue.toFixed(4);
+            }
+
             if (moOron > 0 && dailyHoursValue > moOron) {
                 hasExceeded = true;
                 const dayLabel =
@@ -1201,9 +1391,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const totalHours = (totalMinutes / 60).toFixed(2);
         const totalInput = document.getElementById('total_hours_day');
 
-        if (totalInput && parseFloat(totalHours) <= 40) {
+        // Γενικό σύνολο ωρών εβδομαδιαίου προδηλωμένου προγράμματος.
+        // Ενημερώνεται ΠΑΝΤΑ, ακόμη και αν οι ώρες ξεπερνούν τις 40,
+        // ώστε ο χρήστης να βλέπει το πραγματικό σύνολο που έχει πληκτρολογήσει.
+        if (totalInput) {
             totalInput.value = totalHours;
-        } else if (parseFloat(totalHours) > 40) {
+        }
+
+        if (parseFloat(totalHours) > 40) {
             return false;
         }
 
@@ -1281,7 +1476,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         allowOutsideClick: false,
                         icon: 'info',
                         title: 'ΠΡΟΣΟΧΗ!!!',
-                        text: 'Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου.',
+                        html: `Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου.<br>
+                                Οι ώρες που δηλώθηκαν είναι <strong>${actualHours}</strong>, ενώ οι ώρες που αναμένονται σύμφωνα με το ωράριο είναι <strong>${expectedHours}</strong>.`,
                         showConfirmButton: true,
                         confirmButtonText: 'Κλείσιμο',
                         customClass: {

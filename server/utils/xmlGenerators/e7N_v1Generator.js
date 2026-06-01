@@ -22,7 +22,8 @@ async function generateE7NXML(ergazomenos, companyData, ypokatasthmataData, opti
             { field: 'hmeromhnia_proslhpshs', label: 'Ημ/νία Πρόσληψης' },
             { field: 'hmeromhnia_lhxhs_symbashs', label: 'Ημ/νία Λήξης Σύμβασης' },
             { field: 'hmeromhnia_apoxorhshs', label: 'Ημ/νία Απόλυσης/Λύσης' },
-            { field: 'logos_peratosis', label: 'Λόγος Περάτωσης Σύμβασης' }
+            { field: 'logos_peratosis', label: 'Λόγος Περάτωσης Σύμβασης' },
+            { field: 'parathrhseis_peratosis', label: 'Παρατηρήσεις Περάτωσης Σύμβασης' }
         ];
 
         const apoxwrisiDate =
@@ -190,7 +191,7 @@ async function generateE7NXML(ergazomenos, companyData, ypokatasthmataData, opti
             f_apolysisdate: formatDateForErganh(apoxwrisiDate),
             f_comments: ergazomenos.parathrhseis || options.comments || '',
             f_logosperatosis: ergazomenos.logos_peratosis || '0',
-            f_logosperatosiscomments: '',
+            f_logosperatosiscomments: ergazomenos.parathrhseis_peratosis || '',
 
             f_foreign_file: foreignPdfBase64,
             f_young_file: youngPdfBase64

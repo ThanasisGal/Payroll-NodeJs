@@ -144,45 +144,62 @@
                 </div>		  
             </div>		  
 
-            <div class="height-vh-0_2"></div>
+            <div
+                id="logos_peratoshs_section"
+                class="logos-peratoshs-section"
+                style="display: none;">
 
-            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
-                <div class="col-2 left-align">
-                    <label for="logos_peratoshs" id="logos_peratoshs_label" class="col-form-label label-font-size field-required">
-                    Λόγος Περάτωσης της Σύμβασης
-                    </label>
+                <div class="height-vh-0_2"></div>
+
+                <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                    <div class="col-2 left-align">
+                        <label for="logos_peratoshs" id="logos_peratoshs_label" class="col-form-label label-font-size field-required">
+                        Λόγος Περάτωσης Σ.Ο.Χ.
+                        </label>
+                    </div>
+
+                    <input
+                        type="hidden"
+                        name="logos_peratoshs_stathera"
+                        id="logos_peratoshs_stathera"
+                        class="form-control input-contents"
+                        value="<%= safe('logos_peratosis') %>"
+                        />
+
+                    <div class="col-9-75">
+                        <select
+                            id="logos_peratoshs"
+                            name="logos_peratoshs"
+                            class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
+                            aria-label="Λόγος Περάτωσης Σ.Ο.Χ."
+                            data-api="/api/dropdown/ergazomenoi/logos_peratoshs"
+                            single
+                            data-target-input="logos_peratoshs_stathera"
+                            data-preselect="logos_peratoshs_stathera"
+                            data-preload-all="true"
+                            data-pad-length="1"
+                            placeholder="Αναζήτηση Λόγου Περάτωσης Σ.Ο.Χ."
+                            disabled>
+                        </select>
+                    </div>
                 </div>
 
-                <%
-                    const hasLhxhSymbashs = !!safe('hmeromhnia_lhxhs_symbashs');
-                    const hasApoxorhsh = !!safe('hmeromhnia_apoxorhshs');
-                    const enableLogosPeratoshs = hasLhxhSymbashs && hasApoxorhsh;
-                %>                
-
-                <input
-                    type="hidden"
-                    name="logos_peratoshs_stathera"
-                    id="logos_peratoshs_stathera"
-                    class="form-control input-contents"
-                    value="<%= safe('logos_peratosis') %>"
-                    />
-
-                <div class="col-9-75">
-                    <select
-                        id="logos_peratoshs"
-                        name="logos_peratoshs"
-                        class="tom-dropdown selectpicker-dropdown-normal left-align w-100"
-                        aria-label="Λόγος Περάτωσης της Σύμβασης"
-                        data-api="/api/dropdown/ergazomenoi/logos_peratoshs"
-                        single
-                        data-target-input=<%= `logos_peratoshs_stathera` %>
-                        data-preselect="logos_peratoshs_stathera"
-                        data-preload-all="true"
-                        data-pad-length="1"
-                        placeholder="Αναζήτηση Λόγου Λύσης της Σύμβασης"
-                        <%= enableLogosPeratoshs ? '' : 'disabled' %> 
-                >
-                    </select>
+                <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+                    <div class="col-2 left-align">
+                        <label for="parathrhseis_peratosis" id="parathrhseis_peratosis_label" class="col-form-label label-font-size field-required">
+                        Παρατηρήσεις Περάτωσης Σ.Ο.Χ.
+                        </label>
+                    </div>
+                    <div class="col-10 left-align">
+                        <input
+                            type="text"
+                            name="parathrhseis_peratosis"
+                            id="parathrhseis_peratosis"
+                            class="form-control input-contents"
+                            value="<%= safe('parathrhseis_peratosis') %>"
+                            disabled
+                            />
+                    </div>
                 </div>
             </div>
 

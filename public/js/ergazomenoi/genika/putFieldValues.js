@@ -307,6 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const days = ['01', '02', '03', '04', '05', '06', '07'];
             const scheduleErrors = [];
             const emptyDays = [];
+            const emptyDayIndexes = [];
 
             days.forEach((day) => {
                 const category = (formData[`kathgoria_ergasias_${day}`] || '').trim();
@@ -314,14 +315,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const label = document.getElementById(`day_label_${day}`);
                     const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
                     emptyDays.push(dateStr);
+                    emptyDayIndexes.push(day);
                 }
             });
 
             if (emptyDays.length > 0) {
-                await Swal.fire({
+                const emptyDaysResult = await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
-                    icon: 'error',
+                    icon: 'warning',
                     title: 'Ελλιπές Εβδομαδιαίο Ωράριο',
                     html: `
                         <p><strong>${emptyDays.length}</strong> ημέρες δεν έχουν Κατηγορία Εργασίας:</p>
@@ -330,16 +332,51 @@ document.addEventListener('DOMContentLoaded', () => {
                         </ul>
                         <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
                             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και συμπλήρωσε την κατηγορία για όλες τις ημέρες (ΕΡΓ, ΤΗΛ, ΑΝ, ΜΕ).
+                            <br><br>
+                            Αλλιώς, αν <strong>συνεχίσετε στην ενημέρωση</strong>, οι παραπάνω ημέρες θα ενημερωθούν σαν
+                            <strong>"ΜΕ - ΜΗ ΕΡΓΑΣΙΑ"</strong>.
                         </p>
                     `,
-                    confirmButtonText: 'OK',
+                    showCancelButton: true,
+                    confirmButtonText: 'Συνέχεια',
+                    cancelButtonText: 'Επιστροφή',
                     customClass: {
-                        confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                        confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                        cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
                         title: 'custom-title',
                         popup: 'custom-swal-popup'
                     }
                 });
-                // return;
+
+                if (!emptyDaysResult.isConfirmed) {
+                    return;
+                }
+
+                emptyDayIndexes.forEach((day) => {
+                    const hidden = document.getElementById(`kathgoria_ergasias_stathera_${day}`);
+                    const select = document.getElementById(`kathgoria_ergasias_${day}`);
+
+                    if (hidden) {
+                        hidden.value = 'ΜΕ';
+                        if (hidden.name) formData[hidden.name] = 'ΜΕ';
+                    }
+
+                    formData[`kathgoria_ergasias_${day}`] = 'ΜΕ';
+                    formData[`kathgoria_ergasias_stathera_${day}`] = 'ΜΕ';
+                    formData[`kathgoria_ergasias_sthathera_${day}`] = 'ΜΕ';
+
+                    if (select?.tomselect) {
+                        if (!select.tomselect.options['ΜΕ']) {
+                            select.tomselect.addOption({
+                                value: 'ΜΕ',
+                                text: 'ΜΕ  -  ΜΗ ΕΡΓΑΣΙΑ'
+                            });
+                        }
+                        select.tomselect.setValue('ΜΕ', true);
+                    } else if (select) {
+                        select.value = 'ΜΕ';
+                    }
+                });
             }
 
             console.log('✅ [PRE-VALIDATION] All days have categories');

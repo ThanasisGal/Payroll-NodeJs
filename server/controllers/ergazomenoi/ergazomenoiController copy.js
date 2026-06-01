@@ -19,7 +19,6 @@ const Models_B = require('../../models/privileges');
 const Models_C = require('../../models/companies');
 const Models_D = require('../../models/ergazomenoi');
 const Models_E = require('../../models/pdfDocument');
-const Models_Symbaseis = require('../../models/symbaseis');
 
 const {
     KrathseisModel,
@@ -36,13 +35,6 @@ const { CompaniesModel, YpokatasthmataModel, PasswordsModel, NomimoiEkprosopoiMo
 const { ErgazomenoiModel, ProdhlomenaOrariaModel, IstorikoProslhpseonAllagonModel } = Models_D;
 
 const { pdfDocumentl } = Models_E;
-
-const {
-    SymbaseisModel,
-    KathgoriesSymbaseonModel,
-    EidikothtesAnaKathgoriaSymbaseonModel,
-    StoixeiaSymbaseonModel
-} = Models_Symbaseis;
 
 // ✅ IMPORTS
 const { savePdfFromBase64, deletePdf } = require('../../utils/pdfHandler');
@@ -177,27 +169,18 @@ function normalizeTemporaryOrarioValue(formData, i1) {
         valueOrEmpty(formData[`kathgoria_ergasias_sthathera_${i1}`]).trim() ||
         valueOrEmpty(formData[`kathgoria_ergasias_${i1}`]).trim();
 
-    // Κατηγορίες που ΔΕΝ απαιτούν ώρες εργασίας.
-    const categoriesWithoutWorkTime = new Set(['ΜΕ', 'ΑΝ']);
-
-    const isNoWorkTimeCategory = categoriesWithoutWorkTime.has(rawKathgoria);
-
     const forceTemporaryErg =
-        !rawKathgoria ||
-        (!isNoWorkTimeCategory && hasIncompleteWorkTimeForTemporarySave(formData, i1));
-
+        rawKathgoria !== 'ΜΕ' &&
+        (!rawKathgoria || hasIncompleteWorkTimeForTemporarySave(formData, i1));
     const kathgoriaErgasias = forceTemporaryErg ? 'ΕΡΓ' : rawKathgoria;
 
-    const shouldClearTimeFields =
-        forceTemporaryErg || categoriesWithoutWorkTime.has(kathgoriaErgasias);
-
     const getTimeValue = (fieldName) => {
-        if (shouldClearTimeFields) return '';
+        if (forceTemporaryErg || kathgoriaErgasias === 'ΜΕ') return '';
         return valueOrEmpty(formData[fieldName]);
     };
 
     const getHourMetricValue = (fieldName) => {
-        if (shouldClearTimeFields) return '';
+        if (forceTemporaryErg || kathgoriaErgasias === 'ΜΕ') return '';
         return parseHoursOrEmpty(formData[fieldName]);
     };
 
@@ -207,46 +190,6 @@ function normalizeTemporaryOrarioValue(formData, i1) {
         getTimeValue,
         getHourMetricValue
     };
-}
-
-function minutesFromHHMM(value) {
-    if (!value || !String(value).includes(':')) return null;
-
-    const [h, m] = String(value).split(':').map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-
-    return h * 60 + m;
-}
-
-function calcHoursFromTimePairs(formData, i1) {
-    let totalMinutes = 0;
-
-    for (let j = 1; j <= 3; j++) {
-        const jj = String(j).padStart(2, '0');
-
-        const apo = minutesFromHHMM(formData[`apo_ora_${jj}_${i1}`]);
-        const eos = minutesFromHHMM(formData[`eos_ora_${jj}_${i1}`]);
-
-        if (apo === null || eos === null) continue;
-
-        let diff = eos - apo;
-
-        // Αν περνάει μεσάνυχτα
-        if (diff < 0) diff += 24 * 60;
-
-        totalMinutes += diff;
-    }
-
-    return totalMinutes > 0 ? (totalMinutes / 60).toFixed(4) : '';
-}
-
-function firstPositiveHours(...values) {
-    for (const value of values) {
-        const n = toNumberOrNull(value);
-        if (n && n > 0) return n.toFixed(4);
-    }
-
-    return '0.0000';
 }
 
 // =========================================================================
@@ -355,199 +298,6 @@ function getIstorikoDateIdentity(formData = {}) {
     };
 }
 
-// =========================================================================
-// ✅ HELPERS: Εμπλουτισμός ιστορικού για αναλυτικό modal
-// =========================================================================
-// Το EJS/JS δεν διαβάζουν απευθείας MongoDB.  Οι περιγραφές για σύμβαση,
-// κατηγορία, ειδικότητα, στοιχεία σύμβασης και κρατήσεις φορτώνονται εδώ
-// server-side και περνάνε στο istoriko.ejs μέσα στο __lookups κάθε γραμμής.
-function uniqueTruthy(values = []) {
-    return [
-        ...new Set(
-            values
-                .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
-                .map((v) => String(v).trim())
-        )
-    ];
-}
-
-function mapByKey(docs = [], keyBuilder) {
-    const map = new Map();
-    docs.forEach((doc) => map.set(keyBuilder(doc), doc));
-    return map;
-}
-
-async function enrichIstorikoRowsForDetails(rows = []) {
-    if (!Array.isArray(rows) || rows.length === 0) return [];
-
-    const symbashCodes = uniqueTruthy(rows.map((row) => row.symbash));
-
-    const symbaseis = symbashCodes.length
-        ? await SymbaseisModel.find({
-              $or: symbashCodes.map((kodikos) => ({ kodikos }))
-          })
-              .select('kodikos perigrafh')
-              .lean()
-        : [];
-
-    const symbaseisMap = mapByKey(symbaseis, (doc) => String(doc.kodikos));
-
-    const kathgoriaQueries = rows
-        .filter((row) => row.symbash && row.kathgoria_symbashs)
-        .map((row) => ({
-            afora_thn_symbash: String(row.symbash),
-            kodikos: String(row.kathgoria_symbashs)
-        }));
-
-    const kathgories = kathgoriaQueries.length
-        ? await KathgoriesSymbaseonModel.find({ $or: kathgoriaQueries })
-              .select('afora_thn_symbash kodikos perigrafh')
-              .lean()
-        : [];
-
-    const kathgoriesMap = mapByKey(kathgories, (doc) => `${doc.afora_thn_symbash}||${doc.kodikos}`);
-
-    const eidikothtaQueries = rows
-        .filter((row) => row.symbash && row.kathgoria_symbashs && row.eidikothta_symbashs)
-        .map((row) => ({
-            afora_thn_symbash_kathgoria: `${row.symbash}${row.kathgoria_symbashs}`,
-            kodikos: String(row.eidikothta_symbashs)
-        }));
-
-    const eidikothtes = eidikothtaQueries.length
-        ? await EidikothtesAnaKathgoriaSymbaseonModel.find({ $or: eidikothtaQueries })
-              .select('afora_thn_symbash_kathgoria kodikos perigrafh')
-              .lean()
-        : [];
-
-    const eidikothtesMap = mapByKey(
-        eidikothtes,
-        (doc) => `${doc.afora_thn_symbash_kathgoria}||${doc.kodikos}`
-    );
-
-    const stoixeiaQueries = [];
-    rows.forEach((row) => {
-        const parentKey = `${row.symbash || ''}${row.kathgoria_symbashs || ''}${row.eidikothta_symbashs || ''}`;
-        if (!parentKey.trim()) return;
-
-        for (let i = 1; i <= 15; i += 1) {
-            const ii = String(i).padStart(2, '0');
-            const code = row[`stoixeio_symbashs_${ii}`];
-            if (!code) continue;
-
-            stoixeiaQueries.push({
-                afora_thn_symbash_kathgoria_eidikothta: parentKey,
-                kodikos: String(code)
-            });
-        }
-    });
-
-    const stoixeia = stoixeiaQueries.length
-        ? await StoixeiaSymbaseonModel.find({ $or: stoixeiaQueries })
-              .select('afora_thn_symbash_kathgoria_eidikothta kodikos perigrafh')
-              .lean()
-        : [];
-
-    const stoixeiaMap = mapByKey(
-        stoixeia,
-        (doc) => `${doc.afora_thn_symbash_kathgoria_eidikothta}||${doc.kodikos}`
-    );
-
-    const krathseisCodes = [];
-    rows.forEach((row) => {
-        for (let i = 1; i <= 7; i += 1) {
-            const ii = String(i).padStart(2, '0');
-            const code = row[`krathsh_${ii}`];
-            if (code) krathseisCodes.push(code);
-        }
-    });
-
-    const krathseisCodeList = uniqueTruthy(krathseisCodes);
-    const krathseis = krathseisCodeList.length
-        ? await KrathseisModel.find({
-              $or: krathseisCodeList.map((kodikos) => ({ kodikos }))
-          })
-              .select('kodikos perigrafh')
-              .lean()
-        : [];
-
-    const krathseisMap = mapByKey(krathseis, (doc) => String(doc.kodikos));
-
-    return rows.map((row) => {
-        const symbash = row.symbash || '';
-        const kathgoria = row.kathgoria_symbashs || '';
-        const eidikothta = row.eidikothta_symbashs || '';
-        const eidikothtaParentKey = `${symbash}${kathgoria}`;
-        const stoixeioParentKey = `${symbash}${kathgoria}${eidikothta}`;
-
-        const stoixeiaSymbaseon = {};
-        for (let i = 1; i <= 15; i += 1) {
-            const ii = String(i).padStart(2, '0');
-            const code = row[`stoixeio_symbashs_${ii}`];
-            if (!code) continue;
-
-            const doc = stoixeiaMap.get(`${stoixeioParentKey}||${code}`);
-            if (doc) {
-                stoixeiaSymbaseon[ii] = {
-                    kodikos: doc.kodikos,
-                    perigrafh: doc.perigrafh || ''
-                };
-            }
-        }
-
-        const krathseisLookup = {};
-        for (let i = 1; i <= 7; i += 1) {
-            const ii = String(i).padStart(2, '0');
-            const code = row[`krathsh_${ii}`];
-            if (!code) continue;
-
-            const doc = krathseisMap.get(String(code));
-            if (doc) {
-                krathseisLookup[ii] = {
-                    kodikos: doc.kodikos,
-                    perigrafh: doc.perigrafh || ''
-                };
-            }
-        }
-
-        const symbashDoc = symbaseisMap.get(String(symbash));
-        const kathgoriaDoc = kathgoriesMap.get(`${symbash}||${kathgoria}`);
-        const eidikothtaDoc = eidikothtesMap.get(`${eidikothtaParentKey}||${eidikothta}`);
-
-        return {
-            ...row,
-            __lookups: {
-                symbaseis: symbashDoc
-                    ? {
-                          [symbash]: {
-                              kodikos: symbashDoc.kodikos,
-                              perigrafh: symbashDoc.perigrafh || ''
-                          }
-                      }
-                    : {},
-                kathgoriesSymbaseon: kathgoriaDoc
-                    ? {
-                          [kathgoria]: {
-                              kodikos: kathgoriaDoc.kodikos,
-                              perigrafh: kathgoriaDoc.perigrafh || ''
-                          }
-                      }
-                    : {},
-                eidikothtesAnaKathgoriaSymbaseon: eidikothtaDoc
-                    ? {
-                          [eidikothta]: {
-                              kodikos: eidikothtaDoc.kodikos,
-                              perigrafh: eidikothtaDoc.perigrafh || ''
-                          }
-                      }
-                    : {},
-                stoixeiaSymbaseon,
-                krathseis: krathseisLookup
-            }
-        };
-    });
-}
-
 // Server-side guards (in-memory)
 // Αν έχεις PM2 cluster / multiple instances, αυτό θέλει DB/Redis. Για single instance είναι ΟΚ.
 const erganiInflight = new Map(); // key -> true
@@ -643,23 +393,13 @@ class ergazomenoiController {
             // const ergazomenoiKod = req.params.kod;
             const ergazomenoiKod = ergazomenoiData.kodikos;
 
-            console.time('ISTORIKO_FIND');
-
-            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
+            const istorikoData = await IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod
             })
                 .sort({ aa_eggrafhs: 1 })
                 .lean();
-
-            console.timeEnd('ISTORIKO_FIND');
-
-            console.time('ENRICH');
-
-            const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
-
-            console.timeEnd('ENRICH');
 
             const perifereies = await PerifereiesModel.find().sort('perigrafh');
             const genikesParametroi = await GenikesParametroiModel.find()
@@ -721,17 +461,15 @@ class ergazomenoiController {
             const companyId = req.session.companyInUse;
 
             const ergazomenoiKod = req.params.kod;
-            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
+            const istorikoData = await IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
                 company_kod: companyId,
                 kodikos: ergazomenoiKod
-            })
-                .sort({ aa_eggrafhs: 1 })
-                .lean();
+            }).sort({ aa_eggrafhs: 1 });
 
-            const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
-
-            res.json(istorikoData);
+            if (istorikoData) {
+                res.json(istorikoData);
+            }
         } catch (err) {
             res.status(500).send('Σφάλμα κατά την αναζήτηση στη βάση δεδομένων');
         }
@@ -1740,10 +1478,7 @@ class ergazomenoiController {
                     argia: formData[`argia_${i1}`] || false,
                     perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
                     kathgoria_adeias: '',
-                    ores_ergasias: firstPositiveHours(
-                        getHourMetricValue(`total_hours_day_${i1}`),
-                        calcHoursFromTimePairs(formData, i1)
-                    )
+                    ores_ergasias: getHourMetricValue(`total_hours_day_${i1}`)
                 };
             }
 
@@ -3568,7 +3303,6 @@ class ergazomenoiController {
                 company_kod: formData.company_kod,
                 kodikos: formData.kodikosHidden,
                 hmeromhnia: formData[`hmeromhnia_${i1}`],
-                // kathgoria_ergasias: kathgoriaErgasias,
                 kathgoria_ergasias: kathgoriaErgasias,
                 apo_ora_01: getTimeValue(`apo_ora_01_${i1}`),
                 eos_ora_01: getTimeValue(`eos_ora_01_${i1}`),
@@ -3588,10 +3322,7 @@ class ergazomenoiController {
                 argia: formData[`argia_${i1}`] || false,
                 perigrafh_argias: formData[`perigrafh_argias_${i1}`] || '',
                 kathgoria_adeias: '',
-                ores_ergasias: firstPositiveHours(
-                    getHourMetricValue(`total_hours_day_${i1}`),
-                    calcHoursFromTimePairs(formData, i1)
-                ),
+                ores_ergasias: getHourMetricValue(`total_hours_day_${i1}`),
                 ores_nyxtas: getHourMetricValue(`night_hours_day_${i1}`),
                 ores_argion: getHourMetricValue(`holiday_hours_day_${i1}`),
                 ores_yperergasias: getHourMetricValue(`overwork_hours_day_${i1}`),

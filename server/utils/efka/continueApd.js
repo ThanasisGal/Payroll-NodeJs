@@ -517,15 +517,15 @@ async function continueApd(sessionId, opts = {}) {
             await apdPage.title().catch(() => 'NO_TITLE')
         );
 
-        await apdPage.screenshot({
-            path: `./efka-debug-${Date.now()}.png`,
-            fullPage: true
-        });
+        // await apdPage.screenshot({
+        //     path: `./efka-debug-${Date.now()}.png`,
+        //     fullPage: true
+        // });
 
-        await require('fs').promises.writeFile(
-            `./efka-debug-${Date.now()}.html`,
-            await apdPage.content()
-        );
+        // await require('fs').promises.writeFile(
+        //     `./efka-debug-${Date.now()}.html`,
+        //     await apdPage.content()
+        // );
 
         await Promise.race([
             apdPage.waitForSelector('#submissionTable_data', {

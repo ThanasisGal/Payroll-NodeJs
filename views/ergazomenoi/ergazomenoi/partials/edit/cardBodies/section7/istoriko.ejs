@@ -1,50 +1,182 @@
-<div class="card d-flex flex-column z-depth-5" style="width: 90%; margin-left: 5%">
-  <div class="card-header p-0" style="height: 2.7rem !important;">
-      <label class="text-center w-100 headers-content mt-1" style="font-size: 1.1vw;">Ιστορικό Προσλήψεων - Αλλαγών</label>
-  </div>
-  <div>
-    <table class="table table-striped table-bordered table-sm table-hover mb-0" id="myTableHeader">
-      <thead style="font-size: 0.8vw;">
-        <tr>
-          <th scope="col" class="color-brown col-1" style="background-color: #3d4e001e !important;"><i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-6" colspan="4" style="background-color: #3d4e001e !important;">Η Μ Ε Ρ Ο Μ Η Ν Ι Α<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;"></th>
-        </tr>
-        <tr>
-          <th scope="col" class="color-brown col-1" style="background-color: #3d4e001e !important;">α/α<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;">Πρόσληψης<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;">Αλλαγής Σύμβασης<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;">Λήξης Σύμβασης<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;">Αποχώρησης<i class="sort-icon bi"></i></th>
-          <th scope="col" class="color-brown col-1-5" style="background-color: #3d4e001e !important;">Ενέργειες</th>
-        </tr>
-      </thead>
-    </table>
-  </div>
+<input type="hidden" id="istorikoEmployeeId" value="<%= ergazomenoiData._id %>">
 
-  <div class="card-body p-0 overflow-auto flex-grow-1" style="height: 36.2vh; background-color: #ffffff;">
-    <table class="table table-striped table-bordered table-sm table-hover" id="myTable">
-      <tbody>
-      </tbody>
-    </table>
-  </div>
+<%
+    const rows = Array.isArray(istorikoData) ? istorikoData : [];
 
-  <div class="card-footer mt-auto">
-    <div class="d-flex" style="margin: -0.5rem 0.625rem 2rem;">
-  
-      <!-- Κουμπιά ενεργειών -->
-      <div class="d-flex" style="width: 100%; justify-content: space-around;">
-        <button 
-          id="updateBtn" style="font-size: 0.8vw;" data-bs-toggle="tooltip" data-bs-title="Αποθήκευση και τακτοποίηση των εγγραφών του Ιστορικού" data-bs-placement="bottom" class="btn btn-brown rounded-4 mb-3 mt-2 mr-1 col-3">
-            <i class="bi bi-save"></i> Ενημέρωση Ιστορικού Αρχείου
-        </button>
-        
-        <button 
-          id="cancelBtn"
-          class="btn btn-brown rounded-4 mb-3 mt-2 col-3" style="font-size: 0.8vw;" data-bs-toggle="tooltip" data-bs-title="Ακύρωση ενημέρωσης των τροποποιημένων / διεγραμμένων εγγραφών" data-bs-placement="bottom" >
-          <i class="bi bi-arrow-counterclockwise"></i> Ακύρωση Ενημέρωσης
-        </button>
-      </div>
+    const fmtDate = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('el-GR');
+    };
+
+    const showIfChanged = (row, prev, field) => {
+        if (!prev) return fmtDate(row[field]);
+        const current = fmtDate(row[field]);
+        const previous = fmtDate(prev[field]);
+        return current !== previous ? current : '';
+    };
+
+    const escapeDataAttrJson = (obj) => JSON.stringify(obj || {})
+        .replace(/&/g, '&amp;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const originalForRow = (row) => ({
+        aa_eggrafhs: row.aa_eggrafhs || '',
+        hmeromhnia_proslhpshs: row.hmeromhnia_proslhpshs || '',
+        hmeromhnia_allaghs_symbashs: row.hmeromhnia_allaghs_symbashs || '',
+        hmeromhnia_allaghs_orarioy_apo: row.hmeromhnia_allaghs_orarioy_apo || '',
+        hmeromhnia_allaghs_orarioy_eos: row.hmeromhnia_allaghs_orarioy_eos || '',
+        hmeromhnia_lhxhs_symbashs: row.hmeromhnia_lhxhs_symbashs || '',
+        hmeromhnia_apoxorhshs: row.hmeromhnia_apoxorhshs || ''
+    });
+%>
+
+<div class="istoriko-card card d-flex flex-column z-depth-5">
+
+    <div class="card-header p-0 istoriko-card-header">
+        <label class="text-center w-100 headers-content mt-1 istoriko-card-title">
+            Ιστορικό Προσλήψεων - Αλλαγών
+        </label>
     </div>
-  </div>
+
+    <div class="istoriko-table-wrapper">
+
+        <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable">
+
+            <colgroup>
+                <col class="istoriko-col-aa">
+                <col class="istoriko-col-date">
+                <col class="istoriko-col-date-wide">
+                <col class="istoriko-col-date-wide">
+                <col class="istoriko-col-date-wide">
+                <col class="istoriko-col-date-wide">
+                <col class="istoriko-col-date">
+                <col class="istoriko-col-state">
+                <col class="istoriko-col-actions">
+            </colgroup>
+
+            <thead>
+                <tr>
+                    <th class="istoriko-th istoriko-aa-col"></th>
+                    <th class="istoriko-th text-center" colspan="6">Η Μ Ε Ρ Ο Μ Η Ν Ι Α</th>
+                    <th class="istoriko-th istoriko-state-col"></th>
+                    <th class="istoriko-th istoriko-actions-col"></th>
+                </tr>
+
+                <tr>
+                    <th class="istoriko-th istoriko-aa-col text-center">α/α</th>
+                    <th class="istoriko-th text-center">Πρόσληψης</th>
+                    <th class="istoriko-th text-center">Αλλαγής Σύμβασης</th>
+                    <th class="istoriko-th text-center">Αλλαγής Ωραρίου Από</th>
+                    <th class="istoriko-th text-center">Αλλαγής Ωραρίου Έως</th>
+                    <th class="istoriko-th text-center">Λήξης Σύμβασης</th>
+                    <th class="istoriko-th text-center">Αποχώρησης</th>
+                    <th class="istoriko-th text-center istoriko-state-col">Κατ.</th>
+                    <th class="istoriko-th istoriko-actions-col text-center">Ενέργειες</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <% if (rows.length > 0) { %>
+                    <% rows.forEach((row, index) => { 
+                        const prev = index > 0 ? rows[index - 1] : null;
+                    %>
+                        <tr
+                            class="istoriko-row"
+                            data-id="<%= row._id %>"
+                            data-state="clean"
+                            data-record='<%- escapeDataAttrJson(row) %>'
+                            data-original='<%- escapeDataAttrJson(originalForRow(row)) %>'>
+
+                            <td class="text-center istoriko-aa-col"><%= row.aa_eggrafhs || '' %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_proslhpshs') %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_allaghs_symbashs') %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_allaghs_orarioy_apo') %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_allaghs_orarioy_eos') %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_lhxhs_symbashs') %></td>
+                            <td class="text-center"><%= showIfChanged(row, prev, 'hmeromhnia_apoxorhshs') %></td>
+
+                            <td class="text-center istoriko-state-col">
+                                <span class="istoriko-state state-clean"></span>
+                            </td>
+
+                            <td class="istoriko-actions-col text-center">
+                                <div class="istoriko-actions">
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" data-id="<%= row._id %>" title="Προσθήκη">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" data-id="<%= row._id %>" title="Αναίρεση">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <% }) %>
+                <% } else { %>
+                    <tr>
+                        <td colspan="9" class="text-center text-muted istoriko-empty-row">
+                            Δεν υπάρχουν εγγραφές ιστορικού.
+                        </td>
+                    </tr>
+                <% } %>
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="card-footer mt-auto istoriko-card-footer">
+        <div class="d-flex istoriko-footer-actions">
+            <button
+                type="button"
+                id="updateIstorikoBtn"
+                class="btn rounded-4 istoriko-footer-btn istoriko-footer-btn-save"
+                data-bs-toggle="tooltip"
+                data-bs-title="Αποθήκευση και τακτοποίηση των εγγραφών του Ιστορικού"
+                data-bs-placement="bottom">
+                <i class="bi bi-save"></i>
+                Ενημέρωση Ιστορικού Αρχείου
+            </button>
+
+            <button
+                type="button"
+                id="cancelIstorikoBtn"
+                class="btn rounded-4 istoriko-footer-btn istoriko-footer-btn-cancel"
+                data-bs-toggle="tooltip"
+                data-bs-title="Ακύρωση ενημέρωσης των τροποποιημένων / διεγραμμένων εγγραφών"
+                data-bs-placement="bottom">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                Ακύρωση Ενημέρωσης
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal fade" id="istorikoDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content istoriko-details-modal">
+            <div class="modal-header istoriko-details-modal-header">
+                <h5 class="modal-title">Αναλυτικά Στοιχεία Ιστορικού</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+            </div>
+            <div class="modal-body">
+                <div id="istorikoDetailsBody"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-brown rounded-4" data-bs-dismiss="modal">
+                    Κλείσιμο
+                </button>
+            </div>
+        </div>
+    </div>
 </div>

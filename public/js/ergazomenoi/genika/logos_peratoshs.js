@@ -1,8 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const lhxhInput = document.getElementById('hmeromhnia_lhxhs_symbashs');
     const apoxorhshInput = document.getElementById('hmeromhnia_apoxorhshs');
+    const logosSection = document.getElementById('logos_peratoshs_section');
     const logosSelect = document.getElementById('logos_peratoshs');
     const logosHidden = document.getElementById('logos_peratoshs_stathera');
+    const parathrhseisInput = document.getElementById('parathrhseis_peratosis');
 
     function hasValue(el) {
         return !!String(el?.value ?? '').trim();
@@ -18,39 +20,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function setLogosEnabled(enabled) {
-        if (!logosSelect) return;
+    function clearParathrhseisPeratosis() {
+        if (parathrhseisInput) parathrhseisInput.value = '';
+    }
 
-        if (enabled) {
-            if (logosSelect.tomselect) {
-                logosSelect.tomselect.enable();
+    function setControlDisabled(control, disabled) {
+        if (!control) return;
+
+        if (control.tomselect) {
+            if (disabled) {
+                control.tomselect.disable();
             } else {
-                logosSelect.disabled = false;
+                control.tomselect.enable();
             }
-        } else {
+            return;
+        }
+
+        control.disabled = disabled;
+    }
+
+    function setPeratosisVisible(enabled) {
+        if (logosSection) {
+            logosSection.style.display = enabled ? '' : 'none';
+        }
+
+        setControlDisabled(logosSelect, !enabled);
+        setControlDisabled(parathrhseisInput, !enabled);
+
+        if (!enabled) {
             clearLogosPeratoshs();
-
-            if (logosSelect.tomselect) {
-                logosSelect.tomselect.disable();
-            } else {
-                logosSelect.disabled = true;
-            }
+            clearParathrhseisPeratosis();
         }
     }
 
     function toggleLogosPeratoshs() {
         const enabled = hasValue(lhxhInput) && hasValue(apoxorhshInput);
-        setLogosEnabled(enabled);
+        setPeratosisVisible(enabled);
     }
 
     [lhxhInput, apoxorhshInput].forEach((input) => {
         if (!input) return;
 
-        input.addEventListener('input', clearLogosPeratoshs);
-        input.addEventListener('change', clearLogosPeratoshs);
+        input.addEventListener('input', () => {
+            clearLogosPeratoshs();
+            clearParathrhseisPeratosis();
+            toggleLogosPeratoshs();
+        });
 
-        input.addEventListener('input', toggleLogosPeratoshs);
-        input.addEventListener('change', toggleLogosPeratoshs);
+        input.addEventListener('change', () => {
+            clearLogosPeratoshs();
+            clearParathrhseisPeratosis();
+            toggleLogosPeratoshs();
+        });
+
         input.addEventListener('blur', toggleLogosPeratoshs);
     });
 
@@ -63,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setTimeout(() => {
             clearLogosPeratoshs();
+            clearParathrhseisPeratosis();
             toggleLogosPeratoshs();
         }, 0);
     });

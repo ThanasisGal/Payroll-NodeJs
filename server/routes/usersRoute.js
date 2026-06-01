@@ -327,7 +327,7 @@ router.get(
     ergazomenoiController.getIstorikoData
 );
 router.post(
-    '/ergazomenoi/ergazomenoi/istoriko/:kod',
+    '/ergazomenoi/ergazomenoi/istoriko/update',
     checkAuth,
     ergazomenoiController.updateIstorikoData
 );

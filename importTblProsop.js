@@ -162,7 +162,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
     return {
         // ── Ταυτότητα εταιρείας ───────────────────────────────────────────────
         team: 'BLG',
-        company_kod: '69e70d6d74cb535fd4d195ad',
+        company_kod: '69ea2aabc03fe9738041b8c8',
         kodikos: toStr(row['C']),
 
         // ── Προσωπικά στοιχεία ────────────────────────────────────────────────
@@ -181,7 +181,7 @@ function mapRowToDocument(row, defaultTeam, defaultCompanyKod) {
         arithmos_bibliarioy_anhlikoy: toStr(row['FZ']),
 
         // ── Ταυτότητα / Διαβατήριο ────────────────────────────────────────────
-        typos_taytothtas: toStr(row['FL']),
+        typos_taytothtas: toStr(row['J']) === '048' ? 'ΔAT' : 'ΔΙΑ',
         adt: toStr(row['L']),
         hmeromhnia_ekdoshs: safeDate(row['NW']),
         hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy: excelDateToJS(row['FS']),
@@ -436,10 +436,17 @@ async function main() {
         const doc = mapRowToDocument(row, DEFAULT_TEAM, DEFAULT_COMPANY_KOD);
 
         // Παράλειψη εγγραφών χωρίς AMKA
+        // if (!doc.amka) {
+        //     console.warn(`  ⚠️  Παράλειψη (χωρίς AMKA): ${doc.eponymo ?? ''} ${doc.onoma ?? ''}`);
+        //     skipped++;
+        //     continue;
+        // }
+
+        // Διακοπή εκτέλεσης αν η εγγραφή δεν έχει AMKA
         if (!doc.amka) {
-            console.warn(`  ⚠️  Παράλειψη (χωρίς AMKA): ${doc.eponymo ?? ''} ${doc.onoma ?? ''}`);
-            skipped++;
-            continue;
+            throw new Error(
+                `Σφάλμα: Βρέθηκε εγγραφή χωρίς AMKA: ${doc.eponymo ?? ''} ${doc.onoma ?? ''}`
+            );
         }
 
         try {

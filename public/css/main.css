@@ -11675,3 +11675,511 @@ body.loader-active > *:not(.app-loader) {
     text-align: left;
     font-size: 0.9rem;
 }
+
+/* ==========================================================================
+   Ιστορικό Προσλήψεων - Αλλαγών
+   CSP-safe: χωρίς inline styles
+   ========================================================================== */
+
+.istoriko-card {
+    width: 98%;
+    margin-left: 1%;
+    border-radius: 0.8rem;
+    overflow: hidden;
+}
+
+.istoriko-card-header {
+    height: 2.7rem;
+    background-color: #4f7358;
+}
+
+.istoriko-card-title {
+    font-size: 1.1vw;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.istoriko-table-wrapper {
+    height: 43vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background-color: #ffffff;
+}
+
+.istoriko-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    font-size: 0.78vw;
+    margin-bottom: 0;
+}
+
+.istoriko-th {
+    background-color: #e9ece1 !important;
+    color: #4f4a18 !important;
+    font-weight: 700;
+    vertical-align: middle;
+    white-space: normal;
+    line-height: 1.05;
+    text-align: center;
+}
+
+.istoriko-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.istoriko-table thead tr:nth-child(2) th {
+    top: 1.9rem;
+}
+
+.istoriko-aa-col {
+    width: 4.5rem;
+    min-width: 4.5rem;
+}
+
+.istoriko-actions-col {
+    position: sticky;
+    right: 0;
+    z-index: 8;
+    width: 8.8rem;
+    min-width: 8.8rem;
+    max-width: 8.8rem;
+    background-color: #f7f8f3 !important;
+    box-shadow: -0.18rem 0 0.45rem rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+}
+
+.istoriko-table thead .istoriko-actions-col {
+    z-index: 12;
+    background-color: #e0e4d5 !important;
+}
+
+.istoriko-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.22rem;
+}
+
+.istoriko-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border-radius: 0.45rem;
+    font-size: 0.72vw;
+    transition: all 0.15s ease;
+    border: none;
+}
+
+/* ADD */
+
+.istoriko-btn-add {
+    background-color: #4f7d54;
+    color: #fff;
+}
+
+.istoriko-btn-add:hover {
+    background-color: #355f3c;
+    color: #fff;
+}
+
+/* EDIT */
+
+.istoriko-btn-edit {
+    background-color: #9a8f52;
+    color: #fff;
+}
+
+.istoriko-btn-edit:hover {
+    background-color: #6f6535;
+    color: #fff;
+}
+
+/* DELETE */
+
+.istoriko-btn-delete {
+    background-color: #b44b4b;
+    color: #fff;
+}
+
+.istoriko-btn-delete:hover {
+    background-color: #8f2d2d;
+    color: #fff;
+}
+
+/* UNDO */
+
+.istoriko-btn-undo {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.istoriko-btn-undo:hover {
+    background-color: #4f565c;
+    color: #fff;
+}
+
+/* μικρό zoom */
+
+.istoriko-btn:hover {
+    transform: scale(1.08);
+}
+
+.istoriko-empty-row {
+    height: 8rem;
+    vertical-align: middle;
+    font-size: 0.9vw;
+}
+
+.istoriko-card-footer {
+    background-color: #eef1e7;
+    padding: 0.6rem 1rem;
+}
+
+.istoriko-footer-actions {
+    width: 100%;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.istoriko-footer-btn {
+    width: 22%;
+    font-size: 0.8vw;
+}
+
+.istoriko-footer-btn-save {
+    background-color: #4f7358 !important;
+    color: #ffffff !important;
+}
+
+.istoriko-footer-btn-cancel {
+    background-color: #9b3f3f !important;
+    color: #ffffff !important;
+}
+
+.istoriko-footer-btn-save:hover,
+.istoriko-footer-btn-cancel:hover {
+    filter: brightness(1.08);
+}
+
+.istoriko-table th:not(.istoriko-actions-col):not(.istoriko-aa-col),
+.istoriko-table td:not(.istoriko-actions-col):not(.istoriko-aa-col) {
+    width: 13.83%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.istoriko-col-aa {
+    width: 4.5rem;
+}
+
+.istoriko-col-date {
+    width: 8.2rem;
+}
+
+.istoriko-col-date-wide {
+    width: 11.5rem;
+}
+
+.istoriko-col-actions {
+    width: 8.8rem;
+}
+
+.istoriko-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    vertical-align: middle;
+}
+
+.istoriko-state-col {
+    width: 3.5rem;
+    min-width: 3.5rem;
+    text-align: center;
+}
+
+.istoriko-state {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.state-clean {
+    background: #adb5bd;
+}
+
+.state-inserted {
+    background: #198754;
+}
+
+.state-modified {
+    background: #fd7e14;
+}
+
+.state-deleted {
+    background: #dc3545;
+}
+
+.istoriko-row-inserted td {
+    background-color: #d9f2e3 !important;
+}
+
+.istoriko-row-modified td {
+    background-color: #fff1d6 !important;
+}
+
+.istoriko-row-deleted td {
+    background-color: #ffd9d9 !important;
+    opacity: 0.75;
+}
+
+.istoriko-date-input {
+    width: 100%;
+    font-size: 0.75vw;
+    text-align: center;
+}
+
+/* ==========================================================================
+   Ιστορικό - Αναλυτικό Modal
+   ========================================================================== */
+
+.istoriko-details-modal {
+    border: 0;
+    border-radius: 0.9rem;
+    overflow: hidden;
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.35);
+}
+
+#istorikoDetailsModal .modal-dialog {
+    max-width: 72vw;
+}
+
+.istoriko-details-modal-header {
+    background-color: #4f7358;
+    color: #ffffff;
+    border-bottom: 0;
+    padding: 0.85rem 1.2rem;
+}
+
+.istoriko-details-modal-header .modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+#istorikoDetailsModal .modal-body {
+    background-color: #f7f8f3;
+    padding: 0.9rem;
+}
+
+#istorikoDetailsBody {
+    max-height: 68vh;
+    overflow-y: auto;
+    padding-right: 0.35rem;
+}
+
+.istoriko-details-section {
+    background-color: #ffffff;
+    border: 1px solid #d7ddcf;
+    border-radius: 0.65rem;
+    margin-bottom: 0.85rem;
+    overflow: hidden;
+}
+
+.istoriko-details-section-title {
+    background-color: #e6ebdf;
+    color: #4f4a18;
+    font-weight: 800;
+    text-align: center;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid #d7ddcf;
+}
+
+.istoriko-details-table {
+    margin-bottom: 0;
+    font-size: 0.82rem;
+}
+
+.istoriko-details-table th {
+    width: 32%;
+    background-color: #f0f3ea;
+    color: #4f4a18;
+    font-weight: 700;
+    vertical-align: middle;
+    white-space: normal;
+}
+
+.istoriko-details-table td {
+    background-color: #ffffff;
+    color: #222;
+    vertical-align: middle;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.istoriko-details-code {
+    font-weight: 800;
+    color: #4f7358;
+    margin-right: 0.35rem;
+}
+
+.istoriko-details-description {
+    color: #222;
+}
+
+.istoriko-details-money {
+    text-align: right;
+    font-family: monospace;
+    font-weight: 700;
+}
+
+#istorikoDetailsModal .modal-footer {
+    background-color: #eef1e7;
+    border-top: 1px solid #d7ddcf;
+    padding: 0.55rem 0.9rem;
+}
+
+#istorikoDetailsModal .btn-close {
+    opacity: 0.9;
+}
+
+#istorikoDetailsBody::-webkit-scrollbar {
+    width: 0.6rem;
+}
+
+#istorikoDetailsBody::-webkit-scrollbar-track {
+    background: #eef1e7;
+    border-radius: 1rem;
+}
+
+#istorikoDetailsBody::-webkit-scrollbar-thumb {
+    background: #7a7753;
+    border-radius: 1rem;
+}
+
+#istorikoDetailsBody::-webkit-scrollbar-thumb:hover {
+    background: #5f5b3c;
+}
+
+/* Main contract */
+.istoriko-main-contract-table th {
+    width: 13rem;
+    min-width: 13rem;
+    white-space: nowrap;
+}
+
+.istoriko-main-contract-table td {
+    text-align: left;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Code - description */
+.istoriko-code {
+    font-weight: 800;
+    color: #4f7358;
+}
+
+.istoriko-code-separator {
+    font-weight: 700;
+    color: #4f4a18;
+    padding: 0 0.25rem;
+}
+
+.istoriko-description {
+    color: #222;
+}
+
+/* Contract elements table */
+.istoriko-contract-elements-table .istoriko-modal-aa-col {
+    width: 4.5%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.istoriko-contract-elements-table .istoriko-modal-desc-col {
+    width: 70.5%;
+    text-align: left;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.istoriko-contract-elements-table .istoriko-modal-money-col {
+    width: 12.5%;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.istoriko-modal-totals-row td {
+    font-weight: 800;
+    background-color: #eef1e7 !important;
+}
+
+/* Krathseis */
+.istoriko-krathseis-table .istoriko-modal-aa-col {
+    width: 4.5%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.istoriko-krathseis-table .istoriko-modal-krathsh-col {
+    width: 95.5%;
+    text-align: left;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Other fields */
+.istoriko-other-table th {
+    text-align: left;
+    white-space: nowrap;
+    width: 18rem;
+}
+
+.istoriko-other-table td {
+    text-align: left;
+    padding-left: 4rem !important;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Στοιχεία Σύμβασης: labels αριστερά και στενά */
+.istoriko-main-contract-table th {
+    text-align: left !important;
+    width: fit-content;
+    min-width: 10rem;
+    white-space: nowrap;
+}
+
+.istoriko-main-contract-table td {
+    text-align: left !important;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Νόμιμες / Πραγματικές Αποδοχές */
+.istoriko-remuneration-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.istoriko-remuneration-label {
+    width: 13.5%;
+    text-align: left !important;
+    background-color: #f0f3ea !important;
+    color: #4f4a18 !important;
+    font-weight: 700;
+    white-space: normal;
+    vertical-align: middle;
+}
+
+.istoriko-remuneration-money {
+    width: 19.8%;
+    text-align: right !important;
+    font-family: monospace;
+    font-weight: 700;
+    white-space: nowrap;
+    vertical-align: middle;
+}

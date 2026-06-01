@@ -509,7 +509,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /**
-     * ✅ ΔΙΟΡΘΩΣΗ:  Όταν αλλάξει η λήξη σύμβασης
+     * ✅ ΔΙΟΡΘΩΣΗ: Όταν αλλάξει / γίνει blur η λήξη σύμβασης
+     * ΔΕΝ πειράζουμε πλέον το hmeromhnia_allaghs_orarioy_eos.
+     *
+     * Η λήξη σύμβασης χρησιμοποιείται μόνο για να μαρκάρουμε ως ΜΕ
+     * τις δυναμικές ημέρες ωραρίου που είναι ΜΕΤΑ τη λήξη σύμβασης.
      */
     async function handleLhxhsChange() {
         const currentValue = lhxhsSymbashsInput?.value || '';
@@ -520,7 +524,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (year < 1900 || year > 2100) return;
         }
 
-        // ✅ ΕΛΕΓΧΟΣ:  Αν το value ΔΕΝ άλλαξε, μην κάνεις τίποτα
+        // ✅ ΕΛΕΓΧΟΣ: Αν το value ΔΕΝ άλλαξε, μην κάνεις τίποτα
         if (currentValue === previousLhxhsValue) {
             return;
         }
@@ -528,43 +532,15 @@ document.addEventListener('DOMContentLoaded', function () {
         // ✅ Update το previous value
         previousLhxhsValue = currentValue;
 
-        // ✅ Re-calculate eos date ΜΟΝΟ αν υπάρχει apoDate
-        const apoDate = orarioyApoInput?.value;
-        if (apoDate) {
-            const startDateParsed = new Date(apoDate);
-            if (isNaN(startDateParsed.getTime())) {
-                return;
-            }
+        // ❗ ΣΗΜΑΝΤΙΚΟ:
+        // Δεν καλούμε updateOrarioyEosDate() και δεν γράφουμε orarioyEosInput.value.
+        // Άρα το blur/change της λήξης σύμβασης ΔΕΝ αλλάζει πλέον το ΕΩΣ ωραρίου.
 
-            // ✅ Guard apoDate χρονιά
-            const apoYear = startDateParsed.getFullYear();
-            if (apoYear < 1900 || apoYear > 2100) return;
+        // ✅ Αν έχουν ήδη δημιουργηθεί οι δυναμικές ημέρες, ενημέρωσε μόνο τις κατηγορίες.
+        applyDefaultKathgoriaMEAfterContractEnd();
 
-            let eosDateParsed = new Date(startDateParsed);
-            eosDateParsed.setDate(eosDateParsed.getDate() + 6);
-
-            // Cap στη λήξη σύμβασης
-            if (currentValue && currentValue.trim() !== '') {
-                const lhxhsDate = new Date(currentValue);
-                if (!isNaN(lhxhsDate.getTime())) {
-                    if (eosDateParsed > lhxhsDate) {
-                        eosDateParsed = lhxhsDate;
-                    }
-                }
-            }
-
-            // ✅ ΔΙΟΡΘΩΣΗ yearEnd: χρήση setFullYear/setMonth/setDate αντί new Date(year, 11, 31)
-            const yearEnd = new Date(startDateParsed);
-            yearEnd.setMonth(11);
-            yearEnd.setDate(31);
-
-            if (eosDateParsed > yearEnd) {
-                eosDateParsed = yearEnd;
-            }
-
-            // Format και Update
-            const eosDate = formatDateToISO(eosDateParsed);
-            orarioyEosInput.value = eosDate;
+        if (typeof updateKathgoriaBackgroundColor === 'function') {
+            updateKathgoriaBackgroundColor();
         }
     }
 
@@ -950,6 +926,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // ✅ Κλήση ΜΟΝΟ ΜΙΑ ΦΟΡΑ (ΕΞΩ από το loop)
             updateDates();
+
+            // ✅ ΝΕΟ:
+            // Αφού μπουν οι ημερομηνίες στα hmeromhnia_XX,
+            // όσα rows είναι ΜΕΤΑ τη λήξη σύμβασης παίρνουν default ΜΕ.
+            // Το κάνουμε πριν το reinitTomDropdowns ώστε το data-preselect να βρει ήδη τιμή
+            // στο hidden kathgoria_ergasias_stathera_XX.
+            applyDefaultKathgoriaMEAfterContractEnd();
+
             setupEnterKeyNavigation();
 
             // Αρχικοποίηση TomSelect ΜΕΤΑ από μικρό delay
@@ -963,27 +947,170 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 initializeSelectListeners();
+
+                // ✅ ΝΕΟ:
+                // Extra pass και ΜΕΤΑ το TomSelect init, ώστε να ενημερωθεί και το visual control.
+                applyDefaultKathgoriaMEAfterContractEnd();
+
+                if (typeof updateKathgoriaBackgroundColor === 'function') {
+                    updateKathgoriaBackgroundColor();
+                }
             }, 200);
 
-            // ✅ Attach blur listeners για υπολογισμό συνολικών ωρών εβδομάδας
+            // ✅ Attach listeners για άμεσο υπολογισμό συνολικών ωρών εβδομάδας.
+            // Πλέον δεν περιμένουμε μόνο blur στο eos_ora.
+            // Ενημερώνεται σε input/change/blur από όλα τα ζεύγη ωρών και διαλειμμάτων.
             for (let i = 1; i <= data.differenceInDays; i++) {
-                let i1 = i < 10 ? '0' + i : i;
+                const i1 = i < 10 ? '0' + i : String(i);
 
                 for (let j = 1; j <= 3; j++) {
-                    const eosOraInput = document.getElementById(`eos_ora_0${j}_${i1}`);
-                    if (eosOraInput) {
-                        eosOraInput.addEventListener('blur', function () {
-                            calculateWeeklyTotalHours();
-                        });
-                    }
+                    const jj = j < 10 ? '0' + j : String(j);
+
+                    [
+                        `apo_ora_${jj}_${i1}`,
+                        `eos_ora_${jj}_${i1}`,
+                        `dialleima_apo_ora_${jj}_${i1}`,
+                        `dialleima_eos_ora_${jj}_${i1}`
+                    ].forEach((fieldId) => {
+                        const field = document.getElementById(fieldId);
+                        if (!field || field.dataset.weeklyTotalListenerBound === '1') return;
+
+                        field.dataset.weeklyTotalListenerBound = '1';
+                        field.addEventListener('input', () => calculateWeeklyTotalHours());
+                        field.addEventListener('change', () => calculateWeeklyTotalHours());
+                        field.addEventListener('blur', () => calculateWeeklyTotalHours());
+                    });
+                }
+
+                const kathgoriaSelect = document.getElementById(`kathgoria_ergasias_${i1}`);
+                if (kathgoriaSelect && kathgoriaSelect.dataset.weeklyTotalListenerBound !== '1') {
+                    kathgoriaSelect.dataset.weeklyTotalListenerBound = '1';
+                    kathgoriaSelect.addEventListener('change', () => calculateWeeklyTotalHours());
                 }
             }
+
+            calculateWeeklyTotalHours();
         } catch (error) {
             console.error('❌ Error in updateDateDifference:', error);
             throw error;
         } finally {
             // ✅ ΚΡΙΤΙΚΟ: Reset το flag
             isUpdatingDateDifference = false;
+        }
+    }
+
+    // =========================================================================
+    // ✅ HELPERS: Default ΜΕ μετά τη λήξη σύμβασης
+    // =========================================================================
+
+    /**
+     * Parse ISO date YYYY-MM-DD ως local date, χωρίς timezone surprises.
+     */
+    function parseISODateOnly(value) {
+        if (!value || typeof value !== 'string') return null;
+
+        const parts = value.split('-').map(Number);
+        if (parts.length !== 3) return null;
+
+        const [year, month, day] = parts;
+        if (!year || !month || !day) return null;
+        if (year < 1900 || year > 2100) return null;
+
+        const parsed = new Date(year, month - 1, day);
+        if (isNaN(parsed.getTime())) return null;
+
+        return parsed;
+    }
+
+    /**
+     * Θέτει την κατηγορία εργασίας σε ΜΕ για όλες τις δυναμικές ημέρες
+     * που είναι ΜΕΤΑ την hmeromhnia_lhxhs_symbashs.
+     *
+     * Δεν πειράζει τις ημέρες πριν/ίσες με τη λήξη σύμβασης, ώστε να μην
+     * σβήνονται επιλογές που έχει ήδη κάνει ο χρήστης.
+     */
+    function applyDefaultKathgoriaMEAfterContractEnd() {
+        const contractEndDate = parseISODateOnly(lhxhsSymbashsInput?.value || '');
+        if (!contractEndDate) return;
+
+        const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
+        if (!differenceInDays || differenceInDays <= 0) return;
+
+        for (let i = 1; i <= differenceInDays; i++) {
+            const i1 = i < 10 ? '0' + i : String(i);
+
+            const dayInput = document.getElementById(`hmeromhnia_${i1}`);
+            const hiddenInput = document.getElementById(`kathgoria_ergasias_stathera_${i1}`);
+            const selectElement = document.getElementById(`kathgoria_ergasias_${i1}`);
+
+            if (!dayInput || !hiddenInput || !selectElement) continue;
+
+            const rowDate = parseISODateOnly(dayInput.value);
+            if (!rowDate) continue;
+
+            // ✅ ΜΟΝΟ ημερομηνίες ΜΕΤΑ τη λήξη σύμβασης παίρνουν default ΜΕ
+            if (rowDate > contractEndDate) {
+                setKathgoriaErgasiasValue(selectElement, hiddenInput, 'ΜΕ');
+
+                // ✅ Εφόσον η ημέρα είναι μετά τη λήξη σύμβασης, δεν επιτρέπουμε
+                // συμπλήρωση ωρών εργασίας/διαλείμματος. Τα πεδία μένουν κλειδωμένα
+                // όπως φαίνεται στο επιθυμητό αποτέλεσμα.
+                disableAndClearTimeFieldsForDay(i1);
+            }
+        }
+    }
+
+    /**
+     * Ενημερώνει και το hidden field και το select/TomSelect control.
+     */
+    function setKathgoriaErgasiasValue(selectElement, hiddenInput, value) {
+        hiddenInput.value = value;
+
+        if (selectElement.tomselect) {
+            const ts = selectElement.tomselect;
+
+            // Αν για οποιονδήποτε λόγο δεν έχει φορτωθεί ακόμη option ΜΕ,
+            // το προσθέτουμε προσωρινά ώστε να μπορεί να εμφανιστεί.
+            if (!ts.options[value]) {
+                // ✅ Για το default ΜΕ θέλουμε να φαίνεται όπως στο dropdown:
+                // "ΜΕ - ΜΗ ΕΡΓΑΣΙΑ" και όχι σκέτο "ΜΕ".
+                const fallbackText = value === 'ΜΕ' ? 'ΜΕ  -  ΜΗ ΕΡΓΑΣΙΑ' : value;
+                ts.addOption({ value, text: fallbackText });
+            }
+
+            ts.setValue(value, true);
+            ts.refreshOptions(false);
+        } else {
+            selectElement.value = value;
+        }
+
+        // Ειδοποιούμε τυχόν listeners ότι άλλαξε η τιμή.
+        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    /**
+     * Κλειδώνει και καθαρίζει τα πεδία ωρών/διαλείμματος μιας δυναμικής ημέρας.
+     * Χρησιμοποιείται για ημέρες μετά τη λήξη σύμβασης, όπου η κατηγορία
+     * μπαίνει αυτόματα σε ΜΕ - ΜΗ ΕΡΓΑΣΙΑ.
+     */
+    function disableAndClearTimeFieldsForDay(i1) {
+        for (let j = 1; j <= 3; j++) {
+            const fieldIds = [
+                `apo_ora_0${j}_${i1}`,
+                `eos_ora_0${j}_${i1}`,
+                `dialleima_apo_ora_0${j}_${i1}`,
+                `dialleima_eos_ora_0${j}_${i1}`
+            ];
+
+            fieldIds.forEach((fieldId) => {
+                const field = document.getElementById(fieldId);
+                if (!field) return;
+
+                field.value = '';
+                field.setAttribute('disabled', 'disabled');
+                field.style.setProperty('background-color', '', 'important');
+                field.style.setProperty('border-color', '#cccccc', 'important');
+            });
         }
     }
 
@@ -1191,30 +1318,23 @@ document.addEventListener('DOMContentLoaded', function () {
     function calculateWeeklyTotalHours() {
         let totalMinutes = 0;
         const differenceInDays = parseInt(document.getElementById('differenceInDays')?.value || 0);
-
-        // ✅ Πάρε το Μ. Ο. ωρών ημερήσιας εργασίας
         const moOronInput = document.getElementById('mo_oron_hmerhsias_ergasias');
         const moOron = parseFloat(moOronInput?.value) || 0;
 
-        // ✅ Object για tracking ημερήσιων συνόλων
         const dailyHours = {};
         let hasExceeded = false;
         const exceededDays = [];
 
-        // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Tracking για ημερήσια ανάπαυση 11 ωρών
         let hasRestViolation = false;
         const restViolations = [];
-        let previousDayEndTime = null; // Ώρα λήξης προηγούμενης ημέρας
+        let previousDayEndTime = null;
 
-        // ✅ Έλεγχος αν ΟΛΑ τα kathgoria_ergasias έχουν τιμή
         let allKathgoriesCompleted = true;
 
-        // Για κάθε ημέρα
         for (let i = 1; i <= differenceInDays; i++) {
-            let i1 = i < 10 ? '0' + i : i;
+            const i1 = i < 10 ? '0' + i : String(i);
             let dailyMinutes = 0;
 
-            // ✅ Έλεγχος αν το kathgoria_ergasias έχει τιμή
             const kathgoriaInput = document.getElementById(`kathgoria_ergasias_stathera_${i1}`);
             const kathgoriaValue = kathgoriaInput?.value || '';
 
@@ -1222,47 +1342,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 allKathgoriesCompleted = false;
             }
 
-            // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ:  Βρες την πρώτη ώρα έναρξης και τελευταία ώρα λήξης της ημέρας
             let currentDayStartTime = null;
             let currentDayEndTime = null;
 
-            // Για κάθε j (1, 2, 3)
             for (let j = 1; j <= 3; j++) {
-                const apoOra = document.getElementById(`apo_ora_0${j}_${i1}`)?.value;
-                const eosOra = document.getElementById(`eos_ora_0${j}_${i1}`)?.value;
+                const jj = j < 10 ? '0' + j : String(j);
+                const apoOra = document.getElementById(`apo_ora_${jj}_${i1}`)?.value;
+                const eosOra = document.getElementById(`eos_ora_${jj}_${i1}`)?.value;
 
-                if (!apoOra || !eosOra) {
-                    continue;
-                }
+                if (!apoOra || !eosOra) continue;
 
                 const apoMinutes = timeToMinutes(apoOra);
                 const eosMinutes = timeToMinutes(eosOra);
                 let diffMinutes = eosMinutes - apoMinutes;
 
-                if (diffMinutes < 0) {
-                    diffMinutes += 24 * 60;
-                }
+                if (diffMinutes < 0) diffMinutes += 24 * 60;
 
                 dailyMinutes += diffMinutes;
                 totalMinutes += diffMinutes;
 
-                // ✅ Track πρώτη ώρα έναρξης
-                if (currentDayStartTime === null) {
-                    currentDayStartTime = apoMinutes;
-                }
-
-                // ✅ Track τελευταία ώρα λήξης
+                if (currentDayStartTime === null) currentDayStartTime = apoMinutes;
                 currentDayEndTime = eosMinutes;
             }
 
-            // ✅ Μετατροπή σε ώρες για την ημέρα
             const dailyHoursValue = dailyMinutes / 60;
             dailyHours[i1] = dailyHoursValue;
 
-            // ✅ ΕΛΕΓΧΟΣ:  Ημερήσιο σύνολο > Μ.Ο.?
+            // ✅ Ενημέρωση και του κρυφού ημερήσιου total_hours_day_XX.
+            // Αυτό είναι σημαντικό για την αποθήκευση στο ProdhlomenaOrariaModel.
+            const dailyTotalInput = document.getElementById(`total_hours_day_${i1}`);
+            if (dailyTotalInput) {
+                dailyTotalInput.value = dailyHoursValue.toFixed(4);
+            }
+
             if (moOron > 0 && dailyHoursValue > moOron) {
                 hasExceeded = true;
-
                 const dayLabel =
                     document.getElementById(`day_label_${i1}`)?.textContent || `Ημέρα ${i}`;
                 exceededDays.push({
@@ -1272,80 +1386,70 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Ημερήσια ανάπαυση 11 ωρών (ΜΕΣΑ στο loop!)
             if (i > 1 && previousDayEndTime !== null && currentDayStartTime !== null) {
-                const prevDayNum = i - 1;
-                const prevDayI1 = prevDayNum < 10 ? '0' + prevDayNum : prevDayNum.toString();
+                const prevI1 = i - 1 < 10 ? '0' + (i - 1) : String(i - 1);
 
-                // Βρες αν η προηγούμενη ημέρα είχε εργασία
                 let prevDayHadWork = false;
                 for (let j = 1; j <= 3; j++) {
-                    const prevApoOra = document.getElementById(`apo_ora_0${j}_${prevDayI1}`)?.value;
-                    const prevEosOra = document.getElementById(`eos_ora_0${j}_${prevDayI1}`)?.value;
+                    const jj = j < 10 ? '0' + j : String(j);
+                    const prevApoOra = document.getElementById(`apo_ora_${jj}_${prevI1}`)?.value;
+                    const prevEosOra = document.getElementById(`eos_ora_${jj}_${prevI1}`)?.value;
 
-                    if (prevApoOra && prevEosOra && prevApoOra !== '' && prevEosOra !== '') {
+                    if (prevApoOra && prevEosOra) {
                         prevDayHadWork = true;
                         break;
                     }
                 }
 
-                // ✅ Μόνο αν ΚΑΙ οι 2 ημέρες έχουν εργασία
                 if (prevDayHadWork && dailyMinutes > 0 && previousDayEndTime > 0) {
-                    // Υπολόγισε τη διαφορά
                     let restMinutes = currentDayStartTime - previousDayEndTime;
-
-                    // Αν η διαφορά είναι αρνητική, σημαίνει ότι περάσαμε στην επόμενη μέρα
-                    if (restMinutes < 0) {
-                        restMinutes += 24 * 60;
-                    }
-
+                    if (restMinutes < 0) restMinutes += 24 * 60;
                     const restHours = restMinutes / 60;
 
-                    // ✅ Έλεγχος:  < 11 ώρες ανάπαυση
                     if (restHours < 11) {
                         hasRestViolation = true;
-
-                        const prevDayLabel =
-                            document.getElementById(`day_label_${prevDayI1}`)?.textContent ||
-                            `Ημέρα ${prevDayNum}`;
-                        const currentDayLabel =
+                        const prevLabel =
+                            document.getElementById(`day_label_${prevI1}`)?.textContent ||
+                            `Ημέρα ${i - 1}`;
+                        const currentLabel =
                             document.getElementById(`day_label_${i1}`)?.textContent || `Ημέρα ${i}`;
 
                         restViolations.push({
-                            prevDay: prevDayLabel,
-                            currentDay: currentDayLabel,
+                            prevDay: prevLabel,
+                            currentDay: currentLabel,
                             restHours: restHours.toFixed(2)
                         });
                     }
                 }
             }
 
-            // ✅ Update previousDayEndTime για την επόμενη επανάληψη
-            if (dailyMinutes > 0 && currentDayEndTime !== null && currentDayEndTime > 0) {
-                previousDayEndTime = currentDayEndTime;
-            } else {
-                previousDayEndTime = null;
-            }
-        } // ← ΕΔΩ τελειώνει το for loop
+            previousDayEndTime =
+                dailyMinutes > 0 && currentDayEndTime !== null && currentDayEndTime > 0
+                    ? currentDayEndTime
+                    : null;
+        }
 
         const totalHours = (totalMinutes / 60).toFixed(2);
         const totalInput = document.getElementById('total_hours_day');
 
-        // ✅ ΕΛΕΓΧΟΣ 1: Μόνο αν totalHours <= 40
-        if (totalInput && parseFloat(totalHours) <= 40) {
+        // ✅ Γενικό σύνολο ωρών εβδομαδιαίου προδηλωμένου προγράμματος.
+        // Ενημερώνεται ΠΑΝΤΑ, ακόμη και αν οι ώρες ξεπερνούν τις 40,
+        // ώστε ο χρήστης να βλέπει το πραγματικό σύνολο που έχει πληκτρολογήσει.
+        if (totalInput) {
             totalInput.value = totalHours;
-        } else if (parseFloat(totalHours) > 40) {
+        }
+
+        if (parseFloat(totalHours) > 40) {
             return false;
         }
 
-        // ✅ ΕΛΕΓΧΟΣ:  Ημερήσιο σύνολο > Μ.Ο.?
         if (hasExceeded) {
-            let daysMessage = exceededDays
+            const daysMessage = exceededDays
                 .map(
                     (day) =>
-                        `<div style="text-align: left; margin:  5px 0;">
-					<strong>${day.day}:</strong> ${day.hours} ώρες (Μ.Ο.:  ${day.mo})
-				</div>`
+                        `<div style="text-align: left; margin: 5px 0;">
+                            <strong>${day.day}:</strong> ${day.hours} ώρες (Μ.Ο.: ${day.mo})
+                        </div>`
                 )
                 .join('');
 
@@ -1353,13 +1457,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 backdrop: false,
                 allowOutsideClick: false,
                 icon: 'warning',
-                title: 'ΠΡΟΣΟΧΗ - ΥΠΕΡΒΑΣΗ ΩΡΩΝ !!! ',
+                title: 'ΠΡΟΣΟΧΗ - ΥΠΕΡΒΑΣΗ ΩΡΩΝ !!!',
                 html: `
-					<div style="text-align: center;">
-						<p>Οι παρακάτω ημέρες έχουν περισσότερες ώρες από τον Μ.Ο. ημερήσιας εργασίας:</p>
-						${daysMessage}
-					</div>
-				`,
+                    <div style="text-align: center;">
+                        <p>Οι παρακάτω ημέρες έχουν περισσότερες ώρες από τον Μ.Ο. ημερήσιας εργασίας:</p>
+                        ${daysMessage}
+                    </div>
+                `,
                 showConfirmButton: true,
                 confirmButtonText: 'Το κατάλαβα',
                 customClass: {
@@ -1370,14 +1474,13 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // ✅ ΝΕΟΣ ΕΛΕΓΧΟΣ: Ημερήσια ανάπαυση < 11 ώρες
         if (hasRestViolation) {
-            let restMessage = restViolations
+            const restMessage = restViolations
                 .map(
                     (violation) =>
-                        `<div style="text-align:  left; margin: 5px 0;">
-					<strong>${violation.prevDay} → ${violation.currentDay}:</strong> ${violation.restHours} ώρες ανάπαυσης
-				</div>`
+                        `<div style="text-align: left; margin: 5px 0;">
+                            <strong>${violation.prevDay} → ${violation.currentDay}:</strong> ${violation.restHours} ώρες ανάπαυσης
+                        </div>`
                 )
                 .join('');
 
@@ -1387,13 +1490,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 icon: 'error',
                 title: 'ΠΡΟΣΟΧΗ - ΠΑΡΑΒΙΑΣΗ ΗΜΕΡΗΣΙΑΣ ΑΝΑΠΑΥΣΗΣ !!!',
                 html: `
-					<div style="text-align: center;">
-						<p>Οι παρακάτω ημέρες δεν έχουν την απαιτούμενη ανάπαυση 11 ωρών:</p>
-						${restMessage}
-						<br><br>
-						<p style="color: red; font-weight: bold;">Απαιτούνται τουλάχιστον 11 ώρες ανάπαυσης μεταξύ εργάσιμων ημερών!</p>
-					</div>
-				`,
+                    <div style="text-align: center;">
+                        <p>Οι παρακάτω ημέρες δεν έχουν την απαιτούμενη ανάπαυση 11 ωρών:</p>
+                        ${restMessage}
+                        <br><br>
+                        <p style="color: red; font-weight: bold;">Απαιτούνται τουλάχιστον 11 ώρες ανάπαυσης μεταξύ εργάσιμων ημερών!</p>
+                    </div>
+                `,
                 showConfirmButton: true,
                 confirmButtonText: 'Το κατάλαβα',
                 customClass: {
@@ -1404,7 +1507,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // ✅ ΕΛΕΓΧΟΣ 2: Σύγκριση με ores_ergasias_ebdomadas
         if (allKathgoriesCompleted) {
             const oresErgasiasInput = document.getElementById('ores_ergasias_ebdomadas');
             if (oresErgasiasInput && oresErgasiasInput.value) {
@@ -1417,7 +1519,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         allowOutsideClick: false,
                         icon: 'info',
                         title: 'ΠΡΟΣΟΧΗ !!!',
-                        text: 'Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου',
+                        html: `Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου.<br>
+                                Οι ώρες που δηλώθηκαν είναι <strong>${actualHours}</strong>, ενώ οι ώρες που αναμένονται σύμφωνα με το ωράριο είναι <strong>${expectedHours}</strong>.`,
                         showConfirmButton: true,
                         confirmButtonText: 'Κλείσιμο',
                         customClass: {

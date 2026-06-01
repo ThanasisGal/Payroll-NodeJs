@@ -61,6 +61,7 @@ const ErgazomenoiSchema = new Schema(
         hmeromhnia_lhxhs_symbashs: { type: Date },
         hmeromhnia_apoxorhshs: { type: Date },
         logos_peratosis: { type: String, trim: true },
+        parathrhseis_peratosis: { type: String, trim: true },
         afora_daneismo_ergazomenoy: { type: Boolean, default: false },
         typos_daneismoy: { type: String, defalt: null, trim: true },
         hmnia_enarxhs_daneismoy: { type: Date, default: null },
