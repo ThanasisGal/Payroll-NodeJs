@@ -57,6 +57,7 @@ const CompaniesSchema = new Schema(
         apasxolhsh_kata_tis_argies: { type: Boolean, default: false },
         hmeromhnia_payshs_polyetias_apo: { type: Date },
         hmeromhnia_payshs_polyetias_eos: { type: Date },
+        xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta: { type: Number, default: 0 },
         keimeno_exoflhshs: { type: String, trim: true },
         users: [
             {

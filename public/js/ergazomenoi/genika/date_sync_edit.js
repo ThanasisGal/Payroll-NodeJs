@@ -1362,8 +1362,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 if (prevDayHadWork && dailyMinutes > 0 && previousDayEndTime > 0) {
-                    let restMinutes = currentDayStartTime - previousDayEndTime;
-                    if (restMinutes < 0) restMinutes += 24 * 60;
+                    let restMinutes = 24 * 60 - previousDayEndTime + currentDayStartTime;
+
+                    if (restMinutes < 0) {
+                        restMinutes += 24 * 60;
+                    }
+
                     const restHours = restMinutes / 60;
 
                     if (restHours < 11) {

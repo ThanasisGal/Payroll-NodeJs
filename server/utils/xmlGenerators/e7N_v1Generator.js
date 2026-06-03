@@ -178,8 +178,7 @@ async function generateE7NXML(ergazomenos, companyData, ypokatasthmataData, opti
             f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
             f_apodoxes: formatCurrency(
                 ergazomenos.pragmatikosMisthos ||
-                    ergazomenos.synolo_symbashs ||
-                    ergazomenos.apodoxes_apoxwrhshs ||
+                    ergazomenos.synolo_symbashs_basei_oron_ergasias ||
                     0
             ),
             f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
@@ -265,10 +264,26 @@ function formatDateForErganh(date) {
 
 function formatCurrency(amount) {
     if (amount === null || amount === undefined || amount === '') return '0,00';
-    const numeric = Number(String(amount).replace(/\./g, '').replace(',', '.'));
+
+    let numeric;
+
+    if (typeof amount === 'number') {
+        numeric = amount;
+    } else {
+        const s = String(amount).trim();
+
+        // Αν είναι ελληνικό format: 1.117,16
+        if (s.includes(',')) {
+            numeric = Number(s.replace(/\./g, '').replace(',', '.'));
+        } else {
+            // Αν είναι JS/DB format: 1117.16
+            numeric = Number(s);
+        }
+    }
+
     if (!Number.isFinite(numeric)) return '0,00';
-    const formatted = numeric.toFixed(2).replace('.', ',');
-    return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    return numeric.toFixed(2).replace('.', ',');
 }
 
 function normalizeYphkoothta(val, fallback = '348') {

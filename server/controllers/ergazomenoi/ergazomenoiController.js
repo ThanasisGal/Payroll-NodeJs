@@ -4298,8 +4298,6 @@ class ergazomenoiController {
 
                     const logosPeratosisComments =
                         formData.parathrhseis_peratoshs ||
-                        formData.parathrhseis_peratosis ||
-                        updatedErgazomenos.parathrhseis_peratoshs ||
                         updatedErgazomenos.parathrhseis_peratosis ||
                         '';
 

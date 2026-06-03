@@ -1908,68 +1908,75 @@ function checkOresApoysias(context) {
     }
 
     // ============================================================
-    // Προδηλωμένα λεπτά ημέρας.
+    // b = Προδηλωμένες ώρες ημέρας.
+    // Από τα ζεύγη apo/eos ή fallback στο rec.ores_ergasias.
     // ============================================================
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const declaredHours = toHours(declaredMinutes);
 
     // ============================================================
-    // Απολογιστικές ώρες από τα πεδία *_apologistika.
-    // Αν έχουν ήδη παραχθεί απολογιστικά ζεύγη ωρών, αυτά προηγούνται
-    // των raw καρτών για το πεδίο ores_ergasias_apologistika.
-    // Αυτό είναι κρίσιμο όταν δεν υπάρχει προδηλωμένο ωράριο: τότε
-    // rec.ores_ergasias μπορεί να είναι 0, αλλά το απολογιστικό ωράριο
-    // μπορεί να έχει συμπληρωθεί π.χ. 12:02 - 20:02 = 8.00 ώρες.
+    // a = Ώρες καρτών από ProdhlomenaOrariaModel.cards_ores_ergasias.
+    //
+    // ΠΡΟΣΟΧΗ:
+    // Δεν αλλάζουμε το cards_ores_ergasias.
+    // Το χρησιμοποιούμε μόνο ως βάση υπολογισμού.
     // ============================================================
-    const apologistikaMinutes = getApologistikaMinutes(rec);
-    const apologistikaHours = toHours(apologistikaMinutes);
+    const cardsHours = Number(rec.cards_ores_ergasias || 0);
 
     // ============================================================
-    // Πραγματικές ώρες καρτών.
-    // Το effectiveCardsHours λαμβάνει υπόψη τη λογική getDailyCardsMinutes,
-    // άρα και πιθανές προσαρμογές όπως διάλειμμα.
-    // Χρησιμοποιείται ως fallback όταν δεν υπάρχουν ούτε προδηλωμένες
-    // ούτε απολογιστικές ώρες.
+    // c = Διάλειμμα σε ώρες.
+    //
+    // getBreakOffsetMinutes(ergazomenos):
+    // - αν dialleima_entos_ektos_orarioy === true  -> επιστρέφει 0
+    // - αν dialleima_entos_ektos_orarioy === false -> επιστρέφει dialleima_se_lepta
+    //
+    // Άρα εφαρμόζει ακριβώς τη λογική:
+    // αν το διάλειμμα είναι ΕΝΤΟΣ ωραρίου, c = 0
+    // αν το διάλειμμα είναι ΕΚΤΟΣ ωραρίου, c = dialleima_se_lepta
     // ============================================================
-    const effectiveCardsHours = toHours(
-        getEffectiveDailyWorkMinutesForApologistika(rec, ergazomenos)
-    );
+    const breakMinutes = getBreakOffsetMinutes(ergazomenos);
+    const breakHours = breakMinutes / 60;
 
     // ============================================================
-    // Raw ώρες καρτών όπως είναι ήδη αποθηκευμένες στο record.
-    // Για τον υπολογισμό απουσίας κρατάμε το rawCardsHours,
-    // ώστε να μην δημιουργείται τεχνητή απουσία από αφαίρεση διαλείμματος.
+    // e = a - c
+    //
+    // Αυτό ενημερώνει το ores_ergasias_apologistika.
+    // Παράδειγμα:
+    // cards_ores_ergasias = 10.00
+    // διάλειμμα εκτός = 0.50
+    // => ores_ergasias_apologistika = 9.50
     // ============================================================
-    const rawCardsHours = Number(rec.cards_ores_ergasias || 0);
+    const effectiveCardsHours = Math.max(0, cardsHours - breakHours);
 
     // ============================================================
-    // Ανοχή πρόωρης αποχώρησης σε ώρες.
-    // Παράδειγμα: 10 λεπτά => 10 / 60.
+    // d = Επιτρεπόμενη πρόωρη αποχώρηση σε ώρες.
+    // Από CompanyModel.xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta.
+    // Έρχεται εδώ ως proorhApoxorhshMinutes.
     // ============================================================
-    const toleranceHours = Number(proorhApoxorhshMinutes || 0) / 60;
+    const toleranceHours = (Number(proorhApoxorhshMinutes) || 0) / 60;
 
     // ============================================================
-    // Απουσία:
-    // Υπολογίζεται μόνο όταν υπάρχουν προδηλωμένες ώρες
-    // και οι ώρες καρτών + ανοχή είναι μικρότερες από τις προδηλωμένες.
+    // f = ores_apoysias_apologistika
+    //
+    // if (e >= b) -> f = 0
+    // if (e < b)  -> αν (b - e) > d τότε f = b - e, αλλιώς f = 0
     // ============================================================
+    const absenceDiff = declaredHours - effectiveCardsHours;
+
     const absenceHours =
-        declaredHours > 0 && declaredHours > rawCardsHours + toleranceHours
-            ? +(declaredHours - rawCardsHours).toFixed(2)
-            : 0;
+        declaredHours > 0 && absenceDiff > toleranceHours ? +absenceDiff.toFixed(2) : 0;
 
+    // ============================================================
+    // Σε αυτή τη φάση ΔΕΝ πειράζουμε:
+    // - υπερεργασίες
+    // - νόμιμες υπερωρίες
+    // - παράνομες υπερωρίες
+    // - apo_ora_yperories / eos_ora_yperories
+    //
+    // Αυτά θα υπολογιστούν/διορθωθούν σε επόμενη φάση.
+    // ============================================================
     return {
-        // Προτεραιότητα για τις απολογιστικές ώρες εργασίας:
-        // 1. Αν υπάρχουν *_apologistika ζεύγη, χρησιμοποιούμε αυτά.
-        // 2. Αλλιώς, αν υπάρχει προδηλωμένο ωράριο, κρατάμε τις προδηλωμένες ώρες.
-        // 3. Αλλιώς, fallback στις πραγματικές ώρες καρτών.
-        ores_ergasias_apologistika:
-            apologistikaHours > 0
-                ? +apologistikaHours.toFixed(2)
-                : declaredHours > 0
-                  ? +declaredHours.toFixed(2)
-                  : +effectiveCardsHours.toFixed(2),
-
+        ores_ergasias_apologistika: +effectiveCardsHours.toFixed(2),
         ores_apoysias_apologistika: absenceHours
     };
 }
