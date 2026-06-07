@@ -10,7 +10,15 @@ const { chromium } = require('playwright');
 
 const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
 const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generator');
+const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e7N_v1Generator');
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
+const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
+
+const {
+    authenticateErgani,
+    logoutErgani,
+    cancelSubmittedDocument
+} = require('../../utils/erganh/erganiRestClient');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -34,7 +42,8 @@ const {
     OrariaFromCardsModel,
     OrariaApologistikaModel,
     ProdhlomenaOrariaModel,
-    ProdhlomenaOrariaAuditModel
+    ProdhlomenaOrariaAuditModel,
+    ErgazomenoiErganhModel
 } = Models_D;
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
@@ -2372,6 +2381,125 @@ function makeReviewPdfDocument() {
     return doc;
 }
 
+// ============================================================================
+// E7N REST helpers
+// ============================================================================
+function parseErganiSubmitDate(value) {
+    if (!value) return null;
+
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+
+    if (match) {
+        const [, dd, mm, yyyy, hh = '00', min = '00'] = match;
+        const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function safeFilenamePart(value, fallback = 'UNKNOWN') {
+    const cleaned = String(value || fallback)
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/\s+/g, '_')
+        .substring(0, 80);
+
+    return cleaned || fallback;
+}
+
+async function saveSubmittedErganiPdfToS3({
+    pdfBuffer,
+    contentType,
+    ergazomenos,
+    companyData,
+    restResult
+}) {
+    if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
+        return {
+            pdfSaved: false,
+            pdfFilename: null,
+            pdfS3Key: null,
+            pdfS3Url: null,
+            pdfRelativePath: null,
+            pdfSizeBytes: 0,
+            pdfContentType: contentType || 'application/pdf',
+            pdfSaveError: 'Δεν υπάρχει PDF buffer από το ΕΡΓΑΝΗ.'
+        };
+    }
+
+    try {
+        const { uploadBufferToS3 } = require('../../utils/s3Helper');
+
+        const employeeId = safeFilenamePart(ergazomenos?._id || ergazomenos?.kodikos || 'E7N');
+        const eponymo = safeFilenamePart(ergazomenos?.eponymo || 'UNKNOWN');
+        const onoma = safeFilenamePart(ergazomenos?.onoma || 'UNKNOWN');
+        const protocol = safeFilenamePart(restResult?.protocol || 'NO_PROTOCOL');
+        const datePart = safeFilenamePart(String(restResult?.submitDate || '').replace(/\//g, '-'));
+
+        const filename = `${employeeId}_${eponymo}_${onoma}_${protocol}_${datePart}.pdf`;
+        const companyNameClean = safeFilenamePart(
+            companyData?.eponymia || companyData?.perigrafh || 'UNKNOWN'
+        );
+        const companyKod = safeFilenamePart(companyData?.kod || companyData?.kodikos || 'UNKNOWN');
+        const team = safeFilenamePart(ergazomenos?.team || 'NO_TEAM');
+
+        const s3Key = `ergani-submissions/${team}/${companyKod}_${companyNameClean}/E7N/${filename}`;
+
+        const uploadResult = await uploadBufferToS3(
+            pdfBuffer,
+            s3Key,
+            contentType || 'application/pdf'
+        );
+
+        return {
+            pdfSaved: true,
+            pdfFilename: filename,
+            pdfS3Key: uploadResult.s3Key,
+            pdfS3Url: uploadResult.s3Url || uploadResult.localPath || null,
+            pdfRelativePath: uploadResult.s3Key,
+            pdfSizeBytes: pdfBuffer.length,
+            pdfContentType: contentType || 'application/pdf',
+            pdfSaveError: null
+        };
+    } catch (err) {
+        return {
+            pdfSaved: false,
+            pdfFilename: null,
+            pdfS3Key: null,
+            pdfS3Url: null,
+            pdfRelativePath: null,
+            pdfSizeBytes: pdfBuffer.length,
+            pdfContentType: contentType || 'application/pdf',
+            pdfSaveError: err.message || String(err)
+        };
+    }
+}
+
+function sanitizeErganiResultForResponse(restResult) {
+    if (!restResult) return null;
+
+    return {
+        success: restResult.success === true,
+        submission: restResult.submission || null,
+        protocol: restResult.protocol || null,
+        submitDate: restResult.submitDate || null,
+        id: restResult.id || null,
+        error: restResult.error || null,
+        raw: restResult.raw || null,
+        submittedPdf: restResult.submittedPdf
+            ? {
+                  fetched: !!restResult.submittedPdf.buffer,
+                  contentType: restResult.submittedPdf.contentType || null,
+                  sizeBytes: restResult.submittedPdf.buffer?.length || 0,
+                  error: restResult.submittedPdf.error || null
+              }
+            : null
+    };
+}
+
 class erganhController {
     static mainApologistikosPinakasForm = async (req, res) => {
         const locals = {
@@ -2903,17 +3031,26 @@ class erganhController {
                 kodikos: req.session.periodInUse
             }).lean();
 
+            const companyRec = await CompaniesModel.findById(companyId)
+                .select('xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta')
+                .lean();
+
+            const xronosEpitrepomenhsProorhsApoxorhshsSeLepta = Number(
+                companyRec?.xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta || 0
+            );
+
             res.render('ergazomenoi/programmata/calcApasxolhseisPeriodoy', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
-                // passwords: cleanedPasswordsData,
                 rec: {},
-                periodRec
+                periodRec,
+                xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta:
+                    xronosEpitrepomenhsProorhsApoxorhshsSeLepta
             });
         } catch (error) {
-            console.log('Error into erganhController -> mainLhpshOrarionApoErganhForm :', error);
+            console.log('Error into erganhController -> mainCalcApasxolhseisPeriodoyForm :', error);
         }
     };
 
@@ -4616,6 +4753,800 @@ class erganhController {
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση ιστορικού αλλαγών.',
                 error: error.message
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ E7N: Επιλογή τρόπου αποστολής στο ΕΡΓΑΝΗ
+    //
+    // Υποστηρίζει δύο ροές:
+    // 1) XML + Playwright  -> Προσωρινή καταχώρηση στο ΕΡΓΑΝΗ
+    // 2) JSON + REST API   -> Οριστική υποβολή στο ΕΡΓΑΝΗ και επιστροφή πρωτοκόλλου
+    //
+    // Αναμενόμενο body από fetch:
+    // {
+    //   "ergazomenosId": "...",                 // _id εργαζόμενου ή kodikos εργαζόμενου
+    //   "ypokatasthma": "0",                    // προαιρετικά, αλλιώς από εργαζόμενο
+    //   "erganiUploadMethod": "xml" | "rest",   // default: "xml"
+    //   "options": { ... }                      // προαιρετικά overrides για ημερομηνίες/σχόλια
+    // }
+    // ============================================================================
+    static submitE7NToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή Ε7Ν.'
+                });
+            }
+
+            const rawUploadMethod =
+                body.erganiUploadMethod ||
+                body.submissionMethod ||
+                body.uploadMethod ||
+                body.method ||
+                'xml';
+
+            const uploadMethod = String(rawUploadMethod).trim().toLowerCase();
+
+            if (!['xml', 'rest', 'json', 'json_rest'].includes(uploadMethod)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρος τρόπος αποστολής. Επιτρεπτές τιμές: xml ή rest.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή Ε7Ν.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({
+                    kod: companyId
+                }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({
+                    kodikos: companyId
+                }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ από PasswordsModel, όπως στο υπάρχον XML flow
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5) Options προς generator.
+            // Κρατάμε όσα overrides έρχονται από body.options και επιτρέπουμε
+            // και top-level fields για ευκολότερο fetch από UI.
+            // --------------------------------------------------------------------
+            const generatorOptions = {
+                ...(body.options || {}),
+
+                hmeromhnia_apoxorhshs:
+                    body.hmeromhnia_apoxorhshs ||
+                    body.hmeromhnia_apoxwrhshs ||
+                    body.apolysisdate ||
+                    body.options?.hmeromhnia_apoxorhshs ||
+                    body.options?.hmeromhnia_apoxwrhshs ||
+                    body.options?.apolysisdate,
+
+                hmeromhnia_lhxhs_symbashs:
+                    body.hmeromhnia_lhxhs_symbashs ||
+                    body.lixisymbashdate ||
+                    body.options?.hmeromhnia_lhxhs_symbashs ||
+                    body.options?.lixisymbashdate,
+
+                comments:
+                    body.comments ||
+                    body.f_comments ||
+                    body.options?.comments ||
+                    body.options?.f_comments ||
+                    ''
+            };
+
+            // --------------------------------------------------------------------
+            // 6Α) XML + Playwright -> Προσωρινή καταχώρηση
+            // --------------------------------------------------------------------
+            if (uploadMethod === 'xml') {
+                const xmlResult = await generateE7NXML(
+                    ergazomenos,
+                    companyData,
+                    ypokatasthmataData,
+                    generatorOptions
+                );
+
+                const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');
+
+                if (!fs.existsSync(tmpXmlDir)) {
+                    fs.mkdirSync(tmpXmlDir, { recursive: true });
+                }
+
+                const xmlFilename =
+                    xmlResult.filename ||
+                    `${String(ergazomenos._id || ergazomenos.kodikos || 'E7N')}_E7N.xml`;
+
+                const xmlPath = path.join(tmpXmlDir, xmlFilename);
+
+                fs.writeFileSync(xmlPath, xmlResult.xml, 'utf8');
+
+                const uploadResult = await uploadE3ToErganh(
+                    companyId,
+                    xmlPath,
+                    userId,
+                    {
+                        username: creds.username,
+                        password: creds.password
+                    },
+                    {
+                        xmlType: 'ma_222',
+                        isPermanent: false
+                    }
+                );
+
+                return res.status(uploadResult?.success ? 200 : 400).json({
+                    success: !!uploadResult?.success,
+                    uploadMethod: 'xml',
+                    temporary: true,
+                    finalSubmission: false,
+                    message: uploadResult?.success
+                        ? 'Το E7N XML δημιουργήθηκε και ανέβηκε στο ΕΡΓΑΝΗ ως προσωρινή καταχώρηση.'
+                        : uploadResult?.userMessage ||
+                          'Το E7N XML δημιουργήθηκε, αλλά η αποστολή στο ΕΡΓΑΝΗ απέτυχε.',
+                    filename: xmlFilename,
+                    xmlPath,
+                    s3Key: xmlResult.s3Key,
+                    s3Url: xmlResult.s3Url,
+                    generator: {
+                        success: xmlResult.success,
+                        saveError: xmlResult.saveError || null
+                    },
+                    erganh: uploadResult
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 6Β) JSON + REST API -> Οριστική υποβολή
+            // --------------------------------------------------------------------
+            const jsonResult = await generateE7NJSON(
+                ergazomenos,
+                companyData,
+                ypokatasthmataData,
+                generatorOptions
+            );
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: 'WebE7N',
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+
+            const submissionYear = effectiveSubmitDate.getFullYear();
+            const submissionMonth = effectiveSubmitDate.getMonth() + 1;
+            const submissionDay = effectiveSubmitDate.getDate();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: 'WebE7N',
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || '',
+                process_code: 'ma_222',
+                process_description: 'Λύση Σύμβασης Ορισμένου Χρόνου (E7N)',
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: submissionYear,
+                submission_month: submissionMonth,
+                submission_day: submissionDay,
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                message: restResult?.success
+                    ? 'Το E7N υποβλήθηκε οριστικά μέσω REST API.'
+                    : restResult?.error || 'Η οριστική υποβολή E7N μέσω REST API απέτυχε.',
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                    : pdfStorage.pdfS3Url,
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitE7NToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την αποστολή E7N στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
+    static cancelE7NSubmission = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+            const username = req.session?.userName || req.session?.username || '';
+
+            const { erganhLogId, cancelReason } = req.body || {};
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            if (!erganhLogId || !mongoose.Types.ObjectId.isValid(String(erganhLogId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ID της υποβολής ΕΡΓΑΝΗ.'
+                });
+            }
+
+            const erganhLog = await ErgazomenoiErganhModel.findOne({
+                _id: erganhLogId,
+                team: sessionTeam,
+                companykod_object: companyId
+            });
+
+            if (!erganhLog) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε η υποβολή ΕΡΓΑΝΗ.'
+                });
+            }
+
+            if (erganhLog.document_status === 'CANCELLED' || erganhLog.is_cancelled === true) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Η υποβολή είναι ήδη ακυρωμένη.'
+                });
+            }
+
+            if (!erganhLog.protocol || !erganhLog.submit_date_text || !erganhLog.submission_code) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Η υποβολή δεν έχει πλήρη στοιχεία πρωτοκόλλου για ακύρωση.'
+                });
+            }
+
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            const auth = await authenticateErgani(creds);
+            const accessToken =
+                auth?.accessToken || auth?.AccessToken || auth?.token || auth?.Token;
+            const refreshToken = auth?.refreshToken || auth?.RefreshToken || null;
+
+            if (!accessToken) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Το ΕΡΓΑΝΗ δεν επέστρεψε accessToken.'
+                });
+            }
+
+            let cancelResult;
+
+            try {
+                cancelResult = await cancelSubmittedDocument(accessToken, {
+                    submissionCode: erganhLog.submission_code,
+                    protocol: erganhLog.protocol,
+                    submittedDate: erganhLog.submit_date_text
+                });
+            } finally {
+                if (refreshToken) {
+                    await logoutErgani(accessToken, refreshToken).catch(() => {});
+                }
+            }
+
+            const cancelMessage = String(cancelResult?.message || '').trim();
+
+            const cancelAccepted =
+                cancelResult?.success === true ||
+                cancelMessage.includes('επιτυχ') ||
+                cancelMessage.includes('ολοκληρώθηκε') ||
+                cancelMessage.includes('ακυρώθηκε') ||
+                cancelMessage.includes('ανακλήθηκε');
+
+            if (!cancelAccepted) {
+                erganhLog.cancel_reason = cancelReason || '';
+                erganhLog.cancel_raw_response = cancelResult;
+                erganhLog.error_message =
+                    cancelMessage || 'Το ΕΡΓΑΝΗ δεν επιβεβαίωσε την ακύρωση της υποβολής.';
+
+                await erganhLog.save();
+
+                return res.status(400).json({
+                    success: false,
+                    message: cancelMessage || 'Το ΕΡΓΑΝΗ απέρριψε την ακύρωση της υποβολής.',
+                    cancelResult
+                });
+            }
+
+            erganhLog.document_status = 'CANCELLED';
+            erganhLog.submission_status = 'CANCELLED';
+            erganhLog.is_cancelled = true;
+            erganhLog.cancelled_at = new Date();
+            erganhLog.cancel_reason = cancelReason || '';
+            erganhLog.cancelled_by_user = userId;
+            erganhLog.cancelled_by_username = username;
+            erganhLog.cancel_raw_response = cancelResult;
+            erganhLog.error_message = null;
+
+            await erganhLog.save();
+
+            return res.json({
+                success: true,
+                message: cancelResult?.message || 'Η υποβολή ακυρώθηκε επιτυχώς.',
+                erganhLogId: erganhLog._id,
+                protocol: erganhLog.protocol,
+                documentStatus: erganhLog.document_status,
+                cancelResult
+            });
+        } catch (error) {
+            console.error('[cancelE7NSubmission] ❌', error);
+
+            return res.status(400).json({
+                success: false,
+                message: error?.message || 'Σφάλμα κατά την ακύρωση της υποβολής ΕΡΓΑΝΗ.',
+                error: error?.message || String(error)
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ GET: Ιστορικό υποβολών ΕΡΓΑΝΗ εργαζόμενου
+    // ============================================================================
+    static getErgazomenosErganhHistory = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const { ergazomenosId } = req.params || {};
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            if (!ergazomenosId || !mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ID εργαζόμενου.'
+                });
+            }
+
+            const rows = await ErgazomenoiErganhModel.find({
+                team: sessionTeam,
+                companykod_object: companyId,
+                ergazomenos_object: ergazomenosId
+            })
+                .sort({ createdAt: -1 })
+                .lean();
+
+            return res.json({
+                success: true,
+                data: rows.map((row) => ({
+                    _id: row._id,
+                    createdAt: row.createdAt,
+                    protocol: row.protocol || '',
+                    submitDate: row.submit_date_text || '',
+                    processCode: row.process_code || '',
+                    processDescription: row.process_description || '',
+                    uploadMethod: row.upload_method || '',
+                    submissionStatus: row.submission_status || '',
+                    documentStatus: row.document_status || 'ACTIVE',
+                    environment: row.environment || '',
+                    pdfUrl: row.pdf_s3_url?.startsWith('file://')
+                        ? `/uploads/s3-mock/${row.pdf_relative_path}`
+                        : row.pdf_s3_url || '',
+                    pdfFilename: row.pdf_filename || '',
+                    pdfSaved: !!row.pdf_s3_url,
+                    isCancelled: row.is_cancelled === true,
+                    cancelledAt: row.cancelled_at || null,
+                    cancelledProtocol: row.cancelled_protocol || '',
+                    cancelReason: row.cancel_reason || '',
+                    errorMessage: row.error_message || ''
+                }))
+            });
+        } catch (error) {
+            console.error('[getErgazomenosErganhHistory] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την ανάκτηση ιστορικού ΕΡΓΑΝΗ.'
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ DASHBOARD: Στατιστικά υποβολών ΕΡΓΑΝΗ εταιρείας
+    // ============================================================================
+    static getCompanyErganhDashboard = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+
+            const period = String(req.query?.period || '30').trim();
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const now = new Date();
+
+            let dateFrom;
+
+            if (period === '60') {
+                dateFrom = new Date(now);
+                dateFrom.setDate(dateFrom.getDate() - 60);
+            } else if (period === '90') {
+                dateFrom = new Date(now);
+                dateFrom.setDate(dateFrom.getDate() - 90);
+            } else if (period === 'year' || period === 'annual' || period === 'etisia') {
+                dateFrom = new Date(now.getFullYear(), 0, 1);
+            } else {
+                dateFrom = new Date(now);
+                dateFrom.setDate(dateFrom.getDate() - 30);
+            }
+
+            const match = {
+                team: sessionTeam,
+                companykod_object: companyId,
+                createdAt: mongoose.trusted({
+                    $gte: dateFrom,
+                    $lte: now
+                })
+            };
+
+            const rows = await ErgazomenoiErganhModel.find(match)
+                .sort({ createdAt: -1 })
+                .limit(500)
+                .lean();
+
+            const totals = {
+                total: rows.length,
+                rest: rows.filter((r) => r.upload_method === 'REST').length,
+                xml: rows.filter((r) => r.upload_method === 'XML').length,
+                active: rows.filter((r) => (r.document_status || 'ACTIVE') === 'ACTIVE').length,
+                cancelled: rows.filter((r) => r.document_status === 'CANCELLED').length,
+                failed: rows.filter((r) => r.submission_status === 'FAILED').length,
+                temporary: rows.filter((r) => r.is_temporary === true).length,
+                final: rows.filter((r) => r.is_final === true).length
+            };
+
+            const byProcessMap = new Map();
+
+            const byMonthProcessMap = new Map();
+
+            rows.forEach((r) => {
+                const d = new Date(r.submit_date || r.createdAt || new Date());
+
+                const year = d.getFullYear();
+                const month = d.getMonth() + 1;
+
+                const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+
+                const monthLabel = `${String(month).padStart(2, '0')}/${year}`;
+
+                const processKey = r.process_code || r.submission_code || 'UNKNOWN';
+
+                const key = `${monthKey}_${processKey}`;
+
+                if (!byMonthProcessMap.has(key)) {
+                    byMonthProcessMap.set(key, {
+                        monthKey,
+                        monthLabel,
+                        processCode: processKey,
+                        processDescription: r.process_description || r.submission_description || '',
+                        count: 0
+                    });
+                }
+
+                byMonthProcessMap.get(key).count++;
+            });
+
+            const byMonthProcess = Array.from(byMonthProcessMap.values()).sort((a, b) => {
+                if (a.monthKey === b.monthKey) {
+                    return String(a.processCode).localeCompare(String(b.processCode));
+                }
+
+                return String(a.monthKey).localeCompare(String(b.monthKey));
+            });
+
+            rows.forEach((r) => {
+                const key = r.process_code || r.submission_code || 'UNKNOWN';
+
+                if (!byProcessMap.has(key)) {
+                    byProcessMap.set(key, {
+                        processCode: key,
+                        processDescription: r.process_description || r.submission_description || '',
+                        count: 0,
+                        rest: 0,
+                        xml: 0,
+                        active: 0,
+                        cancelled: 0,
+                        failed: 0
+                    });
+                }
+
+                const item = byProcessMap.get(key);
+
+                item.count++;
+
+                if (r.upload_method === 'REST') item.rest++;
+                if (r.upload_method === 'XML') item.xml++;
+                if ((r.document_status || 'ACTIVE') === 'ACTIVE') item.active++;
+                if (r.document_status === 'CANCELLED') item.cancelled++;
+                if (r.submission_status === 'FAILED') item.failed++;
+            });
+
+            const byProcess = Array.from(byProcessMap.values()).sort((a, b) => b.count - a.count);
+
+            const latest = rows.slice(0, 20).map((r) => ({
+                _id: r._id,
+                createdAt: r.createdAt,
+                submitDate: r.submit_date_text || '',
+                protocol: r.protocol || '',
+                employee:
+                    `${r.ergazomenos_eponymo || ''} ${r.ergazomenos_onoma || ''}`.trim() ||
+                    r.ergazomenos_kodikos ||
+                    '',
+                employeeAfm: r.ergazomenos_afm || '',
+                processCode: r.process_code || '',
+                processDescription: r.process_description || '',
+                uploadMethod: r.upload_method || '',
+                submissionStatus: r.submission_status || '',
+                documentStatus: r.document_status || 'ACTIVE',
+                pdfUrl: r.pdf_s3_url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${r.pdf_relative_path}`
+                    : r.pdf_s3_url || ''
+            }));
+
+            return res.json({
+                success: true,
+                period,
+                dateFrom,
+                dateTo: now,
+                totals,
+                byProcess,
+                byMonthProcess,
+                latest
+            });
+        } catch (error) {
+            console.error('[getCompanyErganhDashboard] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την ανάκτηση dashboard ΕΡΓΑΝΗ.'
             });
         }
     };

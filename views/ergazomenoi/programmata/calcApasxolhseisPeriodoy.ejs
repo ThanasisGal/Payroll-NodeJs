@@ -10,6 +10,7 @@
             </label>
         </div>
 
+       
         <div class="card-body overflow-auto flex-grow-1 height-vh-33 bg-white">
             <%
                 const safe = (k) => (rec && rec[k]) || '';
@@ -54,6 +55,7 @@
             <input type="hidden" name="team" id="team" class="form-control input-contents" value="<%= sessionTeam %>" />
             <input type="hidden" name="company_kod" id="company_kod" class="form-control input-contents" value="<%= companyId %>" />
             <input type="hidden" name="ypokatasthmaHidden" id="ypokatasthmaHidden" class="form-control input-contents" value="" />
+            <input type="hidden" name="xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta" id="xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta" class="form-control input-contents" value="<%= xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta %>" />
 
             </br>
             <div class="row form-group g-3 align-items-center mb-3">
@@ -211,6 +213,45 @@
 <% const isProduction = NODE_ENV === 'production'; %>
 <script nonce="<%= nonce %>">
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
+
+<script nonce="<%= nonce %>">
+    document.addEventListener('DOMContentLoaded', function () {
+        const companyToleranceInput = document.getElementById(
+            'xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta'
+        );
+
+        const selectedToleranceInput = document.getElementById('proorhApoxorhsh_stathera');
+
+        const checkProorhApoxorhshTolerance = () => {
+            const companyTolerance = Number(companyToleranceInput?.value || 0);
+            const selectedTolerance = Number(selectedToleranceInput?.value || 0);
+
+            if (companyTolerance !== selectedTolerance) {
+                Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'warning',
+                    title: 'ΠΡΟΣΟΧΗ!',
+                    text: `Ο ανεκτός χρόνος πρόωρης αποχώρησης που δεν λογίσεται σαν απουσία έχει δηλωθεί για την εταιρεία σε ${companyTolerance} λεπτά`,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Εντάξει',
+                    customClass: {
+                        confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                        title: 'custom-title',
+                        popup: 'custom-swal-popup'
+                    }
+                });
+            }
+        };
+
+        setTimeout(checkProorhApoxorhshTolerance, 500);
+
+        if (selectedToleranceInput) {
+            selectedToleranceInput.addEventListener('change', checkProorhApoxorhshTolerance);
+            selectedToleranceInput.addEventListener('input', checkProorhApoxorhshTolerance);
+        }
+    });
 </script>
 
 <script src="<%= script('ergazomenoi/programmata/calcApasxolhseisPeriodoy') %>"></script>

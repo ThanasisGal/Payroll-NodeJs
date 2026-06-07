@@ -706,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <label for="storage_temporary"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
                                 style="color: ${noErganiUpdates ? '#aaaaaa' : '#000000'}">
-                                Προσωρινή Αποθήκευση
+                                Προσωρινή Αποθήκευση (XML)
                             </label>
                         </div>
                         <div class="display-flex align-items-center gap-0_75rem">
@@ -719,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <label for="storage_permanent"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
                                 style="color: ${noErganiUpdates ? '#aaaaaa' : '#184d00'}">
-                                <strong>Οριστική Ενημέρωση</strong>
+                                <strong>Οριστική Ενημέρωση (REST API)</strong>
                             </label>
                         </div>
 
@@ -801,8 +801,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const lhxhTypeRadio = document.querySelector('input[name="lhxh_type"]:checked');
                     const lhxhType = lhxhTypeRadio?.value || 'none';
 
+                    const erganiUploadMethod =
+                        lhxhType === 'ma_222' && isPermanent ? 'rest' : 'xml';
+
                     const filesToUpdate = {
                         isPermanent,
+                        erganiUploadMethod,
                         create_contract: createContract,
                         e3_anaggelia_proslhpshs: e3AnaggeliaProslhpshs,
                         wto_pshfiakh_organosh_xronoy_ergasias: wtoPshfiakhOrganoshXronoy,
@@ -1264,21 +1268,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         result.value?.ma_217 === true ||
                         result.value?.ma_222 === true;
 
+                    const isE7NRestSubmit =
+                        result.value?.ma_222 === true &&
+                        result.value?.isPermanent === true &&
+                        result.value?.erganiUploadMethod === 'rest';
+
                     if (
                         userWantsMA &&
-                        maXmlData?.success &&
-                        (maXmlData?.s3Url ||
-                            maXmlData?.downloadUrl ||
-                            maXmlData?.relativePath ||
-                            maXmlData?.s3Key) &&
-                        data.data?._id
+                        data.data?._id &&
+                        (isE7NRestSubmit ||
+                            (maXmlData?.success &&
+                                (maXmlData?.s3Url ||
+                                    maXmlData?.downloadUrl ||
+                                    maXmlData?.relativePath ||
+                                    maXmlData?.s3Key)))
                     ) {
-                        const maUrlToSend =
-                            maXmlData?.s3Url ||
-                            maXmlData?.downloadUrl ||
-                            maXmlData?.relativePath ||
-                            maXmlData?.s3Key ||
-                            null;
+                        const maUrlToSend = isE7NRestSubmit
+                            ? 'REST_E7N_NO_XML_REQUIRED'
+                            : maXmlData?.s3Url ||
+                              maXmlData?.downloadUrl ||
+                              maXmlData?.relativePath ||
+                              maXmlData?.s3Key ||
+                              null;
                         if (maUrlToSend) {
                             try {
                                 console.log('[MA-UPLOAD] Uploading MA XML...');
@@ -1292,7 +1303,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ? '222'
                                             : result.value?.ma_217 === true
                                               ? '217'
-                                              : undefined)
+                                              : undefined),
+                                    result.value?.erganiUploadMethod || 'xml'
                                 );
 
                                 console.log('[MA-UPLOAD] Result:', maResult);
@@ -2575,10 +2587,267 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================================================================
+    // ✅ HELPER FUNCTION: Εμφάνιση PDF υποβληθέντος ΕΡΓΑΝΗ
+    // ============================================================================
+    async function showErganiSubmittedPdfModal(payload) {
+        const pdfUrl = payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url || '';
+        const protocol = payload?.protocol || '';
+        const submitDate = payload?.submitDate || '';
+        const title = protocol ? `ΕΡΓΑΝΗ - Πρωτόκολλο ${protocol}` : 'ΕΡΓΑΝΗ - Υποβληθέν PDF';
+
+        if (!pdfUrl) {
+            await Swal.fire({
+                icon: 'success',
+                title: 'ΕΡΓΑΝΗ ΙΙ - Επιτυχής Υποβολή',
+                html: `
+                <p>Η υποβολή ολοκληρώθηκε επιτυχώς.</p>
+                ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${protocol}</p>` : ''}
+                ${submitDate ? `<p><strong>Ημερομηνία:</strong> ${submitDate}</p>` : ''}
+                <p class="text-muted">Δεν επιστράφηκε διαθέσιμο URL PDF για προεπισκόπηση.</p>
+            `,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
+            });
+            return;
+        }
+
+        await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            width: 1250,
+            title,
+            html: `
+            <div style="
+                display:flex;
+                flex-direction:column;
+                gap:0.55rem;
+                width:100%;
+                height:min(84vh, 820px);
+                box-sizing:border-box;
+            ">
+                <div style="
+                    display:flex;
+                    gap:0.75rem;
+                    align-items:center;
+                    justify-content:center;
+                    flex-wrap:wrap;
+                    font-size:0.95rem;
+                ">
+                    ${protocol ? `<span><strong>Πρωτόκολλο:</strong> ${protocol}</span>` : ''}
+                    ${submitDate ? `<span><strong>Ημ/νία:</strong> ${submitDate}</span>` : ''}
+                </div>
+
+                <iframe
+                    src="${pdfUrl}"
+                    style="
+                        width:100%;
+                        flex:1 1 auto;
+                        min-height:620px;
+                        height:72vh;
+                        border:1px solid #ccc;
+                        border-radius:6px;
+                        background:#fff;
+                    "
+                    title="ΕΡΓΑΝΗ PDF">
+                </iframe>
+
+                <div style="
+                    display:flex;
+                    gap:0.75rem;
+                    justify-content:center;
+                    align-items:center;
+                    flex-wrap:wrap;
+                    margin-top:0.25rem;
+                ">
+                    <button type="button" id="erganiPdfOpenBtn" class="btn btn-primary">
+                        Άνοιγμα PDF
+                    </button>
+
+                    <a
+                        href="${pdfUrl}"
+                        target="_blank"
+                        download
+                        class="btn btn-success"
+                        style="text-decoration:none;"
+                    >
+                        Αποθήκευση Τοπικά
+                    </a>
+
+                    <button type="button" id="erganiPdfPrintBtn" class="btn btn-secondary">
+                        Εκτύπωση
+                    </button>
+
+                    <button type="button" id="erganiPdfCloseBtn" class="btn btn-secondary">
+                        Κλείσιμο
+                    </button>
+                </div>
+            </div>
+        `,
+            showConfirmButton: false,
+            customClass: {
+                title: 'custom-title',
+                popup: 'custom-swal-popup-wide',
+                htmlContainer: 'custom-html-container'
+            },
+            didOpen: () => {
+                const popup = Swal.getPopup();
+                const iframe = popup?.querySelector('iframe');
+                const htmlContainer = Swal.getHtmlContainer();
+
+                if (popup) {
+                    popup.style.setProperty('width', '1250px', 'important');
+                    popup.style.setProperty('max-width', '98vw', 'important');
+                    popup.style.setProperty('min-width', '900px', 'important');
+                    popup.style.setProperty('padding', '1rem', 'important');
+                }
+
+                if (htmlContainer) {
+                    htmlContainer.style.setProperty('width', '100%', 'important');
+                    htmlContainer.style.setProperty('max-width', '100%', 'important');
+                    htmlContainer.style.setProperty('margin', '0', 'important');
+                }
+
+                if (iframe) {
+                    iframe.style.setProperty('width', '100%', 'important');
+                    iframe.style.setProperty('height', '72vh', 'important');
+                    iframe.style.setProperty('min-height', '620px', 'important');
+                }
+
+                const openBtn = document.getElementById('erganiPdfOpenBtn');
+                const printBtn = document.getElementById('erganiPdfPrintBtn');
+                const closeBtn = document.getElementById('erganiPdfCloseBtn');
+
+                if (openBtn) {
+                    openBtn.addEventListener('click', () => {
+                        window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                    });
+                }
+
+                if (printBtn) {
+                    printBtn.addEventListener('click', () => {
+                        const printWindow = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                        if (!printWindow) return;
+
+                        printWindow.addEventListener('load', () => {
+                            try {
+                                printWindow.focus();
+                                printWindow.print();
+                            } catch (e) {
+                                console.warn('PDF print failed:', e);
+                            }
+                        });
+                    });
+                }
+
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => {
+                        Swal.close();
+                    });
+                }
+            }
+        });
+    }
+
+    // ============================================================================
     // ✅ HELPER FUNCTION: Upload MA to ERGANH (Μεταβολή Στοιχείων)
     // ============================================================================
-    async function uploadMaToErganh(ergazomenosId, s3Url, isPermanent = false, processCode = null) {
+    async function uploadMaToErganh(
+        ergazomenosId,
+        s3Url,
+        isPermanent = false,
+        processCode = null,
+        erganiUploadMethod = 'xml'
+    ) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const normalizedProcessCode = String(processCode || '')
+            .trim()
+            .toLowerCase();
+        const normalizedUploadMethod = String(erganiUploadMethod || 'xml')
+            .trim()
+            .toLowerCase();
+        const isE7NRestSubmit =
+            isPermanent === true &&
+            normalizedUploadMethod === 'rest' &&
+            (normalizedProcessCode === '222' || normalizedProcessCode === 'ma_222');
+
+        if (isE7NRestSubmit) {
+            if (erganiUploadInProgress) {
+                if (window.hideLoader) window.hideLoader();
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'ΕΡΓΑΝΗ REST',
+                    text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
+                    confirmButtonText: 'OK'
+                });
+                return { success: false, userMessage: 'Upload already in progress' };
+            }
+
+            erganiUploadInProgress = true;
+
+            try {
+                if (window.applyServerProgress) {
+                    window.applyServerProgress(0, 'Οριστική υποβολή E7N μέσω REST API', 1, 4);
+                } else if (window.showLoader) {
+                    window.showLoader('Οριστική υποβολή E7N μέσω REST API');
+                }
+
+                const uploadResponse = await fetch(
+                    '/ergazomenoi/ergazomenoi/submit-e7n-to-erganh',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            ergazomenosId,
+                            erganiUploadMethod: 'rest'
+                        })
+                    }
+                );
+
+                let payload;
+                try {
+                    payload = await uploadResponse.json();
+                } catch {
+                    payload = { success: false, message: await uploadResponse.text() };
+                }
+
+                if (window.hideLoader) window.hideLoader();
+
+                if (!uploadResponse.ok || !payload?.success) {
+                    await Swal.fire({
+                        icon: 'error',
+                        title: 'E7N REST - ΕΡΓΑΝΗ ΙΙ',
+                        html: `<p>${payload?.message || payload?.error || `HTTP ${uploadResponse.status}`}</p>`,
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup'
+                        }
+                    });
+                    return { success: false, ...payload };
+                }
+
+                await showErganiSubmittedPdfModal(payload);
+                return { success: true, ...payload };
+            } catch (error) {
+                if (window.hideLoader) window.hideLoader();
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'E7N REST - Σφάλμα',
+                    text: error?.message || 'Unknown error',
+                    confirmButtonText: 'OK'
+                });
+                return { success: false, userMessage: error?.message || 'Unknown error' };
+            } finally {
+                if (window.hideLoader) window.hideLoader();
+                erganiUploadInProgress = false;
+            }
+        }
 
         if (!s3Url || typeof s3Url !== 'string') {
             throw new Error('uploadMaToErganh: s3Url must be a string');
@@ -2674,6 +2943,1014 @@ document.addEventListener('DOMContentLoaded', () => {
             return { success: false, error: err?.message };
         } finally {
             erganiUploadInProgress = false;
+        }
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Ακύρωση / Ανάκληση υποβολής E7N από ΕΡΓΑΝΗ
+    // ============================================================================
+    async function cancelE7NSubmission(erganhLogId, cancelReason = '') {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const response = await fetch('/ergazomenoi/ergazomenoi/cancel-e7n-submission', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                erganhLogId,
+                cancelReason
+            })
+        });
+
+        const payload = await response.json().catch(async () => ({
+            success: false,
+            message: await response.text()
+        }));
+
+        if (!response.ok || payload?.success === false) {
+            throw new Error(
+                payload?.message || payload?.error || 'Η ακύρωση της υποβολής ΕΡΓΑΝΗ απέτυχε.'
+            );
+        }
+
+        return payload;
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Modal επιβεβαίωσης ακύρωσης E7N
+    // ============================================================================
+    async function confirmAndCancelE7NSubmission(erganhLogId, protocol = '') {
+        if (!erganhLogId) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Σφάλμα',
+                text: 'Δεν βρέθηκε ID υποβολής ΕΡΓΑΝΗ για ακύρωση.'
+            });
+            return null;
+        }
+
+        const confirm = await Swal.fire({
+            icon: 'warning',
+            title: 'Ακύρωση Υποβολής ΕΡΓΑΝΗ',
+            html: `
+            <p>Θέλετε σίγουρα να ακυρώσετε την υποβολή;</p>
+            ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${protocol}</p>` : ''}
+            <p class="text-danger">
+                Η ενέργεια θα σταλεί στο ΕΡΓΑΝΗ και δεν είναι απλή τοπική διαγραφή.
+            </p>
+        `,
+            input: 'textarea',
+            inputPlaceholder: 'Προαιρετικός λόγος ακύρωσης για εσωτερική καταγραφή...',
+            inputAttributes: {
+                maxlength: 500
+            },
+            showCancelButton: true,
+            confirmButtonText: 'Ναι, ακύρωση',
+            cancelButtonText: 'Όχι',
+            customClass: {
+                confirmButton: 'class-danger custom-confirm-button custom-swal-button',
+                cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup'
+            }
+        });
+
+        if (!confirm.isConfirmed) return null;
+
+        try {
+            const result = await cancelE7NSubmission(erganhLogId, confirm.value || '');
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Ακύρωση Υποβολής',
+                html: `
+                <p>${result?.message || 'Η υποβολή ακυρώθηκε επιτυχώς.'}</p>
+                ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${protocol}</p>` : ''}
+            `,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
+            });
+
+            return result;
+        } catch (error) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Αποτυχία Ακύρωσης',
+                html: `
+                <p>Το ΕΡΓΑΝΗ απέρριψε ή απέτυχε να εκτελέσει την ακύρωση.</p>
+                <p><strong>Μήνυμα:</strong></p>
+                <pre style="white-space:pre-wrap;text-align:left;">${error.message}</pre>
+            `,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-danger custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
+            });
+
+            return null;
+        }
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Φόρτωση Ιστορικού ΕΡΓΑΝΗ
+    // ============================================================================
+    async function loadErganhHistory(ergazomenosId) {
+        const response = await fetch(`/ergazomenoi/ergazomenoi/${ergazomenosId}/erganh-history`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        const payload = await response.json().catch(async () => ({
+            success: false,
+            message: await response.text()
+        }));
+
+        if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.message || 'Αποτυχία φόρτωσης ιστορικού ΕΡΓΑΝΗ.');
+        }
+
+        return payload.data || [];
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Render πίνακα Ιστορικού ΕΡΓΑΝΗ
+    // ============================================================================
+    function renderErganhHistoryTable(rows = []) {
+        if (!rows.length) {
+            return `
+            <div class="alert alert-info mt-3">
+                Δεν υπάρχουν ακόμα υποβολές ΕΡΓΑΝΗ για τον εργαζόμενο.
+            </div>
+        `;
+        }
+
+        const tr = rows
+            .map((row) => {
+                const statusBadge =
+                    row.documentStatus === 'CANCELLED'
+                        ? '<span class="badge bg-danger">CANCELLED</span>'
+                        : row.submissionStatus === 'FAILED'
+                          ? '<span class="badge bg-warning text-dark">FAILED</span>'
+                          : '<span class="badge bg-success">ACTIVE</span>';
+
+                const pdfBtn = row.pdfUrl
+                    ? `
+                    <button type="button"
+                        class="btn btn-sm btn-primary erganh-history-pdf-btn"
+                        data-pdf-url="${row.pdfUrl}"
+                        data-protocol="${row.protocol || ''}"
+                        data-submit-date="${row.submitDate || ''}">
+                        PDF
+                    </button>
+                `
+                    : '<span class="text-muted">-</span>';
+
+                const cancelBtn =
+                    row.documentStatus === 'ACTIVE' && row.uploadMethod === 'REST'
+                        ? `
+                        <button type="button"
+                            class="btn btn-sm btn-danger erganh-history-cancel-btn"
+                            data-erganh-log-id="${row._id}"
+                            data-protocol="${row.protocol || ''}">
+                            Ακύρωση
+                        </button>
+                    `
+                        : '<span class="text-muted">-</span>';
+
+                return `
+                <tr
+                    data-upload-method="${row.uploadMethod || ''}"
+                    data-document-status="${row.documentStatus || ''}"
+                    data-submission-status="${row.submissionStatus || ''}"
+                >
+                    <td>${row.submitDate || '-'}</td>
+                    <td>${row.protocol || '-'}</td>
+                    <td>${row.processDescription || row.processCode || '-'}</td>
+                    <td>${row.uploadMethod || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td>${pdfBtn}</td>
+                    <td>${cancelBtn}</td>
+                </tr>
+            `;
+            })
+            .join('');
+
+        return `
+        <div class="erganh-history-filterbar">
+            <div>
+                <label for="erganhHistoryMethodFilter"><strong>Μέθοδος:</strong></label>
+                <select id="erganhHistoryMethodFilter" class="form-select form-select-sm">
+                    <option value="ALL">Όλα</option>
+                    <option value="REST">REST</option>
+                    <option value="XML">XML</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="erganhHistoryStatusFilter"><strong>Κατάσταση:</strong></label>
+                <select id="erganhHistoryStatusFilter" class="form-select form-select-sm">
+                    <option value="ALL">Όλα</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="FAILED">FAILED</option>
+                </select>
+            </div>
+
+            <div class="erganh-history-count">
+                <strong>Εγγραφές:</strong>
+                <span id="erganhHistoryVisibleCount">${rows.length}</span> / ${rows.length}
+            </div>
+        </div>
+
+        <div class="erganh-history-wrapper">
+            <table class="erganh-history-table">
+                <thead>
+                    <tr>
+                        <th>Ημερομηνία</th>
+                        <th>Πρωτόκολλο</th>
+                        <th>Τύπος</th>
+                        <th>XML / REST</th>
+                        <th>Κατάσταση</th>
+                        <th>PDF</th>
+                        <th>Ακύρωση</th>
+                    </tr>
+                </thead>
+                <tbody>${tr}</tbody>
+            </table>
+        </div>
+    `;
+    }
+
+    function applyErganhHistoryFilters() {
+        const methodFilter = document.getElementById('erganhHistoryMethodFilter')?.value || 'ALL';
+        const statusFilter = document.getElementById('erganhHistoryStatusFilter')?.value || 'ALL';
+        const rows = document.querySelectorAll('.erganh-history-table tbody tr');
+
+        let visibleCount = 0;
+
+        rows.forEach((tr) => {
+            const method = tr.dataset.uploadMethod || '';
+            const documentStatus = tr.dataset.documentStatus || '';
+            const submissionStatus = tr.dataset.submissionStatus || '';
+
+            const methodOk = methodFilter === 'ALL' || method === methodFilter;
+
+            const statusOk =
+                statusFilter === 'ALL' ||
+                documentStatus === statusFilter ||
+                submissionStatus === statusFilter;
+
+            const visible = methodOk && statusOk;
+
+            tr.style.display = visible ? '' : 'none';
+
+            if (visible) visibleCount++;
+        });
+
+        const countEl = document.getElementById('erganhHistoryVisibleCount');
+        if (countEl) countEl.textContent = String(visibleCount);
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Άνοιγμα modal Ιστορικού ΕΡΓΑΝΗ
+    // ============================================================================
+    async function showErganhHistoryModal(ergazomenosId) {
+        try {
+            const rows = await loadErganhHistory(ergazomenosId);
+
+            await Swal.fire({
+                title: 'Ιστορικό ΕΡΓΑΝΗ',
+                width: 'auto',
+                html: renderErganhHistoryTable(rows),
+                confirmButtonText: 'Κλείσιμο',
+                customClass: {
+                    confirmButton: 'class-secondary custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container'
+                },
+                didOpen: () => {
+                    const popup = Swal.getPopup();
+                    const htmlContainer = Swal.getHtmlContainer();
+
+                    if (popup) {
+                        popup.style.setProperty('width', 'auto', 'important');
+                        popup.style.setProperty('min-width', 'unset', 'important');
+                        popup.style.setProperty('max-width', 'fit-content', 'important');
+                        popup.style.setProperty('padding', '1.5rem', 'important');
+                    }
+
+                    if (htmlContainer) {
+                        htmlContainer.style.setProperty('width', 'auto', 'important');
+                        htmlContainer.style.setProperty('max-width', '100%', 'important');
+                        htmlContainer.style.setProperty('overflow-x', 'auto', 'important');
+                    }
+
+                    const methodFilter = document.getElementById('erganhHistoryMethodFilter');
+                    const statusFilter = document.getElementById('erganhHistoryStatusFilter');
+
+                    if (methodFilter) {
+                        methodFilter.addEventListener('change', applyErganhHistoryFilters);
+                    }
+
+                    if (statusFilter) {
+                        statusFilter.addEventListener('change', applyErganhHistoryFilters);
+                    }
+
+                    applyErganhHistoryFilters();
+
+                    document.querySelectorAll('.erganh-history-pdf-btn').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            await showErganiSubmittedPdfModal({
+                                pdfUrl: btn.dataset.pdfUrl,
+                                protocol: btn.dataset.protocol,
+                                submitDate: btn.dataset.submitDate
+                            });
+                        });
+                    });
+
+                    document.querySelectorAll('.erganh-history-cancel-btn').forEach((btn) => {
+                        btn.addEventListener('click', async () => {
+                            const result = await confirmAndCancelE7NSubmission(
+                                btn.dataset.erganhLogId,
+                                btn.dataset.protocol
+                            );
+
+                            if (result) {
+                                Swal.close();
+                                await showErganhHistoryModal(ergazomenosId);
+                            }
+                        });
+                    });
+                }
+            });
+        } catch (error) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Ιστορικό ΕΡΓΑΝΗ',
+                text: error.message || 'Αποτυχία φόρτωσης ιστορικού ΕΡΓΑΝΗ.'
+            });
+        }
+    }
+
+    const erganhHistoryBtn = document.getElementById('btnErganhHistory');
+
+    if (erganhHistoryBtn) {
+        erganhHistoryBtn.addEventListener('click', async () => {
+            const ergazomenoiId = document.getElementById('ergazomenoiId')?.value?.trim();
+
+            if (!ergazomenoiId) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Ιστορικό ΕΡΓΑΝΗ',
+                    text: 'Δεν βρέθηκε ID εργαζόμενου.'
+                });
+                return;
+            }
+
+            await showErganhHistoryModal(ergazomenoiId);
+        });
+    }
+
+    const erganhDashboardBtn = document.getElementById('btnErganhDashboard');
+
+    if (erganhDashboardBtn) {
+        erganhDashboardBtn.addEventListener('click', async () => {
+            await showErganhDashboardModal('30');
+        });
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Φόρτωση Dashboard ΕΡΓΑΝΗ εταιρείας
+    // ============================================================================
+    async function loadErganhDashboard(period = '30') {
+        const response = await fetch(`/ergazomenoi/ergazomenoi/erganh-dashboard?period=${period}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        const payload = await response.json().catch(async () => ({
+            success: false,
+            message: await response.text()
+        }));
+
+        if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.message || 'Αποτυχία φόρτωσης Dashboard ΕΡΓΑΝΗ.');
+        }
+
+        return payload;
+    }
+
+    // ============================================================================
+    // ✅ HELPER FUNCTION: Chart.js loader για Dashboard ΕΡΓΑΝΗ
+    // ============================================================================
+    async function ensureChartJsLoaded() {
+        if (window.Chart) return true;
+
+        return new Promise((resolve, reject) => {
+            const existingScript = document.getElementById('chartjs-cdn-script');
+
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(true), { once: true });
+                existingScript.addEventListener(
+                    'error',
+                    () => reject(new Error('Αποτυχία φόρτωσης Chart.js.')),
+                    { once: true }
+                );
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.id = 'chartjs-cdn-script';
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.async = true;
+
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error('Αποτυχία φόρτωσης Chart.js.'));
+
+            document.head.appendChild(script);
+        });
+    }
+
+    function destroyErganhDashboardCharts() {
+        if (!window.__erganhDashboardCharts) {
+            window.__erganhDashboardCharts = {};
+            return;
+        }
+
+        Object.values(window.__erganhDashboardCharts).forEach((chart) => {
+            if (chart && typeof chart.destroy === 'function') {
+                chart.destroy();
+            }
+        });
+
+        window.__erganhDashboardCharts = {};
+    }
+
+    function percentOf(value, total) {
+        const n = Number(value) || 0;
+        const t = Number(total) || 0;
+
+        if (!t) return 0;
+
+        return Math.round((n / t) * 100);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function renderDashboardCard({ cssClass, title, value, subtitle = '' }) {
+        return `
+            <div class="erganh-dashboard-card ${cssClass}">
+                <strong>${escapeHtml(title)}</strong>
+                <span>${Number(value) || 0}</span>
+                ${subtitle ? `<small>${escapeHtml(subtitle)}</small>` : ''}
+            </div>
+        `;
+    }
+
+    function renderErganhDashboard(payload) {
+        const totals = payload?.totals || {};
+        const byProcess = payload?.byProcess || [];
+        const latest = payload?.latest || [];
+
+        const totalCount = Number(totals.total) || 0;
+        const activePercent = percentOf(totals.active, totalCount);
+        const cancelledPercent = percentOf(totals.cancelled, totalCount);
+        const failedPercent = percentOf(totals.failed, totalCount);
+
+        const processRows = byProcess
+            .map(
+                (r) => `
+                <tr>
+                    <td>${escapeHtml(r.processCode || '-')}</td>
+                    <td>${escapeHtml(r.processDescription || '-')}</td>
+                    <td class="text-center">${Number(r.count) || 0}</td>
+                    <td class="text-center">${Number(r.rest) || 0}</td>
+                    <td class="text-center">${Number(r.xml) || 0}</td>
+                    <td class="text-center">${Number(r.active) || 0}</td>
+                    <td class="text-center">${Number(r.cancelled) || 0}</td>
+                    <td class="text-center">${Number(r.failed) || 0}</td>
+                </tr>
+            `
+            )
+            .join('');
+
+        const latestRows = latest
+            .map((r) => {
+                const pdfButton = r.pdfUrl
+                    ? `
+                        <button type="button"
+                            class="btn btn-sm btn-primary erganh-dashboard-pdf-btn"
+                            data-pdf-url="${escapeHtml(r.pdfUrl)}"
+                            data-protocol="${escapeHtml(r.protocol || '')}"
+                            data-submit-date="${escapeHtml(r.submitDate || '')}"
+                            title="Άνοιγμα PDF">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </button>
+                    `
+                    : '<span class="text-muted">-</span>';
+
+                const protocolCell = r.pdfUrl
+                    ? `
+                        <button type="button"
+                            class="btn btn-link btn-sm p-0 erganh-dashboard-pdf-btn erganh-dashboard-protocol-btn"
+                            data-pdf-url="${escapeHtml(r.pdfUrl)}"
+                            data-protocol="${escapeHtml(r.protocol || '')}"
+                            data-submit-date="${escapeHtml(r.submitDate || '')}">
+                            ${escapeHtml(r.protocol || '-')}
+                        </button>
+                    `
+                    : escapeHtml(r.protocol || '-');
+
+                const statusClass =
+                    r.documentStatus === 'CANCELLED'
+                        ? 'badge bg-danger'
+                        : r.submissionStatus === 'FAILED'
+                          ? 'badge bg-warning text-dark'
+                          : 'badge bg-success';
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(r.submitDate || '-')}</td>
+                        <td>${protocolCell}</td>
+                        <td>${escapeHtml(r.employee || '-')}</td>
+                        <td>${escapeHtml(r.employeeAfm || '-')}</td>
+                        <td>${escapeHtml(r.processDescription || r.processCode || '-')}</td>
+                        <td class="text-center">${escapeHtml(r.uploadMethod || '-')}</td>
+                        <td class="text-center">
+                            <span class="${statusClass}">
+                                ${escapeHtml(r.documentStatus || r.submissionStatus || '-')}
+                            </span>
+                        </td>
+                        <td class="text-center">${pdfButton}</td>
+                    </tr>
+                `;
+            })
+            .join('');
+
+        return `
+                <div class="erganh-dashboard-cards">
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-total',
+                        title: 'Σύνολο',
+                        value: totals.total || 0,
+                        subtitle: 'Υποβολές'
+                    })}
+
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-rest',
+                        title: 'REST',
+                        value: totals.rest || 0,
+                        subtitle: `${percentOf(totals.rest, totalCount)}% του συνόλου`
+                    })}
+
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-xml',
+                        title: 'XML',
+                        value: totals.xml || 0,
+                        subtitle: `${percentOf(totals.xml, totalCount)}% του συνόλου`
+                    })}
+
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-active',
+                        title: 'ACTIVE',
+                        value: totals.active || 0,
+                        subtitle: `${activePercent}% του συνόλου`
+                    })}
+
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-cancelled',
+                        title: 'CANCELLED',
+                        value: totals.cancelled || 0,
+                        subtitle: `${cancelledPercent}% του συνόλου`
+                    })}
+
+                    ${renderDashboardCard({
+                        cssClass: 'dashboard-card-failed',
+                        title: 'FAILED',
+                        value: totals.failed || 0,
+                        subtitle: `${failedPercent}% του συνόλου`
+                    })}
+                </div>
+
+                <div class="erganh-dashboard-charts">
+                    <div class="erganh-dashboard-chart-card">
+                        <h6>Υποβολές ανά κατηγορία</h6>
+                        <div class="erganh-dashboard-chart-box">
+                            <canvas id="erganhTotalsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="erganh-dashboard-chart-card">
+                        <h6>Κατάσταση εγγράφων</h6>
+                        <div class="erganh-dashboard-chart-box">
+                            <canvas id="erganhStatusChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="erganh-dashboard-chart-card erganh-dashboard-chart-wide">
+                        <h6>Υποβολές ανά μήνα και ανά έντυπο ΕΡΓΑΝΗ</h6>
+                        <div class="erganh-dashboard-chart-box">
+                            <canvas id="erganhProcessChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="mt-3 mb-2">Υποβολές ανά μήνα και ανά έντυπο ΕΡΓΑΝΗ</h6>
+                <div class="table-responsive">
+                    <table class="erganh-history-table">
+                        <thead>
+                            <tr>
+                                <th>Κωδικός</th>
+                                <th>Περιγραφή</th>
+                                <th>Σύνολο</th>
+                                <th>REST</th>
+                                <th>XML</th>
+                                <th>ACTIVE</th>
+                                <th>CANCELLED</th>
+                                <th>FAILED</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${processRows || '<tr><td colspan="8">Δεν υπάρχουν δεδομένα.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h6 class="mt-3 mb-2">Τελευταίες 20 υποβολές</h6>
+                <div class="table-responsive">
+                    <table class="erganh-history-table">
+                        <thead>
+                            <tr>
+                                <th>Ημερομηνία</th>
+                                <th>Πρωτόκολλο</th>
+                                <th>Εργαζόμενος</th>
+                                <th>ΑΦΜ</th>
+                                <th>Τύπος</th>
+                                <th>Μέθοδος</th>
+                                <th>Κατάσταση</th>
+                                <th>PDF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${latestRows || '<tr><td colspan="8">Δεν υπάρχουν πρόσφατες υποβολές.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    function buildStackedMonthProcessChartData(byMonthProcess = []) {
+        const monthMap = new Map();
+        const processMap = new Map();
+
+        byMonthProcess.forEach((row) => {
+            const monthKey = row.monthKey || '';
+            const monthLabel = row.monthLabel || monthKey || '-';
+            const processCode = row.processCode || 'UNKNOWN';
+            const processDescription = row.processDescription || processCode;
+            const count = Number(row.count) || 0;
+
+            if (!monthMap.has(monthKey)) {
+                monthMap.set(monthKey, {
+                    monthKey,
+                    monthLabel
+                });
+            }
+
+            monthMap.get(monthKey)[processCode] = count;
+
+            if (!processMap.has(processCode)) {
+                processMap.set(processCode, processDescription);
+            }
+        });
+
+        const months = Array.from(monthMap.values()).sort((a, b) =>
+            String(a.monthKey).localeCompare(String(b.monthKey))
+        );
+
+        const processes = Array.from(processMap.keys()).sort();
+
+        return {
+            labels: months.map((m) => m.monthLabel),
+            processes,
+            processMap,
+            datasets: processes.map((processCode) => ({
+                label: processMap.get(processCode) || processCode,
+                data: months.map((m) => Number(m[processCode]) || 0)
+            }))
+        };
+    }
+
+    function initErganhDashboardCharts(payload) {
+        if (!window.Chart) return;
+
+        destroyErganhDashboardCharts();
+
+        const totals = payload?.totals || {};
+        const byProcess = payload?.byProcess || [];
+
+        const totalsCanvas = document.getElementById('erganhTotalsChart');
+        const statusCanvas = document.getElementById('erganhStatusChart');
+        const processCanvas = document.getElementById('erganhProcessChart');
+
+        if (totalsCanvas) {
+            window.__erganhDashboardCharts.totals = new Chart(totalsCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ['REST', 'XML', 'ACTIVE', 'CANCELLED', 'FAILED'],
+                    datasets: [
+                        {
+                            label: 'Υποβολές',
+                            data: [
+                                Number(totals.rest) || 0,
+                                Number(totals.xml) || 0,
+                                Number(totals.active) || 0,
+                                Number(totals.cancelled) || 0,
+                                Number(totals.failed) || 0
+                            ],
+                            backgroundColor: [
+                                '#0d6efd',
+                                '#198754',
+                                '#20c997',
+                                '#dc3545',
+                                '#fd7e14'
+                            ],
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        if (statusCanvas) {
+            window.__erganhDashboardCharts.status = new Chart(statusCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ACTIVE', 'CANCELLED', 'FAILED'],
+                    datasets: [
+                        {
+                            data: [
+                                Number(totals.active) || 0,
+                                Number(totals.cancelled) || 0,
+                                Number(totals.failed) || 0
+                            ],
+                            backgroundColor: ['#20c997', '#dc3545', '#fd7e14'],
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        if (processCanvas) {
+            const stackedData = buildStackedMonthProcessChartData(payload?.byMonthProcess || []);
+
+            window.__erganhDashboardCharts.process = new Chart(processCanvas, {
+                type: 'bar',
+                data: {
+                    labels: stackedData.labels,
+                    datasets: stackedData.datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    return items?.[0]?.label || '';
+                                },
+                                label: (context) => {
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    async function showErganhDashboardModal(initialPeriod = '30') {
+        let currentPeriod = initialPeriod;
+
+        async function refreshDashboardHtml() {
+            const payload = await loadErganhDashboard(currentPeriod);
+
+            const container = document.getElementById('erganhDashboardContent');
+            if (container) {
+                container.innerHTML = renderErganhDashboard(payload);
+            }
+
+            initErganhDashboardCharts(payload);
+
+            document.querySelectorAll('.erganh-dashboard-pdf-btn').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    await showErganiSubmittedPdfModal({
+                        pdfUrl: btn.dataset.pdfUrl,
+                        protocol: btn.dataset.protocol,
+                        submitDate: btn.dataset.submitDate
+                    });
+                });
+            });
+        }
+
+        await Swal.fire({
+            title: 'Dashboard ΕΡΓΑΝΗ Εταιρείας',
+            width: 'min(1250px, 96vw)',
+            heightAuto: false,
+            html: `
+                <div class="erganh-history-filterbar">
+                    <div>
+                        <label for="erganhDashboardPeriod"><strong>Περίοδος:</strong></label>
+                        <select id="erganhDashboardPeriod" class="form-select form-select-sm">
+                            <option value="30">30 ημέρες</option>
+                            <option value="60">60 ημέρες</option>
+                            <option value="90">90 ημέρες</option>
+                            <option value="year">Ετήσια</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="erganhDashboardContent">
+                    <div class="text-muted p-3">Φόρτωση...</div>
+                </div>
+            `,
+            confirmButtonText: 'Κλείσιμο',
+            customClass: {
+                confirmButton: 'class-secondary custom-confirm-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup-wide erganh-dashboard-swal',
+                htmlContainer: 'custom-html-container erganh-dashboard-html-container'
+            },
+            didOpen: async () => {
+                const periodSelect = document.getElementById('erganhDashboardPeriod');
+
+                if (periodSelect) {
+                    periodSelect.value = currentPeriod;
+                    periodSelect.addEventListener('change', async () => {
+                        currentPeriod = periodSelect.value;
+
+                        const container = document.getElementById('erganhDashboardContent');
+                        if (container) {
+                            container.innerHTML = '<div class="text-muted p-3">Φόρτωση...</div>';
+                        }
+
+                        await refreshDashboardHtml();
+                    });
+                }
+
+                await refreshDashboardHtml();
+            },
+            willClose: () => {
+                destroyErganhDashboardCharts();
+            }
+        });
+    }
+
+    let erganhTotalsChart = null;
+    let erganhStatusChart = null;
+    let erganhProcessChart = null;
+
+    function renderErganhDashboardCharts(payload) {
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js δεν έχει φορτωθεί.');
+            return;
+        }
+
+        const totals = payload?.totals || {};
+        const byProcess = payload?.byProcess || [];
+
+        if (erganhTotalsChart) erganhTotalsChart.destroy();
+        if (erganhStatusChart) erganhStatusChart.destroy();
+        if (erganhProcessChart) erganhProcessChart.destroy();
+
+        const totalsCanvas = document.getElementById('erganhTotalsChart');
+        const statusCanvas = document.getElementById('erganhStatusChart');
+        const processCanvas = document.getElementById('erganhProcessChart');
+
+        if (totalsCanvas) {
+            erganhTotalsChart = new Chart(totalsCanvas, {
+                type: 'bar',
+                data: {
+                    labels: ['REST', 'XML', 'ACTIVE', 'CANCELLED', 'FAILED'],
+                    datasets: [
+                        {
+                            label: 'Υποβολές',
+                            data: [
+                                Number(totals.rest) || 0,
+                                Number(totals.xml) || 0,
+                                Number(totals.active) || 0,
+                                Number(totals.cancelled) || 0,
+                                Number(totals.failed) || 0
+                            ]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        if (statusCanvas) {
+            erganhStatusChart = new Chart(statusCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ACTIVE', 'CANCELLED', 'FAILED'],
+                    datasets: [
+                        {
+                            data: [
+                                Number(totals.active) || 0,
+                                Number(totals.cancelled) || 0,
+                                Number(totals.failed) || 0
+                            ]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        if (processCanvas) {
+            erganhProcessChart = new Chart(processCanvas, {
+                type: 'bar',
+                data: {
+                    labels: byProcess.map((r) => r.processCode || 'UNKNOWN'),
+                    datasets: [
+                        {
+                            label: 'Σύνολο',
+                            data: byProcess.map((r) => Number(r.count) || 0)
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
         }
     }
 

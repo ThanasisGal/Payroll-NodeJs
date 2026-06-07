@@ -1,6 +1,6 @@
 :root {
-    --aaa: #b8b8b8;
-    --dark: #292c4f;
+    --aaa: #981208b6;
+    --dark: #4f3429;
     --info: #0dcaf0;
     --light: #adb5bd;
     --lightTable: #696e74;
@@ -11858,8 +11858,14 @@ body.loader-active > *:not(.app-loader) {
     color: #ffffff !important;
 }
 
+.istoriko-footer-btn-erganh {
+    background-color: #3332049a !important;
+    color: #ffffff !important;
+}
+
 .istoriko-footer-btn-save:hover,
-.istoriko-footer-btn-cancel:hover {
+.istoriko-footer-btn-cancel:hover,
+.istoriko-footer-btn-erganh:hover {
     filter: brightness(1.08);
 }
 
@@ -12182,4 +12188,297 @@ body.loader-active > *:not(.app-loader) {
     font-weight: 700;
     white-space: nowrap;
     vertical-align: middle;
+}
+
+/* ==========================================================================
+   ERGANI History / Dashboard Modals
+   ========================================================================== */
+
+.swal2-popup.custom-swal-popup,
+.swal2-popup.custom-swal-popup-wide {
+    background-color: #fdf9eb !important;
+}
+
+.erganh-history-wrapper,
+.erganh-dashboard-wrapper {
+    background-color: #fdf9eb;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+}
+
+.erganh-history-table {
+    border-collapse: collapse;
+    width: auto;
+    margin: 0 auto;
+    background-color: #ffffff;
+    font-size: 0.92rem;
+}
+
+.erganh-history-table th,
+.erganh-history-table td {
+    border: 1px solid #d9d9d9;
+    padding: 0.35rem 0.45rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.erganh-history-table th {
+    background-color: #f1f1f1;
+    font-weight: 700;
+    text-align: center;
+}
+
+.erganh-history-table td {
+    background-color: #ffffff;
+}
+
+.erganh-history-table tbody tr:hover td {
+    background-color: #f7f7f7;
+}
+
+.erganh-history-filterbar {
+    display: flex;
+    gap: 1rem;
+    align-items: end;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.erganh-history-filterbar select {
+    min-width: 120px;
+}
+
+.erganh-history-count {
+    padding-bottom: 0.25rem;
+    font-size: 0.9rem;
+}
+
+.erganh-dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.erganh-dashboard-card {
+    background: #ffffff;
+    border: 1px solid #d9d9d9;
+    border-left: 5px solid #6c757d;
+    border-radius: 0.5rem;
+    padding: 0.7rem;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.erganh-dashboard-card strong {
+    display: block;
+    font-size: 0.86rem;
+    letter-spacing: 0.02rem;
+}
+
+.erganh-dashboard-card span {
+    display: block;
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-top: 0.25rem;
+    line-height: 1.1;
+}
+
+.erganh-dashboard-card small {
+    display: block;
+    color: #6c757d;
+    font-size: 0.78rem;
+    margin-top: 0.2rem;
+}
+
+.dashboard-card-total {
+    border-left-color: #6c757d;
+}
+
+.dashboard-card-rest {
+    border-left-color: #0d6efd;
+}
+
+.dashboard-card-xml {
+    border-left-color: #198754;
+}
+
+.dashboard-card-active {
+    border-left-color: #20c997;
+}
+
+.dashboard-card-cancelled {
+    border-left-color: #dc3545;
+}
+
+.dashboard-card-failed {
+    border-left-color: #fd7e14;
+}
+
+.erganh-dashboard-charts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.erganh-dashboard-chart-card {
+    background: #ffffff;
+    border: 1px solid #d9d9d9;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+.erganh-dashboard-chart-card h6 {
+    text-align: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.erganh-dashboard-chart-wide {
+    grid-column: 1 / -1;
+}
+
+.erganh-dashboard-chart-box {
+    position: relative;
+    height: 250px;
+}
+
+.erganh-dashboard-chart-wide .erganh-dashboard-chart-box {
+    height: 300px;
+}
+
+@media (max-width: 992px) {
+    .erganh-dashboard-cards {
+        grid-template-columns: repeat(3, minmax(120px, 1fr));
+    }
+
+    .erganh-dashboard-charts {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 576px) {
+    .erganh-dashboard-cards {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+
+    .erganh-dashboard-chart-box,
+    .erganh-dashboard-chart-wide .erganh-dashboard-chart-box {
+        height: 240px;
+    }
+}
+
+.erganh-dashboard-card small,
+.erganh-dashboard-card .card-subtitle,
+.erganh-dashboard-card-subtitle {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    color: #6c757d;
+    margin-top: 0.15rem;
+}
+
+.erganh-dashboard-swal {
+    max-height: 92vh !important;
+    overflow: hidden !important;
+}
+
+.erganh-dashboard-swal .swal2-html-container {
+    max-height: calc(92vh - 130px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 0.5rem !important;
+}
+
+.erganh-dashboard-wrapper {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.erganh-dashboard-cards {
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
+}
+
+.erganh-dashboard-card {
+    min-width: 0;
+}
+
+/* ==========================================================================
+   ERGANI Dashboard Swal sizing fix
+   ========================================================================== */
+
+.swal2-popup.erganh-dashboard-swal {
+    width: min(1250px, 96vw) !important;
+    max-width: 96vw !important;
+    height: auto !important;
+    max-height: 92vh !important;
+    overflow: hidden !important;
+    padding: 1rem !important;
+}
+
+.swal2-popup.erganh-dashboard-swal .swal2-title {
+    margin: 0 0 0.5rem 0 !important;
+    padding: 0 !important;
+}
+
+.swal2-popup.erganh-dashboard-swal .swal2-html-container,
+.erganh-dashboard-html-container {
+    max-height: calc(92vh - 115px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 0.5rem !important;
+}
+
+.swal2-popup.erganh-dashboard-swal .swal2-actions {
+    margin: 0.75rem 0 0 0 !important;
+}
+
+.erganh-dashboard-wrapper {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.erganh-dashboard-cards {
+    grid-template-columns: repeat(6, minmax(105px, 1fr));
+}
+
+.erganh-dashboard-card {
+    min-width: 0;
+    padding: 0.9rem 0.75rem;
+}
+
+.erganh-dashboard-swal .erganh-history-filterbar {
+    margin-top: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.erganh-dashboard-swal #erganhDashboardPeriod {
+    min-width: 155px;
+    height: 42px;
+    line-height: 1.4;
+    padding: 0.35rem 2rem 0.35rem 0.75rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+.erganh-dashboard-swal .erganh-history-filterbar label {
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.erganh-dashboard-protocol-btn {
+    color: #0d6efd !important;
+    font-weight: 700 !important;
+    text-decoration: underline !important;
+    text-underline-offset: 2px;
+}
+
+.erganh-dashboard-protocol-btn:hover {
+    color: #981208b6 !important;
+    text-decoration-thickness: 2px;
 }

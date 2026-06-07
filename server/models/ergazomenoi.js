@@ -758,6 +758,140 @@ const IstorikoProslhpseonAllagonModel = model(
     IstorikoProslhpseonAllagonSchema
 );
 
+const ErgazomenoiErganhSchema = new Schema(
+    {
+        team: { type: String, trim: true, index: true },
+        companykod_object: { type: Schema.Types.ObjectId, ref: 'Companies', index: true },
+        companykod: { type: String, trim: true, index: true },
+
+        ergazomenos_object: { type: Schema.Types.ObjectId, ref: 'Ergazomenoi', index: true },
+        ergazomenos_kodikos: { type: String, trim: true, index: true },
+        ergazomenos_afm: { type: String, trim: true, index: true },
+        ergazomenos_eponymo: { type: String, trim: true },
+        ergazomenos_onoma: { type: String, trim: true },
+
+        ypokatasthma_object: { type: Schema.Types.ObjectId, ref: 'Ypokatasthmata' },
+        ypokatasthma_kodikos: { type: String, trim: true },
+
+        submission_code: { type: String, trim: true, index: true },
+        submission_id: { type: Number },
+        submission_description: { type: String, trim: true },
+        process_code: { type: String, trim: true, index: true },
+        process_description: { type: String, trim: true },
+
+        upload_method: { type: String, enum: ['XML', 'REST'], required: true, index: true },
+        submission_status: {
+            type: String,
+            enum: ['SUCCESS', 'FAILED', 'TEMPORARY', 'CANCELLED'],
+            required: true,
+            index: true
+        },
+        is_temporary: { type: Boolean, default: false },
+        is_final: { type: Boolean, default: false },
+        environment: { type: String, trim: true, default: 'trial', index: true },
+
+        protocol: { type: String, trim: true, index: true },
+        submit_date_text: { type: String, trim: true },
+        submit_date: { type: Date },
+        erganh_submission_id: { type: String, trim: true, index: true },
+
+        // ---------------------------------------------------------------------
+        // Βοηθητικά πεδία αναφορών / dashboard
+        // ---------------------------------------------------------------------
+        submission_year: {
+            type: Number,
+            index: true
+        },
+
+        submission_month: {
+            type: Number,
+            index: true
+        },
+
+        submission_day: {
+            type: Number,
+            index: true
+        },
+
+        pdf_s3_key: { type: String, trim: true },
+        pdf_s3_url: { type: String, trim: true },
+        pdf_relative_path: { type: String, trim: true },
+        pdf_filename: { type: String, trim: true },
+        pdf_content_type: { type: String, trim: true, default: 'application/pdf' },
+        pdf_size_bytes: { type: Number, default: 0 },
+
+        xml_s3_key: { type: String, trim: true },
+        xml_s3_url: { type: String, trim: true },
+        xml_filename: { type: String, trim: true },
+
+        request_payload: { type: Schema.Types.Mixed },
+        erganh_raw_response: { type: Schema.Types.Mixed },
+        error_message: { type: String, trim: true },
+
+        created_by_user: { type: Schema.Types.ObjectId, ref: 'User' },
+        created_by_username: { type: String, trim: true },
+        // ---------------------------------------------------------------------
+        // Κατάσταση εγγράφου ΕΡΓΑΝΗ
+        // ---------------------------------------------------------------------
+        document_status: {
+            type: String,
+            enum: ['ACTIVE', 'CANCELLED'],
+            default: 'ACTIVE',
+            index: true
+        },
+
+        // ---------------------------------------------------------------------
+        // Στοιχεία ακύρωσης υποβολής
+        // ---------------------------------------------------------------------
+        is_cancelled: {
+            type: Boolean,
+            default: false,
+            index: true
+        },
+
+        cancelled_protocol: {
+            type: String,
+            trim: true,
+            index: true
+        },
+
+        cancelled_at: {
+            type: Date
+        },
+
+        cancel_reason: {
+            type: String,
+            trim: true
+        },
+
+        cancelled_by_user: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        },
+
+        cancelled_by_username: {
+            type: String,
+            trim: true
+        },
+
+        cancel_raw_response: {
+            type: Schema.Types.Mixed
+        }
+    },
+    {
+        timestamps: true,
+        collection: 'Ergazomenoi_Erganh'
+    }
+);
+
+ErgazomenoiErganhSchema.index({ team: 1, companykod_object: 1, ergazomenos_object: 1 });
+ErgazomenoiErganhSchema.index({ submission_code: 1, protocol: 1, submit_date_text: 1 });
+ErgazomenoiErganhSchema.index({ ergazomenos_object: 1, createdAt: -1 });
+ErgazomenoiErganhSchema.index({ companykod_object: 1, submission_year: 1, submission_month: 1 });
+ErgazomenoiErganhSchema.index({ companykod_object: 1, createdAt: -1 });
+
+const ErgazomenoiErganhModel = model('ErgazomenoiErganh', ErgazomenoiErganhSchema);
+
 module.exports = {
     ErgazomenoiModel,
     ProdhlomenaOrariaModel,
@@ -765,5 +899,6 @@ module.exports = {
     OrariaFromErganhModel,
     OrariaFromCardsModel,
     OrariaApologistikaModel,
-    IstorikoProslhpseonAllagonModel
+    IstorikoProslhpseonAllagonModel,
+    ErgazomenoiErganhModel
 };
