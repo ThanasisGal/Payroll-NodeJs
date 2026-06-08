@@ -44,23 +44,59 @@ function onlyDate(value) {
 
 async function erganiFetch(path, options = {}) {
     const url = `${getBaseUrl()}${path}`;
-    const res = await fetch(url, options);
-    const text = await res.text();
-    const json = safeJsonParse(text);
-    const data = json !== null ? json : text;
+    const timeoutMs = Number(process.env.ERGANI_FETCH_TIMEOUT_MS || 60000);
 
-    if (!res.ok) {
-        const message =
-            data?.message ||
-            data?.Message ||
-            data?.error ||
-            data?.Error ||
-            text ||
-            `HTTP ${res.status}`;
-        throw new Error(message);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+        controller.abort();
+    }, timeoutMs);
+
+    try {
+        console.log('[ERGANI-FETCH] →', options.method || 'GET', url);
+
+        const res = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+
+        console.log('[ERGANI-FETCH] ←', res.status, res.statusText, url);
+
+        const text = await res.text();
+
+        console.log('[ERGANI-FETCH] response text first 1000 chars:', text.slice(0, 1000));
+
+        const json = safeJsonParse(text);
+        const data = json !== null ? json : text;
+
+        if (!res.ok) {
+            const message =
+                data?.message ||
+                data?.Message ||
+                data?.error ||
+                data?.Error ||
+                text ||
+                `HTTP ${res.status}`;
+
+            const err = new Error(message);
+            err.status = res.status;
+            err.rawText = text;
+            err.rawJson = json;
+            throw err;
+        }
+
+        return data;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error(
+                `ERGANI request timeout after ${timeoutMs}ms: ${options.method || 'GET'} ${url}`
+            );
+        }
+
+        console.error('[ERGANI-FETCH] ❌', error.message || error);
+        throw error;
+    } finally {
+        clearTimeout(timeout);
     }
-
-    return data;
 }
 
 async function erganiRawFetch(path, options = {}) {

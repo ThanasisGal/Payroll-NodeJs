@@ -161,6 +161,119 @@ async function generateWtoXML(ergazomenos, companyData, ypokatasthmataData, sche
 }
 
 // =========================================================================
+// ✅ Generate WTOWeek JSON για REST API ΕΡΓΑΝΗ II
+//    Βασισμένο στο ίδιο mapping με το generateWtoXML()
+//    SubmissionCode: WTOWeek
+//    Trial ID: 80
+//    Production ID: 182
+// =========================================================================
+async function generateWTOWeekJSON(ergazomenos, companyData, ypokatasthmataData, schedules) {
+    try {
+        console.log('🔧 [WTOWeek-JSON] Starting JSON generation...');
+        console.log('   Employee:', ergazomenos?.eponymo, ergazomenos?.onoma);
+        console.log('   Company:', companyData?.eponymia || 'N/A');
+        console.log('   Schedules:', Array.isArray(schedules) ? schedules.length : 0, 'days');
+
+        if (!Array.isArray(schedules) || schedules.length === 0) {
+            throw new Error('No schedules provided for WTOWeek JSON generation');
+        }
+
+        // =====================================================================
+        // ✅ SORT & VALIDATE SCHEDULES
+        // =====================================================================
+
+        const validSchedules = schedules
+            .filter((doc) => doc?.hmeromhnia)
+            .map((doc) => {
+                const plainDoc = doc.toObject ? doc.toObject() : doc;
+                return {
+                    ...plainDoc,
+                    __dateObj: new Date(plainDoc.hmeromhnia)
+                };
+            })
+            .filter((doc) => !isNaN(doc.__dateObj.getTime()))
+            .sort((a, b) => a.__dateObj - b.__dateObj);
+
+        if (validSchedules.length === 0) {
+            throw new Error('No valid schedule dates found for WTOWeek JSON generation');
+        }
+
+        const fromDate = validSchedules[0].__dateObj;
+
+        // =====================================================================
+        // ✅ WTOWeek REST JSON payload
+        //
+        // ΠΡΟΣΟΧΗ:
+        // Στο REST JSON κρατάμε ΑΚΡΙΒΩΣ τη σειρά του schema/XSD:
+        // f_aa_pararthmatos
+        // f_rel_protocol
+        // f_rel_date
+        // f_comments
+        // f_from_date
+        // f_to_date
+        // Ergazomenoi
+        //
+        // Και στον εργαζόμενο:
+        // f_afm
+        // f_eponymo
+        // f_onoma
+        // f_day
+        // ErgazomenosAnalytics
+        // =====================================================================
+
+        const ergazomenoiWTO = validSchedules.map((doc) => {
+            const dayEntry = buildDayEntry(doc);
+
+            return {
+                f_afm: safeString(ergazomenos?.afm),
+                f_eponymo: safeString(ergazomenos?.eponymo).toUpperCase(),
+                f_onoma: safeString(ergazomenos?.onoma).toUpperCase(),
+                f_day: dayEntry.f_day,
+                ErgazomenosAnalytics: {
+                    ErgazomenosWTOAnalytics: dayEntry.shifts.map((shift) => ({
+                        f_type: safeString(shift.f_type).toUpperCase(),
+                        f_from: safeString(shift.f_from),
+                        f_to: safeString(shift.f_to)
+                    }))
+                }
+            };
+        });
+
+        const payload = {
+            WTOS: {
+                WTO: [
+                    {
+                        f_aa_pararthmatos: normalizePararthmaKodikos(ypokatasthmataData?.kodikos),
+                        f_rel_protocol: '',
+                        f_rel_date: '',
+                        f_comments: '',
+                        f_from_date: formatDateForErganh(fromDate),
+                        f_to_date: '',
+                        Ergazomenoi: {
+                            ErgazomenoiWTO: ergazomenoiWTO
+                        }
+                    }
+                ]
+            }
+        };
+
+        console.log('✅ [WTOWeek-JSON] JSON generated successfully');
+        console.log('   Payload root:', Object.keys(payload));
+        console.log('   Days in payload:', ergazomenoiWTO.length);
+
+        return {
+            success: true,
+            submissionCode: 'WTOWeek',
+            payload,
+            json: payload
+        };
+    } catch (error) {
+        console.error('❌ [WTOWeek-JSON] Error:', error.message);
+        throw error;
+    }
+}
+
+// =========================================================================
 // ✅ HELPER: Build one day entry
 // =========================================================================
 
@@ -398,4 +511,7 @@ function escapeXml(unsafe) {
 // ✅ EXPORTS
 // =========================================================================
 
-module.exports = { generateWtoXML };
+module.exports = {
+    generateWtoXML,
+    generateWTOWeekJSON
+};

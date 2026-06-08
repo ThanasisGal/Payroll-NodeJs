@@ -27,6 +27,7 @@ const kinhseisController = require('../controllers/Kinhseis/kinhseisController.j
 const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
 const ektyposhApasxolhseonController = require('../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js');
+const E3NJsonSubmitController = require('../controllers/ergazomenoi/e3nJsonSubmitController');
 
 // const { savePdfFromBase64, deletePdf } = require('../utils/pdfHandler');
 
@@ -457,6 +458,18 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-e7n-to-erganh',
     checkAuth,
     erganhController.submitE7NToErganh
+);
+
+router.post(
+    '/ergazomenoi/ergazomenoi/submit-e3n-to-erganh',
+    checkAuth,
+    erganhController.submitE3NToErganh
+);
+
+router.post(
+    '/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh',
+    checkAuth,
+    erganhController.submitWTOWeekToErganh
 );
 
 router.post(

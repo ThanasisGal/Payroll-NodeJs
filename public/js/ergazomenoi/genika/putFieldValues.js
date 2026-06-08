@@ -701,11 +701,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 name="storage_mode"
                                 value="temporary"
                                 class="custom-radio"
-                                ${noErganiUpdates ? 'disabled' : ''}
                                 checked />
                             <label for="storage_temporary"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
-                                style="color: ${noErganiUpdates ? '#aaaaaa' : '#000000'}">
+                                style="color: #000000">
                                 Προσωρινή Αποθήκευση (XML)
                             </label>
                         </div>
@@ -715,10 +714,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 name="storage_mode"
                                 value="permanent"
                                 class="custom-radio"
-                                ${noErganiUpdates ? 'disabled' : ''} />
+                                />
                             <label for="storage_permanent"
                                 class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
-                                style="color: ${noErganiUpdates ? '#aaaaaa' : '#184d00'}">
+                                style="color: #184d00">
                                 <strong>Οριστική Ενημέρωση (REST API)</strong>
                             </label>
                         </div>
@@ -802,7 +801,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const lhxhType = lhxhTypeRadio?.value || 'none';
 
                     const erganiUploadMethod =
-                        lhxhType === 'ma_222' && isPermanent ? 'rest' : 'xml';
+                        isPermanent &&
+                        (lhxhType === 'ma_222' ||
+                            e3AnaggeliaProslhpshs ||
+                            wtoPshfiakhOrganoshXronoy)
+                            ? 'rest'
+                            : 'xml';
 
                     const filesToUpdate = {
                         isPermanent,
@@ -1131,33 +1135,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const userWantsWto = result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true;
 
+                const isE3NRestSubmit =
+                    userWantsE3 === true &&
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+
+                const isE7NRestSubmit =
+                    result.value?.ma_222 === true &&
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+
+                const isWTOWeekRestSubmit =
+                    userWantsWto === true && result.value?.isPermanent === true;
+
                 // ✅ BUILD HTML STRINGS (ONCE)
-                const e3XmlHtml = hasE3Xml
-                    ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
+                const e3XmlHtml =
+                    hasE3Xml && userWantsE3 && !isE3NRestSubmit
+                        ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
                     <a href="${e3XmlData.downloadUrl}" 
                         download="${e3XmlData.filename}"
                         class="btn btn-sm btn-outline-primary mt-2">
                         <i class="bi bi-download"></i> Λήψη E3 XML
                     </a>`
+                        : '';
+
+                const e3RestPendingHtml =
+                    userWantsE3 && isE3NRestSubmit
+                        ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή E3N μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
+                        : '';
+
+                const e7RestPendingHtml = isE7NRestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή E7N μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
-                const wtoXmlHtml = hasWtoXml
-                    ? `<p class="text-success mt-3">✅ WTO XML δημιουργήθηκε επιτυχώς!</p>
+                const wtoXmlHtml =
+                    hasWtoXml && !isWTOWeekRestSubmit
+                        ? `<p class="text-success mt-3">✅ WTO XML δημιουργήθηκε επιτυχώς!</p>
                     <a href="${wtoXmlData.downloadUrl}" 
                         download="${wtoXmlData.filename}"
                         class="btn btn-sm btn-outline-success mt-2">
                         <i class="bi bi-download"></i> Λήψη WTO XML
                     </a>`
+                        : '';
+
+                const wtoRestPendingHtml = isWTOWeekRestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή WTOWeek μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
-                const maXmlHtml = hasMAXml
-                    ? `<p class="text-success mt-3">✅ MA XML (Μεταβολή) δημιουργήθηκε επιτυχώς!</p>
-                    <a href="${maXmlData.downloadUrl}"
-                        download="${maXmlData.filename}"
-                        class="btn btn-sm btn-outline-warning mt-2">
-                        <i class="bi bi-download"></i> Λήψη MA XML
-                    </a>`
-                    : '';
+                // const maXmlHtml = hasMAXml
+                //     ? `<p class="text-success mt-3">✅ MA XML (Μεταβολή) δημιουργήθηκε επιτυχώς!</p>
+                //     <a href="${maXmlData.downloadUrl}"
+                //         download="${maXmlData.filename}"
+                //         class="btn btn-sm btn-outline-warning mt-2">
+                //         <i class="bi bi-download"></i> Λήψη MA XML
+                //     </a>`
+                //     : '';
 
                 const hadPdfs = window.pdfUploadModule && window.pdfUploadModule.hasPendingUpload();
 
@@ -1229,34 +1261,59 @@ document.addEventListener('DOMContentLoaded', () => {
                     let maResult = { success: true };
                     let wtoResult = { success: true };
 
-                    if (
-                        userWantsE3 &&
-                        e3XmlData?.success &&
-                        (e3XmlData?.s3Url ||
-                            e3XmlData?.downloadUrl ||
-                            e3XmlData?.relativePath ||
-                            e3XmlData?.s3Key) &&
-                        data.data?._id
-                    ) {
-                        const e3UrlToSend =
-                            e3XmlData?.s3Url ||
-                            e3XmlData?.downloadUrl ||
-                            e3XmlData?.relativePath ||
-                            e3XmlData?.s3Key ||
-                            null;
-
-                        if (e3UrlToSend && typeof e3UrlToSend === 'string') {
+                    if (userWantsE3 && data.data?._id) {
+                        if (isE3NRestSubmit) {
                             try {
-                                console.log('[E3-UPLOAD] Uploading E3 XML...');
-                                e3Result = await uploadToErganh(
-                                    data.data._id,
-                                    e3UrlToSend,
-                                    result.value?.isPermanent === true
-                                );
-                                console.log('[E3-UPLOAD] Result:', e3Result);
+                                console.log('[E3-REST-UPLOAD] Submitting E3N via REST JSON...');
+
+                                showE3NRestProgressSwal();
+
+                                e3Result = await submitE3NRestToErganh(data.data._id);
+
+                                Swal.close();
+
+                                console.log('[E3-REST-UPLOAD] Result:', e3Result);
+
+                                await showE3NRestResultSwal(e3Result);
                             } catch (e) {
-                                console.error('[E3-UPLOAD] ❌ Exception:', e?.message || e);
-                                e3Result = { success: false, error: e?.message };
+                                Swal.close();
+
+                                console.error('[E3-REST-UPLOAD] ❌ Exception:', e?.message || e);
+
+                                e3Result = {
+                                    success: false,
+                                    error: e?.message || String(e)
+                                };
+
+                                await showE3NRestResultSwal(e3Result);
+                            }
+                        } else if (
+                            e3XmlData?.success &&
+                            (e3XmlData?.s3Url ||
+                                e3XmlData?.downloadUrl ||
+                                e3XmlData?.relativePath ||
+                                e3XmlData?.s3Key)
+                        ) {
+                            const e3UrlToSend =
+                                e3XmlData?.s3Url ||
+                                e3XmlData?.downloadUrl ||
+                                e3XmlData?.relativePath ||
+                                e3XmlData?.s3Key ||
+                                null;
+
+                            if (e3UrlToSend && typeof e3UrlToSend === 'string') {
+                                try {
+                                    console.log('[E3-UPLOAD] Uploading E3 XML...');
+                                    e3Result = await uploadToErganh(
+                                        data.data._id,
+                                        e3UrlToSend,
+                                        false
+                                    );
+                                    console.log('[E3-UPLOAD] Result:', e3Result);
+                                } catch (e) {
+                                    console.error('[E3-UPLOAD] ❌ Exception:', e?.message || e);
+                                    e3Result = { success: false, error: e?.message };
+                                }
                             }
                         }
                     }
@@ -1267,11 +1324,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             true ||
                         result.value?.ma_217 === true ||
                         result.value?.ma_222 === true;
-
-                    const isE7NRestSubmit =
-                        result.value?.ma_222 === true &&
-                        result.value?.isPermanent === true &&
-                        result.value?.erganiUploadMethod === 'rest';
 
                     if (
                         userWantsMA &&
@@ -1292,7 +1344,14 @@ document.addEventListener('DOMContentLoaded', () => {
                               null;
                         if (maUrlToSend) {
                             try {
-                                console.log('[MA-UPLOAD] Uploading MA XML...');
+                                if (isE7NRestSubmit) {
+                                    console.log(
+                                        '[E7N-REST-UPLOAD] Submitting E7N via REST JSON...'
+                                    );
+                                    showE7NRestProgressSwal();
+                                } else {
+                                    console.log('[MA-UPLOAD] Uploading MA XML...');
+                                }
 
                                 maResult = await uploadMaToErganh(
                                     data.data._id,
@@ -1307,16 +1366,48 @@ document.addEventListener('DOMContentLoaded', () => {
                                     result.value?.erganiUploadMethod || 'xml'
                                 );
 
-                                console.log('[MA-UPLOAD] Result:', maResult);
+                                if (isE7NRestSubmit) {
+                                    Swal.close();
+                                    console.log('[E7N-REST-UPLOAD] Result:', maResult);
+                                    await showE7NRestResultSwal(maResult);
+                                } else {
+                                    console.log('[MA-UPLOAD] Result:', maResult);
+                                }
                             } catch (e) {
+                                if (isE7NRestSubmit) {
+                                    Swal.close();
+                                }
+
                                 console.error('[MA-UPLOAD] ❌ Exception:', e?.message || e);
-                                maResult = { success: false, error: e?.message };
+
+                                maResult = {
+                                    success: false,
+                                    error: e?.message || String(e)
+                                };
+
+                                if (isE7NRestSubmit) {
+                                    await showE7NRestResultSwal(maResult);
+                                }
                             }
                         }
                     }
 
                     if (userWantsWto && data.data?._id) {
-                        if (result.value?.isPermanent === true) {
+                        if (isWTOWeekRestSubmit) {
+                            try {
+                                console.log(
+                                    '[WTO-REST-UPLOAD] Submitting WTOWeek via REST JSON...'
+                                );
+                                wtoResult = await uploadWtoToErganh(
+                                    data.data._id,
+                                    'REST_WTOWEEK_NO_XML_REQUIRED'
+                                );
+                                console.log('[WTO-REST-UPLOAD] Result:', wtoResult);
+                            } catch (e) {
+                                console.error('[WTO-REST-UPLOAD] ❌ Exception:', e?.message || e);
+                                wtoResult = { success: false, error: e?.message || String(e) };
+                            }
+                        } else if (result.value?.isPermanent === true) {
                             if (
                                 wtoXmlData?.success &&
                                 (wtoXmlData?.s3Url ||
@@ -1389,9 +1480,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         : ''
                 }
                 ${e3XmlHtml}
+                ${e3RestPendingHtml}
+                ${e7RestPendingHtml}
+                ${wtoRestPendingHtml}
                 ${wtoXmlHtml}
-                ${maXmlHtml}
-            `,
+                `,
+                            // ${maXmlHtml}
                             timer: hasE3Xml || hasWtoXml || hasMAXml ? null : 1500,
                             showConfirmButton: hasE3Xml || hasWtoXml || hasMAXml,
                             confirmButtonText: 'OK',
@@ -1457,7 +1551,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!data.contractPdf.s3Key) {
                             console.warn('⚠️ [FRONTEND] Missing s3Key — skipping modal');
                             await showSuccessSwal();
-                            await runXmlUploads();
+
+                            const uploadResults = await runXmlUploads();
+
+                            if (
+                                uploadResults?.e3Result?.success === false ||
+                                uploadResults?.maResult?.success === false ||
+                                uploadResults?.wtoResult?.success === false
+                            ) {
+                                console.warn(
+                                    '[REDIRECT] Skipped because ERGANI REST upload failed.'
+                                );
+                                return;
+                            }
+
                             window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         } else {
                             await showSuccessSwal();
@@ -1492,7 +1599,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         await showSuccessSwal();
 
-                        await runXmlUploads();
+                        const uploadResults = await runXmlUploads();
+
+                        if (
+                            uploadResults?.e3Result?.success === false ||
+                            uploadResults?.maResult?.success === false ||
+                            uploadResults?.wtoResult?.success === false
+                        ) {
+                            console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
+                            return;
+                        }
 
                         console.log(
                             '[REDIRECT] Redirecting to:',
@@ -1545,6 +1661,350 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+    }
+
+    // ============================================================================
+    // ✅ E3N REST JSON PROGRESS / RESULT SWALS
+    // ============================================================================
+    function showE3NRestProgressSwal() {
+        Swal.fire({
+            title: 'Οριστική Υποβολή Πρόσληψης E3N',
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="e3n-rest-progress-step-text">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                id="e3n-rest-progress-bar"
+                                role="progressbar"
+                                aria-valuenow="15"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload</li>
+                            <li>Έλεγχο WebE3N στο trial/production περιβάλλον</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title'
+            },
+            didOpen: () => {
+                const steps = [
+                    { percent: 25, text: 'Προετοιμασία JSON payload...', duration: 800 },
+                    { percent: 45, text: 'Αυθεντικοποίηση στο ΕΡΓΑΝΗ...', duration: 1200 },
+                    { percent: 65, text: 'Υποβολή WebE3N...', duration: 1800 },
+                    { percent: 85, text: 'Αναμονή απάντησης από ΕΡΓΑΝΗ...', duration: 2000 },
+                    { percent: 95, text: 'Ολοκλήρωση ελέγχου αποτελέσματος...', duration: 1200 }
+                ];
+                let currentStepIndex = 0;
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('e3n-rest-progress-bar');
+                    const progressText = document.getElementById('e3n-rest-progress-step-text');
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+                    currentStepIndex++;
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+                setTimeout(updateProgress, 350);
+            }
+        });
+    }
+
+    async function showE3NRestResultSwal(e3Result) {
+        await showGenericRestResultSwal({
+            result: e3Result,
+            titleSuccess: 'Επιτυχής Οριστική Υποβολή E3N',
+            titleError: 'Αποτυχία Οριστικής Υποβολής E3N',
+            successText: 'Η πρόσληψη υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.',
+            errorText: 'Η πρόσληψη δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
+        });
+    }
+
+    // ============================================================================
+    // ✅ E7N REST JSON PROGRESS / RESULT SWALS
+    // ============================================================================
+    function showE7NRestProgressSwal() {
+        Swal.fire({
+            title: 'Οριστική Υποβολή E7N',
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="e7n-rest-progress-step-text">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                id="e7n-rest-progress-bar"
+                                role="progressbar"
+                                aria-valuenow="15"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload</li>
+                            <li>Έλεγχο WebE7N στο trial/production περιβάλλον</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title'
+            },
+            didOpen: () =>
+                animateRestProgress('e7n-rest-progress-bar', 'e7n-rest-progress-step-text')
+        });
+    }
+
+    async function showE7NRestResultSwal(e7Result) {
+        await showGenericRestResultSwal({
+            result: e7Result,
+            titleSuccess: 'Επιτυχής Οριστική Υποβολή E7N',
+            titleError: 'Αποτυχία Οριστικής Υποβολής E7N',
+            successText: 'Η λήξη σύμβασης υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.',
+            errorText: 'Η λήξη σύμβασης δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
+        });
+    }
+
+    function animateRestProgress(progressBarId, progressTextId) {
+        const steps = [
+            { percent: 25, text: 'Προετοιμασία JSON payload...', duration: 800 },
+            { percent: 45, text: 'Αυθεντικοποίηση στο ΕΡΓΑΝΗ...', duration: 1200 },
+            { percent: 65, text: 'Υποβολή REST JSON...', duration: 1800 },
+            { percent: 85, text: 'Αναμονή απάντησης από ΕΡΓΑΝΗ...', duration: 2000 },
+            { percent: 95, text: 'Ολοκλήρωση ελέγχου αποτελέσματος...', duration: 1200 }
+        ];
+
+        let currentStepIndex = 0;
+
+        function updateProgress() {
+            if (currentStepIndex >= steps.length) return;
+
+            const step = steps[currentStepIndex];
+            const progressBar = document.getElementById(progressBarId);
+            const progressText = document.getElementById(progressTextId);
+
+            if (progressBar && progressText) {
+                progressBar.style.width = `${step.percent}%`;
+                progressBar.textContent = `${step.percent}%`;
+                progressBar.setAttribute('aria-valuenow', step.percent);
+                progressText.textContent = step.text;
+            }
+
+            currentStepIndex++;
+
+            if (currentStepIndex < steps.length) {
+                setTimeout(updateProgress, step.duration);
+            }
+        }
+
+        setTimeout(updateProgress, 350);
+    }
+
+    function escapeHtmlForSwal(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatErganiErrorForSwal(value) {
+        return escapeHtmlForSwal(value || 'Άγνωστο σφάλμα')
+            .replace(/\\n/g, '<br>')
+            .replace(/\n/g, '<br>');
+    }
+
+    async function showGenericRestResultSwal({
+        result,
+        titleSuccess,
+        titleError,
+        successText,
+        errorText
+    }) {
+        const success = result?.success === true;
+
+        if (success) {
+            const protocol = result?.protocol || null;
+            const submitDate = result?.submitDate || null;
+            const pdfUrl = result?.pdfUrl || null;
+            const pdfFilename = result?.pdfFilename || null;
+            const erganhLogId = result?.erganhLogId || null;
+
+            await Swal.fire({
+                backdrop: false,
+                allowOutsideClick: false,
+                icon: 'success',
+                title: titleSuccess,
+                html: `
+                    <div class="left-align">
+                        <p>${successText}</p>
+                        ${
+                            protocol
+                                ? `<p><strong>Πρωτόκολλο:</strong> <span class="text-success">${protocol}</span></p>`
+                                : `<p class="text-warning">⚠️ Δεν επιστράφηκε πρωτόκολλο στην απάντηση.</p>`
+                        }
+                        ${
+                            submitDate
+                                ? `<p><strong>Ημερομηνία υποβολής:</strong> ${submitDate}</p>`
+                                : ''
+                        }
+                        ${
+                            erganhLogId
+                                ? `<p class="text-muted font-size-rem-0_9">Log ID: ${erganhLogId}</p>`
+                                : ''
+                        }
+                    </div>
+                `,
+                // ${
+                //     pdfUrl
+                //         ? `<a href="${pdfUrl}" target="_blank"
+                //             class="btn mt-3 px-4 py-3 font-weight-700"
+                //             style="background-color: #0d6efd; color: #ffffff; border-radius: 0.65rem; min-height: 52px; display: inline-flex; align-items: center; gap: 0.5rem;">
+                //             <i class="bi bi-file-earmark-pdf"></i>
+                //             Άνοιγμα PDF ${pdfFilename ? `(${pdfFilename})` : ''}
+                //         </a>`
+                //         : `<p class="text-muted mt-3">Δεν υπάρχει διαθέσιμο PDF για άνοιγμα.</p>`
+                // }
+
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container'
+                }
+            });
+
+            return;
+        }
+
+        await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            icon: 'error',
+            title: titleError,
+            html: `
+                <div class="left-align">
+                    <p>${errorText}</p>
+                    <p class="text-danger"><strong>Σφάλμα:</strong></p>
+                    <div style="text-align:left; max-height:260px; overflow:auto; line-height:1.55;">
+                        ${formatErganiErrorForSwal(result?.error || result?.message)}
+                    </div>
+                </div>
+            `,
+            confirmButtonText: 'Κλείσιμο',
+            customClass: {
+                confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup',
+                htmlContainer: 'custom-html-container'
+            }
+        });
+    }
+
+    // ============================================================================
+    // ✅ E3N REST JSON UPLOAD
+    // ============================================================================
+    async function submitE3NRestToErganh(ergazomenosId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const ypokatasthma =
+            document.getElementById('ypokatasthma')?.value ||
+            document.getElementById('ypokatasthmata')?.value ||
+            document.getElementById('ypokatasthmata_stathera')?.value ||
+            document.querySelector('[name="ypokatasthma"]')?.value ||
+            document.querySelector('[name="ypokatasthmata"]')?.value ||
+            document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+            '0';
+
+        const response = await fetch('/ergazomenoi/ergazomenoi/submit-e3n-to-erganh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                ergazomenosId,
+                ypokatasthma,
+                erganiUploadMethod: 'rest'
+            })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { success: response.ok, message: await response.text() };
+
+        if (!response.ok || data?.success !== true) {
+            throw new Error(
+                data?.message ||
+                    data?.error ||
+                    `E3N REST JSON upload failed with HTTP ${response.status}`
+            );
+        }
+
+        // ------------------------------------------------------------------------
+        // ✅ Όπως στο E7N:
+        // Πρώτα εμφανίζουμε το υποβληθέν PDF σε iframe με κουμπιά
+        // Άνοιγμα / Αποθήκευση / Εκτύπωση / Κλείσιμο.
+        // Μετά, όταν κλείσει το PDF modal, επιστρέφουμε στο runXmlUploads()
+        // ώστε να εμφανιστεί το τελικό success Swal με πρωτόκολλο.
+        // ------------------------------------------------------------------------
+        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
+            Swal.close();
+            await showErganiSubmittedPdfModal(data);
+        }
+
+        return data;
     }
 
     const buttons = document.querySelectorAll('.submitButton');
@@ -2224,19 +2684,119 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================================================================
+    // ✅ WTOWeek REST JSON PROGRESS / RESULT SWALS
+    // ============================================================================
+    function showWTOWeekRestProgressSwal() {
+        Swal.fire({
+            title: 'Οριστική Υποβολή WTOWeek',
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="wtoweek-rest-progress-step-text">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                id="wtoweek-rest-progress-bar"
+                                role="progressbar"
+                                aria-valuenow="15"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload WTOWeek</li>
+                            <li>Έλεγχο WTOWeek στο trial/production περιβάλλον</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title'
+            },
+            didOpen: () => {
+                if (typeof animateRestProgress === 'function') {
+                    animateRestProgress(
+                        'wtoweek-rest-progress-bar',
+                        'wtoweek-rest-progress-step-text'
+                    );
+                    return;
+                }
+
+                const steps = [
+                    { percent: 25, text: 'Προετοιμασία JSON payload...', duration: 800 },
+                    { percent: 45, text: 'Αυθεντικοποίηση στο ΕΡΓΑΝΗ...', duration: 1200 },
+                    { percent: 65, text: 'Υποβολή WTOWeek...', duration: 1800 },
+                    { percent: 85, text: 'Αναμονή απάντησης από ΕΡΓΑΝΗ...', duration: 2000 },
+                    { percent: 95, text: 'Ολοκλήρωση ελέγχου αποτελέσματος...', duration: 1200 }
+                ];
+
+                let currentStepIndex = 0;
+
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('wtoweek-rest-progress-bar');
+                    const progressText = document.getElementById('wtoweek-rest-progress-step-text');
+
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+
+                    currentStepIndex++;
+
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+
+                setTimeout(updateProgress, 350);
+            }
+        });
+    }
+
+    async function showWTOWeekRestResultSwal(wtoResult) {
+        await showGenericRestResultSwal({
+            result: wtoResult,
+            titleSuccess: 'Επιτυχής Οριστική Υποβολή WTOWeek',
+            titleError: 'Αποτυχία Οριστικής Υποβολής WTOWeek',
+            successText:
+                'Η Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.',
+            errorText:
+                'Η Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
+        });
+    }
+
+    // ============================================================================
     // ✅ HELPER FUNCTION: Upload WTO to ERGANH
     // ============================================================================
-    async function uploadWtoToErganh(ergazomenosId, s3Url) {
+    async function uploadWtoToErganh(ergazomenosId, _s3Url = null) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-        if (!s3Url || typeof s3Url !== 'string') {
-            throw new Error('uploadWtoToErganh: s3Url must be a string');
-        }
 
         if (erganiUploadInProgress) {
             await Swal.fire({
                 icon: 'info',
-                title: 'ΕΡΓΑΝΗ (WTO)',
+                title: 'ΕΡΓΑΝΗ (WTOWeek)',
                 text: 'Η υποβολή είναι ήδη σε εξέλιξη. Περίμενε να ολοκληρωθεί.',
                 confirmButtonText: 'OK'
             });
@@ -2251,147 +2811,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
         erganiUploadInProgress = true;
 
-        const escapeHtml = (s) =>
-            String(s ?? '').replace(
-                /[<>&"]/g,
-                (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]
-            );
-
-        const redactSecrets = (s) => {
-            if (!s) return '';
-            let out = String(s);
-            out = out.replace(/X-Amz-Signature=[^&\s]+/gi, 'X-Amz-Signature=REDACTED');
-            out = out.replace(/X-Amz-Security-Token=[^&\s]+/gi, 'X-Amz-Security-Token=REDACTED');
-            out = out.replace(/X-Amz-Credential=[^&\s]+/gi, 'X-Amz-Credential=REDACTED');
-            const MAX = 1200;
-            if (out.length > MAX)
-                out = out.slice(0, MAX) + `\n\n…(truncated, ${out.length - MAX} chars)`;
-            return out;
-        };
-
-        const buildErrorHtml = ({ userMessage, errorDetails, messages }) => {
-            const short = userMessage || 'Η υποβολή WTO απέτυχε.';
-            const detailsParts = [
-                errorDetails,
-                ...(Array.isArray(messages) ? messages : [])
-            ].filter(Boolean);
-            const details = redactSecrets(detailsParts.join('\n\n'));
-
-            return `
-                <div style="text-align:left; line-height:1.4; font-size:14px;">
-                    <div style="font-weight:600; margin-bottom:10px;">${escapeHtml(short)}</div>
-                    ${
-                        details
-                            ? `
-                        <details style="margin-top:8px;">
-                            <summary style="cursor:pointer;">Λεπτομέρειες</summary>
-                            <pre style="max-height:220px; overflow:auto; white-space:pre-wrap;
-                                        overflow-wrap:anywhere; word-break:break-word;
-                                        padding:10px 12px; border:1px solid rgba(0,0,0,.10);
-                                        border-radius:10px; background:#fff;
-                                        font-size:12px;">${escapeHtml(details)}</pre>
-                        </details>
-                    `
-                            : ''
-                    }
-                </div>
-            `;
-        };
-
         try {
-            if (window.applyServerProgress) {
-                window.applyServerProgress(0, 'Είσοδος στο ΕΡΓΑΝΗ ΙΙ (WTO)', 1, 4);
-            } else if (window.showLoader) {
-                window.showLoader('Είσοδος στο ΕΡΓΑΝΗ ΙΙ (WTO)');
-            }
+            showWTOWeekRestProgressSwal();
 
-            const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-wto-to-erganh', {
+            const ypokatasthma =
+                document.getElementById('ypokatasthma')?.value ||
+                document.getElementById('ypokatasthmata')?.value ||
+                document.getElementById('ypokatasthmata_stathera')?.value ||
+                document.querySelector('[name="ypokatasthma"]')?.value ||
+                document.querySelector('[name="ypokatasthmata"]')?.value ||
+                document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+                '0';
+
+            const response = await fetch('/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'CSRF-Token': csrfToken
                 },
                 credentials: 'include',
-                body: JSON.stringify({ ergazomenosId, s3Url })
+                body: JSON.stringify({
+                    ergazomenosId,
+                    ypokatasthma,
+                    erganiUploadMethod: 'rest'
+                })
             });
 
             let payload;
             try {
-                payload = await uploadResponse.json();
+                payload = await response.json();
             } catch {
-                payload = { success: false, userMessage: await uploadResponse.text() };
-            }
-
-            if (!uploadResponse.ok) {
-                const userMessage =
-                    payload?.userMessage ||
-                    payload?.message ||
-                    payload?.errorDetails ||
-                    payload?.error ||
-                    `HTTP ${uploadResponse.status}`;
-
-                if (window.hideLoader) window.hideLoader();
-
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Σφάλμα WTO',
-                    html: buildErrorHtml({
-                        userMessage,
-                        errorDetails: payload?.errorDetails || payload?.error || '',
-                        messages: Array.isArray(payload?.messages) ? payload.messages : []
-                    }),
-                    width: 700,
-                    confirmButtonText: 'OK'
-                });
-
-                return {
+                payload = {
                     success: false,
-                    userMessage,
-                    errorDetails: payload?.errorDetails || payload?.error || '',
-                    messages: Array.isArray(payload?.messages) ? payload.messages : []
+                    message: await response.text()
                 };
             }
 
-            const userMessage = payload?.userMessage || payload?.message || '';
-            const errorDetails = payload?.errorDetails || payload?.error || '';
-            const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+            Swal.close();
 
-            if (payload.success) {
-                const userMsg = payload?.userMessage || 'Επιτυχής Προσωρινή Αποθήκευση WTO';
+            if (!response.ok || payload?.success !== true) {
+                const failedPayload = {
+                    ...payload,
+                    success: false,
+                    error:
+                        payload?.error ||
+                        payload?.message ||
+                        payload?.userMessage ||
+                        `HTTP ${response.status}`
+                };
 
-                if (window.hideLoader) window.hideLoader();
-
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'ΕΡΓΑΝΗ ΙΙ (WTO)',
-                    width: 700,
-                    html: `
-                        <div style="text-align:left;">
-                            <div style="font-weight:600;margin-bottom:10px;">${escapeHtml(userMsg)}</div>
-                            ${
-                                payload?.protocol
-                                    ? `<div>Πρωτόκολλο: <b>${escapeHtml(payload.protocol)}</b></div>`
-                                    : ''
-                            }
-                        </div>
-                    `,
-                    confirmButtonText: 'OK'
-                });
-
-                return payload;
+                await showWTOWeekRestResultSwal(failedPayload);
+                return failedPayload;
             }
 
-            if (window.hideLoader) window.hideLoader();
+            // Όπως στο E7N/E3N:
+            // πρώτα PDF iframe modal, μετά τελικό Swal με πρωτόκολλο.
+            if (payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url) {
+                await showErganiSubmittedPdfModal(payload);
+            }
 
-            await Swal.fire({
-                icon: 'error',
-                title: 'Σφάλματα WTO XML - Αποτυχία Υποβολής',
-                html: buildErrorHtml({ userMessage, errorDetails, messages }),
-                width: 800,
-                confirmButtonText: 'OK'
-            });
+            await showWTOWeekRestResultSwal(payload);
 
             return payload;
+        } catch (error) {
+            Swal.close();
+
+            const failedPayload = {
+                success: false,
+                error: error?.message || String(error),
+                message: error?.message || String(error)
+            };
+
+            await showWTOWeekRestResultSwal(failedPayload);
+
+            return failedPayload;
         } finally {
             if (window.hideLoader) window.hideLoader();
             erganiUploadInProgress = false;
@@ -2818,31 +3311,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (window.hideLoader) window.hideLoader();
 
                 if (!uploadResponse.ok || !payload?.success) {
-                    await Swal.fire({
-                        icon: 'error',
-                        title: 'E7N REST - ΕΡΓΑΝΗ ΙΙ',
-                        html: `<p>${payload?.message || payload?.error || `HTTP ${uploadResponse.status}`}</p>`,
-                        confirmButtonText: 'OK',
-                        customClass: {
-                            confirmButton: 'class-error custom-confirm-button custom-swal-button',
-                            title: 'custom-title',
-                            popup: 'custom-swal-popup'
-                        }
-                    });
-                    return { success: false, ...payload };
+                    // await Swal.fire({
+                    //     icon: 'error',
+                    //     title: 'E7N REST - ΕΡΓΑΝΗ ΙΙ',
+                    //     html: `<p>${payload?.message || payload?.error || `HTTP ${uploadResponse.status}`}</p>`,
+                    //     confirmButtonText: 'OK',
+                    //     customClass: {
+                    //         confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                    //         title: 'custom-title',
+                    //         popup: 'custom-swal-popup'
+                    //     }
+                    // });
+                    // return { success: false, ...payload };
+                    return {
+                        success: false,
+                        error:
+                            payload?.message ||
+                            payload?.error ||
+                            payload?.userMessage ||
+                            `HTTP ${uploadResponse.status}`,
+                        message:
+                            payload?.message ||
+                            payload?.error ||
+                            payload?.userMessage ||
+                            `HTTP ${uploadResponse.status}`,
+                        ...payload
+                    };
                 }
 
                 await showErganiSubmittedPdfModal(payload);
                 return { success: true, ...payload };
             } catch (error) {
                 if (window.hideLoader) window.hideLoader();
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'E7N REST - Σφάλμα',
-                    text: error?.message || 'Unknown error',
-                    confirmButtonText: 'OK'
-                });
-                return { success: false, userMessage: error?.message || 'Unknown error' };
+
+                return {
+                    success: false,
+                    error: error?.message || 'Unknown error',
+                    message: error?.message || 'Unknown error',
+                    userMessage: error?.message || 'Unknown error'
+                };
             } finally {
                 if (window.hideLoader) window.hideLoader();
                 erganiUploadInProgress = false;

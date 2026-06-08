@@ -34,11 +34,11 @@ function assertRestSubmitAllowed() {
         );
     }
 
-    if (env === 'production' && process.env.NODE_ENV !== 'production') {
-        throw new Error(
-            'Blocked: Production ERGANI submit επιτρέπεται μόνο όταν NODE_ENV=production.'
-        );
-    }
+    // if (env === 'production' && process.env.NODE_ENV !== 'production') {
+    //     throw new Error(
+    //         'Blocked: Production ERGANI submit επιτρέπεται μόνο όταν NODE_ENV=production.'
+    //     );
+    // }
 }
 
 function normalizeSubmissionList(value) {

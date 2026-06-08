@@ -9,10 +9,12 @@ const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
 
 const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
+const { generateWtoXML, generateWTOWeekJSON } = require('../../utils/xmlGenerators/wtoGenerator');
 const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generator');
 const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e7N_v1Generator');
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
+const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 
 const {
     authenticateErgani,
@@ -2415,7 +2417,8 @@ async function saveSubmittedErganiPdfToS3({
     contentType,
     ergazomenos,
     companyData,
-    restResult
+    restResult,
+    submissionFolder = 'E7N'
 }) {
     if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
         return {
@@ -2446,7 +2449,7 @@ async function saveSubmittedErganiPdfToS3({
         const companyKod = safeFilenamePart(companyData?.kod || companyData?.kodikos || 'UNKNOWN');
         const team = safeFilenamePart(ergazomenos?.team || 'NO_TEAM');
 
-        const s3Key = `ergani-submissions/${team}/${companyKod}_${companyNameClean}/E7N/${filename}`;
+        const s3Key = `ergani-submissions/${team}/${companyKod}_${companyNameClean}/${safeFilenamePart(submissionFolder, 'E7N')}/${filename}`;
 
         const uploadResult = await uploadBufferToS3(
             pdfBuffer,
@@ -5168,6 +5171,380 @@ class erganhController {
         }
     };
 
+    // ============================================================================
+    // ✅ E3N: Επιλογή τρόπου αποστολής στο ΕΡΓΑΝΗ
+    //
+    // Υποστηρίζει δύο ροές:
+    // 1) XML + Playwright  -> Προσωρινή καταχώρηση στο ΕΡΓΑΝΗ
+    // 2) JSON + REST API   -> Οριστική υποβολή στο ΕΡΓΑΝΗ και επιστροφή πρωτοκόλλου
+    //
+    // Αναμενόμενο body από fetch:
+    // {
+    //   "ergazomenosId": "...",                 // _id εργαζόμενου ή kodikos εργαζόμενου
+    //   "ypokatasthma": "0",                    // προαιρετικά, αλλιώς από εργαζόμενο
+    //   "erganiUploadMethod": "xml" | "rest"    // default: "xml"
+    // }
+    // ============================================================================
+    static submitE3NToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή Ε3Ν.'
+                });
+            }
+
+            const rawUploadMethod =
+                body.erganiUploadMethod ||
+                body.submissionMethod ||
+                body.uploadMethod ||
+                body.method ||
+                'xml';
+
+            const uploadMethod = String(rawUploadMethod).trim().toLowerCase();
+
+            if (!['xml', 'rest', 'json', 'json_rest'].includes(uploadMethod)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρος τρόπος αποστολής. Επιτρεπτές τιμές: xml ή rest.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή Ε3Ν.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({
+                    kod: companyId
+                }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({
+                    kodikos: companyId
+                }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ από PasswordsModel, όπως στο υπάρχον flow
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5Α) XML + Playwright -> Προσωρινή καταχώρηση
+            // --------------------------------------------------------------------
+            if (uploadMethod === 'xml') {
+                const xmlResult = await generateE3XML(ergazomenos, companyData, ypokatasthmataData);
+
+                const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');
+
+                if (!fs.existsSync(tmpXmlDir)) {
+                    fs.mkdirSync(tmpXmlDir, { recursive: true });
+                }
+
+                const xmlFilename =
+                    xmlResult.filename ||
+                    `${String(ergazomenos._id || ergazomenos.kodikos || 'E3N')}_E3N.xml`;
+
+                const xmlPath = path.join(tmpXmlDir, xmlFilename);
+
+                fs.writeFileSync(xmlPath, xmlResult.xml, 'utf8');
+
+                const uploadResult = await uploadE3ToErganh(
+                    companyId,
+                    xmlPath,
+                    userId,
+                    {
+                        username: creds.username,
+                        password: creds.password
+                    },
+                    {
+                        // Για Πρόσληψη WebE3N:
+                        // trial id: 93, production id: 213.
+                        // Το XML portal flow συνήθως χρησιμοποιεί το production process code.
+                        // Αν στο trial σου θέλει ρητά ma_93, άλλαξε μόνο αυτή τη γραμμή σε 'ma_93'.
+                        xmlType: 'ma_213',
+                        isPermanent: false
+                    }
+                );
+
+                return res.status(uploadResult?.success ? 200 : 400).json({
+                    success: !!uploadResult?.success,
+                    uploadMethod: 'xml',
+                    temporary: true,
+                    finalSubmission: false,
+                    message: uploadResult?.success
+                        ? 'Το E3N XML δημιουργήθηκε και ανέβηκε στο ΕΡΓΑΝΗ ως προσωρινή καταχώρηση.'
+                        : uploadResult?.userMessage ||
+                          'Το E3N XML δημιουργήθηκε, αλλά η αποστολή στο ΕΡΓΑΝΗ απέτυχε.',
+                    filename: xmlFilename,
+                    xmlPath,
+                    s3Key: xmlResult.s3Key,
+                    s3Url: xmlResult.s3Url,
+                    generator: {
+                        success: xmlResult.success,
+                        saveError: xmlResult.saveError || null
+                    },
+                    erganh: uploadResult
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 5Β) JSON + REST API -> Οριστική υποβολή
+            // --------------------------------------------------------------------
+            const jsonResult = await generateE3NJSON(ergazomenos, companyData, ypokatasthmataData);
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: 'WebE3N',
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+
+            const submissionYear = effectiveSubmitDate.getFullYear();
+            const submissionMonth = effectiveSubmitDate.getMonth() + 1;
+            const submissionDay = effectiveSubmitDate.getDate();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: 'WebE3N',
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || '',
+                process_code: process.env.ERGANI_ENV === 'production' ? 'ma_213' : 'ma_93',
+                process_description: 'Πρόσληψη (E3N)',
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: submissionYear,
+                submission_month: submissionMonth,
+                submission_day: submissionDay,
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                message: restResult?.success
+                    ? 'Το E3N υποβλήθηκε οριστικά μέσω REST API.'
+                    : restResult?.error || 'Η οριστική υποβολή E3N μέσω REST API απέτυχε.',
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                    : pdfStorage.pdfS3Url,
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitE3NToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την αποστολή E3N στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
     static cancelE7NSubmission = async (req, res) => {
         try {
             const sessionTeam = req.session?.userTeam;
@@ -5586,6 +5963,382 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάγνωση credentials ΕΡΓΑΝΗ.'
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ WTOWeek: Οριστική υποβολή Σταθερού Εβδομαδιαίου μέσω REST JSON
+    //
+    // Submission:
+    // - trial id: 80
+    // - production id: 182
+    // - code: WTOWeek
+    // - description: Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο
+    //
+    // Αναμενόμενο body:
+    // {
+    //   "ergazomenosId": "...",
+    //   "ypokatasthma": "0",                    // προαιρετικά
+    //   "apo_hmeromhnia": "YYYY-MM-DD" | "dd/MM/yyyy", // προαιρετικά
+    //   "eos_hmeromhnia": "YYYY-MM-DD" | "dd/MM/yyyy"  // προαιρετικά
+    // }
+    // ============================================================================
+    static submitWTOWeekToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή WTOWeek.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή WTOWeek.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kod: companyId }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kodikos: companyId }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5) Φόρτωση εβδομαδιαίου προγράμματος εργαζομένου
+            // --------------------------------------------------------------------
+            const parseDateInput = (value) => {
+                if (!value) return null;
+                const raw = String(value).trim();
+
+                const gr = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (gr) {
+                    const [, dd, mm, yyyy] = gr;
+                    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+                    return Number.isNaN(d.getTime()) ? null : d;
+                }
+
+                const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+                if (iso) {
+                    const [, yyyy, mm, dd] = iso;
+                    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+                    return Number.isNaN(d.getTime()) ? null : d;
+                }
+
+                const d = new Date(raw);
+                return Number.isNaN(d.getTime()) ? null : d;
+            };
+
+            const apoDate = parseDateInput(
+                body.apo_hmeromhnia || body.fromDate || body.f_from_date || body.hmeromhnia_apo
+            );
+            const eosDate = parseDateInput(
+                body.eos_hmeromhnia || body.toDate || body.f_to_date || body.hmeromhnia_eos
+            );
+
+            const scheduleQuery = {
+                team: sessionTeam,
+                company_kod: companyId,
+                kodikos: ergazomenos.kodikos,
+                ypokatasthma: String(selectedYpokatasthma)
+            };
+
+            if (apoDate || eosDate) {
+                scheduleQuery.hmeromhnia = {};
+                if (apoDate) scheduleQuery.hmeromhnia.$gte = apoDate;
+                if (eosDate) {
+                    const eosEnd = new Date(eosDate);
+                    eosEnd.setHours(23, 59, 59, 999);
+                    scheduleQuery.hmeromhnia.$lte = eosEnd;
+                }
+            }
+
+            let schedules = await ProdhlomenaOrariaModel.find(scheduleQuery)
+                .sort({ hmeromhnia: 1 })
+                .limit(7)
+                .lean();
+
+            // Fallback: σε κάποιες εγκαταστάσεις το ypokatasthma μπορεί να είναι 0000/0 ή να λείπει.
+            if (!schedules.length) {
+                const fallbackQuery = {
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: ergazomenos.kodikos
+                };
+
+                if (scheduleQuery.hmeromhnia) fallbackQuery.hmeromhnia = scheduleQuery.hmeromhnia;
+
+                schedules = await ProdhlomenaOrariaModel.find(fallbackQuery)
+                    .sort({ hmeromhnia: 1 })
+                    .limit(7)
+                    .lean();
+            }
+
+            if (!schedules.length) {
+                return res.status(404).json({
+                    success: false,
+                    message:
+                        'Δεν βρέθηκε εβδομαδιαίο προδηλωμένο πρόγραμμα για τον εργαζόμενο WTOWeek.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 6) Δημιουργία JSON + REST submit
+            // --------------------------------------------------------------------
+            const jsonResult = await generateWTOWeekJSON(
+                ergazomenos,
+                companyData,
+                ypokatasthmataData,
+                schedules
+            );
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: 'WTOWeek',
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult,
+                        submissionFolder: 'WTOWeek'
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: 'WTOWeek',
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || '',
+                process_code: process.env.ERGANI_ENV === 'production' ? 'ma_182' : 'ma_80',
+                process_description: 'Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο',
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: effectiveSubmitDate.getFullYear(),
+                submission_month: effectiveSubmitDate.getMonth() + 1,
+                submission_day: effectiveSubmitDate.getDate(),
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                message: restResult?.success
+                    ? 'Το WTOWeek υποβλήθηκε οριστικά μέσω REST API.'
+                    : restResult?.error || 'Η οριστική υποβολή WTOWeek μέσω REST API απέτυχε.',
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                    : pdfStorage.pdfS3Url,
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitWTOWeekToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την οριστική υποβολή WTOWeek στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
             });
         }
     };

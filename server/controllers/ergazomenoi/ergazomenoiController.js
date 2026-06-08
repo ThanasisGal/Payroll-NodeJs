@@ -2085,11 +2085,9 @@ class ergazomenoiController {
                         isPermanent: true
                     });
 
-                    const {
-                        generateWtoWeeklyXML
-                    } = require('../../utils/xmlGenerators/wtoGenerator');
+                    const { generateWtoXML } = require('../../utils/xmlGenerators/wtoGenerator');
 
-                    wtoXmlData = await generateWtoWeeklyXML(
+                    wtoXmlData = await generateWtoXML(
                         newErgazomenos._id,
                         newErgazomenos,
                         companyData,
@@ -4195,10 +4193,16 @@ class ergazomenoiController {
         // =========================================================================
         let wtoXmlData = { success: false };
 
+        const isWTOWeekRestSubmit =
+            filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true &&
+            filesToUpdate?.isPermanent === true &&
+            filesToUpdate?.erganiUploadMethod === 'rest';
+
         if (
             (filesToUpdate?.schedules === true ||
                 filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true) &&
-            filesToUpdate?.isPermanent === true
+            filesToUpdate?.isPermanent === true &&
+            !isWTOWeekRestSubmit
         ) {
             try {
                 logger.info('WTO XML generation requested (UPDATE — Οριστική)', {
@@ -4209,13 +4213,25 @@ class ergazomenoiController {
                     isPermanent: true
                 });
 
-                const { generateWtoWeeklyXML } = require('../../utils/xmlGenerators/wtoGenerator');
+                const { generateWtoXML } = require('../../utils/xmlGenerators/wtoGenerator');
 
-                wtoXmlData = await generateWtoWeeklyXML(
-                    updatedErgazomenos._id,
-                    updatedErgazomenos, // ✅ Χρήση updated data αντί για newErgazomenos
-                    company, // ✅ Χρήση company αντί για companyData
-                    ypokatasthmata // ✅ Χρήση ypokatasthmata αντί για ypokatasthmataData
+                const schedulesForWto = await ProdhlomenaOrariaModel.find({
+                    team: formData.team,
+                    company_kod: formData.company_kod,
+                    kodikos: formData.kodikosHidden,
+                    hmeromhnia: {
+                        $gte: new Date(formData.hmeromhnia_allaghs_orarioy_apo),
+                        $lte: new Date(formData.hmeromhnia_allaghs_orarioy_eos)
+                    }
+                })
+                    .sort({ hmeromhnia: 1 })
+                    .lean();
+
+                wtoXmlData = await generateWtoXML(
+                    updatedErgazomenos,
+                    company,
+                    ypokatasthmata,
+                    schedulesForWto
                 );
 
                 if (wtoXmlData.success) {
