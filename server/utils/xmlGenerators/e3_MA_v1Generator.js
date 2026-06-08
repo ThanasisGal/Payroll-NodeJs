@@ -4,6 +4,399 @@
 //    Βάσει MA_v1.xsd
 // =========================================================================
 
+async function buildMAData(ergazomenos, companyData, ypokatasthmataData, options = {}) {
+    try {
+        // =====================================================================
+        // ✅ VALIDATION: Required Fields
+        // =====================================================================
+
+        const requiredFields = [
+            { field: 'eponymo', label: 'Επώνυμο' },
+            { field: 'onoma', label: 'Όνομα' },
+            { field: 'patronymo', label: 'Πατρώνυμο' },
+            { field: 'mhtronymo', label: 'Μητρώνυμο' },
+            { field: 'hmeromhnia_gennhshs', label: 'Ημ/νία Γέννησης' },
+            { field: 'afm', label: 'ΑΦΜ' },
+            { field: 'amka', label: 'ΑΜΚΑ' },
+            { field: 'adt', label: 'Τύπος Νομιμοποιητικού εγγράφου' }
+        ];
+
+        const missingFields = requiredFields
+            .filter(({ field }) => !ergazomenos[field])
+            .map(({ label }) => label);
+
+        if (missingFields.length > 0) {
+            throw new Error(
+                `[MA-GENERATOR-v1] Λείπουν υποχρεωτικά πεδία: ${missingFields.join(', ')}`
+            );
+        }
+
+        // =====================================================================
+        // ✅ PARSE TYPOS METABOLHS (από typos_metabolhs_table)
+        //    Πίνακας τύπων μεταβολής που έχουν καταχωρηθεί για τον εργαζόμενο
+        // =====================================================================
+
+        let typesMetabolon = [];
+
+        try {
+            const rawData = ergazomenos.typos_metabolhs_table;
+            if (rawData) {
+                let parsed;
+                if (typeof rawData === 'string' && rawData.trim() !== '') {
+                    parsed = JSON.parse(rawData);
+                } else if (Array.isArray(rawData)) {
+                    parsed = rawData;
+                }
+
+                // ✅ Log ΠΡΙΝ τον έλεγχο — πάντα ασφαλές
+                console.log('🔍 [MA] rawData:', JSON.stringify(rawData));
+                console.log('🔍 [MA] parsed:', JSON.stringify(parsed ?? null));
+
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    typesMetabolon = parsed
+                        .filter((item) => item)
+                        .map((item) => {
+                            let typos;
+                            if (typeof item === 'object') {
+                                typos =
+                                    item.typos_metabolhs ??
+                                    item.typos ??
+                                    item.value ??
+                                    item.code ??
+                                    Object.values(item)[0];
+                            } else {
+                                typos = item;
+                            }
+                            return { typos_metabolhs: String(typos || '') };
+                        })
+                        .filter((item) => item.typos_metabolhs !== '');
+
+                    console.log('🔍 [MA] typesMetabolon:', JSON.stringify(typesMetabolon));
+                }
+            }
+        } catch (parseError) {
+            console.error(
+                '❌ [MA-GENERATOR-v1] Failed to parse typos_metabolhs_table:',
+                parseError.message
+            );
+            typesMetabolon = [];
+        }
+
+        // Αν δεν υπάρχουν τύποι μεταβολής, βάζουμε default '1' (Γενική Μεταβολή)
+        if (typesMetabolon.length === 0) {
+            console.warn('⚠️ [MA-GENERATOR-v1] No metaboles types found — using default type "1"');
+            typesMetabolon = [{ typos_metabolhs: '1' }];
+        }
+
+        // =====================================================================
+        // ✅ PARSE EPIKOURIKI ASFALISH (ίδια λογική με E3N)
+        // =====================================================================
+
+        let epikourikiSelections = [];
+
+        try {
+            const epikourikiData = ergazomenos.foreas_epikoyrikhs_asfalishs;
+            if (epikourikiData) {
+                let parsed;
+                if (typeof epikourikiData === 'string' && epikourikiData.trim() !== '') {
+                    parsed = JSON.parse(epikourikiData);
+                } else if (Array.isArray(epikourikiData)) {
+                    parsed = epikourikiData;
+                }
+                if (Array.isArray(parsed)) {
+                    epikourikiSelections = parsed
+                        .filter((item) => item)
+                        .map((item) => {
+                            const kodikos =
+                                typeof item === 'object' ? item.kodikos || item.value : item;
+                            return { kodikos: String(kodikos).padStart(3, '0') };
+                        });
+                    console.log(
+                        `✅ [MA-GENERATOR-v1] Found ${epikourikiSelections.length} epikouriki selections`
+                    );
+                }
+            }
+        } catch (parseError) {
+            console.error(
+                '❌ [MA-GENERATOR-v1] Failed to parse epikouriki JSON:',
+                parseError.message
+            );
+            epikourikiSelections = [];
+        }
+
+        // =====================================================================
+        // ✅ DOWNLOAD PDFs FROM S3 (ίδια λογική με E3N)
+        // =====================================================================
+
+        let contractPdfBase64 = '';
+        let foreignPdfBase64 = '';
+        let youngPdfBase64 = '';
+        let epivolhPdfBase64 = ''; // ✅ MA-ONLY: Αρχείο Επιβολής (δεν υπάρχει στο E3N)
+
+        if (ergazomenos.oysiodeis_oroi === '0') {
+            if (ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path) {
+                try {
+                    console.log('📥 [MA-GENERATOR-v1] Downloading contract PDF from S3...');
+                    const { downloadFileFromS3 } = require('../s3Helper');
+                    const pdfBuffer = await downloadFileFromS3(
+                        ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path
+                    );
+                    contractPdfBase64 = pdfBuffer.toString('base64');
+                    console.log(
+                        `✅ [MA-GENERATOR-v1] Contract PDF: ${contractPdfBase64.length} chars`
+                    );
+                } catch (pdfError) {
+                    console.error(
+                        '❌ [MA-GENERATOR-v1] Failed to download contract PDF:',
+                        pdfError.message
+                    );
+                }
+            }
+        }
+
+        if (ergazomenos.arxeio_nomimopoihtikon_eggrafon_path) {
+            try {
+                const { downloadFileFromS3 } = require('../s3Helper');
+                const pdfBuffer = await downloadFileFromS3(
+                    ergazomenos.arxeio_nomimopoihtikon_eggrafon_path
+                );
+                foreignPdfBase64 = pdfBuffer.toString('base64');
+                console.log(
+                    `✅ [MA-GENERATOR-v1] Foreign docs PDF: ${foreignPdfBase64.length} chars`
+                );
+            } catch (pdfError) {
+                console.error(
+                    '❌ [MA-GENERATOR-v1] Failed to download foreign docs PDF:',
+                    pdfError.message
+                );
+            }
+        }
+
+        if (ergazomenos.bibliario_anhlikoy_path) {
+            try {
+                const { downloadFileFromS3 } = require('../s3Helper');
+                const pdfBuffer = await downloadFileFromS3(ergazomenos.bibliario_anhlikoy_path);
+                youngPdfBase64 = pdfBuffer.toString('base64');
+                console.log(
+                    `✅ [MA-GENERATOR-v1] Young worker docs PDF: ${youngPdfBase64.length} chars`
+                );
+            } catch (pdfError) {
+                console.error(
+                    '❌ [MA-GENERATOR-v1] Failed to download young docs PDF:',
+                    pdfError.message
+                );
+            }
+        }
+
+        // =====================================================================
+        // ✅ ΥΠΟΛΟΓΙΣΜΟΣ ΠΕΡΙΟΔΟΥ ΑΝΑΦΟΡΑΣ
+        //    Αν δεν υπάρχουν αποθηκευμένες ημερομηνίες, υπολογίζουμε αυτόματα
+        //    1η - τελευταία του τρέχοντος μήνα
+        // =====================================================================
+
+        const today = new Date();
+
+        const periodos_apo = ergazomenos.periodos_anaforas_from
+            ? formatDateForErganh(ergazomenos.periodos_anaforas_from)
+            : '';
+
+        const periodos_eos = ergazomenos.periodos_anaforas_to
+            ? formatDateForErganh(ergazomenos.periodos_anaforas_to)
+            : '';
+
+        const date_metabolhs = options.hmeromhnia_metabolhs
+            ? formatDateForErganh(options.hmeromhnia_metabolhs)
+            : '';
+
+        // =====================================================================
+        // ✅ FIELD MAPPING
+        //    Τα πεδία που είναι ΙΔΙΑ με E3N παίρνουν ΙΔΙΕΣ τιμές
+        //    Τα πεδία που είναι ΜΟΝΟ MA έχουν σχόλιο // MA-ONLY
+        // =====================================================================
+
+        const xmlData = {
+            // ── COMPANY DATA (ίδιο με E3N) ──
+            f_aa_pararthmatos: ypokatasthmataData?.kodikos || '00000',
+            f_rel_protocol: '',
+            f_rel_date: '',
+            f_ypiresia_sepe: ypokatasthmataData?.sepe_ergoy || '00000',
+            f_ypiresia_oaed: ypokatasthmataData?.dypa_ergoy || '000000',
+            f_kad_pararthmatos: companyData?.kad6
+                ? companyData.kad6.split('.').slice(0, 2).join('')
+                : '0000',
+            f_kallikratis_pararthmatos: ypokatasthmataData?.polh || '00000000',
+
+            // ── PERSONAL DATA (ίδιο με E3N) ──
+            f_eponymo: ergazomenos.eponymo.toUpperCase(),
+            f_onoma: ergazomenos.onoma.toUpperCase(),
+            f_onoma_patros: ergazomenos.patronymo.toUpperCase(),
+            f_onoma_mitros: ergazomenos.mhtronymo.toUpperCase(),
+            f_birthdate: formatDateForErganh(ergazomenos.hmeromhnia_gennhshs),
+            f_sex: ergazomenos.fylo ? '1' : '0',
+            f_yphkoothta: normalizeYphkoothta(ergazomenos.yphkoothta, '348'),
+            f_typos_taytothtas: ergazomenos.typos_taytothtas || 'ΔΑΤ',
+            f_ar_taytothtas: ergazomenos.adt || 'Α00000000',
+            f_ekdousa_arxh: ergazomenos.arxh_ekdoshs || '',
+            f_date_ekdosis: formatDateForErganh(ergazomenos.hmeromhnia_ekdoshs),
+            f_date_ekdosis_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy
+            ),
+
+            // ── RESIDENCE PERMITS (ίδιο με E3N) ──
+            f_res_permit_inst: ergazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? '1' : '0',
+            f_res_permit_inst_type:
+                ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_ar:
+                ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_inst_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia
+            ),
+            f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia
+                ? '1'
+                : '0',
+            f_res_permit_ap_type:
+                ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_ar:
+                ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+            f_res_permit_ap_lixi: formatDateForErganh(
+                ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia
+            ),
+            f_res_permit_visa: ergazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh ? '1' : '0',
+            f_res_permit_visa_ar: ergazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh || '',
+            f_res_permit_visa_from: formatDateForErganh(
+                ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
+            f_res_permit_visa_to: formatDateForErganh(
+                ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+            ),
+
+            // ── FAMILY STATUS (ίδιο με E3N) ──
+            f_marital_status: ergazomenos.oikogeneiakh_katastash || '0',
+            f_arithmos_teknon: String(ergazomenos.arithmos_teknon || 0).padStart(2, '0'),
+
+            // ── TAX & INSURANCE (ίδιο με E3N) ──
+            f_afm: ergazomenos.afm,
+            f_doy: ergazomenos.doy || '',
+            f_amika: ergazomenos.ama_krathshs_01 || '',
+            f_amka: ergazomenos.amka || '',
+            f_code_anergias: ergazomenos.arithmos_deltioy_anergias || '',
+            f_ar_vivliou_anilikou: ergazomenos.arithmos_bibliarioy_anhlikoy || '',
+            f_epipedo_morfosis: ergazomenos.ekpaideytiko_epipedo || '1',
+
+            // ── MA-ONLY: Στοιχεία Μεταβολής ──
+            f_date_metabolhs: date_metabolhs,
+            f_eidos_dieuthethshs: ergazomenos.eidos_dieuthethshs || '2',
+            f_eidos_dieuthethshs_comments: ergazomenos.eidos_dieuthethshs_comments || '',
+            f_periodos_anaforas_from: periodos_apo,
+            f_periodos_anaforas_to: periodos_eos,
+
+            // ── EMPLOYMENT DATA (ίδιο με E3N) ──
+            f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
+            f_eidikothta_anal: ergazomenos.antikeimeno_ergasion || '',
+            f_proipiresia: String(ergazomenos.proyphresia_se_eth || 0),
+
+            // ── SALARY DATA (ίδιο με E3N) ──
+            f_apodoxes: formatCurrency(
+                ergazomenos.pragmatikosMisthos || ergazomenos.synolo_symbashs || 0
+            ),
+            f_hour_apodoxes: formatCurrency(ergazomenos.pragmatikoOromisthio || 0),
+
+            // ── MA-ONLY: Χρόνος Καταβολής (διαφορετικό όνομα από E3N) ──
+            f_xronos_katabolhs:
+                ergazomenos.xronos_katabolhs_apodoxon ||
+                'ΕΝΤΟΣ 20ΗΜΕΡΟΥ ΑΠΟ ΤΟ ΤΕΛΟΣ ΚΑΘΕ ΜΙΣΘΟΛΟΓΙΚΗΣ ΠΕΡΙΟΔΟΥ',
+
+            // ── WORKPLACE (ίδιο με E3N) ──
+            f_topos_ergasias: ergazomenos.topos_ergasias ? '1' : '0',
+            f_topos_ergasias_comments: ergazomenos.topos_ergasias
+                ? ergazomenos.topos_ergasias_parathrhseis || ''
+                : '',
+
+            // ── CONTRACT TYPE (ίδιο με E3N) ──
+            f_sxeshapasxolisis: ergazomenos.sxesh_ergasias || '0',
+            f_orismenou_apo:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs)
+                    : '',
+            f_orismenou_ews:
+                ergazomenos.sxesh_ergasias === '1'
+                    ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs)
+                    : '',
+
+            // ── EMPLOYMENT STATUS (ίδιο με E3N) ──
+            f_kathestosapasxolisis: ergazomenos.kathestos_apasxolhshs || '0',
+            f_xaraktirismos: ergazomenos.xarakthrismos_ergazomenon ? '1' : '0',
+            f_special_case: ergazomenos.eidikh_periptosh || '',
+            f_responsible_position: ergazomenos.thesh_eythynhs || '1',
+
+            // ── INSURANCE (ίδιο με E3N — διαφορετικό tag name στο XML) ──
+            f_efarmostea_sillogiki_simbasi: ergazomenos.efarmostea_sse ? '1' : '0',
+            f_efarmostea_sillogiki_simbasi_comments: ergazomenos.efarmostea_sse_parathrhseis || '',
+            f_kyria_asfalish: ergazomenos.foreas_kyrias_asfalishs || '',
+            f_prosthetes_asfalistikes_paroxes: ergazomenos.prosthetes_asfalistikes_apodoxes || '',
+            epikourikiSelections: epikourikiSelections,
+            f_ipoxreotiki_katartisi: ergazomenos.ypoxreotikh_ek_toy_nomoy_katartish ? '1' : '0',
+
+            // ── WORKING TIME (ίδιο με E3N) ──
+            f_working_time_digital_organization: ergazomenos.pshfiakh_organosh ? '1' : '0',
+            f_mh_problepsimo_programma: ergazomenos.mh_problepsimo_programma ? '1' : '0',
+            f_paraggelia_hmeres_hours: ergazomenos.hmeres_ores_anaforas || '',
+            f_paraggelia_min_notification: ergazomenos.eidopoihsh_prin_thn_anathesh || '',
+            f_paraggelia_notes: ergazomenos.prothesmia_akyroshs_ths_anatheshs || '',
+            f_week_hours: formatWeekHours(ergazomenos.ores_ergasias_ebdomadas),
+            f_full_employment_hours: formatWeekHours(ergazomenos.symbatikes_ores_ergasias || 40),
+            f_week_days: (() => {
+                const days = parseInt(ergazomenos.apasxolhsh_basei_symbashs);
+                return days === 6 ? '6' : '5';
+            })(),
+            f_euelikto_wrario_minutes: String(ergazomenos.evelikth_proselefsh || 0),
+            f_working_card: ergazomenos.karta_ergasias ? '1' : '0',
+            f_dialeimma_minutes: String(ergazomenos.dialleima_se_lepta || 30),
+            f_dialeimma_entos_wrariou: ergazomenos.dialleima_entos_ektos_orarioy ? '1' : '0',
+
+            // ── ΔΥΠΑ (ίδιο με E3N) ──
+            f_topothetisioaed: ergazomenos.topothethsh_me_programma ? '1' : '0',
+            f_programaoaed: ergazomenos.programma_dypa || '',
+
+            // ── TRIAL PERIOD (ίδιο με E3N) ──
+            f_trial_period: ergazomenos.afora_dokimastikh_periodo ? '1' : '0',
+            f_trial_date_to: formatDateForErganh(ergazomenos.hmnia_lhxhs_dokimastikhs_periodoy),
+
+            // ── MA-ONLY: Δανεισμός ──
+            f_borrow_type: ergazomenos.typos_daneismoy || '',
+            f_borrow_date_from: formatDateForErganh(ergazomenos.hmeromhnia_enarxhs_daneismoy),
+            f_borrow_date_to: formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_daneismoy),
+            f_borrow_company_afm: ergazomenos.afm_epixeirishs_daneismoy || '',
+            f_borrow_company_eponimia: ergazomenos.eponimia_epixeirishs_daneismoy || '',
+
+            // ── FILES (ίδιο με E3N + MA-ONLY f_epibolh_file) ──
+            // ✅ '2' ΜΟΝΟ αν υπάρχει ακριβώς ΕΝΑ type ΚΑΙ είναι '001'
+            f_basics_acceptance:
+                typesMetabolon.length === 1 &&
+                String(typesMetabolon[0].typos_metabolhs).padStart(3, '0') === '001'
+                    ? '2'
+                    : ergazomenos.oysiodeis_oroi || '2',
+            f_file: contractPdfBase64,
+            f_comments: ergazomenos.allo_parathrhseis || '',
+            f_foreign_file: foreignPdfBase64,
+            f_young_file: youngPdfBase64,
+            f_epibolh_file: epivolhPdfBase64, // MA-ONLY
+
+            // ── MA-ONLY: Τύποι Μεταβολών ──
+            typesMetabolon: typesMetabolon
+        };
+
+        return {
+            xmlData,
+            typesMetabolon,
+            epikourikiSelections
+        };
+    } catch (error) {
+        console.error('❌ [MA-GENERATOR-v1] Data Error:', error.message);
+        throw error;
+    }
+}
+
 async function generateMAXML(ergazomenos, companyData, ypokatasthmataData, options = {}) {
     try {
         // =====================================================================
@@ -377,7 +770,7 @@ async function generateMAXML(ergazomenos, companyData, ypokatasthmataData, optio
                     ? '2'
                     : ergazomenos.oysiodeis_oroi || '2',
             f_file: contractPdfBase64,
-            f_comments: ergazomenos.parathrhseis || '',
+            f_comments: ergazomenos.allo_parathrhseis || '',
             f_foreign_file: foreignPdfBase64,
             f_young_file: youngPdfBase64,
             f_epibolh_file: epivolhPdfBase64, // MA-ONLY
@@ -648,4 +1041,190 @@ ${epikourikesXml}
 </AnaggeliesMA>`;
 }
 
-module.exports = { generateMAXML };
+// =========================================================================
+// ✅ BUILD MA JSON PAYLOAD για ΕΡΓΑΝΗ REST API
+//    Root: AnaggeliesMA -> AnaggeliaMA[]
+// =========================================================================
+const MA_JSON_FIELDS = [
+    'f_aa_pararthmatos',
+    'f_rel_protocol',
+    'f_rel_date',
+    'f_ypiresia_sepe',
+    'f_ypiresia_oaed',
+    'f_kad_pararthmatos',
+    'f_kallikratis_pararthmatos',
+    'f_eponymo',
+    'f_onoma',
+    'f_onoma_patros',
+    'f_onoma_mitros',
+    'f_birthdate',
+    'f_sex',
+    'f_yphkoothta',
+    'f_typos_taytothtas',
+    'f_ar_taytothtas',
+    'f_ekdousa_arxh',
+    'f_date_ekdosis',
+    'f_date_ekdosis_lixi',
+    'f_res_permit_inst',
+    'f_res_permit_inst_type',
+    'f_res_permit_inst_ar',
+    'f_res_permit_inst_lixi',
+    'f_res_permit_ap',
+    'f_res_permit_ap_type',
+    'f_res_permit_ap_ar',
+    'f_res_permit_ap_lixi',
+    'f_res_permit_visa',
+    'f_res_permit_visa_ar',
+    'f_res_permit_visa_from',
+    'f_res_permit_visa_to',
+    'f_marital_status',
+    'f_arithmos_teknon',
+    'f_afm',
+    'f_doy',
+    'f_amika',
+    'f_amka',
+    'f_code_anergias',
+    'f_ar_vivliou_anilikou',
+    'f_epipedo_morfosis',
+    'f_date_metabolhs',
+    'f_eidos_dieuthethshs',
+    'f_eidos_dieuthethshs_comments',
+    'f_periodos_anaforas_from',
+    'f_periodos_anaforas_to',
+    'f_eidikothta',
+    'f_eidikothta_anal',
+    'f_proipiresia',
+    'f_apodoxes',
+    'f_hour_apodoxes',
+    'f_xronos_katabolhs',
+    'f_topos_ergasias',
+    'f_topos_ergasias_comments',
+    'f_sxeshapasxolisis',
+    'f_orismenou_apo',
+    'f_orismenou_ews',
+    'f_kathestosapasxolisis',
+    'f_xaraktirismos',
+    'f_special_case',
+    'f_responsible_position',
+    'f_efarmostea_sillogiki_simbasi',
+    'f_efarmostea_sillogiki_simbasi_comments',
+    'f_kyria_asfalish',
+    'f_prosthetes_asfalistikes_paroxes',
+    'f_ipoxreotiki_katartisi',
+    'f_working_time_digital_organization',
+    'f_mh_problepsimo_programma',
+    'f_paraggelia_hmeres_hours',
+    'f_paraggelia_min_notification',
+    'f_paraggelia_notes',
+    'f_week_hours',
+    'f_full_employment_hours',
+    'f_week_days',
+    'f_euelikto_wrario_minutes',
+    'f_working_card',
+    'f_dialeimma_minutes',
+    'f_dialeimma_entos_wrariou',
+    'f_topothetisioaed',
+    'f_programaoaed',
+    'f_trial_period',
+    'f_trial_date_to',
+    'f_borrow_type',
+    'f_borrow_date_from',
+    'f_borrow_date_to',
+    'f_borrow_company_afm',
+    'f_borrow_company_eponimia',
+    'f_basics_acceptance',
+    'f_file',
+    'f_comments',
+    'f_foreign_file',
+    'f_young_file',
+    'f_epibolh_file'
+];
+
+function buildMAJSON(data) {
+    const anaggelia = {};
+
+    MA_JSON_FIELDS.forEach((field) => {
+        const value = data[field];
+        anaggelia[field] = value === undefined || value === null ? '' : value;
+    });
+
+    // -------------------------------------------------------------------------
+    // ✅ REST WebMA attachments
+    // -------------------------------------------------------------------------
+    // Στο XML schema/sample συχνά φαίνεται το "AA==" ως placeholder για byte[].
+    // Στο REST API όμως το "AA==" θεωρείται πραγματικό επισυναπτόμενο αρχείο
+    // μηδενικού περιεχομένου. Αυτό προκαλεί business validation errors, π.χ.:
+    // - "έχετε επισυνάψει το αρχείο αποδοχής ουσιωδών όρων" ενώ δεν υπάρχει PDF
+    // - "τύπος μεταβολής που δεν απαιτεί απόφαση επιβολής..." ενώ στείλαμε "AA=="
+    // Για REST στέλνουμε null όταν δεν υπάρχει πραγματικό PDF.
+    const normalizeRestPdfField = (value) => {
+        if (value === undefined || value === null) return null;
+
+        const str = String(value).trim();
+
+        if (!str || str === 'AA==') return null;
+
+        // Αν για κάποιο λόγο έρθει data URL από frontend, κρατάμε μόνο το base64 payload.
+        const dataUrlMatch = str.match(/^data:application\/pdf;base64,(.+)$/i);
+        if (dataUrlMatch) return dataUrlMatch[1];
+
+        return str;
+    };
+
+    ['f_file', 'f_foreign_file', 'f_young_file', 'f_epibolh_file'].forEach((field) => {
+        anaggelia[field] = normalizeRestPdfField(anaggelia[field]);
+    });
+
+    anaggelia.TypesMetabolon = {
+        TypesMetabolonMA: (data.typesMetabolon || [{ typos_metabolhs: '001' }]).map((t) => ({
+            f_typos_metabolhs: String(t.typos_metabolhs || '').padStart(3, '0')
+        }))
+    };
+
+    anaggelia.Epikourikes = {
+        EpikourikesMA: (data.epikourikiSelections || []).map((item) => ({
+            f_epikouriki_kod: String(item.kodikos || '').padStart(3, '0')
+        }))
+    };
+
+    return {
+        AnaggeliesMA: {
+            AnaggeliaMA: [anaggelia]
+        }
+    };
+}
+
+async function generateMAJSON(ergazomenos, companyData, ypokatasthmataData, options = {}) {
+    try {
+        const { xmlData } = await buildMAData(
+            ergazomenos,
+            companyData,
+            ypokatasthmataData,
+            options
+        );
+        const json = buildMAJSON(xmlData);
+
+        console.log('✅ [MA-GENERATOR-v1] JSON generated successfully');
+        console.log('   Root:', Object.keys(json).join(', '));
+        console.log(
+            '   Metaboles types:',
+            json.AnaggeliesMA.AnaggeliaMA[0].TypesMetabolon.TypesMetabolonMA.length
+        );
+        console.log(
+            '   Epikouriki:',
+            json.AnaggeliesMA.AnaggeliaMA[0].Epikourikes.EpikourikesMA.length
+        );
+
+        return {
+            success: true,
+            json,
+            payload: json,
+            data: xmlData
+        };
+    } catch (error) {
+        console.error('❌ [MA-GENERATOR-v1] JSON Error:', error.message);
+        throw error;
+    }
+}
+
+module.exports = { generateMAXML, generateMAJSON, buildMAData, buildMAJSON, MA_JSON_FIELDS };

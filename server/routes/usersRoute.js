@@ -473,6 +473,12 @@ router.post(
 );
 
 router.post(
+    '/ergazomenoi/ergazomenoi/submit-ma-to-erganh',
+    checkAuth,
+    erganhController.submitMAToErganh
+);
+
+router.post(
     '/ergazomenoi/ergazomenoi/cancel-e7n-submission',
     checkAuth,
     erganhController.cancelE7NSubmission

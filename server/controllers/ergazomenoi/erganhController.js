@@ -15,6 +15,7 @@ const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
+const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
 
 const {
     authenticateErgani,
@@ -5540,6 +5541,311 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: error.message || 'Σφάλμα κατά την αποστολή E3N στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ MA REST JSON UPLOAD - WebMA
+    //    Trial Submission id: 127 / Production Submission id: 230
+    // ============================================================================
+    static submitMAToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή ΜΑ.'
+                });
+            }
+
+            const rawUploadMethod =
+                body.erganiUploadMethod ||
+                body.submissionMethod ||
+                body.uploadMethod ||
+                body.method ||
+                'rest';
+
+            const uploadMethod = String(rawUploadMethod).trim().toLowerCase();
+
+            if (!['rest', 'json', 'json_rest'].includes(uploadMethod)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Η οριστική υποβολή WebMA υποστηρίζεται μόνο μέσω REST API.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή ΜΑ.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kod: companyId }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kodikos: companyId }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ από PasswordsModel
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5) JSON + REST API -> Οριστική υποβολή WebMA
+            // --------------------------------------------------------------------
+            const jsonResult = await generateMAJSON(ergazomenos, companyData, ypokatasthmataData, {
+                hmeromhnia_metabolhs:
+                    body.hmeromhnia_metabolhs ||
+                    body.hmeromhniaMetabolhs ||
+                    ergazomenos.hmeromhnia_metabolhs ||
+                    ergazomenos.hmeromhnia_allaghs_orarioy_apo ||
+                    ergazomenos.hmeromhnia_proslhpshs
+            });
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: 'WebMA',
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+            const submissionYear = effectiveSubmitDate.getFullYear();
+            const submissionMonth = effectiveSubmitDate.getMonth() + 1;
+            const submissionDay = effectiveSubmitDate.getDate();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: 'WebMA',
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || '',
+                process_code: process.env.ERGANI_ENV === 'production' ? 'ma_230' : 'ma_127',
+                process_description: 'Μεταβολή Στοιχείων Εργασιακής Σχέσης (MA)',
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: submissionYear,
+                submission_month: submissionMonth,
+                submission_day: submissionDay,
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                message: restResult?.success
+                    ? 'Το MA υποβλήθηκε οριστικά μέσω REST API.'
+                    : restResult?.error || 'Η οριστική υποβολή MA μέσω REST API απέτυχε.',
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                    : pdfStorage.pdfS3Url,
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitMAToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την αποστολή MA στο ΕΡΓΑΝΗ.',
                 error: error.message || String(error)
             });
         }

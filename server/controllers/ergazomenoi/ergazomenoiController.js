@@ -1516,8 +1516,6 @@ class ergazomenoiController {
             formData.hmeromhnia_katabolhs_ths_apozhmioshs || null;
         newErgazomenos.shmeioseis_apozhmioshs = formData.shmeioseis_apozhmioshs;
         newErgazomenos.parathrhseis = formData.parathrhseis;
-        // newErgazomenos.typos_metabolhs = [];
-        // newErgazomenos.typos_metabolhs_table = [];
 
         let savedErgazomenos = null; // ✅ Δήλωση
 
@@ -3429,6 +3427,7 @@ class ergazomenoiController {
             parathrhseis: formData.parathrhseis,
             typos_metabolhs: formData.typos_metabolhs || null,
             typos_metabolhs_table: formData.typos_metabolhs_table || '[]',
+            allo_parathrhseis: formData.allo_parathrhseis || '',
             symfonhtheis_misthos_genikos: formData.symfonhtheis_misthos_genikos,
             symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
             paketo_apodoxon: formData.paketo_apodoxon,

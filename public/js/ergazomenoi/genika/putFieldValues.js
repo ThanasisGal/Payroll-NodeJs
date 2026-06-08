@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        console.log('📦 Συλλεγμένα δεδομένα φόρμας:', formData);
+        // console.log('📦 Συλλεγμένα δεδομένα φόρμας:', formData);
 
         try {
             await Promise.all(filePromises);
@@ -804,7 +804,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         isPermanent &&
                         (lhxhType === 'ma_222' ||
                             e3AnaggeliaProslhpshs ||
-                            wtoPshfiakhOrganoshXronoy)
+                            wtoPshfiakhOrganoshXronoy ||
+                            e3Enabled_1 ||
+                            e3Enabled_2)
                             ? 'rest'
                             : 'xml';
 
@@ -1129,9 +1131,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const maXmlData = data?.maXmlData || null;
                 const hasMAXml = maXmlData && maXmlData.success === true;
 
-                const userWantsE3 =
-                    result.value?.e3_anaggelia_proslhpshs === true ||
-                    result.value?.e3_metaboles_ergasiakhs_sxeshs === true;
+                const userWantsE3 = result.value?.e3_anaggelia_proslhpshs === true;
+
+                const userWantsMAChange =
+                    result.value?.e3_metaboles_ergasiakhs_sxeshs === true ||
+                    result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy === true;
 
                 const userWantsWto = result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true;
 
@@ -1142,6 +1146,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const isE7NRestSubmit =
                     result.value?.ma_222 === true &&
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+
+                const isMARestSubmit =
+                    userWantsMAChange === true &&
                     result.value?.isPermanent === true &&
                     result.value?.erganiUploadMethod === 'rest';
 
@@ -1166,6 +1175,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const e7RestPendingHtml = isE7NRestSubmit
                     ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή E7N μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
+                    : '';
+
+                const maRestPendingHtml = isMARestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή MA μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
                 const wtoXmlHtml =
@@ -1329,6 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         userWantsMA &&
                         data.data?._id &&
                         (isE7NRestSubmit ||
+                            isMARestSubmit ||
                             (maXmlData?.success &&
                                 (maXmlData?.s3Url ||
                                     maXmlData?.downloadUrl ||
@@ -1337,11 +1351,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     ) {
                         const maUrlToSend = isE7NRestSubmit
                             ? 'REST_E7N_NO_XML_REQUIRED'
-                            : maXmlData?.s3Url ||
-                              maXmlData?.downloadUrl ||
-                              maXmlData?.relativePath ||
-                              maXmlData?.s3Key ||
-                              null;
+                            : isMARestSubmit
+                              ? 'REST_MA_NO_XML_REQUIRED'
+                              : maXmlData?.s3Url ||
+                                maXmlData?.downloadUrl ||
+                                maXmlData?.relativePath ||
+                                maXmlData?.s3Key ||
+                                null;
                         if (maUrlToSend) {
                             try {
                                 if (isE7NRestSubmit) {
@@ -1349,6 +1365,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                         '[E7N-REST-UPLOAD] Submitting E7N via REST JSON...'
                                     );
                                     showE7NRestProgressSwal();
+                                } else if (isMARestSubmit) {
+                                    console.log('[MA-REST-UPLOAD] Submitting MA via REST JSON...');
+                                    showGenericRestProgressSwal(
+                                        'Οριστική υποβολή MA μέσω REST API'
+                                    );
                                 } else {
                                     console.log('[MA-UPLOAD] Uploading MA XML...');
                                 }
@@ -1370,11 +1391,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                     Swal.close();
                                     console.log('[E7N-REST-UPLOAD] Result:', maResult);
                                     await showE7NRestResultSwal(maResult);
+                                } else if (isMARestSubmit) {
+                                    Swal.close();
+                                    console.log('[MA-REST-UPLOAD] Result:', maResult);
+                                    await showMARestResultSwal(maResult);
                                 } else {
                                     console.log('[MA-UPLOAD] Result:', maResult);
                                 }
                             } catch (e) {
-                                if (isE7NRestSubmit) {
+                                if (isE7NRestSubmit || isMARestSubmit) {
                                     Swal.close();
                                 }
 
@@ -1387,6 +1412,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 if (isE7NRestSubmit) {
                                     await showE7NRestResultSwal(maResult);
+                                } else if (isMARestSubmit) {
+                                    await showMARestResultSwal(maResult);
                                 }
                             }
                         }
@@ -1449,9 +1476,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    if (!e3Result.success || !wtoResult.success) {
+                    if (!e3Result.success || !maResult.success || !wtoResult.success) {
                         console.warn('[ERGANH] Some uploads failed:', {
                             e3: e3Result.success,
+                            ma: maResult.success,
                             wto: wtoResult.success
                         });
                     }
@@ -1948,6 +1976,123 @@ document.addEventListener('DOMContentLoaded', () => {
                 htmlContainer: 'custom-html-container'
             }
         });
+    }
+
+    function showGenericRestProgressSwal(title = 'Οριστική υποβολή μέσω REST API') {
+        const safeTitle = title || 'Οριστική υποβολή μέσω REST API';
+        const isMA = String(safeTitle).toUpperCase().includes('MA');
+        const progressBarId = isMA ? 'ma-rest-progress-bar' : 'generic-rest-progress-bar';
+        const progressTextId = isMA
+            ? 'ma-rest-progress-step-text'
+            : 'generic-rest-progress-step-text';
+
+        Swal.fire({
+            title: safeTitle,
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="${progressTextId}">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                id="${progressBarId}"
+                                role="progressbar"
+                                aria-valuenow="15"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload</li>
+                            <li>Έλεγχο WebMA στο trial/production περιβάλλον</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title',
+                htmlContainer: 'custom-html-container'
+            },
+            didOpen: () => animateRestProgress(progressBarId, progressTextId)
+        });
+    }
+
+    async function showMARestResultSwal(result) {
+        return showGenericRestResultSwal({
+            result,
+            titleSuccess: 'MA REST - Επιτυχής Υποβολή',
+            titleError: 'MA REST - Αποτυχία Υποβολής',
+            successText:
+                'Η Μεταβολή Στοιχείων Εργασιακής Σχέσης υποβλήθηκε οριστικά μέσω REST API.',
+            errorText: 'Η οριστική υποβολή MA μέσω REST API απέτυχε.'
+        });
+    }
+
+    // ============================================================================
+    // ✅ MA REST JSON UPLOAD
+    // ============================================================================
+    async function submitMARestToErganh(ergazomenosId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const ypokatasthma =
+            document.getElementById('ypokatasthma')?.value ||
+            document.getElementById('ypokatasthmata')?.value ||
+            document.getElementById('ypokatasthmata_stathera')?.value ||
+            document.querySelector('[name="ypokatasthma"]')?.value ||
+            document.querySelector('[name="ypokatasthmata"]')?.value ||
+            document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+            '0';
+
+        const response = await fetch('/ergazomenoi/ergazomenoi/submit-ma-to-erganh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                ergazomenosId,
+                ypokatasthma,
+                erganiUploadMethod: 'rest'
+            })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { success: response.ok, message: await response.text() };
+
+        if (!response.ok || data?.success !== true) {
+            throw new Error(
+                data?.message ||
+                    data?.error ||
+                    `MA REST JSON upload failed with HTTP ${response.status}`
+            );
+        }
+
+        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
+            Swal.close();
+            await showErganiSubmittedPdfModal(data);
+        }
+
+        return data;
     }
 
     // ============================================================================
@@ -3266,6 +3411,48 @@ document.addEventListener('DOMContentLoaded', () => {
             isPermanent === true &&
             normalizedUploadMethod === 'rest' &&
             (normalizedProcessCode === '222' || normalizedProcessCode === 'ma_222');
+
+        const isMARestSubmit =
+            isPermanent === true && normalizedUploadMethod === 'rest' && !isE7NRestSubmit;
+
+        if (isMARestSubmit) {
+            if (erganiUploadInProgress) {
+                if (window.hideLoader) window.hideLoader();
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'ΕΡΓΑΝΗ REST',
+                    text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
+                    confirmButtonText: 'OK'
+                });
+                return { success: false, userMessage: 'Upload already in progress' };
+            }
+
+            erganiUploadInProgress = true;
+
+            try {
+                // Το MA REST έχει ήδη δικό του Swal progress bar (ίδιο ύφος με E3N/E7N).
+                // Δεν ανοίγουμε το παλιό global loader/applyServerProgress, γιατί εμφανίζει
+                // δεύτερο overlay/μικρό progress indicator πάνω από το SweetAlert.
+                if (!Swal.isVisible()) {
+                    showGenericRestProgressSwal('Οριστική υποβολή MA μέσω REST API');
+                }
+
+                const payload = await submitMARestToErganh(ergazomenosId);
+                return { success: true, ...payload };
+            } catch (error) {
+                if (window.hideLoader) window.hideLoader();
+
+                return {
+                    success: false,
+                    error: error?.message || 'Unknown error',
+                    message: error?.message || 'Unknown error',
+                    userMessage: error?.message || 'Unknown error'
+                };
+            } finally {
+                if (window.hideLoader) window.hideLoader();
+                erganiUploadInProgress = false;
+            }
+        }
 
         if (isE7NRestSubmit) {
             if (erganiUploadInProgress) {
