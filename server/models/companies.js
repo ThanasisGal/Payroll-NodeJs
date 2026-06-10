@@ -58,6 +58,11 @@ const CompaniesSchema = new Schema(
         hmeromhnia_payshs_polyetias_apo: { type: Date },
         hmeromhnia_payshs_polyetias_eos: { type: Date },
         xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta: { type: Number, default: 0 },
+        tropos_ypologismoy_pragmatikoy_oromisthioy: {
+            type: String,
+            enum: ['actual_plus_extra', 'full_legal_plus_extra'],
+            default: 'actual_plus_extra'
+        },
         keimeno_exoflhshs: { type: String, trim: true },
         users: [
             {

@@ -5114,16 +5114,16 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 .font-weight-400 {
-    font-weight: 400;
+    font-weight: 400 !important;
 }
 .font-weight-500 {
-    font-weight: 500;
+    font-weight: 500 !important;
 }
 .font-weight-600 {
-    font-weight: 600;
+    font-weight: 600 !important;
 }
 .font-weight-700 {
-    font-weight: 700;
+    font-weight: 700 !important;
 }
 
 .loginConnect {
@@ -5356,6 +5356,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .margin-top--1rem {
     margin-top: -1rem !important;
 }
+.margin-top--1_25rem {
+    margin-top: -1.25rem !important;
+}
 .margin-top--1_5rem {
     margin-top: -1.5rem !important;
 }
@@ -5391,6 +5394,9 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 .margin-top-0_2rem {
     margin-top: 0.2rem !important;
+}
+.margin-top-0_25rem {
+    margin-top: 0.25rem !important;
 }
 .margin-top-0_3rem {
     margin-top: 0.3rem !important;

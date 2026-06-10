@@ -22,7 +22,7 @@ public/txt-cache/
 
 # Test files
 server/utils/test-*.js
-scripts/
+scripts/**
 
 # ============================================================================
 # Παραγόμενα αρχεία (generated files)

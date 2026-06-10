@@ -4,6 +4,8 @@
 //    Βάσει MA_v1.xsd
 // =========================================================================
 
+const { formatCurrencyForErgani: formatCurrency } = require('../erganh/erganiFormatters');
+
 async function buildMAData(ergazomenos, companyData, ypokatasthmataData, options = {}) {
     try {
         // =====================================================================
@@ -874,13 +876,7 @@ function formatWeekHours(hours) {
     return n.toFixed(1).replace('.', ',');
 }
 
-function formatCurrency(amount) {
-    if (!amount) return '0,00';
-    const formatted = Number(amount).toFixed(2).replace('.', ',');
-    return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-function normalizeYphkoothta(val, fallback = '348') {
+// function normalizeYphkoothta(val, fallback = '348') {
     const digits = String(val ?? '').replace(/\D/g, '');
     const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
     return base.slice(-3).padStart(3, '0');

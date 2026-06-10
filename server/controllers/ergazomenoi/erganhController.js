@@ -1,3 +1,5 @@
+// module.exports = erganhController;
+
 const mongoose = require('mongoose');
 
 const { Builder, By, Key, until } = require('selenium-webdriver');
@@ -16,6 +18,70 @@ const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
+const { generateE5NJSON } = require('../../utils/xmlGenerators/e5N_v1Generator');
+
+async function tryGenerateE5NPdfForRest(
+    ergazomenos,
+    companyData,
+    ypokatasthmataData,
+    options = {}
+) {
+    // Για το WebE5N REST το f_file είναι υποχρεωτικό.
+    // Προσπαθούμε να χρησιμοποιήσουμε τον υπάρχοντα PDF generator της εφαρμογής.
+    // Αν δεν υπάρχει διαθέσιμος generator ή αποτύχει, αφήνουμε το generateE5NJSON()
+    // να πετάξει καθαρό validation error για το f_file.
+    const candidateModules = [
+        '../../utils/pdfGenerators/e5nTemplatePdfGenerator',
+        '../../utils/pdfGenerators/E5NTemplatePdfGenerator',
+        '../../utils/pdfGenerators/e5NPdfGenerator',
+        '../../utils/pdfGenerators/e5nPdfGenerator'
+    ];
+
+    for (const modulePath of candidateModules) {
+        try {
+            const mod = require(modulePath);
+            const generateE5NPdf =
+                mod.generateE5NPdf ||
+                mod.generateE5NTemplatePdf ||
+                mod.generatePdf ||
+                mod.default ||
+                (typeof mod === 'function' ? mod : null);
+
+            if (typeof generateE5NPdf !== 'function') continue;
+
+            console.log('[submitE5NToErganh] Δημιουργία PDF Ε5Ν με:', modulePath);
+            const result = await generateE5NPdf(
+                ergazomenos,
+                companyData,
+                ypokatasthmataData,
+                options
+            );
+
+            const pdfPath =
+                result?.s3Key ||
+                result?.s3_key ||
+                result?.relativePath ||
+                result?.relative_path ||
+                result?.path ||
+                result?.pdfPath ||
+                result?.pdf_path ||
+                result?.key ||
+                '';
+
+            const pdfBase64 = result?.base64 || result?.pdfBase64 || result?.pdf_base64 || '';
+
+            if (pdfPath || pdfBase64) {
+                return { pdfPath, pdfBase64, result };
+            }
+        } catch (error) {
+            if (error?.code === 'MODULE_NOT_FOUND') continue;
+            console.error('[submitE5NToErganh] Αποτυχία δημιουργίας PDF Ε5Ν:', error.message);
+            throw error;
+        }
+    }
+
+    return { pdfPath: '', pdfBase64: '', result: null };
+}
 
 const {
     authenticateErgani,
@@ -5541,6 +5607,330 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: error.message || 'Σφάλμα κατά την αποστολή E3N στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ E5N REST JSON UPLOAD - WebE5N
+    //    Trial Submission id: 101 / Production Submission id: 217
+    // ============================================================================
+    static submitE5NToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή E5N.'
+                });
+            }
+
+            const rawUploadMethod =
+                body.erganiUploadMethod ||
+                body.submissionMethod ||
+                body.uploadMethod ||
+                body.method ||
+                'rest';
+
+            const uploadMethod = String(rawUploadMethod).trim().toLowerCase();
+
+            if (!['rest', 'json', 'json_rest'].includes(uploadMethod)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Η οριστική υποβολή WebE5N υποστηρίζεται μόνο μέσω REST API.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή E5N.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kod: companyId }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kodikos: companyId }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ από PasswordsModel
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5) PDF Ε5Ν + JSON + REST API -> Οριστική υποβολή WebE5N
+            // --------------------------------------------------------------------
+            const apoxorhshDateForE5N =
+                body.hmeromhnia_apoxorhshs ||
+                body.hmeromhnia_apoxwrhshs ||
+                body.apoxwrisi_date ||
+                ergazomenos.hmeromhnia_apoxorhshs ||
+                ergazomenos.hmeromhnia_apoxwrhshs;
+
+            const e5PdfResult = await tryGenerateE5NPdfForRest(
+                ergazomenos,
+                companyData,
+                ypokatasthmataData,
+                {
+                    hmeromhnia_apoxorhshs: apoxorhshDateForE5N,
+                    hmeromhnia_apoxwrhshs: apoxorhshDateForE5N,
+                    apoxwrisi_date: apoxorhshDateForE5N,
+                    userId,
+                    requestBody: body
+                }
+            );
+
+            const jsonResult = await generateE5NJSON(ergazomenos, companyData, ypokatasthmataData, {
+                hmeromhnia_apoxorhshs: apoxorhshDateForE5N,
+                hmeromhnia_apoxwrhshs: apoxorhshDateForE5N,
+                apoxwrisi_date: apoxorhshDateForE5N,
+                e5_pdf_path: e5PdfResult.pdfPath,
+                e5_pdf_base64: e5PdfResult.pdfBase64
+            });
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: 'WebE5N',
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+            const submissionYear = effectiveSubmitDate.getFullYear();
+            const submissionMonth = effectiveSubmitDate.getMonth() + 1;
+            const submissionDay = effectiveSubmitDate.getDate();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: 'WebE5N',
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || '',
+                process_code: process.env.ERGANI_ENV === 'production' ? 'ma_217' : 'ma_101',
+                process_description: 'Οικειοθελής Αποχώρηση (E5N)',
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: submissionYear,
+                submission_month: submissionMonth,
+                submission_day: submissionDay,
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                message: restResult?.success
+                    ? 'Το E5N υποβλήθηκε οριστικά μέσω REST API.'
+                    : restResult?.error || 'Η οριστική υποβολή E5N μέσω REST API απέτυχε.',
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
+                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                    : pdfStorage.pdfS3Url,
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitE5NToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την αποστολή E5N στο ΕΡΓΑΝΗ.',
                 error: error.message || String(error)
             });
         }

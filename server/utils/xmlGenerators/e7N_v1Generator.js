@@ -9,6 +9,8 @@
 //    - JSON output: generateE7NJSON(...)
 // =========================================================================
 
+const { formatCurrencyForErgani: formatCurrency } = require('../erganh/erganiFormatters');
+
 const E7N_FIELDS = [
     'f_aa_pararthmatos',
     'f_rel_protocol',
@@ -348,30 +350,6 @@ function formatDateForErganh(date) {
     return `${day}/${month}/${year}`;
 }
 
-function formatCurrency(amount) {
-    if (amount === null || amount === undefined || amount === '') return '0,00';
-
-    let numeric;
-
-    if (typeof amount === 'number') {
-        numeric = amount;
-    } else {
-        const s = String(amount).trim();
-
-        // Αν είναι ελληνικό format: 1.117,16
-        if (s.includes(',')) {
-            numeric = Number(s.replace(/\./g, '').replace(',', '.'));
-        } else {
-            // Αν είναι JS/DB format: 1117.16
-            numeric = Number(s);
-        }
-    }
-
-    if (!Number.isFinite(numeric)) return '0,00';
-
-    return numeric.toFixed(2).replace('.', ',');
-}
-
 function normalizeYphkoothta(val, fallback = '348') {
     const digits = String(val ?? '').replace(/\D/g, '');
     const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
@@ -428,7 +406,6 @@ module.exports = {
 
     // Exports για μικρά tests/debug αν χρειαστούν.
     formatDateForErganh,
-    formatCurrency,
     normalizeYphkoothta,
     getKad4
 };

@@ -4,6 +4,296 @@
 //    Βάσει E5N_v1.xsd
 // =========================================================================
 
+const { formatCurrencyForErgani: formatCurrency } = require('../erganh/erganiFormatters');
+
+const E5N_FIELDS = [
+    'f_aa_pararthmatos',
+    'f_rel_protocol',
+    'f_rel_date',
+    'f_ypiresia_sepe',
+    'f_ypiresia_oaed',
+    'f_kad_pararthmatos',
+    'f_kallikratis_pararthmatos',
+    'f_eponymo',
+    'f_onoma',
+    'f_onoma_patros',
+    'f_onoma_mitros',
+    'f_birthdate',
+    'f_sex',
+    'f_yphkoothta',
+    'f_typos_taytothtas',
+    'f_ar_taytothtas',
+    'f_ekdousa_arxh',
+    'f_date_ekdosis',
+    'f_date_ekdosis_lixi',
+    'f_res_permit_inst',
+    'f_res_permit_inst_type',
+    'f_res_permit_inst_ar',
+    'f_res_permit_inst_lixi',
+    'f_res_permit_ap',
+    'f_res_permit_ap_type',
+    'f_res_permit_ap_ar',
+    'f_res_permit_ap_lixi',
+    'f_res_permit_visa',
+    'f_res_permit_visa_ar',
+    'f_res_permit_visa_from',
+    'f_res_permit_visa_to',
+    'f_marital_status',
+    'f_arithmos_teknon',
+    'f_afm',
+    'f_doy',
+    'f_amika',
+    'f_amka',
+    'f_code_anergias',
+    'f_ar_vivliou_anilikou',
+    'f_epipedo_morfosis',
+    'f_xaraktirismos',
+    'f_sxeshapasxolisis',
+    'f_orismenou_apo',
+    'f_orismenou_ews',
+    'f_kathestosapasxolisis',
+    'f_eidikothta',
+    'f_proslipsidate',
+    'f_apoxwrisidate',
+    'f_apodoxes',
+    'f_comments',
+    'f_file',
+    'f_foreign_file',
+    'f_young_file'
+];
+
+function resolveE5NApoxwrisiDate(ergazomenos, options = {}) {
+    return (
+        options.hmeromhnia_apoxwrhshs ||
+        options.hmeromhnia_apoxorhshs ||
+        options.apoxwrisi_date ||
+        options.apoxorisi_date ||
+        ergazomenos.hmeromhnia_apoxwrhshs ||
+        ergazomenos.hmeromhnia_apoxorhshs ||
+        ergazomenos.hmeromhnia_apoxorisis ||
+        ergazomenos.apoxwrisi_date ||
+        ergazomenos.apoxwrisidate ||
+        ''
+    );
+}
+
+function validateE5NRequiredFields(ergazomenos, options = {}) {
+    const requiredFields = [
+        { field: 'eponymo', label: 'Επώνυμο' },
+        { field: 'onoma', label: 'Όνομα' },
+        { field: 'patronymo', label: 'Πατρώνυμο' },
+        { field: 'mhtronymo', label: 'Μητρώνυμο' },
+        { field: 'hmeromhnia_gennhshs', label: 'Ημ/νία Γέννησης' },
+        { field: 'afm', label: 'ΑΦΜ' },
+        { field: 'amka', label: 'ΑΜΚΑ' },
+        { field: 'adt', label: 'Αριθμός Νομιμοποιητικού εγγράφου' },
+        { field: 'hmeromhnia_proslhpshs', label: 'Ημ/νία Πρόσληψης' }
+    ];
+
+    const apoxwrisiDate = resolveE5NApoxwrisiDate(ergazomenos, options);
+
+    if (!apoxwrisiDate) {
+        throw new Error('[E5N-GENERATOR-v1] Λείπει υποχρεωτικό πεδίο: Ημ/νία Αποχώρησης');
+    }
+
+    const missingFields = requiredFields
+        .filter(({ field }) => !ergazomenos[field])
+        .map(({ label }) => label);
+
+    if (missingFields.length > 0) {
+        throw new Error(
+            `[E5N-GENERATOR-v1] Λείπουν υποχρεωτικά πεδία: ${missingFields.join(', ')}`
+        );
+    }
+
+    return { apoxwrisiDate };
+}
+
+async function loadE5NAttachmentsBase64(ergazomenos, options = {}) {
+    let e5PdfBase64 = normalizeBase64PdfInput(
+        options.e5_pdf_base64 ||
+            options.f_file ||
+            options.e5PdfBase64 ||
+            ergazomenos.e5_pdf_base64 ||
+            ergazomenos.f_file
+    );
+    let foreignPdfBase64 = '';
+    let youngPdfBase64 = '';
+
+    const pdfPath =
+        options.e5_pdf_path ||
+        options.apoxwrhsh_pdf_path ||
+        ergazomenos.e5_pdf_path ||
+        ergazomenos.apoxwrhsh_pdf_path ||
+        ergazomenos.arxeio_entypou_e5_path ||
+        ergazomenos.arxeio_oikeiothelous_apoxwrhshs_path ||
+        ergazomenos.arxeio_apoxwrhshs_path;
+
+    if (!e5PdfBase64 && pdfPath) {
+        try {
+            console.log('[E5N-GENERATOR-v1] pdfPath:', pdfPath);
+            console.log('📥 [E5N-GENERATOR-v1] Downloading E5N PDF from S3...');
+            const { downloadFileFromS3 } = require('../s3Helper');
+            const pdfBuffer = await downloadFileFromS3(pdfPath);
+            e5PdfBase64 = pdfBuffer.toString('base64');
+            console.log(`✅ [E5N-GENERATOR-v1] E5N PDF: ${e5PdfBase64.length} chars`);
+        } catch (pdfError) {
+            console.error('❌ [E5N-GENERATOR-v1] Failed to download E5N PDF:', pdfError.message);
+        }
+    }
+
+    if (ergazomenos.arxeio_nomimopoihtikon_eggrafon_path) {
+        try {
+            const { downloadFileFromS3 } = require('../s3Helper');
+            const pdfBuffer = await downloadFileFromS3(
+                ergazomenos.arxeio_nomimopoihtikon_eggrafon_path
+            );
+            foreignPdfBase64 = pdfBuffer.toString('base64');
+            console.log(`✅ [E5N-GENERATOR-v1] Foreign docs PDF: ${foreignPdfBase64.length} chars`);
+        } catch (pdfError) {
+            console.error(
+                '❌ [E5N-GENERATOR-v1] Failed to download foreign docs PDF:',
+                pdfError.message
+            );
+        }
+    }
+
+    if (ergazomenos.bibliario_anhlikoy_path) {
+        try {
+            const { downloadFileFromS3 } = require('../s3Helper');
+            const pdfBuffer = await downloadFileFromS3(ergazomenos.bibliario_anhlikoy_path);
+            youngPdfBase64 = pdfBuffer.toString('base64');
+            console.log(
+                `✅ [E5N-GENERATOR-v1] Young worker docs PDF: ${youngPdfBase64.length} chars`
+            );
+        } catch (pdfError) {
+            console.error(
+                '❌ [E5N-GENERATOR-v1] Failed to download young docs PDF:',
+                pdfError.message
+            );
+        }
+    }
+
+    return { e5PdfBase64, foreignPdfBase64, youngPdfBase64 };
+}
+
+async function buildE5NData(ergazomenos, companyData, ypokatasthmataData, options = {}) {
+    const { apoxwrisiDate } = validateE5NRequiredFields(ergazomenos, options);
+    const { e5PdfBase64, foreignPdfBase64, youngPdfBase64 } = await loadE5NAttachmentsBase64(
+        ergazomenos,
+        options
+    );
+
+    const requireMainPdf = options.requireMainPdf === true;
+    if (requireMainPdf && (!e5PdfBase64 || e5PdfBase64.trim() === '')) {
+        throw new Error('[E5N-GENERATOR-v1] Λείπει το υποχρεωτικό PDF Εντύπου Ε5Ν (f_file).');
+    }
+
+    return {
+        f_aa_pararthmatos: String(ypokatasthmataData?.kodikos || '0'),
+        f_rel_protocol: options.f_rel_protocol || ergazomenos.f_rel_protocol || '',
+        f_rel_date: formatDateForErganh(options.f_rel_date || ergazomenos.f_rel_date),
+        f_ypiresia_sepe: ypokatasthmataData?.sepe_ergoy || '00000',
+        f_ypiresia_oaed: ypokatasthmataData?.dypa_ergoy || '000000',
+        f_kad_pararthmatos:
+            getKad4(
+                ypokatasthmataData?.kad6 ||
+                    ypokatasthmataData?.kad ||
+                    companyData?.kad6 ||
+                    companyData?.kad
+            ) || '0000',
+        f_kallikratis_pararthmatos:
+            ypokatasthmataData?.polh || ypokatasthmataData?.kallikratis || '00000000',
+
+        f_eponymo: upper(ergazomenos.eponymo),
+        f_onoma: upper(ergazomenos.onoma),
+        f_onoma_patros: upper(ergazomenos.patronymo),
+        f_onoma_mitros: upper(ergazomenos.mhtronymo),
+        f_birthdate: formatDateForErganh(ergazomenos.hmeromhnia_gennhshs),
+        f_sex: ergazomenos.fylo ? '1' : '0',
+        f_yphkoothta: normalizeYphkoothta(ergazomenos.yphkoothta, '348'),
+        f_typos_taytothtas: ergazomenos.typos_taytothtas || 'ΔΑΤ',
+        f_ar_taytothtas: ergazomenos.adt || '',
+        f_ekdousa_arxh: ergazomenos.arxh_ekdoshs || '',
+        f_date_ekdosis: formatDateForErganh(ergazomenos.hmeromhnia_ekdoshs),
+        f_date_ekdosis_lixi: formatDateForErganh(
+            ergazomenos.hmeromhnia_lhxhs_nomimopoihtikoy_eggrafoy
+        ),
+
+        f_res_permit_inst: ergazomenos.adeia_diamonhs_me_amesh_prosbash_gia_ergasia ? '1' : '0',
+        f_res_permit_inst_type:
+            ergazomenos.eidos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+        f_res_permit_inst_ar:
+            ergazomenos.arithmos_adeias_diamonhs_me_amesh_prosbash_gia_ergasia || '',
+        f_res_permit_inst_lixi: formatDateForErganh(
+            ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_me_amesh_prosbash_gia_ergasia
+        ),
+        f_res_permit_ap: ergazomenos.adeia_diamonhs_xwris_amesh_prosbash_gia_ergasia ? '1' : '0',
+        f_res_permit_ap_type:
+            ergazomenos.eidos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+        f_res_permit_ap_ar:
+            ergazomenos.arithmos_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia || '',
+        f_res_permit_ap_lixi: formatDateForErganh(
+            ergazomenos.hmeromhnia_lhxhs_adeias_diamonhs_xwris_amesh_prosbash_gia_ergasia
+        ),
+        f_res_permit_visa: ergazomenos.adeia_eisodoy_gia_epoxikh_apasxolhsh ? '1' : '0',
+        f_res_permit_visa_ar: ergazomenos.arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh || '',
+        f_res_permit_visa_from: formatDateForErganh(
+            ergazomenos.apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+        ),
+        f_res_permit_visa_to: formatDateForErganh(
+            ergazomenos.eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh
+        ),
+
+        f_marital_status: ergazomenos.oikogeneiakh_katastash || '0',
+        f_arithmos_teknon: String(ergazomenos.arithmos_teknon || 0),
+        f_afm: ergazomenos.afm,
+        f_doy: ergazomenos.doy || '',
+        f_amika: ergazomenos.ama_krathshs_01 || ergazomenos.amika || '',
+        f_amka: ergazomenos.amka || '',
+        f_code_anergias: ergazomenos.arithmos_deltioy_anergias || '',
+        f_ar_vivliou_anilikou: ergazomenos.arithmos_bibliarioy_anhlikoy || '',
+        f_epipedo_morfosis: ergazomenos.ekpaideytiko_epipedo || '1',
+
+        f_xaraktirismos: ergazomenos.xarakthrismos_ergazomenon ? '1' : '0',
+        f_sxeshapasxolisis: ergazomenos.sxesh_ergasias || '0',
+        f_orismenou_apo:
+            ergazomenos.sxesh_ergasias === '1'
+                ? formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs)
+                : '',
+        f_orismenou_ews:
+            ergazomenos.sxesh_ergasias === '1'
+                ? formatDateForErganh(ergazomenos.hmeromhnia_lhxhs_symbashs)
+                : '',
+        f_kathestosapasxolisis: ergazomenos.kathestos_apasxolhshs || '0',
+        f_eidikothta: ergazomenos.eidikothta_erganh || '000000',
+        f_proslipsidate: formatDateForErganh(ergazomenos.hmeromhnia_proslhpshs),
+        f_apoxwrisidate: formatDateForErganh(apoxwrisiDate),
+        f_apodoxes: formatCurrency(
+            ergazomenos.pragmatikosMisthos ||
+                ergazomenos.synolo_symbashs_basei_oron_ergasias ||
+                ergazomenos.synolo_symbashs ||
+                ergazomenos.apodoxes_apoxwrhshs ||
+                0
+        ),
+        f_comments: ergazomenos.parathrhseis || options.comments || '',
+
+        // Το WebE5N απαιτεί ΠΑΝΤΑ πραγματικό PDF στο f_file.
+        // Γι' αυτό στο JSON ενεργοποιούμε requireMainPdf=true και δεν επιτρέπουμε null εδώ.
+        f_file: e5PdfBase64,
+        f_foreign_file: foreignPdfBase64 || null,
+        f_young_file: youngPdfBase64 || null
+    };
+}
+
+function buildE5NJSON(data) {
+    return {
+        AnaggeliesE5N: {
+            AnaggeliaE5N: [data]
+        }
+    };
+}
+
 async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, options = {}) {
     try {
         // =====================================================================
@@ -270,6 +560,32 @@ async function generateE5NXML(ergazomenos, companyData, ypokatasthmataData, opti
     }
 }
 
+async function generateE5NJSON(ergazomenos, companyData, ypokatasthmataData, options = {}) {
+    try {
+        const data = await buildE5NData(ergazomenos, companyData, ypokatasthmataData, {
+            ...options,
+            requireMainPdf: true
+        });
+        const json = buildE5NJSON(data);
+
+        console.log('✅ [E5N-GENERATOR-v1] JSON generated successfully');
+        console.log('   Root:', Object.keys(json).join(', '));
+        console.log('   E5N PDF:', data.f_file ? 'YES' : 'NO');
+        console.log('   Foreign PDF:', data.f_foreign_file ? 'YES' : 'NO');
+        console.log('   Young PDF:', data.f_young_file ? 'YES' : 'NO');
+
+        return {
+            success: true,
+            json,
+            payload: json,
+            data
+        };
+    } catch (error) {
+        console.error('❌ [E5N-GENERATOR-v1] JSON Error:', error.message);
+        throw error;
+    }
+}
+
 function formatDateForErganh(date) {
     if (!date) return '';
     if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -284,14 +600,6 @@ function formatDateForErganh(date) {
     return `${day}/${month}/${year}`;
 }
 
-function formatCurrency(amount) {
-    if (amount === null || amount === undefined || amount === '') return '0,00';
-    const numeric = Number(String(amount).replace(/\./g, '').replace(',', '.'));
-    if (!Number.isFinite(numeric)) return '0,00';
-    const formatted = numeric.toFixed(2).replace('.', ',');
-    return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
 function normalizeYphkoothta(val, fallback = '348') {
     const digits = String(val ?? '').replace(/\D/g, '');
     const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
@@ -301,6 +609,19 @@ function normalizeYphkoothta(val, fallback = '348') {
 function getKad4(value) {
     const digits = String(value ?? '').replace(/\D/g, '');
     return digits ? digits.slice(0, 4).padEnd(4, '0') : '';
+}
+
+function normalizeBase64PdfInput(value) {
+    if (!value) return '';
+
+    const raw = String(value).trim();
+    if (!raw) return '';
+
+    // Υποστήριξη data URL από browser/PDF preview modules.
+    const dataUrlMatch = raw.match(/^data:application\/pdf;base64,(.+)$/i);
+    if (dataUrlMatch) return dataUrlMatch[1].trim();
+
+    return raw;
 }
 
 function upper(value) {
@@ -386,4 +707,12 @@ ${body}
 </AnaggeliesE5N>`;
 }
 
-module.exports = { generateE5NXML, buildE5NXML };
+module.exports = {
+    generateE5NXML,
+    generateE5NJSON,
+    buildE5NData,
+    buildE5NXML,
+    buildE5NJSON,
+    E5N_FIELDS,
+    formatDateForErganh
+};

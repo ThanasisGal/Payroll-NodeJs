@@ -976,6 +976,184 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
         pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
 }
 
+function getExtraApodoxesCalcMode() {
+    return (
+        window._EXTRA_APODOXES_CALC_MODE ||
+        document.getElementById('extra_apodoxes_calc_mode')?.value ||
+        'actual_plus_extra'
+    );
+}
+
+// function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
+//     const nomimosMisthos = document.getElementById('nomimosMisthos');
+//     const nomimoHmeromisthio = document.getElementById('nomimoHmeromisthio');
+//     const nomimoOromisthio = document.getElementById('nomimoOromisthio');
+//     const pragmatikosMisthos = document.getElementById('pragmatikosMisthos');
+//     const pragmatikoHmeromisthio = document.getElementById('pragmatikoHmeromisthio');
+//     const pragmatikoOromisthio = document.getElementById('pragmatikoOromisthio');
+
+//     const _ores_apasxolhshs = !hmeres.isZero() ? ores.div(hmeres) : new Decimal(0);
+
+//     let nomimosMisthosValue = new Decimal(0);
+//     let nomimoHmeromisthioValue = new Decimal(0);
+//     let nomimoOromisthioValue = new Decimal(0);
+//     let pragmatikosMisthosValue = new Decimal(0);
+//     let pragmatikoHmeromisthioValue = new Decimal(0);
+//     let pragmatikoOromisthioValue = new Decimal(0);
+
+//     // 🔵 Υπάρχουν δωτά στοιχεία;
+//     const hasExtraApodoxes = !_TOTAL_EXTRA_APODOXES.isZero();
+//     const totalBaseiMinusExtra = totalBaseiOronErgasias.minus(_TOTAL_EXTRA_APODOXES);
+
+//     switch (typosErg) {
+//         case 'Ω':
+//             if (eidKath === '0001') {
+//                 _NOMIMO_OROMISTHIO = new Decimal(6)
+//                     .div(toDecimal(window._ORES_EIDIKHS_KATHGORIAS_PLHROYS_APASXOLHSHS))
+//                     .div(25)
+//                     .times(totalSymbashs);
+
+//                 _PRAGMATIKO_OROMISTHIO = !ores.isZero()
+//                     ? totalBaseiOronErgasias.div(
+//                           ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
+//                       )
+//                     : new Decimal(0);
+
+//                 if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
+//                     _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//                 }
+
+//                 nomimosMisthosValue = totalSymbashs;
+//                 nomimoHmeromisthioValue = totalSymbashs.div(
+//                     toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
+//                 );
+//                 nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+//                 if (hasExtraApodoxes) {
+//                     _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//                     pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                     if (!ores.isZero() && !hmeres.isZero()) {
+//                         pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+//                     } else {
+//                         pragmatikoHmeromisthioValue = new Decimal(0);
+//                     }
+//                     pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+//                 } else {
+//                     pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                     if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+//                         pragmatikoHmeromisthioValue =
+//                             _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
+//                     } else {
+//                         pragmatikoHmeromisthioValue = new Decimal(0);
+//                     }
+//                     pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+//                 }
+//             }
+//             break;
+
+//         case 'Μ':
+//             _NOMIMO_OROMISTHIO = totalSymbashs.div(
+//                 toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+//             );
+
+//             _PRAGMATIKO_OROMISTHIO = !ores.isZero()
+//                 ? totalBaseiOronErgasias.div(
+//                       ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
+//                   )
+//                 : new Decimal(0);
+
+//             if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
+//                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//             }
+
+//             nomimosMisthosValue = totalSymbashs;
+//             nomimoHmeromisthioValue = totalSymbashs.div(
+//                 toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
+//             );
+//             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
+//             if (hasExtraApodoxes) {
+//                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//                 pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                 if (!ores.isZero() && !hmeres.isZero()) {
+//                     pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+//                 } else {
+//                     pragmatikoHmeromisthioValue = new Decimal(0);
+//                 }
+//                 pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+//             } else {
+//                 pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                 if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+//                     pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
+//                 } else {
+//                     pragmatikoHmeromisthioValue = new Decimal(0);
+//                 }
+//                 pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+//             }
+//             break;
+
+//         case 'Η':
+//             _NOMIMO_OROMISTHIO = totalSymbashs.times(
+//                 toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
+//             );
+
+//             _PRAGMATIKO_OROMISTHIO = !ores.isZero()
+//                 ? totalBaseiOronErgasias.div(
+//                       ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
+//                   )
+//                 : new Decimal(0);
+
+//             if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
+//                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//             }
+
+//             nomimoHmeromisthioValue = totalSymbashs;
+//             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+//             nomimosMisthosValue = nomimoOromisthioValue
+//                 .times(toDecimal(window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS))
+//                 .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
+
+//             if (hasExtraApodoxes) {
+//                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+//                 pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                 if (!ores.isZero() && !hmeres.isZero()) {
+//                     pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
+//                 } else {
+//                     pragmatikoHmeromisthioValue = new Decimal(0);
+//                 }
+//                 pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+//             } else {
+//                 pragmatikosMisthosValue = totalBaseiOronErgasias;
+//                 if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+//                     pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
+//                 } else {
+//                     pragmatikoHmeromisthioValue = new Decimal(0);
+//                 }
+//                 pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+//             }
+//             break;
+//     }
+
+//     if (nomimosMisthos) {
+//         nomimosMisthos.value = formatForDisplay(nomimosMisthosValue, 2);
+//     }
+//     if (nomimoHmeromisthio) {
+//         nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
+//     }
+//     if (nomimoOromisthio) {
+//         nomimoOromisthio.value = formatForDisplay(nomimoOromisthioValue, 4);
+//     }
+//     if (pragmatikosMisthos) {
+//         pragmatikosMisthos.value = formatForDisplay(pragmatikosMisthosValue, 2);
+//     }
+//     if (pragmatikoHmeromisthio) {
+//         pragmatikoHmeromisthio.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+//     }
+//     if (pragmatikoOromisthio) {
+//         pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
+//     }
+// }
+
 function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
     const nomimosMisthos = document.getElementById('nomimosMisthos');
     const nomimoHmeromisthio = document.getElementById('nomimoHmeromisthio');
@@ -993,9 +1171,74 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
     let pragmatikoHmeromisthioValue = new Decimal(0);
     let pragmatikoOromisthioValue = new Decimal(0);
 
-    // 🔵 Υπάρχουν δωτά στοιχεία;
     const hasExtraApodoxes = !_TOTAL_EXTRA_APODOXES.isZero();
-    const totalBaseiMinusExtra = totalBaseiOronErgasias.minus(_TOTAL_EXTRA_APODOXES);
+    const extraMode = getExtraApodoxesCalcMode();
+
+    function calcPragmatikaForMisthoto() {
+        if (hasExtraApodoxes && extraMode === 'full_legal_plus_extra') {
+            const fullLegalPlusExtra = totalSymbashs.plus(_TOTAL_EXTRA_APODOXES);
+
+            _PRAGMATIKO_OROMISTHIO = fullLegalPlusExtra.div(
+                toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+            );
+
+            pragmatikosMisthosValue = _PRAGMATIKO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON));
+        } else {
+            _PRAGMATIKO_OROMISTHIO = !ores.isZero()
+                ? totalBaseiOronErgasias.div(
+                      ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
+                  )
+                : new Decimal(0);
+
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+        }
+
+        if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
+            _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+        }
+
+        pragmatikoHmeromisthioValue =
+            !ores.isZero() && !hmeres.isZero()
+                ? _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs)
+                : new Decimal(0);
+
+        pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+    }
+
+    function calcPragmatikaForHmeromisthio() {
+        if (hasExtraApodoxes && extraMode === 'full_legal_plus_extra') {
+            const fullLegalPlusExtra = totalSymbashs.plus(_TOTAL_EXTRA_APODOXES);
+
+            _PRAGMATIKO_OROMISTHIO = fullLegalPlusExtra.times(
+                toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
+            );
+
+            pragmatikosMisthosValue = _PRAGMATIKO_OROMISTHIO
+                .times(ores)
+                .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
+        } else {
+            _PRAGMATIKO_OROMISTHIO = !ores.isZero()
+                ? totalBaseiOronErgasias.div(
+                      ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
+                  )
+                : new Decimal(0);
+
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+        }
+
+        if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
+            _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+        }
+
+        pragmatikoHmeromisthioValue =
+            !ores.isZero() && !hmeres.isZero()
+                ? _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs)
+                : new Decimal(0);
+
+        pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
+    }
 
     switch (typosErg) {
         case 'Ω':
@@ -1005,41 +1248,13 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
                     .div(25)
                     .times(totalSymbashs);
 
-                _PRAGMATIKO_OROMISTHIO = !ores.isZero()
-                    ? totalBaseiOronErgasias.div(
-                          ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
-                      )
-                    : new Decimal(0);
-
-                if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
-                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                }
-
                 nomimosMisthosValue = totalSymbashs;
                 nomimoHmeromisthioValue = totalSymbashs.div(
                     toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
                 );
                 nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-                if (hasExtraApodoxes) {
-                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                    pragmatikosMisthosValue = totalBaseiOronErgasias;
-                    if (!ores.isZero() && !hmeres.isZero()) {
-                        pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
-                    } else {
-                        pragmatikoHmeromisthioValue = new Decimal(0);
-                    }
-                    pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-                } else {
-                    pragmatikosMisthosValue = totalBaseiOronErgasias;
-                    if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-                        pragmatikoHmeromisthioValue =
-                            _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
-                    } else {
-                        pragmatikoHmeromisthioValue = new Decimal(0);
-                    }
-                    pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-                }
+                calcPragmatikaForMisthoto();
             }
             break;
 
@@ -1048,40 +1263,13 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
                 toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
             );
 
-            _PRAGMATIKO_OROMISTHIO = !ores.isZero()
-                ? totalBaseiOronErgasias.div(
-                      ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON))
-                  )
-                : new Decimal(0);
-
-            if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-            }
-
             nomimosMisthosValue = totalSymbashs;
             nomimoHmeromisthioValue = totalSymbashs.div(
                 toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
             );
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-            if (hasExtraApodoxes) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero()) {
-                    pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-            } else {
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-            }
+            calcPragmatikaForMisthoto();
             break;
 
         case 'Η':
@@ -1089,40 +1277,14 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
                 toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
             );
 
-            _PRAGMATIKO_OROMISTHIO = !ores.isZero()
-                ? totalBaseiOronErgasias.div(
-                      ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
-                  )
-                : new Decimal(0);
-
-            if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-            }
-
             nomimoHmeromisthioValue = totalSymbashs;
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
+
             nomimosMisthosValue = nomimoOromisthioValue
                 .times(toDecimal(window._ORES_ERGASIAS_EBDOMADAS_PLHROYS_APASXOLHSHS))
                 .times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION));
 
-            if (hasExtraApodoxes) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero()) {
-                    pragmatikoHmeromisthioValue = _NOMIMO_OROMISTHIO.times(_ores_apasxolhshs);
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-            } else {
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(_ores_apasxolhshs);
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-            }
+            calcPragmatikaForHmeromisthio();
             break;
     }
 
@@ -1509,3 +1671,4 @@ window.clearStoixeiaSymbaseonContainer = function () {
 
 window.loadStoixeiaSymbaseonFromAPI = loadStoixeiaSymbaseonFromAPI;
 window.calculateTotal = calculateTotal;
+window.calculatePartTimeWages = calculatePartTimeWages;

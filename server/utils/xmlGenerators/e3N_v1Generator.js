@@ -9,6 +9,9 @@
  * @param {Object} ypokatasthmataData - Branch data
  * @returns {Promise<Object>} XML result object
  */
+
+const { formatCurrencyForErgani: formatCurrency } = require('../erganh/erganiFormatters');
+
 async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
     try {
         console.log('🔧 [E3-GENERATOR] Starting XML generation...');
@@ -414,13 +417,8 @@ function formatWeekHours(hours) {
     if (!Number.isFinite(n)) return '0,0';
     return n.toFixed(1).replace('.', ','); // πάντα 1 δεκαδικό
 }
-function formatCurrency(amount) {
-    if (!amount) return '0,00';
-    const formatted = Number(amount).toFixed(2).replace('.', ',');
-    return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
 
-function normalizeYphkoothta(val, fallback = '348') {
+// function normalizeYphkoothta(val, fallback = '348') {
     // Παίρνουμε μόνο ψηφία
     const digits = String(val ?? '').replace(/\D/g, '');
     // Αν δεν έχει τίποτα, χρησιμοποίησε fallback
