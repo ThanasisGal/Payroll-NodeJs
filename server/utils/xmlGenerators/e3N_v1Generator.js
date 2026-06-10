@@ -418,7 +418,7 @@ function formatWeekHours(hours) {
     return n.toFixed(1).replace('.', ','); // πάντα 1 δεκαδικό
 }
 
-// function normalizeYphkoothta(val, fallback = '348') {
+function normalizeYphkoothta(val, fallback = '348') {
     // Παίρνουμε μόνο ψηφία
     const digits = String(val ?? '').replace(/\D/g, '');
     // Αν δεν έχει τίποτα, χρησιμοποίησε fallback

@@ -876,7 +876,7 @@ function formatWeekHours(hours) {
     return n.toFixed(1).replace('.', ',');
 }
 
-// function normalizeYphkoothta(val, fallback = '348') {
+function normalizeYphkoothta(val, fallback = '348') {
     const digits = String(val ?? '').replace(/\D/g, '');
     const base = digits.length ? digits : String(fallback).replace(/\D/g, '');
     return base.slice(-3).padStart(3, '0');
