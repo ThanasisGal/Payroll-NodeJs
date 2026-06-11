@@ -948,6 +948,12 @@ async function initializeTomSelectForStoixeia(items) {
                 hooks: {
                     onInitialize: function () {
                         this.on('change', async (value) => {
+                            // Όταν το F9/F10 επιλέγει αυτόματα την EXTRA γραμμή,
+                            // δεν πρέπει να τρέξει ο κλασικός handler, γιατί θα φέρει
+                            // data.poso = 0 και updatePosoBasedOnHours(..., false)
+                            // θα μηδενίσει αμέσως τη χειροκίνητη διαφορά.
+                            if (_isStoixeioChangeInProgress || this._manualExtraApplying) return;
+
                             if (value) {
                                 await handleStoixeioChange(idNum, value);
                             }
@@ -962,6 +968,11 @@ async function initializeTomSelectForStoixeia(items) {
 }
 
 async function handleStoixeioChange(rowIndex, selectedValue) {
+    // Guard απαραίτητος για ADD mode:
+    // Το TomSelect μπορεί να πυροδοτήσει change ακόμη και όταν εμείς κάνουμε
+    // programmatic επιλογή της EXTRA γραμμής από το F9/F10 flow. Σε αυτή την περίπτωση
+    // ο κανονικός handler δεν πρέπει να ξαναϋπολογίσει τη γραμμή και να τη μηδενίσει.
+    if (_isStoixeioChangeInProgress) return;
     if (!selectedValue) return;
 
     _AA_STOIXEIOY = parseInt(rowIndex);
@@ -1189,7 +1200,46 @@ function normalizeManualInputInPlace(input) {
 
 function getNomimoOromisthioValue() {
     const nomimoOromisthioEl = document.getElementById('nomimoOromisthio');
-    return toDecimal(normalizeManualDecimalValue(nomimoOromisthioEl?.value));
+
+    // Παίρνουμε πρώτα την ΟΡΑΤΗ τιμή του πεδίου. Σε ορισμένες φόρμες/flows
+    // το local _NOMIMO_OROMISTHIO μπορεί να μην έχει προλάβει να συγχρονιστεί,
+    // ενώ το input στην οθόνη έχει ήδη σωστή τιμή.
+    const inputValue = toDecimal(normalizeManualDecimalValue(nomimoOromisthioEl?.value));
+    if (!inputValue.isNaN() && !inputValue.isZero()) {
+        return inputValue;
+    }
+
+    // Fallback στο global/local υπολογισμένο νόμιμο ωρομίσθιο.
+    const windowValue = toDecimal(window._NOMIMO_OROMISTHIO);
+    if (!windowValue.isNaN() && !windowValue.isZero()) {
+        return windowValue;
+    }
+
+    const localValue = toDecimal(_NOMIMO_OROMISTHIO);
+    if (!localValue.isNaN() && !localValue.isZero()) {
+        return localValue;
+    }
+
+    return new Decimal(0);
+}
+
+function validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl) {
+    const nomimoOromisthioValue = getNomimoOromisthioValue();
+
+    if (!nomimoOromisthioValue.isZero() && neoOromisthio.lt(nomimoOromisthioValue)) {
+        if (oromisthioEl) {
+            oromisthioEl.value = formatForDisplay(nomimoOromisthioValue, 4);
+        }
+
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή',
+            html: `Το πραγματικό (δωτό) ωρομίσθιο δεν μπορεί να είναι μικρότερο από το νόμιμο ωρομίσθιο.<br><br>Νόμιμο ωρομίσθιο: <strong>${formatForDisplay(nomimoOromisthioValue, 4)}</strong>`
+        });
+        return false;
+    }
+
+    return true;
 }
 
 function switchManualInputToText(input) {
@@ -1508,7 +1558,6 @@ async function applyManualPragmatikoOromisthio() {
     }
 
     const neoOromisthio = getManualDecimalFromInput(oromisthioEl);
-    const nomimoOromisthioValue = getNomimoOromisthioValue();
 
     if (neoOromisthio.lte(0)) {
         showAlert({
@@ -1519,16 +1568,7 @@ async function applyManualPragmatikoOromisthio() {
         return;
     }
 
-    if (!nomimoOromisthioValue.isZero() && neoOromisthio.lt(nomimoOromisthioValue)) {
-        if (oromisthioEl) {
-            oromisthioEl.value = formatForDisplay(nomimoOromisthioValue, 4);
-        }
-
-        showAlert({
-            icon: 'warning',
-            title: 'Προσοχή',
-            html: `Το πραγματικό (δωτό) ωρομίσθιο δεν μπορεί να είναι μικρότερο από το νόμιμο ωρομίσθιο.<br><br>Νόμιμο ωρομίσθιο: <strong>${formatForDisplay(nomimoOromisthioValue, 4)}</strong>`
-        });
+    if (!validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl)) {
         return;
     }
 
@@ -1564,6 +1604,13 @@ async function applyManualPragmatikoOromisthio() {
                 : toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
 
         pragmatikosMisthosValue = neoOromisthio.times(ores).times(weeklyFactor);
+    }
+
+    // Τελική δικλείδα ασφαλείας: πριν γραφτούν Πραγματικός Μισθός/Ημερομίσθιο
+    // και πριν ψάξουμε EXTRA γραμμή, ελέγχουμε ξανά ότι το δωτό ωρομίσθιο
+    // δεν είναι κάτω από το νόμιμο.
+    if (!validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl)) {
+        return;
     }
 
     if (oromisthioEl) oromisthioEl.value = formatForDisplay(neoOromisthio, 4);
@@ -1744,6 +1791,11 @@ async function ensureTomSelectForManualRow(idNum) {
             onInitialize: function () {
                 this.on('change', async (value) => {
                     syncManualHiddenTarget(idNum, value || '');
+
+                    // Programmatic EXTRA selection από F9/F10: μην αφήσεις τον
+                    // κανονικό handler να γράψει 0.00 πάνω στη χειροκίνητη διαφορά.
+                    if (_isStoixeioChangeInProgress || this._manualExtraApplying) return;
+
                     if (typeof handleStoixeioChange === 'function' && value) {
                         await handleStoixeioChange(idNum, value);
                     } else if (!value) {
@@ -1795,6 +1847,8 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
 
     try {
         if (tom) {
+            tom._manualExtraApplying = true;
+
             const normalized = {
                 ...extraItem,
                 value: kodikos,
@@ -1832,8 +1886,12 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
         setManualExtraAmountToRow(idNum, diafora);
     } finally {
         setTimeout(() => {
+            const rowSelectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+            if (rowSelectEl?.tomselect) {
+                rowSelectEl.tomselect._manualExtraApplying = false;
+            }
             _isStoixeioChangeInProgress = previousStoixeioFlag;
-        }, 100);
+        }, 250);
     }
 }
 
