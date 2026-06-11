@@ -224,6 +224,7 @@ document.addEventListener('DOMContentLoaded', function () {
     addEventListeners();
     calculateTotal();
     watchEidikothtaChanges();
+    setupManualPragmatikoOromisthioEditor();
     loadExistingStoixeia();
 });
 
@@ -829,6 +830,11 @@ async function calculateTotal() {
     setupAutomaticRecalculation();
 
     applyNomimaFromSymbashTotals();
+
+    // Αν έχει εφαρμοστεί manual πραγματικό ωρομίσθιο με F9/F10,
+    // δεν αφήνουμε τον κλασικό επανυπολογισμό να επαναφέρει
+    // Πραγματικό Ωρομίσθιο/Ημερομίσθιο/Μισθό στις νόμιμες τιμές.
+    restoreManualPragmatikoOromisthioSnapshot();
 }
 
 function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
@@ -1664,6 +1670,672 @@ window.clearStoixeiaSymbaseonContainer = function () {
         if (el) el.value = '0.00';
     });
 };
+
+// ========================================================================
+// MANUAL ΠΡΑΓΜΑΤΙΚΟ ΩΡΟΜΙΣΘΙΟ (F9/F10 ή διπλό κλικ)
+// ------------------------------------------------------------------------
+// F9 ή διπλό κλικ στο πεδίο pragmatikoOromisthio:
+//      ξεκλειδώνει προσωρινά το readonly πεδίο για πληκτρολόγηση.
+// F10:
+//      κλειδώνει ξανά το πεδίο, υπολογίζει Πραγματικό Ημερομίσθιο/Μισθό,
+//      βρίσκει το στοιχείο σύμβασης "EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ",
+//      περνάει τη διαφορά στο ποσό βάσει ωρών εργασίας και ανανεώνει τα σύνολα.
+// ========================================================================
+
+const MANUAL_EXTRA_APODOXES_TEXT = 'EXTRA ΑΠΟΔΟΧΕΣ ΔΥΝΑΜΕΝΕΣ ΝΑ ΑΝΑΙΡΕΘΟΥΝ';
+
+function normalizeManualDecimalValue(value) {
+    return String(value ?? '')
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(',', '.');
+}
+
+function getManualDecimalFromInput(input) {
+    return toDecimal(normalizeManualDecimalValue(input?.value));
+}
+
+function normalizeManualInputInPlace(input) {
+    if (!input) return '';
+
+    const normalizedValue = normalizeManualDecimalValue(input.value);
+    if (input.value !== normalizedValue) {
+        input.value = normalizedValue;
+    }
+
+    return normalizedValue;
+}
+
+function getNomimoOromisthioValue() {
+    const nomimoOromisthioEl = document.getElementById('nomimoOromisthio');
+
+    // Παίρνουμε πρώτα την ΟΡΑΤΗ τιμή του πεδίου. Σε ορισμένες φόρμες/flows
+    // το local _NOMIMO_OROMISTHIO μπορεί να μην έχει προλάβει να συγχρονιστεί,
+    // ενώ το input στην οθόνη έχει ήδη σωστή τιμή.
+    const inputValue = toDecimal(normalizeManualDecimalValue(nomimoOromisthioEl?.value));
+    if (!inputValue.isNaN() && !inputValue.isZero()) {
+        return inputValue;
+    }
+
+    // Fallback στο global/local υπολογισμένο νόμιμο ωρομίσθιο.
+    const windowValue = toDecimal(window._NOMIMO_OROMISTHIO);
+    if (!windowValue.isNaN() && !windowValue.isZero()) {
+        return windowValue;
+    }
+
+    const localValue = toDecimal(_NOMIMO_OROMISTHIO);
+    if (!localValue.isNaN() && !localValue.isZero()) {
+        return localValue;
+    }
+
+    return new Decimal(0);
+}
+
+function validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl) {
+    const nomimoOromisthioValue = getNomimoOromisthioValue();
+
+    if (!nomimoOromisthioValue.isZero() && neoOromisthio.lt(nomimoOromisthioValue)) {
+        if (oromisthioEl) {
+            oromisthioEl.value = formatForDisplay(nomimoOromisthioValue, 4);
+        }
+
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή',
+            html: `Το πραγματικό (δωτό) ωρομίσθιο δεν μπορεί να είναι μικρότερο από το νόμιμο ωρομίσθιο.<br><br>Νόμιμο ωρομίσθιο: <strong>${formatForDisplay(nomimoOromisthioValue, 4)}</strong>`
+        });
+        return false;
+    }
+
+    return true;
+}
+
+function switchManualInputToText(input) {
+    if (!input) return;
+
+    if (!input.dataset.originalType) {
+        input.dataset.originalType = input.getAttribute('type') || 'text';
+    }
+
+    // Το type="number" σε Chrome/Ubuntu δεν κρατάει πάντα την τιμή όταν ο χρήστης γράφει κόμμα.
+    // Στο manual edit το γυρίζουμε προσωρινά σε text, ώστε το "10,5" να διαβαστεί κανονικά.
+    input.setAttribute('type', 'text');
+    input.setAttribute('inputmode', 'decimal');
+}
+
+function restoreManualInputType(input) {
+    if (!input) return;
+
+    const originalType = input.dataset.originalType || 'number';
+    input.setAttribute('type', originalType);
+}
+
+let _manualPragmatikoOromisthioEnabled = false;
+let _manualPragmatikoOromisthioApplying = false;
+let _manualPragmatikoOromisthioActive = false;
+let _manualPragmatikoOromisthioSnapshot = null;
+
+function setupManualPragmatikoOromisthioEditor() {
+    const input = document.getElementById('pragmatikoOromisthio');
+    if (!input) return;
+
+    input.title = 'F9 ή διπλό κλικ: Επεξεργασία | F10: Οριστικοποίηση';
+
+    if (!input.__manualCommaNormalizeBound) {
+        input.__manualCommaNormalizeBound = true;
+        input.addEventListener('input', () => {
+            if (_manualPragmatikoOromisthioEnabled) {
+                normalizeManualInputInPlace(input);
+            }
+        });
+    }
+
+    setupManualRecalcButtonInterceptor();
+
+    input.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        unlockManualPragmatikoOromisthio();
+    });
+
+    input.addEventListener('keydown', async (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            await lockAndApplyManualPragmatikoOromisthio();
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            lockManualPragmatikoOromisthioWithoutApply();
+        }
+    });
+
+    document.addEventListener('keydown', async (event) => {
+        const activeEl = document.activeElement;
+        const isManualInputFocused = activeEl?.id === 'pragmatikoOromisthio';
+
+        if (event.key === 'F9') {
+            event.preventDefault();
+            unlockManualPragmatikoOromisthio();
+            return;
+        }
+
+        if (event.key === 'F10') {
+            event.preventDefault();
+            if (_manualPragmatikoOromisthioEnabled || isManualInputFocused) {
+                await lockAndApplyManualPragmatikoOromisthio();
+            }
+        }
+    });
+}
+
+function unlockManualPragmatikoOromisthio() {
+    const input = document.getElementById('pragmatikoOromisthio');
+    if (!input) return;
+
+    _manualPragmatikoOromisthioEnabled = true;
+    switchManualInputToText(input);
+    input.readOnly = false;
+    input.classList.add('border-warning');
+    input.classList.add('bg-warning-subtle');
+    input.focus();
+    input.select();
+}
+
+function lockManualPragmatikoOromisthioWithoutApply() {
+    const input = document.getElementById('pragmatikoOromisthio');
+    if (!input) return;
+
+    _manualPragmatikoOromisthioEnabled = false;
+    normalizeManualInputInPlace(input);
+    restoreManualInputType(input);
+    input.readOnly = true;
+    input.classList.remove('border-warning');
+    input.classList.remove('bg-warning-subtle');
+}
+
+async function lockAndApplyManualPragmatikoOromisthio() {
+    if (_manualPragmatikoOromisthioApplying) return;
+
+    const input = document.getElementById('pragmatikoOromisthio');
+    if (!input) return;
+
+    try {
+        _manualPragmatikoOromisthioApplying = true;
+        _manualPragmatikoOromisthioEnabled = false;
+        normalizeManualInputInPlace(input);
+        restoreManualInputType(input);
+        input.readOnly = true;
+        input.classList.remove('border-warning');
+        input.classList.remove('bg-warning-subtle');
+
+        await applyManualPragmatikoOromisthio();
+    } finally {
+        _manualPragmatikoOromisthioApplying = false;
+    }
+}
+
+function setupManualRecalcButtonInterceptor() {
+    const recalcButton = document.getElementById('reCalcButton');
+    if (!recalcButton || recalcButton.__manualOromisthioInterceptorBound) return;
+
+    recalcButton.__manualOromisthioInterceptorBound = true;
+
+    // Capture phase: τρέχει ΠΡΙΝ από το reCalcApodoxes_Edit.js listener.
+    // Έτσι, όταν υπάρχει manual ωρομίσθιο, δεν αφήνουμε το κουμπί να καλέσει
+    // τον παλιό επανυπολογισμό που ξαναγράφει το πραγματικό ωρομίσθιο στο νόμιμο.
+    recalcButton.addEventListener(
+        'click',
+        async (event) => {
+            if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            await calculateTotal();
+            restoreManualPragmatikoOromisthioSnapshot();
+
+            showAlert({
+                icon: 'success',
+                title: 'Επιτυχία',
+                html: 'Οι αποδοχές επανυπολογίστηκαν με βάση το manual πραγματικό ωρομίσθιο.',
+                timer: 1200,
+                showConfirmButton: false
+            });
+        },
+        true
+    );
+}
+
+function saveManualPragmatikoOromisthioSnapshot({ oromisthio, hmeromisthio, misthos }) {
+    _manualPragmatikoOromisthioActive = true;
+    _manualPragmatikoOromisthioSnapshot = {
+        oromisthio: toDecimal(oromisthio),
+        hmeromisthio: toDecimal(hmeromisthio),
+        misthos: toDecimal(misthos)
+    };
+}
+
+function restoreManualPragmatikoOromisthioSnapshot() {
+    if (!_manualPragmatikoOromisthioActive || !_manualPragmatikoOromisthioSnapshot) return;
+
+    const oromisthioEl = document.getElementById('pragmatikoOromisthio');
+    const hmeromisthioEl = document.getElementById('pragmatikoHmeromisthio');
+    const misthosEl = document.getElementById('pragmatikosMisthos');
+
+    if (oromisthioEl) {
+        oromisthioEl.value = formatForDisplay(_manualPragmatikoOromisthioSnapshot.oromisthio, 4);
+    }
+    if (hmeromisthioEl) {
+        hmeromisthioEl.value = formatForDisplay(
+            _manualPragmatikoOromisthioSnapshot.hmeromisthio,
+            4
+        );
+    }
+    if (misthosEl) {
+        misthosEl.value = formatForDisplay(_manualPragmatikoOromisthioSnapshot.misthos, 2);
+    }
+}
+
+function normalizeGreekSearchText(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getSelectedContractTriplet() {
+    const symbash =
+        document.getElementById('selectedSymbash')?.value ||
+        document.getElementById('symbash_stathera')?.value ||
+        document.getElementById('symbash')?.value ||
+        '';
+
+    const kathgoria =
+        document.getElementById('selectedKathgoria')?.value ||
+        document.getElementById('kathgoria_symbashs_stathera')?.value ||
+        document.getElementById('kathgoria_symbashs')?.value ||
+        '';
+
+    const eidikothta =
+        document.getElementById('selectedEidikothta')?.value ||
+        document.getElementById('eidikothta_symbashs_stathera')?.value ||
+        document.getElementById('eidikothta_symbashs')?.value ||
+        '';
+
+    return {
+        symbash: pad4(symbash),
+        kathgoria: pad4(kathgoria),
+        eidikothta: pad4(eidikothta)
+    };
+}
+
+function ensureManualCalculationParameters() {
+    // Αν οι γενικές παράμετροι έχουν ήδη φορτωθεί από υπάρχοντα flows,
+    // τα αντίστοιχα window.* υπάρχουν. Αν όχι, χρησιμοποιούμε τα local Decimal values.
+    if (!window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS) {
+        window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS = _ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS;
+    }
+    if (!window._SYNTELESTHS_EBDOMADON_MISTHOTON) {
+        window._SYNTELESTHS_EBDOMADON_MISTHOTON = _SYNTELESTHS_EBDOMADON_MISTHOTON;
+    }
+    if (!window._SYNTELESTHS_EBDOMADON_HMEROMISTHION) {
+        window._SYNTELESTHS_EBDOMADON_HMEROMISTHION = _SYNTELESTHS_EBDOMADON_HMEROMISTHION;
+    }
+}
+
+async function applyManualPragmatikoOromisthio() {
+    ensureManualCalculationParameters();
+
+    const oromisthioEl = document.getElementById('pragmatikoOromisthio');
+    const hmeromisthioEl = document.getElementById('pragmatikoHmeromisthio');
+    const misthosEl = document.getElementById('pragmatikosMisthos');
+    const synoloBaseiEl = document.getElementById('synolo_symbashs_basei_oron_ergasias');
+
+    // ΚΡΙΣΙΜΟ:
+    // Κρατάμε το ΠΑΛΙΟ σύνολο βάσει ωρών ΠΡΙΝ πειραχθούν τα πεδία από τον manual υπολογισμό.
+    // Από αυτό θα αφαιρεθεί ο νέος πραγματικός μισθός για να βρούμε τη διαφορά που θα μπει
+    // στο poso_symbashs_basei_oron_ergasias_${row} του EXTRA στοιχείου.
+    const previousSynoloBaseiOron = toDecimal(synoloBaseiEl?.value);
+
+    const neoOromisthio = getManualDecimalFromInput(oromisthioEl);
+
+    if (neoOromisthio.lte(0)) {
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή',
+            html: 'Το πραγματικό ωρομίσθιο πρέπει να είναι μεγαλύτερο από μηδέν.'
+        });
+        return;
+    }
+
+    if (!validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl)) {
+        return;
+    }
+
+    const ores = toDecimal(document.getElementById('ores_ergasias_ebdomadas')?.value);
+    const hmeres = toDecimal(document.getElementById('hmeres_ergasias_ebdomadas')?.value);
+    const typosErg = document.getElementById('typos_ergazomenon')?.value || '';
+    const isFullTime = Boolean(document.getElementById('plhrhs_apasxolhsh')?.checked);
+
+    if (!isFullTime && (ores.lte(0) || hmeres.lte(0))) {
+        showAlert({
+            icon: 'warning',
+            title: 'Προσοχή',
+            html: 'Για μερική απασχόληση πρέπει να υπάρχουν ώρες και ημέρες εβδομαδιαίας εργασίας.'
+        });
+        return;
+    }
+
+    let pragmatikoHmeromisthioValue = new Decimal(0);
+    let pragmatikosMisthosValue = new Decimal(0);
+
+    if (isFullTime) {
+        pragmatikoHmeromisthioValue = neoOromisthio.div(new Decimal(6).div(40));
+        pragmatikosMisthosValue = neoOromisthio.times(
+            toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
+        );
+    } else {
+        const moOronHmeras = ores.div(hmeres);
+        pragmatikoHmeromisthioValue = neoOromisthio.times(moOronHmeras);
+
+        const weeklyFactor =
+            typosErg === 'Η'
+                ? toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION)
+                : toDecimal(window._SYNTELESTHS_EBDOMADON_MISTHOTON);
+
+        pragmatikosMisthosValue = neoOromisthio.times(ores).times(weeklyFactor);
+    }
+
+    // Τελική δικλείδα ασφαλείας: πριν γραφτούν Πραγματικός Μισθός/Ημερομίσθιο
+    // και πριν ψάξουμε EXTRA γραμμή, ελέγχουμε ξανά ότι το δωτό ωρομίσθιο
+    // δεν είναι κάτω από το νόμιμο.
+    if (!validateManualOromisthioAgainstNomimo(neoOromisthio, oromisthioEl)) {
+        return;
+    }
+
+    if (oromisthioEl) oromisthioEl.value = formatForDisplay(neoOromisthio, 4);
+    if (hmeromisthioEl) hmeromisthioEl.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+    if (misthosEl) misthosEl.value = formatForDisplay(pragmatikosMisthosValue, 2);
+
+    saveManualPragmatikoOromisthioSnapshot({
+        oromisthio: neoOromisthio,
+        hmeromisthio: pragmatikoHmeromisthioValue,
+        misthos: pragmatikosMisthosValue
+    });
+
+    const diafora = pragmatikosMisthosValue.minus(previousSynoloBaseiOron);
+
+    if (diafora.lte(0)) {
+        showAlert({
+            icon: 'info',
+            title: 'Δεν απαιτούνται Extra Αποδοχές',
+            html: `Ο υπολογισμένος πραγματικός μισθός (${formatForDisplay(
+                pragmatikosMisthosValue,
+                2
+            )}) δεν είναι μεγαλύτερος από τις αποδοχές βάσει ωρών εργασίας (${formatForDisplay(
+                previousSynoloBaseiOron,
+                2
+            )}).`
+        });
+        return;
+    }
+
+    const extraItem = await findExtraApodoxesStoixeioSymbashs();
+    if (!extraItem) {
+        showAlert({
+            icon: 'warning',
+            title: 'Δεν βρέθηκε στοιχείο σύμβασης',
+            html: `Δεν βρέθηκε στοιχείο που να περιέχει:<br><strong>${MANUAL_EXTRA_APODOXES_TEXT}</strong>`
+        });
+        return;
+    }
+
+    const targetRow = findExistingOrFirstEmptyExtraRow(extraItem.value);
+    if (!targetRow) {
+        showAlert({
+            icon: 'warning',
+            title: 'Δεν υπάρχει διαθέσιμη γραμμή',
+            html: 'Δεν βρέθηκε κενή γραμμή στα στοιχεία σύμβασης για να καταχωρηθούν οι Extra Αποδοχές.'
+        });
+        return;
+    }
+
+    await applyExtraApodoxesToRow(targetRow, extraItem, diafora);
+
+    // Ανανεώνουμε σύνολα μετά την καταχώρηση της διαφοράς στη γραμμή EXTRA.
+    await calculateTotal();
+
+    // Σε ορισμένες περιπτώσεις το TomSelect/change flow μπορεί να καθυστερήσει ένα tick.
+    // Γι' αυτό ξανασφραγίζουμε τη διαφορά στη γραμμή και ξαναϋπολογίζουμε τα σύνολα.
+    setManualExtraAmountToRow(targetRow, diafora);
+    await calculateTotal();
+
+    // Επαναφέρουμε τις manual τιμές, ώστε το κουμπί/οι παλιοί υπολογισμοί να μη τις αντικαταστήσουν.
+    if (oromisthioEl) oromisthioEl.value = formatForDisplay(neoOromisthio, 4);
+    if (hmeromisthioEl) hmeromisthioEl.value = formatForDisplay(pragmatikoHmeromisthioValue, 4);
+    if (misthosEl) misthosEl.value = formatForDisplay(pragmatikosMisthosValue, 2);
+
+    // Και ένα τελευταίο async σφράγισμα για την οθόνη, χωρίς να πειράξει ο χρήστης κάτι.
+    setTimeout(async () => {
+        setManualExtraAmountToRow(targetRow, diafora);
+        await calculateTotal();
+        restoreManualPragmatikoOromisthioSnapshot();
+    }, 150);
+
+    showAlert({
+        icon: 'success',
+        title: 'Υπολογισμός ολοκληρώθηκε',
+        timer: 1200,
+        showConfirmButton: false,
+        html: `Καταχωρήθηκαν Extra Αποδοχές: <strong>${formatForDisplay(diafora, 2)}</strong>`
+    });
+}
+
+async function findExtraApodoxesStoixeioSymbashs() {
+    const { symbash, kathgoria, eidikothta } = getSelectedContractTriplet();
+
+    if (
+        !symbash ||
+        !kathgoria ||
+        !eidikothta ||
+        symbash === '0000' ||
+        kathgoria === '0000' ||
+        eidikothta === '0000'
+    ) {
+        return null;
+    }
+
+    const url = new URL('/api/dropdown/symbaseis/stoixeio_symbashs', window.location.origin);
+    url.searchParams.set('symbash_stathera', symbash);
+    url.searchParams.set('kathgoria_symbashs_stathera', kathgoria);
+    url.searchParams.set('eidikothta_symbashs_stathera', eidikothta);
+    url.searchParams.set('limit', '100');
+
+    const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+    });
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const items = Array.isArray(json.items) ? json.items : [];
+    const targetText = normalizeGreekSearchText(MANUAL_EXTRA_APODOXES_TEXT);
+
+    return (
+        items.find((item) => {
+            const searchable = normalizeGreekSearchText(
+                `${item.label || ''} ${item.text || ''} ${item.perigrafh || ''}`
+            );
+            return (
+                searchable.includes(targetText) ||
+                (searchable.includes('EXTRA') &&
+                    searchable.includes('ΑΠΟΔΟΧΕΣ') &&
+                    searchable.includes('ΑΝΑΙΡΕΘΟΥΝ'))
+            );
+        }) || null
+    );
+}
+
+function findExistingOrFirstEmptyExtraRow(extraValue) {
+    const rowCount = getEffectiveRowCount();
+    let firstEmpty = null;
+
+    for (let i = 1; i <= rowCount; i++) {
+        const idNum = i.toString().padStart(2, '0');
+        const hidden = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+        const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+        const selectedValue = pad4(
+            hidden?.value || selectEl?.value || selectEl?.tomselect?.getValue?.() || ''
+        );
+
+        if (selectedValue === pad4(extraValue)) {
+            return idNum;
+        }
+
+        if (!firstEmpty && (!selectedValue || selectedValue === '0000')) {
+            firstEmpty = idNum;
+        }
+    }
+
+    return firstEmpty;
+}
+
+async function ensureTomSelectForManualRow(idNum) {
+    const selectId = `stoixeio_symbashs_${idNum}`;
+    const selectEl = document.getElementById(selectId);
+    const row = document.getElementById(`row_${idNum}`);
+    if (!selectEl) return null;
+
+    if (row) row.classList.remove('d-none');
+
+    if (selectEl.tomselect) {
+        return selectEl.tomselect;
+    }
+
+    const { symbash, kathgoria, eidikothta } = getSelectedContractTriplet();
+
+    await initTomDropdown({
+        selector: `#${selectId}`,
+        url: '/api/dropdown/symbaseis/stoixeio_symbashs',
+        extraParams: {
+            symbash_stathera: symbash,
+            kathgoria_symbashs_stathera: kathgoria,
+            eidikothta_symbashs_stathera: eidikothta,
+            padLength: '4'
+        },
+        minChars: 0,
+        hooks: {
+            onInitialize: function () {
+                this.on('change', async (value) => {
+                    syncManualHiddenTarget(idNum, value || '');
+                    if (typeof handleStoixeioChange === 'function' && value) {
+                        await handleStoixeioChange(idNum, value);
+                    } else if (!value) {
+                        clearManualRowAmounts(idNum);
+                        calculateTotal();
+                    }
+                });
+            }
+        }
+    });
+
+    return selectEl.tomselect || null;
+}
+
+function syncManualHiddenTarget(idNum, value = '') {
+    if (typeof syncHiddenTarget === 'function') {
+        syncHiddenTarget(idNum, value);
+        return;
+    }
+
+    const hiddenTarget = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+    if (hiddenTarget) hiddenTarget.value = value ? pad4(value) : '';
+}
+
+function clearManualRowAmounts(idNum) {
+    if (typeof clearRowAmounts === 'function') {
+        clearRowAmounts(idNum);
+        return;
+    }
+
+    const posoField = document.getElementById(`poso_symbashs_${idNum}`);
+    const posoBaseiField = document.getElementById(`poso_symbashs_basei_oron_ergasias_${idNum}`);
+    if (posoField) posoField.value = '';
+    if (posoBaseiField) posoBaseiField.value = '';
+}
+
+async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
+    const tom = await ensureTomSelectForManualRow(idNum);
+    const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+    const kodikos = pad4(extraItem.value || extraItem.kodikos || '');
+    const label = String(
+        extraItem.label || extraItem.text || `${kodikos} - ${extraItem.perigrafh || ''}`
+    );
+
+    // Μπλοκάρουμε προσωρινά τους αυτόματους handlers του stoixeio change,
+    // γιατί αλλιώς μπορούν να ξαναγράψουν το posoBasei της EXTRA γραμμής σε 0.00.
+    const previousStoixeioFlag = _isStoixeioChangeInProgress;
+    _isStoixeioChangeInProgress = true;
+
+    try {
+        if (tom) {
+            const normalized = {
+                ...extraItem,
+                value: kodikos,
+                label,
+                text: label,
+                kodikos
+            };
+
+            if (!tom.options[kodikos]) {
+                tom.addOption(normalized);
+            }
+
+            try {
+                if (typeof removeLockedTomStyle === 'function') removeLockedTomStyle(tom);
+            } catch (_) {}
+
+            tom.setValue(kodikos, true);
+            tom.refreshOptions(false);
+            tom.refreshItems();
+            tom.refreshState();
+
+            try {
+                if (typeof applyLockedTomStyle === 'function') applyLockedTomStyle(tom);
+            } catch (_) {}
+        } else if (selectEl) {
+            selectEl.value = kodikos;
+        }
+
+        syncManualHiddenTarget(idNum, kodikos);
+        setManualExtraAmountToRow(idNum, diafora);
+    } finally {
+        setTimeout(() => {
+            _isStoixeioChangeInProgress = previousStoixeioFlag;
+        }, 100);
+    }
+}
+
+function setManualExtraAmountToRow(idNum, diafora) {
+    const posoField = document.getElementById(`poso_symbashs_${idNum}`);
+    const posoBaseiField = document.getElementById(`poso_symbashs_basei_oron_ergasias_${idNum}`);
+
+    if (posoField) {
+        posoField.value = '0.00';
+    }
+
+    if (posoBaseiField) {
+        posoBaseiField.value = formatForDisplay(diafora, 2);
+        currentValues[posoBaseiField.id] = diafora.toString();
+    }
+}
 
 // ========================================================================
 // GLOBAL EXPORTS

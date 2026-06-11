@@ -517,7 +517,10 @@ class userController {
 
             const month = req.query.month || new Date().toISOString().slice(0, 7);
             const [year, monthIndex] = month.split('-');
-            const monthLabel = `${greekMonths[parseInt(monthIndex, 10) - 1]} ${year}`;
+            const yearNumber = parseInt(year, 10);
+            const monthNumber = parseInt(monthIndex, 10);
+            const monthLabel = `${greekMonths[monthNumber - 1]} ${year}`;
+            const athensTimezone = 'Europe/Athens';
 
             const logs = await UsageLogModel.aggregate([
                 { $match: { date: month } },
@@ -531,6 +534,85 @@ class userController {
                     }
                 },
                 { $sort: { '_id.team': 1 } }
+            ]);
+
+            const [dailyRaw, hourlyRaw, weekdayRaw, dailyUserRaw] = await Promise.all([
+                UsageLogModel.aggregate([
+                    { $match: { date: month } },
+                    {
+                        $group: {
+                            _id: {
+                                day: {
+                                    $dateToString: {
+                                        format: '%Y-%m-%d',
+                                        date: '$loginAt',
+                                        timezone: athensTimezone
+                                    }
+                                }
+                            },
+                            sessions: { $sum: 1 },
+                            totalMs: { $sum: '$durationMs' }
+                        }
+                    },
+                    { $sort: { '_id.day': 1 } }
+                ]),
+                UsageLogModel.aggregate([
+                    { $match: { date: month } },
+                    {
+                        $group: {
+                            _id: {
+                                hour: {
+                                    $hour: {
+                                        date: '$loginAt',
+                                        timezone: athensTimezone
+                                    }
+                                }
+                            },
+                            sessions: { $sum: 1 },
+                            totalMs: { $sum: '$durationMs' }
+                        }
+                    },
+                    { $sort: { '_id.hour': 1 } }
+                ]),
+                UsageLogModel.aggregate([
+                    { $match: { date: month } },
+                    {
+                        $group: {
+                            _id: {
+                                weekday: {
+                                    $dayOfWeek: {
+                                        date: '$loginAt',
+                                        timezone: athensTimezone
+                                    }
+                                }
+                            },
+                            sessions: { $sum: 1 },
+                            totalMs: { $sum: '$durationMs' }
+                        }
+                    },
+                    { $sort: { '_id.weekday': 1 } }
+                ]),
+                UsageLogModel.aggregate([
+                    { $match: { date: month } },
+                    {
+                        $group: {
+                            _id: {
+                                day: {
+                                    $dateToString: {
+                                        format: '%Y-%m-%d',
+                                        date: '$loginAt',
+                                        timezone: athensTimezone
+                                    }
+                                },
+                                userId: '$userId',
+                                team: '$team'
+                            },
+                            sessions: { $sum: 1 },
+                            totalMs: { $sum: '$durationMs' }
+                        }
+                    },
+                    { $sort: { '_id.day': 1, sessions: -1 } }
+                ])
             ]);
 
             const enriched = await Promise.all(
@@ -557,17 +639,138 @@ class userController {
                 })
             );
 
-            // ✅ Ομαδοποίηση ανά team
             const byTeam = enriched.reduce((acc, u) => {
                 if (!acc[u.team]) acc[u.team] = [];
                 acc[u.team].push(u);
                 return acc;
             }, {});
 
+            const daysInMonth = new Date(Date.UTC(yearNumber, monthNumber, 0)).getUTCDate();
+            const dailyMap = new Map(
+                dailyRaw.map((d) => [
+                    d._id.day,
+                    {
+                        sessions: Number(d.sessions || 0),
+                        totalMs: Number(d.totalMs || 0)
+                    }
+                ])
+            );
+
+            const dailyUsage = Array.from({ length: daysInMonth }, (_, index) => {
+                const day = index + 1;
+                const isoDay = `${year}-${String(monthNumber).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const data = dailyMap.get(isoDay) || { sessions: 0, totalMs: 0 };
+                return {
+                    day: isoDay,
+                    label: `${String(day).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`,
+                    sessions: data.sessions,
+                    totalMs: data.totalMs
+                };
+            });
+
+            const hourlyMap = new Map(
+                hourlyRaw.map((h) => [
+                    Number(h._id.hour),
+                    {
+                        sessions: Number(h.sessions || 0),
+                        totalMs: Number(h.totalMs || 0)
+                    }
+                ])
+            );
+
+            const hourlyUsage = Array.from({ length: 24 }, (_, hour) => {
+                const data = hourlyMap.get(hour) || { sessions: 0, totalMs: 0 };
+                return {
+                    hour,
+                    label: `${String(hour).padStart(2, '0')}:00`,
+                    sessions: data.sessions,
+                    totalMs: data.totalMs
+                };
+            });
+
+            const weekdayLabels = {
+                1: 'Κυριακή',
+                2: 'Δευτέρα',
+                3: 'Τρίτη',
+                4: 'Τετάρτη',
+                5: 'Πέμπτη',
+                6: 'Παρασκευή',
+                7: 'Σάββατο'
+            };
+            const weekdayOrder = [2, 3, 4, 5, 6, 7, 1];
+            const weekdayMap = new Map(
+                weekdayRaw.map((w) => [
+                    Number(w._id.weekday),
+                    {
+                        sessions: Number(w.sessions || 0),
+                        totalMs: Number(w.totalMs || 0)
+                    }
+                ])
+            );
+            const weekdayUsage = weekdayOrder.map((weekday) => {
+                const data = weekdayMap.get(weekday) || { sessions: 0, totalMs: 0 };
+                return {
+                    weekday,
+                    label: weekdayLabels[weekday],
+                    sessions: data.sessions,
+                    totalMs: data.totalMs
+                };
+            });
+
+            const dailyUserIds = [
+                ...new Set(dailyUserRaw.map((d) => String(d._id.userId)).filter(Boolean))
+            ];
+
+            const dailyUsers = dailyUserIds.length
+                ? await UserModel.find({
+                      _id: mongoose.trusted({ $in: dailyUserIds })
+                  })
+                      .select('firstName lastName')
+                      .lean()
+                : [];
+
+            const dailyUserNameMap = new Map(
+                dailyUsers.map((user) => [
+                    String(user._id),
+                    `${user.firstName || ''} ${user.lastName || ''}`.trim() || '—'
+                ])
+            );
+
+            const dailyUserBreakdown = dailyUserRaw.reduce((acc, row) => {
+                const day = row._id.day;
+                const userId = String(row._id.userId || '');
+                if (!day) return acc;
+                if (!acc[day]) acc[day] = [];
+
+                acc[day].push({
+                    day,
+                    userId,
+                    team: row._id.team || '',
+                    name: dailyUserNameMap.get(userId) || '—',
+                    sessions: Number(row.sessions || 0),
+                    totalMs: Number(row.totalMs || 0)
+                });
+
+                return acc;
+            }, {});
+
+            Object.keys(dailyUserBreakdown).forEach((day) => {
+                dailyUserBreakdown[day].sort((a, b) => {
+                    if (b.sessions !== a.sessions) return b.sessions - a.sessions;
+                    return b.totalMs - a.totalMs;
+                });
+            });
+
             res.render('admin/usageReport', {
                 title: 'Αναφορά Χρήσης',
                 description: 'Web Payroll Solutions',
                 byTeam,
+                usageAnalytics: {
+                    dailyUsage,
+                    hourlyUsage,
+                    weekdayUsage,
+                    dailyUserBreakdown
+                },
                 month,
                 monthLabel,
                 nonce: res.locals.nonce

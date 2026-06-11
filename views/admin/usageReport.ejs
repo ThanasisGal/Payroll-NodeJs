@@ -1,8 +1,563 @@
 <%# ============================================================================
-    Usage Report Page - CSP/CSRF Safe
+    Usage Report Page - CSP/CSRF Safe + Dashboard
     ============================================================================ %>
 
-<div class="container-fluid mt-4">
+<style nonce="<%= nonce %>">
+    .usage-page-wrap { max-width: 100%; }
+    .usage-team-card { border-radius: 12px; overflow: hidden; }
+    .usage-team-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
+    .usage-month-input { width: 10rem; }
+
+    .usage-dashboard-swal {
+        width: min(92vw, 1520px) !important;
+        max-width: min(92vw, 1520px) !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        border-radius: 16px !important;
+        overflow: hidden !important;
+    }
+
+    .usage-dashboard-title { font-size: 1.22rem; font-weight: 800; }
+    .usage-dashboard-html { padding: 0 !important; margin: 0 !important; }
+
+    .usage-dashboard-shell {
+        background: #f4f6fb;
+        max-height: 82vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0.85rem;
+    }
+
+    .usage-dashboard-grid-kpi {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.65rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .usage-kpi-card {
+        min-height: 4.05rem;
+        transition: transform 180ms ease, box-shadow 180ms ease;
+        border-radius: 14px;
+        padding: 0.55rem 0.65rem;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        min-width: 0;
+    }
+
+    .usage-kpi-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        flex: 0 0 auto;
+        font-size: 1rem;
+    }
+
+    .usage-kpi-blue { background: linear-gradient(135deg, #2563eb, #06b6d4); }
+    .usage-kpi-purple { background: linear-gradient(135deg, #7c3aed, #ec4899); }
+    .usage-kpi-orange { background: linear-gradient(135deg, #f97316, #facc15); }
+    .usage-kpi-green { background: linear-gradient(135deg, #059669, #84cc16); }
+    .usage-kpi-red { background: linear-gradient(135deg, #dc2626, #fb7185); }
+    .usage-kpi-dark { background: linear-gradient(135deg, #111827, #64748b); }
+
+
+
+    .usage-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+    }
+
+    .usage-kpi-text { min-width: 0; }
+    .usage-kpi-label {
+        color: #64748b;
+        font-size: 0.64rem;
+        font-weight: 800;
+        line-height: 1.05;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-kpi-value {
+        color: #0f172a;
+        font-size: 0.95rem;
+        font-weight: 900;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-kpi-sub {
+        color: #64748b;
+        font-size: 0.66rem;
+        font-weight: 700;
+        line-height: 1.05;
+        margin-top: 0.08rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-dashboard-grid-main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.8rem;
+    }
+
+    .usage-chart-card {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        padding: 0.85rem;
+    }
+
+    .usage-chart-card-wide { grid-column: 1 / -1; }
+
+    .usage-chart-title {
+        color: #0f172a;
+        font-size: 0.86rem;
+        font-weight: 900;
+        margin-bottom: 0.55rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .usage-bars { display: flex; flex-direction: column; gap: 0.48rem; }
+
+    .usage-bar-row {
+        display: grid;
+        grid-template-columns: minmax(9rem, 16rem) minmax(0, 1fr) minmax(4.5rem, 6rem);
+        align-items: center;
+        gap: 0.65rem;
+    }
+
+    .usage-bar-label {
+        color: #1f2937;
+        font-size: 0.76rem;
+        font-weight: 850;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-bar-track {
+        height: 0.82rem;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .usage-bar-fill { height: 100%; border-radius: 999px; width: 0%; transition: width 850ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .usage-bar-blue { background: linear-gradient(90deg, #2563eb, #06b6d4); }
+    .usage-bar-green { background: linear-gradient(90deg, #059669, #84cc16); }
+    .usage-bar-purple { background: linear-gradient(90deg, #7c3aed, #ec4899); }
+    .usage-bar-orange { background: linear-gradient(90deg, #f97316, #facc15); }
+    .usage-bar-red { background: linear-gradient(90deg, #dc2626, #fb7185); }
+
+    .usage-bar-value {
+        color: #334155;
+        font-size: 0.73rem;
+        font-weight: 850;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .usage-donut-wrap {
+        display: grid;
+        grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+        align-items: center;
+        gap: 1.15rem;
+        min-height: 20rem;
+    }
+
+    .usage-donut-svg { width: 19rem; height: 19rem; }
+    .usage-donut-bg { fill: none; stroke: #e5e7eb; stroke-width: 16; }
+    .usage-donut-segment { fill: none; stroke-width: 16; stroke-linecap: butt; transform: rotate(-90deg); transform-origin: 50% 50%; }
+    .usage-donut-hole { fill: #ffffff; }
+    .usage-donut-center-main { font-size: 1.25rem; font-weight: 900; fill: #0f172a; text-anchor: middle; dominant-baseline: middle; }
+    .usage-donut-center-sub { font-size: 0.62rem; font-weight: 800; fill: #64748b; text-anchor: middle; dominant-baseline: middle; }
+
+    .usage-team-insights {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+        margin-top: 0.75rem;
+    }
+
+    .usage-insight-pill {
+        border-radius: 12px;
+        padding: 0.55rem 0.65rem;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+
+    .usage-insight-pill strong { color: #0f172a; }
+
+    .usage-legend { display: flex; flex-direction: column; gap: 0.45rem; }
+
+    .usage-legend-row {
+        display: grid;
+        grid-template-columns: 0.8rem minmax(0, 1fr) auto;
+        gap: 0.45rem;
+        align-items: center;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 750;
+    }
+
+    .usage-legend-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; }
+    .usage-legend-color-0 { background: #2563eb; }
+    .usage-legend-color-1 { background: #7c3aed; }
+    .usage-legend-color-2 { background: #f97316; }
+    .usage-legend-color-3 { background: #059669; }
+    .usage-legend-color-4 { background: #dc2626; }
+    .usage-legend-color-5 { background: #06b6d4; }
+    .usage-legend-color-6 { background: #facc15; }
+    .usage-legend-color-7 { background: #ec4899; }
+
+
+
+    .usage-line-chart-wrap {
+        width: 100%;
+        min-height: 13.5rem;
+    }
+
+    .usage-line-svg {
+        width: 100%;
+        height: 13.5rem;
+        display: block;
+        overflow: visible;
+    }
+
+    .usage-line-grid { stroke: #e5e7eb; stroke-width: 1; }
+    .usage-line-axis { stroke: #cbd5e1; stroke-width: 1; }
+    .usage-line-blue { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .usage-line-green { fill: none; stroke: #059669; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .usage-area-blue { fill: #2563eb; opacity: 0.09; }
+    .usage-area-green { fill: #059669; opacity: 0.09; }
+    .usage-line-dot-blue { fill: #2563eb; stroke: #ffffff; stroke-width: 2; }
+    .usage-line-dot-green { fill: #059669; stroke: #ffffff; stroke-width: 2; }
+    .usage-line-label { fill: #334155; font-size: 0.64rem; font-weight: 800; }
+    .usage-line-xlabel { fill: #64748b; font-size: 0.58rem; font-weight: 700; }
+    .usage-line-ylabel { fill: #94a3b8; font-size: 0.56rem; font-weight: 700; }
+
+    .usage-analytics-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.8rem;
+    }
+
+    .usage-compact-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 0.42rem;
+    }
+
+    .usage-compact-row {
+        display: grid;
+        grid-template-columns: minmax(4.2rem, 5.8rem) minmax(0, 1fr) minmax(3.5rem, 5rem);
+        gap: 0.55rem;
+        align-items: center;
+    }
+
+    .usage-compact-label {
+        color: #334155;
+        font-size: 0.68rem;
+        font-weight: 850;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-compact-value {
+        color: #475569;
+        font-size: 0.66rem;
+        font-weight: 850;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .usage-heatmap {
+        display: grid;
+        grid-template-columns: repeat(31, minmax(0.35rem, 1fr));
+        gap: 0.16rem;
+        align-items: end;
+    }
+
+    .usage-heat-cell {
+        height: 1.05rem;
+        border-radius: 4px;
+        background: #e5e7eb;
+        border: 0;
+        padding: 0;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    .usage-heat-0 { background: #e5e7eb; }
+    .usage-heat-1 { background: #bfdbfe; }
+    .usage-heat-2 { background: #60a5fa; }
+    .usage-heat-3 { background: #2563eb; }
+    .usage-heat-4 { background: #1d4ed8; }
+    .usage-heat-5 { background: #1e40af; }
+
+    .usage-w-0 { width: 0%; }
+    .usage-w-1 { width: 1%; }
+    .usage-w-2 { width: 2%; }
+    .usage-w-3 { width: 3%; }
+    .usage-w-4 { width: 4%; }
+    .usage-w-5 { width: 5%; }
+    .usage-w-6 { width: 6%; }
+    .usage-w-7 { width: 7%; }
+    .usage-w-8 { width: 8%; }
+    .usage-w-9 { width: 9%; }
+    .usage-w-10 { width: 10%; }
+    .usage-w-11 { width: 11%; }
+    .usage-w-12 { width: 12%; }
+    .usage-w-13 { width: 13%; }
+    .usage-w-14 { width: 14%; }
+    .usage-w-15 { width: 15%; }
+    .usage-w-16 { width: 16%; }
+    .usage-w-17 { width: 17%; }
+    .usage-w-18 { width: 18%; }
+    .usage-w-19 { width: 19%; }
+    .usage-w-20 { width: 20%; }
+    .usage-w-21 { width: 21%; }
+    .usage-w-22 { width: 22%; }
+    .usage-w-23 { width: 23%; }
+    .usage-w-24 { width: 24%; }
+    .usage-w-25 { width: 25%; }
+    .usage-w-26 { width: 26%; }
+    .usage-w-27 { width: 27%; }
+    .usage-w-28 { width: 28%; }
+    .usage-w-29 { width: 29%; }
+    .usage-w-30 { width: 30%; }
+    .usage-w-31 { width: 31%; }
+    .usage-w-32 { width: 32%; }
+    .usage-w-33 { width: 33%; }
+    .usage-w-34 { width: 34%; }
+    .usage-w-35 { width: 35%; }
+    .usage-w-36 { width: 36%; }
+    .usage-w-37 { width: 37%; }
+    .usage-w-38 { width: 38%; }
+    .usage-w-39 { width: 39%; }
+    .usage-w-40 { width: 40%; }
+    .usage-w-41 { width: 41%; }
+    .usage-w-42 { width: 42%; }
+    .usage-w-43 { width: 43%; }
+    .usage-w-44 { width: 44%; }
+    .usage-w-45 { width: 45%; }
+    .usage-w-46 { width: 46%; }
+    .usage-w-47 { width: 47%; }
+    .usage-w-48 { width: 48%; }
+    .usage-w-49 { width: 49%; }
+    .usage-w-50 { width: 50%; }
+    .usage-w-51 { width: 51%; }
+    .usage-w-52 { width: 52%; }
+    .usage-w-53 { width: 53%; }
+    .usage-w-54 { width: 54%; }
+    .usage-w-55 { width: 55%; }
+    .usage-w-56 { width: 56%; }
+    .usage-w-57 { width: 57%; }
+    .usage-w-58 { width: 58%; }
+    .usage-w-59 { width: 59%; }
+    .usage-w-60 { width: 60%; }
+    .usage-w-61 { width: 61%; }
+    .usage-w-62 { width: 62%; }
+    .usage-w-63 { width: 63%; }
+    .usage-w-64 { width: 64%; }
+    .usage-w-65 { width: 65%; }
+    .usage-w-66 { width: 66%; }
+    .usage-w-67 { width: 67%; }
+    .usage-w-68 { width: 68%; }
+    .usage-w-69 { width: 69%; }
+    .usage-w-70 { width: 70%; }
+    .usage-w-71 { width: 71%; }
+    .usage-w-72 { width: 72%; }
+    .usage-w-73 { width: 73%; }
+    .usage-w-74 { width: 74%; }
+    .usage-w-75 { width: 75%; }
+    .usage-w-76 { width: 76%; }
+    .usage-w-77 { width: 77%; }
+    .usage-w-78 { width: 78%; }
+    .usage-w-79 { width: 79%; }
+    .usage-w-80 { width: 80%; }
+    .usage-w-81 { width: 81%; }
+    .usage-w-82 { width: 82%; }
+    .usage-w-83 { width: 83%; }
+    .usage-w-84 { width: 84%; }
+    .usage-w-85 { width: 85%; }
+    .usage-w-86 { width: 86%; }
+    .usage-w-87 { width: 87%; }
+    .usage-w-88 { width: 88%; }
+    .usage-w-89 { width: 89%; }
+    .usage-w-90 { width: 90%; }
+    .usage-w-91 { width: 91%; }
+    .usage-w-92 { width: 92%; }
+    .usage-w-93 { width: 93%; }
+    .usage-w-94 { width: 94%; }
+    .usage-w-95 { width: 95%; }
+    .usage-w-96 { width: 96%; }
+    .usage-w-97 { width: 97%; }
+    .usage-w-98 { width: 98%; }
+    .usage-w-99 { width: 99%; }
+    .usage-w-100 { width: 100%; }
+
+    @media (max-width: 1350px) {
+        .usage-dashboard-grid-kpi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 1100px) {
+        .usage-dashboard-grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .usage-dashboard-grid-main { grid-template-columns: minmax(0, 1fr); }
+        .usage-analytics-grid { grid-template-columns: minmax(0, 1fr); }
+        .usage-bar-row { grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) minmax(4rem, 5rem); }
+        .usage-donut-wrap { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+    }
+
+    @media (max-width: 700px) {
+        .usage-dashboard-grid-kpi { grid-template-columns: minmax(0, 1fr); }
+        .usage-team-insights { grid-template-columns: minmax(0, 1fr); }
+        .usage-bar-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+        .usage-bar-value { text-align: left; }
+    }
+
+    .usage-heatmap-detail {
+        margin-top: 1rem;
+        min-height: 16rem;
+        border-radius: 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        border: 1px solid #e5e7eb;
+        padding: 1rem 1.1rem;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+    }
+
+    .usage-heatmap-detail-empty {
+        min-height: 13.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .usage-heatmap-detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.85rem;
+    }
+
+    .usage-heatmap-detail-title {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 1rem;
+        font-weight: 900;
+        color: #0f172a;
+    }
+
+    .usage-heatmap-detail-badges {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+    }
+
+    .usage-heatmap-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        border-radius: 999px;
+        padding: 0.28rem 0.65rem;
+        font-size: 0.78rem;
+        font-weight: 900;
+        color: #1d4ed8;
+        background: #dbeafe;
+    }
+
+    .usage-day-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .usage-day-bar-row {
+        display: grid;
+        grid-template-columns: minmax(9rem, 15rem) minmax(0, 1fr) minmax(5.2rem, 7rem) minmax(4.8rem, 6rem);
+        align-items: center;
+        gap: 0.65rem;
+    }
+
+    .usage-day-bar-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.82rem;
+        font-weight: 900;
+        color: #111827;
+    }
+
+    .usage-day-bar-time,
+    .usage-day-bar-value {
+        font-size: 0.82rem;
+        font-weight: 900;
+        color: #1e3a8a;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .usage-day-summary {
+        margin-top: 0.9rem;
+        padding-top: 0.75rem;
+        border-top: 1px dashed #dbe3ef;
+        color: #475569;
+        font-weight: 800;
+        text-align: center;
+    }
+
+    .usage-heat-cell {
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, outline-color 0.15s ease;
+    }
+
+    .usage-heat-cell:hover,
+    .usage-heat-cell.is-selected {
+        transform: translateY(-2px) scale(1.06);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22), 0 8px 18px rgba(15, 23, 42, 0.16);
+        outline: 2px solid #1d4ed8;
+        outline-offset: 2px;
+    }
+
+    @media (max-width: 1100px) {
+        .usage-day-bar-row { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(4.5rem, 5.5rem); }
+        .usage-day-bar-time { display: none; }
+    }
+
+    @media (max-width: 700px) {
+        .usage-day-bar-row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+        .usage-day-bar-value { text-align: left; }
+    }
+
+</style>
+
+<div class="container-fluid mt-4 usage-page-wrap">
 
     <%# ── Header ── %>
     <div class="row mb-4">
@@ -10,7 +565,6 @@
             <h2 class="mb-0">
                 <i class="bi bi-bar-chart-fill text-primary"></i>
                 Αναφορά Χρήσης
-                <!-- <span class="text-muted fs-5"><%= monthLabel %></span> -->
             </h2>
 
             <%# ── Month picker ── %>
@@ -33,6 +587,14 @@
                 <i class="bi bi-file-earmark-excel"></i> Export CSV
             </button>
 
+            <%# ── Dashboard ── %>
+            <button id="btnUsageDashboard"
+                    type="button"
+                    class="btn btn-sm btn-success"
+                    data-month="<%= month %>">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </button>
+
             <%# ── Close (redirect στο /mainapp) ── %>
             <button id="btnCloseUsage" type="button" class="btn btn-sm btn-secondary">
                 <i class="bi bi-x-lg"></i> Κλείσιμο
@@ -51,11 +613,10 @@
     <% } else { %>
 
         <% teams.forEach(function(team) { %>
-            <div class="card shadow-sm border-0 mb-4" style="border-radius:12px; overflow:hidden;">
+            <div class="card shadow-sm border-0 mb-4 usage-team-card">
 
                 <%# Team Header %>
-                <div class="card-header py-3"
-                     style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);">
+                <div class="card-header py-3 usage-team-header">
                     <h5 class="mb-0 text-white">
                         <i class="bi bi-people-fill me-2"></i>
                         Team: <%= team %>
@@ -128,9 +689,476 @@
     <%- JSON.stringify(byTeam) %>
 </script>
 
+<script id="usageAnalyticsJson" type="application/json">
+    <%- JSON.stringify(usageAnalytics || {}) %>
+</script>
+
 <script nonce="<%= nonce %>">
 (function () {
     'use strict';
+
+    function minutesToText(totalMs) {
+        const totalMinutes = Math.round(Number(totalMs || 0) / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return hours + 'ω ' + minutes + 'λ';
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function percentClass(value, max) {
+        const n = Number(value || 0);
+        const m = Number(max || 0);
+        if (!m || m <= 0) return 'usage-w-0';
+        const pct = Math.max(0, Math.min(100, Math.round((n / m) * 100)));
+        return 'usage-w-' + pct;
+    }
+
+    function getUsageRows(teamData) {
+        const rows = [];
+        Object.keys(teamData || {}).forEach(function (team) {
+            (teamData[team] || []).forEach(function (u) {
+                rows.push({
+                    team: team,
+                    name: String((u.firstName || '') + ' ' + (u.lastName || '')).trim(),
+                    sessionCount: Number(u.sessionCount || 0),
+                    totalMs: Number(u.totalMs || 0),
+                    totalHours: u.totalHours || minutesToText(u.totalMs)
+                });
+            });
+        });
+        return rows;
+    }
+
+    function getTeamRows(teamData) {
+        return Object.keys(teamData || {}).map(function (team) {
+            const users = teamData[team] || [];
+            const sessions = users.reduce(function (s, u) { return s + Number(u.sessionCount || 0); }, 0);
+            const totalMs = users.reduce(function (s, u) { return s + Number(u.totalMs || 0); }, 0);
+            return { team: team, users: users.length, sessions: sessions, totalMs: totalMs };
+        });
+    }
+
+
+    function getUsageAnalytics() {
+        try {
+            return JSON.parse(document.getElementById('usageAnalyticsJson').textContent || '{}');
+        } catch (err) {
+            console.error('[UsageDashboard] Invalid analytics JSON:', err);
+            return {};
+        }
+    }
+
+    function msToHours(totalMs) {
+        return Number(totalMs || 0) / 3600000;
+    }
+
+    function niceNumber(value) {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '0';
+        if (Math.abs(n) >= 10) return String(Math.round(n));
+        return n.toFixed(1).replace('.', ',');
+    }
+
+    function renderLineChart(rows, options) {
+        const data = Array.isArray(rows) ? rows : [];
+        const valueKey = options.valueKey;
+        const colorClass = options.colorClass;
+        const areaClass = options.areaClass;
+        const dotClass = options.dotClass;
+        const valueFormatter = options.valueFormatter || function (v) { return String(v); };
+        const labelEvery = Math.max(1, Number(options.labelEvery || 5));
+        const width = 900;
+        const height = 220;
+        const padLeft = 46;
+        const padRight = 18;
+        const padTop = 24;
+        const padBottom = 34;
+        const chartWidth = width - padLeft - padRight;
+        const chartHeight = height - padTop - padBottom;
+        const maxValue = Math.max(1, data.reduce(function (m, r) { return Math.max(m, Number(r[valueKey] || 0)); }, 0));
+        const denom = Math.max(1, data.length - 1);
+
+        function xAt(index) {
+            return padLeft + (chartWidth * index / denom);
+        }
+
+        function yAt(value) {
+            return padTop + chartHeight - (chartHeight * Number(value || 0) / maxValue);
+        }
+
+        const points = data.map(function (row, index) {
+            return xAt(index).toFixed(2) + ',' + yAt(row[valueKey]).toFixed(2);
+        }).join(' ');
+
+        const areaPoints = data.length
+            ? padLeft + ',' + (padTop + chartHeight) + ' ' + points + ' ' + (padLeft + chartWidth) + ',' + (padTop + chartHeight)
+            : '';
+
+        const grid = [0, 0.25, 0.5, 0.75, 1].map(function (ratio) {
+            const y = padTop + chartHeight - (chartHeight * ratio);
+            const label = niceNumber(maxValue * ratio);
+            return '<line class="usage-line-grid" x1="' + padLeft + '" y1="' + y.toFixed(2) + '" x2="' + (padLeft + chartWidth) + '" y2="' + y.toFixed(2) + '"></line>' +
+                '<text class="usage-line-ylabel" x="8" y="' + (y + 4).toFixed(2) + '">' + escapeHtml(label) + '</text>';
+        }).join('');
+
+        const labels = data.map(function (row, index) {
+            if (index !== 0 && index !== data.length - 1 && (index + 1) % labelEvery !== 0) return '';
+            return '<text class="usage-line-xlabel" x="' + xAt(index).toFixed(2) + '" y="' + (height - 10) + '" text-anchor="middle">' + escapeHtml(row.label || '') + '</text>';
+        }).join('');
+
+        const dots = data.map(function (row, index) {
+            const value = Number(row[valueKey] || 0);
+            const x = xAt(index).toFixed(2);
+            const y = yAt(value).toFixed(2);
+            return '<circle class="' + dotClass + '" cx="' + x + '" cy="' + y + '" r="4">' +
+                '<title>' + escapeHtml(row.label || '') + ': ' + escapeHtml(valueFormatter(value, row)) + '</title>' +
+                '</circle>';
+        }).join('');
+
+        return '' +
+            '<div class="usage-line-chart-wrap">' +
+                '<svg class="usage-line-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + escapeHtml(options.title || '') + '">' +
+                    grid +
+                    '<line class="usage-line-axis" x1="' + padLeft + '" y1="' + (padTop + chartHeight) + '" x2="' + (padLeft + chartWidth) + '" y2="' + (padTop + chartHeight) + '"></line>' +
+                    '<polygon class="' + areaClass + '" points="' + areaPoints + '"></polygon>' +
+                    '<polyline class="' + colorClass + '" points="' + points + '"></polyline>' +
+                    dots + labels +
+                '</svg>' +
+            '</div>';
+    }
+
+    function renderCompactBars(rows, metric, colorClass, valueFormatter) {
+        const safeRows = Array.isArray(rows) ? rows : [];
+        const max = safeRows.reduce(function (m, r) { return Math.max(m, Number(r[metric] || 0)); }, 0);
+        return '<div class="usage-compact-bars">' + safeRows.map(function (r) {
+            const value = Number(r[metric] || 0);
+            return '' +
+                '<div class="usage-compact-row">' +
+                    '<div class="usage-compact-label" title="' + escapeHtml(r.label || '') + '">' + escapeHtml(r.label || '') + '</div>' +
+                    '<div class="usage-bar-track"><div class="usage-bar-fill ' + colorClass + '" data-width-class="' + percentClass(value, max) + '"></div></div>' +
+                    '<div class="usage-compact-value">' + escapeHtml(valueFormatter(value, r)) + '</div>' +
+                '</div>';
+        }).join('') + '</div>';
+    }
+
+    function renderHeatmap(dailyUsage) {
+        const rows = Array.isArray(dailyUsage) ? dailyUsage : [];
+        const max = Math.max(1, rows.reduce(function (m, r) { return Math.max(m, Number(r.sessions || 0)); }, 0));
+        return '<div class="usage-heatmap" id="usageHeatmapMonth">' + rows.map(function (r) {
+            const sessions = Number(r.sessions || 0);
+            const level = sessions <= 0 ? 0 : Math.max(1, Math.min(5, Math.ceil((sessions / max) * 5)));
+            return '<button type="button" class="usage-heat-cell usage-heat-' + level + '" data-day="' + escapeHtml(r.day || '') + '" title="' + escapeHtml(r.label || '') + ': ' + sessions + ' sessions" aria-label="' + escapeHtml(r.label || '') + ': ' + sessions + ' sessions"></button>';
+        }).join('') + '</div>';
+    }
+
+    function formatDayTitle(isoDay) {
+        if (!isoDay) return 'Ημέρα μήνα';
+        const parts = String(isoDay).split('-');
+        if (parts.length !== 3) return isoDay;
+        const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        if (isNaN(date.getTime())) return isoDay;
+        return date.toLocaleDateString('el-GR', {
+            weekday: 'long',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        });
+    }
+
+    function renderDailyUserDetail(day, analytics) {
+        const breakdown = analytics?.dailyUserBreakdown || {};
+        const rows = Array.isArray(breakdown[day]) ? breakdown[day] : [];
+
+        if (!day) {
+            return '<div class="usage-heatmap-detail-empty">Πέρασε το ποντίκι πάνω από μία ημέρα του heatmap για να δεις sessions ανά χρήστη.</div>';
+        }
+
+        if (!rows.length) {
+            return '' +
+                '<div class="usage-heatmap-detail-header">' +
+                    '<div class="usage-heatmap-detail-title"><i class="bi bi-bar-chart-fill text-primary"></i>' + escapeHtml(formatDayTitle(day)) + '</div>' +
+                    '<div class="usage-heatmap-detail-badges"><span class="usage-heatmap-badge">0 sessions</span></div>' +
+                '</div>' +
+                '<div class="usage-heatmap-detail-empty">Δεν υπάρχουν sessions για την επιλεγμένη ημέρα.</div>';
+        }
+
+        const totalSessions = rows.reduce(function (s, r) { return s + Number(r.sessions || 0); }, 0);
+        const totalMs = rows.reduce(function (s, r) { return s + Number(r.totalMs || 0); }, 0);
+        const uniqueUsers = rows.length;
+        const maxSessions = rows.reduce(function (m, r) { return Math.max(m, Number(r.sessions || 0)); }, 0);
+
+        const bars = rows.map(function (r) {
+            const sessions = Number(r.sessions || 0);
+            return '' +
+                '<div class="usage-day-bar-row">' +
+                    '<div class="usage-day-bar-name" title="' + escapeHtml(r.name || '') + '">' + escapeHtml(r.name || '') + '</div>' +
+                    '<div class="usage-bar-track"><div class="usage-bar-fill usage-bar-blue" data-width-class="' + percentClass(sessions, maxSessions) + '"></div></div>' +
+                    '<div class="usage-day-bar-value">' + sessions + ' sessions</div>' +
+                    '<div class="usage-day-bar-time">' + escapeHtml(minutesToText(r.totalMs || 0)) + '</div>' +
+                '</div>';
+        }).join('');
+
+        return '' +
+            '<div class="usage-heatmap-detail-header">' +
+                '<div class="usage-heatmap-detail-title"><i class="bi bi-bar-chart-fill text-primary"></i>' + escapeHtml(formatDayTitle(day)) + '</div>' +
+                '<div class="usage-heatmap-detail-badges">' +
+                    '<span class="usage-heatmap-badge">' + totalSessions + ' sessions</span>' +
+                    '<span class="usage-heatmap-badge">' + uniqueUsers + ' χρήστες</span>' +
+                    '<span class="usage-heatmap-badge">' + escapeHtml(minutesToText(totalMs)) + '</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="usage-day-bars">' + bars + '</div>' +
+            '<div class="usage-day-summary">Συνολικές sessions ημέρας: ' + totalSessions + ' • Μοναδικοί χρήστες: ' + uniqueUsers + ' • Συνολικός χρόνος: ' + escapeHtml(minutesToText(totalMs)) + '</div>';
+    }
+
+    function updateHeatmapDayDetail(day, analytics) {
+        const target = document.getElementById('usageHeatmapDayDetail');
+        if (!target) return;
+        target.innerHTML = renderDailyUserDetail(day, analytics || {});
+        animateDashboardBars();
+    }
+
+    function initHeatmapDayDetail(analytics) {
+        const heatmap = document.getElementById('usageHeatmapMonth');
+        const detail = document.getElementById('usageHeatmapDayDetail');
+        if (!heatmap || !detail) return;
+
+        const cells = Array.from(heatmap.querySelectorAll('.usage-heat-cell[data-day]'));
+        const activeDay = (analytics?.dailyUsage || []).find(function (d) {
+            return Number(d.sessions || 0) > 0;
+        })?.day || cells[0]?.getAttribute('data-day') || '';
+
+        function selectDay(day) {
+            cells.forEach(function (cell) {
+                cell.classList.toggle('is-selected', cell.getAttribute('data-day') === day);
+            });
+            updateHeatmapDayDetail(day, analytics || {});
+        }
+
+        cells.forEach(function (cell) {
+            cell.addEventListener('mouseenter', function () {
+                selectDay(cell.getAttribute('data-day') || '');
+            });
+            cell.addEventListener('focus', function () {
+                selectDay(cell.getAttribute('data-day') || '');
+            });
+            cell.addEventListener('click', function () {
+                selectDay(cell.getAttribute('data-day') || '');
+            });
+        });
+
+        selectDay(activeDay);
+    }
+
+    function renderAnalyticsSection(analytics) {
+        const dailyUsage = Array.isArray(analytics?.dailyUsage) ? analytics.dailyUsage : [];
+        const hourlyUsage = Array.isArray(analytics?.hourlyUsage) ? analytics.hourlyUsage : [];
+        const weekdayUsage = Array.isArray(analytics?.weekdayUsage) ? analytics.weekdayUsage : [];
+
+        const dailyHours = dailyUsage.map(function (d) {
+            return Object.assign({}, d, { hours: msToHours(d.totalMs) });
+        });
+        const hourlySessions = hourlyUsage.filter(function (h) {
+            return Number(h.sessions || 0) > 0;
+        });
+        const weekdayHours = weekdayUsage.map(function (d) {
+            return Object.assign({}, d, { hours: msToHours(d.totalMs) });
+        });
+
+        if (!dailyUsage.length && !hourlyUsage.length && !weekdayUsage.length) return '';
+
+        return '' +
+            '<div class="usage-chart-card usage-chart-card-wide">' +
+                '<div class="usage-chart-title"><i class="bi bi-graph-up-arrow text-primary"></i>Χρήση ανά ημέρα</div>' +
+                '<div class="usage-analytics-grid">' +
+                    '<div>' + renderLineChart(dailyUsage, {
+                        title: 'Sessions ανά ημέρα',
+                        valueKey: 'sessions',
+                        colorClass: 'usage-line-blue',
+                        areaClass: 'usage-area-blue',
+                        dotClass: 'usage-line-dot-blue',
+                        labelEvery: 5,
+                        valueFormatter: function (v) { return v + ' sessions'; }
+                    }) + '</div>' +
+                    '<div>' + renderLineChart(dailyHours, {
+                        title: 'Ώρες χρήσης ανά ημέρα',
+                        valueKey: 'hours',
+                        colorClass: 'usage-line-green',
+                        areaClass: 'usage-area-green',
+                        dotClass: 'usage-line-dot-green',
+                        labelEvery: 5,
+                        valueFormatter: function (v, r) { return minutesToText(r.totalMs || 0); }
+                    }) + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="usage-chart-card">' +
+                '<div class="usage-chart-title"><i class="bi bi-clock-history text-info"></i>Ώρες σύνδεσης</div>' +
+                renderCompactBars(hourlySessions, 'sessions', 'usage-bar-orange', function (v) { return v + ' sess.'; }) +
+            '</div>' +
+            '<div class="usage-chart-card">' +
+                '<div class="usage-chart-title"><i class="bi bi-calendar-week text-success"></i>Χρήση ανά ημέρα εβδομάδας</div>' +
+                renderCompactBars(weekdayHours, 'hours', 'usage-bar-green', function (v, r) { return minutesToText(r.totalMs || 0); }) +
+                '<div class="usage-chart-title mt-3"><i class="bi bi-grid-3x3-gap-fill text-primary"></i>Heatmap sessions μήνα</div>' +
+                renderHeatmap(dailyUsage) +
+                '<div id="usageHeatmapDayDetail" class="usage-heatmap-detail">' + renderDailyUserDetail('', analytics || {}) + '</div>' +
+            '</div>';
+    }
+
+    function renderBars(rows, metric, colorClass, valueFormatter) {
+        const max = rows.reduce(function (m, r) { return Math.max(m, Number(r[metric] || 0)); }, 0);
+        return '<div class="usage-bars">' + rows.map(function (r) {
+            const value = Number(r[metric] || 0);
+            return '' +
+                '<div class="usage-bar-row">' +
+                    '<div class="usage-bar-label" title="' + escapeHtml(r.name || r.team) + '">' + escapeHtml(r.name || r.team) + '</div>' +
+                    '<div class="usage-bar-track"><div class="usage-bar-fill ' + colorClass + '" data-width-class="' + percentClass(value, max) + '"></div></div>' +
+                    '<div class="usage-bar-value">' + escapeHtml(valueFormatter(value, r)) + '</div>' +
+                '</div>';
+        }).join('') + '</div>';
+    }
+
+    function renderTeamBars(rows, metric, colorClass, valueFormatter) {
+        const max = rows.reduce(function (m, r) { return Math.max(m, Number(r[metric] || 0)); }, 0);
+        return '<div class="usage-bars">' + rows.map(function (r) {
+            const value = Number(r[metric] || 0);
+            return '' +
+                '<div class="usage-bar-row">' +
+                    '<div class="usage-bar-label" title="Team: ' + escapeHtml(r.team) + '">Team: ' + escapeHtml(r.team) + '</div>' +
+                    '<div class="usage-bar-track"><div class="usage-bar-fill ' + colorClass + '" data-width-class="' + percentClass(value, max) + '"></div></div>' +
+                    '<div class="usage-bar-value">' + escapeHtml(valueFormatter(value, r)) + '</div>' +
+                '</div>';
+        }).join('') + '</div>';
+    }
+
+    function renderLegend(teamRows) {
+        return '<div class="usage-legend">' + teamRows.map(function (t, idx) {
+            const pct = t.totalSessions ? ((t.sessions / t.totalSessions) * 100).toFixed(1) : '0.0';
+            return '' +
+                '<div class="usage-legend-row" title="Team ' + escapeHtml(t.team) + ': ' + pct + '% των sessions">' +
+                    '<span class="usage-legend-dot usage-legend-color-' + (idx % 8) + '"></span>' +
+                    '<span>Team: ' + escapeHtml(t.team) + '</span>' +
+                    '<strong>' + escapeHtml(String(t.sessions)) + ' (' + pct + '%)</strong>' +
+                '</div>';
+        }).join('') + '</div>';
+    }
+
+    function renderSvgDonut(teamRows, totalSessions) {
+        const colors = ['#2563eb', '#7c3aed', '#f97316', '#059669', '#dc2626', '#06b6d4', '#facc15', '#ec4899'];
+        const radius = 42;
+        const circumference = 2 * Math.PI * radius;
+        let offset = 0;
+
+        const segments = teamRows.map(function (t, idx) {
+            const value = Number(t.sessions || 0);
+            const fraction = totalSessions > 0 ? value / totalSessions : 0;
+            const dash = fraction * circumference;
+            const gap = totalSessions > 0 && teamRows.length > 1 ? 0.6 : 0;
+            const safeDash = Math.max(0, dash - gap);
+            const currentOffset = offset;
+            offset += dash;
+
+            return '<circle class="usage-donut-segment" cx="60" cy="60" r="' + radius + '" ' +
+                'stroke="' + colors[idx % colors.length] + '" ' +
+                'stroke-dasharray="' + safeDash.toFixed(3) + ' ' + circumference.toFixed(3) + '" ' +
+                'stroke-dashoffset="-' + currentOffset.toFixed(3) + '">' +
+                '<title>Team ' + escapeHtml(t.team) + ': ' + value + ' sessions</title>' +
+                '</circle>';
+        }).join('');
+
+        return '' +
+            '<svg class="usage-donut-svg" viewBox="0 0 120 120" role="img" aria-label="Sessions ανά team">' +
+                '<circle class="usage-donut-bg" cx="60" cy="60" r="' + radius + '"></circle>' +
+                segments +
+                '<circle class="usage-donut-hole" cx="60" cy="60" r="29"></circle>' +
+                '<text class="usage-donut-center-main" x="60" y="55">' + totalSessions + '</text>' +
+                '<text class="usage-donut-center-sub" x="60" y="70">sessions</text>' +
+            '</svg>';
+    }
+
+    function renderTeamInsights(teamRows) {
+        if (!teamRows || teamRows.length === 0) return '';
+
+        const byTime = teamRows.slice().sort(function (a, b) { return b.totalMs - a.totalMs; });
+        const bySessions = teamRows.slice().sort(function (a, b) { return b.sessions - a.sessions; });
+        const topTime = byTime[0];
+        const topSessions = bySessions[0];
+        const secondTime = byTime[1];
+        const diffMs = secondTime ? topTime.totalMs - secondTime.totalMs : 0;
+        const diffSessions = bySessions[1] ? topSessions.sessions - bySessions[1].sessions : 0;
+
+        return '' +
+            '<div class="usage-team-insights">' +
+                '<div class="usage-insight-pill">Πρώτο σε χρόνο: <strong>' + escapeHtml(topTime.team) + '</strong></div>' +
+                '<div class="usage-insight-pill">Πρώτο σε sessions: <strong>' + escapeHtml(topSessions.team) + '</strong></div>' +
+                '<div class="usage-insight-pill">Διαφορά χρόνου: <strong>' + escapeHtml(minutesToText(diffMs)) + '</strong></div>' +
+                '<div class="usage-insight-pill">Διαφορά sessions: <strong>' + diffSessions + '</strong></div>' +
+            '</div>';
+    }
+
+    function animateDashboardBars() {
+        const fills = document.querySelectorAll('.usage-dashboard-shell .usage-bar-fill[data-width-class]');
+        fills.forEach(function (el) {
+            el.classList.remove(el.getAttribute('data-width-class'));
+        });
+        window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(function () {
+                fills.forEach(function (el) {
+                    const widthClass = el.getAttribute('data-width-class');
+                    if (widthClass) el.classList.add(widthClass);
+                });
+            });
+        });
+    }
+
+    function buildDashboardHtml(teamData, month, analytics) {
+        const userRows = getUsageRows(teamData);
+        const teamRows = getTeamRows(teamData);
+
+        if (userRows.length === 0) {
+            return '<div class="usage-dashboard-shell"><div class="usage-empty-dashboard">Δεν υπάρχουν δεδομένα για dashboard.</div></div>';
+        }
+
+        const totalSessions = userRows.reduce(function (s, u) { return s + u.sessionCount; }, 0);
+        const totalMs = userRows.reduce(function (s, u) { return s + u.totalMs; }, 0);
+        const topSessions = userRows.slice().sort(function (a, b) { return b.sessionCount - a.sessionCount; })[0];
+        const topUsage = userRows.slice().sort(function (a, b) { return b.totalMs - a.totalMs; })[0];
+        const topTeam = teamRows.slice().sort(function (a, b) { return b.totalMs - a.totalMs; })[0];
+        const avgMsPerUser = userRows.length ? totalMs / userRows.length : 0;
+
+        const bySessions = userRows.slice().sort(function (a, b) { return b.sessionCount - a.sessionCount; });
+        const byHours = userRows.slice().sort(function (a, b) { return b.totalMs - a.totalMs; });
+        const byTeamHours = teamRows.slice().sort(function (a, b) { return b.totalMs - a.totalMs; });
+        const byTeamSessions = teamRows.slice().sort(function (a, b) { return b.sessions - a.sessions; }).map(function (t) {
+            return Object.assign({}, t, { totalSessions: totalSessions });
+        });
+
+        return '' +
+            '<div class="usage-dashboard-shell">' +
+                '<div class="usage-dashboard-grid-kpi">' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-blue"><i class="bi bi-box-arrow-in-right"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Sessions</div><div class="usage-kpi-value">' + totalSessions + '</div><div class="usage-kpi-sub">συνολικές είσοδοι</div></div></div>' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-purple"><i class="bi bi-clock-history"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Χρόνος</div><div class="usage-kpi-value">' + escapeHtml(minutesToText(totalMs)) + '</div><div class="usage-kpi-sub">χρήση μήνα</div></div></div>' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-orange"><i class="bi bi-people-fill"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Teams / Users</div><div class="usage-kpi-value">' + teamRows.length + ' / ' + userRows.length + '</div><div class="usage-kpi-sub">ενεργά σύνολα</div></div></div>' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-green"><i class="bi bi-trophy-fill"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Top sessions</div><div class="usage-kpi-value" title="' + escapeHtml(topSessions.name) + '">' + escapeHtml(topSessions.name) + '</div><div class="usage-kpi-sub">' + topSessions.sessionCount + ' sessions</div></div></div>' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-red"><i class="bi bi-stopwatch-fill"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Top χρόνος</div><div class="usage-kpi-value" title="' + escapeHtml(topUsage.name) + '">' + escapeHtml(topUsage.name) + '</div><div class="usage-kpi-sub">' + escapeHtml(minutesToText(topUsage.totalMs)) + '</div></div></div>' +
+                    '<div class="usage-kpi-card"><div class="usage-kpi-icon usage-kpi-dark"><i class="bi bi-person-check-fill"></i></div><div class="usage-kpi-text"><div class="usage-kpi-label">Μ.Ο. / χρήστη</div><div class="usage-kpi-value">' + escapeHtml(minutesToText(avgMsPerUser)) + '</div><div class="usage-kpi-sub">μέση χρήση</div></div></div>' +
+                '</div>' +
+                '<div class="usage-dashboard-grid-main">' +
+                    renderAnalyticsSection(analytics || {}) +
+                    '<div class="usage-chart-card usage-chart-card-wide"><div class="usage-chart-title"><i class="bi bi-bar-chart-fill text-primary"></i>Sessions ανά χρήστη</div>' + renderBars(bySessions, 'sessionCount', 'usage-bar-blue', function (v, r) { return v + ' sessions'; }) + '</div>' +
+                    '<div class="usage-chart-card usage-chart-card-wide"><div class="usage-chart-title"><i class="bi bi-clock-fill text-success"></i>Χρόνος χρήσης ανά χρήστη</div>' + renderBars(byHours, 'totalMs', 'usage-bar-green', function (v) { return minutesToText(v); }) + '</div>' +
+                    '<div class="usage-chart-card"><div class="usage-chart-title"><i class="bi bi-diagram-3-fill text-warning"></i>Συνολικός χρόνος ανά team</div>' + renderTeamBars(byTeamHours, 'totalMs', 'usage-bar-purple', function (v) { return minutesToText(v); }) + renderTeamInsights(teamRows) + '</div>' +
+                    '<div class="usage-chart-card"><div class="usage-chart-title"><i class="bi bi-pie-chart-fill text-danger"></i>Sessions ανά team</div><div class="usage-donut-wrap">' + renderSvgDonut(byTeamSessions, totalSessions) + renderLegend(byTeamSessions) + '</div></div>' +
+                '</div>' +
+            '</div>';
+    }
 
     // ── Format dates ────────────────────────────────────────────────
     document.querySelectorAll('[data-date]').forEach(function (el) {
@@ -149,11 +1177,42 @@
         } catch (e) { /* leave as — */ }
     });
 
-// ── Close button ───────────────────────────────────────────────
+    // ── Close button ───────────────────────────────────────────────
     const btnCloseUsage = document.getElementById('btnCloseUsage');
     if (btnCloseUsage) {
         btnCloseUsage.addEventListener('click', function () {
             window.location.href = '/mainapp';
+        });
+    }
+
+    const btnDashboard = document.getElementById('btnUsageDashboard');
+    if (btnDashboard) {
+        btnDashboard.addEventListener('click', function () {
+            const teamData = JSON.parse(document.getElementById('teamDataJson').textContent || '{}');
+            const usageAnalytics = getUsageAnalytics();
+            const month = this.getAttribute('data-month') || '';
+
+            if (!window.Swal) {
+                console.error('[UsageDashboard] Swal is not available');
+                return;
+            }
+
+            Swal.fire({
+                title: '<span class="usage-dashboard-title"><i class="bi bi-speedometer2"></i> Dashboard Χρήσης - ' + escapeHtml(month) + '</span>',
+                html: buildDashboardHtml(teamData, month, usageAnalytics),
+                showCloseButton: true,
+                showConfirmButton: false,
+                backdrop: true,
+                allowOutsideClick: true,
+                customClass: {
+                    popup: 'usage-dashboard-swal',
+                    htmlContainer: 'usage-dashboard-html'
+                },
+                didOpen: function () {
+                    animateDashboardBars();
+                    initHeatmapDayDetail(usageAnalytics);
+                }
+            });
         });
     }
 
@@ -163,19 +1222,17 @@
             const month = this.getAttribute('data-month') || '';
             const url   = '/admin/usage-report/export?month=' + encodeURIComponent(month);
 
-            // Δείξε loader άμεσα (delay 0 για να φανεί σίγουρα)
             window.AppLoader.begin('Δημιουργία αρχείου CSV...', 0);
 
             try {
                 const response = await fetch(url, {
                     method: 'GET',
                     credentials: 'same-origin',
-                    skipLoader: true   // ← για να μην τρέξει και ο global fetch loader
+                    skipLoader: true
                 });
 
                 if (!response.ok) throw new Error('HTTP ' + response.status);
 
-                // Πάρε filename από Content-Disposition αν υπάρχει
                 let filename = 'usage-report-' + month + '.csv';
                 const cd = response.headers.get('Content-Disposition') || '';
                 const m  = cd.match(/filename="?([^"]+)"?/i);
@@ -207,24 +1264,20 @@
             }
         });
     }
-            
+
     // ── Team totals (ms → ώρες/λεπτά) ──────────────────────────────
     const teamData = JSON.parse(
         document.getElementById('teamDataJson').textContent
     );
 
     Object.keys(teamData).forEach(function (team) {
-        const totalMs      = teamData[team].reduce(function (s, u) { return s + u.totalMs; }, 0);
-        const totalMinutes = Math.round(totalMs / 60000);
-        const hours        = Math.floor(totalMinutes / 60);
-        const minutes      = totalMinutes % 60;
-
+        const totalMs = teamData[team].reduce(function (s, u) { return s + u.totalMs; }, 0);
         const el = document.getElementById('total-' + team);
         if (el) {
             el.innerHTML =
                 '<span class="badge bg-success rounded-pill">' +
                 '<i class="bi bi-clock me-1"></i>' +
-                hours + 'ω ' + minutes + 'λ' +
+                minutesToText(totalMs) +
                 '</span>';
         }
     });
