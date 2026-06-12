@@ -6520,6 +6520,7 @@ class erganhController {
     };
 
     static openErganiPdf = async (req, res) => {
+        console.log('🔥 openErganiPdf HIT:', req.params.id);
         try {
             const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
 
