@@ -627,6 +627,22 @@ function addEventListeners() {
 
     container.addEventListener('input', handleInputEvent);
 
+    // Για χειροκίνητη αλλαγή ποσού EXTRA αποδοχών στο edit:
+    // με το blur επανυπολογίζονται άμεσα τα πραγματικά ποσά, χωρίς να χρειάζεται
+    // κλικ στο κουμπί «Επανυπολογισμός Αποδοχών».
+    container.addEventListener(
+        'blur',
+        (event) => {
+            if (_isStoixeioChangeInProgress) return;
+            if (event.target.type === 'number' && event.target.classList.contains('numeric')) {
+                formatNumericInput(event.target);
+                calculateTotal();
+                applyNomimaFromSymbashTotals();
+            }
+        },
+        true
+    );
+
     container.addEventListener('click', (e) => {
         const trashBtn = e.target.closest('.clear-row');
         if (trashBtn) {
@@ -757,13 +773,11 @@ async function handleStoixeioChange(rowIndex, selectedValue) {
             applyNomimaFromSymbashTotals();
         }, 500);
     }
-    // } catch (error) {
-    //     console.error('❌ Σφάλμα κατά την ενημέρωση αποδοχών:', error);
-    // } finally {
-    //     setTimeout(() => {
-    //         _isStoixeioChangeInProgress = false;
-    //     }, 600);
-    // }
+    // Ξεκλειδώνουμε ξανά τους input / blur handlers μετά την ολοκλήρωση
+    // του αυτόματου υπολογισμού της γραμμής.
+    setTimeout(() => {
+        _isStoixeioChangeInProgress = false;
+    }, 300);
 }
 
 // ========================================================================
@@ -881,11 +895,13 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
                 nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
                 if (hasExtraApodoxes) {
-                    // 🔵 Δωτά στοιχεία: πραγματικό ωρομίσθιο = νόμιμο ωρομίσθιο
-                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+                    // 🔵 Δωτά στοιχεία σε πλήρη απασχόληση:
+                    // Το πραγματικό ωρομίσθιο / ημερομίσθιο πρέπει να βγαίνει από το
+                    // συνολικό πραγματικό ποσό βάσει ωρών εργασίας (βασικό + extra),
+                    // όχι να επιστρέφει στο νόμιμο ωρομίσθιο.
                     pragmatikosMisthosValue = totalBaseiOronErgasias;
                     pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
-                    pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+                    pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
                 } else {
                     pragmatikosMisthosValue = totalBaseiOronErgasias;
                     pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
@@ -913,14 +929,15 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
             if (hasExtraApodoxes) {
-                // 🔵 Δωτά στοιχεία
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+                // 🔵 Δωτά στοιχεία σε πλήρη απασχόληση:
+                // Πραγματικός μισθός = σύνολο βάσει ωρών εργασίας.
+                // Πραγματικό ωρομίσθιο = πραγματικός μισθός / ώρες μήνα πλήρους απασχόλησης.
+                // Πραγματικό ημερομίσθιο = πραγματικό ωρομίσθιο * ώρες ημερήσιας εργασίας.
                 pragmatikosMisthosValue = totalBaseiOronErgasias;
-                // Ημερομίσθιο βάσει (totalBasei - extra) / ημέρες πλήρους
-                pragmatikoHmeromisthioValue = totalBaseiMinusExtra.div(
-                    toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
+                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(
+                    toDecimal(window._ORES_HMERHSIAS_ERGASIAS)
                 );
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
             } else {
                 pragmatikosMisthosValue = totalBaseiOronErgasias;
                 pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(
@@ -949,17 +966,15 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
             if (hasExtraApodoxes) {
-                // 🔵 Δωτά στοιχεία
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
+                // 🔵 Δωτά στοιχεία σε πλήρη απασχόληση ημερομισθίου:
+                // κρατάμε το πραγματικό ωρομίσθιο που υπολογίστηκε από το totalBaseiOronErgasias.
                 pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero()) {
-                    pragmatikoHmeromisthioValue = totalBaseiMinusExtra.div(
-                        toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
-                    );
+                if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
+                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
                 } else {
                     pragmatikoHmeromisthioValue = new Decimal(0);
                 }
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
+                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
             } else {
                 pragmatikosMisthosValue = totalBaseiOronErgasias;
                 if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
@@ -1312,6 +1327,22 @@ function calculatePartTimeWages(typosErg, eidKath, ores, hmeres) {
     if (pragmatikoOromisthio) {
         pragmatikoOromisthio.value = formatForDisplay(pragmatikoOromisthioValue, 4);
     }
+}
+
+function triggerRecalcButton() {
+    // Το editStoixeiaSymbaseon.js κάνει ήδη τους υπολογισμούς μέσα από calculateTotal().
+    // Δεν κάνουμε programmatic click στο κουμπί, για να μη μπλέκονται οι εξωτερικοί listeners
+    // και να μη χαλάνε τα πραγματικά ποσά. Το χρησιμοποιούμε μόνο ως ασφαλές debounce hook.
+    if (_recalcInProgress) return;
+    _recalcInProgress = true;
+    setTimeout(() => {
+        try {
+            calculateTotal();
+            applyNomimaFromSymbashTotals();
+        } finally {
+            _recalcInProgress = false;
+        }
+    }, 0);
 }
 
 function setupAutomaticRecalculation() {

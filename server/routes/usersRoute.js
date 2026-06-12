@@ -502,6 +502,8 @@ router.get(
     erganhController.getErgazomenosErganhHistory
 );
 
+router.get('/ergazomenoi/ergazomenoi/ergani/pdf/:id', checkAuth, erganhController.openErganiPdf);
+
 router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-to-erganh',
     checkAuth,

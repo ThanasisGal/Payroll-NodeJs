@@ -465,10 +465,13 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
     let pragmatikoHmeromisthioValue = new Decimal(0);
     let pragmatikoOromisthioValue = new Decimal(0);
 
-    const hasExtraApodoxes = !_TOTAL_EXTRA_APODOXES.isZero();
-    const totalBaseiMinusExtra = totalBaseiOronErgasias.minus(_TOTAL_EXTRA_APODOXES);
-
-    console.log('📊 ADD calculateFullTimeWages:', { typosErg, eidKath, hasExtraApodoxes });
+    // ΠΡΟΣΟΧΗ:
+    // Τα EXTRA στοιχεία σύμβασης (poso == 0 και posoBasei > 0) αυξάνουν τις
+    // αποδοχές βάσει ωρών εργασίας. Στον κανονικό επανυπολογισμό πρέπει να
+    // επηρεάζουν Πραγματικό Μισθό / Ημερομίσθιο / Ωρομίσθιο.
+    //
+    // Μόνο στο manual F9/F10 flow ξανασφραγίζουμε τα πραγματικά ποσά από το
+    // snapshot στο τέλος του calculateTotal(), ώστε να μη χαλάει το manual αποτέλεσμα.
 
     switch (typosErg) {
         case 'Ω':
@@ -483,7 +486,7 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
                     .div(25)
                     .times(totalBaseiOronErgasias);
 
-                if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+                if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
                     _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
                 }
 
@@ -493,16 +496,12 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
                 );
                 nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-                if (hasExtraApodoxes) {
-                    _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                    pragmatikosMisthosValue = totalBaseiOronErgasias;
-                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
-                    pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-                } else {
-                    pragmatikosMisthosValue = totalBaseiOronErgasias;
-                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
-                    pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-                }
+                pragmatikosMisthosValue = totalBaseiOronErgasias;
+                pragmatikoHmeromisthioValue =
+                    !ores.isZero() && !hmeres.isZero()
+                        ? _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres)
+                        : new Decimal(0);
+                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
             }
             break;
 
@@ -510,11 +509,12 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
             _NOMIMO_OROMISTHIO = totalSymbashs.div(
                 toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
             );
+
             _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
                 toDecimal(window._ORES_ERGASIAS_MHNA_PLHROYS_APASXOLHSHS)
             );
 
-            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+            if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
             }
 
@@ -524,31 +524,26 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
             );
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-            if (hasExtraApodoxes) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                pragmatikoHmeromisthioValue = totalBaseiMinusExtra.div(
-                    toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
-                );
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-            } else {
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(
-                    toDecimal(window._ORES_HMERHSIAS_ERGASIAS)
-                );
-                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-            }
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+            pragmatikoHmeromisthioValue = totalBaseiOronErgasias.div(
+                toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
+            );
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
             break;
 
         case 'Η':
             _NOMIMO_OROMISTHIO = totalSymbashs.times(
                 toDecimal(window._SYNTELESTHS_METATROPHS_OROMISTHIOY_SE_HMEROMISTHIO)
             );
-            _PRAGMATIKO_OROMISTHIO = totalBaseiOronErgasias.div(
-                ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
-            );
 
-            if (_PRAGMATIKO_OROMISTHIO < _NOMIMO_OROMISTHIO) {
+            _PRAGMATIKO_OROMISTHIO =
+                !ores.isZero() && !toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION).isZero()
+                    ? totalBaseiOronErgasias.div(
+                          ores.times(toDecimal(window._SYNTELESTHS_EBDOMADON_HMEROMISTHION))
+                      )
+                    : new Decimal(0);
+
+            if (_PRAGMATIKO_OROMISTHIO.lt(_NOMIMO_OROMISTHIO)) {
                 _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
             }
 
@@ -558,35 +553,14 @@ function calculateFullTimeWages(typosErg, eidKath, ores, hmeres) {
             );
             nomimoOromisthioValue = _NOMIMO_OROMISTHIO;
 
-            if (hasExtraApodoxes) {
-                _PRAGMATIKO_OROMISTHIO = _NOMIMO_OROMISTHIO;
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero()) {
-                    pragmatikoHmeromisthioValue = totalBaseiMinusExtra.div(
-                        toDecimal(window._HMERES_MHNIAIAS_PLHROYS_APASXOLHSHS)
-                    );
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _NOMIMO_OROMISTHIO;
-            } else {
-                pragmatikosMisthosValue = totalBaseiOronErgasias;
-                if (!ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()) {
-                    pragmatikoHmeromisthioValue = _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres);
-                } else {
-                    pragmatikoHmeromisthioValue = new Decimal(0);
-                }
-                pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
-            }
+            pragmatikosMisthosValue = totalBaseiOronErgasias;
+            pragmatikoHmeromisthioValue =
+                !ores.isZero() && !hmeres.isZero() && !_PRAGMATIKO_OROMISTHIO.isZero()
+                    ? _PRAGMATIKO_OROMISTHIO.times(ores).div(hmeres)
+                    : new Decimal(0);
+            pragmatikoOromisthioValue = _PRAGMATIKO_OROMISTHIO;
             break;
     }
-
-    console.log('📊 ADD FullTime RESULTS:', {
-        nomimosMisthosValue: nomimosMisthosValue.toString(),
-        nomimoHmeromisthioValue: nomimoHmeromisthioValue.toString(),
-        pragmatikosMisthosValue: pragmatikosMisthosValue.toString(),
-        pragmatikoHmeromisthioValue: pragmatikoHmeromisthioValue.toString()
-    });
 
     if (nomimosMisthos) nomimosMisthos.value = formatForDisplay(nomimosMisthosValue, 2);
     if (nomimoHmeromisthio) nomimoHmeromisthio.value = formatForDisplay(nomimoHmeromisthioValue, 4);
@@ -1683,6 +1657,14 @@ async function applyManualPragmatikoOromisthio() {
         restoreManualPragmatikoOromisthioSnapshot();
     }, 150);
 
+    // Τελικό σφράγισμα μετά το TomSelect async cycle. Αυτό αφορά μόνο F9/F10,
+    // επειδή το targetRow/diafora είναι manual snapshot.
+    setTimeout(async () => {
+        setManualExtraAmountToRow(targetRow, diafora);
+        await calculateTotal();
+        restoreManualPragmatikoOromisthioSnapshot();
+    }, 800);
+
     showAlert({
         icon: 'success',
         title: 'Υπολογισμός ολοκληρώθηκε',
@@ -1790,12 +1772,9 @@ async function ensureTomSelectForManualRow(idNum) {
         hooks: {
             onInitialize: function () {
                 this.on('change', async (value) => {
-                    syncManualHiddenTarget(idNum, value || '');
-
-                    // Programmatic EXTRA selection από F9/F10: μην αφήσεις τον
-                    // κανονικό handler να γράψει 0.00 πάνω στη χειροκίνητη διαφορά.
                     if (_isStoixeioChangeInProgress || this._manualExtraApplying) return;
 
+                    syncManualHiddenTarget(idNum, value || '');
                     if (typeof handleStoixeioChange === 'function' && value) {
                         await handleStoixeioChange(idNum, value);
                     } else if (!value) {
@@ -1844,11 +1823,10 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
     // γιατί αλλιώς μπορούν να ξαναγράψουν το posoBasei της EXTRA γραμμής σε 0.00.
     const previousStoixeioFlag = _isStoixeioChangeInProgress;
     _isStoixeioChangeInProgress = true;
+    if (tom) tom._manualExtraApplying = true;
 
     try {
         if (tom) {
-            tom._manualExtraApplying = true;
-
             const normalized = {
                 ...extraItem,
                 value: kodikos,
@@ -1885,13 +1863,13 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
         syncManualHiddenTarget(idNum, kodikos);
         setManualExtraAmountToRow(idNum, diafora);
     } finally {
+        // Το TomSelect σε ADD mode μπορεί να ολοκληρώσει async change/refresh λίγο μετά
+        // το silent setValue. Κρατάμε το guard ενεργό αρκετά, ώστε να μην προλάβει
+        // ο κανονικός handler να μηδενίσει το manual EXTRA ποσό.
         setTimeout(() => {
-            const rowSelectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
-            if (rowSelectEl?.tomselect) {
-                rowSelectEl.tomselect._manualExtraApplying = false;
-            }
+            if (tom) tom._manualExtraApplying = false;
             _isStoixeioChangeInProgress = previousStoixeioFlag;
-        }, 250);
+        }, 700);
     }
 }
 

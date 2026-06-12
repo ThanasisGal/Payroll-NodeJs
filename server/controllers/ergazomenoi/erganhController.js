@@ -10,6 +10,10 @@ const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
 
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { s3Client } = require('../../config/aws');
+
 const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
 const { generateWtoXML, generateWTOWeekJSON } = require('../../utils/xmlGenerators/wtoGenerator');
 const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generator');
@@ -2568,6 +2572,50 @@ function sanitizeErganiResultForResponse(restResult) {
               }
             : null
     };
+}
+
+function getErganiS3BucketFromUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw || raw.startsWith('file://')) return '';
+
+    try {
+        const parsed = new URL(raw);
+
+        // Virtual-hosted-style S3 URL:
+        // https://bucket-name.s3.eu-central-1.amazonaws.com/key
+        const virtualHostedMatch = parsed.hostname.match(
+            /^(.+)\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i
+        );
+        if (virtualHostedMatch?.[1]) {
+            return virtualHostedMatch[1];
+        }
+
+        // Path-style S3 URL:
+        // https://s3.eu-central-1.amazonaws.com/bucket-name/key
+        const pathStyleMatch = parsed.hostname.match(/^s3[.-][a-z0-9-]+\.amazonaws\.com$/i);
+        if (pathStyleMatch) {
+            return parsed.pathname.split('/').filter(Boolean)[0] || '';
+        }
+    } catch (_) {}
+
+    return '';
+}
+
+function getErganiS3Bucket(rec = {}) {
+    return (
+        process.env.AWS_S3_BUCKET ||
+        process.env.AWS_S3_BUCKET_NAME ||
+        process.env.S3_BUCKET ||
+        process.env.S3_BUCKET_NAME ||
+        process.env.AWS_BUCKET ||
+        process.env.AWS_BUCKET_NAME ||
+        getErganiS3BucketFromUrl(rec.pdf_s3_url) ||
+        'payroll-s3-uploader'
+    );
+}
+
+function getErganiPdfRoute(id) {
+    return id ? `/ergazomenoi/ergazomenoi/ergani/pdf/${id}` : '';
 }
 
 class erganhController {
@@ -5217,9 +5265,12 @@ class erganhController {
                 erganhSubmissionId: restResult?.id || null,
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                    : pdfStorage.pdfS3Url,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
                 pdfS3Key: pdfStorage.pdfS3Key,
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
@@ -5591,9 +5642,12 @@ class erganhController {
                 erganhSubmissionId: restResult?.id || null,
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                    : pdfStorage.pdfS3Url,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
                 pdfS3Key: pdfStorage.pdfS3Key,
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
@@ -5915,9 +5969,12 @@ class erganhController {
                 erganhSubmissionId: restResult?.id || null,
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                    : pdfStorage.pdfS3Url,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
                 pdfS3Key: pdfStorage.pdfS3Key,
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
@@ -6220,9 +6277,12 @@ class erganhController {
                 erganhSubmissionId: restResult?.id || null,
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                    : pdfStorage.pdfS3Url,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
                 pdfS3Key: pdfStorage.pdfS3Key,
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
@@ -6435,9 +6495,11 @@ class erganhController {
                     submissionStatus: row.submission_status || '',
                     documentStatus: row.document_status || 'ACTIVE',
                     environment: row.environment || '',
-                    pdfUrl: row.pdf_s3_url?.startsWith('file://')
-                        ? `/uploads/s3-mock/${row.pdf_relative_path}`
-                        : row.pdf_s3_url || '',
+                    pdfUrl: row.pdf_s3_key
+                        ? `/ergazomenoi/ergazomenoi/ergani/pdf/${row._id}`
+                        : row.pdf_relative_path
+                          ? `/uploads/s3-mock/${row.pdf_relative_path}`
+                          : '',
                     pdfFilename: row.pdf_filename || '',
                     pdfSaved: !!row.pdf_s3_url,
                     isCancelled: row.is_cancelled === true,
@@ -6454,6 +6516,59 @@ class erganhController {
                 success: false,
                 message: error.message || 'Σφάλμα κατά την ανάκτηση ιστορικού ΕΡΓΑΝΗ.'
             });
+        }
+    };
+
+    static openErganiPdf = async (req, res) => {
+        try {
+            const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
+
+            if (!rec) {
+                return res.status(404).send('PDF not found');
+            }
+
+            const localMockUrl = rec.pdf_relative_path
+                ? `/uploads/s3-mock/${rec.pdf_relative_path}`
+                : '';
+
+            // Local/mock storage: το pdf_s3_url είναι file:// και ΔΕΝ υπογράφεται με S3.
+            // Ανοίγει από το static /uploads/s3-mock route.
+            if (rec.pdf_s3_url?.startsWith('file://')) {
+                if (localMockUrl) return res.redirect(localMockUrl);
+                return res.status(404).send('PDF local path not found');
+            }
+
+            if (!rec.pdf_s3_key) {
+                if (localMockUrl) return res.redirect(localMockUrl);
+                return res.status(404).send('PDF S3 key not found');
+            }
+
+            const bucket = getErganiS3Bucket(rec);
+
+            if (!bucket) {
+                console.error('openErganiPdf error: missing S3 bucket', {
+                    id: String(rec._id),
+                    pdf_s3_key: rec.pdf_s3_key,
+                    pdf_s3_url: rec.pdf_s3_url
+                });
+
+                if (localMockUrl) return res.redirect(localMockUrl);
+                return res.status(500).send('PDF bucket not configured');
+            }
+
+            const signedUrl = await getSignedUrl(
+                s3Client,
+                new GetObjectCommand({
+                    Bucket: bucket,
+                    Key: rec.pdf_s3_key
+                }),
+                { expiresIn: 300 }
+            );
+
+            return res.redirect(signedUrl);
+        } catch (err) {
+            console.error('openErganiPdf error:', err);
+            return res.status(500).send('PDF open error');
         }
     };
 
@@ -6599,9 +6714,11 @@ class erganhController {
                 uploadMethod: r.upload_method || '',
                 submissionStatus: r.submission_status || '',
                 documentStatus: r.document_status || 'ACTIVE',
-                pdfUrl: r.pdf_s3_url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${r.pdf_relative_path}`
-                    : r.pdf_s3_url || ''
+                pdfUrl: r.pdf_s3_key
+                    ? getErganiPdfRoute(r._id)
+                    : r.pdf_relative_path
+                      ? `/uploads/s3-mock/${r.pdf_relative_path}`
+                      : ''
             }));
 
             return res.json({
@@ -7018,9 +7135,12 @@ class erganhController {
                 erganhSubmissionId: restResult?.id || null,
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
-                pdfUrl: pdfStorage.pdfS3Url?.startsWith('file://')
-                    ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                    : pdfStorage.pdfS3Url,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
                 pdfS3Key: pdfStorage.pdfS3Key,
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
