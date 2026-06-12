@@ -6521,11 +6521,9 @@ class erganhController {
 
     static openErganiPdf = async (req, res) => {
         console.log('🔥 openErganiPdf HIT:', req.params.id);
+
         try {
             const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
-
-            console.log('pdf_s3_key =', rec.pdf_s3_key);
-            console.log('AWS_S3_BUCKET =', process.env.AWS_S3_BUCKET);
 
             if (!rec) {
                 return res.status(404).send('PDF not found');
@@ -6535,8 +6533,10 @@ class erganhController {
                 ? `/uploads/s3-mock/${rec.pdf_relative_path}`
                 : '';
 
-            // Local/mock storage: το pdf_s3_url είναι file:// και ΔΕΝ υπογράφεται με S3.
-            // Ανοίγει από το static /uploads/s3-mock route.
+            console.log('pdf_s3_key =', rec.pdf_s3_key);
+            console.log('pdf_s3_url =', rec.pdf_s3_url);
+            console.log('pdf_relative_path =', rec.pdf_relative_path);
+
             if (rec.pdf_s3_url?.startsWith('file://')) {
                 if (localMockUrl) return res.redirect(localMockUrl);
                 return res.status(404).send('PDF local path not found');
@@ -6548,6 +6548,8 @@ class erganhController {
             }
 
             const bucket = getErganiS3Bucket(rec);
+
+            console.log('bucket =', bucket);
 
             if (!bucket) {
                 console.error('openErganiPdf error: missing S3 bucket', {
@@ -6564,12 +6566,14 @@ class erganhController {
                 s3Client,
                 new GetObjectCommand({
                     Bucket: bucket,
-                    Key: rec.pdf_s3_key
+                    Key: rec.pdf_s3_key,
+                    ResponseContentType: rec.pdf_content_type || 'application/pdf',
+                    ResponseContentDisposition: `inline; filename="${rec.pdf_filename || 'ergani.pdf'}"`
                 }),
                 { expiresIn: 300 }
             );
 
-            console.log('SIGNED URL =', signedUrl);
+            console.log('SIGNED URL created OK');
 
             return res.redirect(signedUrl);
         } catch (err) {
