@@ -6533,10 +6533,6 @@ class erganhController {
                 ? `/uploads/s3-mock/${rec.pdf_relative_path}`
                 : '';
 
-            console.log('pdf_s3_key =', rec.pdf_s3_key);
-            console.log('pdf_s3_url =', rec.pdf_s3_url);
-            console.log('pdf_relative_path =', rec.pdf_relative_path);
-
             if (rec.pdf_s3_url?.startsWith('file://')) {
                 if (localMockUrl) return res.redirect(localMockUrl);
                 return res.status(404).send('PDF local path not found');
@@ -6549,32 +6545,30 @@ class erganhController {
 
             const bucket = getErganiS3Bucket(rec);
 
-            console.log('bucket =', bucket);
-
             if (!bucket) {
-                console.error('openErganiPdf error: missing S3 bucket', {
-                    id: String(rec._id),
-                    pdf_s3_key: rec.pdf_s3_key,
-                    pdf_s3_url: rec.pdf_s3_url
-                });
-
                 if (localMockUrl) return res.redirect(localMockUrl);
                 return res.status(500).send('PDF bucket not configured');
             }
 
-            const signedUrl = await getSignedUrl(
-                s3Client,
+            console.log('bucket =', bucket);
+            console.log('pdf_s3_key =', rec.pdf_s3_key);
+
+            const s3Response = await s3Client.send(
                 new GetObjectCommand({
                     Bucket: bucket,
-                    Key: rec.pdf_s3_key,
-                    ResponseContentType: 'application/pdf'
-                }),
-                { expiresIn: 300 }
+                    Key: rec.pdf_s3_key
+                })
             );
 
-            console.log('SIGNED URL created OK');
+            res.setHeader('Content-Type', s3Response.ContentType || 'application/pdf');
+            res.setHeader('Content-Disposition', 'inline; filename="ergani.pdf"');
+            res.setHeader('Cache-Control', 'private, max-age=300');
 
-            return res.redirect(302, encodeURI(signedUrl));
+            if (s3Response.ContentLength) {
+                res.setHeader('Content-Length', String(s3Response.ContentLength));
+            }
+
+            return s3Response.Body.pipe(res);
         } catch (err) {
             console.error('openErganiPdf error:', err);
             return res.status(500).send('PDF open error');
