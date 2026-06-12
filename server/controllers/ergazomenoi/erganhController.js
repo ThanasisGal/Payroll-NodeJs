@@ -6524,6 +6524,9 @@ class erganhController {
         try {
             const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
 
+            console.log('pdf_s3_key =', rec.pdf_s3_key);
+            console.log('AWS_S3_BUCKET =', process.env.AWS_S3_BUCKET);
+
             if (!rec) {
                 return res.status(404).send('PDF not found');
             }
@@ -6565,6 +6568,8 @@ class erganhController {
                 }),
                 { expiresIn: 300 }
             );
+
+            console.log('SIGNED URL =', signedUrl);
 
             return res.redirect(signedUrl);
         } catch (err) {
