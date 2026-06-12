@@ -6567,15 +6567,14 @@ class erganhController {
                 new GetObjectCommand({
                     Bucket: bucket,
                     Key: rec.pdf_s3_key,
-                    ResponseContentType: rec.pdf_content_type || 'application/pdf',
-                    ResponseContentDisposition: `inline; filename="${rec.pdf_filename || 'ergani.pdf'}"`
+                    ResponseContentType: 'application/pdf'
                 }),
                 { expiresIn: 300 }
             );
 
             console.log('SIGNED URL created OK');
 
-            return res.redirect(signedUrl);
+            return res.redirect(302, encodeURI(signedUrl));
         } catch (err) {
             console.error('openErganiPdf error:', err);
             return res.status(500).send('PDF open error');
