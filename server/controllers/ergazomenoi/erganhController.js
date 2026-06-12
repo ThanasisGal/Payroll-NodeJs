@@ -6560,6 +6560,9 @@ class erganhController {
                 })
             );
 
+            res.removeHeader('X-Frame-Options');
+            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+            res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
             res.setHeader('Content-Type', s3Response.ContentType || 'application/pdf');
             res.setHeader('Content-Disposition', 'inline; filename="ergani.pdf"');
             res.setHeader('Cache-Control', 'private, max-age=300');
