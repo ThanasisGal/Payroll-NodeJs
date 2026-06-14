@@ -316,6 +316,57 @@ function ensureReviewTableStructure() {
                 color: #12344d !important;
             }
 
+            .cell-repo-day {
+                background-color: #fff3cd !important;
+                color: #856404 !important;
+                font-weight: 700;
+                text-align: center;
+            }
+
+            .cell-declared-repo-day {
+                background-color: #f1f3f5 !important;
+                color: #495057 !important;
+                font-weight: 700;
+                text-align: center;
+            }
+
+            .cell-non-work-day {
+                background-color: #e9ecef !important;
+                color: #495057 !important;
+                font-weight: 700;
+                text-align: center;
+            }
+
+            .cell-adeia-suggestion {
+                background-color: #fdebd0 !important;
+                color: #7f3300 !important;
+                font-weight: 700;
+            }
+
+            .review-warning-badge {
+                display: inline-block;
+                padding: 0.25rem 0.5rem;
+                border-radius: 999px;
+                background-color: #fff3cd;
+                color: #856404;
+                font-weight: 700;
+                border: 1px solid #ffe69c;
+                margin-left: 0.5rem;
+                white-space: nowrap;
+            }
+
+            .review-adeia-badge {
+                display: inline-block;
+                padding: 0.25rem 0.55rem;
+                border-radius: 999px;
+                background-color: #fdebd0;
+                color: #7f3300;
+                border: 1px solid #f7c98b;
+                font-weight: 700;
+                margin-left: 0.4rem;
+                white-space: nowrap;
+            }
+
             .review-hours-note {
                 display: block;
                 margin-top: 2px;
@@ -415,6 +466,147 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
     tbody.appendChild(tr);
 }
 
+function buildDeviationsByKodikos(deviations = []) {
+    const map = new Map();
+
+    deviations.forEach((dev) => {
+        const kodikos = String(dev.kodikos || '').trim();
+        if (!kodikos) return;
+        if (!map.has(kodikos)) map.set(kodikos, []);
+        map.get(kodikos).push(dev);
+    });
+
+    return map;
+}
+
+function employmentTypeLabel(value) {
+    const v = String(value ?? '').trim();
+
+    switch (v) {
+        case '0':
+            return 'Πλήρης';
+        case '1':
+            return 'Μερική';
+        case '2':
+            return 'Εκ Περιτροπής';
+        default:
+            return v || '-';
+    }
+}
+
+function renderDeviationProfileCell(dev) {
+    const effectiveRepo = dev.effective_mhniaia_repo ?? dev.mhniaia_repo ?? dev.expected_repo ?? '';
+    const effectiveType = employmentTypeLabel(dev.effective_typos_apasxolhshs);
+    const effectiveDate = dev.effective_profile_date ? formatDate(dev.effective_profile_date) : '';
+    const hasReadableEmploymentType =
+        effectiveType && effectiveType !== '-' && !/^\d+$/.test(String(effectiveType));
+
+    if (!dev.profile_changed_inside_week) {
+        return `
+            ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
+            <small class="text-muted">Αναμενόμενα ρεπό profile: ${escapeHtml(effectiveRepo)}</small>
+        `;
+    }
+
+    return `
+        <div class="fw-bold text-warning-emphasis">Τελικό προφίλ εβδομάδας</div>
+        ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
+        <div>${escapeHtml(effectiveRepo)} ${Number(effectiveRepo) === 1 ? 'ρεπό' : 'ρεπό'}</div>
+        ${
+            effectiveDate
+                ? `<small class="text-muted">Ισχύει από: ${escapeHtml(effectiveDate)}</small>`
+                : ''
+        }
+    `;
+}
+
+function renderDeviationNoteCell(dev) {
+    if (dev.profile_changed_inside_week) {
+        const excessRepo =
+            Number(dev.actual_repo ?? dev.pragmatikaRepo ?? 0) -
+            Number(dev.expected_repo ?? dev.mhniaia_repo ?? 0);
+        const excessText =
+            excessRepo > 0
+                ? `<div>Πλεονάζοντα ρεπό: <strong>${escapeHtml(excessRepo)}</strong></div>`
+                : '';
+
+        return `
+            <div class="fw-bold text-warning-emphasis">
+                ⚠ Αλλαγή όρων εργασίας μέσα στην εβδομάδα
+            </div>
+            <small class="text-muted">
+                Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο της εβδομάδας.
+            </small>
+            ${excessText}
+            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+        `;
+    }
+
+    return dev.note ? escapeHtml(dev.note) : '-';
+}
+
+function hasProfileChangeDeviation(deviations = []) {
+    return (
+        Array.isArray(deviations) &&
+        deviations.some((dev) => dev.profile_changed_inside_week === true)
+    );
+}
+
+function hasAdeiaSuggestion(row) {
+    return hasMeaningfulValue(row?.kathgoria_adeias_apologistika);
+}
+
+function hasAdeiaSuggestionInRows(rows = []) {
+    return Array.isArray(rows) && rows.some((row) => hasAdeiaSuggestion(row));
+}
+
+function appendEmployeeDeviationRows(tbody, deviations, groupId) {
+    if (!Array.isArray(deviations) || deviations.length === 0) return;
+
+    const wrapperTr = document.createElement('tr');
+    wrapperTr.classList.add('employee-deviation-row');
+    wrapperTr.classList.add('d-none');
+    wrapperTr.dataset.groupId = groupId;
+
+    const rowsHtml = deviations
+        .map(
+            (dev) => `
+                <tr class="${dev.profile_changed_inside_week ? 'table-warning' : ''}">
+                    <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
+                    <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
+                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '')}</td>
+                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '')}</td>
+                    <td>${renderDeviationProfileCell(dev)}</td>
+                    <td>${renderDeviationNoteCell(dev)}</td>
+                </tr>
+            `
+        )
+        .join('');
+
+    wrapperTr.innerHTML = `
+        <td colspan="13" class="p-2 bg-warning-subtle">
+            <div class="fw-bold mb-1">Αποκλίσεις εβδομαδιαίων ρεπό</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0 bg-white">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Από</th>
+                            <th>Έως</th>
+                            <th class="text-end">Αναμενόμενα ρεπό</th>
+                            <th class="text-end">Πραγματικά ρεπό</th>
+                            <th>Profile</th>
+                            <th>Σχόλιο</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        </td>
+    `;
+
+    tbody.appendChild(wrapperTr);
+}
+
 function appendGrandTotalsRow(tbody, totals) {
     const tr = document.createElement('tr');
     tr.classList.add('grand-total-row');
@@ -471,6 +663,13 @@ async function loadResults() {
         ensureReviewTableStructure();
 
         const rows = payload.rows || [];
+        const deviationsByKodikos = buildDeviationsByKodikos(payload.deviations || []);
+        const rowsByKodikos = new Map();
+        rows.forEach((row) => {
+            const key = employeeGroupKey(row);
+            if (!rowsByKodikos.has(key)) rowsByKodikos.set(key, []);
+            rowsByKodikos.get(key).push(row);
+        });
         const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
 
         const tbody = document.querySelector('#resultsTable tbody');
@@ -480,6 +679,7 @@ async function loadResults() {
         let currentGroupId = '';
         let employeeTotals = createEmptyTotals();
         let grandTotals = createEmptyTotals();
+        let currentGroupRows = [];
 
         for (const row of rows) {
             const groupKey = employeeGroupKey(row);
@@ -487,7 +687,13 @@ async function loadResults() {
             if (groupKey !== currentGroup) {
                 if (currentGroup !== '') {
                     appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+                    appendEmployeeDeviationRows(
+                        tbody,
+                        deviationsByKodikos.get(currentGroup) || [],
+                        currentGroupId
+                    );
                     employeeTotals = createEmptyTotals();
+                    currentGroupRows = [];
                 }
 
                 currentGroup = groupKey;
@@ -500,6 +706,12 @@ async function loadResults() {
                 groupTr.dataset.groupId = groupId;
                 groupTr.style.cursor = 'pointer';
 
+                const groupDeviations = deviationsByKodikos.get(groupKey) || [];
+                const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
+                const groupHasAdeiaSuggestion = hasAdeiaSuggestionInRows(
+                    rowsByKodikos.get(groupKey) || []
+                );
+
                 groupTr.innerHTML = `
                     <td colspan="13" class="fw-bold">
                         ${row.ypokatasthma || ''}
@@ -508,6 +720,8 @@ async function loadResults() {
                         |
                         ${row.eponymo || ''}
                         ${row.onoma || ''}
+                        ${groupHasProfileChange ? '<span class="review-warning-badge">⚠ Αλλαγή όρων</span>' : ''}
+                        ${groupHasAdeiaSuggestion ? '<span class="review-adeia-badge">⚠ Έλεγχος άδειας</span>' : ''}
                     </td>
                 `;
 
@@ -516,7 +730,8 @@ async function loadResults() {
 
                     const rows = document.querySelectorAll(
                         `tr.employee-detail-row[data-group-id="${groupId}"],
-                         tr.employee-subtotal-row[data-group-id="${groupId}"]`
+                         tr.employee-subtotal-row[data-group-id="${groupId}"],
+                         tr.employee-deviation-row[data-group-id="${groupId}"]`
                     );
 
                     rows.forEach((r) => {
@@ -542,6 +757,66 @@ async function loadResults() {
 
             const apologistikoText = renderIntervalCell(row, 'apo_ora', 'eos_ora', '_apologistika');
 
+            const effectiveKathgoria =
+                row.kathgoria_ergasias_apologistika &&
+                String(row.kathgoria_ergasias_apologistika).trim() !== ''
+                    ? String(row.kathgoria_ergasias_apologistika).trim()
+                    : String(row.kathgoria_ergasias || '').trim();
+
+            const effectiveTyposApasxolhshs = String(
+                row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? ''
+            ).trim();
+
+            const isFullTimeProfile =
+                row.effective_is_full_time === true ||
+                row.effective_is_full_time === 'true' ||
+                row.effective_is_full_time === 1 ||
+                row.effective_is_full_time === '1' ||
+                effectiveTyposApasxolhshs === '0';
+
+            const isApologistikoRepoRow =
+                row.apologistiko_biblio === true &&
+                effectiveKathgoria === 'ΑΝ' &&
+                num(row.cards_ores_ergasias) === 0;
+
+            const isApologistikoNonWorkRow =
+                row.apologistiko_biblio === true &&
+                effectiveKathgoria === 'ΜΕ' &&
+                num(row.cards_ores_ergasias) === 0;
+
+            const apologistikoDisplayText = isApologistikoRepoRow
+                ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+                : isApologistikoNonWorkRow
+                  ? 'ΜΗ ΕΡΓΑΣΙΑ'
+                  : apologistikoText;
+
+            const apologistikoDisplayClass = isApologistikoRepoRow
+                ? 'cell-repo-day'
+                : isApologistikoNonWorkRow
+                  ? 'cell-non-work-day'
+                  : isApologistikoIntervalPresent(row)
+                    ? 'cell-apologistiko'
+                    : hasAdeiaSuggestion(row)
+                      ? 'cell-adeia-suggestion'
+                      : '';
+
+            const isDeclaredRestOrNonWork =
+                row.apologistiko_biblio !== true &&
+                num(row.ores_ergasias) === 0 &&
+                num(row.cards_ores_ergasias) === 0;
+
+            const declaredText = isDeclaredRestOrNonWork
+                ? isFullTimeProfile
+                    ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+                    : 'ΜΗ ΕΡΓΑΣΙΑ'
+                : renderIntervalCell(row, 'apo_ora', 'eos_ora');
+
+            const declaredClass = isDeclaredRestOrNonWork
+                ? isFullTimeProfile
+                    ? 'cell-declared-repo-day'
+                    : 'cell-non-work-day'
+                : '';
+
             const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
 
             const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
@@ -550,10 +825,10 @@ async function loadResults() {
                 <td>${formatDate(row.hmeromhnia)}</td>
                 <td>${row.ypokatasthma || ''}</td>
                 <td>${row.kodikos || ''}</td>
-                <td>${renderIntervalCell(row, 'apo_ora', 'eos_ora')}</td>
+                <td${tdClass(declaredClass)}>${declaredText}</td>
                 <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
-                <td${tdClass(isApologistikoIntervalPresent(row) ? 'cell-apologistiko' : '')}>
-                    ${apologistikoText}
+                <td${tdClass(apologistikoDisplayClass)}>
+                    ${apologistikoDisplayText}
                 </td>
                 <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
                     ${renderHoursCell(row)}
@@ -584,12 +859,18 @@ async function loadResults() {
 
             addRowToTotals(employeeTotals, row);
             addRowToTotals(grandTotals, row);
+            currentGroupRows.push(row);
 
             tbody.appendChild(tr);
         }
 
         if (currentGroup !== '') {
             appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+            appendEmployeeDeviationRows(
+                tbody,
+                deviationsByKodikos.get(currentGroup) || [],
+                currentGroupId
+            );
             appendGrandTotalsRow(tbody, grandTotals);
         }
     } catch (error) {
@@ -1027,6 +1308,7 @@ function showDetailsModal(row) {
             <span class="review-badge">Παράρτημα: ${row.ypokatasthma || ''}</span>
             <span class="review-badge">Κωδικός: ${row.kodikos || ''}</span>
             <span class="review-badge">${row.eponymo || ''} ${row.onoma || ''}</span>
+            ${hasAdeiaSuggestion(row) ? '<span class="review-adeia-badge">⚠ Προτείνεται έλεγχος άδειας</span>' : ''}
         </div>
 
         <div class="review-modal-grid-3">
@@ -1058,7 +1340,10 @@ function showDetailsModal(row) {
         </div>
 
         <div class="review-modal-section">
-            <div class="review-modal-section-title">Απολογιστικά Πεδία</div>
+            <div class="review-modal-section-title">
+                Απολογιστικά Πεδία
+                ${hasAdeiaSuggestion(row) ? '<span class="review-adeia-badge">Προτείνεται έλεγχος άδειας</span>' : ''}
+            </div>
             ${renderApologistikaFields(row)}
         </div>
 
@@ -1390,6 +1675,7 @@ function initModalMoveByEnter() {
 function initModalKathgoriaAdeiasTomSelect() {
     const select = document.getElementById('edit_kathgoria_adeias_apologistika');
     const hidden = document.getElementById('edit_kathgoria_adeias_apologistika_hidden');
+    const adeiaCheckbox = document.getElementById('edit_adeia_apologistika');
 
     if (!select || !hidden) return;
 
@@ -1402,7 +1688,7 @@ function initModalKathgoriaAdeiasTomSelect() {
         return;
     }
 
-    new TomSelect(select, {
+    const tomSelect = new TomSelect(select, {
         valueField: 'value',
         labelField: 'label',
         searchField: ['label', 'text', 'perigrafh', 'kodikos', 'value'],
@@ -1459,13 +1745,30 @@ function initModalKathgoriaAdeiasTomSelect() {
                 });
 
                 this.setValue(value, true);
+
+                if (adeiaCheckbox) {
+                    adeiaCheckbox.checked = true;
+                }
             }
         },
 
         onChange: function (value) {
             hidden.value = value || '';
+
+            if (adeiaCheckbox) {
+                adeiaCheckbox.checked = !!value;
+            }
         }
     });
+
+    if (adeiaCheckbox) {
+        adeiaCheckbox.addEventListener('change', () => {
+            if (!adeiaCheckbox.checked) {
+                hidden.value = '';
+                tomSelect.clear(true);
+            }
+        });
+    }
 }
 
 let suppressLoaderUntil = 0;

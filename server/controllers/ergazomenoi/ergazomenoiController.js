@@ -300,12 +300,21 @@ function getTyposApasxolhshsFromFormData(formData = {}) {
     );
 }
 
-function buildIstorikoWorkTermsSnapshot(formData = {}) {
+function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {}) {
     const hmeres = toNumberOrNull(formData.hmeres_ergasias_ebdomadas);
     const weeklyHours = toNumberOrNull(formData.ores_ergasias_ebdomadas);
     const averageDailyHours =
         toNumberOrNull(formData.mo_oron_hmerhsias_ergasias) ||
         (hmeres && weeklyHours ? +(weeklyHours / hmeres).toFixed(4) : null);
+
+    // Το mhniaia_repo χρησιμοποιείται πλέον από τον απολογιστικό έλεγχο
+    // ως αναμενόμενα ρεπό ανά εβδομάδα. Το κρατάμε σαν snapshot στο ιστορικό,
+    // ώστε οι έλεγχοι παλιών περιόδων να μη βασίζονται στην τρέχουσα εικόνα
+    // του ErgazomenoiModel μετά από μεταβολές σύμβασης/ωραρίου.
+    const mhniaiaRepo =
+        toNumberOrNull(formData.mhniaia_repo) ??
+        toNumberOrNull(fallbackErgazomenos.mhniaia_repo) ??
+        0;
 
     const orarioApo = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
     const orarioEos = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos);
@@ -333,6 +342,8 @@ function buildIstorikoWorkTermsSnapshot(formData = {}) {
         mo_oron_hmerhsias_ergasias: averageDailyHours,
         typos_apasxolhshs: getTyposApasxolhshsFromFormData(formData),
         typos_ebdomadas: formData.typos_ebdomadas || getTyposEbdomadasFromHmeres(hmeres),
+        mhniaia_repo: mhniaiaRepo,
+        employment_profile_source: formData.employment_profile_source || 'ERGOMENOI_CONTROLLER',
 
         // Flag ότι η εγγραφή μπορεί να χρησιμοποιηθεί από τον απολογιστικό υπολογισμό.
         afora_allagh_oron_ergasias: Boolean(oroiApo || hmeres || weeklyHours || averageDailyHours)
@@ -786,6 +797,11 @@ class ergazomenoiController {
                 typos_ebdomadas:
                     data.typos_ebdomadas ||
                     getTyposEbdomadasFromHmeres(data.hmeres_ergasias_ebdomadas),
+                mhniaia_repo:
+                    toNumberOrNull(data.mhniaia_repo) ??
+                    toNumberOrNull(ergazomenos.mhniaia_repo) ??
+                    0,
+                employment_profile_source: data.employment_profile_source || 'ERGOMENOI_CONTROLLER',
                 afora_allagh_oron_ergasias:
                     data.afora_allagh_oron_ergasias === true ||
                     data.afora_allagh_oron_ergasias === 'true' ||

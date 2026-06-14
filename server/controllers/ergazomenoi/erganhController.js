@@ -115,6 +115,7 @@ const {
     OrariaFromCardsModel,
     OrariaApologistikaModel,
     ProdhlomenaOrariaModel,
+    ProdhlomenaOrariaDeviationsModel,
     ProdhlomenaOrariaAuditModel,
     ErgazomenoiErganhModel
 } = Models_D;
@@ -1095,6 +1096,496 @@ function getWeekKeySunday(date) {
     return dateKeyUtc(startOfWeekSundayUtc(date));
 }
 
+function endOfWeekSaturdayUtc(date) {
+    const start = startOfWeekSundayUtc(date);
+    const end = addDaysUtc(start, 6);
+    end.setUTCHours(23, 59, 59, 999);
+    return end;
+}
+
+function clampDateStartUtc(date) {
+    const d = new Date(date);
+    d.setUTCHours(0, 0, 0, 0);
+    return d;
+}
+
+function clampDateEndUtc(date) {
+    const d = new Date(date);
+    d.setUTCHours(23, 59, 59, 999);
+    return d;
+}
+
+function isZeroHours(value) {
+    const num = Number(value || 0);
+    return !Number.isFinite(num) || Math.abs(num) < 0.000001;
+}
+
+function isNonZeroHours(value) {
+    const num = Number(value || 0);
+    return Number.isFinite(num) && Math.abs(num) >= 0.000001;
+}
+
+function getExpectedWeeklyRepo(ergazomenos) {
+    const raw = ergazomenos?.mhniaia_repo;
+    const parsed = Number(raw ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isFullTimeWorkTerms(workTerms = {}) {
+    const typos = String(workTerms.typos_apasxolhshs ?? '')
+        .trim()
+        .toUpperCase();
+
+    if (typos === '0' || typos === 'PLHRHS' || typos === 'ΠΛΗΡΗΣ') {
+        return true;
+    }
+
+    if (typos === '1' || typos === '2' || typos === 'MERIKH' || typos === 'EK_PERITROPHS') {
+        return false;
+    }
+
+    const weeklyHours = Number(workTerms.ores_ergasias_ebdomadas || 0);
+    return weeklyHours >= 40;
+}
+
+function asDateOnlyUtc(value, endOfDay = false) {
+    const d = new Date(value);
+    if (endOfDay) {
+        d.setUTCHours(23, 59, 59, 999);
+    } else {
+        d.setUTCHours(0, 0, 0, 0);
+    }
+    return d;
+}
+
+function getEffectiveKathgoriaErgasias(row) {
+    const apologistika = String(row?.kathgoria_ergasias_apologistika || '').trim();
+    if (apologistika !== '') return apologistika;
+    return String(row?.kathgoria_ergasias || '').trim();
+}
+
+function getEffectiveRepoProfileForDate(date, istorikoRows = [], ergazomenos = {}) {
+    return getOrarioTermsForDate(date, istorikoRows, ergazomenos);
+}
+
+function getProfileSignature(profile = {}) {
+    return [
+        profile.source || '',
+        profile.istorikoId ? String(profile.istorikoId) : '',
+        String(profile.mhniaia_repo ?? ''),
+        String(profile.typos_apasxolhshs ?? ''),
+        String(profile.hmeres_ergasias_ebdomadas ?? ''),
+        String(profile.ores_ergasias_ebdomadas ?? '')
+    ].join('|');
+}
+
+function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
+    return (
+        normalizeDateOnlyForCalc(profile.hmeromhnia_isxyos_oron_ergasias_apo) ||
+        normalizeDateOnlyForCalc(profile.hmeromhnia_allaghs_orarioy_apo) ||
+        normalizeDateOnlyForCalc(profile.hmeromhnia_allaghs_symbashs) ||
+        normalizeDateOnlyForCalc(fallbackDate)
+    );
+}
+
+function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} }) {
+    const signatures = new Set();
+    const profiles = [];
+
+    // Κανόνας σπασμένης εβδομάδας:
+    // Για εβδομάδα Κυριακή-Σάββατο που έχει αλλαγή όρων εργασίας μέσα της,
+    // ΔΕΝ κάνουμε αναλογικό υπολογισμό. Υπερισχύει το profile που ισχύει
+    // στο τέλος της φυσικής εβδομάδας, δηλαδή το Σάββατο.
+    const saturdayOfWeek = week.naturalWeekEnd || endOfWeekSaturdayUtc(week.weekStart);
+
+    for (
+        let day = clampDateStartUtc(week.weekStart);
+        day.getTime() <= week.weekEnd.getTime();
+        day = addDaysUtc(day, 1)
+    ) {
+        const profile = getEffectiveRepoProfileForDate(day, istorikoRows, ergazomenos);
+        const signature = getProfileSignature(profile);
+        signatures.add(signature);
+        profiles.push({ day: new Date(day), profile, signature });
+    }
+
+    const firstProfile =
+        profiles.length > 0
+            ? profiles[0].profile
+            : getEffectiveRepoProfileForDate(week.weekStart, istorikoRows, ergazomenos);
+
+    const profileOfSaturday = getEffectiveRepoProfileForDate(
+        saturdayOfWeek,
+        istorikoRows,
+        ergazomenos
+    );
+
+    const lastProfileInsidePeriod =
+        profiles.length > 0
+            ? profiles[profiles.length - 1].profile
+            : getEffectiveRepoProfileForDate(week.weekEnd, istorikoRows, ergazomenos);
+
+    const effectiveProfile = week.isFullWeek ? profileOfSaturday : lastProfileInsidePeriod;
+    const firstSignature = getProfileSignature(firstProfile);
+    const saturdaySignature = getProfileSignature(profileOfSaturday);
+
+    return {
+        expectedWeeklyRepo: getExpectedWeeklyRepo(effectiveProfile),
+        profileChangedInsideWeek: signatures.size > 1 || firstSignature !== saturdaySignature,
+        effectiveProfile,
+        effectiveProfileDate: getProfileDateForDeviation(effectiveProfile, saturdayOfWeek),
+        previousProfile: firstProfile,
+        previousProfileDate: getProfileDateForDeviation(firstProfile, week.weekStart)
+    };
+}
+function getWeekRangesInsidePeriod(apoDate, eosDate) {
+    const periodStart = clampDateStartUtc(apoDate);
+    const periodEnd = clampDateEndUtc(eosDate);
+    const ranges = [];
+
+    let cursor = startOfWeekSundayUtc(periodStart);
+
+    while (cursor.getTime() <= periodEnd.getTime()) {
+        const naturalWeekStart = startOfWeekSundayUtc(cursor);
+        const naturalWeekEnd = endOfWeekSaturdayUtc(cursor);
+
+        const weekStart =
+            naturalWeekStart.getTime() < periodStart.getTime() ? periodStart : naturalWeekStart;
+        const weekEnd = naturalWeekEnd.getTime() > periodEnd.getTime() ? periodEnd : naturalWeekEnd;
+
+        const isFullWeek =
+            dateKeyUtc(weekStart) === dateKeyUtc(naturalWeekStart) &&
+            dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd) &&
+            weekStart.getUTCDay() === 0 &&
+            weekEnd.getUTCDay() === 6;
+
+        ranges.push({
+            naturalWeekStart,
+            naturalWeekEnd,
+            weekStart,
+            weekEnd,
+            isFullWeek
+        });
+
+        cursor = addDaysUtc(naturalWeekStart, 7);
+    }
+
+    return ranges;
+}
+
+async function runWeeklyRepoPostCheck({
+    sessionTeam,
+    companyId,
+    apoDate,
+    eosDate,
+    selectedYpokatasthma = ''
+}) {
+    const result = {
+        recordsChecked: 0,
+        recordsUpdated: 0,
+        deviations: []
+    };
+
+    const employeeQuery = {
+        team: sessionTeam,
+        company_kod: companyId,
+        energos: true
+    };
+
+    if (selectedYpokatasthma) {
+        employeeQuery.ypokatasthma = selectedYpokatasthma;
+    }
+
+    const employees = await ErgazomenoiModel.find(employeeQuery)
+        .select(
+            'ypokatasthma kodikos eponymo onoma mhniaia_repo ' +
+                'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+        )
+        .sort({ kodikos: 1 })
+        .lean();
+
+    const employeesByKodikos = new Map();
+    const kodikoi = [];
+
+    for (const erg of employees) {
+        if (!erg?.kodikos) continue;
+        employeesByKodikos.set(String(erg.kodikos), erg);
+        kodikoi.push(erg.kodikos);
+    }
+
+    if (kodikoi.length === 0) {
+        return result;
+    }
+
+    const periodStart = clampDateStartUtc(apoDate);
+    const periodEnd = clampDateEndUtc(eosDate);
+
+    const istorikoRowsByKodikos = new Map();
+
+    if (IstorikoProslhpseonAllagonModel) {
+        const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+            team: sessionTeam,
+            company_kod: companyId,
+            kodikos: mongoose.trusted({ $in: kodikoi }),
+            $or: mongoose.trusted([
+                {
+                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: periodEnd }),
+                    $or: mongoose.trusted([
+                        {
+                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
+                                $gte: periodStart
+                            })
+                        },
+                        { hmeromhnia_isxyos_oron_ergasias_eos: null }
+                    ])
+                },
+                {
+                    hmeromhnia_isxyos_oron_ergasias_apo: null,
+                    hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({ $lte: periodEnd }),
+                    $or: mongoose.trusted([
+                        {
+                            hmeromhnia_allaghs_orarioy_eos: mongoose.trusted({
+                                $gte: periodStart
+                            })
+                        },
+                        { hmeromhnia_allaghs_orarioy_eos: null }
+                    ])
+                },
+                {
+                    // Fallback για ιστορικά records που έχουν μόνο ημερομηνία αλλαγής σύμβασης.
+                    hmeromhnia_isxyos_oron_ergasias_apo: null,
+                    hmeromhnia_allaghs_orarioy_apo: null,
+                    hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: periodEnd })
+                }
+            ])
+        })
+            .select(
+                'kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
+                    'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
+                    'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
+                    'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+            )
+            .sort({
+                kodikos: 1,
+                hmeromhnia_isxyos_oron_ergasias_apo: 1,
+                hmeromhnia_allaghs_orarioy_apo: 1,
+                hmeromhnia_allaghs_symbashs: 1,
+                createdAt: 1
+            })
+            .lean();
+
+        for (const row of istorikoRows) {
+            const key = String(row.kodikos || '').trim();
+            if (!key) continue;
+            if (!istorikoRowsByKodikos.has(key)) istorikoRowsByKodikos.set(key, []);
+            istorikoRowsByKodikos.get(key).push(row);
+        }
+    }
+
+    const rows = await ProdhlomenaOrariaModel.find({
+        team: sessionTeam,
+        company_kod: companyId,
+        kodikos: mongoose.trusted({ $in: kodikoi }),
+        hmeromhnia: mongoose.trusted({
+            $gte: periodStart,
+            $lte: periodEnd
+        })
+    })
+        .select(
+            'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                'ores_ergasias cards_ores_ergasias apologistiko_biblio is_locked'
+        )
+        .sort({ kodikos: 1, hmeromhnia: 1 })
+        .lean();
+
+    result.recordsChecked = rows.length;
+
+    const rowsByEmployeeAndDate = new Map();
+
+    for (const row of rows) {
+        const key = `${row.kodikos}|${dateKeyUtc(row.hmeromhnia)}`;
+        rowsByEmployeeAndDate.set(key, row);
+    }
+
+    const bulkOps = [];
+    const weekRanges = getWeekRangesInsidePeriod(apoDate, eosDate);
+
+    for (const erg of employees) {
+        const istorikoRows = istorikoRowsByKodikos.get(String(erg.kodikos)) || [];
+
+        for (const week of weekRanges) {
+            let pragmatikaRepo = 0;
+
+            const weeklyProfileInfo = getWeeklyRepoProfileInfo({
+                week,
+                istorikoRows,
+                ergazomenos: erg
+            });
+
+            const expectedWeeklyRepo = weeklyProfileInfo.expectedWeeklyRepo;
+            const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
+            const previousProfile = weeklyProfileInfo.previousProfile || {};
+
+            for (
+                let day = clampDateStartUtc(week.weekStart);
+                day.getTime() <= week.weekEnd.getTime();
+                day = addDaysUtc(day, 1)
+            ) {
+                const row = rowsByEmployeeAndDate.get(`${erg.kodikos}|${dateKeyUtc(day)}`);
+                if (!row) continue;
+
+                // Για τον post-check κοιτάμε ΠΑΝΤΑ την αρχική προδηλωμένη κατηγορία.
+                // Το kathgoria_ergasias_apologistika είναι αποτέλεσμα του ελέγχου και
+                // χρησιμοποιείται στο review/display, όχι σαν είσοδος του κανόνα.
+                const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
+                const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
+                const oresErgasiasIsNonZero = isNonZeroHours(row.ores_ergasias);
+                const cardsOresIsZero = isZeroHours(row.cards_ores_ergasias);
+                const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
+                const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
+                const isFullTimeProfile = isFullTimeWorkTerms(dailyProfile);
+
+                const update = {};
+
+                if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsZero) {
+                    if (isFullTimeProfile) {
+                        pragmatikaRepo += 1;
+                    }
+                } else if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsNonZero) {
+                    update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
+                } else if (
+                    kathgoriaErgasias === 'ΕΡΓ' &&
+                    oresErgasiasIsNonZero &&
+                    cardsOresIsZero
+                ) {
+                    update.apologistiko_biblio = true;
+
+                    if (isFullTimeProfile) {
+                        update.kathgoria_ergasias_apologistika = 'ΑΝ';
+                        pragmatikaRepo += 1;
+                    } else {
+                        update.kathgoria_ergasias_apologistika = 'ΜΕ';
+                    }
+                }
+
+                if (Object.keys(update).length > 0 && row.is_locked !== true) {
+                    bulkOps.push({
+                        updateOne: {
+                            filter: { _id: row._id },
+                            update: { $set: update },
+                            upsert: false
+                        }
+                    });
+                }
+            }
+
+            if (week.isFullWeek && Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)) {
+                const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
+
+                result.deviations.push({
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    period_apo: asDateOnlyUtc(apoDate),
+                    period_eos: asDateOnlyUtc(eosDate, true),
+                    ypokatasthma: erg.ypokatasthma || '',
+                    kodikos: erg.kodikos || '',
+                    eponymo: erg.eponymo || '',
+                    onoma: erg.onoma || '',
+                    week_apo: asDateOnlyUtc(week.weekStart),
+                    week_eos: asDateOnlyUtc(week.weekEnd),
+                    weekStart: dateKeyUtc(week.weekStart),
+                    weekEnd: dateKeyUtc(week.weekEnd),
+                    expected_repo: expectedWeeklyRepo,
+                    actual_repo: pragmatikaRepo,
+                    mhniaia_repo: expectedWeeklyRepo,
+                    pragmatikaRepo,
+                    profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek,
+                    excess_repo: excessRepo,
+                    effective_mhniaia_repo: expectedWeeklyRepo,
+                    effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                    effective_profile_source:
+                        effectiveProfile.employment_profile_source || effectiveProfile.source || '',
+                    effective_profile_date: weeklyProfileInfo.effectiveProfileDate,
+                    effective_profile_istoriko_id: effectiveProfile.istorikoId || null,
+                    previous_mhniaia_repo: getExpectedWeeklyRepo(previousProfile),
+                    previous_typos_apasxolhshs: previousProfile.typos_apasxolhshs || '',
+                    previous_profile_source:
+                        previousProfile.employment_profile_source || previousProfile.source || '',
+                    previous_profile_date: weeklyProfileInfo.previousProfileDate,
+                    previous_profile_istoriko_id: previousProfile.istorikoId || null,
+                    deviation_type: weeklyProfileInfo.profileChangedInsideWeek
+                        ? 'PROFILE_CHANGED_INSIDE_WEEK'
+                        : 'WEEKLY_REPO_MISMATCH',
+                    note:
+                        weeklyProfileInfo.profileChangedInsideWeek && excessRepo > 0
+                            ? 'Υπάρχουν επιπλέον ρεπό σε εβδομάδα με αλλαγή όρων εργασίας. Να ελεγχθεί αν πρέπει να χαρακτηριστούν ως ΑΔΑΛ.'
+                            : ''
+                });
+            }
+        }
+    }
+
+    const CHUNK_SIZE = 1000;
+
+    for (let i = 0; i < bulkOps.length; i += CHUNK_SIZE) {
+        const chunk = bulkOps.slice(i, i + CHUNK_SIZE);
+        const writeResult = await ProdhlomenaOrariaModel.bulkWrite(chunk, { ordered: false });
+        result.recordsUpdated += writeResult.modifiedCount || 0;
+    }
+
+    // Αποθήκευση αποκλίσεων ρεπό ανά περίοδο.
+    // Πριν γράψουμε τα νέα αποτελέσματα, καθαρίζουμε μόνο τις αποκλίσεις
+    // της ίδιας ομάδας/εταιρείας/περιόδου, ώστε το review να δείχνει πάντα
+    // το τελευταίο αποτέλεσμα του υπολογισμού χωρίς να χρειάζεται νέο re-calc.
+    await ProdhlomenaOrariaDeviationsModel.deleteMany({
+        team: sessionTeam,
+        company_kod: companyId,
+        period_apo: asDateOnlyUtc(apoDate),
+        period_eos: asDateOnlyUtc(eosDate, true)
+    });
+
+    if (result.deviations.length > 0) {
+        await ProdhlomenaOrariaDeviationsModel.insertMany(
+            result.deviations.map((d) => ({
+                team: d.team,
+                company_kod: d.company_kod,
+                period_apo: d.period_apo,
+                period_eos: d.period_eos,
+                ypokatasthma: d.ypokatasthma,
+                kodikos: d.kodikos,
+                eponymo: d.eponymo,
+                onoma: d.onoma,
+                week_apo: d.week_apo,
+                week_eos: d.week_eos,
+                expected_repo: d.expected_repo,
+                actual_repo: d.actual_repo,
+                profile_changed_inside_week: d.profile_changed_inside_week,
+                excess_repo: d.excess_repo,
+                effective_mhniaia_repo: d.effective_mhniaia_repo,
+                effective_typos_apasxolhshs: d.effective_typos_apasxolhshs,
+                effective_profile_source: d.effective_profile_source,
+                effective_profile_date: d.effective_profile_date,
+                effective_profile_istoriko_id: d.effective_profile_istoriko_id,
+                previous_mhniaia_repo: d.previous_mhniaia_repo,
+                previous_typos_apasxolhshs: d.previous_typos_apasxolhshs,
+                previous_profile_source: d.previous_profile_source,
+                previous_profile_date: d.previous_profile_date,
+                previous_profile_istoriko_id: d.previous_profile_istoriko_id,
+                deviation_type: d.deviation_type,
+                note: d.note
+            })),
+            { ordered: false }
+        );
+    }
+
+    result.deviationsSaved = result.deviations.length;
+
+    return result;
+}
+
 function getDailyDeclaredMinutes(rec) {
     const declaredFromIntervals =
         durationMinutesSafe(rec.apo_ora_01, rec.eos_ora_01) +
@@ -1258,7 +1749,10 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
         typos_apasxolhshs: ergazomenos.typos_apasxolhshs || '',
-        typos_ebdomadas: ergazomenos.typos_ebdomadas || ''
+        typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
+        mhniaia_repo: getNumber(ergazomenos.mhniaia_repo, 0),
+        employment_profile_source: 'ERG_AKTUAL',
+        hmeromhnia_allaghs_symbashs: null
     };
 }
 
@@ -1278,6 +1772,9 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
         mo_oron_hmerhsias_ergasias: averageDailyHours,
         typos_apasxolhshs: row.typos_apasxolhshs || fallback.typos_apasxolhshs || '',
         typos_ebdomadas: row.typos_ebdomadas || fallback.typos_ebdomadas || '',
+        mhniaia_repo: getNumber(row.mhniaia_repo, fallback.mhniaia_repo || 0),
+        employment_profile_source: row.employment_profile_source || 'ISTORIKO',
+        hmeromhnia_allaghs_symbashs: row.hmeromhnia_allaghs_symbashs || null,
         hmeromhnia_allaghs_orarioy_apo: row.hmeromhnia_allaghs_orarioy_apo || null,
         hmeromhnia_allaghs_orarioy_eos: row.hmeromhnia_allaghs_orarioy_eos || null,
         hmeromhnia_isxyos_oron_ergasias_apo:
@@ -1445,16 +1942,63 @@ function chunkArray(arr, size = 300) {
     return chunks;
 }
 
+function normalizeEmploymentTypeForAdditionalWork(workTerms = {}) {
+    const raw = String(workTerms.typos_apasxolhshs ?? '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '_');
+
+    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
+        return 'FULL';
+    }
+
+    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PART_TIME'].includes(raw)) {
+        return 'PARTIAL';
+    }
+
+    if (
+        [
+            '2',
+            '02',
+            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
+            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
+            'EK_PERITROPHS',
+            'EK_PERITROPHIS',
+            'ROTATIONAL'
+        ].includes(raw)
+    ) {
+        return 'ROTATIONAL';
+    }
+
+    // Fallback μόνο όταν λείπει καθαρός τύπος απασχόλησης.
+    // Αν οι εβδομαδιαίες ώρες είναι <40 και το ημερήσιο συμβατικό όριο είναι >=8h,
+    // το αντιμετωπίζουμε ως εκ περιτροπής, όχι ως μερική.
+    const weeklyHours = getNumber(workTerms.ores_ergasias_ebdomadas, 0);
+    const hmeres = Math.max(1, getNumber(workTerms.hmeres_ergasias_ebdomadas, 0));
+    const averageDailyHours =
+        getNumber(workTerms.mo_oron_hmerhsias_ergasias, 0) || weeklyHours / hmeres;
+
+    if (weeklyHours > 0 && weeklyHours < 40) {
+        return averageDailyHours >= 8 ? 'ROTATIONAL' : 'PARTIAL';
+    }
+
+    if (weeklyHours >= 40) {
+        return 'FULL';
+    }
+
+    return '';
+}
+
+function isPartialEmploymentForAdditionalWork(workTerms = {}) {
+    return normalizeEmploymentTypeForAdditionalWork(workTerms) === 'PARTIAL';
+}
+
 function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     const { rec, ergazomenos, argiesDateSet } = context;
 
     const rules = getWorkTimeRules(ergazomenos);
-
-    const weeklyContractHours = Number(
-        String(ergazomenos?.ores_ergasias_ebdomadas || 0).replace(',', '.')
-    );
-
-    const canCalculateAdditionalWork = weeklyContractHours > 0 && weeklyContractHours < 40;
+    const employmentTypeForAdditional = normalizeEmploymentTypeForAdditionalWork(ergazomenos);
+    const isPartialEmployment = employmentTypeForAdditional === 'PARTIAL';
 
     const declaredMinutes = getDailyDeclaredMinutes(rec);
     const dailyCardsMinutes = getPayrollDailyWorkMinutes(rec, ergazomenos);
@@ -1479,17 +2023,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
     //
     // Κρατάμε ΜΟΝΟ τα λεπτά που τελικά ταξινομούνται ως νόμιμη
     // υπερωρία (όχι υπερεργασία και όχι παράνομη υπερωρία).
-    //
-    // Παράδειγμα:
-    // Κάρτες 13:00 - 02:30
-    // 13:00 - 21:00 = κανονική εργασία
-    // 21:00 - 22:00 = υπερεργασία
-    // 22:00 - 01:00 = νόμιμη υπερωρία
-    // 01:00 - 02:30 = παράνομη υπερωρία
-    //
-    // Άρα:
-    // apo_ora_yperories = 22:00
-    // eos_ora_yperories = 01:00
     // ============================================================
     let firstLegalOvertimeMinute = null;
     let totalLegalOvertimeMinutes = 0;
@@ -1503,29 +2036,108 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
         addClassifiedMinute(nomimiYperoria, rec, minute, argiesDateSet);
     };
 
-    if (dailyCardsMinutes <= 0) {
+    const buildResult = () => {
+        const legalOvertimeBreakOffsetMinutes = shouldSubtractExternalBreak(rec, ergazomenos)
+            ? getBreakOffsetMinutes(ergazomenos)
+            : 0;
+
+        const legalOvertimeStartTime =
+            totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
+                ? minutesToTimeSafe(firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes)
+                : '';
+
+        const legalOvertimeEndTime =
+            totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
+                ? minutesToTimeSafe(
+                      firstLegalOvertimeMinute +
+                          legalOvertimeBreakOffsetMinutes +
+                          totalLegalOvertimeMinutes
+                  )
+                : '';
+
         return {
-            ores_prostheths_ergasias_apologistika: 0,
+            ores_prostheths_ergasias_apologistika: toHours(prosthetiMinutes),
 
-            ores_yperergasias_apologistika: 0,
-            ores_yperergasias_nyxtas_apologistika: 0,
-            ores_yperergasias_argion_apologistika: 0,
-            ores_yperergasias_argion_nyxtas_apologistika: 0,
+            ores_yperergasias_apologistika: toHours(yperergasia.normal),
+            ores_yperergasias_nyxtas_apologistika: toHours(yperergasia.night),
+            ores_yperergasias_argion_apologistika: toHours(yperergasia.holiday),
+            ores_yperergasias_argion_nyxtas_apologistika: toHours(yperergasia.holidayNight),
 
-            ores_nominhs_yperorias_apologistika: 0,
-            ores_nominhs_yperorias_nyxtas_apologistika: 0,
-            ores_nominhs_yperorias_argion_apologistika: 0,
-            ores_nominhs_yperorias_argion_nyxtas_apologistika: 0,
+            ores_nominhs_yperorias_apologistika: toHours(nomimiYperoria.normal),
+            ores_nominhs_yperorias_nyxtas_apologistika: toHours(nomimiYperoria.night),
+            ores_nominhs_yperorias_argion_apologistika: toHours(nomimiYperoria.holiday),
+            ores_nominhs_yperorias_argion_nyxtas_apologistika: toHours(nomimiYperoria.holidayNight),
 
-            ores_paranomhs_yperorias_apologistika: 0,
-            ores_paranomhs_yperorias_nyxtas_apologistika: 0,
-            ores_paranomhs_yperorias_argion_apologistika: 0,
-            ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
+            ores_paranomhs_yperorias_apologistika: toHours(paranomiYperoria.normal),
+            ores_paranomhs_yperorias_nyxtas_apologistika: toHours(paranomiYperoria.night),
+            ores_paranomhs_yperorias_argion_apologistika: toHours(paranomiYperoria.holiday),
+            ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(
+                paranomiYperoria.holidayNight
+            ),
 
-            // Δεν υπάρχουν νόμιμες υπερωρίες, άρα καθαρίζουμε τυχόν παλιές τιμές.
-            apo_ora_yperories: '',
-            eos_ora_yperories: ''
+            // Ώρα έναρξης/λήξης ΜΟΝΟ της νόμιμης υπερωρίας.
+            // Δεν περιλαμβάνει υπερεργασία ούτε παράνομη υπερωρία.
+            apo_ora_yperories: legalOvertimeStartTime,
+            eos_ora_yperories: legalOvertimeEndTime
         };
+    };
+
+    if (dailyCardsMinutes <= 0) {
+        return buildResult();
+    }
+
+    const intervals = getPayrollCalculationIntervals(rec, ergazomenos);
+
+    // ============================================================
+    // ΜΕΡΙΚΗ ΑΠΑΣΧΟΛΗΣΗ
+    // ============================================================
+    // Πλήρης απασχόληση: ΔΕΝ υπάρχει πρόσθετη εργασία εδώ.
+    // Εκ περιτροπής: ΔΕΝ υπάρχει πρόσθετη εργασία εδώ.
+    // Μερική:
+    //   έως προδηλωμένες ώρες       -> κανονικά
+    //   από προδηλωμένες έως 8h     -> πρόσθετη εργασία
+    //   πάνω από 8h έως 11h         -> νόμιμη υπερωρία
+    //   πάνω από 11h                -> παράνομη υπερωρία
+    // ============================================================
+    if (isPartialEmployment) {
+        const partialDeclaredLimitMinutes = Math.min(baseWorkMinutes, 8 * 60);
+        const partialAdditionalEndMinutes = 8 * 60;
+        const partialLegalOvertimeEndMinutes = partialAdditionalEndMinutes + 3 * 60;
+
+        let workedSoFarToday = 0;
+        let regularWorkedSoFarToday = 0;
+
+        for (const interval of intervals) {
+            for (let minute = interval.start; minute < interval.end; minute++) {
+                workedSoFarToday++;
+
+                if (regularDay) {
+                    regularWorkedSoFarToday++;
+                }
+
+                if (workedSoFarToday <= partialDeclaredLimitMinutes) {
+                    continue;
+                }
+
+                if (workedSoFarToday <= partialAdditionalEndMinutes) {
+                    prosthetiMinutes++;
+                    continue;
+                }
+
+                if (workedSoFarToday <= partialLegalOvertimeEndMinutes) {
+                    addLegalOvertimeMinute(minute);
+                    continue;
+                }
+
+                addClassifiedMinute(paranomiYperoria, rec, minute, argiesDateSet);
+            }
+        }
+
+        if (regularDay && weeklyState) {
+            weeklyState.processedRegularMinutes += regularWorkedSoFarToday;
+        }
+
+        return buildResult();
     }
 
     // Η υπερεργασία πρέπει να προηγείται ΠΑΝΤΑ της νόμιμης υπερωρίας.
@@ -1541,8 +2153,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
 
     let workedSoFarToday = 0;
     let regularWorkedSoFarToday = 0;
-
-    const intervals = getPayrollCalculationIntervals(rec, ergazomenos);
 
     for (const interval of intervals) {
         for (let minute = interval.start; minute < interval.end; minute++) {
@@ -1611,16 +2221,6 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
                 addLegalOvertimeMinute(minute);
                 continue;
             }
-
-            const additionalUpperLimit = Math.min(rules.contractualDailyLimitMinutes, 8 * 60);
-
-            if (
-                canCalculateAdditionalWork &&
-                workedSoFarToday > baseWorkMinutes &&
-                workedSoFarToday <= additionalUpperLimit
-            ) {
-                prosthetiMinutes++;
-            }
         }
     }
 
@@ -1628,63 +2228,7 @@ function calculateAdditionalAndOverworkForDay(context, weeklyState) {
         weeklyState.processedRegularMinutes += regularWorkedSoFarToday;
     }
 
-    // ============================================================
-    // Ώρες νόμιμης υπερωρίας για ΕΡΓΑΝΗ.
-    //
-    // Αν το διάλειμμα είναι ΕΚΤΟΣ ωραρίου, ο εργαζόμενος πρέπει να
-    // το καλύψει δουλεύοντας ισόχρονα. Επειδή οι υπολογισμοί buckets
-    // γίνονται ήδη πάνω σε χρόνο όπου αφαιρέθηκε το εξωτερικό διάλειμμα,
-    // μετακινούμε ΚΑΙ την έναρξη ΚΑΙ τη λήξη της νόμιμης υπερωρίας
-    // κατά τα λεπτά του διαλείμματος.
-    //
-    // Παράδειγμα:
-    // Κάρτες 13:09 - 23:58, διάλειμμα εκτός 30'
-    // Κανονική λήξη 21:09 → κάλυψη διαλείμματος έως 21:39
-    // Νόμιμη υπερωρία: 21:39 - 23:58
-    //
-    // Αν το διάλειμμα είναι ΕΝΤΟΣ ωραρίου, δεν προσθέτουμε τίποτα.
-    // ============================================================
-    const legalOvertimeBreakOffsetMinutes = shouldSubtractExternalBreak(rec, ergazomenos)
-        ? getBreakOffsetMinutes(ergazomenos)
-        : 0;
-
-    const legalOvertimeStartTime =
-        totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-            ? minutesToTimeSafe(firstLegalOvertimeMinute + legalOvertimeBreakOffsetMinutes)
-            : '';
-
-    const legalOvertimeEndTime =
-        totalLegalOvertimeMinutes > 0 && firstLegalOvertimeMinute !== null
-            ? minutesToTimeSafe(
-                  firstLegalOvertimeMinute +
-                      legalOvertimeBreakOffsetMinutes +
-                      totalLegalOvertimeMinutes
-              )
-            : '';
-
-    return {
-        ores_prostheths_ergasias_apologistika: toHours(prosthetiMinutes),
-
-        ores_yperergasias_apologistika: toHours(yperergasia.normal),
-        ores_yperergasias_nyxtas_apologistika: toHours(yperergasia.night),
-        ores_yperergasias_argion_apologistika: toHours(yperergasia.holiday),
-        ores_yperergasias_argion_nyxtas_apologistika: toHours(yperergasia.holidayNight),
-
-        ores_nominhs_yperorias_apologistika: toHours(nomimiYperoria.normal),
-        ores_nominhs_yperorias_nyxtas_apologistika: toHours(nomimiYperoria.night),
-        ores_nominhs_yperorias_argion_apologistika: toHours(nomimiYperoria.holiday),
-        ores_nominhs_yperorias_argion_nyxtas_apologistika: toHours(nomimiYperoria.holidayNight),
-
-        ores_paranomhs_yperorias_apologistika: toHours(paranomiYperoria.normal),
-        ores_paranomhs_yperorias_nyxtas_apologistika: toHours(paranomiYperoria.night),
-        ores_paranomhs_yperorias_argion_apologistika: toHours(paranomiYperoria.holiday),
-        ores_paranomhs_yperorias_argion_nyxtas_apologistika: toHours(paranomiYperoria.holidayNight),
-
-        // Ώρα έναρξης/λήξης ΜΟΝΟ της νόμιμης υπερωρίας.
-        // Δεν περιλαμβάνει υπερεργασία ούτε παράνομη υπερωρία.
-        apo_ora_yperories: legalOvertimeStartTime,
-        eos_ora_yperories: legalOvertimeEndTime
-    };
+    return buildResult();
 }
 
 function getCardIntervals(rec, ergazomenos = null) {
@@ -2288,6 +2832,13 @@ function reviewDateOnly(value) {
     if (Number.isNaN(d.getTime())) return '';
     return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
+function reviewDateWithDay(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const days = ['Κυ', 'Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα'];
+    return `${days[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+}
 function reviewInterval(row, apoField, eosField) {
     const apo = String(row?.[apoField] || '').trim();
     const eos = String(row?.[eosField] || '').trim();
@@ -2300,6 +2851,144 @@ function reviewIntervals(row, apoPrefix, eosPrefix, suffix = '') {
         .filter(Boolean)
         .join(' / ');
 }
+
+function reviewEffectiveKathgoria(row = {}) {
+    const apologistiki = String(row.kathgoria_ergasias_apologistika || '').trim();
+    return apologistiki || String(row.kathgoria_ergasias || '').trim();
+}
+
+function reviewIsFullTimeProfile(row = {}) {
+    return (
+        row.effective_is_full_time === true ||
+        row.effective_is_full_time === 'true' ||
+        row.effective_is_full_time === 1 ||
+        row.effective_is_full_time === '1' ||
+        String(row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? '').trim() === '0'
+    );
+}
+
+function reviewProgramDisplay(row = {}) {
+    const isDeclaredRestOrNonWork =
+        row.apologistiko_biblio !== true &&
+        reviewNum(row.ores_ergasias) === 0 &&
+        reviewNum(row.cards_ores_ergasias) === 0;
+
+    if (!isDeclaredRestOrNonWork) {
+        return { text: reviewIntervals(row, 'apo_ora', 'eos_ora') || '-', type: '' };
+    }
+
+    if (reviewIsFullTimeProfile(row)) {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'declared_repo' };
+    }
+
+    return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
+}
+
+function reviewApologistikoDisplay(row = {}) {
+    const effectiveKathgoria = reviewEffectiveKathgoria(row);
+    const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
+
+    if (row.apologistiko_biblio === true && effectiveKathgoria === 'ΑΝ' && hasNoCards) {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'repo' };
+    }
+
+    if (row.apologistiko_biblio === true && effectiveKathgoria === 'ΜΕ' && hasNoCards) {
+        return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
+    }
+
+    const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
+    if (intervals) return { text: intervals, type: 'apologistiko' };
+
+    if (String(row.kathgoria_adeias_apologistika || '').trim()) {
+        return { text: '-', type: 'adeia_suggestion' };
+    }
+
+    return { text: '-', type: '' };
+}
+
+function reviewEmploymentTypeLabel(value) {
+    const v = String(value ?? '').trim();
+    if (v === '0') return 'Πλήρης';
+    if (v === '1') return 'Μερική';
+    if (v === '2') return 'Εκ Περιτροπής';
+    return v || '-';
+}
+
+function buildReviewDeviationsFilter(req) {
+    const filter = { team: req.session.userTeam, company_kod: req.session.companyInUse };
+    const { apo_hmeromhnia, eos_hmeromhnia, ypokatasthma, kodikos } = req.query;
+
+    if (apo_hmeromhnia && eos_hmeromhnia) {
+        filter.period_apo = asDateOnlyUtc(`${apo_hmeromhnia}T00:00:00.000Z`);
+        filter.period_eos = asDateOnlyUtc(`${eos_hmeromhnia}T23:59:59.999Z`, true);
+    }
+
+    if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+        filter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+    }
+
+    if (kodikos && String(kodikos).trim() !== '') {
+        filter.kodikos = String(kodikos).trim();
+    }
+
+    return filter;
+}
+
+function mapDeviationForReviewExport(d = {}) {
+    return {
+        _id: d._id,
+        ypokatasthma: d.ypokatasthma || '',
+        kodikos: d.kodikos || '',
+        eponymo: d.eponymo || '',
+        onoma: d.onoma || '',
+        week_apo: d.week_apo,
+        week_eos: d.week_eos,
+        weekStart: dateKeyUtc(d.week_apo),
+        weekEnd: dateKeyUtc(d.week_eos),
+        expected_repo: Number(d.expected_repo || 0),
+        actual_repo: Number(d.actual_repo || 0),
+        profile_changed_inside_week: d.profile_changed_inside_week === true,
+        excess_repo: Number(d.excess_repo || 0),
+        effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
+        effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
+        effective_profile_source: d.effective_profile_source || '',
+        effective_profile_date: d.effective_profile_date,
+        previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
+        previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
+        previous_profile_date: d.previous_profile_date,
+        deviation_type: d.deviation_type || '',
+        note: d.note || ''
+    };
+}
+
+function reviewDeviationProfileText(dev = {}) {
+    const repo = dev.effective_mhniaia_repo ?? dev.expected_repo ?? '';
+    const type = reviewEmploymentTypeLabel(dev.effective_typos_apasxolhshs);
+    const parts = [];
+    if (dev.profile_changed_inside_week) parts.push('Τελικό προφίλ εβδομάδας');
+    if (type && type !== '-') parts.push(type);
+    parts.push(`${repo} ρεπό`);
+    if (dev.effective_profile_date)
+        parts.push(`Ισχύει από: ${reviewDateOnly(dev.effective_profile_date)}`);
+    return parts.join(' | ');
+}
+
+function reviewDeviationNoteText(dev = {}) {
+    if (dev.profile_changed_inside_week) {
+        const excess = Number(dev.actual_repo || 0) - Number(dev.expected_repo || 0);
+        return [
+            'Αλλαγή όρων εργασίας μέσα στην εβδομάδα.',
+            'Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο.',
+            excess > 0 ? `Πλεονάζοντα ρεπό: ${excess}` : '',
+            dev.note || ''
+        ]
+            .filter(Boolean)
+            .join(' ');
+    }
+
+    return dev.note || '';
+}
+
 function reviewYperergasiaTotal(row) {
     return (
         reviewNum(row.ores_yperergasias_apologistika) +
@@ -2411,33 +3100,138 @@ function buildProdhlomenaReviewFilter(req) {
     return filter;
 }
 const REVIEW_SELECT_FIELDS =
-    'ypokatasthma kodikos hmeromhnia apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ores_ergasias_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ores_ergasias_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 async function getReviewRowsForExport(req) {
     const rows = await ProdhlomenaOrariaModel.find(buildProdhlomenaReviewFilter(req))
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
         .lean();
+
     const kodikoi = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+
     const ergazomenoi = kodikoi.length
         ? await ErgazomenoiModel.find({
               team: req.session.userTeam,
               company_kod: req.session.companyInUse,
               kodikos: mongoose.trusted({ $in: kodikoi })
           })
-              .select('kodikos eponymo onoma ypokatasthma')
+              .select(
+                  'kodikos eponymo onoma ypokatasthma mhniaia_repo ' +
+                      'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                      'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+              )
               .lean()
         : [];
+
     const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
-    return rows.map((row) => {
+
+    const periodStart = req.query.apo_hmeromhnia
+        ? clampDateStartUtc(`${req.query.apo_hmeromhnia}T00:00:00.000Z`)
+        : rows.length
+          ? clampDateStartUtc(rows[0].hmeromhnia)
+          : null;
+
+    const periodEnd = req.query.eos_hmeromhnia
+        ? clampDateEndUtc(`${req.query.eos_hmeromhnia}T23:59:59.999Z`)
+        : rows.length
+          ? clampDateEndUtc(rows[rows.length - 1].hmeromhnia)
+          : null;
+
+    const istorikoRowsByKodikos = new Map();
+
+    if (kodikoi.length > 0 && periodStart && periodEnd) {
+        const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+            team: req.session.userTeam,
+            company_kod: req.session.companyInUse,
+            kodikos: mongoose.trusted({ $in: kodikoi }),
+            $or: mongoose.trusted([
+                {
+                    hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: periodEnd }),
+                    $or: mongoose.trusted([
+                        {
+                            hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
+                                $gte: periodStart
+                            })
+                        },
+                        { hmeromhnia_isxyos_oron_ergasias_eos: null }
+                    ])
+                },
+                {
+                    hmeromhnia_isxyos_oron_ergasias_apo: null,
+                    hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({ $lte: periodEnd }),
+                    $or: mongoose.trusted([
+                        { hmeromhnia_allaghs_orarioy_eos: mongoose.trusted({ $gte: periodStart }) },
+                        { hmeromhnia_allaghs_orarioy_eos: null }
+                    ])
+                },
+                {
+                    hmeromhnia_isxyos_oron_ergasias_apo: null,
+                    hmeromhnia_allaghs_orarioy_apo: null,
+                    hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: periodEnd })
+                }
+            ])
+        })
+            .select(
+                'kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
+                    'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
+                    'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
+                    'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+            )
+            .sort({
+                kodikos: 1,
+                hmeromhnia_isxyos_oron_ergasias_apo: 1,
+                hmeromhnia_allaghs_orarioy_apo: 1,
+                hmeromhnia_allaghs_symbashs: 1,
+                createdAt: 1
+            })
+            .lean();
+
+        for (const row of istorikoRows) {
+            const key = String(row.kodikos || '').trim();
+            if (!key) continue;
+            if (!istorikoRowsByKodikos.has(key)) istorikoRowsByKodikos.set(key, []);
+            istorikoRowsByKodikos.get(key).push(row);
+        }
+    }
+
+    const deviations = await ProdhlomenaOrariaDeviationsModel.find(buildReviewDeviationsFilter(req))
+        .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
+        .lean();
+
+    const enrichedRows = rows.map((row) => {
         const erg = ergByKodikos.get(row.kodikos) || {};
+        const istorikoRowsForEmployee =
+            istorikoRowsByKodikos.get(String(row.kodikos || '').trim()) || [];
+        const effectiveProfile = getOrarioTermsForDate(
+            row.hmeromhnia,
+            istorikoRowsForEmployee,
+            erg || {}
+        );
+        const effectiveKathgoria = getEffectiveKathgoriaErgasias(row);
+
         return {
             ...row,
+            kathgoria_ergasias_original: row.kathgoria_ergasias || '',
+            kathgoria_ergasias: effectiveKathgoria,
+            kathgoria_ergasias_effective: effectiveKathgoria,
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
-            exportYpokatasthma: row.ypokatasthma || erg.ypokatasthma || ''
+            exportYpokatasthma: row.ypokatasthma || erg.ypokatasthma || '',
+            effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
+            effective_is_full_time: isFullTimeWorkTerms(effectiveProfile),
+            effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+            effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
+            effective_profile_source: effectiveProfile.source || '',
+            effective_profile_date: getProfileDateForDeviation(effectiveProfile, row.hmeromhnia),
+            effective_profile_istoriko_id: effectiveProfile.istorikoId || null
         };
     });
+
+    enrichedRows.__deviations = deviations.map(mapDeviationForReviewExport);
+    return enrichedRows;
 }
 function makeReviewPdfDocument() {
     const doc = new PDFDocument({
@@ -3363,7 +4157,7 @@ class erganhController {
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias ' +
+                        'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
@@ -3391,20 +4185,195 @@ class erganhController {
                 company_kod: companyId,
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
             })
-                .select('kodikos eponymo onoma')
+                .select(
+                    'kodikos eponymo onoma mhniaia_repo ' +
+                        'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                        'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                )
                 .lean();
 
             const ergByKodikos = new Map(ergazomenoi.map((e) => [e.kodikos, e]));
 
+            // ============================================================
+            // Ιστορικό profile ανά ημέρα για το review.
+            // Δεν αρκεί η τρέχουσα εικόνα του ErgazomenoiModel, γιατί μέσα
+            // στην περίοδο μπορεί να έχει αλλάξει 5ήμερο/6ήμερο ή
+            // πλήρης/μερική/εκ περιτροπής απασχόληση.
+            // ============================================================
+            const reviewPeriodStart = apo_hmeromhnia
+                ? clampDateStartUtc(`${apo_hmeromhnia}T00:00:00.000Z`)
+                : rows.length > 0
+                  ? clampDateStartUtc(rows[0].hmeromhnia)
+                  : null;
+
+            const reviewPeriodEnd = eos_hmeromhnia
+                ? clampDateEndUtc(`${eos_hmeromhnia}T23:59:59.999Z`)
+                : rows.length > 0
+                  ? clampDateEndUtc(rows[rows.length - 1].hmeromhnia)
+                  : null;
+
+            const istorikoRowsByKodikos = new Map();
+
+            if (
+                IstorikoProslhpseonAllagonModel &&
+                kodikoiRows.length > 0 &&
+                reviewPeriodStart &&
+                reviewPeriodEnd
+            ) {
+                const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: kodikoiRows }),
+                    $or: mongoose.trusted([
+                        {
+                            hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
+                                $lte: reviewPeriodEnd
+                            }),
+                            $or: mongoose.trusted([
+                                {
+                                    hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
+                                        $gte: reviewPeriodStart
+                                    })
+                                },
+                                { hmeromhnia_isxyos_oron_ergasias_eos: null }
+                            ])
+                        },
+                        {
+                            hmeromhnia_isxyos_oron_ergasias_apo: null,
+                            hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({
+                                $lte: reviewPeriodEnd
+                            }),
+                            $or: mongoose.trusted([
+                                {
+                                    hmeromhnia_allaghs_orarioy_eos: mongoose.trusted({
+                                        $gte: reviewPeriodStart
+                                    })
+                                },
+                                { hmeromhnia_allaghs_orarioy_eos: null }
+                            ])
+                        },
+                        {
+                            hmeromhnia_isxyos_oron_ergasias_apo: null,
+                            hmeromhnia_allaghs_orarioy_apo: null,
+                            hmeromhnia_allaghs_symbashs: mongoose.trusted({
+                                $lte: reviewPeriodEnd
+                            })
+                        }
+                    ])
+                })
+                    .select(
+                        'kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
+                            'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
+                            'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
+                            'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+                            'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                            'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+                    )
+                    .sort({
+                        kodikos: 1,
+                        hmeromhnia_isxyos_oron_ergasias_apo: 1,
+                        hmeromhnia_allaghs_orarioy_apo: 1,
+                        hmeromhnia_allaghs_symbashs: 1,
+                        createdAt: 1
+                    })
+                    .lean();
+
+                for (const row of istorikoRows) {
+                    const key = String(row.kodikos || '').trim();
+                    if (!key) continue;
+                    if (!istorikoRowsByKodikos.has(key)) istorikoRowsByKodikos.set(key, []);
+                    istorikoRowsByKodikos.get(key).push(row);
+                }
+            }
+
+            const deviationsFilter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (apo_hmeromhnia && eos_hmeromhnia) {
+                deviationsFilter.period_apo = asDateOnlyUtc(`${apo_hmeromhnia}T00:00:00.000Z`);
+                deviationsFilter.period_eos = asDateOnlyUtc(
+                    `${eos_hmeromhnia}T23:59:59.999Z`,
+                    true
+                );
+            }
+
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                deviationsFilter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+            }
+
+            if (kodikos && String(kodikos).trim() !== '') {
+                deviationsFilter.kodikos = String(kodikos).trim();
+            }
+
+            const deviations = await ProdhlomenaOrariaDeviationsModel.find(deviationsFilter)
+                .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
+                .lean();
+
             const enrichedRows = rows.map((r) => {
                 const erg = ergByKodikos.get(r.kodikos);
+                const effectiveKathgoria = getEffectiveKathgoriaErgasias(r);
+                const istorikoRowsForEmployee =
+                    istorikoRowsByKodikos.get(String(r.kodikos || '').trim()) || [];
+                const effectiveProfile = getOrarioTermsForDate(
+                    r.hmeromhnia,
+                    istorikoRowsForEmployee,
+                    erg || {}
+                );
 
                 return {
                     ...r,
+                    kathgoria_ergasias_original: r.kathgoria_ergasias || '',
+                    kathgoria_ergasias: effectiveKathgoria,
+                    kathgoria_ergasias_effective: effectiveKathgoria,
                     eponymo: erg?.eponymo || '',
-                    onoma: erg?.onoma || ''
+                    onoma: erg?.onoma || '',
+
+                    // Ιστορικά σωστό profile για την ΗΜΕΡΑ της εγγραφής.
+                    // Χρησιμοποιείται από το frontend για display τύπου:
+                    // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
+                    // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
+                    effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
+                    effective_is_full_time: isFullTimeWorkTerms(effectiveProfile),
+                    effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                    effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
+                    effective_profile_source: effectiveProfile.source || '',
+                    effective_profile_date: getProfileDateForDeviation(
+                        effectiveProfile,
+                        r.hmeromhnia
+                    ),
+                    effective_profile_istoriko_id: effectiveProfile.istorikoId || null
                 };
             });
+
+            const enrichedDeviations = deviations.map((d) => ({
+                _id: d._id,
+                ypokatasthma: d.ypokatasthma || '',
+                kodikos: d.kodikos || '',
+                eponymo: d.eponymo || '',
+                onoma: d.onoma || '',
+                week_apo: d.week_apo,
+                week_eos: d.week_eos,
+                weekStart: dateKeyUtc(d.week_apo),
+                weekEnd: dateKeyUtc(d.week_eos),
+                expected_repo: Number(d.expected_repo || 0),
+                actual_repo: Number(d.actual_repo || 0),
+                profile_changed_inside_week: d.profile_changed_inside_week === true,
+                excess_repo: Number(d.excess_repo || 0),
+                effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
+                effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
+                effective_profile_source: d.effective_profile_source || '',
+                effective_profile_date: d.effective_profile_date,
+                effective_profile_istoriko_id: d.effective_profile_istoriko_id || null,
+                previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
+                previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
+                previous_profile_source: d.previous_profile_source || '',
+                previous_profile_date: d.previous_profile_date,
+                previous_profile_istoriko_id: d.previous_profile_istoriko_id || null,
+                deviation_type: d.deviation_type || '',
+                note: d.note || ''
+            }));
 
             return res.json({
                 success: true,
@@ -3412,7 +4381,8 @@ class erganhController {
                 limit: limitNum,
                 total,
                 totalPages: Math.ceil(total / limitNum),
-                rows: enrichedRows
+                rows: enrichedRows,
+                deviations: enrichedDeviations
             });
         } catch (error) {
             console.error('[getProdhlomenaOrariaForReview] ❌', error);
@@ -3428,42 +4398,91 @@ class erganhController {
     static exportProdhlomenaOrariaReviewExcel = async (req, res) => {
         try {
             const rows = await getReviewRowsForExport(req);
+            const deviations = rows.__deviations || [];
+            const deviationsByKodikos = new Map();
+            deviations.forEach((dev) => {
+                const key = String(dev.kodikos || '').trim();
+                if (!key) return;
+                if (!deviationsByKodikos.has(key)) deviationsByKodikos.set(key, []);
+                deviationsByKodikos.get(key).push(dev);
+            });
+
             const workbook = new ExcelJS.Workbook();
             workbook.creator = 'Payroll-NodeJs';
 
             const worksheet = workbook.addWorksheet('Έλεγχος απασχολήσεων', {
                 views: [{ state: 'frozen', ySplit: 1, xSplit: 3 }],
-                properties: { outlineLevelRow: 2 }
+                properties: { outlineLevelRow: 2 },
+                pageSetup: {
+                    paperSize: 9,
+                    orientation: 'landscape',
+                    fitToPage: true,
+                    fitToWidth: 1,
+                    fitToHeight: 0,
+                    horizontalCentered: false,
+                    verticalCentered: false,
+                    margins: {
+                        left: 0.15,
+                        right: 0.15,
+                        top: 0.25,
+                        bottom: 0.25,
+                        header: 0.1,
+                        footer: 0.1
+                    }
+                }
             });
 
+            // Πλάτη στηλών ρυθμισμένα ώστε το print preview να γεμίζει όλο το πλάτος
+            // της Α4 Landscape. Το fitToWidth=1 θα κάνει scale down αν χρειαστεί,
+            // αλλά δεν θα μένει κενό δεξιά από την τελευταία στήλη.
             worksheet.columns = [
-                { header: 'Ημ/νία', key: 'hmeromhnia', width: 13 },
-                { header: 'Παράρτημα', key: 'ypokatasthma', width: 11 },
-                { header: 'Κωδ.', key: 'kodikos', width: 10 },
-                { header: 'Επώνυμο', key: 'eponymo', width: 20 },
-                { header: 'Όνομα', key: 'onoma', width: 18 },
-                { header: 'Προδηλωμένο', key: 'program', width: 28 },
-                { header: 'Κάρτες', key: 'cards', width: 24 },
-                { header: 'Απολογιστικό', key: 'apologistiko_intervals', width: 28 },
-                { header: 'Ώρες', key: 'ores_ergasias_apologistika', width: 9 },
-                { header: 'Απουσίες', key: 'ores_apoysias_apologistika', width: 10 },
-                { header: 'Νύχτα', key: 'ores_nyxtas_apologistika', width: 9 },
-                { header: 'Αργία', key: 'argia_total', width: 9 },
-                { header: 'Πρόσθ.', key: 'ores_prostheths_ergasias_apologistika', width: 9 },
-                { header: 'Υπερεργ.', key: 'yperergasia_total', width: 11 },
-                { header: 'Νόμ. υπερ.', key: 'nomimi_total', width: 12 },
-                { header: 'Παρ. υπερ.', key: 'paranomi_total', width: 12 },
-                { header: 'Απολ.', key: 'apologistiko_biblio', width: 8 },
-                { header: 'Ρεπό', key: 'repo', width: 8 },
-                { header: 'Άδεια', key: 'adeia_apologistika', width: 8 },
-                { header: 'Ασθένεια', key: 'astheneia_apologistika', width: 10 },
+                { header: 'Ημ/νία\nΗμέρα', key: 'hmeromhnia', width: 17 },
+                { header: 'Παράρτημα', key: 'ypokatasthma', width: 9 },
+                { header: 'Κωδικός', key: 'kodikos', width: 9 },
+                { header: 'Επώνυμο', key: 'eponymo', width: 16 },
+                { header: 'Όνομα', key: 'onoma', width: 14 },
+                { header: 'Προδηλωμένο\nΩράριο', key: 'program', width: 22 },
+                { header: 'Κάρτες\nΕργασίας', key: 'cards', width: 22 },
+                { header: 'Απολογιστικό\nΩράριο', key: 'apologistiko_intervals', width: 22 },
+                { header: 'Ώρες\nΕργασίας', key: 'ores_ergasias_apologistika', width: 9 },
+                { header: 'Ώρες\nΑπουσίας', key: 'ores_apoysias_apologistika', width: 9 },
+                { header: 'Ώρες\nΝύχτας', key: 'ores_nyxtas_apologistika', width: 9 },
+                { header: 'Ώρες\nΑργίας', key: 'argia_total', width: 9 },
+                {
+                    header: 'Πρόσθετη\nΕργασία',
+                    key: 'ores_prostheths_ergasias_apologistika',
+                    width: 9
+                },
+                { header: 'Ώρες\nΥπερεργ.', key: 'yperergasia_total', width: 9 },
+                { header: 'Νόμιμη\nΥπερωρία', key: 'nomimi_total', width: 9 },
+                { header: 'Παράνομη\nΥπερωρία', key: 'paranomi_total', width: 9 },
+                { header: 'Απολογ.\nΒιβλίο', key: 'apologistiko_biblio', width: 9 },
+                { header: 'Άδεια\nΑπολογ.', key: 'adeia_apologistika', width: 9 },
+                { header: 'Κατηγορία\nΆδειας', key: 'kathgoria_adeias_apologistika', width: 13 },
                 { header: 'Κυριακή', key: 'kyriakes_apologistika', width: 9 },
-                { header: 'Περιγραφή αργίας', key: 'perigrafh_argias', width: 24 },
-                { header: 'Locked', key: 'is_locked', width: 9 }
+                { header: 'Περιγραφή\nΑργίας', key: 'perigrafh_argias', width: 20 },
+                { header: 'Κλειδ.', key: 'is_locked', width: 9 }
             ];
 
-            const GROUP_ROW_HEIGHT = 71; // ~2.5 cm
-            const EMPLOYEE_TOTAL_ROW_HEIGHT = 48;
+            const HEADER_ROW_HEIGHT = 42;
+            const GROUP_ROW_HEIGHT = 22;
+            const EMPLOYEE_TOTAL_ROW_HEIGHT = 20;
+            const LAST_EXCEL_COLUMN = 'V';
+
+            const styleExcelRange = (row, fromCol = 1, toCol = 22, styleFn = null) => {
+                for (let col = fromCol; col <= toCol; col++) {
+                    const cell = row.getCell(col);
+
+                    if (styleFn) styleFn(cell, col);
+
+                    cell.border = cell.border || {
+                        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                        right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                    };
+                }
+            };
 
             const numericColumnColors = {
                 9: 'FFE2F0D9', // Ώρες
@@ -3487,19 +4506,42 @@ class erganhController {
                             pattern: 'solid',
                             fgColor: { argb: color }
                         };
-                        cell.font = { bold: true, color: { argb: 'FF000000' } };
+                        cell.font = {
+                            name: 'DejaVu Sans',
+                            size: 9,
+                            bold: true,
+                            color: { argb: 'FF000000' }
+                        };
                     }
                 });
             };
 
+            const applyBaseExcelFont = (cell, extra = {}) => {
+                const oldFont = cell.font || {};
+                cell.font = {
+                    name: 'DejaVu Sans',
+                    size: 9,
+                    ...oldFont,
+                    ...extra
+                };
+            };
+
+            const centerColumns = new Set([2, 3, 17, 18, 19, 20, 21, 22]);
+
             const headerRow = worksheet.getRow(1);
-            headerRow.height = GROUP_ROW_HEIGHT;
-            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            headerRow.height = HEADER_ROW_HEIGHT;
+            headerRow.font = {
+                name: 'DejaVu Sans',
+                size: 7,
+                bold: true,
+                color: { argb: 'FFFFFFFF' }
+            };
             headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF212529' } };
             headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
 
             let currentBranch = null;
             let currentEmployee = null;
+            let currentEmployeeKodikos = '';
             let branchTotals = createReviewTotals();
             let employeeTotals = createReviewTotals();
             const grandTotals = createReviewTotals();
@@ -3517,18 +4559,20 @@ class erganhController {
                     paranomi_total: t.paranomiYperoria
                 });
 
-                r.font = { bold: true };
+                r.font = { name: 'DejaVu Sans', size: 9, bold: true };
                 r.outlineLevel = level;
                 r.height = options.employeeTotal ? EMPLOYEE_TOTAL_ROW_HEIGHT : undefined;
 
-                r.eachCell((c) => {
+                worksheet.mergeCells(`A${r.number}:H${r.number}`);
+                r.getCell(1).value = label;
+
+                styleExcelRange(r, 1, 22, (c) => {
                     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-                    c.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-                    c.border = {
-                        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
-                        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
-                        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
-                        right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                    c.alignment = {
+                        vertical: 'middle',
+                        horizontal: 'left',
+                        wrapText: false,
+                        shrinkToFit: true
                     };
                 });
 
@@ -3541,9 +4585,65 @@ class erganhController {
                     };
                 }
 
+                r.getCell(1).alignment = {
+                    vertical: 'middle',
+                    horizontal: 'left',
+                    wrapText: false,
+                    shrinkToFit: true
+                };
+                applyBaseExcelFont(r.getCell(1), { bold: true });
+
                 applyNumericColors(r);
 
                 return r;
+            };
+
+            const addDeviationRowsForEmployee = (kodikos) => {
+                const employeeDeviations =
+                    deviationsByKodikos.get(String(kodikos || '').trim()) || [];
+                if (employeeDeviations.length === 0) return;
+
+                const title = worksheet.addRow({ hmeromhnia: 'Αποκλίσεις εβδομαδιαίων ρεπό' });
+                title.outlineLevel = 1;
+                title.hidden = true;
+                title.font = {
+                    name: 'DejaVu Sans',
+                    size: 9,
+                    bold: true,
+                    color: { argb: 'FF7F3300' }
+                };
+                title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+
+                const header = worksheet.addRow({
+                    hmeromhnia: 'Από',
+                    ypokatasthma: 'Έως',
+                    kodikos: 'Αναμ.',
+                    eponymo: 'Πραγμ.',
+                    onoma: 'Προφίλ',
+                    program: 'Σχόλιο'
+                });
+                header.outlineLevel = 1;
+                header.hidden = true;
+                header.font = { name: 'DejaVu Sans', size: 9, bold: true };
+                header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+
+                employeeDeviations.forEach((dev) => {
+                    const r = worksheet.addRow({
+                        hmeromhnia: reviewDateWithDay(dev.week_apo),
+                        ypokatasthma: reviewDateWithDay(dev.week_eos),
+                        kodikos: dev.expected_repo,
+                        eponymo: dev.actual_repo,
+                        onoma: reviewDeviationProfileText(dev),
+                        program: reviewDeviationNoteText(dev)
+                    });
+                    r.outlineLevel = 1;
+                    r.hidden = true;
+                    r.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: dev.profile_changed_inside_week ? 'FFFFF2CC' : 'FFFFFFFF' }
+                    };
+                });
             };
 
             const closeEmployee = () => {
@@ -3558,6 +4658,7 @@ class erganhController {
                 );
                 totalRow.hidden = true;
 
+                addDeviationRowsForEmployee(currentEmployeeKodikos);
                 employeeTotals = createReviewTotals();
             };
 
@@ -3581,41 +4682,81 @@ class erganhController {
                     closeBranch();
                     currentBranch = branch;
                     currentEmployee = null;
+                    currentEmployeeKodikos = '';
 
                     const br = worksheet.addRow({ hmeromhnia: `Υποκατάστημα: ${branch}` });
                     br.height = GROUP_ROW_HEIGHT;
-                    br.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-                    br.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF305496' } };
-                    br.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                    worksheet.mergeCells(`A${br.number}:${LAST_EXCEL_COLUMN}${br.number}`);
+                    br.getCell(1).value = `Υποκατάστημα: ${branch}`;
+                    br.font = {
+                        name: 'DejaVu Sans',
+                        size: 9,
+                        bold: true,
+                        color: { argb: 'FFFFFFFF' }
+                    };
+                    styleExcelRange(br, 1, 22, (c) => {
+                        c.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FF305496' }
+                        };
+                        c.alignment = {
+                            vertical: 'middle',
+                            horizontal: 'left',
+                            wrapText: false,
+                            shrinkToFit: true
+                        };
+                    });
                 }
 
                 if (employeeKey !== currentEmployee) {
                     closeEmployee();
                     currentEmployee = employeeKey;
+                    currentEmployeeKodikos = row.kodikos || '';
 
-                    const er = worksheet.addRow({ hmeromhnia: `Εργαζόμενος: ${employeeKey}` });
+                    const employeeDeviations =
+                        deviationsByKodikos.get(String(currentEmployeeKodikos || '').trim()) || [];
+                    const changeBadge = employeeDeviations.some(
+                        (dev) => dev.profile_changed_inside_week
+                    )
+                        ? '  |  ⚠ Αλλαγή όρων'
+                        : '';
+                    const er = worksheet.addRow({
+                        hmeromhnia: `Εργαζόμενος: ${employeeKey}${changeBadge}`
+                    });
                     er.height = GROUP_ROW_HEIGHT;
                     er.outlineLevel = 1;
                     er.hidden = true;
-                    er.font = { bold: true };
-                    er.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAF7' } };
-                    er.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                    worksheet.mergeCells(`A${er.number}:${LAST_EXCEL_COLUMN}${er.number}`);
+                    er.getCell(1).value = `Εργαζόμενος: ${employeeKey}${changeBadge}`;
+                    er.font = { name: 'DejaVu Sans', size: 9, bold: true };
+                    styleExcelRange(er, 1, 22, (c) => {
+                        c.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFD9EAF7' }
+                        };
+                        c.alignment = {
+                            vertical: 'middle',
+                            horizontal: 'left',
+                            wrapText: false,
+                            shrinkToFit: true
+                        };
+                    });
                 }
 
+                const programDisplay = reviewProgramDisplay(row);
+                const apologistikoDisplay = reviewApologistikoDisplay(row);
+
                 const detail = worksheet.addRow({
-                    hmeromhnia: row.hmeromhnia ? new Date(row.hmeromhnia) : '',
+                    hmeromhnia: reviewDateWithDay(row.hmeromhnia),
                     ypokatasthma: row.exportYpokatasthma || '',
                     kodikos: row.kodikos || '',
                     eponymo: row.eponymo || '',
                     onoma: row.onoma || '',
-                    program: reviewIntervals(row, 'apo_ora', 'eos_ora'),
+                    program: programDisplay.text,
                     cards: reviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora'),
-                    apologistiko_intervals: reviewIntervals(
-                        row,
-                        'apo_ora',
-                        'eos_ora',
-                        '_apologistika'
-                    ),
+                    apologistiko_intervals: apologistikoDisplay.text,
                     ores_ergasias_apologistika: reviewNum(row.ores_ergasias_apologistika),
                     ores_apoysias_apologistika: reviewNum(row.ores_apoysias_apologistika),
                     ores_nyxtas_apologistika: reviewNum(row.ores_nyxtas_apologistika),
@@ -3629,7 +4770,7 @@ class erganhController {
                     apologistiko_biblio: row.apologistiko_biblio ? 'ΝΑΙ' : '',
                     repo: row.repo ? 'ΝΑΙ' : '',
                     adeia_apologistika: row.adeia_apologistika ? 'ΝΑΙ' : '',
-                    astheneia_apologistika: row.astheneia_apologistika ? 'ΝΑΙ' : '',
+                    kathgoria_adeias_apologistika: row.kathgoria_adeias_apologistika || '',
                     kyriakes_apologistika: row.kyriakes_apologistika ? 'ΝΑΙ' : '',
                     perigrafh_argias: row.perigrafh_argias || '',
                     is_locked: row.is_locked ? 'ΝΑΙ' : ''
@@ -3648,8 +4789,65 @@ class erganhController {
                     };
                 });
 
-                detail.getCell(1).numFmt = 'dd/mm/yyyy';
                 for (let col = 9; col <= 16; col++) detail.getCell(col).numFmt = '0.00';
+
+                const displayFills = {
+                    declared_repo: 'FFFFF2CC',
+                    repo: 'FFFFF2CC',
+                    non_work: 'FFE9ECEF',
+                    adeia_suggestion: 'FFFDEBD0',
+                    apologistiko: 'FFE2F0D9'
+                };
+                if (displayFills[programDisplay.type]) {
+                    detail.getCell(6).fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: displayFills[programDisplay.type] }
+                    };
+                    detail.getCell(6).font = {
+                        name: 'DejaVu Sans',
+                        size: 9,
+                        bold: true,
+                        color: { argb: 'FF000000' }
+                    };
+                }
+                if (displayFills[apologistikoDisplay.type]) {
+                    detail.getCell(8).fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: displayFills[apologistikoDisplay.type] }
+                    };
+                    detail.getCell(8).font = {
+                        name: 'DejaVu Sans',
+                        size: 9,
+                        bold: true,
+                        color: { argb: 'FF000000' }
+                    };
+                }
+                if (row.kathgoria_adeias_apologistika) {
+                    detail.getCell(18).fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFDEBD0' }
+                    };
+                    detail.getCell(19).fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFFDEBD0' }
+                    };
+                    detail.getCell(18).font = {
+                        name: 'DejaVu Sans',
+                        size: 9,
+                        bold: true,
+                        color: { argb: 'FF7F3300' }
+                    };
+                    detail.getCell(19).font = {
+                        name: 'DejaVu Sans',
+                        size: 9,
+                        bold: true,
+                        color: { argb: 'FF7F3300' }
+                    };
+                }
 
                 if (row.is_locked) {
                     detail.eachCell((c) => {
@@ -3674,8 +4872,22 @@ class erganhController {
             addTotalsRow('Γενικά σύνολα', grandTotals, 0, 'FFFFC000');
 
             worksheet.eachRow((r, i) => {
-                r.eachCell((c) => {
-                    c.alignment = c.alignment || { vertical: 'middle', wrapText: true };
+                r.eachCell((c, colNumber) => {
+                    applyBaseExcelFont(
+                        c,
+                        i === 1 ? { size: 7, bold: true, color: { argb: 'FFFFFFFF' } } : {}
+                    );
+
+                    c.alignment = c.alignment || { vertical: 'middle', wrapText: i === 1 };
+
+                    if (centerColumns.has(colNumber)) {
+                        c.alignment = {
+                            ...c.alignment,
+                            horizontal: 'center',
+                            vertical: 'middle'
+                        };
+                    }
+
                     c.border = c.border || {
                         top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
                         left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
@@ -3685,30 +4897,19 @@ class erganhController {
                 });
 
                 if (i > 1) {
-                    r.getCell(1).numFmt = 'dd/mm/yyyy';
                     for (let col = 9; col <= 16; col++) r.getCell(col).numFmt = '0.00';
                 }
             });
 
-            worksheet.autoFilter = { from: 'A1', to: 'W1' };
+            worksheet.autoFilter = { from: 'A1', to: 'V1' };
 
-            worksheet.columns.forEach((column) => {
-                let maxLength = 10;
-
-                column.eachCell({ includeEmpty: true }, (cell) => {
-                    const rawValue = cell.value;
-                    const value =
-                        rawValue instanceof Date
-                            ? '00/00/0000'
-                            : rawValue === null || rawValue === undefined
-                              ? ''
-                              : String(rawValue);
-
-                    maxLength = Math.max(maxLength, value.length);
-                });
-
-                column.width = Math.min(maxLength + 2, 60);
-            });
+            // Τα πλάτη έχουν οριστεί ρητά πιο πάνω ώστε να γεμίζουν όλο το πλάτος
+            // της Α4 Landscape. Δεν κάνουμε auto-fit εδώ, γιατί θα ξαναστενέψει/ανοίξει
+            // απρόβλεπτα τις στήλες και θα χαλάσει το print layout.
+            worksheet.pageSetup.printArea = `A1:${LAST_EXCEL_COLUMN}${worksheet.rowCount}`;
+            worksheet.pageSetup.fitToPage = true;
+            worksheet.pageSetup.fitToWidth = 1;
+            worksheet.pageSetup.fitToHeight = 0;
 
             const buffer = await workbook.xlsx.writeBuffer();
 
@@ -3735,6 +4936,15 @@ class erganhController {
     static exportProdhlomenaOrariaReviewPdf = async (req, res) => {
         try {
             const rows = await getReviewRowsForExport(req);
+            const deviations = rows.__deviations || [];
+            const deviationsByKodikos = new Map();
+            deviations.forEach((dev) => {
+                const key = String(dev.kodikos || '').trim();
+                if (!key) return;
+                if (!deviationsByKodikos.has(key)) deviationsByKodikos.set(key, []);
+                deviationsByKodikos.get(key).push(dev);
+            });
+
             const doc = makeReviewPdfDocument();
 
             res.setHeader('Content-Type', 'application/pdf');
@@ -3748,38 +4958,42 @@ class erganhController {
             const left = doc.page.margins.left;
             const right = doc.page.width - doc.page.margins.right;
             const bottom = doc.page.height - doc.page.margins.bottom;
+            const availableWidth = right - left;
             let y = doc.page.margins.top;
 
             const regular = doc._fontFamilies.ReviewRegular ? 'ReviewRegular' : 'Helvetica';
             const bold = doc._fontFamilies.ReviewBold ? 'ReviewBold' : regular;
 
-            const cols = [
-                ['Ημ/νία', 45],
-                ['Προδ.', 97],
-                ['Κάρτες', 82],
-                ['Απολ.', 82],
-                ['Ώρ.', 31],
-                ['Απ.', 31],
-                ['Νύχ.', 31],
-                ['Αργ.', 31],
-                ['Πρ.', 31],
-                ['Υπερ.', 31],
-                ['Ν.Υπ.', 31],
-                ['Π.Υπ.', 31]
+            const baseCols = [
+                ['Ημ/νία', 46],
+                ['Προδηλωμένο', 90],
+                ['Κάρτες', 78],
+                ['Απολογιστικό', 92],
+                ['Ώρες', 34],
+                ['Απουσ.', 34],
+                ['Νύχτα', 34],
+                ['Αργία', 34],
+                ['Πρόσθ.', 34],
+                ['Υπερ.', 36],
+                ['Ν.Υπ.', 36],
+                ['Π.Υπ.', 36]
             ];
 
-            const tableWidth = cols.reduce((a, [, w]) => a + w, 0);
+            const baseWidth = baseCols.reduce((sum, [, w]) => sum + w, 0);
+            const scale = availableWidth / baseWidth;
+            const cols = baseCols.map(([label, w]) => [label, Math.floor(w * scale)]);
+            const tableWidth = cols.reduce((sum, [, w]) => sum + w, 0);
             const x0 = left;
 
             const numericPdfColors = {
-                4: '#E2F0D9', // Ώρες
-                5: '#F8CBAD', // Απουσίες
-                6: '#D9EAF7', // Νύχτα
-                7: '#FCE4D6', // Αργία
-                8: '#EADCF8', // Πρόσθετη
-                9: '#FFF2CC', // Υπερεργασία
-                10: '#F8CBAD', // Νόμιμη υπερωρία
-                11: '#F4CCCC' // Παράνομη υπερωρία
+                4: '#E2F0D9',
+                5: '#F8CBAD',
+                6: '#D9EAF7',
+                7: '#FCE4D6',
+                8: '#EADCF8',
+                9: '#FFF2CC',
+                10: '#F8CBAD',
+                11: '#F4CCCC'
             };
 
             const numericTextColors = {
@@ -3788,35 +5002,44 @@ class erganhController {
                 11: '#9C0006'
             };
 
+            const displayPdfFills = {
+                declared_repo: '#FFF3CD',
+                repo: '#FFF3CD',
+                non_work: '#E9ECEF',
+                adeia_suggestion: '#FDEBD0',
+                apologistiko: '#DFF0D8'
+            };
+
             const drawHeader = () => {
                 doc.font(bold)
                     .fontSize(9)
                     .fillColor('#000')
                     .text('Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ', left, y, {
-                        width: right - left
+                        width: availableWidth,
+                        align: 'center'
                     });
 
-                y += 14;
+                y += 13;
 
                 doc.font(regular)
-                    .fontSize(6.5)
+                    .fontSize(6.3)
                     .fillColor('#555')
                     .text(
                         `Περίοδος: ${req.query.apo_hmeromhnia || ''} έως ${
                             req.query.eos_hmeromhnia || ''
-                        }    Παράρτημα φίλτρου: ${req.query.ypokatasthma || '-'}    Κωδικός: ${
+                        }    Παράρτημα: ${req.query.ypokatasthma || '-'}    Κωδικός: ${
                             req.query.kodikos || '-'
                         }`,
                         left,
                         y,
-                        { width: right - left }
+                        { width: availableWidth, align: 'center' }
                     );
 
-                y += 12;
+                y += 11;
             };
 
-            const newPageIfNeeded = (h = 16) => {
-                if (y + h <= bottom) return;
+            const newPageIfNeeded = (height = 16) => {
+                if (y + height <= bottom) return;
 
                 doc.addPage({
                     size: 'A4',
@@ -3831,28 +5054,26 @@ class erganhController {
                 const {
                     fill = null,
                     font = regular,
-                    fontSize = 5.5,
+                    fontSize = 5.3,
                     color = '#000',
                     align = 'left',
                     boldText = false
                 } = options;
 
-                if (fill) {
-                    doc.save().rect(x, rowY, w, h).fill(fill).restore();
-                }
+                if (fill) doc.save().rect(x, rowY, w, h).fill(fill).restore();
 
                 doc.save()
                     .rect(x, rowY, w, h)
                     .strokeColor('#D9D9D9')
-                    .lineWidth(0.3)
+                    .lineWidth(0.25)
                     .stroke()
                     .restore();
 
                 doc.font(boldText ? bold : font)
                     .fontSize(fontSize)
                     .fillColor(color)
-                    .text(String(value || '-'), x + 1, rowY + 2, {
-                        width: w - 2,
+                    .text(String(value || '-'), x + 1.2, rowY + 2, {
+                        width: w - 2.4,
                         height: h - 3,
                         ellipsis: true,
                         align
@@ -3860,67 +5081,61 @@ class erganhController {
             };
 
             const drawTableHeader = () => {
+                newPageIfNeeded(12);
                 let x = x0;
                 const h = 12;
-
                 doc.rect(x0, y, tableWidth, h).fill('#212529');
-                doc.font(bold).fontSize(5.8).fillColor('#FFF');
-
+                doc.font(bold).fontSize(5.6).fillColor('#FFF');
                 for (const [label, w] of cols) {
-                    doc.text(label, x + 2, y + 3, {
-                        width: w - 4,
-                        height: 8,
-                        align: 'center'
-                    });
+                    doc.text(label, x + 1, y + 3, { width: w - 2, height: 8, align: 'center' });
                     x += w;
                 }
-
                 y += h;
             };
 
             let currentBranch = null;
             let currentEmployee = null;
+            let currentEmployeeKodikos = '';
             let employeeTotals = createReviewTotals();
             let branchTotals = createReviewTotals();
             const grandTotals = createReviewTotals();
 
-            const drawTotals = (label, t, fill = '#E2F0D9') => {
-                newPageIfNeeded(13);
-
+            const drawTotals = (label, totals, fill = '#E2F0D9') => {
+                newPageIfNeeded(12);
                 const rowY = y;
                 const h = 12;
                 doc.rect(x0, rowY, tableWidth, h).fill(fill);
-                doc.rect(x0, rowY, tableWidth, h).strokeColor('#BFBFBF').lineWidth(0.3).stroke();
+                doc.rect(x0, rowY, tableWidth, h).strokeColor('#BFBFBF').lineWidth(0.25).stroke();
                 doc.font(bold)
-                    .fontSize(5.8)
+                    .fontSize(5.6)
                     .fillColor('#000')
                     .text(label, x0 + 2, rowY + 3, {
-                        width: 300
+                        width: cols.slice(0, 4).reduce((a, [, w]) => a + w, 0) - 4,
+                        ellipsis: true
                     });
 
                 const values = [
-                    reviewHours(t.ores_ergasias_apologistika),
-                    reviewHours(t.ores_apoysias_apologistika),
-                    reviewHours(t.ores_nyxtas_apologistika),
-                    reviewHours(t.argia),
-                    reviewHours(t.ores_prostheths_ergasias_apologistika),
-                    reviewHours(t.yperergasia),
-                    reviewHours(t.nomimiYperoria),
-                    reviewHours(t.paranomiYperoria)
+                    reviewHours(totals.ores_ergasias_apologistika),
+                    reviewHours(totals.ores_apoysias_apologistika),
+                    reviewHours(totals.ores_nyxtas_apologistika),
+                    reviewHours(totals.argia),
+                    reviewHours(totals.ores_prostheths_ergasias_apologistika),
+                    reviewHours(totals.yperergasia),
+                    reviewHours(totals.nomimiYperoria),
+                    reviewHours(totals.paranomiYperoria)
                 ];
 
                 let x = x0 + cols.slice(0, 4).reduce((a, [, w]) => a + w, 0);
-                values.forEach((v, i) => {
+                values.forEach((value, i) => {
                     const numericIndex = 4 + i;
-                    const n = Number(String(v || 0).replace(',', '.'));
+                    const n = Number(String(value || 0).replace(',', '.'));
                     const w = cols[numericIndex][1];
                     const cellFill =
                         Number.isFinite(n) && n !== 0 ? numericPdfColors[numericIndex] : fill;
-
-                    drawCell(x, rowY, w, h, v, {
+                    drawCell(x, rowY, w, h, value, {
                         fill: cellFill,
                         font: bold,
-                        fontSize: 5.8,
+                        fontSize: 5.6,
                         color: numericTextColors[numericIndex] || '#000',
                         align: 'right',
                         boldText: true
@@ -3931,9 +5146,38 @@ class erganhController {
                 y += h;
             };
 
+            const drawEmployeeDeviations = (kodikos) => {
+                const employeeDeviations =
+                    deviationsByKodikos.get(String(kodikos || '').trim()) || [];
+                if (employeeDeviations.length === 0) return;
+
+                newPageIfNeeded(20 + employeeDeviations.length * 14);
+                doc.rect(x0, y, tableWidth, 12).fill('#FFF3CD');
+                doc.font(bold)
+                    .fontSize(6)
+                    .fillColor('#7F3300')
+                    .text('Αποκλίσεις εβδομαδιαίων ρεπό', x0 + 3, y + 3, { width: tableWidth - 6 });
+                y += 12;
+
+                employeeDeviations.forEach((dev) => {
+                    newPageIfNeeded(16);
+                    const text = `${reviewDateOnly(dev.week_apo)} - ${reviewDateOnly(dev.week_eos)} | Αναμ.: ${
+                        dev.expected_repo
+                    } | Πραγμ.: ${dev.actual_repo} | ${reviewDeviationProfileText(dev)} | ${reviewDeviationNoteText(dev)}`;
+                    drawCell(x0, y, tableWidth, 15, text, {
+                        fill: dev.profile_changed_inside_week ? '#FFF3CD' : '#FFFFFF',
+                        fontSize: 5.2,
+                        color: '#000',
+                        boldText: dev.profile_changed_inside_week
+                    });
+                    y += 15;
+                });
+            };
+
             const closeEmployee = () => {
                 if (!currentEmployee) return;
                 drawTotals(`Σύνολα εργαζομένου: ${currentEmployee}`, employeeTotals, '#E2F0D9');
+                drawEmployeeDeviations(currentEmployeeKodikos);
                 employeeTotals = createReviewTotals();
             };
 
@@ -3954,41 +5198,53 @@ class erganhController {
                     closeBranch();
                     currentBranch = branch;
                     currentEmployee = null;
+                    currentEmployeeKodikos = '';
 
-                    newPageIfNeeded(28);
-                    doc.rect(x0, y, tableWidth, 13).fill('#305496');
+                    newPageIfNeeded(27);
+                    doc.rect(x0, y, tableWidth, 12).fill('#305496');
                     doc.font(bold)
-                        .fontSize(7)
+                        .fontSize(6.5)
                         .fillColor('#FFF')
                         .text(`Υποκατάστημα: ${branch}`, x0 + 3, y + 3, {
                             width: tableWidth - 6
                         });
-                    y += 13;
+                    y += 12;
                 }
 
                 if (employee !== currentEmployee) {
                     closeEmployee();
                     currentEmployee = employee;
+                    currentEmployeeKodikos = row.kodikos || '';
 
-                    newPageIfNeeded(26);
+                    const employeeDeviations =
+                        deviationsByKodikos.get(String(currentEmployeeKodikos || '').trim()) || [];
+                    const changeBadge = employeeDeviations.some(
+                        (dev) => dev.profile_changed_inside_week
+                    )
+                        ? '  |  ⚠ Αλλαγή όρων'
+                        : '';
+
+                    newPageIfNeeded(25);
                     doc.rect(x0, y, tableWidth, 12).fill('#D9EAF7');
                     doc.font(bold)
-                        .fontSize(6.5)
+                        .fontSize(6.2)
                         .fillColor('#000')
-                        .text(`Εργαζόμενος: ${employee}`, x0 + 3, y + 3, {
+                        .text(`Εργαζόμενος: ${employee}${changeBadge}`, x0 + 3, y + 3, {
                             width: tableWidth - 6
                         });
                     y += 12;
                     drawTableHeader();
                 }
 
-                newPageIfNeeded(13);
+                newPageIfNeeded(12);
 
+                const programDisplay = reviewProgramDisplay(row);
+                const apologistikoDisplay = reviewApologistikoDisplay(row);
                 const vals = [
                     reviewDateOnly(row.hmeromhnia),
-                    reviewIntervals(row, 'apo_ora', 'eos_ora'),
+                    programDisplay.text,
                     reviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora'),
-                    reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika'),
+                    apologistikoDisplay.text,
                     reviewHours(row.ores_ergasias_apologistika),
                     reviewHours(row.ores_apoysias_apologistika),
                     reviewHours(row.ores_nyxtas_apologistika),
@@ -4003,22 +5259,27 @@ class erganhController {
                 const rowH = 12;
                 let x = x0;
 
-                vals.forEach((v, i) => {
-                    const w = cols[i][1];
-                    const isNumeric = i >= 4;
-                    const n = isNumeric ? Number(String(v || 0).replace(',', '.')) : 0;
-                    const fill =
-                        isNumeric && Number.isFinite(n) && n !== 0 ? numericPdfColors[i] : null;
+                vals.forEach((value, index) => {
+                    const w = cols[index][1];
+                    const isNumeric = index >= 4;
+                    const n = isNumeric ? Number(String(value || 0).replace(',', '.')) : 0;
+                    let fill = null;
+                    if (index === 1) fill = displayPdfFills[programDisplay.type] || null;
+                    if (index === 3) fill = displayPdfFills[apologistikoDisplay.type] || null;
+                    if (!fill && isNumeric && Number.isFinite(n) && n !== 0)
+                        fill = numericPdfColors[index];
 
-                    drawCell(x, rowY, w, rowH, v, {
+                    drawCell(x, rowY, w, rowH, value, {
                         fill,
                         font: regular,
-                        fontSize: 5.5,
-                        color: isNumeric ? numericTextColors[i] || '#000' : '#000',
+                        fontSize: 5.15,
+                        color: isNumeric ? numericTextColors[index] || '#000' : '#000',
                         align: isNumeric ? 'right' : 'left',
-                        boldText: isNumeric && Number.isFinite(n) && n !== 0
+                        boldText:
+                            (isNumeric && Number.isFinite(n) && n !== 0) ||
+                            programDisplay.type ||
+                            apologistikoDisplay.type
                     });
-
                     x += w;
                 });
 
@@ -4033,10 +5294,8 @@ class erganhController {
             drawTotals('Γενικά σύνολα', grandTotals, '#FFC000');
 
             const range = doc.bufferedPageRange();
-
             for (let i = range.start; i < range.start + range.count; i++) {
                 doc.switchToPage(i);
-
                 doc.font(regular)
                     .fontSize(6)
                     .fillColor('#666')
@@ -4045,7 +5304,7 @@ class erganhController {
                         left,
                         doc.page.height - doc.page.margins.bottom - 8,
                         {
-                            width: right - left,
+                            width: availableWidth,
                             align: 'right',
                             lineBreak: false
                         }
@@ -4447,8 +5706,16 @@ class erganhController {
                 totalModified += result.modifiedCount || 0;
             }
 
+            const weeklyRepoPostCheck = await runWeeklyRepoPostCheck({
+                sessionTeam,
+                companyId,
+                apoDate,
+                eosDate,
+                selectedYpokatasthma
+            });
+
             console.log(
-                `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}`
+                `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}, RepoPostCheckUpdated: ${weeklyRepoPostCheck.recordsUpdated}, RepoDeviations: ${weeklyRepoPostCheck.deviations.length}`
             );
 
             return res.json({
@@ -4456,7 +5723,14 @@ class erganhController {
                 message: 'Ο υπολογισμός ολοκληρώθηκε επιτυχώς.',
                 employeesCount: ergazomenoi.length,
                 recordsChecked: prodhlomena.length,
-                recordsUpdated: totalModified
+                recordsUpdated: totalModified,
+                weeklyRepoPostCheck: {
+                    recordsChecked: weeklyRepoPostCheck.recordsChecked,
+                    recordsUpdated: weeklyRepoPostCheck.recordsUpdated,
+                    deviationsCount: weeklyRepoPostCheck.deviations.length,
+                    deviationsSaved: weeklyRepoPostCheck.deviationsSaved || 0,
+                    deviations: weeklyRepoPostCheck.deviations
+                }
             });
         } catch (error) {
             console.error('[calcApasxolhseisPeriodoy] ❌', error);
@@ -6520,8 +7794,6 @@ class erganhController {
     };
 
     static openErganiPdf = async (req, res) => {
-        console.log('🔥 openErganiPdf HIT:', req.params.id);
-
         try {
             const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
 
@@ -6549,9 +7821,6 @@ class erganhController {
                 if (localMockUrl) return res.redirect(localMockUrl);
                 return res.status(500).send('PDF bucket not configured');
             }
-
-            console.log('bucket =', bucket);
-            console.log('pdf_s3_key =', rec.pdf_s3_key);
 
             const s3Response = await s3Client.send(
                 new GetObjectCommand({
@@ -6952,11 +8221,27 @@ class erganhController {
             };
 
             const apoDate = parseDateInput(
-                body.apo_hmeromhnia || body.fromDate || body.f_from_date || body.hmeromhnia_apo
+                body.apo_hmeromhnia ||
+                    body.fromDate ||
+                    body.f_from_date ||
+                    body.hmeromhnia_apo ||
+                    ergazomenos.hmeromhnia_allaghs_orarioy_apo
             );
             const eosDate = parseDateInput(
-                body.eos_hmeromhnia || body.toDate || body.f_to_date || body.hmeromhnia_eos
+                body.eos_hmeromhnia ||
+                    body.toDate ||
+                    body.f_to_date ||
+                    body.hmeromhnia_eos ||
+                    ergazomenos.hmeromhnia_allaghs_orarioy_eos
             );
+
+            console.log('[WTOWeek DATE DEBUG]', {
+                body_apo:
+                    body.apo_hmeromhnia || body.fromDate || body.f_from_date || body.hmeromhnia_apo,
+                employee_orario_apo: ergazomenos.hmeromhnia_allaghs_orarioy_apo,
+                apoDate,
+                eosDate
+            });
 
             const scheduleQuery = {
                 team: sessionTeam,
@@ -6966,13 +8251,22 @@ class erganhController {
             };
 
             if (apoDate || eosDate) {
-                scheduleQuery.hmeromhnia = {};
-                if (apoDate) scheduleQuery.hmeromhnia.$gte = apoDate;
+                const hmeromhniaFilter = {};
+
+                if (apoDate) {
+                    hmeromhniaFilter.$gte = apoDate;
+                }
+
                 if (eosDate) {
                     const eosEnd = new Date(eosDate);
                     eosEnd.setHours(23, 59, 59, 999);
-                    scheduleQuery.hmeromhnia.$lte = eosEnd;
+                    hmeromhniaFilter.$lte = eosEnd;
                 }
+
+                // Χρειάζεται mongoose.trusted(), αλλιώς το Mongoose κάνει cast όλο το
+                // { $gte, $lte } σαν Date και βγάζει:
+                // Cast to date failed for value "{ '$gte': ..., '$lte': ... }"
+                scheduleQuery.hmeromhnia = mongoose.trusted(hmeromhniaFilter);
             }
 
             let schedules = await ProdhlomenaOrariaModel.find(scheduleQuery)

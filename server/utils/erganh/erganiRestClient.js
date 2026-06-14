@@ -201,6 +201,13 @@ async function getDocumentSchema(accessToken, code) {
 }
 
 async function submitDocument(accessToken, code, payload) {
+    // console.log('========================================');
+    // console.log('FINAL JSON PAYLOAD TO ERGANI');
+    // console.log('========================================');
+    // console.log('Submission Code:', code);
+    // console.log(JSON.stringify(payload, null, 2));
+    // console.log('========================================');
+
     return erganiFetch(`/Documents/${code}`, {
         method: 'POST',
         headers: {

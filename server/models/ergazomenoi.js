@@ -376,6 +376,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         apo_ora_03_apologistika: { type: String },
         eos_ora_03_apologistika: { type: String },
         apologistiko_biblio: { type: Boolean, default: false },
+        kathgoria_ergasias_apologistika: { type: String, trim: true },
         ores_ergasias_apologistika: { type: Number, default: 0 },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
         ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
@@ -464,6 +465,74 @@ ProdhlomenaOrariaAuditSchema.index({
 });
 
 const ProdhlomenaOrariaAuditModel = model('ProdhlomenaOrariaAudit', ProdhlomenaOrariaAuditSchema);
+
+const ProdhlomenaOrariaDeviationsSchema = new Schema(
+    {
+        team: { type: String, trim: true, index: true },
+        company_kod: { type: String, trim: true, index: true },
+
+        period_apo: { type: Date, index: true },
+        period_eos: { type: Date, index: true },
+
+        ypokatasthma: { type: String, trim: true, index: true },
+        kodikos: { type: String, trim: true, index: true },
+        eponymo: { type: String, trim: true },
+        onoma: { type: String, trim: true },
+
+        week_apo: { type: Date, index: true },
+        week_eos: { type: Date, index: true },
+
+        expected_repo: { type: Number, default: 0 },
+        actual_repo: { type: Number, default: 0 },
+
+        // Όταν αλλάζουν οι όροι εργασίας μέσα στην ίδια εβδομάδα,
+        // ο έλεγχος ρεπό χρησιμοποιεί το profile που ισχύει το Σάββατο.
+        profile_changed_inside_week: { type: Boolean, default: false },
+        excess_repo: { type: Number, default: 0 },
+
+        effective_mhniaia_repo: { type: Number, default: 0 },
+        effective_typos_apasxolhshs: { type: String, trim: true, default: '' },
+        effective_profile_source: { type: String, trim: true, default: '' },
+        effective_profile_date: { type: Date },
+        effective_profile_istoriko_id: {
+            type: Schema.Types.ObjectId,
+            ref: 'IstorikoProslhpseonAllagon'
+        },
+
+        previous_mhniaia_repo: { type: Number, default: 0 },
+        previous_typos_apasxolhshs: { type: String, trim: true, default: '' },
+        previous_profile_source: { type: String, trim: true, default: '' },
+        previous_profile_date: { type: Date },
+        previous_profile_istoriko_id: {
+            type: Schema.Types.ObjectId,
+            ref: 'IstorikoProslhpseonAllagon'
+        },
+
+        deviation_type: { type: String, trim: true, default: '' },
+        note: { type: String, trim: true, default: '' },
+
+        created_by: { type: String, trim: true },
+        created_by_user: { type: Schema.Types.ObjectId, ref: 'User' }
+    },
+    {
+        timestamps: true,
+        collection: 'Prodhlomena_Oraria_Deviations'
+    }
+);
+
+ProdhlomenaOrariaDeviationsSchema.index({ team: 1, company_kod: 1, period_apo: 1, period_eos: 1 });
+ProdhlomenaOrariaDeviationsSchema.index({
+    team: 1,
+    company_kod: 1,
+    kodikos: 1,
+    week_apo: 1,
+    week_eos: 1
+});
+
+const ProdhlomenaOrariaDeviationsModel = model(
+    'ProdhlomenaOrariaDeviations',
+    ProdhlomenaOrariaDeviationsSchema
+);
 
 const OrariaFromErganhSchema = new Schema(
     {
@@ -676,11 +745,20 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
             type: Boolean,
             default: false
         },
-        typos_apasxolhshs: {
+
+        mhniaia_repo: {
+            type: Number,
+            default: 0
+        },
+
+        // Για να ξέρουμε ποια εγγραφή χρησιμοποιήθηκε σαν profile αλλαγής
+        // στον έλεγχο απασχολήσεων / deviations.
+        employment_profile_source: {
             type: String,
             trim: true,
             default: ''
         },
+
         misthologiko_klimakio: { type: Number, default: 0 },
         symbash: { type: String, trim: true },
         kathgoria_symbashs: { type: String, trim: true },
@@ -896,6 +974,7 @@ module.exports = {
     ErgazomenoiModel,
     ProdhlomenaOrariaModel,
     ProdhlomenaOrariaAuditModel,
+    ProdhlomenaOrariaDeviationsModel,
     OrariaFromErganhModel,
     OrariaFromCardsModel,
     OrariaApologistikaModel,

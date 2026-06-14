@@ -65,10 +65,10 @@ async function generateWtoXML(ergazomenos, companyData, ypokatasthmataData, sche
         const xmlData = {
             f_aa_pararthmatos: normalizePararthmaKodikos(ypokatasthmataData?.kodikos),
             f_rel_protocol: '',
-            f_rel_date: '',
+            f_rel_date: ' ',
             f_comments: '',
             f_from_date: formatDateForErganh(fromDate),
-            f_to_date: '',
+            f_to_date: ' ',
 
             f_afm: safeString(ergazomenos?.afm),
             f_eponymo: safeString(ergazomenos?.eponymo).toUpperCase(),
@@ -239,11 +239,17 @@ async function generateWTOWeekJSON(ergazomenos, companyData, ypokatasthmataData,
             };
         });
 
+        const erganhPararthma = String(
+            Number(normalizePararthmaKodikos(ypokatasthmataData?.kodikos))
+        );
+
+        console.log('[WTOWeek-JSON] ypokatasthma.kodikos:', ypokatasthmataData?.kodikos);
+        console.log('[WTOWeek-JSON] f_aa_pararthmatos sent:', erganhPararthma);
         const payload = {
             WTOS: {
                 WTO: [
                     {
-                        f_aa_pararthmatos: normalizePararthmaKodikos(ypokatasthmataData?.kodikos),
+                        f_aa_pararthmatos: erganhPararthma,
                         f_rel_protocol: '',
                         f_rel_date: '',
                         f_comments: '',
@@ -306,7 +312,7 @@ function buildDayEntry(doc) {
         });
 
         return {
-            f_day: String(dayOfWeek),
+            f_day: dayOfWeek,
             shifts
         };
     }

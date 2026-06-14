@@ -1406,35 +1406,35 @@ document.addEventListener('DOMContentLoaded', function () {
             return false;
         }
 
-        if (hasExceeded) {
-            const daysMessage = exceededDays
-                .map(
-                    (day) =>
-                        `<div style="text-align:left; margin:5px 0;">
-                    <strong>${day.day}:</strong> ${day.hours} ώρες (Μ.Ο.: ${day.mo})
-                </div>`
-                )
-                .join('');
+        // if (hasExceeded) {
+        //     const daysMessage = exceededDays
+        //         .map(
+        //             (day) =>
+        //                 `<div style="text-align:left; margin:5px 0;">
+        //             <strong>${day.day}:</strong> ${day.hours} ώρες (Μ.Ο.: ${day.mo})
+        //         </div>`
+        //         )
+        //         .join('');
 
-            Swal.fire({
-                backdrop: false,
-                allowOutsideClick: false,
-                icon: 'warning',
-                title: 'ΠΡΟΣΟΧΗ - ΥΠΕΡΒΑΣΗ ΩΡΩΝ!!!',
-                html: `
-                    <div style="text-align:center;">
-                        <p>Οι παρακάτω ημέρες έχουν περισσότερες ώρες από τον Μ.Ο. ημερήσιας εργασίας:</p>
-                        ${daysMessage}
-                    </div>`,
-                showConfirmButton: true,
-                confirmButtonText: 'Το κατάλαβα',
-                customClass: {
-                    confirmButton: 'class-warning custom-confirm-button custom-swal-button',
-                    title: 'custom-title',
-                    popup: 'custom-swal-popup'
-                }
-            });
-        }
+        //     Swal.fire({
+        //         backdrop: false,
+        //         allowOutsideClick: false,
+        //         icon: 'warning',
+        //         title: 'ΠΡΟΣΟΧΗ - ΥΠΕΡΒΑΣΗ ΩΡΩΝ!!!',
+        //         html: `
+        //             <div style="text-align:center;">
+        //                 <p>Οι παρακάτω ημέρες έχουν περισσότερες ώρες από τον Μ.Ο. ημερήσιας εργασίας:</p>
+        //                 ${daysMessage}
+        //             </div>`,
+        //         showConfirmButton: true,
+        //         confirmButtonText: 'Το κατάλαβα',
+        //         customClass: {
+        //             confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+        //             title: 'custom-title',
+        //             popup: 'custom-swal-popup'
+        //         }
+        //     });
+        // }
 
         if (hasRestViolation) {
             const restMessage = restViolations
@@ -1474,23 +1474,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 const expectedHours = parseFloat(oresErgasiasInput.value);
                 const actualHours = parseFloat(totalHours);
 
-                if (actualHours !== expectedHours) {
-                    Swal.fire({
-                        backdrop: false,
-                        allowOutsideClick: false,
-                        icon: 'info',
-                        title: 'ΠΡΟΣΟΧΗ!!!',
-                        html: `Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου.<br>
-                                Οι ώρες που δηλώθηκαν είναι <strong>${actualHours}</strong>, ενώ οι ώρες που αναμένονται σύμφωνα με το ωράριο είναι <strong>${expectedHours}</strong>.`,
-                        showConfirmButton: true,
-                        confirmButtonText: 'Κλείσιμο',
-                        customClass: {
-                            confirmButton: 'class-info custom-confirm-button custom-swal-button',
-                            title: 'custom-title',
-                            popup: 'custom-swal-popup'
-                        }
-                    });
-                }
+                // if (actualHours !== expectedHours) {
+                //     Swal.fire({
+                //         backdrop: false,
+                //         allowOutsideClick: false,
+                //         icon: 'info',
+                //         title: 'ΠΡΟΣΟΧΗ!!!',
+                //         html: `Δεν συμφωνούν οι ώρες εβδομαδιαίας εργασίας με το σύνολο των ωρών του δηλωθέντος ωραρίου.<br>
+                //                 Οι ώρες που δηλώθηκαν είναι <strong>${actualHours}</strong>, ενώ οι ώρες που αναμένονται σύμφωνα με το ωράριο είναι <strong>${expectedHours}</strong>.`,
+                //         showConfirmButton: true,
+                //         confirmButtonText: 'Κλείσιμο',
+                //         customClass: {
+                //             confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                //             title: 'custom-title',
+                //             popup: 'custom-swal-popup'
+                //         }
+                //     });
+                // }
             }
         }
 
