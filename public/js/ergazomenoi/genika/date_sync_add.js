@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     allowOutsideClick: false,
                     icon: 'error',
                     title: 'Προσοχή !!! ',
-                    text: 'Ο Μ.Ο. ωρών ημερ��σιας εργασίας δεν μπορεί να υπερβαίνει τις 10 ώρες.  Παρακαλώ ελέγξτε τις τιμές που εισάγατε.',
+                    text: 'Ο Μ.Ο. ωρών ημερήσιας εργασίας δεν μπορεί να υπερβαίνει τις 10 ώρες.  Παρακαλώ ελέγξτε τις τιμές που εισάγατε.',
                     showConfirmButton: true,
                     confirmButtonText: 'Εντάξει',
                     customClass: {

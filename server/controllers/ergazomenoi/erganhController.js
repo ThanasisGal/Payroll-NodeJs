@@ -23,6 +23,14 @@ const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentU
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
 const { generateE5NJSON } = require('../../utils/xmlGenerators/e5N_v1Generator');
+const {
+    generateE6NMPXML,
+    generateE6NMPJSON,
+    generateE6NXPXML,
+    generateE6NXPJSON,
+    normalizeE6NType,
+    E6N_CONFIG
+} = require('../../utils/xmlGenerators/e6n_v1Generator');
 
 async function tryGenerateE5NPdfForRest(
     ergazomenos,
@@ -3072,8 +3080,26 @@ function createReviewTotals() {
         ores_nyxtas_apologistika: 0,
         argia: 0,
         ores_prostheths_ergasias_apologistika: 0,
+
+        // Σύνολα υπερεργασίας αναλυμένα όπως στις ημερήσιες γραμμές PDF
+        ores_yperergasias_apologistika: 0,
+        ores_yperergasias_nyxtas_apologistika: 0,
+        ores_yperergasias_argion_apologistika: 0,
+        ores_yperergasias_argion_nyxtas_apologistika: 0,
         yperergasia: 0,
+
+        // Σύνολα νόμιμης υπερωρίας αναλυμένα όπως στις ημερήσιες γραμμές PDF
+        ores_nominhs_yperorias_apologistika: 0,
+        ores_nominhs_yperorias_nyxtas_apologistika: 0,
+        ores_nominhs_yperorias_argion_apologistika: 0,
+        ores_nominhs_yperorias_argion_nyxtas_apologistika: 0,
         nomimiYperoria: 0,
+
+        // Σύνολα παράνομης υπερωρίας αναλυμένα όπως στις ημερήσιες γραμμές PDF
+        ores_paranomhs_yperorias_apologistika: 0,
+        ores_paranomhs_yperorias_nyxtas_apologistika: 0,
+        ores_paranomhs_yperorias_argion_apologistika: 0,
+        ores_paranomhs_yperorias_argion_nyxtas_apologistika: 0,
         paranomiYperoria: 0
     };
 }
@@ -3083,8 +3109,37 @@ function addReviewTotals(t, row) {
     t.ores_nyxtas_apologistika += reviewNum(row.ores_nyxtas_apologistika);
     t.argia += reviewArgiaTotal(row);
     t.ores_prostheths_ergasias_apologistika += reviewNum(row.ores_prostheths_ergasias_apologistika);
+
+    t.ores_yperergasias_apologistika += reviewNum(row.ores_yperergasias_apologistika);
+    t.ores_yperergasias_nyxtas_apologistika += reviewNum(row.ores_yperergasias_nyxtas_apologistika);
+    t.ores_yperergasias_argion_apologistika += reviewNum(row.ores_yperergasias_argion_apologistika);
+    t.ores_yperergasias_argion_nyxtas_apologistika += reviewNum(
+        row.ores_yperergasias_argion_nyxtas_apologistika
+    );
     t.yperergasia += reviewYperergasiaTotal(row);
+
+    t.ores_nominhs_yperorias_apologistika += reviewNum(row.ores_nominhs_yperorias_apologistika);
+    t.ores_nominhs_yperorias_nyxtas_apologistika += reviewNum(
+        row.ores_nominhs_yperorias_nyxtas_apologistika
+    );
+    t.ores_nominhs_yperorias_argion_apologistika += reviewNum(
+        row.ores_nominhs_yperorias_argion_apologistika
+    );
+    t.ores_nominhs_yperorias_argion_nyxtas_apologistika += reviewNum(
+        row.ores_nominhs_yperorias_argion_nyxtas_apologistika
+    );
     t.nomimiYperoria += reviewNomimiYperoriaTotal(row);
+
+    t.ores_paranomhs_yperorias_apologistika += reviewNum(row.ores_paranomhs_yperorias_apologistika);
+    t.ores_paranomhs_yperorias_nyxtas_apologistika += reviewNum(
+        row.ores_paranomhs_yperorias_nyxtas_apologistika
+    );
+    t.ores_paranomhs_yperorias_argion_apologistika += reviewNum(
+        row.ores_paranomhs_yperorias_argion_apologistika
+    );
+    t.ores_paranomhs_yperorias_argion_nyxtas_apologistika += reviewNum(
+        row.ores_paranomhs_yperorias_argion_nyxtas_apologistika
+    );
     t.paranomiYperoria += reviewParanomiYperoriaTotal(row);
 }
 function buildProdhlomenaReviewFilter(req) {
@@ -5136,9 +5191,7 @@ class erganhController {
                 y += 13;
             };
 
-            const newPageIfNeeded = (height = 16) => {
-                if (y + height <= bottom) return;
-
+            const addReviewPdfPage = () => {
                 doc.addPage({
                     size: 'A4',
                     layout: 'landscape',
@@ -5146,6 +5199,12 @@ class erganhController {
                 });
                 y = doc.page.margins.top;
                 drawHeader();
+            };
+
+            const newPageIfNeeded = (height = 16) => {
+                if (y + height <= bottom) return false;
+                addReviewPdfPage();
+                return true;
             };
 
             const drawCell = (x, rowY, w, h, value, options = {}) => {
@@ -5182,7 +5241,15 @@ class erganhController {
             };
 
             const drawBreakdownCell = (x, rowY, w, h, breakdown, options = {}) => {
-                const { fill = null, fontSize = 5.7, color = '#000', boldText = true } = options;
+                const {
+                    fill = null,
+                    fontSize = 5.7,
+                    color = '#000',
+                    boldText = true,
+                    paddingTop = 1.8,
+                    paddingBottom = 1.7,
+                    labelWidth = Math.max(16, w * 0.48)
+                } = options;
 
                 if (fill) doc.save().rect(x, rowY, w, h).fill(fill).restore();
 
@@ -5194,15 +5261,19 @@ class erganhController {
                     .restore();
 
                 const parts = Array.isArray(breakdown?.parts) ? breakdown.parts.slice(0, 4) : [];
-                const lineHeight = Math.max(4.7, (h - 3.5) / Math.max(parts.length, 1));
+                const usableHeight = Math.max(1, h - paddingTop - paddingBottom);
+                const lineHeight = Math.max(
+                    fontSize + 1.1,
+                    usableHeight / Math.max(parts.length, 1)
+                );
 
                 parts.forEach((part, index) => {
-                    const lineY = rowY + 1.8 + index * lineHeight;
+                    const lineY = rowY + paddingTop + index * lineHeight;
                     doc.font(boldText ? bold : regular)
                         .fontSize(fontSize)
                         .fillColor(color)
-                        .text(part.label, x + 1.2, lineY, {
-                            width: Math.max(14, w * 0.46),
+                        .text(part.label, x + 1.6, lineY, {
+                            width: labelWidth,
                             height: lineHeight,
                             ellipsis: true,
                             align: 'left'
@@ -5211,8 +5282,8 @@ class erganhController {
                     doc.font(boldText ? bold : regular)
                         .fontSize(fontSize)
                         .fillColor(color)
-                        .text(reviewHours(part.value), x + 1.2, lineY, {
-                            width: w - 2.4,
+                        .text(reviewHours(part.value), x + 1.6, lineY, {
+                            width: w - 3.2,
                             height: lineHeight,
                             ellipsis: true,
                             align: 'right'
@@ -5220,14 +5291,79 @@ class erganhController {
                 });
             };
 
-            const drawTableHeader = () => {
+            const drawTotalsBreakdownCell = (x, rowY, w, h, breakdown, options = {}) => {
+                const {
+                    fill = null,
+                    totalFontSize = 10.2,
+                    detailFontSize = 5.7,
+                    color = '#000',
+                    paddingTop = 2.2,
+                    labelWidth = Math.max(19, w * 0.5)
+                } = options;
+
+                if (fill) doc.save().rect(x, rowY, w, h).fill(fill).restore();
+
+                doc.save()
+                    .rect(x, rowY, w, h)
+                    .strokeColor('#D9D9D9')
+                    .lineWidth(0.25)
+                    .stroke()
+                    .restore();
+
+                doc.font(bold)
+                    .fontSize(totalFontSize)
+                    .fillColor(color)
+                    .text(reviewHours(breakdown?.total || 0), x + 1.6, rowY + paddingTop, {
+                        width: w - 3.2,
+                        height: totalFontSize + 2,
+                        ellipsis: true,
+                        align: 'right'
+                    });
+
+                const parts = Array.isArray(breakdown?.parts) ? breakdown.parts.slice(0, 4) : [];
+                const detailsTop = rowY + paddingTop + totalFontSize + 3.6;
+                const usableHeight = Math.max(1, rowY + h - 2.2 - detailsTop);
+                const lineHeight = Math.max(
+                    detailFontSize + 1.2,
+                    usableHeight / Math.max(parts.length, 1)
+                );
+
+                parts.forEach((part, index) => {
+                    const lineY = detailsTop + index * lineHeight;
+                    doc.font(bold)
+                        .fontSize(detailFontSize)
+                        .fillColor(color)
+                        .text(part.label, x + 1.6, lineY, {
+                            width: labelWidth,
+                            height: lineHeight,
+                            ellipsis: true,
+                            align: 'left'
+                        });
+
+                    doc.font(bold)
+                        .fontSize(detailFontSize)
+                        .fillColor(color)
+                        .text(reviewHours(part.value), x + 1.6, lineY, {
+                            width: w - 3.2,
+                            height: lineHeight,
+                            ellipsis: true,
+                            align: 'right'
+                        });
+                });
+            };
+
+            const drawTableHeader = (options = {}) => {
+                const labelsOverride = Array.isArray(options.labelsOverride)
+                    ? options.labelsOverride
+                    : null;
                 newPageIfNeeded(27);
                 let x = x0;
                 const h = 26;
                 doc.rect(x0, y, tableWidth, h).fill('#212529');
                 doc.font(bold).fontSize(7.2).fillColor('#FFF');
-                for (const [label, w] of cols) {
-                    doc.text(label, x + 1, y + 3.5, {
+                cols.forEach(([label, w], index) => {
+                    const headerLabel = labelsOverride ? (labelsOverride[index] ?? label) : label;
+                    doc.text(headerLabel, x + 1, y + 3.5, {
                         width: w - 2,
                         height: h - 7,
                         align: 'center',
@@ -5235,8 +5371,17 @@ class erganhController {
                         ellipsis: false
                     });
                     x += w;
-                }
+                });
                 y += h;
+            };
+
+            const drawEmployeeTotalsSummaryTableHeader = () => {
+                const labels = cols.map(([label]) => label);
+                labels[0] = 'Εργαζόμενος';
+                labels[1] = '';
+                labels[2] = '';
+                labels[3] = '';
+                drawTableHeader({ labelsOverride: labels });
             };
 
             let currentBranch = null;
@@ -5247,18 +5392,47 @@ class erganhController {
             let printedEmployees = 0;
             let branchHeaderPending = false;
             const grandTotals = createReviewTotals();
+            const employeeTotalsSummary = [];
 
-            const drawTotals = (label, totals, fill = '#E2F0D9') => {
-                newPageIfNeeded(12);
+            const cloneReviewTotalsForPdf = (sourceTotals = {}) => {
+                const cloned = createReviewTotals();
+                Object.keys(cloned).forEach((key) => {
+                    cloned[key] = reviewNum(sourceTotals[key]);
+                });
+                return cloned;
+            };
+
+            const drawTotals = (label, totals, fill = '#E2F0D9', options = {}) => {
+                const yperergasiaBreakdown = reviewPdfYperergasiaBreakdown(totals);
+                const nomimiYperoriaBreakdown = reviewPdfNomimiYperoriaBreakdown(totals);
+                const paranomiYperoriaBreakdown = reviewPdfParanomiYperoriaBreakdown(totals);
+                const overtimeBreakdowns = {
+                    9: yperergasiaBreakdown,
+                    10: nomimiYperoriaBreakdown,
+                    11: paranomiYperoriaBreakdown
+                };
+                const hasOvertimeBreakdown = Object.values(overtimeBreakdowns).some(
+                    (breakdown) => breakdown?.needsBreakdown
+                );
+
+                const totalValueFontSize = options.totalValueFontSize || 10.2;
+                const totalLabelFontSize = options.totalLabelFontSize || 7.2;
+                const h = hasOvertimeBreakdown
+                    ? options.breakdownHeight || 43
+                    : options.normalHeight || 19;
+                const movedToNewPage = newPageIfNeeded(h + 3);
+                if (movedToNewPage && typeof options.afterPageBreak === 'function') {
+                    options.afterPageBreak();
+                }
                 const rowY = y;
-                const h = 14;
                 doc.rect(x0, rowY, tableWidth, h).fill(fill);
                 doc.rect(x0, rowY, tableWidth, h).strokeColor('#BFBFBF').lineWidth(0.25).stroke();
                 doc.font(bold)
-                    .fontSize(6.5)
+                    .fontSize(totalLabelFontSize)
                     .fillColor('#000')
-                    .text(label, x0 + 2, rowY + 3, {
+                    .text(label, x0 + 2, rowY + 3.4, {
                         width: cols.slice(0, 4).reduce((a, [, w]) => a + w, 0) - 4,
+                        height: h - 5,
                         ellipsis: true
                     });
 
@@ -5268,9 +5442,9 @@ class erganhController {
                     reviewHours(totals.ores_nyxtas_apologistika),
                     reviewHours(totals.argia),
                     reviewHours(totals.ores_prostheths_ergasias_apologistika),
-                    reviewHours(totals.yperergasia),
-                    reviewHours(totals.nomimiYperoria),
-                    reviewHours(totals.paranomiYperoria)
+                    reviewHours(yperergasiaBreakdown.total),
+                    reviewHours(nomimiYperoriaBreakdown.total),
+                    reviewHours(paranomiYperoriaBreakdown.total)
                 ];
 
                 let x = x0 + cols.slice(0, 4).reduce((a, [, w]) => a + w, 0);
@@ -5278,18 +5452,41 @@ class erganhController {
                     const numericIndex = 4 + i;
                     const n = Number(String(value || 0).replace(',', '.'));
                     const w = cols[numericIndex][1];
+                    const breakdown = overtimeBreakdowns[numericIndex];
                     const cellFill =
                         Number.isFinite(n) && n !== 0 ? numericPdfColors[numericIndex] : fill;
-                    drawCell(x, rowY, w, h, value, {
-                        fill: cellFill,
-                        font: bold,
-                        fontSize: 6.5,
-                        color: numericTextColors[numericIndex] || '#000',
-                        align: 'right',
-                        boldText: true
-                    });
+
+                    if (breakdown?.needsBreakdown) {
+                        drawTotalsBreakdownCell(x, rowY, w, h, breakdown, {
+                            fill: cellFill,
+                            totalFontSize: totalValueFontSize,
+                            detailFontSize: options.breakdownFontSize || 5.7,
+                            color: numericTextColors[numericIndex] || '#000',
+                            labelWidth: Math.max(19, w * 0.5)
+                        });
+                    } else {
+                        drawCell(x, rowY, w, h, value, {
+                            fill: cellFill,
+                            font: bold,
+                            fontSize: totalValueFontSize,
+                            color: numericTextColors[numericIndex] || '#000',
+                            align: 'right',
+                            boldText: true,
+                            ellipsis: true
+                        });
+                    }
                     x += w;
                 });
+
+                if (options.strongBottomLine) {
+                    doc.save()
+                        .moveTo(x0, rowY + h)
+                        .lineTo(x0 + tableWidth, rowY + h)
+                        .strokeColor('#666666')
+                        .lineWidth(0.9)
+                        .stroke()
+                        .restore();
+                }
 
                 y += h;
             };
@@ -5347,9 +5544,61 @@ class erganhController {
                 });
             };
 
+            const drawEmployeeTotalsSummaryHeader = () => {
+                newPageIfNeeded(43);
+                doc.rect(x0, y, tableWidth, 14).fill('#305496');
+                doc.font(bold)
+                    .fontSize(8)
+                    .fillColor('#FFF')
+                    .text('Ανακεφαλαίωση συνόλων ανά εργαζόμενο', x0 + 3, y + 4, {
+                        width: tableWidth - 6,
+                        align: 'center'
+                    });
+                y += 14;
+                drawEmployeeTotalsSummaryTableHeader();
+            };
+
+            const drawEmployeeTotalsSummaryPage = () => {
+                if (employeeTotalsSummary.length === 0) return;
+
+                addReviewPdfPage();
+                drawEmployeeTotalsSummaryHeader();
+
+                employeeTotalsSummary.forEach((entry) => {
+                    const branchPart = entry.branch ? ` | Υποκ.: ${entry.branch}` : '';
+                    drawTotals(
+                        `Σύνολα εργαζομένου: ${entry.employee}${branchPart}`,
+                        entry.totals,
+                        '#E2F0D9',
+                        {
+                            breakdownHeight: 45,
+                            normalHeight: 20,
+                            breakdownFontSize: 5.8,
+                            totalValueFontSize: 10.2,
+                            totalLabelFontSize: 7.4,
+                            strongBottomLine: true,
+                            afterPageBreak: drawEmployeeTotalsSummaryHeader
+                        }
+                    );
+                });
+            };
+
             const closeEmployee = () => {
                 if (!currentEmployee) return;
-                drawTotals(`Σύνολα εργαζομένου: ${currentEmployee}`, employeeTotals, '#E2F0D9');
+                drawTotals(`Σύνολα εργαζομένου: ${currentEmployee}`, employeeTotals, '#E2F0D9', {
+                    breakdownHeight: 45,
+                    normalHeight: 20,
+                    breakdownFontSize: 5.8,
+                    totalValueFontSize: 10.2,
+                    totalLabelFontSize: 7.4,
+                    strongBottomLine: true
+                });
+                employeeTotalsSummary.push({
+                    branch: currentBranch,
+                    employee: currentEmployee,
+                    kodikos: currentEmployeeKodikos,
+                    totals: cloneReviewTotalsForPdf(employeeTotals)
+                });
                 drawEmployeeDeviations(currentEmployeeKodikos);
                 employeeTotals = createReviewTotals();
             };
@@ -5357,7 +5606,14 @@ class erganhController {
             const closeBranch = () => {
                 if (!currentBranch) return;
                 closeEmployee();
-                drawTotals(`Σύνολα υποκαταστήματος: ${currentBranch}`, branchTotals, '#B7DEE8');
+                drawTotals(`Σύνολα υποκαταστήματος: ${currentBranch}`, branchTotals, '#B7DEE8', {
+                    breakdownHeight: 45,
+                    normalHeight: 20,
+                    breakdownFontSize: 5.8,
+                    totalValueFontSize: 10.2,
+                    totalLabelFontSize: 7.4,
+                    strongBottomLine: true
+                });
                 branchTotals = createReviewTotals();
             };
 
@@ -5497,7 +5753,15 @@ class erganhController {
             }
 
             closeBranch();
-            drawTotals('Γενικά σύνολα', grandTotals, '#FFC000');
+            drawTotals('Γενικά σύνολα', grandTotals, '#FFC000', {
+                breakdownHeight: 45,
+                normalHeight: 20,
+                breakdownFontSize: 5.8,
+                totalValueFontSize: 10.2,
+                totalLabelFontSize: 7.4,
+                strongBottomLine: true
+            });
+            drawEmployeeTotalsSummaryPage();
 
             const range = doc.bufferedPageRange();
             const footerLeftText = `(c) Copyright: www.WebPayrollSolutions.com  |  Ιωλκού 266α Βόλος  |  Τηλ. : 2421 0 56825  |  Κιν. : 697 20 12 650  |  eMail : support@WebPayrollSolutions.com`;
@@ -7149,6 +7413,484 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: error.message || 'Σφάλμα κατά την αποστολή E3N στο ΕΡΓΑΝΗ.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
+    // ============================================================================
+    // ✅ E6N XML / REST JSON UPLOAD - WebE6NMP / WebE6NXP
+    //    WebE6NMP: Trial id 109 / Production id 221
+    //    WebE6NXP: Trial id 107 / Production id 220
+    // ============================================================================
+    static submitE6NToErganh = async (req, res) => {
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const userId = req.session?.userId || req.session?.user?._id || null;
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            const body = req.body || {};
+            const ergazomenosId =
+                body.ergazomenosId || body.employeeId || body.id || body.kodikos || '';
+
+            if (!ergazomenosId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο εργαζόμενος για την υποβολή E6N.'
+                });
+            }
+
+            const e6nType = normalizeE6NType(
+                body.e6nType ||
+                    body.submissionCode ||
+                    body.submission_code ||
+                    body.processCode ||
+                    body.process_code ||
+                    body.lhxh_type ||
+                    body.type ||
+                    'WebE6NXP'
+            );
+            const config = E6N_CONFIG[e6nType];
+
+            const rawUploadMethod =
+                body.erganiUploadMethod ||
+                body.submissionMethod ||
+                body.uploadMethod ||
+                body.method ||
+                'xml';
+
+            const uploadMethod = String(rawUploadMethod).trim().toLowerCase();
+
+            if (!['xml', 'rest', 'json', 'json_rest'].includes(uploadMethod)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Μη έγκυρος τρόπος αποστολής. Επιτρεπτές τιμές: xml ή rest.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 1) Φόρτωση εργαζομένου
+            // --------------------------------------------------------------------
+            const employeeQuery = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+
+            if (mongoose.Types.ObjectId.isValid(String(ergazomenosId))) {
+                employeeQuery._id = ergazomenosId;
+            } else {
+                employeeQuery.kodikos = String(ergazomenosId).trim();
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(employeeQuery).lean();
+
+            if (!ergazomenos) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε ο εργαζόμενος για την υποβολή E6N.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 2) Φόρτωση εταιρείας
+            // --------------------------------------------------------------------
+            let companyData = null;
+
+            if (mongoose.Types.ObjectId.isValid(String(companyId))) {
+                companyData = await CompaniesModel.findById(companyId).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kod: companyId }).lean();
+            }
+
+            if (!companyData) {
+                companyData = await CompaniesModel.findOne({ kodikos: companyId }).lean();
+            }
+
+            if (!companyData) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν τα στοιχεία της εταιρείας.'
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 3) Φόρτωση υποκαταστήματος
+            // --------------------------------------------------------------------
+            const selectedYpokatasthma =
+                body.ypokatasthma ||
+                body.ypokatasthmata ||
+                body.ypokatasthmata_stathera ||
+                ergazomenos.ypokatasthma ||
+                ergazomenos.ypokatasthma_kodikos ||
+                '0';
+
+            let ypokatasthmataData = await YpokatasthmataModel.findOne({
+                companykod_object: companyId,
+                kodikos: String(selectedYpokatasthma)
+            }).lean();
+
+            if (!ypokatasthmataData) {
+                ypokatasthmataData = await YpokatasthmataModel.findOne({
+                    company: companyData.kod || companyData.kodikos || companyId,
+                    kodikos: String(selectedYpokatasthma)
+                }).lean();
+            }
+
+            if (!ypokatasthmataData) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Δεν βρέθηκε το υποκατάστημα ${selectedYpokatasthma}.`
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 4) Credentials ΕΡΓΑΝΗ από PasswordsModel
+            // --------------------------------------------------------------------
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const creds = {
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            };
+
+            // --------------------------------------------------------------------
+            // 5) Options προς generator.
+            // --------------------------------------------------------------------
+            const generatorOptions = {
+                ...(body.options || {}),
+
+                hmeromhnia_apolysis:
+                    body.hmeromhnia_apolysis ||
+                    body.hmeromhnia_apolyshs ||
+                    body.hmeromhnia_apoxorhshs ||
+                    body.hmeromhnia_apoxwrhshs ||
+                    body.apolysisdate ||
+                    body.apoxwrisi_date ||
+                    body.options?.hmeromhnia_apolysis ||
+                    body.options?.hmeromhnia_apolyshs ||
+                    body.options?.hmeromhnia_apoxorhshs ||
+                    body.options?.hmeromhnia_apoxwrhshs ||
+                    body.options?.apolysisdate ||
+                    body.options?.apoxwrisi_date,
+
+                proidopoihshdate:
+                    body.f_proidopoihshdate ||
+                    body.proidopoihshdate ||
+                    body.hmeromhnia_proidopoihshs ||
+                    body.hmeromhnia_proeidopoihshs ||
+                    body.options?.f_proidopoihshdate ||
+                    body.options?.proidopoihshdate ||
+                    body.options?.hmeromhnia_proidopoihshs ||
+                    body.options?.hmeromhnia_proeidopoihshs,
+
+                minesproidopoihsh:
+                    body.f_minesproidopoihsh ||
+                    body.minesproidopoihsh ||
+                    body.mines_proidopoihshs ||
+                    body.mines_proeidopoihshs ||
+                    body.options?.f_minesproidopoihsh ||
+                    body.options?.minesproidopoihsh ||
+                    body.options?.mines_proidopoihshs ||
+                    body.options?.mines_proeidopoihshs,
+
+                koinopoihshdate:
+                    body.f_koinopoihshdate ||
+                    body.koinopoihshdate ||
+                    body.hmeromhnia_koinopoihshs ||
+                    body.hmeromhnia_koinopoihshs_kataggelias ||
+                    body.options?.f_koinopoihshdate ||
+                    body.options?.koinopoihshdate ||
+                    body.options?.hmeromhnia_koinopoihshs ||
+                    body.options?.hmeromhnia_koinopoihshs_kataggelias,
+
+                poso_apozimiosis:
+                    body.f_posoapozimiosis ||
+                    body.posoapozimiosis ||
+                    body.poso_apozimiosis ||
+                    body.options?.f_posoapozimiosis ||
+                    body.options?.posoapozimiosis ||
+                    body.options?.poso_apozimiosis,
+
+                comments:
+                    body.comments ||
+                    body.f_comments ||
+                    body.options?.comments ||
+                    body.options?.f_comments ||
+                    '',
+
+                e6_pdf_base64:
+                    body.e6_pdf_base64 ||
+                    body.e6n_pdf_base64 ||
+                    body.f_file ||
+                    body.options?.e6_pdf_base64 ||
+                    body.options?.e6n_pdf_base64 ||
+                    body.options?.f_file,
+
+                allowFallbackPdf:
+                    body.allowFallbackPdf !== false && body.options?.allowFallbackPdf !== false
+            };
+
+            // --------------------------------------------------------------------
+            // 6Α) XML + Playwright -> Προσωρινή καταχώρηση
+            // --------------------------------------------------------------------
+            if (uploadMethod === 'xml') {
+                const xmlResult =
+                    e6nType === 'MP'
+                        ? await generateE6NMPXML(
+                              ergazomenos,
+                              companyData,
+                              ypokatasthmataData,
+                              generatorOptions
+                          )
+                        : await generateE6NXPXML(
+                              ergazomenos,
+                              companyData,
+                              ypokatasthmataData,
+                              generatorOptions
+                          );
+
+                const tmpXmlDir = path.join(process.cwd(), 'tmp', 'erganh-xml');
+
+                if (!fs.existsSync(tmpXmlDir)) {
+                    fs.mkdirSync(tmpXmlDir, { recursive: true });
+                }
+
+                const xmlFilename =
+                    xmlResult.filename ||
+                    `${String(ergazomenos._id || ergazomenos.kodikos || config.folder)}_${config.folder}.xml`;
+
+                const xmlPath = path.join(tmpXmlDir, xmlFilename);
+
+                fs.writeFileSync(xmlPath, xmlResult.xml, 'utf8');
+
+                const uploadResult = await uploadE3ToErganh(
+                    companyId,
+                    xmlPath,
+                    userId,
+                    {
+                        username: creds.username,
+                        password: creds.password
+                    },
+                    {
+                        xmlType: config.xmlType,
+                        isPermanent: false
+                    }
+                );
+
+                return res.status(uploadResult?.success ? 200 : 400).json({
+                    success: !!uploadResult?.success,
+                    uploadMethod: 'xml',
+                    temporary: true,
+                    finalSubmission: false,
+                    submissionCode: config.submissionCode,
+                    processCode: config.xmlType,
+                    message: uploadResult?.success
+                        ? `Το ${config.submissionCode} XML δημιουργήθηκε και ανέβηκε στο ΕΡΓΑΝΗ ως προσωρινή καταχώρηση.`
+                        : uploadResult?.userMessage ||
+                          `Το ${config.submissionCode} XML δημιουργήθηκε, αλλά η αποστολή στο ΕΡΓΑΝΗ απέτυχε.`,
+                    filename: xmlFilename,
+                    xmlPath,
+                    s3Key: xmlResult.s3Key,
+                    s3Url: xmlResult.s3Url,
+                    generator: {
+                        success: xmlResult.success,
+                        saveError: xmlResult.saveError || null
+                    },
+                    erganh: uploadResult
+                });
+            }
+
+            // --------------------------------------------------------------------
+            // 6Β) JSON + REST API -> Οριστική υποβολή
+            // --------------------------------------------------------------------
+            const jsonResult =
+                e6nType === 'MP'
+                    ? await generateE6NMPJSON(
+                          ergazomenos,
+                          companyData,
+                          ypokatasthmataData,
+                          generatorOptions
+                      )
+                    : await generateE6NXPJSON(
+                          ergazomenos,
+                          companyData,
+                          ypokatasthmataData,
+                          generatorOptions
+                      );
+
+            const payload = jsonResult.payload || jsonResult.json;
+
+            const restResult = await uploadJsonDocumentToErgani({
+                submissionCode: config.submissionCode,
+                payload,
+                creds,
+                fetchSubmittedPdf: true
+            });
+
+            const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
+            const submittedPdfContentType =
+                restResult?.submittedPdf?.contentType || 'application/pdf';
+
+            let pdfStorage = {
+                pdfSaved: false,
+                pdfFilename: null,
+                pdfS3Key: null,
+                pdfS3Url: null,
+                pdfRelativePath: null,
+                pdfSizeBytes: 0,
+                pdfContentType: submittedPdfContentType,
+                pdfSaveError: restResult?.submittedPdf?.error || null
+            };
+
+            if (restResult?.success) {
+                const isValidPdfBuffer =
+                    Buffer.isBuffer(submittedPdfBuffer) &&
+                    submittedPdfBuffer.length > 5 &&
+                    submittedPdfBuffer.subarray(0, 5).toString() === '%PDF-';
+
+                if (isValidPdfBuffer) {
+                    pdfStorage = await saveSubmittedErganiPdfToS3({
+                        pdfBuffer: submittedPdfBuffer,
+                        contentType: 'application/pdf',
+                        ergazomenos,
+                        companyData,
+                        restResult,
+                        submissionFolder: config.folder
+                    });
+                } else {
+                    pdfStorage = {
+                        pdfSaved: false,
+                        pdfFilename: null,
+                        pdfS3Key: null,
+                        pdfS3Url: null,
+                        pdfRelativePath: null,
+                        pdfSizeBytes: 0,
+                        pdfContentType: null,
+                        pdfSaveError:
+                            restResult?.submittedPdf?.error ||
+                            `Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF. Content-Type: ${
+                                restResult?.submittedPdf?.rawContentType ||
+                                restResult?.submittedPdf?.contentType ||
+                                'unknown'
+                            }`
+                    };
+                }
+            }
+
+            const effectiveSubmitDate = parseErganiSubmitDate(restResult?.submitDate) || new Date();
+            const submissionYear = effectiveSubmitDate.getFullYear();
+            const submissionMonth = effectiveSubmitDate.getMonth() + 1;
+            const submissionDay = effectiveSubmitDate.getDate();
+
+            const erganhLog = await ErgazomenoiErganhModel.create({
+                team: sessionTeam,
+                companykod_object: companyData?._id || companyId,
+                companykod: companyData?.kod || companyData?.kodikos || '',
+
+                ergazomenos_object: ergazomenos?._id,
+                ergazomenos_kodikos: ergazomenos?.kodikos || '',
+                ergazomenos_afm: ergazomenos?.afm || '',
+                ergazomenos_eponymo: ergazomenos?.eponymo || '',
+                ergazomenos_onoma: ergazomenos?.onoma || '',
+
+                ypokatasthma_object: ypokatasthmataData?._id || null,
+                ypokatasthma_kodikos:
+                    ypokatasthmataData?.kodikos || ypokatasthmataData?.kod || selectedYpokatasthma,
+
+                submission_code: config.submissionCode,
+                submission_id: restResult?.submission?.id || null,
+                submission_description: restResult?.submission?.description || config.label,
+                process_code: config.xmlType,
+                process_description: config.label,
+
+                upload_method: 'REST',
+                submission_status: restResult?.success ? 'SUCCESS' : 'FAILED',
+                is_temporary: false,
+                is_final: restResult?.success === true,
+                environment: process.env.ERGANI_ENV || 'trial',
+
+                protocol: restResult?.protocol || null,
+                submit_date_text: restResult?.submitDate || null,
+                submit_date: effectiveSubmitDate,
+                erganh_submission_id: restResult?.id || null,
+
+                submission_year: submissionYear,
+                submission_month: submissionMonth,
+                submission_day: submissionDay,
+
+                pdf_s3_key: pdfStorage.pdfS3Key,
+                pdf_s3_url: pdfStorage.pdfS3Url,
+                pdf_relative_path: pdfStorage.pdfRelativePath,
+                pdf_filename: pdfStorage.pdfFilename,
+                pdf_content_type: pdfStorage.pdfContentType,
+                pdf_size_bytes: pdfStorage.pdfSizeBytes,
+
+                request_payload: payload,
+                erganh_raw_response: restResult?.raw || null,
+                error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
+
+                created_by_user: userId,
+                created_by_username: req.session?.userName || req.session?.username || ''
+            });
+
+            const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+
+            return res.status(restResult?.success ? 200 : 400).json({
+                success: !!restResult?.success,
+                uploadMethod: 'rest',
+                temporary: false,
+                finalSubmission: true,
+                submissionCode: config.submissionCode,
+                processCode: config.xmlType,
+                message: restResult?.success
+                    ? `Το ${config.submissionCode} υποβλήθηκε οριστικά μέσω REST API.`
+                    : restResult?.error ||
+                      `Η οριστική υποβολή ${config.submissionCode} μέσω REST API απέτυχε.`,
+                protocol: restResult?.protocol || null,
+                submitDate: restResult?.submitDate || null,
+                erganhSubmissionId: restResult?.id || null,
+                erganhLogId: erganhLog?._id || null,
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfUrl:
+                    pdfStorage.pdfS3Key && erganhLog?._id
+                        ? getErganiPdfRoute(erganhLog._id)
+                        : pdfStorage.pdfRelativePath
+                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
+                          : pdfStorage.pdfS3Url || '',
+                pdfS3Key: pdfStorage.pdfS3Key,
+                pdfFilename: pdfStorage.pdfFilename,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes,
+                pdfSaveError: pdfStorage.pdfSaveError,
+                submission: restResult?.submission || null,
+                erganh: sanitizedErgani
+            });
+        } catch (error) {
+            console.error('[submitE6NToErganh] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά την αποστολή E6N στο ΕΡΓΑΝΗ.',
                 error: error.message || String(error)
             });
         }

@@ -804,6 +804,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         isPermanent &&
                         (lhxhType === 'ma_222' ||
                             lhxhType === 'ma_217' ||
+                            lhxhType === 'ma_221' ||
+                            lhxhType === 'ma_220' ||
                             e3AnaggeliaProslhpshs ||
                             wtoPshfiakhOrganoshXronoy ||
                             e3Enabled_1 ||
@@ -864,6 +866,88 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             const createContract = result.value?.create_contract === true;
+
+            // -------------------------------------------------------------------------
+            // ✅ SAFETY NET για E6N: σε ορισμένες ροές ο /api/ergazomenoi/update
+            //    μπορεί να επιστρέψει redirect ή non-json OK πριν προλάβει να τρέξει
+            //    η κανονική μεταγενέστερη υποβολή.  Για τα WebE6NMP/WebE6NXP
+            //    κρατάμε την οθόνη και εκτελούμε την υποβολή πριν γίνει redirect.
+            // -------------------------------------------------------------------------
+            const selectedE6NProcessCode =
+                result.value?.ma_221 === true ? '221' : result.value?.ma_220 === true ? '220' : '';
+
+            const selectedE6NLabel =
+                selectedE6NProcessCode === '221'
+                    ? 'E6NMP / Καταγγελία με Προειδοποίηση'
+                    : selectedE6NProcessCode === '220'
+                      ? 'E6NXP / Καταγγελία Χωρίς Προειδοποίηση'
+                      : 'E6N';
+
+            const selectedE6NUploadMethod =
+                result.value?.erganiUploadMethod === 'rest' && result.value?.isPermanent === true
+                    ? 'rest'
+                    : 'xml';
+
+            const shouldRunE6NBeforeRedirect = Boolean(selectedE6NProcessCode);
+
+            const runE6NBeforeRedirectIfNeeded = async (reason = '') => {
+                if (!shouldRunE6NBeforeRedirect) {
+                    return { success: true, skipped: true };
+                }
+
+                const progressTitle =
+                    selectedE6NUploadMethod === 'rest'
+                        ? `Οριστική υποβολή ${selectedE6NLabel} μέσω REST API`
+                        : `Προσωρινή υποβολή ${selectedE6NLabel} XML`;
+
+                console.warn('[E6N-SAFETY-NET] Running E6N before redirect/non-json response:', {
+                    reason,
+                    ergazomenoiId,
+                    selectedE6NProcessCode,
+                    selectedE6NUploadMethod
+                });
+
+                try {
+                    showGenericRestProgressSwal(progressTitle);
+
+                    const e6nResult = await submitE6NRestToErganh(
+                        ergazomenoiId,
+                        selectedE6NProcessCode,
+                        selectedE6NUploadMethod
+                    );
+
+                    Swal.close();
+
+                    if (selectedE6NUploadMethod === 'rest') {
+                        await showE6NRestResultSwal(e6nResult);
+                    } else {
+                        await showE6NXmlResultSwal(e6nResult);
+                    }
+
+                    return { success: true, ...e6nResult };
+                } catch (error) {
+                    Swal.close();
+
+                    const failedResult = {
+                        success: false,
+                        submissionCode: selectedE6NProcessCode === '221' ? 'WebE6NMP' : 'WebE6NXP',
+                        uploadMethod: selectedE6NUploadMethod,
+                        message: error?.message || String(error),
+                        error: error?.message || String(error),
+                        userMessage: error?.message || String(error)
+                    };
+
+                    console.error('[E6N-SAFETY-NET] E6N upload failed:', failedResult);
+
+                    if (selectedE6NUploadMethod === 'rest') {
+                        await showE6NRestResultSwal(failedResult);
+                    } else {
+                        await showE6NXmlResultSwal(failedResult);
+                    }
+
+                    return failedResult;
+                }
+            };
 
             console.group('[CONTRACT-DEBUG] BEFORE FETCH');
             console.log('ergazomenoiId:', ergazomenoiId);
@@ -1023,6 +1107,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1) Browser auto-followed redirect
             if (response.redirected && response.url) {
                 console.warn('[CONTRACT-DEBUG] Browser auto-followed redirect:', response.url);
+
+                const e6nRedirectResult = await runE6NBeforeRedirectIfNeeded(
+                    'browser-auto-followed-redirect'
+                );
+                if (shouldRunE6NBeforeRedirect && e6nRedirectResult?.success === false) {
+                    console.warn('[REDIRECT] Skipped because E6N upload failed before redirect.');
+                    return;
+                }
+
                 window.location.href = response.url;
                 return;
             }
@@ -1035,6 +1128,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     location: loc
                 });
                 if (loc) {
+                    const e6nManualRedirectResult = await runE6NBeforeRedirectIfNeeded(
+                        'manual-redirect-response'
+                    );
+                    if (shouldRunE6NBeforeRedirect && e6nManualRedirectResult?.success === false) {
+                        console.warn(
+                            '[REDIRECT] Skipped because E6N upload failed before manual redirect.'
+                        );
+                        return;
+                    }
+
                     const abs = loc.startsWith('http')
                         ? loc
                         : new URL(loc, window.location.origin).toString();
@@ -1155,6 +1258,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     result.value?.isPermanent === true &&
                     result.value?.erganiUploadMethod === 'rest';
 
+                const isE6NMPRestSubmit =
+                    result.value?.ma_221 === true &&
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+
+                const isE6NXPRestSubmit =
+                    result.value?.ma_220 === true &&
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+
+                const isE6NRestSubmit = isE6NMPRestSubmit || isE6NXPRestSubmit;
+
+                const isE6NXmlSubmit =
+                    (result.value?.ma_221 === true || result.value?.ma_220 === true) &&
+                    result.value?.erganiUploadMethod === 'xml';
+
                 const isMARestSubmit =
                     userWantsMAChange === true &&
                     result.value?.isPermanent === true &&
@@ -1185,6 +1304,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const e5RestPendingHtml = isE5NRestSubmit
                     ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή E5N / Οικειοθελούς Αποχώρησης μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
+                    : '';
+
+                const e6nRestPendingHtml = isE6NRestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή ${isE6NMPRestSubmit ? 'E6NMP / Καταγγελία με Προειδοποίηση' : 'E6NXP / Καταγγελία Χωρίς Προειδοποίηση'} μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
+                    : '';
+
+                const e6nXmlPendingHtml = isE6NXmlSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί προσωρινή υποβολή ${result.value?.ma_221 === true ? 'E6NMP / Καταγγελία με Προειδοποίηση' : 'E6NXP / Καταγγελία Χωρίς Προειδοποίηση'} μέσω XML. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
                 const maRestPendingHtml = isMARestSubmit
@@ -1346,13 +1473,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         result.value?.e3_metaboles_ergasiakhs_sxeshs_daneizomenoy_prosopikoy ===
                             true ||
                         result.value?.ma_217 === true ||
-                        result.value?.ma_222 === true;
+                        result.value?.ma_222 === true ||
+                        result.value?.ma_221 === true ||
+                        result.value?.ma_220 === true;
 
                     if (
                         userWantsMA &&
                         data.data?._id &&
                         (isE7NRestSubmit ||
                             isE5NRestSubmit ||
+                            isE6NRestSubmit ||
+                            isE6NXmlSubmit ||
                             isMARestSubmit ||
                             (maXmlData?.success &&
                                 (maXmlData?.s3Url ||
@@ -1364,13 +1495,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? 'REST_E7N_NO_XML_REQUIRED'
                             : isE5NRestSubmit
                               ? 'REST_E5N_NO_XML_REQUIRED'
-                              : isMARestSubmit
-                                ? 'REST_MA_NO_XML_REQUIRED'
-                                : maXmlData?.s3Url ||
-                                  maXmlData?.downloadUrl ||
-                                  maXmlData?.relativePath ||
-                                  maXmlData?.s3Key ||
-                                  null;
+                              : isE6NRestSubmit
+                                ? 'REST_E6N_NO_XML_REQUIRED'
+                                : isE6NXmlSubmit
+                                  ? 'XML_E6N_DIRECT_SUBMIT'
+                                  : isMARestSubmit
+                                    ? 'REST_MA_NO_XML_REQUIRED'
+                                    : maXmlData?.s3Url ||
+                                      maXmlData?.downloadUrl ||
+                                      maXmlData?.relativePath ||
+                                      maXmlData?.s3Key ||
+                                      null;
                         if (maUrlToSend) {
                             try {
                                 if (isE7NRestSubmit) {
@@ -1384,6 +1519,22 @@ document.addEventListener('DOMContentLoaded', () => {
                                     );
                                     showGenericRestProgressSwal(
                                         'Οριστική υποβολή E5N μέσω REST API'
+                                    );
+                                } else if (isE6NRestSubmit) {
+                                    console.log(
+                                        '[E6N-REST-UPLOAD] Submitting E6N via REST JSON...'
+                                    );
+                                    showGenericRestProgressSwal(
+                                        isE6NMPRestSubmit
+                                            ? 'Οριστική υποβολή E6NMP μέσω REST API'
+                                            : 'Οριστική υποβολή E6NXP μέσω REST API'
+                                    );
+                                } else if (isE6NXmlSubmit) {
+                                    console.log('[E6N-XML-UPLOAD] Submitting E6N XML...');
+                                    showGenericRestProgressSwal(
+                                        result.value?.ma_221 === true
+                                            ? 'Προσωρινή υποβολή E6NMP XML'
+                                            : 'Προσωρινή υποβολή E6NXP XML'
                                     );
                                 } else if (isMARestSubmit) {
                                     console.log('[MA-REST-UPLOAD] Submitting MA via REST JSON...');
@@ -1403,7 +1554,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ? '222'
                                             : result.value?.ma_217 === true
                                               ? '217'
-                                              : undefined),
+                                              : result.value?.ma_221 === true
+                                                ? '221'
+                                                : result.value?.ma_220 === true
+                                                  ? '220'
+                                                  : undefined),
                                     result.value?.erganiUploadMethod || 'xml'
                                 );
 
@@ -1415,6 +1570,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                     Swal.close();
                                     console.log('[E5N-REST-UPLOAD] Result:', maResult);
                                     await showE5NRestResultSwal(maResult);
+                                } else if (isE6NRestSubmit) {
+                                    Swal.close();
+                                    console.log('[E6N-REST-UPLOAD] Result:', maResult);
+                                    await showE6NRestResultSwal(maResult);
+                                } else if (isE6NXmlSubmit) {
+                                    Swal.close();
+                                    console.log('[E6N-XML-UPLOAD] Result:', maResult);
+                                    await showE6NXmlResultSwal(maResult);
                                 } else if (isMARestSubmit) {
                                     Swal.close();
                                     console.log('[MA-REST-UPLOAD] Result:', maResult);
@@ -1423,7 +1586,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                     console.log('[MA-UPLOAD] Result:', maResult);
                                 }
                             } catch (e) {
-                                if (isE7NRestSubmit || isE5NRestSubmit || isMARestSubmit) {
+                                if (
+                                    isE7NRestSubmit ||
+                                    isE5NRestSubmit ||
+                                    isE6NRestSubmit ||
+                                    isE6NXmlSubmit ||
+                                    isMARestSubmit
+                                ) {
                                     Swal.close();
                                 }
 
@@ -1436,6 +1605,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 if (isE7NRestSubmit) {
                                     await showE7NRestResultSwal(maResult);
+                                } else if (isE6NRestSubmit) {
+                                    await showE6NRestResultSwal(maResult);
+                                } else if (isE6NXmlSubmit) {
+                                    await showE6NXmlResultSwal(maResult);
                                 } else if (isMARestSubmit) {
                                     await showMARestResultSwal(maResult);
                                 }
@@ -1535,12 +1708,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${e3RestPendingHtml}
                 ${e7RestPendingHtml}
                 ${e5RestPendingHtml}
+                ${e6nRestPendingHtml}
+                ${e6nXmlPendingHtml}
                 ${wtoRestPendingHtml}
                 ${wtoXmlHtml}
                 `,
                             // ${maXmlHtml}
-                            timer: hasE3Xml || hasWtoXml || hasMAXml ? null : 1500,
-                            showConfirmButton: hasE3Xml || hasWtoXml || hasMAXml,
+                            timer:
+                                hasE3Xml ||
+                                hasWtoXml ||
+                                hasMAXml ||
+                                isE6NRestSubmit ||
+                                isE6NXmlSubmit
+                                    ? null
+                                    : 1500,
+                            showConfirmButton:
+                                hasE3Xml ||
+                                hasWtoXml ||
+                                hasMAXml ||
+                                isE6NRestSubmit ||
+                                isE6NXmlSubmit,
                             confirmButtonText: 'OK',
                             customClass: {
                                 confirmButton:
@@ -1676,6 +1863,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6) Other content-type but OK
             if (response.ok) {
                 console.warn('[CONTRACT-DEBUG] Non-JSON but OK response branch hit');
+
+                const e6nNonJsonResult = await runE6NBeforeRedirectIfNeeded('non-json-ok-response');
+                if (shouldRunE6NBeforeRedirect && e6nNonJsonResult?.success === false) {
+                    console.warn(
+                        '[REDIRECT] Skipped because E6N upload failed after non-json OK response.'
+                    );
+                    return;
+                }
+
                 await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
@@ -2080,6 +2276,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function showE6NRestResultSwal(result) {
+        const code = result?.submissionCode || result?.submission?.code || 'E6N';
+        return showGenericRestResultSwal({
+            result,
+            titleSuccess: `${code} REST - Επιτυχής Υποβολή`,
+            titleError: `${code} REST - Αποτυχία Υποβολής`,
+            successText: 'Η Καταγγελία Σύμβασης υποβλήθηκε οριστικά μέσω REST API.',
+            errorText: 'Η οριστική υποβολή E6N μέσω REST API απέτυχε.'
+        });
+    }
+
+    async function showE6NXmlResultSwal(result) {
+        const code = result?.submissionCode || 'E6N';
+        return Swal.fire({
+            icon: result?.success === true ? 'success' : 'error',
+            title:
+                result?.success === true
+                    ? `${code} XML - Επιτυχής Προσωρινή Υποβολή`
+                    : `${code} XML - Αποτυχία Υποβολής`,
+            html: `
+                <p>${result?.message || result?.userMessage || ''}</p>
+                ${result?.protocol ? `<p>Πρωτόκολλο: <b>${result.protocol}</b></p>` : ''}
+            `,
+            confirmButtonText: 'OK',
+            customClass: {
+                confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup'
+            }
+        });
+    }
+
     // ============================================================================
     // ✅ MA REST JSON UPLOAD
     // ============================================================================
@@ -2169,6 +2397,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 data?.message ||
                     data?.error ||
                     `E5N REST JSON upload failed with HTTP ${response.status}`
+            );
+        }
+
+        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
+            Swal.close();
+            await showErganiSubmittedPdfModal(data);
+        }
+
+        return data;
+    }
+
+    // ============================================================================
+    // ✅ E6N REST JSON UPLOAD
+    // ============================================================================
+    async function submitE6NRestToErganh(ergazomenosId, processCode, uploadMethod = 'rest') {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const ypokatasthma =
+            document.getElementById('ypokatasthma')?.value ||
+            document.getElementById('ypokatasthmata')?.value ||
+            document.getElementById('ypokatasthmata_stathera')?.value ||
+            document.querySelector('[name="ypokatasthma"]')?.value ||
+            document.querySelector('[name="ypokatasthmata"]')?.value ||
+            document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+            '0';
+
+        const normalizedProcessCode = String(processCode || '')
+            .trim()
+            .toLowerCase();
+        const submissionCode =
+            normalizedProcessCode === '221' || normalizedProcessCode === 'ma_221'
+                ? 'WebE6NMP'
+                : 'WebE6NXP';
+
+        const response = await fetch('/ergazomenoi/ergazomenoi/submit-e6n-to-erganh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                ergazomenosId,
+                ypokatasthma,
+                processCode,
+                submissionCode,
+                erganiUploadMethod: uploadMethod
+            })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { success: response.ok, message: await response.text() };
+
+        if (!response.ok || data?.success !== true) {
+            throw new Error(
+                data?.message ||
+                    data?.error ||
+                    `E6N ${String(uploadMethod).toUpperCase()} upload failed with HTTP ${response.status}`
             );
         }
 
@@ -3502,11 +3790,27 @@ document.addEventListener('DOMContentLoaded', () => {
             normalizedUploadMethod === 'rest' &&
             (normalizedProcessCode === '217' || normalizedProcessCode === 'ma_217');
 
+        const isE6NRestSubmit =
+            isPermanent === true &&
+            normalizedUploadMethod === 'rest' &&
+            (normalizedProcessCode === '221' ||
+                normalizedProcessCode === 'ma_221' ||
+                normalizedProcessCode === '220' ||
+                normalizedProcessCode === 'ma_220');
+
+        const isE6NXmlSubmit =
+            normalizedUploadMethod === 'xml' &&
+            (normalizedProcessCode === '221' ||
+                normalizedProcessCode === 'ma_221' ||
+                normalizedProcessCode === '220' ||
+                normalizedProcessCode === 'ma_220');
+
         const isMARestSubmit =
             isPermanent === true &&
             normalizedUploadMethod === 'rest' &&
             !isE7NRestSubmit &&
-            !isE5NRestSubmit;
+            !isE5NRestSubmit &&
+            !isE6NRestSubmit;
 
         if (isE5NRestSubmit) {
             if (erganiUploadInProgress) {
@@ -3528,6 +3832,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const payload = await submitE5NRestToErganh(ergazomenosId);
+                return { success: true, ...payload };
+            } catch (error) {
+                if (window.hideLoader) window.hideLoader();
+
+                return {
+                    success: false,
+                    error: error?.message || 'Unknown error',
+                    message: error?.message || 'Unknown error',
+                    userMessage: error?.message || 'Unknown error'
+                };
+            } finally {
+                if (window.hideLoader) window.hideLoader();
+                erganiUploadInProgress = false;
+            }
+        }
+
+        if (isE6NRestSubmit) {
+            if (erganiUploadInProgress) {
+                if (window.hideLoader) window.hideLoader();
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'ΕΡΓΑΝΗ REST',
+                    text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
+                    confirmButtonText: 'OK'
+                });
+                return { success: false, userMessage: 'Upload already in progress' };
+            }
+
+            erganiUploadInProgress = true;
+
+            try {
+                if (!Swal.isVisible()) {
+                    showGenericRestProgressSwal(
+                        normalizedProcessCode === '221' || normalizedProcessCode === 'ma_221'
+                            ? 'Οριστική υποβολή E6NMP μέσω REST API'
+                            : 'Οριστική υποβολή E6NXP μέσω REST API'
+                    );
+                }
+
+                const payload = await submitE6NRestToErganh(ergazomenosId, normalizedProcessCode);
                 return { success: true, ...payload };
             } catch (error) {
                 if (window.hideLoader) window.hideLoader();
@@ -3672,6 +4016,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        if (isE6NXmlSubmit) {
+            if (erganiUploadInProgress) {
+                if (window.hideLoader) window.hideLoader();
+                await Swal.fire({
+                    icon: 'info',
+                    title: 'ΕΡΓΑΝΗ XML',
+                    text: 'Η υποβολή είναι ήδη σε εξέλιξη.',
+                    confirmButtonText: 'OK'
+                });
+                return { success: false, userMessage: 'Upload already in progress' };
+            }
+
+            erganiUploadInProgress = true;
+
+            try {
+                if (!Swal.isVisible()) {
+                    showGenericRestProgressSwal(
+                        normalizedProcessCode === '221' || normalizedProcessCode === 'ma_221'
+                            ? 'Προσωρινή υποβολή E6NMP XML'
+                            : 'Προσωρινή υποβολή E6NXP XML'
+                    );
+                }
+
+                const payload = await submitE6NRestToErganh(
+                    ergazomenosId,
+                    normalizedProcessCode,
+                    'xml'
+                );
+                return { success: true, ...payload };
+            } catch (error) {
+                if (window.hideLoader) window.hideLoader();
+
+                return {
+                    success: false,
+                    error: error?.message || 'Unknown error',
+                    message: error?.message || 'Unknown error',
+                    userMessage: error?.message || 'Unknown error'
+                };
+            } finally {
+                if (window.hideLoader) window.hideLoader();
+                erganiUploadInProgress = false;
+            }
+        }
         if (!s3Url || typeof s3Url !== 'string') {
             throw new Error('uploadMaToErganh: s3Url must be a string');
         }
