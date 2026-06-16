@@ -3013,6 +3013,52 @@ function reviewParanomiYperoriaTotal(row) {
         reviewNum(row.ores_paranomhs_yperorias_argion_nyxtas_apologistika)
     );
 }
+
+function reviewPdfOvertimeBreakdown(row = {}, fieldNames = []) {
+    const labels = ['Καν.', 'Νύχ.', 'Αργ.', 'Αρ.Ν'];
+    const parts = fieldNames
+        .map((field, index) => ({
+            label: labels[index],
+            value: reviewNum(row[field])
+        }))
+        .filter((part) => part.value !== 0);
+
+    const total = fieldNames.reduce((sum, field) => sum + reviewNum(row[field]), 0);
+    const hasSpecialComponent = fieldNames.slice(1).some((field) => reviewNum(row[field]) !== 0);
+
+    return {
+        total,
+        needsBreakdown: total !== 0 && hasSpecialComponent,
+        parts
+    };
+}
+
+function reviewPdfYperergasiaBreakdown(row = {}) {
+    return reviewPdfOvertimeBreakdown(row, [
+        'ores_yperergasias_apologistika',
+        'ores_yperergasias_nyxtas_apologistika',
+        'ores_yperergasias_argion_apologistika',
+        'ores_yperergasias_argion_nyxtas_apologistika'
+    ]);
+}
+
+function reviewPdfNomimiYperoriaBreakdown(row = {}) {
+    return reviewPdfOvertimeBreakdown(row, [
+        'ores_nominhs_yperorias_apologistika',
+        'ores_nominhs_yperorias_nyxtas_apologistika',
+        'ores_nominhs_yperorias_argion_apologistika',
+        'ores_nominhs_yperorias_argion_nyxtas_apologistika'
+    ]);
+}
+
+function reviewPdfParanomiYperoriaBreakdown(row = {}) {
+    return reviewPdfOvertimeBreakdown(row, [
+        'ores_paranomhs_yperorias_apologistika',
+        'ores_paranomhs_yperorias_nyxtas_apologistika',
+        'ores_paranomhs_yperorias_argion_apologistika',
+        'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+    ]);
+}
 function reviewArgiaTotal(row) {
     return (
         reviewNum(row.ores_argion_prosayxhsh_apologistika) +
@@ -3237,14 +3283,39 @@ function makeReviewPdfDocument() {
     const doc = new PDFDocument({
         size: 'A4',
         layout: 'landscape',
-        margins: { top: 22, left: 18, right: 18, bottom: 22 },
+        // Μικρότερα margins ώστε ο πίνακας να πιάνει πραγματικά όλο το πλάτος
+        // της A4 landscape και να μην μένει κενός χώρος δεξιά.
+        margins: { top: 18, left: 10, right: 10, bottom: 18 },
         bufferPages: true
     });
-    const regularFont = path.join(process.cwd(), 'fonts/JetBrainsMono/JetBrainsMono-Regular.ttf');
-    const boldFont = path.join(process.cwd(), 'fonts/JetBrainsMono/JetBrainsMono-Bold.ttf');
-    if (fs.existsSync(regularFont)) doc.registerFont('ReviewRegular', regularFont);
-    if (fs.existsSync(boldFont)) doc.registerFont('ReviewBold', boldFont);
-    doc.font(fs.existsSync(regularFont) ? 'ReviewRegular' : 'Helvetica');
+
+    const fontCandidates = [
+        {
+            regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            bold: '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        },
+        {
+            regular: path.join(process.cwd(), 'fonts/DejaVuSans/DejaVuSans.ttf'),
+            bold: path.join(process.cwd(), 'fonts/DejaVuSans/DejaVuSans-Bold.ttf')
+        },
+        {
+            regular: path.join(process.cwd(), 'fonts/JetBrainsMono/JetBrainsMono-Regular.ttf'),
+            bold: path.join(process.cwd(), 'fonts/JetBrainsMono/JetBrainsMono-Bold.ttf')
+        }
+    ];
+
+    const selectedFonts = fontCandidates.find(
+        (candidate) => fs.existsSync(candidate.regular) && fs.existsSync(candidate.bold)
+    );
+
+    if (selectedFonts) {
+        doc.registerFont('ReviewRegular', selectedFonts.regular);
+        doc.registerFont('ReviewBold', selectedFonts.bold);
+        doc.font('ReviewRegular');
+    } else {
+        doc.font('Helvetica');
+    }
+
     return doc;
 }
 
@@ -4957,32 +5028,44 @@ class erganhController {
 
             const left = doc.page.margins.left;
             const right = doc.page.width - doc.page.margins.right;
-            const bottom = doc.page.height - doc.page.margins.bottom;
+            // Κρατάμε επιπλέον χώρο για το footer, ώστε η τελευταία γραμμή
+            // δεδομένων να μην πέφτει πάνω στο υποσέλιδο.
+            const bottom = doc.page.height - doc.page.margins.bottom - 15;
             const availableWidth = right - left;
             let y = doc.page.margins.top;
 
             const regular = doc._fontFamilies.ReviewRegular ? 'ReviewRegular' : 'Helvetica';
             const bold = doc._fontFamilies.ReviewBold ? 'ReviewBold' : regular;
+            const companyDisplayName =
+                req.session.companyDescription ||
+                req.session.companyDescr ||
+                req.session.companyName ||
+                req.session.companyKodikos ||
+                '';
+            const formatQueryDateForPdf = (value) =>
+                value ? reviewDateOnly(`${value}T00:00:00.000Z`) || String(value) : '';
 
             const baseCols = [
-                ['Ημ/νία', 46],
-                ['Προδηλωμένο', 90],
-                ['Κάρτες', 78],
-                ['Απολογιστικό', 92],
-                ['Ώρες', 34],
-                ['Απουσ.', 34],
-                ['Νύχτα', 34],
-                ['Αργία', 34],
-                ['Πρόσθ.', 34],
-                ['Υπερ.', 36],
-                ['Ν.Υπ.', 36],
-                ['Π.Υπ.', 36]
+                ['Ημερομηνία', 47],
+                ['Προδηλωμένα\nΩράρια', 50],
+                ['Από\nΚάρτες', 50],
+                ['Απολογιστικά\nΩράρια', 58],
+                ['Ώρες\nΕργασίας', 45],
+                ['Ώρες\nΑπουσίας', 45],
+                ['Ώρες\nΝύχτας', 43],
+                ['Ώρες\nΑργιών', 43],
+                ['Πρόσθετη\nΕργασία', 44],
+                ['Υπερ-\nεργασία', 50],
+                ['Νόμιμη\nΥπερωρία', 50],
+                ['Παράνομη\nΥπερωρία', 50]
             ];
 
             const baseWidth = baseCols.reduce((sum, [, w]) => sum + w, 0);
             const scale = availableWidth / baseWidth;
-            const cols = baseCols.map(([label, w]) => [label, Math.floor(w * scale)]);
-            const tableWidth = cols.reduce((sum, [, w]) => sum + w, 0);
+            // Χρησιμοποιούμε δεκαδικά πλάτη και όχι Math.floor, ώστε το άθροισμα
+            // να είναι ίσο με το διαθέσιμο πλάτος της σελίδας.
+            const cols = baseCols.map(([label, w]) => [label, w * scale]);
+            const tableWidth = availableWidth;
             const x0 = left;
 
             const numericPdfColors = {
@@ -5011,31 +5094,46 @@ class erganhController {
             };
 
             const drawHeader = () => {
-                doc.font(bold)
-                    .fontSize(9)
-                    .fillColor('#000')
-                    .text('Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ', left, y, {
-                        width: availableWidth,
-                        align: 'center'
-                    });
+                const headerTopY = y;
 
-                y += 13;
+                if (companyDisplayName) {
+                    doc.font(regular)
+                        .fontSize(6.4)
+                        .fillColor('#555')
+                        .text(String(companyDisplayName), left, headerTopY, {
+                            width: availableWidth * 0.3,
+                            align: 'left',
+                            ellipsis: true,
+                            lineBreak: false
+                        });
+                }
+
+                doc.font(bold)
+                    .fontSize(11)
+                    .fillColor('#000')
+                    .text(
+                        'Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ',
+                        left,
+                        headerTopY + 2,
+                        {
+                            width: availableWidth,
+                            align: 'center'
+                        }
+                    );
+
+                y += 17;
 
                 doc.font(regular)
-                    .fontSize(6.3)
+                    .fontSize(7.4)
                     .fillColor('#555')
                     .text(
-                        `Περίοδος: ${req.query.apo_hmeromhnia || ''} έως ${
-                            req.query.eos_hmeromhnia || ''
-                        }    Παράρτημα: ${req.query.ypokatasthma || '-'}    Κωδικός: ${
-                            req.query.kodikos || '-'
-                        }`,
+                        `Περίοδος: ${formatQueryDateForPdf(req.query.apo_hmeromhnia)} έως ${formatQueryDateForPdf(req.query.eos_hmeromhnia)}`,
                         left,
                         y,
                         { width: availableWidth, align: 'center' }
                     );
 
-                y += 11;
+                y += 13;
             };
 
             const newPageIfNeeded = (height = 16) => {
@@ -5044,7 +5142,7 @@ class erganhController {
                 doc.addPage({
                     size: 'A4',
                     layout: 'landscape',
-                    margins: { top: 22, left: 18, right: 18, bottom: 22 }
+                    margins: { top: 18, left: 10, right: 10, bottom: 18 }
                 });
                 y = doc.page.margins.top;
                 drawHeader();
@@ -5054,10 +5152,12 @@ class erganhController {
                 const {
                     fill = null,
                     font = regular,
-                    fontSize = 5.3,
+                    fontSize = 6.4,
                     color = '#000',
                     align = 'left',
-                    boldText = false
+                    boldText = false,
+                    ellipsis = true,
+                    lineGap = 0
                 } = options;
 
                 if (fill) doc.save().rect(x, rowY, w, h).fill(fill).restore();
@@ -5075,19 +5175,65 @@ class erganhController {
                     .text(String(value || '-'), x + 1.2, rowY + 2, {
                         width: w - 2.4,
                         height: h - 3,
-                        ellipsis: true,
-                        align
+                        ellipsis,
+                        align,
+                        lineGap
                     });
             };
 
+            const drawBreakdownCell = (x, rowY, w, h, breakdown, options = {}) => {
+                const { fill = null, fontSize = 5.7, color = '#000', boldText = true } = options;
+
+                if (fill) doc.save().rect(x, rowY, w, h).fill(fill).restore();
+
+                doc.save()
+                    .rect(x, rowY, w, h)
+                    .strokeColor('#D9D9D9')
+                    .lineWidth(0.25)
+                    .stroke()
+                    .restore();
+
+                const parts = Array.isArray(breakdown?.parts) ? breakdown.parts.slice(0, 4) : [];
+                const lineHeight = Math.max(4.7, (h - 3.5) / Math.max(parts.length, 1));
+
+                parts.forEach((part, index) => {
+                    const lineY = rowY + 1.8 + index * lineHeight;
+                    doc.font(boldText ? bold : regular)
+                        .fontSize(fontSize)
+                        .fillColor(color)
+                        .text(part.label, x + 1.2, lineY, {
+                            width: Math.max(14, w * 0.46),
+                            height: lineHeight,
+                            ellipsis: true,
+                            align: 'left'
+                        });
+
+                    doc.font(boldText ? bold : regular)
+                        .fontSize(fontSize)
+                        .fillColor(color)
+                        .text(reviewHours(part.value), x + 1.2, lineY, {
+                            width: w - 2.4,
+                            height: lineHeight,
+                            ellipsis: true,
+                            align: 'right'
+                        });
+                });
+            };
+
             const drawTableHeader = () => {
-                newPageIfNeeded(12);
+                newPageIfNeeded(27);
                 let x = x0;
-                const h = 12;
+                const h = 26;
                 doc.rect(x0, y, tableWidth, h).fill('#212529');
-                doc.font(bold).fontSize(5.6).fillColor('#FFF');
+                doc.font(bold).fontSize(7.2).fillColor('#FFF');
                 for (const [label, w] of cols) {
-                    doc.text(label, x + 1, y + 3, { width: w - 2, height: 8, align: 'center' });
+                    doc.text(label, x + 1, y + 3.5, {
+                        width: w - 2,
+                        height: h - 7,
+                        align: 'center',
+                        lineGap: -0.2,
+                        ellipsis: false
+                    });
                     x += w;
                 }
                 y += h;
@@ -5098,16 +5244,18 @@ class erganhController {
             let currentEmployeeKodikos = '';
             let employeeTotals = createReviewTotals();
             let branchTotals = createReviewTotals();
+            let printedEmployees = 0;
+            let branchHeaderPending = false;
             const grandTotals = createReviewTotals();
 
             const drawTotals = (label, totals, fill = '#E2F0D9') => {
                 newPageIfNeeded(12);
                 const rowY = y;
-                const h = 12;
+                const h = 14;
                 doc.rect(x0, rowY, tableWidth, h).fill(fill);
                 doc.rect(x0, rowY, tableWidth, h).strokeColor('#BFBFBF').lineWidth(0.25).stroke();
                 doc.font(bold)
-                    .fontSize(5.6)
+                    .fontSize(6.5)
                     .fillColor('#000')
                     .text(label, x0 + 2, rowY + 3, {
                         width: cols.slice(0, 4).reduce((a, [, w]) => a + w, 0) - 4,
@@ -5135,7 +5283,7 @@ class erganhController {
                     drawCell(x, rowY, w, h, value, {
                         fill: cellFill,
                         font: bold,
-                        fontSize: 5.6,
+                        fontSize: 6.5,
                         color: numericTextColors[numericIndex] || '#000',
                         align: 'right',
                         boldText: true
@@ -5146,31 +5294,56 @@ class erganhController {
                 y += h;
             };
 
+            const drawBranchHeader = (branch) => {
+                newPageIfNeeded(13);
+                doc.rect(x0, y, tableWidth, 12).fill('#305496');
+                doc.font(bold)
+                    .fontSize(7.2)
+                    .fillColor('#FFF')
+                    .text(`Υποκατάστημα: ${branch}`, x0 + 3, y + 3, {
+                        width: tableWidth - 6
+                    });
+                y += 12;
+            };
+
             const drawEmployeeDeviations = (kodikos) => {
                 const employeeDeviations =
                     deviationsByKodikos.get(String(kodikos || '').trim()) || [];
                 if (employeeDeviations.length === 0) return;
 
-                newPageIfNeeded(20 + employeeDeviations.length * 14);
+                newPageIfNeeded(24);
                 doc.rect(x0, y, tableWidth, 12).fill('#FFF3CD');
                 doc.font(bold)
-                    .fontSize(6)
+                    .fontSize(7)
                     .fillColor('#7F3300')
                     .text('Αποκλίσεις εβδομαδιαίων ρεπό', x0 + 3, y + 3, { width: tableWidth - 6 });
                 y += 12;
 
                 employeeDeviations.forEach((dev) => {
-                    newPageIfNeeded(16);
-                    const text = `${reviewDateOnly(dev.week_apo)} - ${reviewDateOnly(dev.week_eos)} | Αναμ.: ${
-                        dev.expected_repo
-                    } | Πραγμ.: ${dev.actual_repo} | ${reviewDeviationProfileText(dev)} | ${reviewDeviationNoteText(dev)}`;
-                    drawCell(x0, y, tableWidth, 15, text, {
-                        fill: dev.profile_changed_inside_week ? '#FFF3CD' : '#FFFFFF',
-                        fontSize: 5.2,
-                        color: '#000',
-                        boldText: dev.profile_changed_inside_week
+                    const lines = [
+                        `${reviewDateWithDay(dev.week_apo)} - ${reviewDateWithDay(dev.week_eos)} | Αναμ.: ${dev.expected_repo} | Πραγμ.: ${dev.actual_repo}`,
+                        reviewDeviationProfileText(dev),
+                        reviewDeviationNoteText(dev)
+                    ].filter(Boolean);
+                    const text = lines.join('\n');
+
+                    doc.font(dev.profile_changed_inside_week ? bold : regular).fontSize(6.1);
+                    const textHeight = doc.heightOfString(text, {
+                        width: tableWidth - 6,
+                        lineGap: 0.45
                     });
-                    y += 15;
+                    const rowH = Math.max(18, textHeight + 7);
+                    newPageIfNeeded(rowH + 1);
+
+                    drawCell(x0, y, tableWidth, rowH, text, {
+                        fill: dev.profile_changed_inside_week ? '#FFF3CD' : '#FFFFFF',
+                        fontSize: 6.1,
+                        color: '#000',
+                        boldText: dev.profile_changed_inside_week,
+                        ellipsis: false,
+                        lineGap: 0.45
+                    });
+                    y += rowH;
                 });
             };
 
@@ -5199,20 +5372,30 @@ class erganhController {
                     currentBranch = branch;
                     currentEmployee = null;
                     currentEmployeeKodikos = '';
-
-                    newPageIfNeeded(27);
-                    doc.rect(x0, y, tableWidth, 12).fill('#305496');
-                    doc.font(bold)
-                        .fontSize(6.5)
-                        .fillColor('#FFF')
-                        .text(`Υποκατάστημα: ${branch}`, x0 + 3, y + 3, {
-                            width: tableWidth - 6
-                        });
-                    y += 12;
+                    branchHeaderPending = true;
                 }
 
                 if (employee !== currentEmployee) {
                     closeEmployee();
+
+                    if (printedEmployees > 0) {
+                        doc.addPage({
+                            size: 'A4',
+                            layout: 'landscape',
+                            margins: { top: 18, left: 10, right: 10, bottom: 18 }
+                        });
+                        y = doc.page.margins.top;
+                        drawHeader();
+                        branchHeaderPending = true;
+                    } else {
+                        newPageIfNeeded(39);
+                    }
+
+                    if (branchHeaderPending) {
+                        drawBranchHeader(currentBranch);
+                        branchHeaderPending = false;
+                    }
+
                     currentEmployee = employee;
                     currentEmployeeKodikos = row.kodikos || '';
 
@@ -5224,24 +5407,34 @@ class erganhController {
                         ? '  |  ⚠ Αλλαγή όρων'
                         : '';
 
-                    newPageIfNeeded(25);
+                    newPageIfNeeded(38);
                     doc.rect(x0, y, tableWidth, 12).fill('#D9EAF7');
                     doc.font(bold)
-                        .fontSize(6.2)
+                        .fontSize(7)
                         .fillColor('#000')
                         .text(`Εργαζόμενος: ${employee}${changeBadge}`, x0 + 3, y + 3, {
                             width: tableWidth - 6
                         });
                     y += 12;
                     drawTableHeader();
+                    printedEmployees += 1;
                 }
 
-                newPageIfNeeded(12);
+                newPageIfNeeded(15);
 
                 const programDisplay = reviewProgramDisplay(row);
                 const apologistikoDisplay = reviewApologistikoDisplay(row);
+                const yperergasiaBreakdown = reviewPdfYperergasiaBreakdown(row);
+                const nomimiYperoriaBreakdown = reviewPdfNomimiYperoriaBreakdown(row);
+                const paranomiYperoriaBreakdown = reviewPdfParanomiYperoriaBreakdown(row);
+                const overtimeBreakdowns = {
+                    9: yperergasiaBreakdown,
+                    10: nomimiYperoriaBreakdown,
+                    11: paranomiYperoriaBreakdown
+                };
+
                 const vals = [
-                    reviewDateOnly(row.hmeromhnia),
+                    reviewDateWithDay(row.hmeromhnia),
                     programDisplay.text,
                     reviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora'),
                     apologistikoDisplay.text,
@@ -5250,36 +5443,49 @@ class erganhController {
                     reviewHours(row.ores_nyxtas_apologistika),
                     reviewHours(reviewArgiaTotal(row)),
                     reviewHours(row.ores_prostheths_ergasias_apologistika),
-                    reviewHours(reviewYperergasiaTotal(row)),
-                    reviewHours(reviewNomimiYperoriaTotal(row)),
-                    reviewHours(reviewParanomiYperoriaTotal(row))
+                    reviewHours(yperergasiaBreakdown.total),
+                    reviewHours(nomimiYperoriaBreakdown.total),
+                    reviewHours(paranomiYperoriaBreakdown.total)
                 ];
 
+                const hasOvertimeBreakdown = Object.values(overtimeBreakdowns).some(
+                    (breakdown) => breakdown?.needsBreakdown
+                );
                 const rowY = y;
-                const rowH = 12;
+                const rowH = hasOvertimeBreakdown ? 24 : 14;
                 let x = x0;
 
                 vals.forEach((value, index) => {
                     const w = cols[index][1];
                     const isNumeric = index >= 4;
                     const n = isNumeric ? Number(String(value || 0).replace(',', '.')) : 0;
+                    const breakdown = overtimeBreakdowns[index];
                     let fill = null;
                     if (index === 1) fill = displayPdfFills[programDisplay.type] || null;
                     if (index === 3) fill = displayPdfFills[apologistikoDisplay.type] || null;
                     if (!fill && isNumeric && Number.isFinite(n) && n !== 0)
                         fill = numericPdfColors[index];
 
-                    drawCell(x, rowY, w, rowH, value, {
-                        fill,
-                        font: regular,
-                        fontSize: 5.15,
-                        color: isNumeric ? numericTextColors[index] || '#000' : '#000',
-                        align: isNumeric ? 'right' : 'left',
-                        boldText:
-                            (isNumeric && Number.isFinite(n) && n !== 0) ||
-                            programDisplay.type ||
-                            apologistikoDisplay.type
-                    });
+                    if (breakdown?.needsBreakdown) {
+                        drawBreakdownCell(x, rowY, w, rowH, breakdown, {
+                            fill,
+                            fontSize: 5.7,
+                            color: numericTextColors[index] || '#000',
+                            boldText: true
+                        });
+                    } else {
+                        drawCell(x, rowY, w, rowH, value, {
+                            fill,
+                            font: regular,
+                            fontSize: 6.2,
+                            color: isNumeric ? numericTextColors[index] || '#000' : '#000',
+                            align: isNumeric ? 'right' : 'left',
+                            boldText:
+                                (isNumeric && Number.isFinite(n) && n !== 0) ||
+                                programDisplay.type ||
+                                apologistikoDisplay.type
+                        });
+                    }
                     x += w;
                 });
 
@@ -5294,21 +5500,29 @@ class erganhController {
             drawTotals('Γενικά σύνολα', grandTotals, '#FFC000');
 
             const range = doc.bufferedPageRange();
+            const footerLeftText = `(c) Copyright: www.WebPayrollSolutions.com  |  Ιωλκού 266α Βόλος  |  Τηλ. : 2421 0 56825  |  Κιν. : 697 20 12 650  |  eMail : support@WebPayrollSolutions.com`;
             for (let i = range.start; i < range.start + range.count; i++) {
                 doc.switchToPage(i);
+                const footerY = doc.page.height - doc.page.margins.bottom - 8;
+
+                doc.font(regular)
+                    .fontSize(5.5)
+                    .fillColor('#666')
+                    .text(footerLeftText, left, footerY, {
+                        width: availableWidth * 0.82,
+                        align: 'left',
+                        ellipsis: true,
+                        lineBreak: false
+                    });
+
                 doc.font(regular)
                     .fontSize(6)
                     .fillColor('#666')
-                    .text(
-                        `Σελίδα ${i + 1} / ${range.count}`,
-                        left,
-                        doc.page.height - doc.page.margins.bottom - 8,
-                        {
-                            width: availableWidth,
-                            align: 'right',
-                            lineBreak: false
-                        }
-                    );
+                    .text(`Σελίδα ${i + 1} / ${range.count}`, left, footerY, {
+                        width: availableWidth,
+                        align: 'right',
+                        lineBreak: false
+                    });
             }
 
             doc.end();

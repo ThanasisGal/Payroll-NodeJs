@@ -5385,6 +5385,22 @@ input[type='time']::-webkit-calendar-picker-indicator {
     margin-top: -0.1vh !important;
 }
 
+.margin-top--0_2vh {
+    margin-top: -0.2vh !important;
+}
+
+.margin-top--0_3vh {
+    margin-top: -0.3vh !important;
+}
+
+.margin-top--0_4vh {
+    margin-top: -0.4vh !important;
+}
+
+.margin-top--0_5vh {
+    margin-top: -0.5vh !important;
+}
+
 .margin-top-5px {
     margin-top: 5px !important;
 }
@@ -12493,4 +12509,10 @@ body.loader-active > *:not(.app-loader) {
     --bs-text-opacity: 0.85;
     --bs-success-rgb: 25, 135, 84;
     color: rgba(var(--bs-success-rgb), var(--bs-text-opacity)) !important;
+}
+
+.company-inactive-row,
+.company-inactive-row td {
+    color: #dc3545 !important;
+    font-weight: 600;
 }

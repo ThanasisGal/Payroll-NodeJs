@@ -80,17 +80,86 @@ class companiesController {
         res.render('mainapp', { locals });
     };
 
+    // static mainCompaniesForm = async (req, res) => {
+    //     const locals = { title: 'Εταιρείες', description: 'Web Payroll Solutions' };
+
+    //     const sessionUserTeam = req.session.userTeam;
+    //     const sessionUserId = req.session.userId;
+    //     const basePer = Number(process.env.EGGRAFES) || 10;
+    //     const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+    //     const perPage = basePer * perx;
+    //     const page = Math.max(Number(req.query.page) || 1, 1);
+
+    //     if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+    //     const userId = ObjectId.createFromHexString(sessionUserId);
+
+    //     try {
+    //         const userPrivileges = await UserPrivilegesModel.findOne({
+    //             userId: sessionUserId,
+    //             form: 'Companies'
+    //         }).lean();
+
+    //         // const userId = new ObjectId(sessionUserId);
+    //         const matchBase = { team: sessionUserTeam, users: userId };
+
+    //         const countResults = await CompaniesModel.aggregate([
+    //             { $match: matchBase },
+    //             { $count: 'total' }
+    //         ]).exec();
+    //         const totalRecords = countResults[0]?.total || 0;
+    //         const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
+    //         const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
+
+    //         const company = await CompaniesModel.aggregate([
+    //             { $match: matchBase },
+    //             { $match: { anenergh: false } },
+    //             {
+    //                 $lookup: {
+    //                     from: 'users',
+    //                     localField: 'users',
+    //                     foreignField: '_id',
+    //                     as: 'userData'
+    //                 }
+    //             },
+    //             { $sort: { eponymia: 1, onoma: 1 } },
+    //             { $skip: skipRecords },
+    //             { $limit: perPage }
+    //         ]).exec();
+
+    //         res.render('companies/genikastoixeia/companies', {
+    //             userPrivileges: userPrivileges?.privileges || {},
+    //             locals,
+    //             company,
+    //             current: page,
+    //             pages: totalPages,
+    //             perx, // <-- για το UI πολλαπλασιαστή
+    //             basePer, // (προαιρετικό, αν το δείχνεις)
+    //             entries: perPage, // (προαιρετικό: πόσα/σελίδα)
+    //             totalRecs: totalRecords // (προαιρετικό: συνολικά)
+    //         });
+    //     } catch (error) {
+    //         console.error(error);
+    //         res.status(500).send('Σφάλμα');
+    //     }
+    // };
+
     static mainCompaniesForm = async (req, res) => {
         const locals = { title: 'Εταιρείες', description: 'Web Payroll Solutions' };
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
         const basePer = Number(process.env.EGGRAFES) || 10;
-        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
+        const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1));
         const perPage = basePer * perx;
         const page = Math.max(Number(req.query.page) || 1, 1);
 
+        const showInactive =
+            req.query.anenergh === 'on' ||
+            req.query.anenergh === 'true' ||
+            req.query.anenergh === '1';
+
         if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+
         const userId = ObjectId.createFromHexString(sessionUserId);
 
         try {
@@ -99,20 +168,24 @@ class companiesController {
                 form: 'Companies'
             }).lean();
 
-            // const userId = new ObjectId(sessionUserId);
-            const matchBase = { team: sessionUserTeam, users: userId };
+            const matchBase = {
+                team: sessionUserTeam,
+                users: userId,
+                ...(showInactive ? {} : { anenergh: { $ne: true } })
+            };
 
             const countResults = await CompaniesModel.aggregate([
                 { $match: matchBase },
                 { $count: 'total' }
             ]).exec();
+
             const totalRecords = countResults[0]?.total || 0;
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
-            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
+            const currentPage = Math.min(page, totalPages);
+            const skipRecords = (currentPage - 1) * perPage;
 
             const company = await CompaniesModel.aggregate([
                 { $match: matchBase },
-                { $match: { anenergh: false } },
                 {
                     $lookup: {
                         from: 'users',
@@ -121,7 +194,7 @@ class companiesController {
                         as: 'userData'
                     }
                 },
-                { $sort: { eponymia: 1, onoma: 1 } },
+                { $sort: { eponymia: 1, firstname: 1 } },
                 { $skip: skipRecords },
                 { $limit: perPage }
             ]).exec();
@@ -130,12 +203,13 @@ class companiesController {
                 userPrivileges: userPrivileges?.privileges || {},
                 locals,
                 company,
-                current: page,
+                current: currentPage,
                 pages: totalPages,
-                perx, // <-- για το UI πολλαπλασιαστή
-                basePer, // (προαιρετικό, αν το δείχνεις)
-                entries: perPage, // (προαιρετικό: πόσα/σελίδα)
-                totalRecs: totalRecords // (προαιρετικό: συνολικά)
+                perx,
+                basePer,
+                entries: perPage,
+                totalRecs: totalRecords,
+                showInactive
             });
         } catch (error) {
             console.error(error);

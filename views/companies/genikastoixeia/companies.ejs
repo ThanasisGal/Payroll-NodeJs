@@ -22,6 +22,41 @@
     </form>
 </div>
 
+<form method="GET" action="/companies/genikastoixeia/" id="companiesFilterForm">
+    <input type="hidden" name="page" value="1">
+    <input type="hidden" name="perx" value="<%= perx %>">
+
+    <div class="form-check form-switch d-inline-flex align-items-center gap-2">
+        <input
+            class="form-check-input"
+            type="checkbox"
+            id="anenergh"
+            name="anenergh"
+            <%= showInactive ? 'checked' : '' %>
+        >
+
+        <label class="form-check-label fw-bold" for="anenergh">
+            Ανενεργές:
+            <span id="anenerghLabel" class="<%= showInactive ? 'text-danger' : 'text-success' %>">
+                <%= showInactive ? 'ΝΑΙ' : 'ΟΧΙ' %>
+            </span>
+        </label>
+    </div>
+</form>
+
+<!-- <div class="row form-group g-3 align-items-center mb-0-5">
+    <div class="col-2 right-align">
+        <label for="anenergh" class="col-form-label label-font-size-0-80 field-required">
+            Εμφάνιση Ανενεργών Εταιρειών:
+        </label>
+    </div>
+
+    <div class="col-1 left-align checkbox-flex-center">
+        <input  type="checkbox" class="form-check-input custom-checkbox checkbox-class margin-top--0_5vh" id="anenergh" name="anenergh" value="" /> 
+        <label for="anenergh" id="label-anenergh" class="margin-left-0_75rem font-weight-600 field-required margin-top--0_5vh">ΟΧΙ</label>
+    </div>
+</div> -->
+
 <div class="card d-flex flex-column z-depth-5 w-99 margin-left-percent-0_5 overflow-hidden">
 
     <div class="card-header p-0 height-rem-3_5">
@@ -48,7 +83,11 @@
             <tbody>
                 <% if (company) { %>
                     <% company.forEach(element => { %>
-                        <tr class="input-content-regular" data-id="<%= element._id %>" id="myTableRow">
+                        <tr
+                            class="input-content-regular <%= element.anenergh ? 'company-inactive-row' : '' %>"
+                            data-id="<%= element._id %>"
+                            id="myTableRow"
+                        >
                             <td class="col-1 padding-left-rem-0_5"><%= element.kod %></td>
                             <td class="col-3-25"><%= element.eponymia %></td>
                             <td class="col-2"><%= element.firstname %></td>
@@ -226,6 +265,7 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
             
+<script src="<%= script('common/companiesAnenerghFilter') %>"></script>
 <script src="<%= script('common/blockInvalidClick') %>"></script>
 <script src="<%= script('common/sortTable') %>"></script>
 <script src="<%= script('companies/genikastoixeia/selectRowInTable') %>"></script>
