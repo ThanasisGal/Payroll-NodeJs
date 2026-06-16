@@ -12516,3 +12516,13 @@ body.loader-active > *:not(.app-loader) {
     color: #dc3545 !important;
     font-weight: 600;
 }
+
+#anenergh.form-check-input:checked {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}
+
+#anenergh.form-check-input:focus {
+    border-color: #198754 !important;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important;
+}
