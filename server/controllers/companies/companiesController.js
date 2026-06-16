@@ -80,75 +80,13 @@ class companiesController {
         res.render('mainapp', { locals });
     };
 
-    // static mainCompaniesForm = async (req, res) => {
-    //     const locals = { title: 'Εταιρείες', description: 'Web Payroll Solutions' };
-
-    //     const sessionUserTeam = req.session.userTeam;
-    //     const sessionUserId = req.session.userId;
-    //     const basePer = Number(process.env.EGGRAFES) || 10;
-    //     const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1)); // 1..5
-    //     const perPage = basePer * perx;
-    //     const page = Math.max(Number(req.query.page) || 1, 1);
-
-    //     if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
-    //     const userId = ObjectId.createFromHexString(sessionUserId);
-
-    //     try {
-    //         const userPrivileges = await UserPrivilegesModel.findOne({
-    //             userId: sessionUserId,
-    //             form: 'Companies'
-    //         }).lean();
-
-    //         // const userId = new ObjectId(sessionUserId);
-    //         const matchBase = { team: sessionUserTeam, users: userId };
-
-    //         const countResults = await CompaniesModel.aggregate([
-    //             { $match: matchBase },
-    //             { $count: 'total' }
-    //         ]).exec();
-    //         const totalRecords = countResults[0]?.total || 0;
-    //         const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
-    //         const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
-
-    //         const company = await CompaniesModel.aggregate([
-    //             { $match: matchBase },
-    //             { $match: { anenergh: false } },
-    //             {
-    //                 $lookup: {
-    //                     from: 'users',
-    //                     localField: 'users',
-    //                     foreignField: '_id',
-    //                     as: 'userData'
-    //                 }
-    //             },
-    //             { $sort: { eponymia: 1, onoma: 1 } },
-    //             { $skip: skipRecords },
-    //             { $limit: perPage }
-    //         ]).exec();
-
-    //         res.render('companies/genikastoixeia/companies', {
-    //             userPrivileges: userPrivileges?.privileges || {},
-    //             locals,
-    //             company,
-    //             current: page,
-    //             pages: totalPages,
-    //             perx, // <-- για το UI πολλαπλασιαστή
-    //             basePer, // (προαιρετικό, αν το δείχνεις)
-    //             entries: perPage, // (προαιρετικό: πόσα/σελίδα)
-    //             totalRecs: totalRecords // (προαιρετικό: συνολικά)
-    //         });
-    //     } catch (error) {
-    //         console.error(error);
-    //         res.status(500).send('Σφάλμα');
-    //     }
-    // };
-
     static mainCompaniesForm = async (req, res) => {
         const locals = { title: 'Εταιρείες', description: 'Web Payroll Solutions' };
 
         const sessionUserTeam = req.session.userTeam;
         const sessionUserId = req.session.userId;
-        const basePer = Number(process.env.EGGRAFES) || 10;
+        // const basePer = Number(process.env.EGGRAFES) || 10;
+        const basePer = 500;
         const perx = Math.min(5, Math.max(1, parseInt(req.query.perx, 10) || 1));
         const perPage = basePer * perx;
         const page = Math.max(Number(req.query.page) || 1, 1);
@@ -221,11 +159,10 @@ class companiesController {
         const locals = { title: 'Αναζήτηση Εταιρειών', description: 'Web Payroll Solutions' };
 
         try {
-            const searchTerm = normalizeStr(req.body.searchTerm);
+            const searchTerm = normalizeStr(req.body.searchTerm || '');
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
 
-            // Έλεγχος ότι υπάρχει επιλεγμένη ομάδα στο session
             if (!sessionUserTeam) {
                 return res.redirect('/');
             }
@@ -233,7 +170,7 @@ class companiesController {
             const perPage = Math.max(Number(process.env.EGGRAFES) || 10, 1);
             const page = Math.max(Number(req.query.page) || 1, 1);
 
-            sTerm = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, '');
+            const sTerm = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, '');
 
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
@@ -241,39 +178,43 @@ class companiesController {
             }).lean();
 
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+
             const userId = ObjectId.createFromHexString(sessionUserId);
 
-            const re = new RegExp(searchTerm, 'i');
+            const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(escapedSearchTerm, 'i');
 
-            // Κοινό φίλτρο: ομάδα χρήστη + users + κριτήρια αναζήτησης
             const filter = {
                 $and: [
                     { team: sessionUserTeam },
                     { users: userId },
                     {
                         $or: [
-                            { kod: { $regex: re } },
-                            { eponymia: { $regex: re } },
-                            { firstname: { $regex: re } },
-                            { fathername: { $regex: re } },
-                            { activity: { $regex: re } },
-                            { afm: { $regex: re } }
+                            { kod: re },
+                            { eponymia: re },
+                            { firstname: re },
+                            { fathername: re },
+                            { activity: re },
+                            { afm: re }
                         ]
                     }
                 ]
             };
 
-            // Count πάνω στο ίδιο φίλτρο για συνεπή σελιδοποίηση
             const totalRecords = await CompaniesModel.countDocuments(filter);
+
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
-            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
+            const currentPage = Math.min(page, totalPages);
+            const skipRecords = (currentPage - 1) * perPage;
 
             const companyFilteredRecs = await CompaniesModel.find(filter)
+                .sort({ eponymia: 1, firstname: 1 })
                 .skip(skipRecords)
                 .limit(perPage)
                 .lean();
 
             const highlight = companiesController.highlightText;
+
             const highlightedRecords = companyFilteredRecs.map((r) => ({
                 ...r,
                 kod: highlight(r.kod || '', searchTerm),
@@ -287,9 +228,9 @@ class companiesController {
             res.render('companies/genikastoixeia/search', {
                 companyFilteredRecs: highlightedRecords,
                 locals,
-                current: page,
+                current: currentPage,
                 pages: totalPages,
-                sTerm: searchTerm,
+                sTerm,
                 userPrivileges
             });
         } catch (error) {
@@ -302,11 +243,10 @@ class companiesController {
         const locals = { title: 'Αναζήτηση Εταιρειών', description: 'Web Payroll Solutions' };
 
         try {
-            const searchTerm = normalizeStr(req.body?.searchTerm || '');
+            const searchTerm = normalizeStr(req.query.searchTerm || req.body?.searchTerm || '');
             const sessionUserTeam = req.session.userTeam;
             const sessionUserId = req.session.userId;
 
-            // Έλεγχος ότι υπάρχει επιλεγμένη ομάδα στο session
             if (!sessionUserTeam) {
                 return res.redirect('/');
             }
@@ -320,23 +260,24 @@ class companiesController {
             }).lean();
 
             if (!ObjectId.isValid(sessionUserId)) throw new Error('invalid sessionUserId');
+
             const userId = ObjectId.createFromHexString(sessionUserId);
 
-            const re = new RegExp(searchTerm, 'i');
+            const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const re = new RegExp(escapedSearchTerm, 'i');
 
-            // Κοινό φίλτρο: ομάδα χρήστη + users + κριτήρια αναζήτησης
             const filter = {
                 $and: [
                     { team: sessionUserTeam },
                     { users: userId },
                     {
                         $or: [
-                            { kod: { $regex: re } },
-                            { eponymia: { $regex: re } },
-                            { firstname: { $regex: re } },
-                            { fathername: { $regex: re } },
-                            { activity: { $regex: re } },
-                            { afm: { $regex: re } }
+                            { kod: re },
+                            { eponymia: re },
+                            { firstname: re },
+                            { fathername: re },
+                            { activity: re },
+                            { afm: re }
                         ]
                     }
                 ]
@@ -344,14 +285,17 @@ class companiesController {
 
             const totalRecords = await CompaniesModel.countDocuments(filter);
             const totalPages = Math.max(Math.ceil(totalRecords / perPage), 1);
-            const skipRecords = Math.min((page - 1) * perPage, Math.max(totalRecords - 1, 0));
+            const currentPage = Math.min(page, totalPages);
+            const skipRecords = (currentPage - 1) * perPage;
 
             const companyFilteredRecs = await CompaniesModel.find(filter)
+                .sort({ eponymia: 1, firstname: 1 })
                 .skip(skipRecords)
                 .limit(perPage)
                 .lean();
 
             const highlight = companiesController.highlightText;
+
             const highlightedRecords = companyFilteredRecs.map((r) => ({
                 ...r,
                 kod: highlight(r.kod || '', searchTerm),
@@ -365,8 +309,9 @@ class companiesController {
             res.render('companies/genikastoixeia/search', {
                 companyFilteredRecs: highlightedRecords,
                 locals,
-                current: page,
+                current: currentPage,
                 pages: totalPages,
+                sTerm: searchTerm,
                 userPrivileges
             });
         } catch (error) {
