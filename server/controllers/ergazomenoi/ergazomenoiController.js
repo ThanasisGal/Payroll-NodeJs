@@ -140,6 +140,33 @@ function valueOrEmpty(value) {
     return value === null || value === undefined ? '' : String(value);
 }
 
+function cleanFormValue(value) {
+    return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function resolveKpkEfkaBaseiSymbashsForSave(formData) {
+    const epaEfka = cleanFormValue(formData?.epa_efka_stathera || formData?.epa_efka);
+
+    // Αν δεν υπάρχει EPA, δεν χρειάζεται ξεχωριστός ΚΠΚ βάσει σύμβασης.
+    // Κρατάμε τη μέχρι τώρα συμπεριφορά: αποθηκεύεται κενό, εκτός αν έρθει ήδη τιμή από τη φόρμα.
+    if (!epaEfka) {
+        return cleanFormValue(
+            formData?.kpk_efka_basei_symbashs_stathera ||
+                formData?.kpk_efka_basei_symbashs ||
+                formData?.tmp_kpk_efka_stathera
+        );
+    }
+
+    // Με EPA ο τρέχων kpk_efka είναι ο mapped ΚΠΚ, π.χ. 0111.
+    // Ο ΚΠΚ βάσει σύμβασης πρέπει να έρθει από το dedicated hidden ή το tmp backup, π.χ. 0115.
+    // Δεν χρησιμοποιούμε formData.kpk_efka_stathera ως πρώτο fallback, γιατί τότε αποθηκεύεται λάθος 0111.
+    return cleanFormValue(
+        formData?.kpk_efka_basei_symbashs_stathera ||
+            formData?.kpk_efka_basei_symbashs ||
+            formData?.tmp_kpk_efka_stathera
+    );
+}
+
 function parseHoursOrEmpty(value) {
     if (value === null || value === undefined || value === '') return '';
     const n = parseFloat(value);
@@ -1160,7 +1187,8 @@ class ergazomenoiController {
             aa_eggr = null,
             kodikosValue = 0;
 
-        const { formData, filesToUpdate } = req.body;
+        const { formData } = req.body;
+        const filesToUpdate = req.body?.filesToUpdate || {};
 
         // ============================================================================
         // ✅ AUTO ENABLE E7N / MA_222
@@ -1358,7 +1386,7 @@ class ergazomenoiController {
             kad_efka: formData.kad_efka_stathera,
             eidikothta_efka: formData.eidikothta_efka_stathera,
             kpk_efka: formData.kpk_efka_stathera,
-            kpk_efka_basei_symbashs: formData.tmp_kpk_efka_stathera,
+            kpk_efka_basei_symbashs: resolveKpkEfkaBaseiSymbashsForSave(formData),
             epa_efka: formData.epa_efka_stathera,
             prosthetes_asfalistikes_apodoxes: formData.prosthetes_asfalistikes_apodoxes,
             meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,
@@ -2084,11 +2112,20 @@ class ergazomenoiController {
             let maXmlData = null;
 
             // ✅ CRITICAL: Only generate WTO XML if:
-            //    1. wto_pshfiakh_organosh_xronoy_ergasias checkbox is checked
-            //    2. isPermanent is TRUE (Οριστική Ενημέρωση)
+            //    1. WTO is selected
+            //    2. isPermanent is TRUE
+            //    3. It is NOT a REST WTOWeek submission (REST builds JSON directly)
+            const isWTOWeekRestSubmit =
+                (filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                    filesToUpdate?.schedules === true) &&
+                filesToUpdate?.isPermanent === true &&
+                filesToUpdate?.erganiUploadMethod === 'rest';
+
             if (
-                filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true &&
-                filesToUpdate?.isPermanent === true
+                (filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                    filesToUpdate?.schedules === true) &&
+                filesToUpdate?.isPermanent === true &&
+                !isWTOWeekRestSubmit
             ) {
                 try {
                     logger.info('WTO XML generation requested (Οριστική)', {
@@ -2130,7 +2167,10 @@ class ergazomenoiController {
             } else {
                 logger.info('WTO XML generation skipped (checkbox not checked)', {
                     module: 'WTO-XML',
-                    checkbox_value: filesToUpdate?.schedules
+                    checkbox_value:
+                        filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias ??
+                        filesToUpdate?.schedules,
+                    isRestSubmit: isWTOWeekRestSubmit
                 });
             }
 
@@ -3325,7 +3365,7 @@ class ergazomenoiController {
             kad_efka: formData.kad_efka_stathera,
             eidikothta_efka: formData.eidikothta_efka_stathera,
             kpk_efka: formData.kpk_efka_stathera,
-            kpk_efka_basei_symbashs: formData.tmp_kpk_efka_stathera,
+            kpk_efka_basei_symbashs: resolveKpkEfkaBaseiSymbashsForSave(formData),
             epa_efka: formData.epa_efka_stathera,
             prosthetes_asfalistikes_apodoxes: formData.prosthetes_asfalistikes_apodoxes,
             meiosh_eisforon_ergazomenon: formData.meiosh_eisforon_ergazomenon,

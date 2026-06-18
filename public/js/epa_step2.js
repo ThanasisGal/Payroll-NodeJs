@@ -281,6 +281,25 @@
         return '';
     };
 
+    const getCurrentKpk = () => norm(getVal('kpk_efka_stathera') || ts('kpk_efka')?.getValue());
+
+    const ensureBaseKpkBeforeEpaMapping = () => {
+        // Κλειδώνουμε τον ΚΠΚ βάσει σύμβασης ΠΡΙΝ αλλοιωθεί ο kpk_efka από την EPA.
+        // Παράδειγμα: kpk_efka 0115 + epa 43 => kpk_efka 0111, αλλά base/tmp μένουν 0115.
+        const baseKpk = norm(
+            getVal('kpk_efka_basei_symbashs_stathera') ||
+                getVal('tmp_kpk_efka_stathera') ||
+                getCurrentKpk()
+        );
+
+        if (baseKpk) {
+            setVal('kpk_efka_basei_symbashs_stathera', baseKpk);
+            setVal('tmp_kpk_efka_stathera', baseKpk);
+        }
+
+        return baseKpk;
+    };
+
     const handleEpaPick = async (epaVal) => {
         const epa = norm(epaVal);
 
@@ -292,12 +311,7 @@
         setVal('epa_efka_stathera', epa);
         setVal('tmp_epa_efka_stathera', epa);
 
-        const kpkApo = norm(
-            getVal('kpk_efka_basei_symbashs_stathera') ||
-                getVal('tmp_kpk_efka_stathera') ||
-                getVal('kpk_efka_stathera') ||
-                ts('kpk_efka')?.getValue()
-        );
+        const kpkApo = ensureBaseKpkBeforeEpaMapping();
 
         if (!kpkApo) return;
 
@@ -538,6 +552,7 @@
                 if (__muteKpk) return;
 
                 setVal('kpk_efka_stathera', '');
+                setVal('kpk_efka_basei_symbashs_stathera', '');
                 setVal('tmp_kpk_efka_stathera', '');
                 setVal('tmp_epa_efka_stathera', '');
             });

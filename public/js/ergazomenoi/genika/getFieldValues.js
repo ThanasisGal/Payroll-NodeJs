@@ -82,10 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (input.type === 'date') {
                         formData[input.name] = input.value === '' ? null : input.value;
                     }
-                    // } else if (input.type === 'date') {
-                    //         formData[input.name] = input.value === '' ? null : new Date(input.value);
-                    //         // input.value = "2025-03-15" (βάλθηκε από date_format_fix.js) ✅
-                    //     }
 
                     // ✅ 4. TIME (κενό)
                     else if (input.type === 'time') {
@@ -375,193 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // =====================================================================
             const skipScheduleValidation = errors.length > 0 && errors.some((e) => !e.critical);
 
-            //         // =========================================================================
-            //         // ✅ PRE-VALIDATION: Check WTO schedules BEFORE showing ERGANH modal
-            //         // =========================================================================
-
-            //         console.log('🔍 [PRE-VALIDATION] Checking weekly schedule...');
-
-            //         const days = ['01', '02', '03', '04', '05', '06', '07'];
-            //         const scheduleErrors = [];
-
-            //         // =====================================================================
-            //         // ✅ CHECK 1: ALL days must have a category
-            //         // =====================================================================
-
-            //         const emptyDays = [];
-
-            //         days.forEach((day) => {
-            //             const category = (formData[`kathgoria_ergasias_${day}`] || '').trim();
-
-            //             if (!category) {
-            //                 const label = document.getElementById(`day_label_${day}`);
-            //                 const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
-            //                 emptyDays.push(dateStr);
-            //             }
-            //         });
-
-            //         if (emptyDays.length > 0) {
-            //             await Swal.fire({
-            //                 backdrop: false,
-            //                 allowOutsideClick: false,
-            //                 icon: 'error',
-            //                 title: 'Ελλιπές Εβδομαδιαίο Ωράριο',
-            //                 html: `
-            //         <p><strong>${emptyDays.length}</strong> ημέρες δεν έχουν Κατηγορία Εργασίας:</p>
-            //         <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
-            //             ${emptyDays.map((date) => `<li><strong>${date}</strong></li>`).join('')}
-            //         </ul>
-            //         <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
-            //             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και συμπλήρωσε την κατηγορία για όλες τις ημέρες (ΕΡΓ, ΤΗΛ, ΑΝ, ΜΕ).
-            //         </p>
-            //     `,
-            //                 confirmButtonText: 'OK',
-            //                 customClass: {
-            //                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
-            //                     title: 'custom-title',
-            //                     popup: 'custom-swal-popup'
-            //                 }
-            //             });
-            //             return; // ❌ Stop submission
-            //         }
-
-            //         console.log('✅ [PRE-VALIDATION] All days have categories');
-
-            //         // =====================================================================
-            //         // ✅ CHECK 2: Validate each day's times
-            //         // =====================================================================
-
-            //         days.forEach((day) => {
-            //             const category = (formData[`kathgoria_ergasias_${day}`] || '').trim().toUpperCase();
-
-            //             const label = document.getElementById(`day_label_${day}`);
-            //             const dateStr = label ? label.textContent.trim() : `Ημέρα ${day}`;
-
-            //             // ✅ Get all 6 time fields
-            //             const apo1 = (formData[`apo_ora_01_${day}`] || '').trim();
-            //             const eos1 = (formData[`eos_ora_01_${day}`] || '').trim();
-            //             const apo2 = (formData[`apo_ora_02_${day}`] || '').trim();
-            //             const eos2 = (formData[`eos_ora_02_${day}`] || '').trim();
-            //             const apo3 = (formData[`apo_ora_03_${day}`] || '').trim();
-            //             const eos3 = (formData[`eos_ora_03_${day}`] || '').trim();
-
-            //             const isEmpty = (val) => !val || val === '--:--' || val === '';
-            //             const isValidTime = (val) => val && val.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-
-            //             const allTimes = [apo1, eos1, apo2, eos2, apo3, eos3];
-            //             const nonEmptyTimes = allTimes.filter((t) => !isEmpty(t));
-
-            //             // ✅ RULE 1: ΕΡΓ/ΤΗΛ → Must have at least ONE complete shift
-            //             if (category === 'ΕΡΓ' || category === 'ΤΗΛ') {
-            //                 const shift1Valid = isValidTime(apo1) && isValidTime(eos1);
-            //                 const shift2Valid = isValidTime(apo2) && isValidTime(eos2);
-            //                 const shift3Valid = isValidTime(apo3) && isValidTime(eos3);
-
-            //                 if (!shift1Valid && !shift2Valid && !shift3Valid) {
-            //                     scheduleErrors.push(
-            //                         `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> χωρίς ώρες (από-έως)`
-            //                     );
-            //                 }
-            //             }
-
-            //             // ✅ RULE 2: ΜΕ/ΑΝ → Must NOT have ANY times
-            //             if (category === 'ΜΕ' || category === 'ΑΝ') {
-            //                 if (nonEmptyTimes.length > 0) {
-            //                     scheduleErrors.push(
-            //                         `<strong>${dateStr}</strong>: Κατηγορία <strong>${category}</strong> ΔΕΝ πρέπει να έχει ώρες (βρέθηκαν ${nonEmptyTimes.length} πεδία με τιμές)`
-            //                     );
-            //                 }
-            //             }
-            //         });
-
-            //         // =====================================================================
-            //         // ✅ Show schedule errors if any
-            //         // =====================================================================
-
-            //         if (scheduleErrors.length > 0) {
-            //             await Swal.fire({
-            //                 backdrop: false,
-            //                 allowOutsideClick: false,
-            //                 icon: 'error',
-            //                 title: 'Λάθη στο Εβδομαδιαίο Ωράριο',
-            //                 html: `
-            //         <p>Βρέθηκαν <strong>${scheduleErrors.length}</strong> λάθη στο ωράριο:</p>
-            //         <ul style="text-align: left; padding-left: 20px; margin-top: 10px;">
-            //             ${scheduleErrors.map((err) => `<li>${err}</li>`).join('')}
-            //         </ul>
-            //         <p class="text-muted" style="margin-top: 15px; font-size: 0.9rem;">
-            //             Πήγαινε στην καρτέλα <strong>"Ωράριο Εργασίας"</strong> και διόρθωσε τα πεδία.
-            //         </p>
-            //     `,
-            //                 confirmButtonText: 'OK',
-            //                 customClass: {
-            //                     confirmButton: 'class-error custom-confirm-button custom-swal-button',
-            //                     title: 'custom-title',
-            //                     popup: 'custom-swal-popup',
-            //                     htmlContainer: 'custom-html-container'
-            //                 }
-            //             });
-            //             return; // ❌ Stop submission
-            //         }
-
-            //         console.log('✅ [PRE-VALIDATION] All schedule checks passed');
-
-            //         // =========================================================================
-            //         // ✅ ΕΡΓΑΝΗ FILES SELECTION (Only shown if validation passes)
-            //         // =========================================================================
-
-            //         const result = await Swal.fire({
-            //             backdrop: false,
-            //             allowOutsideClick: false,
-            //             icon: 'info',
-            //             title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
-            //             html: `
-            //     <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
-            //         <!-- ✅ TOGGLE: Προσωρινή/Οριστική -->
-            //         <div class="display-flex align-items-center gap-0_75rem">
-            //             <input type="checkbox"
-            //                    id="temporary_permanent_storage"
-            //                    name="files"
-            //                    value="temporary_permanent_storage"
-            //                    class="custom-checkbox" />
-            //             <label for="temporary_permanent_storage"
-            //                    id="storage_mode_label"
-            //                    class="margin-0 cursor-pointer font-size-rem-1_05"
-            //                    style="transition: all 0.2s; color: #000000">
-            //                 Προσωρινή Αποθήκευση
-            //             </label>
-            //         </div>
-
-            //         <!-- ✅ E3 CHECKBOX -->
-            //         <div class="display-flex align-items-center gap-0_75rem">
-            //             <input type="checkbox"
-            //                    id="e3_anaggelia_proslhpshs"
-            //                    name="files"
-            //                    value="e3_anaggelia_proslhpshs"
-            //                    checked
-            //                    class="custom-checkbox" />
-            //             <label for="e3_anaggelia_proslhpshs"
-            //                    class="margin-0 cursor-pointer font-size-rem-1_05">
-            //                 Αναγγελία Πρόσληψης (E3)
-            //             </label>
-            //         </div>
-
-            //         <!-- ✅ WTO CHECKBOX -->
-            //         <div class="display-flex align-items-center gap-0_75rem">
-            //             <input type="checkbox"
-            //                    id="schedules"
-            //                    name="files"
-            //                    value="schedules"
-            //                    checked
-            //                    class="custom-checkbox" />
-            //             <label for="schedules"
-            //                    class="margin-0 cursor-pointer font-size-rem-1_05">
-            //                 Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
-            //             </label>
-            //         </div>
-            //     </div>
-            // `,
-
             // =========================================================================
             // ✅ PRE-VALIDATION: Check WTO schedules (παραλείπεται αν skipScheduleValidation)
             // =========================================================================
@@ -604,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             popup: 'custom-swal-popup'
                         }
                     });
-                    return;
+                    // return;
                 }
 
                 console.log('✅ [PRE-VALIDATION] All days have categories');
@@ -690,31 +499,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'info',
                 title: 'ΕΝΗΜΕΡΩΣΗ ΕΡΓΑΝΗ ΙΙ',
                 html: `
-                    <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem">
+                    <div class="display-flex flex-direction-column left-align gap-1rem padding-1rem swal-overflow">
+                        <p class="font-weight-600 margin-bottom-0_5rem">Τρόπος Αποθήκευσης:</p>
+
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox" 
-                                   id="temporary_permanent_storage" 
-                                   name="files" 
-                                   value="temporary_permanent_storage" 
-                                   class="custom-checkbox"
-                                   ${skipScheduleValidation ? 'disabled' : ''} />
-                            <label for="temporary_permanent_storage" 
-                                   id="storage_mode_label"
-                                   class="margin-0 cursor-pointer font-size-rem-1_05"
-                                   style="transition: all 0.2s; color: ${skipScheduleValidation ? '#aaaaaa' : '#000000'}">
-                                Προσωρινή Αποθήκευση
+                            <input type="radio"
+                                   id="storage_temporary"
+                                   name="storage_mode"
+                                   value="temporary"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'disabled' : 'checked'} />
+                            <label for="storage_temporary"
+                                   class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
+                                   style="color: ${skipScheduleValidation ? '#aaaaaa' : '#000000'}">
+                                Προσωρινή Αποθήκευση (XML)
                             </label>
                         </div>
 
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox" 
-                                   id="e3_anaggelia_proslhpshs" 
-                                   name="files" 
-                                   value="e3_anaggelia_proslhpshs" 
-                                   ${skipScheduleValidation ? '' : 'checked'}
-                                   ${skipScheduleValidation ? 'disabled' : ''}
-                                   class="custom-checkbox" />
-                            <label for="e3_anaggelia_proslhpshs" 
+                            <input type="radio"
+                                   id="storage_permanent"
+                                   name="storage_mode"
+                                   value="permanent"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'disabled' : ''} />
+                            <label for="storage_permanent"
+                                   class="margin-0 cursor-pointer font-size-rem-1_05 font-weight-600 temp_perm"
+                                   style="color: ${skipScheduleValidation ? '#aaaaaa' : '#184d00'}">
+                                <strong>Οριστική Ενημέρωση (REST API)</strong>
+                            </label>
+                        </div>
+
+                        <hr class="hr-style" />
+                        <p class="font-weight-600 margin-bottom-0_5rem">Ενέργεια ΕΡΓΑΝΗ:</p>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="radio"
+                                   id="ergani_action_none"
+                                   name="ergani_main_action"
+                                   value="none"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'checked' : ''} />
+                            <label for="ergani_action_none"
+                                   class="margin-0 cursor-pointer font-size-rem-1_05">
+                                Χωρίς ενέργεια ΕΡΓΑΝΗ
+                            </label>
+                        </div>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="radio"
+                                   id="e3_anaggelia_proslhpshs"
+                                   name="ergani_main_action"
+                                   value="e3_anaggelia_proslhpshs"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'disabled' : ''} />
+                            <label for="e3_anaggelia_proslhpshs"
                                    class="margin-0 cursor-pointer font-size-rem-1_05"
                                    style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
                                 Αναγγελία Πρόσληψης (E3N)
@@ -722,56 +561,73 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <div class="display-flex align-items-center gap-0_75rem">
-                            <input type="checkbox" 
-                                   id="schedules" 
-                                   name="files" 
-                                   value="schedules" 
-                                   ${skipScheduleValidation ? '' : 'checked'}
-                                   ${skipScheduleValidation ? 'disabled' : ''}
-                                   class="custom-checkbox" />
-                            <label for="schedules" 
+                            <input type="radio"
+                                   id="wto_pshfiakh_organosh_xronoy_ergasias"
+                                   name="ergani_main_action"
+                                   value="wto"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'disabled' : ''} />
+                            <label for="wto_pshfiakh_organosh_xronoy_ergasias"
                                    class="margin-0 cursor-pointer font-size-rem-1_05"
                                    style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
                                 Ψηφιακή Οργάνωση Χρόνου Εργασίας (WTO)
                             </label>
                         </div>
+
+                        <div class="display-flex align-items-center gap-0_75rem">
+                            <input type="radio"
+                                   id="ergani_action_both"
+                                   name="ergani_main_action"
+                                   value="both"
+                                   class="custom-radio"
+                                   ${skipScheduleValidation ? 'disabled' : 'checked'} />
+                            <label for="ergani_action_both"
+                                   class="margin-0 cursor-pointer font-size-rem-1_05"
+                                   style="color: ${skipScheduleValidation ? '#aaaaaa' : 'inherit'}">
+                                Αναγγελία Πρόσληψης (E3N) + WTO
+                            </label>
+                        </div>
                     </div>
                 `,
-
                 focusConfirm: false,
-
-                // ✅ ATTACH EVENT LISTENER AFTER MODAL OPENS (CSP-safe)
                 didOpen: () => {
-                    const checkbox = document.getElementById('temporary_permanent_storage');
-                    const label = document.getElementById('storage_mode_label');
-
-                    if (checkbox && label) {
-                        checkbox.addEventListener('change', function () {
-                            if (this.checked) {
-                                label.innerHTML = '<strong>Οριστική Ενημέρωση</strong>';
-                                label.style.color = '#28a745'; // Green
-                            } else {
-                                label.innerHTML = 'Προσωρινή Αποθήκευση';
-                                label.style.color = '#000000'; // Gray
-                            }
+                    document.querySelectorAll('input[name="storage_mode"]').forEach((radio) => {
+                        radio.addEventListener('change', function () {
+                            document.querySelectorAll('label.temp_perm').forEach((lbl) => {
+                                lbl.style.fontWeight = '400';
+                            });
+                            const selectedLabel = document.querySelector(`label[for="${this.id}"]`);
+                            if (selectedLabel) selectedLabel.style.fontWeight = '700';
                         });
-                    }
+                    });
                 },
-
                 preConfirm: () => {
-                    const isPermanent = document.getElementById(
-                        'temporary_permanent_storage'
-                    ).checked;
-                    const e3Enabled = document.getElementById('e3_anaggelia_proslhpshs').checked;
-                    const wtoEnabled = document.getElementById('schedules').checked;
+                    const storageModeRadio = document.querySelector(
+                        'input[name="storage_mode"]:checked'
+                    );
+                    const isPermanent = storageModeRadio?.value === 'permanent';
+
+                    const erganiMainActionRadio = document.querySelector(
+                        'input[name="ergani_main_action"]:checked'
+                    );
+                    const erganiMainAction = erganiMainActionRadio?.value || 'none';
+
+                    const e3Enabled =
+                        erganiMainAction === 'e3_anaggelia_proslhpshs' ||
+                        erganiMainAction === 'both';
+
+                    const wtoEnabled = erganiMainAction === 'wto' || erganiMainAction === 'both';
 
                     const filesToUpdate = {
-                        isPermanent: isPermanent,
+                        isPermanent,
+                        erganiUploadMethod:
+                            isPermanent && (e3Enabled || wtoEnabled) ? 'rest' : 'xml',
                         e3_anaggelia_proslhpshs: e3Enabled,
-                        schedules: wtoEnabled
+                        schedules: wtoEnabled,
+                        wto_pshfiakh_organosh_xronoy_ergasias: wtoEnabled
                     };
 
-                    console.log('🔍 [FRONTEND] Checkboxes:', filesToUpdate);
+                    console.log('🔍 [FRONTEND] ERGANI selections:', filesToUpdate);
 
                     return filesToUpdate;
                 },
@@ -801,105 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 filesToUpdate: result.value,
                 skipContract: skipScheduleValidation // ✅ ΝΕΟ: αν "Συνέχεια", δεν φτιάχνουμε σύμβαση
             };
-
-            // ============================================================================
-            // ✅ SHOW PROGRESS BAR MODAL
-            // ============================================================================
-
-            // Swal.fire({
-            //     title: 'Δημιουργία Σύμβασης Εργασίας',
-            //     html: `
-            //         <div class="pdf-generation-progress">
-            //             <div class="progress-spinner">
-            //                 <div class="spinner-border text-success" role="status">
-            //                     <span class="visually-hidden">Loading...</span>
-            //                 </div>
-            //             </div>
-
-            //             <div class="progress-step-text" id="progress-step-text">
-            //                 Προετοιμασία...
-            //             </div>
-
-            //             <div class="progress-bar-container">
-            //                 <div class="custom-progress">
-            //                     <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
-            //                         id="pdf-progress-bar"
-            //                         role="progressbar"
-            //                         aria-valuenow="0"
-            //                         aria-valuemin="0"
-            //                         aria-valuemax="100"
-            //                         style="width: 0%">
-            //                         0%
-            //                     </div>
-            //                 </div>
-            //             </div>
-
-            //             <div class="progress-info-text">
-            //                 <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
-            //                 <ul class="progress-steps-list">
-            //                     <li>Αποθήκευση στοιχείων εργαζόμενου</li>
-            //                     <li>Δημιουργία εγγράφου από template</li>
-            //                     <li>Μετατροπή σε PDF</li>
-            //                     <li>Ασφαλή αποθήκευση στο cloud</li>
-            //                 </ul>
-            //             </div>
-
-            //             <div class="progress-time-estimate">
-            //                 <span style="margin-right: 8px;">⏱️</span>
-            //                 <strong>Εκτιμώμενος χρόνος:</strong> 8-10 δευτερόλεπτα
-            //             </div>
-            //         </div>
-            //     `,
-            //     backdrop: false,
-            //     allowOutsideClick: false,
-            //     showConfirmButton: false,
-            //     customClass: {
-            //         popup: 'custom-swal-popup',
-            //         title: 'custom-title'
-            //     },
-            //     didOpen: () => {
-            //         // ✅ Start progress simulation
-            //         startProgressAnimation();
-            //     }
-            // });
-
-            // const response = await fetch('/ergazomenoi/ergazomenoi/add', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //         'CSRF-Token': csrfToken
-            //     },
-            //     credentials: 'include',
-            //     body: JSON.stringify(payload)
-            // });
-
-            // // ============================================================================
-            // // ✅ SMOOTH PROGRESS COMPLETION
-            // // ============================================================================
-
-            // // Calculate minimum wait time (sum of all animation durations: ~9.6s)
-            // const minimumAnimationTime = 800 + 1500 + 2000 + 3000 + 1500 + 800 + 500; // ~10.1 seconds
-
-            // // Wait minimum 3 seconds so user can see the progress animation
-            // await new Promise((resolve) => setTimeout(resolve, 3000));
-
-            // // Smoothly transition to 100%
-            // const progressBar = document.getElementById('pdf-progress-bar');
-            // const progressText = document.getElementById('progress-step-text');
-
-            // if (progressBar && progressText) {
-            //     // Force 100% completion
-            //     progressBar.style.width = '100%';
-            //     progressBar.textContent = '100%';
-            //     progressBar.classList.remove('progress-bar-animated');
-            //     progressBar.setAttribute('aria-valuenow', 100);
-            //     progressText.textContent = 'Ολοκλήρωση...';
-
-            //     // Show completion message for 1 second
-            //     await new Promise((resolve) => setTimeout(resolve, 1000));
-            // }
-            // // Close progress modal smoothly
-            // Swal.close();
 
             if (!skipScheduleValidation) {
                 Swal.fire({
@@ -1075,23 +832,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wtoXmlData = data?.wtoXmlData || null;
                 const hasWtoXml = wtoXmlData && wtoXmlData.success === true;
 
+                const userWantsE3 = result.value?.e3_anaggelia_proslhpshs === true;
+                const userWantsWto =
+                    result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                    result.value?.schedules === true;
+                const isRestSubmit =
+                    result.value?.isPermanent === true &&
+                    result.value?.erganiUploadMethod === 'rest';
+                const isE3NRestSubmit = userWantsE3 && isRestSubmit;
+                const isWTOWeekRestSubmit = userWantsWto && isRestSubmit;
+
                 // ✅ BUILD HTML STRINGS (ONCE)
-                const e3XmlHtml = hasE3Xml
-                    ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
+                const e3XmlHtml =
+                    hasE3Xml && userWantsE3 && !isE3NRestSubmit
+                        ? `<p class="text-success mt-3">✅ E3 XML δημιουργήθηκε επιτυχώς!</p>
                     <a href="${e3XmlData.downloadUrl}" 
                         download="${e3XmlData.filename}"
                         class="btn btn-sm btn-outline-primary mt-2">
                         <i class="bi bi-download"></i> Λήψη E3 XML
                     </a>`
+                        : '';
+
+                const e3RestPendingHtml = isE3NRestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή E3N μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
-                const wtoXmlHtml = hasWtoXml
-                    ? `<p class="text-success mt-3">✅ WTO XML δημιουργήθηκε επιτυχώς!</p>
+                const wtoXmlHtml =
+                    hasWtoXml && userWantsWto && !isWTOWeekRestSubmit
+                        ? `<p class="text-success mt-3">✅ WTO XML δημιουργήθηκε επιτυχώς!</p>
                     <a href="${wtoXmlData.downloadUrl}" 
                         download="${wtoXmlData.filename}"
                         class="btn btn-sm btn-outline-success mt-2">
                         <i class="bi bi-download"></i> Λήψη WTO XML
                     </a>`
+                        : '';
+
+                const wtoRestPendingHtml = isWTOWeekRestSubmit
+                    ? `<p class="text-success-light mt-3">✅ Έχει επιλεγεί οριστική υποβολή WTOWeek μέσω REST API. Η υποβολή θα εκτελεστεί αμέσως μετά την αποθήκευση.</p>`
                     : '';
 
                 // ✅ CHECK: Did we send PDFs?
@@ -1154,9 +931,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // ✅ Store upload options globally (so modal can access them)
                         window.__erganhUploadOptions = {
-                            isPermanent: result.value?.isPermanent || false,
-                            e3Enabled: result.value?.e3_anaggelia_proslhpshs !== false,
-                            wtoEnabled: result.value?.schedules !== false
+                            isPermanent: result.value?.isPermanent === true,
+                            erganiUploadMethod: result.value?.erganiUploadMethod || 'xml',
+                            e3Enabled: result.value?.e3_anaggelia_proslhpshs === true,
+                            wtoEnabled:
+                                result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                                result.value?.schedules === true,
+                            wto_pshfiakh_organosh_xronoy_ergasias:
+                                result.value?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                                result.value?.schedules === true
                         };
 
                         console.log('[MAIN] Stored upload options:', window.__erganhUploadOptions);
@@ -1194,10 +977,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                         : ''
                                 }
                                 ${e3XmlHtml}
+                                ${e3RestPendingHtml}
+                                ${wtoRestPendingHtml}
                                 ${wtoXmlHtml}
                             `,
-                            timer: hasE3Xml || hasWtoXml ? null : 1500,
-                            showConfirmButton: hasE3Xml || hasWtoXml,
+                            timer:
+                                hasE3Xml || hasWtoXml || isE3NRestSubmit || isWTOWeekRestSubmit
+                                    ? null
+                                    : 1500,
+                            showConfirmButton:
+                                hasE3Xml || hasWtoXml || isE3NRestSubmit || isWTOWeekRestSubmit,
                             confirmButtonText: 'OK',
                             customClass: {
                                 confirmButton:
@@ -1208,17 +997,47 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
 
                         // =====================================================================
+
+                        if (isRestSubmit) {
+                            const uploadResults = await runRestUploadsAfterEmployeeSave({
+                                ergazomenosId: data.data?._id,
+                                filesToUpdate: result.value,
+                                redirectUrl: data.redirectUrl || '/ergazomenoi/ergazomenoi'
+                            });
+
+                            if (
+                                uploadResults?.e3Result?.success === false ||
+                                uploadResults?.wtoResult?.success === false
+                            ) {
+                                console.warn(
+                                    '[REDIRECT] Skipped because ERGANI REST upload failed.'
+                                );
+                                return;
+                            }
+
+                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                            return;
+                        }
+
                         // ✅ UPLOAD BOTH XMLs TO ERGANH (SEQUENTIAL)
                         // =====================================================================
 
                         // ✅ 1. Upload E3 XML (if exists)
                         let e3Result = { success: true }; // Default to success if not uploaded
 
-                        if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
+                        if (
+                            e3XmlData?.success &&
+                            data.data?._id &&
+                            (e3XmlData?.relativePath ||
+                                e3XmlData?.s3Url ||
+                                e3XmlData?.downloadUrl ||
+                                e3XmlData?.s3Key)
+                        ) {
                             const e3UrlToSend =
                                 e3XmlData?.relativePath ||
                                 e3XmlData?.s3Url ||
                                 e3XmlData?.downloadUrl ||
+                                e3XmlData?.s3Key ||
                                 null;
 
                             if (e3UrlToSend && typeof e3UrlToSend === 'string') {
@@ -1236,11 +1055,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         // ✅ 2. Upload WTO XML (if exists) - ALWAYS RUNS
                         let wtoResult = { success: true }; // Default to success if not uploaded
 
-                        if (wtoXmlData?.success && wtoXmlData?.s3Url && data.data?._id) {
+                        if (
+                            wtoXmlData?.success &&
+                            data.data?._id &&
+                            (wtoXmlData?.relativePath ||
+                                wtoXmlData?.s3Url ||
+                                wtoXmlData?.downloadUrl ||
+                                wtoXmlData?.s3Key)
+                        ) {
                             const wtoUrlToSend =
                                 wtoXmlData?.relativePath ||
                                 wtoXmlData?.s3Url ||
                                 wtoXmlData?.downloadUrl ||
+                                wtoXmlData?.s3Key ||
                                 null;
 
                             if (wtoUrlToSend && typeof wtoUrlToSend === 'string') {
@@ -1293,6 +1120,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 Μπορείτε να τα ανεβάσετε αργότερα από την επεξεργασία.
                             </p>
                             ${e3XmlHtml}
+                            ${e3RestPendingHtml}
+                            ${wtoRestPendingHtml}
                             ${wtoXmlHtml}
                         `,
                         confirmButtonText: 'OK',
@@ -1303,16 +1132,43 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
+                    if (isRestSubmit) {
+                        const uploadResults = await runRestUploadsAfterEmployeeSave({
+                            ergazomenosId: data.data?._id,
+                            filesToUpdate: result.value,
+                            redirectUrl: data.redirectUrl || '/ergazomenoi/ergazomenoi'
+                        });
+
+                        if (
+                            uploadResults?.e3Result?.success === false ||
+                            uploadResults?.wtoResult?.success === false
+                        ) {
+                            console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
+                            return;
+                        }
+
+                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                        return;
+                    }
+
                     // =====================================================================
                     // ✅ UPLOAD BOTH XMLs TO ERGANH (SEQUENTIAL)
                     // =====================================================================
 
                     // ✅ 1. Upload E3 XML (if exists)
-                    if (e3XmlData?.success && e3XmlData?.s3Url && data.data?._id) {
+                    if (
+                        e3XmlData?.success &&
+                        data.data?._id &&
+                        (e3XmlData?.relativePath ||
+                            e3XmlData?.s3Url ||
+                            e3XmlData?.downloadUrl ||
+                            e3XmlData?.s3Key)
+                    ) {
                         const e3UrlToSend =
                             e3XmlData?.relativePath ||
                             e3XmlData?.s3Url ||
                             e3XmlData?.downloadUrl ||
+                            e3XmlData?.s3Key ||
                             null;
 
                         if (e3UrlToSend && typeof e3UrlToSend === 'string') {
@@ -1327,11 +1183,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     // ✅ 2. Upload WTO XML (if exists)
-                    if (wtoXmlData?.success && wtoXmlData?.s3Url && data.data?._id) {
+                    if (
+                        wtoXmlData?.success &&
+                        data.data?._id &&
+                        (wtoXmlData?.relativePath ||
+                            wtoXmlData?.s3Url ||
+                            wtoXmlData?.downloadUrl ||
+                            wtoXmlData?.s3Key)
+                    ) {
                         const wtoUrlToSend =
                             wtoXmlData?.relativePath ||
                             wtoXmlData?.s3Url ||
                             wtoXmlData?.downloadUrl ||
+                            wtoXmlData?.s3Key ||
                             null;
 
                         if (wtoUrlToSend && typeof wtoUrlToSend === 'string') {
@@ -1397,6 +1261,510 @@ document.addEventListener('DOMContentLoaded', () => {
     buttons.forEach((button) => {
         button.addEventListener('click', handleFormSubmit);
     });
+
+    // ============================================================================
+    // ✅ REST API HELPERS (E3N + WTOWeek) FOR ADD EMPLOYEE FLOW
+    // ============================================================================
+
+    function escapeHtmlForSwal(value) {
+        return String(value ?? '').replace(
+            /[<>&"]/g,
+            (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[ch]
+        );
+    }
+
+    function formatErganiErrorForSwal(value) {
+        return escapeHtmlForSwal(value || 'Άγνωστο σφάλμα')
+            .replace(/\n/g, '<br>')
+            .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+    }
+
+    function showE3NRestProgressSwal() {
+        Swal.fire({
+            title: 'Οριστική Υποβολή Πρόσληψης E3N',
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="e3n-rest-progress-step-text">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                 id="e3n-rest-progress-bar"
+                                 role="progressbar"
+                                 aria-valuenow="15"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100"
+                                 style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload</li>
+                            <li>Έλεγχο WebE3N στο trial/production περιβάλλον</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title'
+            },
+            didOpen: () => {
+                const steps = [
+                    { percent: 25, text: 'Προετοιμασία JSON payload...', duration: 800 },
+                    { percent: 45, text: 'Αυθεντικοποίηση στο ΕΡΓΑΝΗ...', duration: 1200 },
+                    { percent: 65, text: 'Υποβολή WebE3N...', duration: 1800 },
+                    { percent: 85, text: 'Αναμονή απάντησης από ΕΡΓΑΝΗ...', duration: 2000 },
+                    { percent: 95, text: 'Ολοκλήρωση ελέγχου αποτελέσματος...', duration: 1200 }
+                ];
+                let currentStepIndex = 0;
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('e3n-rest-progress-bar');
+                    const progressText = document.getElementById('e3n-rest-progress-step-text');
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+                    currentStepIndex++;
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+                setTimeout(updateProgress, 350);
+            }
+        });
+    }
+
+    function showWTOWeekRestProgressSwal() {
+        Swal.fire({
+            title: 'Οριστική Υποβολή WTOWeek',
+            html: `
+                <div class="pdf-generation-progress">
+                    <div class="progress-spinner">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="progress-step-text" id="wtoweek-rest-progress-step-text">
+                        Σύνδεση με ΕΡΓΑΝΗ...
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="custom-progress">
+                            <div class="custom-progress-bar progress-bar-striped progress-bar-animated"
+                                 id="wtoweek-rest-progress-bar"
+                                 role="progressbar"
+                                 aria-valuenow="15"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100"
+                                 style="width: 15%">
+                                15%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-info-text">
+                        <p class="mb-2">Η διαδικασία περιλαμβάνει:</p>
+                        <ul class="progress-steps-list">
+                            <li>Δημιουργία JSON payload WTOWeek</li>
+                            <li>Έλεγχο ημερομηνιών και υποκαταστήματος</li>
+                            <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
+                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            backdrop: false,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            customClass: {
+                popup: 'custom-swal-popup',
+                title: 'custom-title'
+            },
+            didOpen: () => {
+                const steps = [
+                    { percent: 25, text: 'Προετοιμασία JSON payload WTOWeek...', duration: 800 },
+                    { percent: 45, text: 'Αυθεντικοποίηση στο ΕΡΓΑΝΗ...', duration: 1200 },
+                    { percent: 65, text: 'Υποβολή WTOWeek...', duration: 1800 },
+                    { percent: 85, text: 'Αναμονή απάντησης από ΕΡΓΑΝΗ...', duration: 2000 },
+                    { percent: 95, text: 'Ολοκλήρωση ελέγχου αποτελέσματος...', duration: 1200 }
+                ];
+                let currentStepIndex = 0;
+                function updateProgress() {
+                    if (currentStepIndex >= steps.length) return;
+                    const step = steps[currentStepIndex];
+                    const progressBar = document.getElementById('wtoweek-rest-progress-bar');
+                    const progressText = document.getElementById('wtoweek-rest-progress-step-text');
+                    if (progressBar && progressText) {
+                        progressBar.style.width = `${step.percent}%`;
+                        progressBar.textContent = `${step.percent}%`;
+                        progressBar.setAttribute('aria-valuenow', step.percent);
+                        progressText.textContent = step.text;
+                    }
+                    currentStepIndex++;
+                    if (currentStepIndex < steps.length) {
+                        setTimeout(updateProgress, step.duration);
+                    }
+                }
+                setTimeout(updateProgress, 350);
+            }
+        });
+    }
+
+    async function showGenericRestResultSwal({
+        result,
+        titleSuccess,
+        titleError,
+        successText,
+        errorText
+    }) {
+        if (result?.success === true) {
+            const protocol = result?.protocol || null;
+            const submitDate = result?.submitDate || null;
+            const submissionId = result?.erganhSubmissionId || result?.id || null;
+
+            await Swal.fire({
+                backdrop: false,
+                allowOutsideClick: false,
+                icon: 'success',
+                title: titleSuccess,
+                html: `
+                    <div style="text-align:left; line-height:1.55;">
+                        <p>${successText}</p>
+                        ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${escapeHtmlForSwal(protocol)}</p>` : ''}
+                        ${
+                            submitDate
+                                ? `<p><strong>Ημερομηνία υποβολής:</strong> ${escapeHtmlForSwal(submitDate)}</p>`
+                                : ''
+                        }
+                        ${
+                            submissionId
+                                ? `<p><strong>ERGANI ID:</strong> ${escapeHtmlForSwal(submissionId)}</p>`
+                                : ''
+                        }
+                        ${
+                            result?.pdfSaved === false && result?.pdfSaveError
+                                ? `<p class="text-warning">⚠️ Η υποβολή έγινε, αλλά το PDF δεν αποθηκεύτηκε: ${escapeHtmlForSwal(result.pdfSaveError)}</p>`
+                                : ''
+                        }
+                    </div>
+                `,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup',
+                    htmlContainer: 'custom-html-container'
+                }
+            });
+            return;
+        }
+
+        await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            icon: 'error',
+            title: titleError,
+            html: `
+                <div style="text-align:left; line-height:1.45;">
+                    <p>${errorText}</p>
+                    <p class="text-danger" style="font-weight:600;">
+                        ${formatErganiErrorForSwal(result?.error || result?.message)}
+                    </p>
+                </div>
+            `,
+            confirmButtonText: 'OK',
+            customClass: {
+                confirmButton: 'class-error custom-confirm-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup',
+                htmlContainer: 'custom-html-container'
+            }
+        });
+    }
+
+    async function showE3NRestResultSwal(e3Result) {
+        await showGenericRestResultSwal({
+            result: e3Result,
+            titleSuccess: 'Επιτυχής Οριστική Υποβολή E3N',
+            titleError: 'Αποτυχία Οριστικής Υποβολής E3N',
+            successText: 'Η πρόσληψη υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ μέσω REST API.',
+            errorText: 'Η πρόσληψη δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
+        });
+    }
+
+    async function showWTOWeekRestResultSwal(wtoResult) {
+        await showGenericRestResultSwal({
+            result: wtoResult,
+            titleSuccess: 'Επιτυχής Οριστική Υποβολή WTOWeek',
+            titleError: 'Αποτυχία Οριστικής Υποβολής WTOWeek',
+            successText: 'Το εβδομαδιαίο πρόγραμμα υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ μέσω REST API.',
+            errorText: 'Το εβδομαδιαίο πρόγραμμα δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
+        });
+    }
+
+    async function showErganiSubmittedPdfModal(payload) {
+        const pdfUrl = payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url || '';
+        const protocol = payload?.protocol || '';
+        const submitDate = payload?.submitDate || '';
+        const title = protocol ? `ΕΡΓΑΝΗ - Πρωτόκολλο ${protocol}` : 'ΕΡΓΑΝΗ - Υποβληθέν PDF';
+
+        if (!pdfUrl) return;
+
+        await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            width: 1250,
+            title,
+            html: `
+                <div style="display:flex; flex-direction:column; gap:0.55rem; width:100%; height:min(84vh, 820px); box-sizing:border-box;">
+                    <div style="display:flex; gap:0.75rem; align-items:center; justify-content:center; flex-wrap:wrap; font-size:0.95rem;">
+                        ${protocol ? `<span><strong>Πρωτόκολλο:</strong> ${escapeHtmlForSwal(protocol)}</span>` : ''}
+                        ${submitDate ? `<span><strong>Ημ/νία:</strong> ${escapeHtmlForSwal(submitDate)}</span>` : ''}
+                    </div>
+                    <iframe src="${pdfUrl}"
+                            style="width:100%; flex:1 1 auto; min-height:620px; height:72vh; border:1px solid #ccc; border-radius:6px; background:#fff;"
+                            title="ΕΡΓΑΝΗ PDF"></iframe>
+                    <div style="display:flex; gap:0.75rem; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:0.25rem;">
+                        <button type="button" id="erganiPdfOpenBtn" class="btn btn-primary">Άνοιγμα PDF</button>
+                        <a href="${pdfUrl}" target="_blank" download class="btn btn-success" style="text-decoration:none;">Αποθήκευση Τοπικά</a>
+                        <button type="button" id="erganiPdfPrintBtn" class="btn btn-secondary">Εκτύπωση</button>
+                        <button type="button" id="erganiPdfCloseBtn" class="btn btn-secondary">Κλείσιμο</button>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: false,
+            customClass: {
+                title: 'custom-title',
+                popup: 'custom-swal-popup-wide',
+                htmlContainer: 'custom-html-container'
+            },
+            didOpen: () => {
+                const popup = Swal.getPopup();
+                const iframe = popup?.querySelector('iframe');
+                const htmlContainer = Swal.getHtmlContainer();
+
+                if (popup) {
+                    popup.style.setProperty('width', '1250px', 'important');
+                    popup.style.setProperty('max-width', '98vw', 'important');
+                    popup.style.setProperty('min-width', '900px', 'important');
+                    popup.style.setProperty('padding', '1rem', 'important');
+                }
+                if (htmlContainer) {
+                    htmlContainer.style.setProperty('width', '100%', 'important');
+                    htmlContainer.style.setProperty('max-width', '100%', 'important');
+                    htmlContainer.style.setProperty('margin', '0', 'important');
+                }
+                if (iframe) {
+                    iframe.style.setProperty('width', '100%', 'important');
+                    iframe.style.setProperty('height', '72vh', 'important');
+                    iframe.style.setProperty('min-height', '620px', 'important');
+                }
+
+                const openBtn = document.getElementById('erganiPdfOpenBtn');
+                const printBtn = document.getElementById('erganiPdfPrintBtn');
+                const closeBtn = document.getElementById('erganiPdfCloseBtn');
+
+                if (openBtn) {
+                    openBtn.addEventListener('click', () => {
+                        window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                    });
+                }
+                if (printBtn) {
+                    printBtn.addEventListener('click', () => {
+                        const printWindow = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+                        if (!printWindow) return;
+                        printWindow.addEventListener('load', () => {
+                            try {
+                                printWindow.focus();
+                                printWindow.print();
+                            } catch (e) {
+                                console.warn('PDF print failed:', e);
+                            }
+                        });
+                    });
+                }
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => Swal.close());
+                }
+            }
+        });
+    }
+
+    async function submitE3NRestToErganh(ergazomenosId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const ypokatasthma =
+            document.getElementById('ypokatasthma')?.value ||
+            document.getElementById('ypokatasthmata')?.value ||
+            document.getElementById('ypokatasthmata_stathera')?.value ||
+            document.querySelector('[name="ypokatasthma"]')?.value ||
+            document.querySelector('[name="ypokatasthmata"]')?.value ||
+            document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+            '0';
+
+        const response = await fetch('/ergazomenoi/ergazomenoi/submit-e3n-to-erganh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                ergazomenosId,
+                ypokatasthma,
+                erganiUploadMethod: 'rest'
+            })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { success: response.ok, message: await response.text() };
+
+        if (!response.ok || data?.success !== true) {
+            throw new Error(
+                data?.message ||
+                    data?.error ||
+                    `E3N REST JSON upload failed with HTTP ${response.status}`
+            );
+        }
+
+        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
+            Swal.close();
+            await showErganiSubmittedPdfModal(data);
+        }
+
+        return data;
+    }
+
+    async function submitWTOWeekRestToErganh(ergazomenosId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        const ypokatasthma =
+            document.getElementById('ypokatasthma')?.value ||
+            document.getElementById('ypokatasthmata')?.value ||
+            document.getElementById('ypokatasthmata_stathera')?.value ||
+            document.querySelector('[name="ypokatasthma"]')?.value ||
+            document.querySelector('[name="ypokatasthmata"]')?.value ||
+            document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
+            '0';
+
+        try {
+            showWTOWeekRestProgressSwal();
+
+            const response = await fetch('/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    ergazomenosId,
+                    ypokatasthma,
+                    erganiUploadMethod: 'rest'
+                })
+            });
+
+            let payload;
+            try {
+                payload = await response.json();
+            } catch {
+                payload = { success: false, message: await response.text() };
+            }
+
+            Swal.close();
+
+            if (!response.ok || payload?.success !== true) {
+                const failedPayload = {
+                    ...payload,
+                    success: false,
+                    error:
+                        payload?.error ||
+                        payload?.message ||
+                        payload?.userMessage ||
+                        `HTTP ${response.status}`
+                };
+
+                await showWTOWeekRestResultSwal(failedPayload);
+                return failedPayload;
+            }
+
+            if (payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url) {
+                await showErganiSubmittedPdfModal(payload);
+            }
+
+            await showWTOWeekRestResultSwal(payload);
+            return payload;
+        } catch (error) {
+            Swal.close();
+            const failedPayload = {
+                success: false,
+                error: error?.message || String(error)
+            };
+            await showWTOWeekRestResultSwal(failedPayload);
+            return failedPayload;
+        }
+    }
+
+    async function runRestUploadsAfterEmployeeSave({
+        ergazomenosId,
+        filesToUpdate = {},
+        redirectUrl = '/ergazomenoi/ergazomenoi'
+    }) {
+        const userWantsE3 = filesToUpdate?.e3_anaggelia_proslhpshs === true;
+        const userWantsWto =
+            filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+            filesToUpdate?.schedules === true;
+        const isRestSubmit =
+            filesToUpdate?.isPermanent === true && filesToUpdate?.erganiUploadMethod === 'rest';
+
+        let e3Result = { success: true, skipped: true };
+        let wtoResult = { success: true, skipped: true };
+
+        if (!isRestSubmit || !ergazomenosId) {
+            return { e3Result, wtoResult, skipped: true };
+        }
+
+        if (userWantsE3) {
+            try {
+                console.log('[E3-REST-UPLOAD] Submitting E3N via REST JSON...');
+                showE3NRestProgressSwal();
+                e3Result = await submitE3NRestToErganh(ergazomenosId);
+                Swal.close();
+                await showE3NRestResultSwal(e3Result);
+            } catch (e) {
+                Swal.close();
+                console.error('[E3-REST-UPLOAD] ❌ Exception:', e?.message || e);
+                e3Result = { success: false, error: e?.message || String(e) };
+                await showE3NRestResultSwal(e3Result);
+            }
+        }
+
+        if (userWantsWto) {
+            console.log('[WTO-REST-UPLOAD] Submitting WTOWeek via REST JSON...');
+            wtoResult = await submitWTOWeekRestToErganh(ergazomenosId);
+        }
+
+        return { e3Result, wtoResult, redirectUrl };
+    }
 
     // ============================================================================
     // ✅ PDF CONTRACT PREVIEW MODAL (WITH ERGANH UPLOAD AFTER MANUAL CLOSE)
@@ -1482,7 +1850,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // =====================================================================
                 const isPermanent = filesToUpdate?.isPermanent === true;
                 const e3Enabled = filesToUpdate?.e3_anaggelia_proslhpshs === true;
-                const wtoEnabled = filesToUpdate?.schedules === true;
+                const wtoEnabled =
+                    filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true ||
+                    filesToUpdate?.schedules === true;
 
                 console.log('[CLOSE-MODAL] Upload options:', {
                     isPermanent,
@@ -1510,6 +1880,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     wto_relativePath: wtoXmlData?.relativePath,
                     ergazomenosId
                 });
+
+                if (isPermanent && filesToUpdate?.erganiUploadMethod === 'rest') {
+                    const uploadResults = await runRestUploadsAfterEmployeeSave({
+                        ergazomenosId,
+                        filesToUpdate,
+                        redirectUrl
+                    });
+
+                    if (
+                        uploadResults?.e3Result?.success === false ||
+                        uploadResults?.wtoResult?.success === false
+                    ) {
+                        console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
+                        resolve();
+                        return;
+                    }
+
+                    resolve();
+                    window.location.href = redirectUrl;
+                    return;
+                }
 
                 // ✅ If neither needs upload → redirect immediately
                 if (!needsE3Upload && !needsWtoUpload) {
@@ -2509,142 +2900,4 @@ document.addEventListener('DOMContentLoaded', () => {
             erganiUploadInProgress = false;
         }
     }
-
-    // // ============================================================================
-    // // ✅ SOCKET.IO - ERGANH REAL-TIME STATUS UPDATES
-    // // ============================================================================
-
-    // if (typeof socket !== 'undefined' && socket) {
-    //     console.log('✅ [ERGANH] Socket.io event listeners initialized');
-
-    //     // ================================================================
-    //     // ✅ ERGANH: UPLOAD STARTED
-    //     // ================================================================
-    //     socket.on('erganh:started', function (data) {
-    //         console.log('📡 [ERGANH] Upload started:', data);
-
-    //         Swal.fire({
-    //             toast: true,
-    //             position: 'top-end',
-    //             icon: 'info',
-    //             title: 'ΕΡΓΑΝΗ ΙΙ',
-    //             text: data.message || 'Έναρξη αποστολής...',
-    //             showConfirmButton: false,
-    //             timer: 3000,
-    //             timerProgressBar: true,
-    //             customClass: {
-    //                 popup: 'swal-toast-popup',
-    //                 title: 'swal-toast-title'
-    //             }
-    //         });
-    //     });
-
-    //     // ================================================================
-    //     // ✅ ERGANH: PROGRESS UPDATE
-    //     // ================================================================
-    //     socket.on('erganh:progress', function (data) {
-    //         console.log('📡 [ERGANH] Progress:', data);
-
-    //         const stepIcons = {
-    //             credentials: 'info',
-    //             browser: 'info',
-    //             login: 'info',
-    //             login_success: 'success',
-    //             uploading: 'info',
-    //             processing: 'info'
-    //         };
-
-    //         const icon = stepIcons[data.step] || 'info';
-
-    //         Swal.fire({
-    //             toast: true,
-    //             position: 'top-end',
-    //             icon: icon,
-    //             title: 'ΕΡΓΑΝΗ ΙΙ',
-    //             text: data.message || 'Σε εξέλιξη...',
-    //             showConfirmButton: false,
-    //             timer: data.step === 'login_success' ? 2000 : 3000,
-    //             timerProgressBar: true,
-    //             customClass: {
-    //                 popup: 'swal-toast-popup',
-    //                 title: 'swal-toast-title'
-    //             }
-    //         });
-    //     });
-
-    //     // ================================================================
-    //     // ✅ ERGANH: SUCCESS
-    //     // ================================================================
-    //     socket.on('erganh:success', function (data) {
-    //         console.log('📡 [ERGANH] Success:', data);
-
-    //         const protocolHtml = data.protocol
-    //             ? `<p style="margin-top: 10px; font-size: 0.95rem;">
-    //              <strong>Πρωτόκολλο:</strong>
-    //              <span style="color: #28a745; font-weight: bold;">${data.protocol}</span>
-    //            </p>`
-    //             : '';
-
-    //         Swal.fire({
-    //             toast: true,
-    //             position: 'top-end',
-    //             icon: 'success',
-    //             title: '✅ ΕΡΓΑΝΗ ΙΙ - Επιτυχία',
-    //             html: `
-    //             <p>${data.message || 'Επιτυχής αποστολή!'}</p>
-    //             ${protocolHtml}
-    //         `,
-    //             showConfirmButton: true,
-    //             confirmButtonText: 'OK',
-    //             timer: 8000,
-    //             timerProgressBar: true,
-    //             customClass: {
-    //                 popup: 'swal-toast-popup swal-toast-success',
-    //                 title: 'swal-toast-title',
-    //                 confirmButton: 'swal-toast-confirm-btn'
-    //             },
-    //             didOpen: (toast) => {
-    //                 toast.addEventListener('mouseenter', Swal.stopTimer);
-    //                 toast.addEventListener('mouseleave', Swal.resumeTimer);
-    //             }
-    //         });
-    //     });
-
-    //     // ================================================================
-    //     // ✅ ERGANH: ERROR
-    //     // ================================================================
-    //     socket.on('erganh:error', function (data) {
-    //         console.error('📡 [ERGANH] Error:', data);
-
-    //         Swal.fire({
-    //             toast: true,
-    //             position: 'top-end',
-    //             icon: 'error',
-    //             title: '❌ ΕΡΓΑΝΗ ΙΙ - Αποτυχία',
-    //             html: `
-    //             <p>${data.message || 'Η αποστολή απέτυχε'}</p>
-    //             ${
-    //                 data.error
-    //                     ? `<p style="margin-top: 8px; font-size: 0.85rem; color: #666;">${data.error}</p>`
-    //                     : ''
-    //             }
-    //         `,
-    //             showConfirmButton: true,
-    //             confirmButtonText: 'Κλείσιμο',
-    //             timer: 10000,
-    //             timerProgressBar: true,
-    //             customClass: {
-    //                 popup: 'swal-toast-popup swal-toast-error',
-    //                 title: 'swal-toast-title',
-    //                 confirmButton: 'swal-toast-confirm-btn'
-    //             },
-    //             didOpen: (toast) => {
-    //                 toast.addEventListener('mouseenter', Swal.stopTimer);
-    //                 toast.addEventListener('mouseleave', Swal.resumeTimer);
-    //             }
-    //         });
-    //     });
-    // } else {
-    //     console.warn('⚠️  [ERGANH] Socket.io not available - real-time updates disabled');
-    // }
 });
