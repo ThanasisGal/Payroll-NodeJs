@@ -639,6 +639,7 @@ declare -a common_files=(
     "public/js/common/tooltipsForButtons.js"
     "public/js/common/totalPercentChecker.js"
     "public/js/common/companiesAnenerghFilter.js"
+    "public/js/common/ergazomenoiAnenerghToggle.js"
 )
 
 declare -a companies=(
