@@ -7597,20 +7597,24 @@ class erganhController {
                 proidopoihshdate:
                     body.f_proidopoihshdate ||
                     body.proidopoihshdate ||
+                    body.hmeromhnia_koinopoihshs_kataggelias ||
                     body.hmeromhnia_proidopoihshs ||
                     body.hmeromhnia_proeidopoihshs ||
                     body.options?.f_proidopoihshdate ||
                     body.options?.proidopoihshdate ||
+                    body.options?.hmeromhnia_koinopoihshs_kataggelias ||
                     body.options?.hmeromhnia_proidopoihshs ||
                     body.options?.hmeromhnia_proeidopoihshs,
 
                 minesproidopoihsh:
                     body.f_minesproidopoihsh ||
                     body.minesproidopoihsh ||
+                    body.mhnes_proeidopoihshs ||
                     body.mines_proidopoihshs ||
                     body.mines_proeidopoihshs ||
                     body.options?.f_minesproidopoihsh ||
                     body.options?.minesproidopoihsh ||
+                    body.options?.mhnes_proeidopoihshs ||
                     body.options?.mines_proidopoihshs ||
                     body.options?.mines_proeidopoihshs,
 

@@ -144,6 +144,54 @@
                 </div>		  
             </div>		  
 
+            <div class="height-vh-0_2"></div>
+
+            <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+            
+                <div class="col-2 left-align">
+                    <label for="kataggelia_me_proeidopoihsh" class="col-form-label label-font-size field-required">
+                    Καταγγελία με Προειδοποίηση
+                    </label>
+                </div>
+                <div class="col-3-75 left-align checkbox-flex-center">
+                    <input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="kataggelia_me_proeidopoihsh" name="kataggelia_me_proeidopoihsh" <%= safe('afora_kataggelia_me_proeidopoihsh') ? 'checked' : '' %> value="" />
+                    <label for="kataggelia_me_proeidopoihsh" id="label-kataggelia_me_proeidopoihsh" class="margin-left-0_75rem  font-size-vw-0_875">
+                    </label>
+                </div>
+
+                <div class="col-0-25"></div>
+
+                <div class="col-2 left-align">
+                    <label for="hmnia_koinopoihshs_kataggelias" class="col-form-label label-font-size field-required">
+                    Ημ/νία Κοινοποίησης Καταγγελίας
+                    </label>
+                </div>
+                <div class="col-1-5 left-align">
+                    <input type="date" id="hmnia_koinopoihshs_kataggelias" name="hmnia_koinopoihshs_kataggelias" class="date-control" value="<%= safe('hmeromhnia_koinopoihshs_kataggelias') ? new Date(safe('hmeromhnia_koinopoihshs_kataggelias')).toISOString().split('T')[0] : '' %>" />
+                </div>
+
+                <div class="col-0-5"></div>
+
+                <div class="col-1-5 left-align">
+                    <label for="mhnes_proeidopoihshs" id="mhnes_proeidopoihshs_label" class="col-form-label label-font-size field-required">
+                    Μήνες Προειδοποίησης
+                    </label>
+                </div>
+                <div class="col-0-5 right-align">
+                    <input
+                        type="number"
+                        name="mhnes_proeidopoihshs"
+                        id="mhnes_proeidopoihshs"
+                        class="form-control input-contents"
+                        min="0"
+                        max="4"
+                        value="<%= safe('mhnes_proeidopoihshs') || 0 %>"
+                    />
+                    </div>
+
+            </div>
+
+
             <div
                 id="logos_peratoshs_section"
                 class="logos-peratoshs-section"

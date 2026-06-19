@@ -1305,6 +1305,9 @@ class ergazomenoiController {
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            afora_kataggelia_me_proeidopoihsh: formData.kataggelia_me_proeidopoihsh || false,
+            hmeromhnia_koinopoihshs_kataggelias: formData.hmnia_koinopoihshs_kataggelias || null,
+            mhnes_proeidopoihshs: formData.mhnes_proeidopoihshs || 0,
             logos_peratosis: formData.logos_peratoshs_stathera || '',
             parathrhseis_peratosis: formData.parathrhseis_peratoshs || '',
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,
@@ -3286,6 +3289,9 @@ class ergazomenoiController {
 
             hmeromhnia_lhxhs_symbashs: formData.hmeromhnia_lhxhs_symbashs || null,
             hmeromhnia_apoxorhshs: formData.hmeromhnia_apoxorhshs || null,
+            afora_kataggelia_me_proeidopoihsh: formData.kataggelia_me_proeidopoihsh || false,
+            hmeromhnia_koinopoihshs_kataggelias: formData.hmnia_koinopoihshs_kataggelias || null,
+            mhnes_proeidopoihshs: formData.mhnes_proeidopoihshs || 0,
             logos_peratosis: formData.logos_peratoshs_stathera,
             parathrhseis_peratosis: formData.parathrhseis_peratoshs || '',
             afora_daneismo_ergazomenoy: formData.afora_daneismo_ergazomenoy,

@@ -153,15 +153,21 @@ function resolveE6NApolysisDate(ergazomenos, options = {}) {
 }
 
 function resolveE6NProidopoihshDate(ergazomenos, options = {}, apolysisDate = '') {
+    // WebE6NMP: το f_proidopoihshdate πρέπει να ενημερώνεται από
+    // ErgazomenoiModel.hmeromhnia_koinopoihshs_kataggelias.
+    // Κρατάμε τα παλαιότερα aliases μόνο ως fallback για συμβατότητα.
     return (
-        options.f_proidopoihshdate ||
-        options.proidopoihshdate ||
-        options.hmeromhnia_proidopoihshs ||
-        options.hmeromhnia_proeidopoihshs ||
+        ergazomenos.hmeromhnia_koinopoihshs_kataggelias ||
         ergazomenos.f_proidopoihshdate ||
         ergazomenos.proidopoihshdate ||
         ergazomenos.hmeromhnia_proidopoihshs ||
         ergazomenos.hmeromhnia_proeidopoihshs ||
+        ergazomenos.hmeromhnia_eggrafhs_proeidopoihshs ||
+        options.hmeromhnia_koinopoihshs_kataggelias ||
+        options.f_proidopoihshdate ||
+        options.proidopoihshdate ||
+        options.hmeromhnia_proidopoihshs ||
+        options.hmeromhnia_proeidopoihshs ||
         apolysisDate ||
         ''
     );
@@ -183,15 +189,20 @@ function resolveE6NKoinopoihshDate(ergazomenos, options = {}, apolysisDate = '')
 }
 
 function resolveE6NMinesProidopoihshs(ergazomenos, options = {}) {
+    // WebE6NMP: το f_minesproidopoihsh πρέπει να ενημερώνεται από
+    // ErgazomenoiModel.mhnes_proeidopoihshs.
+    // Κρατάμε τα παλαιότερα aliases μόνο ως fallback για συμβατότητα.
     const raw =
-        options.f_minesproidopoihsh ||
-        options.minesproidopoihsh ||
-        options.mines_proidopoihshs ||
-        options.mines_proeidopoihshs ||
+        ergazomenos.mhnes_proeidopoihshs ||
         ergazomenos.f_minesproidopoihsh ||
         ergazomenos.minesproidopoihsh ||
         ergazomenos.mines_proidopoihshs ||
         ergazomenos.mines_proeidopoihshs ||
+        options.mhnes_proeidopoihshs ||
+        options.f_minesproidopoihsh ||
+        options.minesproidopoihsh ||
+        options.mines_proidopoihshs ||
+        options.mines_proeidopoihshs ||
         '1';
 
     const n = Number(String(raw).replace(/[^0-9]/g, ''));

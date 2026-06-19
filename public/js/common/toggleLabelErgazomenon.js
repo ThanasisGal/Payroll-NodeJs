@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'karta_ergasias',
         'syggeneia',
         'topos_ergasias',
+        'kataggelia_me_proeidopoihsh',
         'afora_daneismo_ergazomenoy',
         'afora_dokimastikh_periodo',
         'dieythethsh_ergasias',
@@ -347,6 +348,12 @@ function toggleCheckboxState(checkboxId, isChecked) {
             break;
         case 'topos_ergasias':
             label.textContent = isChecked ? 'ΑΛΛΟ' : 'ΠΑΡΑΡΤΗΜΑ ΕΡΓΟΔΟΤΗ';
+            break;
+        case 'kataggelia_me_proeidopoihsh':
+            label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ';
+            document.getElementById('hmnia_koinopoihshs_kataggelias').value = null;
+            setFieldsDisabled(['hmnia_koinopoihshs_kataggelias'], !isChecked);
+            setFieldsDisabled(['mhnes_proeidopoihshs'], !isChecked);
             break;
         case 'afora_dokimastikh_periodo':
             label.textContent = isChecked ? 'ΝΑΙ' : 'ΟΧΙ';
