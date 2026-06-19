@@ -36,6 +36,50 @@
         background-color: #f8d7da !important;
     }
 
+    /*
+        Bootstrap .table-striped / .table-hover / .table-danger δεν βάφουν μόνο το <tr>.
+        Χρησιμοποιούν CSS variables και box-shadow στα <td>, οπότε για να γίνει
+        πραγματικά πράσινη και η ανενεργή επιλεγμένη γραμμή πρέπει να κάνουμε
+        override και τα Bootstrap table variables και το box-shadow.
+    */
+    #myTable tbody tr.selected-row,
+    #myTable tbody tr.ergazomenos-anenergos.selected-row {
+        --bs-table-color: #ffffff !important;
+        --bs-table-bg: #198754 !important;
+        --bs-table-striped-color: #ffffff !important;
+        --bs-table-striped-bg: #198754 !important;
+        --bs-table-active-color: #ffffff !important;
+        --bs-table-active-bg: #198754 !important;
+        --bs-table-hover-color: #ffffff !important;
+        --bs-table-hover-bg: #198754 !important;
+        --bs-table-accent-bg: #198754 !important;
+        color: #ffffff !important;
+        background-color: #198754 !important;
+    }
+
+    #myTable tbody tr.selected-row > th,
+    #myTable tbody tr.selected-row > td,
+    #myTable tbody tr.ergazomenos-anenergos.selected-row > th,
+    #myTable tbody tr.ergazomenos-anenergos.selected-row > td {
+        --bs-table-color: #ffffff !important;
+        --bs-table-bg: #198754 !important;
+        --bs-table-striped-color: #ffffff !important;
+        --bs-table-striped-bg: #198754 !important;
+        --bs-table-active-color: #ffffff !important;
+        --bs-table-active-bg: #198754 !important;
+        --bs-table-hover-color: #ffffff !important;
+        --bs-table-hover-bg: #198754 !important;
+        --bs-table-accent-bg: #198754 !important;
+        color: #ffffff !important;
+        background-color: #198754 !important;
+        box-shadow: inset 0 0 0 9999px #198754 !important;
+        font-weight: 600;
+    }
+
+    #myTable tbody tr.selected-row .badge {
+        border: 1px solid rgba(255, 255, 255, 0.75);
+    }
+
     .ergazomenoi-toggle-wrap {
         min-width: 11rem;
     }
