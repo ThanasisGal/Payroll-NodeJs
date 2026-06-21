@@ -175,30 +175,29 @@
                     </form>
                 </div>
             </section>
-
         </div>
+    </div>
+</div>
 
-        <% const isProduction = NODE_ENV === 'production'; %>
-        <script nonce="<%= nonce %>">
-            window.RUNTIME_ENV = "<%= NODE_ENV %>";
-        </script>
+<% const isProduction = NODE_ENV === 'production'; %>
+<script nonce="<%= nonce %>">
+    window.RUNTIME_ENV = "<%= NODE_ENV %>";
+</script>
 
-        <script nonce="<%= nonce %>">
-            /* installEarlyApasxolhseisLoaderArbiter αφαιρέθηκε.
-               Ο .loader-container δεν υπάρχει σε αυτή τη σελίδα.
-               Ο ορατός loader (.app-loader--simple) ελέγχεται αποκλειστικά
-               μέσω window.AppLoader (βλ. views/layouts/main.ejs). */
-        </script>
-
-
-        <% const payrollTypos = ['001']; %>
+<% const payrollTypos = ['001']; %>
 
         <% payrollTypos.forEach(function(typos) { %>
             <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/typoiApodoxon/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
             <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
         <% }); %>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/axiaKrathseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/fillFieldsKinhseon<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+
+<script src="<%= script('kinhseis/ypologismoi/axiaKrathseon') %>"></script>
+<script src="<%= script('kinhseis/ypologismoi/fillFieldsKinhseon') %>"></script>
+<script src="<%= script('kinhseis/ypologismoi/klimakiaForoy') %>"></script>
+
+
+
+
         <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/klimakiaForoy<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
         <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
         <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatDates<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
@@ -231,47 +230,3 @@
 
 
 
-        <!-- <% if (process.env.NODE_ENV === 'production') { %> -->
-            <!-- <script type="module" src="/static/min.js/kinhseis/apasxolhseis_ejs.min.js"></script> -->
-        <!-- <% } else { %> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/typoiApodoxon/001.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/kinhseis/ypologismoi/001.js"></script>
-            <script nonce="<%= nonce %>" src="/static/js/kinhseis/ypologismoi/axiaKrathseon.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/ypologismoi/fillFieldsKinhseon.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/ypologismoi/klimakiaForoy.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/moveByEnter.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/formatDates.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/formatTimes.js"></script> -->
-
-            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/buttonPermissions.js"></script> -->
-            
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/buttonPermissions.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/allaghReadonlyFields.js"></script> -->
-
-            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/loadDropdowns.js"></script> -->
-            
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/loadDropdowns.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/removeGreekAccentsAndToUpper.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/modal.js"></script> -->
-
-            <!-- <script type="module" src="/static/js/kinhseis/apasxolhseis/apasxolhseis.js"></script>
-            <script type="module" src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script> -->
-            
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/apasxolhseis.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/updateLabelFromHidden.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/clearFormFields.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/clearValueFields.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/showModal.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/scrollToTop.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/common/getFocusNumberFields.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/loadKrathseis.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/astheneies.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/ypologismoiForoy.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/adeies.js"></script> -->
-            <!-- <script nonce="<%= nonce %>" src="/static/js/kinhseis/apasxolhseis/putFieldValues.js"></script> -->
-        <!-- <% } %> -->
-
-    </div>
-</div>

@@ -742,6 +742,12 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/istorikoTable.js"
 )
 
+declare -a kinhseis=(
+    "public/js/kinhseis/ypologismoi/axiaKrathseon.js"
+    "public/js/kinhseis/ypologismoi/fillFieldsKinhseon.js"
+    "public/js/kinhseis/ypologismoi/klimakiaForoy.js"
+)
+
 declare -a no_obfuscate=(
 #    "public/js/ergazomenoi/genika/updateLinkFromTomDropdown.js"
 )
@@ -865,11 +871,11 @@ echo "Obfuscation:    $([ "$SKIP_OBFUSCATION" == "true" ] && echo "DISABLED" || 
 echo "CDN Upload:     $([ "$UPLOAD_TO_CDN" == "true" ] && echo "ENABLED" || echo "DISABLED")"
 echo "Version:        $APP_VERSION"
 echo "Phase:          $DEPLOYMENT_PHASE (Core files only)"
-echo "Files:           ~$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#no_obfuscate[@]})) files"
+echo "Files:           ~$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#kinhseis[@]} + ${#no_obfuscate[@]})) files"
 echo "=========================================="
 echo ""
 
-TOTAL_FILES_EXPECTED=$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]}))
+TOTAL_FILES_EXPECTED=$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#kinhseis[@]}))
 PROCESSED=0
 
 PHASE1_START=$(date +%s)
@@ -1020,7 +1026,7 @@ log_success "Phase 1.7 complete in $(format_duration $PHASE7_DURATION)"
 echo ""
 
 PHASE8_START=$(date +%s)
-log_phase "PHASE 1.8: Building non-obfuscated files (${#no_obfuscate[@]} files)..."
+log_phase "PHASE 1.8: Building kinhseis files (${#kinhseis[@]} files)..."
 echo ""
 
 # Προσωρινά disable obfuscation για αυτά τα files
@@ -1045,6 +1051,27 @@ export SKIP_OBFUSCATION="$ORIGINAL_SKIP_OBFUSCATION"
 PHASE8_END=$(date +%s)
 PHASE8_DURATION=$((PHASE8_END - PHASE8_START))
 log_success "Phase 1.8 complete in $(format_duration $PHASE8_DURATION)"
+echo ""
+
+PHASE9_START=$(date +%s)
+log_phase "PHASE 1.9: Building utility files (${#kinhseis[@]} files)..."
+echo ""
+
+for file in "${kinhseis[@]}"; do
+    if [[ -f "$file" ]]; then
+        PROCESSED=$((PROCESSED + 1))
+        echo "[$PROCESSED/$TOTAL_FILES_EXPECTED]"
+        process_file "$file" false
+    else
+        log_warning "File not found: $file"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED + 1))
+        FAILED_FILES+=("$file (source not found)")
+    fi
+done
+
+PHASE9_END=$(date +%s)
+PHASE9_DURATION=$((PHASE9_END - PHASE9_START))
+log_success "Phase 1.9 complete in $(format_duration $PHASE9_DURATION)"
 echo ""
 
 BUILD_END=$(date +%s)
@@ -1670,6 +1697,7 @@ echo "  Build Phase 1.5:  $(format_duration $PHASE5_DURATION)"
 echo "  Build Phase 1.6:  $(format_duration $PHASE6_DURATION)"
 echo "  Build Phase 1.7:  $(format_duration $PHASE7_DURATION)"
 echo "  Build Phase 1.8:  $(format_duration $PHASE8_DURATION)"
+echo "  Build Phase 1.9:  $(format_duration $PHASE9_DURATION)"
 echo "  Total Build:       $(format_duration $BUILD_DURATION)"
 
 if [[ "$UPLOAD_TO_CDN" == "true" && "$OBF_ENV" == "prod" ]]; then

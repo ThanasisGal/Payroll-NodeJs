@@ -12734,6 +12734,7 @@ body.loader-active > *:not(.app-loader) {
 .apx-csp-style-027 { text-align: center; }
 .apx-csp-style-028 { font-size: 1rem; font-weight: 700; }
 .apx-csp-style-029 { background-color: #f5faae61; }
+.apx-csp-style-030 { margin-top: -0.5rem !important; margin-bottom: -1rem !important; margin-left: 10px !important; margin-right: 10px !important;  justify-content: space-around; }
 .apasxolhseis-swal-retry-message { margin-top: 1.5rem; margin-bottom: 1rem; }
 /* APASXOLHSEIS_CSP_INLINE_STYLE_MIGRATION_END */
 
