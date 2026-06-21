@@ -215,6 +215,14 @@
                     debugLog('ACTIVITY', reason);
                 }
 
+                function isPipelineLocked() {
+                    return (
+                        window.apasxolhseisLoaderLocked === true ||
+                        document.body?.classList?.contains('apasxolhseis-loader-locked') === true ||
+                        window.apasxolhseisPipelineLoaderApi?.isLocked?.() === true
+                    );
+                }
+
                 function isLoaderElement(el) {
                     if (!el || el.nodeType !== 1) return false;
                     const id = String(el.id || '').trim().toLowerCase();
@@ -254,6 +262,18 @@
                 }
 
                 function forceVisible(reason) {
+                    if (isPipelineLocked() && state.visible) {
+                        state.applying = true;
+                        try {
+                            collectLoaders(document);
+                            state.containers.forEach((el) => setLoaderDirect(el, true));
+                        } finally {
+                            state.applying = false;
+                        }
+                        debugLog('LOCK KEEP', reason);
+                        return;
+                    }
+
                     markActivity(reason || 'show');
                     state.visible = true;
                     state.lastShowAt = Date.now();
@@ -274,16 +294,10 @@
                     debugLog('SHOW', reason);
                 }
 
-                function finalHide(reason) {
-                    state.hideTimer = null;
-
-                    const now = Date.now();
-                    const quietFor = now - state.lastActivityAt;
-                    const visibleFor = now - state.lastShowAt;
-
-                    if (state.pendingNetwork > 0 || quietFor < state.quietHideMs || visibleFor < state.minVisibleMs) {
-                        scheduleHide(reason || 'reschedule');
-                        return;
+                function hideImmediately(reason) {
+                    if (state.hideTimer) {
+                        clearTimeout(state.hideTimer);
+                        state.hideTimer = null;
                     }
 
                     state.visible = false;
@@ -295,10 +309,43 @@
                         state.applying = false;
                     }
 
-                    debugLog('HIDE', reason);
+                    debugLog('HIDE NOW', reason);
+                }
+
+                function finalHide(reason) {
+                    if (isPipelineLocked()) {
+                        if (state.hideTimer) {
+                            clearTimeout(state.hideTimer);
+                            state.hideTimer = null;
+                        }
+                        debugLog('LOCKED HIDE SKIP', reason);
+                        return;
+                    }
+
+                    state.hideTimer = null;
+
+                    const now = Date.now();
+                    const quietFor = now - state.lastActivityAt;
+                    const visibleFor = now - state.lastShowAt;
+
+                    if (state.pendingNetwork > 0 || quietFor < state.quietHideMs || visibleFor < state.minVisibleMs) {
+                        scheduleHide(reason || 'reschedule');
+                        return;
+                    }
+
+                    hideImmediately(reason);
                 }
 
                 function scheduleHide(reason) {
+                    if (isPipelineLocked()) {
+                        if (state.hideTimer) {
+                            clearTimeout(state.hideTimer);
+                            state.hideTimer = null;
+                        }
+                        debugLog('LOCKED HIDE SUPPRESS', reason);
+                        return;
+                    }
+
                     if (state.hideTimer) clearTimeout(state.hideTimer);
 
                     const now = Date.now();
@@ -316,6 +363,15 @@
                 }
 
                 function requestHide(reason) {
+                    if (isPipelineLocked()) {
+                        if (state.hideTimer) {
+                            clearTimeout(state.hideTimer);
+                            state.hideTimer = null;
+                        }
+                        debugLog('LOCKED HIDE IGNORE', reason);
+                        return;
+                    }
+
                     markActivity(reason || 'hide-request');
                     if (!state.visible) {
                         scheduleHide(reason || 'hide-while-not-visible');
@@ -384,6 +440,10 @@
 
                                 const action = classify('display', value);
                                 if (action === 'show') {
+                                    if (isPipelineLocked() && state.visible) {
+                                        debugLog('LOCKED DISPLAY SHOW SKIP', value);
+                                        return;
+                                    }
                                     forceVisible('style.display=' + value);
                                     return;
                                 }
@@ -402,6 +462,10 @@
 
                             const action = classify(propertyName, value);
                             if (action === 'show') {
+                                if (isPipelineLocked() && state.visible) {
+                                    debugLog('LOCKED SET SHOW SKIP', propertyName + '=' + value);
+                                    return undefined;
+                                }
                                 forceVisible('setProperty(' + propertyName + ', ' + value + ')');
                                 return undefined;
                             }
@@ -418,6 +482,10 @@
                             if (state.applying) return originals.removeProperty(propertyName);
 
                             const prop = String(propertyName || '').trim().toLowerCase();
+                            if (['display', 'visibility', 'opacity'].includes(prop) && isPipelineLocked()) {
+                                debugLog('LOCKED REMOVE SKIP', prop);
+                                return prop === 'display' ? 'grid' : '';
+                            }
                             if (['display', 'visibility', 'opacity'].includes(prop) && state.visible) {
                                 requestHide('removeProperty(' + prop + ')');
                                 return prop === 'display' ? 'grid' : '';
@@ -431,6 +499,14 @@
                     if (!isLoaderElement(el)) return;
                     state.containers.add(el);
                     patchStyleObject(el);
+                    if (isPipelineLocked() && state.visible) {
+                        state.applying = true;
+                        try {
+                            setLoaderDirect(el, true);
+                        } finally {
+                            state.applying = false;
+                        }
+                    }
                 }
 
                 function patchNetwork() {
@@ -487,6 +563,10 @@
 
                         if (mutation.type === 'attributes' && isLoaderElement(mutation.target)) {
                             registerLoader(mutation.target);
+                            if (isPipelineLocked()) {
+                                debugLog('LOCKED ATTRIBUTE SKIP', mutation.attributeName);
+                                continue;
+                            }
                             if (state.visible || state.hideTimer) forceVisible('attribute ' + mutation.attributeName);
                         }
                     }
@@ -503,8 +583,9 @@
                 window.apasxolhseisLoaderArbiter = {
                     show: forceVisible,
                     hide: requestHide,
-                    forceHide: finalHide,
+                    forceHide: hideImmediately,
                     collect: collectLoaders,
+                    isPipelineLocked,
                     state
                 };
             })();

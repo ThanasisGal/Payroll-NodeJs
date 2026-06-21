@@ -416,7 +416,10 @@ function installApasxolhseisLoaderArbiter() {
     return window.apasxolhseisLoaderArbiter;
 }
 
-installApasxolhseisLoaderArbiter();
+// Προτιμάμε τον early arbiter του .ejs και κρατάμε εδώ μόνο fallback εγκατάσταση.
+if (window.apasxolhseisLoaderArbiterInstalled !== true) {
+    installApasxolhseisLoaderArbiter();
+}
 
 let apasxolhseisPipelineLoaderDepth = 0;
 let apasxolhseisPipelineLoaderLockDepth = 0;
@@ -444,10 +447,12 @@ function setLoaderDisplayValue(visible, important = false) {
         loaderContainer.style.setProperty('display', 'grid', important ? 'important' : '');
         loaderContainer.style.setProperty('visibility', 'visible', important ? 'important' : '');
         loaderContainer.style.setProperty('opacity', '1', important ? 'important' : '');
+        loaderContainer.setAttribute('aria-busy', 'true');
         return;
     }
 
     loaderContainer.style.setProperty('display', 'none', important ? 'important' : '');
+    loaderContainer.setAttribute('aria-busy', 'false');
 }
 
 function enforceApasxolhseisLockedLoader() {
@@ -553,6 +558,18 @@ function setApasxolhseisPipelineLoaderVisible(visible) {
     setLoaderDisplayValue(logicalVisible, isApasxolhseisPipelineLoaderLocked() || !logicalVisible);
 }
 
+function finalizeApasxolhseisPipelineLoaderClose(reason = 'pipeline:end') {
+    window.apasxolhseisPipelineLoaderActive = false;
+    window.apasxolhseisPipelineLoaderVisualActive = false;
+
+    if (window.apasxolhseisLoaderArbiter?.forceHide) {
+        window.apasxolhseisLoaderArbiter.forceHide(reason);
+        return;
+    }
+
+    setLoaderDisplayValue(false, true);
+}
+
 function setApasxolhseisLoaderLockClass(locked) {
     ensureApasxolhseisPipelineLoaderStyle();
     installApasxolhseisPipelineLoaderGuard();
@@ -576,7 +593,9 @@ function endApasxolhseisPipelineLoader() {
     if (apasxolhseisPipelineLoaderLockDepth === 0) {
         apasxolhseisPipelineLoaderDepth = 0;
         setApasxolhseisLoaderLockClass(false);
-        setApasxolhseisPipelineLoaderVisible(false);
+        // Το τελικό close του employee pipeline πρέπει να γίνει μία φορά, άμεσα,
+        // χωρίς να ξαναμπεί στο debounce του arbiter.
+        finalizeApasxolhseisPipelineLoaderClose();
     }
 }
 
