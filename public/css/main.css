@@ -12897,18 +12897,6 @@ body.loader-active > *:not(.app-loader) {
 /* APASXOLHSEIS_PERIODOS_TOMDROPDOWN_END */
 
 
-/* ============================================================================
-   APASXOLHSEIS_PIPELINE_LOADER_LOCK_START
-   Όταν τρέχει employee calculation pipeline, ο loader μένει ορατός μέχρι το
-   τελικό τέλος του pipeline. Έτσι εσωτερικοί υπολογισμοί κρατήσεων/φόρου δεν
-   μπορούν να τον κρύψουν προσωρινά και να προκαλέσουν flickering.
-   ============================================================================ */
-
-body.apasxolhseis-loader-locked .loader-container {
-    display: grid !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
 
 .apasxolhseis-alert-message {
     text-align: center;
