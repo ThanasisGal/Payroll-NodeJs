@@ -1090,7 +1090,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const previousEmployeePipeline = window.apasxolhseisEmployeeLoadPipeline;
 
         // Outer AppLoader span για ΟΛΗ τη ροή φόρτωσης εργαζομένου.
-        // Κρατά το activeCount > 0 ώστε τα επιμέρους fetch να μην κλείνουν
+        // Κρατά το AppLoader ανοιχτό ώστε τα επιμέρους fetch να μην κλείνουν
         // τον loader ανάμεσα στα αιτήματα (αντί-flicker).
         let outerLoaderBegun = false;
         if (window.AppLoader?.begin) {
@@ -1631,9 +1631,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const shouldControlLoader = options.useExistingLoader !== true;
 
             // Outer AppLoader span: ξεκινά αμέσως (delay=0) πριν οποιοδήποτε fetch,
-            // κλείνει αφού ολοκληρωθεί ΟΛΗ η αλυσίδα. Έτσι το activeCount μένει > 0
-            // ανάμεσα στα επιμέρους αιτήματα και ο loader δεν κλείνει/ανοίγει πολλές
-            // φορές (αντί-flicker για .app-loader--simple).
+            // κλείνει αφού ολοκληρωθεί ΟΛΗ η αλυσίδα. Έτσι το AppLoader παραμένει
+            // ανοιχτό ανάμεσα στα επιμέρους αιτήματα και ο loader δεν κλείνει/ανοίγει
+            // πολλές φορές (αντί-flicker για .app-loader--simple).
             let outerLoaderBegun = false;
             if (shouldControlLoader) {
                 if (window.AppLoader?.begin) {
