@@ -1,15 +1,12 @@
 async function fillFields(result, sharedParams, loaderContainer) {
+    // Ο loader ελέγχεται από τον outer AppLoader span του employee pipeline.
+    // Εδώ δεν χρειαζόμαστε ανεξάρτητο έλεγχο loader αν τρέχει το pipeline.
     const fillFieldsOwnsLoader =
         !!loaderContainer &&
-        window.apasxolhseisLoaderLocked !== true &&
-        window.apasxolhseisPipelineLoaderActive !== true;
+        window.apasxolhseisEmployeeLoadPipeline !== true;
 
     if (fillFieldsOwnsLoader) {
-        if (window.apasxolhseisPipelineLoaderApi?.show) {
-            window.apasxolhseisPipelineLoaderApi.show();
-        } else {
-            loaderContainer.style.display = "grid";
-        }
+        loaderContainer.style.display = "grid";
     }
     
     firstTimeCalcPlhroteo = true;
@@ -397,11 +394,7 @@ async function loadKrathseis_Edit(data, result) {
     // await calcPlhroteo();
 
     if (fillFieldsOwnsLoader) {
-        if (window.apasxolhseisPipelineLoaderApi?.hide) {
-            window.apasxolhseisPipelineLoaderApi.hide();
-        } else {
-            loaderContainer.style.display = "none";
-        }
+        loaderContainer.style.display = "none";
     }
     
 };
