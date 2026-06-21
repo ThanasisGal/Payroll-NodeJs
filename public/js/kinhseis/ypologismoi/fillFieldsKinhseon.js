@@ -1,5 +1,16 @@
 async function fillFields(result, sharedParams, loaderContainer) {
-    if (loaderContainer) loaderContainer.style.display = "grid";
+    const fillFieldsOwnsLoader =
+        !!loaderContainer &&
+        window.apasxolhseisLoaderLocked !== true &&
+        window.apasxolhseisPipelineLoaderActive !== true;
+
+    if (fillFieldsOwnsLoader) {
+        if (window.apasxolhseisPipelineLoaderApi?.show) {
+            window.apasxolhseisPipelineLoaderApi.show();
+        } else {
+            loaderContainer.style.display = "grid";
+        }
+    }
     
     firstTimeCalcPlhroteo = true;
     hasRecord = true;
@@ -251,6 +262,9 @@ async function fillFields(result, sharedParams, loaderContainer) {
 
 async function loadKrathseis_Edit(data, result) {
     let flag = 0;
+
+    const previousBulkLoading = window.apasxolhseisKrathseisBulkLoading;
+    window.apasxolhseisKrathseisBulkLoading = true;
     const fieldsStoixeionKrathseon = ['kodikos', 'krathsh', 'asfalistikesApodoxes', 'pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'plasmatikh_axia', 'apaiteitai_apodoxes_asfalishs', 'anotato_orio_palion', 'anotato_orio_neon', 'kad', 'eidikothta', 'kpk', 'se_typos_apodoxon', 'epa'];
 
     // Ορίζουμε ποια fields είναι numbers με Fixed(4)
@@ -262,7 +276,8 @@ async function loadKrathseis_Edit(data, result) {
     // Ορίζουμε ποια fields είναι booleans
     const booleanFieldsKrathseon = new Set(['ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'apaiteitai_apodoxes_asfalishs']);
 
-    for (let i = 1; i <= parseInt(window.sharedParams.genikesParametroi[23].timh); i++) {
+    try {
+        for (let i = 1; i <= parseInt(window.sharedParams.genikesParametroi[23].timh); i++) {
         const index = i.toString().padStart(2, '0');
         // const ergazomenoiField = sharedParams.ergazomenoi[`krathsh_${index}`] || '';
         // const krathseisDropdown = document.getElementById(`krathsh_${index}`);
@@ -352,7 +367,7 @@ async function loadKrathseis_Edit(data, result) {
         });
 
         // Ενημέρωση των πεδίων με βάση την αρχική τιμή
-        updatePosostaFields_Edit(i);
+        await updatePosostaFields_Edit(i);
 
         // Προσθήκη event listener (μόνο μία φορά)
         krathseisDropdown.addEventListener('change', () => updatePosostaFields_Edit(i));
@@ -364,13 +379,30 @@ async function loadKrathseis_Edit(data, result) {
         });
 
         document.getElementById(`asfalistikesApodoxes_${index}`).addEventListener('input', () => { 
-            ypologismosAxiasKrathseon(); 
+            if (!window.apasxolhseisKrathseisBulkLoading) {
+                ypologismosAxiasKrathseon();
+            }
         });
+    }
+
+        window.apasxolhseisKrathseisBulkLoading = previousBulkLoading;
+
+        if (typeof ypologismosAxiasKrathseon === 'function') {
+            await ypologismosAxiasKrathseon(window.sharedParams);
+        }
+    } finally {
+        window.apasxolhseisKrathseisBulkLoading = previousBulkLoading;
     }
 
     // await calcPlhroteo();
 
-    if (loaderContainer) loaderContainer.style.display = "none";
+    if (fillFieldsOwnsLoader) {
+        if (window.apasxolhseisPipelineLoaderApi?.hide) {
+            window.apasxolhseisPipelineLoaderApi.hide();
+        } else {
+            loaderContainer.style.display = "none";
+        }
+    }
     
 };
 
@@ -426,8 +458,14 @@ async function updatePosostaFields_Edit(i) {
     }
     
     // Υπολογισμός αξίας κρατήσεων
-    await ypologismosAxiasKrathseon();
+    if (!window.apasxolhseisKrathseisBulkLoading) {
+        await ypologismosAxiasKrathseon();
+    }
 
+}
+
+function isNumberInputField_Edit(field) {
+    return field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number';
 }
 
 function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
@@ -448,12 +486,15 @@ function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = false, 
         return;
     }
 
-    const parsedValue = parseFloat(value);
+    const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
 
     if (isNaN(parsedValue)) {
         field.value = decimalPlaces ? `0.${'0'.repeat(decimalPlaces)}` : '';
     } else {
-        field.value = format ? parsedValue.toFixed(decimalPlaces).replace('.', ',') : parsedValue.toFixed(decimalPlaces);
+        const fixedValue = parsedValue.toFixed(decimalPlaces);
+        field.value = format && !isNumberInputField_Edit(field)
+            ? fixedValue.replace('.', ',')
+            : fixedValue;
     }
 }
 

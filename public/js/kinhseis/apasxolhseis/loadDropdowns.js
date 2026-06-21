@@ -145,19 +145,423 @@ let anapaysh_repo_hmeromhnies,
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const loaderContainer = document.querySelector('.loader-container');
+
+/*
+ * Απασχολήσεις loader arbiter
+ * ---------------------------
+ * Στόχος: Ο loader να φαίνεται σαν ΕΝΑ συνεχόμενο άνοιγμα/κλείσιμο,
+ * ακόμη κι αν παλιότεροι υπολογισμοί κάνουν διαδοχικά style.display = grid/none.
+ *
+ * Δεν πειράζει τους υπολογισμούς. Πιάνει κεντρικά όλα τα .loader-container,
+ * κρατάει τον loader ορατό όσο υπάρχουν συνεχόμενες αιτήσεις hide/show και
+ * επιτρέπει το τελικό hide μόνο αφού η ροή ηρεμήσει για μικρό διάστημα.
+ */
+function installApasxolhseisLoaderArbiter() {
+    if (window.apasxolhseisLoaderArbiterInstalled === true) return window.apasxolhseisLoaderArbiter;
+
+    const state = {
+        containers: new Set(),
+        visible: false,
+        applying: false,
+        hideTimer: null,
+        lastShowAt: 0,
+        quietHideMs: 650,
+        minVisibleMs: 350,
+        debug: false
+    };
+
+    function debugLog(action, reason) {
+        if (!state.debug && window.APASXOLHSEIS_LOADER_TRACE !== true) return;
+        // eslint-disable-next-line no-console
+        console.log(`[APASXOLHSEIS LOADER] ${action}`, reason || '', new Error().stack);
+    }
+
+    function isLoaderElement(el) {
+        return !!(
+            el &&
+            el.nodeType === 1 &&
+            el.classList &&
+            el.classList.contains('loader-container')
+        );
+    }
+
+    function getOriginals(el) {
+        const style = el?.style;
+        return style?.__apasxolhseisLoaderOriginals || null;
+    }
+
+    function setDisplayDirect(el, displayValue, priority = 'important') {
+        const originals = getOriginals(el);
+        if (!originals?.setProperty) {
+            el?.style?.setProperty?.('display', displayValue, priority);
+            return;
+        }
+        originals.setProperty('display', displayValue, priority);
+        originals.setProperty('visibility', displayValue === 'none' ? 'hidden' : 'visible', priority);
+        originals.setProperty('opacity', displayValue === 'none' ? '0' : '1', priority);
+    }
+
+    function collectLoaders(root = document) {
+        if (!root?.querySelectorAll) return;
+        root.querySelectorAll('.loader-container').forEach(registerLoader);
+    }
+
+    function forceVisible(reason) {
+        state.visible = true;
+        state.lastShowAt = Date.now();
+
+        if (state.hideTimer) {
+            clearTimeout(state.hideTimer);
+            state.hideTimer = null;
+        }
+
+        state.applying = true;
+        try {
+            state.containers.forEach((el) => {
+                if (!el?.isConnected) return;
+                setDisplayDirect(el, 'grid', 'important');
+                el.hidden = false;
+                el.setAttribute('aria-busy', 'true');
+            });
+        } finally {
+            state.applying = false;
+        }
+
+        debugLog('SHOW', reason);
+    }
+
+    function finalHide(reason) {
+        state.hideTimer = null;
+        state.visible = false;
+
+        state.applying = true;
+        try {
+            state.containers.forEach((el) => {
+                if (!el?.isConnected) return;
+                setDisplayDirect(el, 'none', 'important');
+                el.setAttribute('aria-busy', 'false');
+            });
+        } finally {
+            state.applying = false;
+        }
+
+        debugLog('HIDE', reason);
+    }
+
+    function requestHide(reason) {
+        if (!state.visible) {
+            state.applying = true;
+            try {
+                state.containers.forEach((el) => {
+                    if (el?.isConnected) setDisplayDirect(el, 'none', 'important');
+                });
+            } finally {
+                state.applying = false;
+            }
+            return;
+        }
+
+        if (state.hideTimer) clearTimeout(state.hideTimer);
+
+        const elapsed = Date.now() - state.lastShowAt;
+        const waitMs = Math.max(state.quietHideMs, state.minVisibleMs - elapsed, 0);
+
+        state.hideTimer = setTimeout(() => finalHide(reason), waitMs);
+        debugLog(`HIDE REQUEST delayed ${waitMs}ms`, reason);
+    }
+
+    function classifyDisplayValue(value) {
+        const normalized = String(value ?? '').trim().toLowerCase();
+        if (normalized === 'none') return 'hide';
+        if (!normalized) return 'other';
+        if (['grid', 'block', 'flex', 'inline-flex', 'inline-block'].includes(normalized)) return 'show';
+        return 'other';
+    }
+
+    function patchStyleObject(el) {
+        if (!isLoaderElement(el)) return;
+
+        const style = el.style;
+        if (!style || style.__apasxolhseisLoaderPatched === true) return;
+
+        const proto = Object.getPrototypeOf(style);
+        const displayDescriptor = Object.getOwnPropertyDescriptor(proto, 'display')
+            || (window.CSSStyleDeclaration
+                ? Object.getOwnPropertyDescriptor(window.CSSStyleDeclaration.prototype, 'display')
+                : null);
+
+        const originals = {
+            setProperty: style.setProperty ? style.setProperty.bind(style) : null,
+            removeProperty: style.removeProperty ? style.removeProperty.bind(style) : null,
+            displayDescriptor
+        };
+
+        Object.defineProperty(style, '__apasxolhseisLoaderOriginals', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: originals
+        });
+
+        Object.defineProperty(style, '__apasxolhseisLoaderPatched', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: true
+        });
+
+        if (displayDescriptor?.get && displayDescriptor?.set) {
+            Object.defineProperty(style, 'display', {
+                configurable: true,
+                enumerable: true,
+                get() {
+                    return displayDescriptor.get.call(style);
+                },
+                set(value) {
+                    if (state.applying) return displayDescriptor.set.call(style, value);
+
+                    const action = classifyDisplayValue(value);
+                    if (action === 'show') {
+                        forceVisible(`style.display=${value}`);
+                        return;
+                    }
+                    if (action === 'hide') {
+                        requestHide('style.display=none');
+                        return;
+                    }
+                    return displayDescriptor.set.call(style, value);
+                }
+            });
+        }
+
+        if (originals.setProperty) {
+            style.setProperty = function (propertyName, value, priority) {
+                if (state.applying) return originals.setProperty(propertyName, value, priority);
+
+                const prop = String(propertyName ?? '').trim().toLowerCase();
+                if (prop === 'display') {
+                    const action = classifyDisplayValue(value);
+                    if (action === 'show') {
+                        forceVisible(`setProperty(display, ${value})`);
+                        return undefined;
+                    }
+                    if (action === 'hide') {
+                        requestHide('setProperty(display, none)');
+                        return undefined;
+                    }
+                }
+                return originals.setProperty(propertyName, value, priority);
+            };
+        }
+
+        if (originals.removeProperty) {
+            style.removeProperty = function (propertyName) {
+                if (state.applying) return originals.removeProperty(propertyName);
+
+                const prop = String(propertyName ?? '').trim().toLowerCase();
+                if (prop === 'display' && state.visible) {
+                    requestHide('removeProperty(display)');
+                    return 'grid';
+                }
+                return originals.removeProperty(propertyName);
+            };
+        }
+    }
+
+    function registerLoader(el) {
+        if (!isLoaderElement(el)) return;
+        state.containers.add(el);
+        patchStyleObject(el);
+    }
+
+    collectLoaders(document);
+
+    const observer = new MutationObserver((mutations) => {
+        if (state.applying) return;
+
+        for (const mutation of mutations) {
+            if (mutation.type === 'childList') {
+                mutation.addedNodes.forEach((node) => {
+                    if (isLoaderElement(node)) registerLoader(node);
+                    collectLoaders(node);
+                });
+            }
+
+            if (mutation.type === 'attributes' && isLoaderElement(mutation.target)) {
+                registerLoader(mutation.target);
+
+                if (state.visible || state.hideTimer) {
+                    forceVisible(`attribute ${mutation.attributeName}`);
+                }
+            }
+        }
+    });
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class', 'hidden']
+    });
+
+    window.apasxolhseisLoaderArbiterInstalled = true;
+    window.apasxolhseisLoaderArbiter = {
+        show: forceVisible,
+        hide: requestHide,
+        forceHide: finalHide,
+        collect: collectLoaders,
+        state
+    };
+
+    return window.apasxolhseisLoaderArbiter;
+}
+
+installApasxolhseisLoaderArbiter();
+
 let apasxolhseisPipelineLoaderDepth = 0;
 let apasxolhseisPipelineLoaderLockDepth = 0;
 
-function setApasxolhseisPipelineLoaderVisible(visible) {
-    window.apasxolhseisPipelineLoaderActive = !!visible;
-    if (loaderContainer) {
-        loaderContainer.style.display = visible ? 'grid' : 'none';
+function ensureApasxolhseisPipelineLoaderStyle() {
+    if (document.getElementById('apasxolhseis-pipeline-loader-style')) return;
+
+    const style = document.createElement('style');
+    style.id = 'apasxolhseis-pipeline-loader-style';
+    style.textContent = `
+        body.apasxolhseis-loader-locked .loader-container {
+            display: grid !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function setLoaderDisplayValue(visible, important = false) {
+    if (!loaderContainer) return;
+
+    if (visible) {
+        loaderContainer.style.setProperty('display', 'grid', important ? 'important' : '');
+        loaderContainer.style.setProperty('visibility', 'visible', important ? 'important' : '');
+        loaderContainer.style.setProperty('opacity', '1', important ? 'important' : '');
+        return;
+    }
+
+    loaderContainer.style.setProperty('display', 'none', important ? 'important' : '');
+}
+
+function enforceApasxolhseisLockedLoader() {
+    if (!isApasxolhseisPipelineLoaderLocked()) return;
+
+    window.apasxolhseisPipelineLoaderActive = true;
+    window.apasxolhseisPipelineLoaderVisualActive = true;
+    setLoaderDisplayValue(true, true);
+}
+
+function installApasxolhseisPipelineLoaderSetterGuard() {
+    if (!loaderContainer || window.apasxolhseisPipelineLoaderSetterGuardInstalled === true) return;
+
+    window.apasxolhseisPipelineLoaderSetterGuardInstalled = true;
+
+    const style = loaderContainer.style;
+    const cssStylePrototype = window.CSSStyleDeclaration ? window.CSSStyleDeclaration.prototype : Object.getPrototypeOf(style);
+    const displayDescriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(style), 'display')
+        || (cssStylePrototype ? Object.getOwnPropertyDescriptor(cssStylePrototype, 'display') : null);
+
+    if (displayDescriptor && typeof displayDescriptor.get === 'function' && typeof displayDescriptor.set === 'function') {
+        Object.defineProperty(style, 'display', {
+            configurable: true,
+            enumerable: true,
+            get() {
+                return displayDescriptor.get.call(style);
+            },
+            set(value) {
+                const normalizedValue = String(value ?? '').trim().toLowerCase();
+                if (isApasxolhseisPipelineLoaderLocked() && normalizedValue === 'none') {
+                    return;
+                }
+                displayDescriptor.set.call(style, value);
+            }
+        });
+    }
+
+    const originalSetProperty = style.setProperty ? style.setProperty.bind(style) : null;
+    if (originalSetProperty) {
+        style.setProperty = function (propertyName, value, priority) {
+            const normalizedProperty = String(propertyName ?? '').trim().toLowerCase();
+            const normalizedValue = String(value ?? '').trim().toLowerCase();
+            if (normalizedProperty === 'display' && isApasxolhseisPipelineLoaderLocked() && normalizedValue === 'none') {
+                return undefined;
+            }
+            return originalSetProperty(propertyName, value, priority);
+        };
+    }
+
+    const originalRemoveProperty = style.removeProperty ? style.removeProperty.bind(style) : null;
+    if (originalRemoveProperty) {
+        style.removeProperty = function (propertyName) {
+            const normalizedProperty = String(propertyName ?? '').trim().toLowerCase();
+            if (normalizedProperty === 'display' && isApasxolhseisPipelineLoaderLocked()) {
+                return style.display || 'grid';
+            }
+            return originalRemoveProperty(propertyName);
+        };
     }
 }
 
+function installApasxolhseisPipelineLoaderGuard() {
+    ensureApasxolhseisPipelineLoaderStyle();
+
+    if (!loaderContainer) return;
+
+    installApasxolhseisPipelineLoaderSetterGuard();
+
+    if (window.apasxolhseisPipelineLoaderGuardInstalled === true) return;
+
+    window.apasxolhseisPipelineLoaderGuardInstalled = true;
+
+    const observer = new MutationObserver(() => {
+        if (!isApasxolhseisPipelineLoaderLocked()) return;
+        window.requestAnimationFrame(enforceApasxolhseisLockedLoader);
+    });
+
+    observer.observe(loaderContainer, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+
+    if (document.body) {
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    }
+
+    window.apasxolhseisPipelineLoaderObserver = observer;
+}
+
+function setApasxolhseisPipelineLoaderVisible(visible) {
+    const logicalVisible = !!visible;
+
+    if (!logicalVisible && isApasxolhseisPipelineLoaderLocked()) {
+        enforceApasxolhseisLockedLoader();
+        return;
+    }
+
+    window.apasxolhseisPipelineLoaderActive = logicalVisible;
+    window.apasxolhseisPipelineLoaderVisualActive = logicalVisible;
+    setLoaderDisplayValue(logicalVisible, isApasxolhseisPipelineLoaderLocked() || !logicalVisible);
+}
+
 function setApasxolhseisLoaderLockClass(locked) {
+    ensureApasxolhseisPipelineLoaderStyle();
+    installApasxolhseisPipelineLoaderGuard();
     document.body?.classList.toggle('apasxolhseis-loader-locked', !!locked);
     window.apasxolhseisLoaderLocked = !!locked;
+
+    if (locked) {
+        enforceApasxolhseisLockedLoader();
+    }
 }
 
 function beginApasxolhseisPipelineLoader() {
@@ -199,12 +603,43 @@ function hideApasxolhseisPipelineLoader() {
     }
 }
 
+function suppressApasxolhseisPipelineLoader() {
+    // No-op while the unified employee pipeline owns the loader.
+    // Ο loader πρέπει να μείνει σταθερά ανοιχτός μέχρι το τελικό end().
+    if (isApasxolhseisPipelineLoaderLocked()) {
+        setApasxolhseisPipelineLoaderVisible(true);
+    }
+}
+
+function resumeApasxolhseisPipelineLoader() {
+    if (apasxolhseisPipelineLoaderDepth > 0 || apasxolhseisPipelineLoaderLockDepth > 0) {
+        setApasxolhseisPipelineLoaderVisible(true);
+    }
+}
+
 function resetApasxolhseisPipelineLoader() {
     apasxolhseisPipelineLoaderDepth = 0;
     apasxolhseisPipelineLoaderLockDepth = 0;
     setApasxolhseisLoaderLockClass(false);
     setApasxolhseisPipelineLoaderVisible(false);
 }
+
+function isApasxolhseisPipelineLoaderLocked() {
+    return apasxolhseisPipelineLoaderLockDepth > 0 || window.apasxolhseisLoaderLocked === true;
+}
+
+window.apasxolhseisPipelineLoaderApi = {
+    begin: beginApasxolhseisPipelineLoader,
+    end: endApasxolhseisPipelineLoader,
+    show: showApasxolhseisPipelineLoader,
+    hide: hideApasxolhseisPipelineLoader,
+    reset: resetApasxolhseisPipelineLoader,
+    suppress: suppressApasxolhseisPipelineLoader,
+    resume: resumeApasxolhseisPipelineLoader,
+    isLocked: isApasxolhseisPipelineLoaderLocked,
+    isVisible: () => window.apasxolhseisPipelineLoaderActive === true,
+    isVisualVisible: () => window.apasxolhseisPipelineLoaderVisualActive === true
+};
 
 const saveButton = document.getElementById('saveButton');
 const updateButton = document.getElementById('updateButton');
@@ -1144,9 +1579,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const forcedRecord = forcedErgazomenosRecordForNavigation;
         forcedErgazomenosRecordForNavigation = null;
 
+        const previousSuppress = window.apasxolhseisSuppressFieldEvents;
+        const previousEmployeePipeline = window.apasxolhseisEmployeeLoadPipeline;
+
         beginApasxolhseisPipelineLoader();
 
         try {
+            window.apasxolhseisEmployeeLoadPipeline = true;
+            window.apasxolhseisSuppressFieldEvents = true;
             await clearFormFields();
 
             if (forcedRecord) {
@@ -1312,7 +1752,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('oresErgasias').focus();
                     await loadTypoiApodoxon();
                     await loadPeriods();
-                    await runEmployeePeriodFlowOnce('employee-change');
+                    await runEmployeePeriodFlowOnce('employee-change', { useExistingLoader: true });
 
                     prefetchAdjacentEmployeeDetails(selectedRecord);
                 } catch (error) {
@@ -1324,6 +1764,8 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Dropdown change error:', error);
         } finally {
+            window.apasxolhseisSuppressFieldEvents = previousSuppress;
+            window.apasxolhseisEmployeeLoadPipeline = previousEmployeePipeline;
             endApasxolhseisPipelineLoader();
         }
     }
@@ -1531,7 +1973,54 @@ document.addEventListener('DOMContentLoaded', function () {
         return hireDate.getTime() > periodEnd.getTime();
     }
 
+    function ensureOutsidePeriodSwalCss() {
+        if (document.getElementById('apasxolhseis-outside-period-swal-style')) return;
+
+        const style = document.createElement('style');
+        style.id = 'apasxolhseis-outside-period-swal-style';
+        style.textContent = `
+            .swal2-popup.apasxolhseis-outside-period-swal {
+                width: 28rem !important;
+                max-width: min(28rem, calc(100vw - 2rem)) !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+                padding-left: 1.75rem !important;
+                padding-right: 1.75rem !important;
+            }
+            .swal2-popup.apasxolhseis-outside-period-swal .swal2-title {
+                font-size: 1.35rem !important;
+                line-height: 1.25 !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            .swal2-popup.apasxolhseis-outside-period-swal .swal2-html-container {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                line-height: 1.35 !important;
+            }
+            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-message,
+            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-message p,
+            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-dates {
+                max-width: 100% !important;
+                white-space: normal !important;
+                overflow-wrap: anywhere !important;
+                word-break: normal !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function forceOutsidePeriodSwalWidth(popup) {
+        if (!popup) return;
+        popup.classList.add('apasxolhseis-outside-period-swal');
+        popup.style.setProperty('width', '28rem', 'important');
+        popup.style.setProperty('max-width', 'min(28rem, calc(100vw - 2rem))', 'important');
+        popup.style.setProperty('min-width', '0', 'important');
+        popup.style.setProperty('box-sizing', 'border-box', 'important');
+    }
+
     function showEmployeeOutsidePeriodMessage(employee, endDateISOString) {
+        ensureOutsidePeriodSwalCss();
         const hireDate = normalizeDateOnly(employee?.hmeromhnia_proslhpshs);
         const periodEnd = normalizeDateOnly(endDateISOString);
         const employeeName = [employee?.eponymo, employee?.onoma].filter(Boolean).join(' ').trim();
@@ -1555,6 +2044,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 html: message,
                 icon: 'warning',
                 confirmButtonText: 'ΟΚ',
+                width: '28rem',
+                customClass: {
+                    popup: 'apasxolhseis-outside-period-swal'
+                },
+                didOpen: forceOutsidePeriodSwalWidth,
+                didRender: forceOutsidePeriodSwalWidth,
                 allowOutsideClick: false,
                 allowEscapeKey: true
             });
@@ -1615,10 +2110,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         activeEmployeePeriodFlowPromise = (async () => {
             const previousSuppress = window.apasxolhseisSuppressFieldEvents;
+            const previousEmployeePipeline = window.apasxolhseisEmployeeLoadPipeline;
+            const shouldControlLoader = options.useExistingLoader === true
+                ? false
+                : !isApasxolhseisPipelineLoaderLocked();
 
-            beginApasxolhseisPipelineLoader();
+            if (shouldControlLoader) {
+                beginApasxolhseisPipelineLoader();
+            }
 
             try {
+                window.apasxolhseisEmployeeLoadPipeline = true;
                 window.apasxolhseisSuppressFieldEvents = true;
 
                 const periodosHidden = document.getElementById('periodos_Hidden');
@@ -1823,8 +2325,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
                     if (!isCurrentFlow()) return;
 
-                    window.apasxolhseisSuppressFieldEvents = previousSuppress;
-
+                    // Κρατάμε suppress/pipeline ενεργά μέχρι να ολοκληρωθεί ΟΛΗ η αλυσίδα.
+                    // Αν απελευθερωθούν εδώ, τα input/change listeners ξεκινούν δεύτερες
+                    // κρατήσεις/φόρο/πληρωτέο και προκαλούν flickering στον loader.
                     if (typeof window.recalculateApasxolhseisAfterEmployeeLoad === 'function') {
                         await window.recalculateApasxolhseisAfterEmployeeLoad({ runHmeresErgasias: true });
                     } else {
@@ -1857,7 +2360,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 lastCompletedEmployeePeriodFlowKey = flowKey;
             } finally {
                 window.apasxolhseisSuppressFieldEvents = previousSuppress;
-                endApasxolhseisPipelineLoader();
+                window.apasxolhseisEmployeeLoadPipeline = previousEmployeePipeline;
+                if (shouldControlLoader) {
+                    endApasxolhseisPipelineLoader();
+                }
 
                 if (activeEmployeePeriodFlowKey === flowKey) {
                     activeEmployeePeriodFlowKey = '';
@@ -1870,6 +2376,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     periodoiDropdown.addEventListener('change', async () => {
+        if (window.apasxolhseisSuppressFieldEvents === true) return;
         await runEmployeePeriodFlowOnce('periodos-change');
     });
 
@@ -1891,6 +2398,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     typoiApodoxonDropdown.addEventListener('change', async () => {
+        if (window.apasxolhseisSuppressFieldEvents === true) return;
+
         const selectedTyposApodoxon = String(typoiApodoxonDropdown.value || '').trim();
 
         // TomSelect μπορεί να πυροδοτήσει change με κενή τιμή κατά το αρχικό init/clear.
@@ -2106,6 +2615,10 @@ document.addEventListener('DOMContentLoaded', function () {
         await ypologismosAxiasKrathseon();
     }
 
+    function isNumberInputField(field) {
+        return field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number';
+    }
+
     function setValue(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
         const field = document.getElementById(fieldId);
 
@@ -2124,14 +2637,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const parsedValue = parseFloat(value);
+        const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
 
         if (isNaN(parsedValue)) {
             field.value = decimalPlaces ? `0.${'0'.repeat(decimalPlaces)}` : '';
         } else {
-            field.value = format
-                ? parsedValue.toFixed(decimalPlaces).replace('.', ',')
-                : parsedValue.toFixed(decimalPlaces);
+            const fixedValue = parsedValue.toFixed(decimalPlaces);
+            field.value = format && !isNumberInputField(field)
+                ? fixedValue.replace('.', ',')
+                : fixedValue;
         }
     }
 

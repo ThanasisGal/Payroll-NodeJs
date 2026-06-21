@@ -183,6 +183,333 @@
             window.RUNTIME_ENV = "<%= NODE_ENV %>";
         </script>
 
+        <script nonce="<%= nonce %>">
+            (function installEarlyApasxolhseisLoaderArbiter() {
+                if (window.apasxolhseisLoaderArbiterInstalled === true) return;
+
+                const state = {
+                    containers: new Set(),
+                    visible: false,
+                    applying: false,
+                    hideTimer: null,
+                    pendingNetwork: 0,
+                    lastShowAt: 0,
+                    lastActivityAt: Date.now(),
+                    quietHideMs: 1800,
+                    minVisibleMs: 800,
+                    debug: false
+                };
+
+                function debugLog(action, reason) {
+                    if (!state.debug && window.APASXOLHSEIS_LOADER_TRACE !== true) return;
+                    // eslint-disable-next-line no-console
+                    console.log('[APASXOLHSEIS LOADER]', action, reason || '', {
+                        pendingNetwork: state.pendingNetwork,
+                        visible: state.visible,
+                        quietHideMs: state.quietHideMs
+                    }, new Error().stack);
+                }
+
+                function markActivity(reason) {
+                    state.lastActivityAt = Date.now();
+                    debugLog('ACTIVITY', reason);
+                }
+
+                function isLoaderElement(el) {
+                    if (!el || el.nodeType !== 1) return false;
+                    const id = String(el.id || '').trim().toLowerCase();
+                    return !!(
+                        el.classList?.contains('loader-container') ||
+                        id === 'loadercontainer' ||
+                        id === 'loader-container'
+                    );
+                }
+
+                function getOriginals(el) {
+                    return el?.style?.__apasxolhseisLoaderOriginals || null;
+                }
+
+                function setDirect(el, property, value, priority = 'important') {
+                    const originals = getOriginals(el);
+                    if (originals?.setProperty) {
+                        originals.setProperty(property, value, priority);
+                    } else {
+                        el?.style?.setProperty?.(property, value, priority);
+                    }
+                }
+
+                function setLoaderDirect(el, visible) {
+                    if (!el || !el.isConnected) return;
+                    setDirect(el, 'display', visible ? 'grid' : 'none', 'important');
+                    setDirect(el, 'visibility', visible ? 'visible' : 'hidden', 'important');
+                    setDirect(el, 'opacity', visible ? '1' : '0', 'important');
+                    el.hidden = false;
+                    el.setAttribute('aria-busy', visible ? 'true' : 'false');
+                }
+
+                function collectLoaders(root = document) {
+                    if (isLoaderElement(root)) registerLoader(root);
+                    if (!root?.querySelectorAll) return;
+                    root.querySelectorAll('.loader-container, #loaderContainer, #loader-container').forEach(registerLoader);
+                }
+
+                function forceVisible(reason) {
+                    markActivity(reason || 'show');
+                    state.visible = true;
+                    state.lastShowAt = Date.now();
+
+                    if (state.hideTimer) {
+                        clearTimeout(state.hideTimer);
+                        state.hideTimer = null;
+                    }
+
+                    state.applying = true;
+                    try {
+                        collectLoaders(document);
+                        state.containers.forEach((el) => setLoaderDirect(el, true));
+                    } finally {
+                        state.applying = false;
+                    }
+
+                    debugLog('SHOW', reason);
+                }
+
+                function finalHide(reason) {
+                    state.hideTimer = null;
+
+                    const now = Date.now();
+                    const quietFor = now - state.lastActivityAt;
+                    const visibleFor = now - state.lastShowAt;
+
+                    if (state.pendingNetwork > 0 || quietFor < state.quietHideMs || visibleFor < state.minVisibleMs) {
+                        scheduleHide(reason || 'reschedule');
+                        return;
+                    }
+
+                    state.visible = false;
+                    state.applying = true;
+                    try {
+                        collectLoaders(document);
+                        state.containers.forEach((el) => setLoaderDirect(el, false));
+                    } finally {
+                        state.applying = false;
+                    }
+
+                    debugLog('HIDE', reason);
+                }
+
+                function scheduleHide(reason) {
+                    if (state.hideTimer) clearTimeout(state.hideTimer);
+
+                    const now = Date.now();
+                    const quietFor = now - state.lastActivityAt;
+                    const visibleFor = now - state.lastShowAt;
+                    const waitMs = Math.max(
+                        state.quietHideMs - quietFor,
+                        state.minVisibleMs - visibleFor,
+                        state.pendingNetwork > 0 ? 500 : 0,
+                        120
+                    );
+
+                    state.hideTimer = setTimeout(() => finalHide(reason), waitMs);
+                    debugLog('HIDE REQUEST delayed ' + waitMs + 'ms', reason);
+                }
+
+                function requestHide(reason) {
+                    markActivity(reason || 'hide-request');
+                    if (!state.visible) {
+                        scheduleHide(reason || 'hide-while-not-visible');
+                        return;
+                    }
+                    scheduleHide(reason);
+                }
+
+                function classify(propertyName, value) {
+                    const prop = String(propertyName || '').trim().toLowerCase();
+                    const val = String(value ?? '').trim().toLowerCase();
+                    if (prop === 'display') {
+                        if (val === 'none') return 'hide';
+                        if (['grid', 'block', 'flex', 'inline-flex', 'inline-block'].includes(val)) return 'show';
+                    }
+                    if (prop === 'visibility') {
+                        if (val === 'hidden') return 'hide';
+                        if (val === 'visible') return 'show';
+                    }
+                    if (prop === 'opacity') {
+                        if (val === '0') return 'hide';
+                        if (val === '1') return 'show';
+                    }
+                    return 'other';
+                }
+
+                function patchStyleObject(el) {
+                    if (!isLoaderElement(el)) return;
+
+                    const style = el.style;
+                    if (!style || style.__apasxolhseisLoaderPatched === true) return;
+
+                    const proto = Object.getPrototypeOf(style);
+                    const displayDescriptor = Object.getOwnPropertyDescriptor(proto, 'display')
+                        || (window.CSSStyleDeclaration ? Object.getOwnPropertyDescriptor(window.CSSStyleDeclaration.prototype, 'display') : null);
+
+                    const originals = {
+                        setProperty: style.setProperty ? style.setProperty.bind(style) : null,
+                        removeProperty: style.removeProperty ? style.removeProperty.bind(style) : null,
+                        displayDescriptor
+                    };
+
+                    Object.defineProperty(style, '__apasxolhseisLoaderOriginals', {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: originals
+                    });
+
+                    Object.defineProperty(style, '__apasxolhseisLoaderPatched', {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: true
+                    });
+
+                    if (displayDescriptor?.get && displayDescriptor?.set) {
+                        Object.defineProperty(style, 'display', {
+                            configurable: true,
+                            enumerable: true,
+                            get() {
+                                return displayDescriptor.get.call(style);
+                            },
+                            set(value) {
+                                if (state.applying) return displayDescriptor.set.call(style, value);
+
+                                const action = classify('display', value);
+                                if (action === 'show') {
+                                    forceVisible('style.display=' + value);
+                                    return;
+                                }
+                                if (action === 'hide') {
+                                    requestHide('style.display=none');
+                                    return;
+                                }
+                                return displayDescriptor.set.call(style, value);
+                            }
+                        });
+                    }
+
+                    if (originals.setProperty) {
+                        style.setProperty = function (propertyName, value, priority) {
+                            if (state.applying) return originals.setProperty(propertyName, value, priority);
+
+                            const action = classify(propertyName, value);
+                            if (action === 'show') {
+                                forceVisible('setProperty(' + propertyName + ', ' + value + ')');
+                                return undefined;
+                            }
+                            if (action === 'hide') {
+                                requestHide('setProperty(' + propertyName + ', ' + value + ')');
+                                return undefined;
+                            }
+                            return originals.setProperty(propertyName, value, priority);
+                        };
+                    }
+
+                    if (originals.removeProperty) {
+                        style.removeProperty = function (propertyName) {
+                            if (state.applying) return originals.removeProperty(propertyName);
+
+                            const prop = String(propertyName || '').trim().toLowerCase();
+                            if (['display', 'visibility', 'opacity'].includes(prop) && state.visible) {
+                                requestHide('removeProperty(' + prop + ')');
+                                return prop === 'display' ? 'grid' : '';
+                            }
+                            return originals.removeProperty(propertyName);
+                        };
+                    }
+                }
+
+                function registerLoader(el) {
+                    if (!isLoaderElement(el)) return;
+                    state.containers.add(el);
+                    patchStyleObject(el);
+                }
+
+                function patchNetwork() {
+                    if (window.__apasxolhseisLoaderNetworkPatched === true) return;
+                    window.__apasxolhseisLoaderNetworkPatched = true;
+
+                    const originalFetch = window.fetch;
+                    if (typeof originalFetch === 'function') {
+                        window.fetch = function (...args) {
+                            state.pendingNetwork += 1;
+                            markActivity('fetch:start');
+                            return originalFetch.apply(this, args)
+                                .finally(() => {
+                                    state.pendingNetwork = Math.max(0, state.pendingNetwork - 1);
+                                    markActivity('fetch:end');
+                                    if (state.visible) scheduleHide('fetch:end');
+                                });
+                        };
+                    }
+
+                    const XHR = window.XMLHttpRequest;
+                    if (XHR?.prototype?.send && XHR?.prototype?.open) {
+                        const originalOpen = XHR.prototype.open;
+                        const originalSend = XHR.prototype.send;
+                        XHR.prototype.open = function (...args) {
+                            this.__apasxolhseisLoaderTrack = true;
+                            return originalOpen.apply(this, args);
+                        };
+                        XHR.prototype.send = function (...args) {
+                            if (this.__apasxolhseisLoaderTrack) {
+                                state.pendingNetwork += 1;
+                                markActivity('xhr:start');
+                                this.addEventListener('loadend', function () {
+                                    state.pendingNetwork = Math.max(0, state.pendingNetwork - 1);
+                                    markActivity('xhr:end');
+                                    if (state.visible) scheduleHide('xhr:end');
+                                }, { once: true });
+                            }
+                            return originalSend.apply(this, args);
+                        };
+                    }
+                }
+
+                collectLoaders(document);
+                patchNetwork();
+
+                const observer = new MutationObserver((mutations) => {
+                    if (state.applying) return;
+
+                    for (const mutation of mutations) {
+                        if (mutation.type === 'childList') {
+                            mutation.addedNodes.forEach((node) => collectLoaders(node));
+                        }
+
+                        if (mutation.type === 'attributes' && isLoaderElement(mutation.target)) {
+                            registerLoader(mutation.target);
+                            if (state.visible || state.hideTimer) forceVisible('attribute ' + mutation.attributeName);
+                        }
+                    }
+                });
+
+                observer.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class', 'hidden']
+                });
+
+                window.apasxolhseisLoaderArbiterInstalled = true;
+                window.apasxolhseisLoaderArbiter = {
+                    show: forceVisible,
+                    hide: requestHide,
+                    forceHide: finalHide,
+                    collect: collectLoaders,
+                    state
+                };
+            })();
+        </script>
+
         <% const payrollTypos = ['001']; %>
 
         <% payrollTypos.forEach(function(typos) { %>

@@ -1258,6 +1258,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     
     exoflhsh.addEventListener("change", async () => {   // EΝΗΜΕΡΩΣΗ ΤΟΥ ΠΟΣΟΥ ΠΛΗΡΩΜΗΣ 
+        if (shouldIgnoreFieldEventDuringLoad()) return;
         if (hasRecord) return;
 
         let selectedValue = exoflhsh.value;
@@ -1462,6 +1463,52 @@ document.addEventListener("DOMContentLoaded", function() {
         return runCalcSynoloMiktonApodoxonCoalesced();
     }
         
+    function getNumberInputValueForPipeline(fieldId) {
+        const value = document.getElementById(fieldId)?.value ?? '';
+        const parsed = parseFloat(String(value).replace(',', '.'));
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    async function waitForKrathseisRowsReady(maxWaitMs = 5000) {
+        const rowCount = Math.max(1, parseInt(window.sharedParams?.genikesParametroi?.[23]?.timh || '7', 10) || 7);
+        const startedAt = Date.now();
+
+        while (Date.now() - startedAt < maxWaitMs) {
+            let pending = false;
+
+            for (let i = 1; i <= rowCount; i++) {
+                const idx = String(i).padStart(2, '0');
+                const dropdown = document.getElementById(`krathsh_${idx}`);
+                if (!dropdown || dropdown.options.length === 0) {
+                    pending = true;
+                    break;
+                }
+                if (dropdown.selectedIndex <= 0) continue;
+
+                const posostoErgazomenoy = document.getElementById(`pososto_krathshs_ergazomenoy_${idx}`);
+                const posostoErgodoth = document.getElementById(`pososto_krathshs_ergodoth_${idx}`);
+                const asfalistikesApodoxes = document.getElementById(`asfalistikesApodoxes_${idx}`);
+
+                if (
+                    !posostoErgazomenoy ||
+                    !posostoErgodoth ||
+                    !asfalistikesApodoxes ||
+                    String(posostoErgazomenoy.value || '').trim() === '' ||
+                    String(posostoErgodoth.value || '').trim() === '' ||
+                    String(asfalistikesApodoxes.value || '').trim() === ''
+                ) {
+                    pending = true;
+                    break;
+                }
+            }
+
+            if (!pending) return true;
+            await new Promise((resolve) => setTimeout(resolve, 40));
+        }
+
+        return false;
+    }
+
     async function recalculateAllHourValuesForEmployeeLoad() {
         // Βήμα Γ pipeline: υπολογισμός αξιών ωρών με τις υπάρχουσες συναρτήσεις.
         // Το finishValueCalculation() επιστρέφει όσο είναι ενεργό το pipeline, άρα
@@ -1510,7 +1557,11 @@ document.addEventListener("DOMContentLoaded", function() {
             // Δ) Μικτά.
             await calcSynoloMiktonApodoxonCore();
 
-            // Ε) Κρατήσεις. Καλούμε το core απευθείας για να μη μπει στο debounce/coalescing.
+            // Ε) Κρατήσεις. Περιμένουμε να έχουν γεμίσει όλες οι γραμμές.
+            // Δεν κρύβουμε/ξανανοίγουμε loader εδώ: ο outer employee pipeline
+            // κρατά τον loader σταθερά ανοιχτό μέχρι το τελικό κλείσιμο.
+            await waitForKrathseisRowsReady();
+
             if (typeof handleSynoloMiktonChangeCoreRef === 'function') {
                 await handleSynoloMiktonChangeCoreRef();
             } else {
@@ -1615,6 +1666,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.calcPlhroteo = function() {
         if (hasRecord) return Promise.resolve();
+
+        // Κατά το ενιαίο employee/period pipeline δεν αφήνουμε εξωτερικούς
+        // listeners (π.χ. sharedParamsReady/loadKrathseis) να ξεκινήσουν δεύτερο
+        // debounced πληρωτέο. Το pipeline καλεί calcPlhroteoCore() μία φορά στο τέλος.
+        if (window.apasxolhseisEmployeeLoadPipeline === true) {
+            return Promise.resolve();
+        }
 
         const promise = new Promise((resolve) => {
             calcPlhroteoResolvers.push(resolve);
@@ -1855,11 +1913,16 @@ document.addEventListener("DOMContentLoaded", function() {
             return num.toFixed(decimals);
         }
 
-        // 3.2 Μορφοποίηση αριθμών για εμφάνιση (με κόμμα)
-        function formatNumberForDisplay(value, decimals = 2) {
-            const num = parseFloat(value || '0');
-            if (isNaN(num)) return '0,00';
-            return num.toFixed(decimals).replace('.', ',');
+        function isNumberInputElement(field) {
+            return field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number';
+        }
+
+        // 3.2 Μορφοποίηση αριθμών για εμφάνιση. Σε input type=number γράφουμε τελεία,
+        // αλλιώς ο Chrome απορρίπτει τιμές όπως 76,48 και εμφανίζει warnings.
+        function formatNumberForDisplay(value, decimals = 2, field = null) {
+            const num = parseFloat(String(value ?? '0').replace(',', '.'));
+            const fixedValue = Number.isFinite(num) ? num.toFixed(decimals) : (0).toFixed(decimals);
+            return isNumberInputElement(field) ? fixedValue : fixedValue.replace('.', ',');
         }
 
         // 3.3 getAnotatoOrio - Υπολογισμός του ανώτατου ορίου από sharedParams
@@ -2043,31 +2106,31 @@ document.addEventListener("DOMContentLoaded", function() {
 
             // Ενημέρωση συνόλων με κόμμα για εμφάνιση
             if (synoloAxiasFields.ergazomenoy) {
-                synoloAxiasFields.ergazomenoy.value = formatNumberForDisplay(totals.ergazomenoy, 2);
+                synoloAxiasFields.ergazomenoy.value = formatNumberForDisplay(totals.ergazomenoy, 2, synoloAxiasFields.ergazomenoy);
             }
             if (synoloAxiasFields.ergodoth) {
-                synoloAxiasFields.ergodoth.value = formatNumberForDisplay(totals.ergodoth, 2);
+                synoloAxiasFields.ergodoth.value = formatNumberForDisplay(totals.ergodoth, 2, synoloAxiasFields.ergodoth);
             }
             if (synoloAxiasFields.ergazomenoyYpologizomenhStoForo) {
                 synoloAxiasFields.ergazomenoyYpologizomenhStoForo.value =
-                    formatNumberForDisplay(totals.ergazomenoyYpologizomenhStoForo, 2);
+                    formatNumberForDisplay(totals.ergazomenoyYpologizomenhStoForo, 2, synoloAxiasFields.ergazomenoyYpologizomenhStoForo);
             }
             if (synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo) {
                 synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo.value =
-                    formatNumberForDisplay(totals.ergazomenoyMhYpologizomenhStoForo, 2);
+                    formatNumberForDisplay(totals.ergazomenoyMhYpologizomenhStoForo, 2, synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo);
             }
             if (synoloAxiasFields.ergodothYpologizomenhStoForo) {
                 synoloAxiasFields.ergodothYpologizomenhStoForo.value =
-                    formatNumberForDisplay(totals.ergodothYpologizomenhStoForo, 2);
+                    formatNumberForDisplay(totals.ergodothYpologizomenhStoForo, 2, synoloAxiasFields.ergodothYpologizomenhStoForo);
             }
             if (synoloAxiasFields.ergodothMhYpologizomenhStoForo) {
                 synoloAxiasFields.ergodothMhYpologizomenhStoForo.value =
-                    formatNumberForDisplay(totals.ergodothMhYpologizomenhStoForo, 2);
+                    formatNumberForDisplay(totals.ergodothMhYpologizomenhStoForo, 2, synoloAxiasFields.ergodothMhYpologizomenhStoForo);
             }
 
             // Για παράδειγμα, το σύνολο των κρατήσεων (εργαζόμενου) στο πεδίο krathseon
             if (synoloAxiasFields.krathseon) {
-                synoloAxiasFields.krathseon.value = formatNumberForDisplay(totals.ergazomenoy, 2);
+                synoloAxiasFields.krathseon.value = formatNumberForDisplay(totals.ergazomenoy, 2, synoloAxiasFields.krathseon);
             }
 
             // Αν υπάρχει κάποια συνάρτηση calcPlhroteo() για έξτρα υπολογισμούς
