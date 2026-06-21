@@ -29,7 +29,7 @@ const { UserPrivilegesModel } = Models_B;
 
 const { CompaniesModel, AntistoixiseisModel } = Models_C;
 
-const { ErgazomenoiModel, OrariaModel, OrariaFromCardsModel } = Models_D;
+const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 
 const { ApoysiesModel, ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
 
@@ -149,6 +149,117 @@ function toUTCDate(dateString) {
     return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
 }
 
+const normalizeApasxolhshKeyValue = (value, defaultValue = '') => {
+    if (value === undefined || value === null) return defaultValue;
+    return String(value).trim();
+};
+
+const getFirstApasxolhshValue = (...values) => {
+    for (const value of values) {
+        const normalizedValue = normalizeApasxolhshKeyValue(value);
+
+        if (normalizedValue !== '') {
+            return normalizedValue;
+        }
+    }
+
+    return '';
+};
+
+const buildApasxolhshKey = (req, source = {}) => {
+    return {
+        team: getFirstApasxolhshValue(source.team, source.selectedTeam, req.session?.userTeam),
+
+        company_kod: getFirstApasxolhshValue(
+            source.company_kod,
+            source.company,
+            source.selectedCompany,
+            req.session?.companyInUse
+        ),
+
+        ypokatasthma: getFirstApasxolhshValue(
+            source.ypokatasthma,
+            source.ypokatasthma_Hidden,
+            source.ypokatasthmaHidden,
+            req.session?.ypokatasthma
+        ),
+
+        kodikos: getFirstApasxolhshValue(
+            source.kodikos,
+            source.employeeKod,
+            source.selectedKodikos,
+            source.ergazomenos,
+            source.ergazomenos_Hidden,
+            source.ergazomenosHidden,
+            source.kodikosHidden
+        ),
+
+        xrhsh: getFirstApasxolhshValue(
+            source.xrhsh,
+            source.etos,
+            source.sessionEtos,
+            req.session?.yearInUse
+        ),
+
+        periodos: getFirstApasxolhshValue(
+            source.periodos,
+            source.periodos_Hidden,
+            source.periodosHidden,
+            source.mhnas,
+            req.session?.periodInUse
+        ),
+
+        typos_apodoxon: getFirstApasxolhshValue(
+            source.typos_apodoxon,
+            source.typosApodoxon,
+            source.typosApodoxon_Hidden,
+            source.typosApodoxonHidden,
+            source.typ_apod,
+            req.session?.currentTyposApodoxon
+        ),
+
+        aa_misthodosias: getFirstApasxolhshValue(
+            source.aa_misthodosias,
+            source.aaMisthodosias,
+            source.aa_misth,
+            '1'
+        )
+    };
+};
+
+const validateApasxolhshKey = (key) => {
+    const requiredFields = [
+        'team',
+        'company_kod',
+        'ypokatasthma',
+        'kodikos',
+        'xrhsh',
+        'periodos',
+        'typos_apodoxon',
+        'aa_misthodosias'
+    ];
+
+    return requiredFields.filter((field) => !key[field]);
+};
+
+const sanitizeApasxolhshPayload = (source = {}) => {
+    const blockedFields = new Set(['_id', 'id', '__v', 'createdAt', 'updatedAt']);
+
+    const cleanPayload = {};
+
+    for (const [key, value] of Object.entries(source)) {
+        if (!key) continue;
+        if (blockedFields.has(key)) continue;
+
+        // Προστασία από περίεργα Mongo update keys
+        if (key.startsWith('$')) continue;
+        if (key.includes('.')) continue;
+
+        cleanPayload[key] = value;
+    }
+
+    return cleanPayload;
+};
 class kinhseisController {
     static mainApasxolhseisForm = async (req, res) => {
         const locals = {
@@ -334,7 +445,7 @@ class kinhseisController {
         }
     };
 
-    static async getTotalValues(team, company, employeeKod, startDate, endDate) {
+    static async getTotalValues(team, company, ypokatasthma, employeeKod, startDate, endDate) {
         try {
             // Δημιουργία των ημερομηνιών σε UTC
             const start = new Date(
@@ -361,50 +472,65 @@ class kinhseisController {
                 )
             );
 
-            // Δημιουργία του aggregation pipeline
-            const result = await OrariaFromCardsModel.aggregate([
+            const matchFilter = {
+                team: team,
+                company_kod: company,
+                kodikos: employeeKod,
+                hmeromhnia: {
+                    $gte: start, // Ημερομηνία από
+                    $lte: end // Ημερομηνία έως
+                }
+            };
+
+            if (ypokatasthma !== undefined && ypokatasthma !== null && String(ypokatasthma).trim() !== '') {
+                matchFilter.ypokatasthma = String(ypokatasthma).trim();
+            }
+
+            // Δημιουργία του aggregation pipeline από ProdhlomenaOrariaModel.
+            // Χρησιμοποιούνται μόνο τα πεδία *_apologistika.
+            const result = await ProdhlomenaOrariaModel.aggregate([
                 {
-                    $match: {
-                        team: team,
-                        company_kod: company,
-                        kodikos: employeeKod,
-                        hmeromhnia: {
-                            $gte: start, // Ημερομηνία από
-                            $lte: end // Ημερομηνία έως
-                        }
-                    }
+                    $match: matchFilter
                 },
                 {
                     $group: {
                         _id: null, // Δεν χρειαζόμαστε ομαδοποίηση με βάση κάποιο πεδίο
-                        total_ores_ergasias: { $sum: '$ores_ergasias' },
-                        total_ores_nyxtas: { $sum: '$ores_nyxtas' },
-                        total_ores_argion: { $sum: '$ores_argion' },
-                        total_ores_yperergasias: { $sum: '$ores_yperergasias' },
-                        total_ores_yperergasias_argion: { $sum: '$ores_yperergasias_argion' },
-                        total_ores_yperergasias_nyxtas: { $sum: '$ores_yperergasias_nyxtas' },
-                        total_ores_yperergasias_argion_nyxtas: {
-                            $sum: '$ores_yperergasias_argion_nyxtas'
+                        total_ores_ergasias: { $sum: '$ores_ergasias_apologistika' },
+                        total_ores_nyxtas: { $sum: '$ores_nyxtas_apologistika' },
+                        total_ores_argion: { $sum: '$ores_argion_prosayxhsh_apologistika' },
+                        total_ores_yperergasias: { $sum: '$ores_yperergasias_apologistika' },
+                        total_ores_yperergasias_argion: {
+                            $sum: '$ores_yperergasias_argion_apologistika'
                         },
-                        total_ores_nomimhs_yperorias: { $sum: '$ores_nomimhs_yperorias' },
+                        total_ores_yperergasias_nyxtas: {
+                            $sum: '$ores_yperergasias_nyxtas_apologistika'
+                        },
+                        total_ores_yperergasias_argion_nyxtas: {
+                            $sum: '$ores_yperergasias_argion_nyxtas_apologistika'
+                        },
+                        total_ores_nomimhs_yperorias: {
+                            $sum: '$ores_nominhs_yperorias_apologistika'
+                        },
                         total_ores_nomimhs_yperorias_argion: {
-                            $sum: '$ores_nomimhs_yperorias_argion'
+                            $sum: '$ores_nominhs_yperorias_argion_apologistika'
                         },
                         total_ores_nomimhs_yperorias_nyxtas: {
-                            $sum: '$ores_nomimhs_yperorias_nyxtas'
+                            $sum: '$ores_nominhs_yperorias_nyxtas_apologistika'
                         },
                         total_ores_nomimhs_yperorias_argion_nyxtas: {
-                            $sum: '$ores_nomimhs_yperorias_argion_nyxtas'
+                            $sum: '$ores_nominhs_yperorias_argion_nyxtas_apologistika'
                         },
-                        total_ores_paranomhs_yperorias: { $sum: '$ores_paranomhs_yperorias' },
+                        total_ores_paranomhs_yperorias: {
+                            $sum: '$ores_paranomhs_yperorias_apologistika'
+                        },
                         total_ores_paranomhs_yperorias_argion: {
-                            $sum: '$ores_paranomhs_yperorias_argion'
+                            $sum: '$ores_paranomhs_yperorias_argion_apologistika'
                         },
                         total_ores_paranomhs_yperorias_nyxtas: {
-                            $sum: '$ores_paranomhs_yperorias_nyxtas'
+                            $sum: '$ores_paranomhs_yperorias_nyxtas_apologistika'
                         },
                         total_ores_paranomhs_yperorias_argion_nyxtas: {
-                            $sum: '$ores_paranomhs_yperorias_argion_nyxtas'
+                            $sum: '$ores_paranomhs_yperorias_argion_nyxtas_apologistika'
                         },
                         countNotAN_ME: {
                             $sum: {
@@ -413,14 +539,19 @@ class kinhseisController {
                                         $and: [
                                             {
                                                 $not: [
-                                                    { $in: ['$kathgoria_ergasias', ['ΑΝ', 'ΜΕ']] }
+                                                    {
+                                                        $in: [
+                                                            '$kathgoria_ergasias_apologistika',
+                                                            ['ΑΝ', 'ΜΕ']
+                                                        ]
+                                                    }
                                                 ]
-                                            }, // Αν η kathgoria_ergasias δεν είναι στα ["ΑΝ", "ΜΕ"]
-                                            { $ne: ['$kathgoria_ergasias', null] } // ΚΑΙ δεν είναι null
+                                            },
+                                            { $ne: ['$kathgoria_ergasias_apologistika', null] }
                                         ]
                                     },
-                                    1, // Προσθέτουμε 1 στο count
-                                    0 // Αλλιώς προσθέτουμε 0
+                                    1,
+                                    0
                                 ]
                             }
                         }
@@ -524,6 +655,7 @@ class kinhseisController {
         try {
             const team = req.query.team;
             const company = req.query.company;
+            const ypokatasthma = req.query.ypokatasthma;
             const employeeKod = req.query.employeeKod;
             const startDate = req.query.startDate;
             const endDate = req.query.endDate;
@@ -537,6 +669,7 @@ class kinhseisController {
             const totals = await kinhseisController.getTotalValues(
                 team,
                 company,
+                ypokatasthma,
                 employeeKod,
                 startDate,
                 endDate
@@ -651,26 +784,54 @@ class kinhseisController {
     };
 
     static getApasxolhseis = async (req, res) => {
-        const { team, company, employeeKod, xrhsh, periodos, typos_apodoxon, aa_misthodosias } =
-            req.query; // Διαβάζουμε την παράμετρο από το query string
-
         try {
-            // Δημιουργία βασικού φίλτρου με team και company_kod
-            const filter = {
-                team: team,
-                company_kod: company,
-                kodikos: employeeKod,
-                xrhsh: xrhsh,
-                periodos: periodos,
-                typos_apodoxon: typos_apodoxon,
-                aa_misthodosias: aa_misthodosias
-            };
+            const filter = buildApasxolhshKey(req, {
+                team: req.query.team,
+                company_kod: req.query.company_kod || req.query.company,
+                ypokatasthma: req.query.ypokatasthma || req.query.ypokatasthma_Hidden,
+                kodikos:
+                    req.query.kodikos ||
+                    req.query.employeeKod ||
+                    req.query.kodikosHidden ||
+                    req.query.ergazomenos_Hidden,
+                xrhsh: req.query.xrhsh,
+                periodos: req.query.periodos || req.query.periodos_Hidden,
+                typos_apodoxon:
+                    req.query.typos_apodoxon ||
+                    req.query.typosApodoxon_Hidden ||
+                    req.query.typ_apod,
+                aa_misthodosias:
+                    req.query.aa_misthodosias || req.query.aa_misthodosias_Hidden || '1'
+            });
+
+            const missingFields = validateApasxolhshKey(filter);
+
+            if (missingFields.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία για την ανάκτηση απασχόλησης.',
+                    missingFields,
+                    filter
+                });
+            }
 
             const apasxolhseis = await ApasxolhseisModel.findOne(filter).lean();
-            res.json(apasxolhseis);
+
+            /*
+            Προσοχή:
+            Επιστρέφουμε apasxolhseis || null και ΟΧΙ { success, data },
+            για να μη σπάσει ακόμα το υπάρχον frontend JS που πιθανότατα
+            περιμένει κατευθείαν το object της απασχόλησης.
+        */
+            return res.json(apasxolhseis || null);
         } catch (error) {
-            console.error('Σφάλμα στο API endpoint:', error);
-            res.status(500).json({ error: 'Κάτι πήγε στραβά' });
+            console.error('Error into kinhseisController -> getApasxolhseis :', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάκτηση της απασχόλησης.',
+                error: error.message
+            });
         }
     };
 
@@ -850,61 +1011,53 @@ class kinhseisController {
 
     static getSynoloHmeronMhErgasias = async (req, res) => {
         try {
-            const { team, company_kod, kodikos, startDate, endDate } = req.body;
+            const { team, company_kod, ypokatasthma, kodikos, startDate, endDate } = req.body;
 
-            // Δημιουργούμε το φίλτρο για το OrariaFromCardsModel για 'ΜΕ'
+            const dateFilter = mongoose.trusted({
+                $gte: new Date(startDate),
+                $lte: new Date(endDate)
+            });
+
+            const baseFilter = {
+                team: team,
+                company_kod: company_kod,
+                kodikos: kodikos,
+                hmeromhnia: dateFilter
+            };
+
+            if (ypokatasthma !== undefined && ypokatasthma !== null && String(ypokatasthma).trim() !== '') {
+                baseFilter.ypokatasthma = String(ypokatasthma).trim();
+            }
+
+            // Φίλτρο ProdhlomenaOrariaModel για εργάσιμες ημέρες.
             const filter_ergasia = {
-                team: team,
-                company_kod: company_kod,
-                kodikos: kodikos,
-                hmeromhnia: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                },
-                kathgoria_ergasias: 'ΕΡΓ'
+                ...baseFilter,
+                kathgoria_ergasias_apologistika: 'ΕΡΓ'
             };
 
-            // Δημιουργούμε το φίλτρο για το OrariaFromCardsModel για 'ΜΕ'
+            // Φίλτρο ProdhlomenaOrariaModel για μη εργάσιμες ημέρες.
             const filter_mh_ergasia = {
-                team: team,
-                company_kod: company_kod,
-                kodikos: kodikos,
-                hmeromhnia: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                },
-                kathgoria_ergasias: 'ΜΕ'
+                ...baseFilter,
+                kathgoria_ergasias_apologistika: 'ΜΕ'
             };
 
-            // Δημιουργούμε το φίλτρο για το OrariaFromCardsModel για οτιδήποτε εκτός 'ΜΕ' και 'ΑΝ'
-            const filter_ergasimes = {
-                team: team,
-                company_kod: company_kod,
-                kodikos: kodikos,
-                hmeromhnia: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                },
-                kathgoria_ergasias: { $nin: ['ΜΕ', 'ΑΝ'] }
+            // Φίλτρο ProdhlomenaOrariaModel για ασθένεια.
+            const filter_astheneia = {
+                ...baseFilter,
+                astheneia_apologistika: true
             };
 
-            // Δημιουργούμε το φίλτρο για το OrariaFromCardsModel για 'ΑΝ'
+            // Φίλτρο ProdhlomenaOrariaModel για ρεπό.
             const filter_repo = {
-                team: team,
-                company_kod: company_kod,
-                kodikos: kodikos,
-                hmeromhnia: {
-                    $gte: new Date(startDate),
-                    $lte: new Date(endDate)
-                },
-                kathgoria_ergasias: 'ΑΝ'
+                ...baseFilter,
+                kathgoria_ergasias_apologistika: 'ΑΝ'
             };
 
             // Ανακτούμε τις εργάσιμες ημερομηνίες
-            const ergasimes = await OrariaFromCardsModel.countDocuments(filter_ergasia);
+            const ergasimes = await ProdhlomenaOrariaModel.countDocuments(filter_ergasia);
 
             // Ανακτούμε τις μη εργάσιμες ημερομηνίες
-            const mhErgasimesDocs = await OrariaFromCardsModel.find(
+            const mhErgasimesDocs = await ProdhlomenaOrariaModel.find(
                 filter_mh_ergasia,
                 'hmeromhnia'
             );
@@ -913,15 +1066,15 @@ class kinhseisController {
             // Μετράμε τον αριθμό των μη εργασίμων ημερών
             const mhErgasimes = mhErgasimesDates.length;
 
-            // Ανακτούμε τις εργάσιμες ημέρες που δεν ανήκουν στις κατηγορίες 'ΜΕ' και 'ΑΝ'
-            const astheneiaDocs = await OrariaFromCardsModel.find(filter_ergasimes, 'hmeromhnia');
+            // Ανακτούμε τις ημέρες ασθένειας από τα απολογιστικά πεδία
+            const astheneiaDocs = await ProdhlomenaOrariaModel.find(filter_astheneia, 'hmeromhnia');
             const astheneiaDates = astheneiaDocs.map((doc) => doc.hmeromhnia);
 
             // Μετράμε τον αριθμό των ημερών αυτών
             const astheneia = astheneiaDates.length;
 
             // Ανακτούμε τις ημερομηνίες των ρεπό
-            const repoDocs = await OrariaFromCardsModel.find(filter_repo, 'hmeromhnia');
+            const repoDocs = await ProdhlomenaOrariaModel.find(filter_repo, 'hmeromhnia');
             const repoDates = repoDocs.map((doc) => doc.hmeromhnia);
 
             // Μετράμε τον αριθμό των ρεπό
@@ -1023,7 +1176,7 @@ class kinhseisController {
 
     static get_Hmeromhnies_Astheneion = async (req, res) => {
         try {
-            const { team, company_kod, kodikos, ...dates } = req.body;
+            const { team, company_kod, ypokatasthma, kodikos, ...dates } = req.body;
 
             // --- Διαχωρισμός σε ασθένειες & άδειες ---
             const hmeromhniesAstheneion = {};
@@ -1072,14 +1225,24 @@ class kinhseisController {
                 let sicknessDatesForCurrentAdeia = [];
 
                 for (const { apoDate, eosDate } of currentSicknessDates) {
-                    const sicknessDocs = await OrariaFromCardsModel.find(
-                        {
-                            team,
-                            company_kod,
-                            kodikos,
-                            kathgoria_ergasias: { $nin: ['ΜΕ', 'ΑΝ'] },
-                            hmeromhnia: { $gte: apoDate, $lte: eosDate }
-                        },
+                    const sicknessFilter = {
+                        team,
+                        company_kod,
+                        kodikos,
+                        astheneia_apologistika: true,
+                        hmeromhnia: mongoose.trusted({ $gte: apoDate, $lte: eosDate })
+                    };
+
+                    if (
+                        ypokatasthma !== undefined &&
+                        ypokatasthma !== null &&
+                        String(ypokatasthma).trim() !== ''
+                    ) {
+                        sicknessFilter.ypokatasthma = String(ypokatasthma).trim();
+                    }
+
+                    const sicknessDocs = await ProdhlomenaOrariaModel.find(
+                        sicknessFilter,
                         'hmeromhnia'
                     );
 
@@ -1215,18 +1378,32 @@ class kinhseisController {
         const { formData, filesToUpdate } = req.body;
 
         if (filesToUpdate.enhmeroshApasxolhseon) {
-            const filter = {
+            const filter = buildApasxolhshKey(req, {
                 team: sessionUserTeam,
                 company_kod: sessionCompanyInUse,
+                ypokatasthma: formData.ypokatasthma_Hidden,
                 kodikos: formData.kodikosHidden,
                 xrhsh: sessionEtos,
                 periodos: formData.periodos_Hidden,
                 typos_apodoxon: formData.typosApodoxon_Hidden,
                 aa_misthodosias: formData.aa_misthodosias_Hidden
-            };
+            });
+
+            const missingFields = validateApasxolhshKey(filter);
+
+            if (missingFields.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία για την αποθήκευση απασχόλησης.',
+                    missingFields,
+                    filter
+                });
+            }
 
             let updateData = {
                 $set: {
+                    ...filter,
+
                     exoflhsh: formData.exoflhsh_Hidden,
                     poso_plhromhs: parseFloat(formData.poso_plhromhs_Hidden.replace(',', '.')),
                     synolo_apodoxon: parseFloat(formData.synoloApodoxon.replace(',', '.')),
@@ -1558,25 +1735,22 @@ class kinhseisController {
                         formData.koines_hmeres_repo_argion_astheneion_adeias,
                     koines_hmeres_repo_argion_astheneion_adeias_hmeromhnies:
                         formData.koines_hmeres_repo_argion_astheneion_adeias_hmeromhnies,
-                    ypoloipo_adeias: formData.ypoloipo_adeias,
-                    updatedAt: Date.now()
-                },
-                $setOnInsert: {
-                    createdAt: Date.now() // μόνο στο insert
+                    ypoloipo_adeias: formData.ypoloipo_adeias
                 }
             };
 
             fieldsStoixeionKrathseon.forEach((fieldStoixeio) => {
                 for (let i = 1; i <= aa_krathseon; i++) {
                     const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+
                     if (numberFieldsKrathseon.has(fieldStoixeio)) {
                         const rawValue = formData[fieldNameStoixeioy];
-                        const parsedValue = parseFloat(rawValue.replace(',', '.'));
-                        updateData[fieldNameStoixeioy] = parsedValue || 0;
+                        const parsedValue = parseFloat(String(rawValue || '0').replace(',', '.'));
+                        updateData.$set[fieldNameStoixeioy] = parsedValue || 0;
                     } else if (booleanFieldsKrathseon.has(fieldStoixeio)) {
-                        updateData[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || false; // Χειρισμός boolean πεδίων
+                        updateData.$set[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || false;
                     } else {
-                        updateData[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                        updateData.$set[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;
                     }
                 }
             });
@@ -1584,14 +1758,15 @@ class kinhseisController {
             fieldsStoixeionAstheneion.forEach((fieldStoixeio) => {
                 for (let i = 1; i <= aa_astheneion; i++) {
                     const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+
                     if (numberFieldsAstheneion.has(fieldStoixeio)) {
                         const rawValue = formData[fieldNameStoixeioy];
-                        const parsedValue = parseFloat(rawValue.replace(',', '.'));
-                        updateData[fieldNameStoixeioy] = parsedValue || 0;
+                        const parsedValue = parseFloat(String(rawValue || '0').replace(',', '.'));
+                        updateData.$set[fieldNameStoixeioy] = parsedValue || 0;
                     } else if (booleanFieldsAstheneion.has(fieldStoixeio)) {
-                        updateData[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || false; // Χειρισμός boolean πεδίων
+                        updateData.$set[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || false;
                     } else {
-                        updateData[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                        updateData.$set[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;
                     }
                 }
             });
@@ -1599,25 +1774,52 @@ class kinhseisController {
             fieldsStoixeionAdeion.forEach((fieldStoixeio) => {
                 for (let i = 1; i <= aa_adeion; i++) {
                     const fieldNameStoixeioy = `${fieldStoixeio}_${i < 10 ? '0' + i : i}`;
+
                     if (numberFieldsAdeion.has(fieldStoixeio)) {
                         const rawValue = formData[fieldNameStoixeioy];
-                        const parsedValue = parseFloat(rawValue.replace(',', '.'));
-                        updateData[fieldNameStoixeioy] = parsedValue || 0;
+                        const parsedValue = parseFloat(String(rawValue || '0').replace(',', '.'));
+                        updateData.$set[fieldNameStoixeioy] = parsedValue || 0;
                     } else {
-                        updateData[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null; // Χειρισμός άλλων τύπων πεδίων
+                        updateData.$set[fieldNameStoixeioy] = formData[fieldNameStoixeioy] || null;
                     }
                 }
             });
 
             const options = {
-                upsert: true, // Δημιούργησε νέα εγγραφή αν δεν υπάρχει
-                new: true // Επιστρέφει το καινούριο/ενημερωμένο έγγραφο
+                upsert: true,
+                new: true,
+                runValidators: true,
+                setDefaultsOnInsert: true
             };
 
             try {
-                await ApasxolhseisModel.findOneAndUpdate(filter, updateData, options);
+                const savedApasxolhsh = await ApasxolhseisModel.findOneAndUpdate(
+                    filter,
+                    updateData,
+                    options
+                ).lean();
+
+                return res.json({
+                    success: true,
+                    message: 'Η απασχόληση αποθηκεύτηκε επιτυχώς.',
+                    data: savedApasxolhsh
+                });
             } catch (error) {
-                console.log(error);
+                console.error('Error into kinhseisController -> postApasxolhseisForm :', error);
+
+                if (error?.code === 11000) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'Υπάρχει ήδη απασχόληση με τα ίδια βασικά στοιχεία.',
+                        error: error.message
+                    });
+                }
+
+                return res.status(500).json({
+                    success: false,
+                    message: 'Σφάλμα κατά την αποθήκευση της απασχόλησης.',
+                    error: error.message
+                });
             }
         }
 

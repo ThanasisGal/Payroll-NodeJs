@@ -4,6 +4,45 @@ const tenSpaces = '\u00A0'.repeat(10);
 
 // import { ypologismosPragmatikonErgasimonHmeronMhna } from './apasxolhseis.js';
 // export let hasRecord = false;
+
+// Global shared parameters used by apasxolhseis.js and other external modules.
+// Keep a real global variable (not only window.sharedParams) to avoid ReferenceError
+// in scripts that read sharedParams directly.
+//
+// IMPORTANT:
+// Some calculation listeners can run before an employee/period has fully loaded
+// (for example from restoreOnBlur / initial input events). In that phase,
+// apasxolhseis.js may read sharedParams.ergazomenoi.asfalish_me_tekmarta.
+// Therefore we keep a safe baseline object instead of plain {}.
+function createSafeSharedParams() {
+    return {
+        ergazomenoi: {},
+        sxeshErgasias: {},
+        kathestosApasxolhshs: {},
+        oikogeneiakhKatastash: {},
+        typosErgazomenoy: {},
+        genikesParametroi: Array.from({ length: 40 }, () => ({ timh: '0' })),
+        asfalistikesKlaseis: [],
+        astheneies: [],
+        etaireia: {},
+        _TEAM: '',
+        _COMPANY: '',
+        _YPOKATASTHMA: '',
+        _XRHSH: '',
+        _KODIKOS_ETAIREIAS: '',
+        _SYNOLO_ERGASIMON_HMERON_MHNA: 0,
+        _ERGASIMES_HMERES_MHNA: 0,
+        _MH_ERGASIMES_HMERES_MHNA: 0,
+        _ETHSIES_ORES_YPERORION: 0,
+        _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
+        startDate: null,
+        endDate: null,
+        isReady: false
+    };
+}
+
+var sharedParams = window.sharedParams || createSafeSharedParams();
+window.sharedParams = sharedParams;
 let hasRecord = false;
 
 // Συνάρτηση φόρτωσης εργαζομένων
@@ -106,6 +145,67 @@ let anapaysh_repo_hmeromhnies,
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const loaderContainer = document.querySelector('.loader-container');
+let apasxolhseisPipelineLoaderDepth = 0;
+let apasxolhseisPipelineLoaderLockDepth = 0;
+
+function setApasxolhseisPipelineLoaderVisible(visible) {
+    window.apasxolhseisPipelineLoaderActive = !!visible;
+    if (loaderContainer) {
+        loaderContainer.style.display = visible ? 'grid' : 'none';
+    }
+}
+
+function setApasxolhseisLoaderLockClass(locked) {
+    document.body?.classList.toggle('apasxolhseis-loader-locked', !!locked);
+    window.apasxolhseisLoaderLocked = !!locked;
+}
+
+function beginApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderLockDepth += 1;
+    apasxolhseisPipelineLoaderDepth = Math.max(apasxolhseisPipelineLoaderDepth, 1);
+    setApasxolhseisLoaderLockClass(true);
+    setApasxolhseisPipelineLoaderVisible(true);
+}
+
+function endApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderLockDepth = Math.max(0, apasxolhseisPipelineLoaderLockDepth - 1);
+    if (apasxolhseisPipelineLoaderLockDepth === 0) {
+        apasxolhseisPipelineLoaderDepth = 0;
+        setApasxolhseisLoaderLockClass(false);
+        setApasxolhseisPipelineLoaderVisible(false);
+    }
+}
+
+function showApasxolhseisPipelineLoader() {
+    if (apasxolhseisPipelineLoaderLockDepth > 0) {
+        setApasxolhseisPipelineLoaderVisible(true);
+        return;
+    }
+
+    apasxolhseisPipelineLoaderDepth += 1;
+    setApasxolhseisPipelineLoaderVisible(true);
+}
+
+function hideApasxolhseisPipelineLoader() {
+    if (apasxolhseisPipelineLoaderLockDepth > 0) {
+        // Όταν τρέχει employee/pipeline flow, κανένας εσωτερικός υπολογισμός
+        // δεν επιτρέπεται να κρύψει τον loader. Κρύβεται μόνο στο τελικό end().
+        return;
+    }
+
+    apasxolhseisPipelineLoaderDepth = Math.max(0, apasxolhseisPipelineLoaderDepth - 1);
+    if (apasxolhseisPipelineLoaderDepth === 0) {
+        setApasxolhseisPipelineLoaderVisible(false);
+    }
+}
+
+function resetApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderDepth = 0;
+    apasxolhseisPipelineLoaderLockDepth = 0;
+    setApasxolhseisLoaderLockClass(false);
+    setApasxolhseisPipelineLoaderVisible(false);
+}
+
 const saveButton = document.getElementById('saveButton');
 const updateButton = document.getElementById('updateButton');
 const undoButton = document.getElementById('undoButton');
@@ -146,56 +246,894 @@ document.addEventListener('DOMContentLoaded', function () {
     const typoiApodoxonDropdown = document.getElementById('typosApodoxon');
     const prevButton = document.getElementById('prevButton');
     const nextButton = document.getElementById('nextButton');
+    let ergazomenoiOptionsCache = [];
+    let forcedErgazomenosRecordForNavigation = null;
 
-    loadYpokatasthmata();
+    // Client-side cache για τα στοιχεία εργαζομένου που φορτώνονται από
+    // /api/kinhseis/getLoipaStoixeiaErgazomenoy/...
+    // Στόχος: όταν ο χρήστης πατάει prev/next και επιστρέφει σε εργαζόμενο
+    // που έχει ήδη φορτωθεί, να μην ξαναγίνεται ίδιο fetch.
+    const EMPLOYEE_DETAILS_CACHE_TTL_MS = 5 * 60 * 1000;
+    const PAYROLL_DATA_CACHE_TTL_MS = 90 * 1000;
+    const ANNUAL_OVERTIME_CACHE_TTL_MS = 5 * 60 * 1000;
+    const STATIC_LOOKUP_CACHE_TTL_MS = 10 * 60 * 1000;
+    const ADJACENT_PREFETCH_RADIUS = 2;
 
-    // Προσθήκη event listeners στα κουμπιά
-    prevButton.addEventListener('click', function () {
-        navigateDropdown(-1); // Πηγαίνει στην προηγούμενη εγγραφή
-    });
+    const employeeDetailsCache = new Map();
+    const employeeDetailsInFlight = new Map();
+    const apasxolhseisCache = new Map();
+    const apasxolhseisInFlight = new Map();
+    const annualOvertimeCache = new Map();
+    const annualOvertimeInFlight = new Map();
+    const calcTotalsCache = new Map();
+    const calcTotalsInFlight = new Map();
+    const staticLookupCache = new Map();
+    const staticLookupInFlight = new Map();
 
-    nextButton.addEventListener('click', function () {
-        navigateDropdown(1); // Πηγαίνει στην επόμενη εγγραφή
-    });
+    let lastSessionTyposApodoxonSent = null;
+    let lastSessionPeriodosSent = null;
 
-    // Συνάρτηση για πλοήγηση στο dropdown
-    function navigateDropdown(direction) {
-        const options = ergazomenoiDropdown.options;
-        const totalOptions = options.length;
-        let currentIndex = ergazomenoiDropdown.selectedIndex;
+    function getInputValue(id, defaultValue = '') {
+        const element = document.getElementById(id);
 
-        // Προσδιορισμός του πρώτου έγκυρου index (παράκαμψη κενής επιλογής αν υπάρχει)
-        const firstIndex = options[0].value === '' ? 1 : 0;
-
-        if (currentIndex === -1) {
-            currentIndex = firstIndex - direction;
+        if (!element || element.value === undefined || element.value === null) {
+            return defaultValue;
         }
 
-        // Υπολογισμός του νέου index
+        return String(element.value).trim();
+    }
+
+    function getCsrfToken() {
+        return (
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+            document.querySelector('input[name="_csrf"]')?.value ||
+            ''
+        );
+    }
+
+    function getJsonHeaders() {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        const csrfToken = getCsrfToken();
+
+        if (csrfToken) {
+            headers['CSRF-Token'] = csrfToken;
+            headers['X-CSRF-Token'] = csrfToken;
+        }
+
+        return headers;
+    }
+
+    function extractResponseArray(payload) {
+        if (Array.isArray(payload)) return payload;
+
+        if (!payload || typeof payload !== 'object') return [];
+
+        if (Array.isArray(payload.items)) return payload.items;
+        if (Array.isArray(payload.data)) return payload.data;
+        if (Array.isArray(payload.results)) return payload.results;
+        if (Array.isArray(payload.docs)) return payload.docs;
+        if (Array.isArray(payload.records)) return payload.records;
+
+        return [];
+    }
+
+    function normalizeYpokatasthmaValue(value) {
+        const normalizedValue = String(value || '').trim();
+
+        if (
+            !normalizedValue ||
+            normalizedValue === '__ALL__' ||
+            normalizedValue === 'ΟΛΑ...' ||
+            normalizedValue === 'ALL'
+        ) {
+            return '';
+        }
+
+        return normalizedValue;
+    }
+
+    function syncYpokatasthmaHidden() {
+        const hiddenElement = document.getElementById('ypokatasthma_Hidden');
+
+        if (!hiddenElement) return '';
+
+        hiddenElement.value = normalizeYpokatasthmaValue(ypokatasthmataDropdown?.value);
+
+        return hiddenElement.value;
+    }
+
+    function getEnergoiSelection() {
+        const selectEmployes = document.getElementById('selectEmployes');
+        return selectEmployes ? selectEmployes.checked : true;
+    }
+
+    function syncEnergoiHidden(energoiValue) {
+        const hiddenElement = document.getElementById('energoi');
+        const finalValue = typeof energoiValue === 'boolean' ? energoiValue : getEnergoiSelection();
+
+        if (hiddenElement) {
+            hiddenElement.value = finalValue ? 'true' : 'false';
+        }
+
+        return finalValue ? 'true' : 'false';
+    }
+
+    function getErgazomenoiTomSelect() {
+        return ergazomenoiDropdown?.tomselect || null;
+    }
+
+
+    function getTyposApodoxonTomSelect() {
+        return typoiApodoxonDropdown?.tomselect || null;
+    }
+
+    function getPeriodosTomSelect() {
+        return periodoiDropdown?.tomselect || null;
+    }
+
+    function normalizeTyposApodoxonOption(item = {}) {
+        const kodikos = String(item.kodikos ?? item.value ?? item.id ?? '').trim();
+        const rawPerigrafh = String(item.perigrafh ?? item.label ?? item.text ?? '').trim();
+        const label = rawPerigrafh ? removeGreekAccentsAndToUpper(rawPerigrafh) : kodikos;
+
+        return {
+            ...item,
+            value: kodikos,
+            id: kodikos,
+            kodikos,
+            label,
+            text: label,
+            perigrafh: rawPerigrafh
+        };
+    }
+
+    async function waitForTomSelect(selectElement, timeoutMs = 1200) {
+        const startedAt = Date.now();
+
+        while (selectElement && !selectElement.tomselect && Date.now() - startedAt < timeoutMs) {
+            await delay(25);
+        }
+
+        return selectElement?.tomselect || null;
+    }
+
+    async function ensureTyposApodoxonOption(value) {
+        const normalizedValue = String(value || '').trim();
+        if (!normalizedValue) return null;
+
+        const tom = await waitForTomSelect(typoiApodoxonDropdown);
+
+        if (tom?.options?.[normalizedValue]) {
+            return tom.options[normalizedValue];
+        }
+
+        const items = await fetchStaticLookupArray(
+            `dropdown:typoiApodoxon:value:${normalizedValue}`,
+            `/api/dropdown/kinhseis/apasxolhseis/typoiApodoxon?value=${encodeURIComponent(normalizedValue)}&search=&page=1&limit=1`
+        );
+
+        const item = normalizeTyposApodoxonOption(items[0] || { kodikos: normalizedValue });
+
+        if (tom && item.value) {
+            tom.addOption(item);
+            tom.refreshOptions(false);
+        }
+
+        return item;
+    }
+
+    async function setTyposApodoxonTomValue(value, silent = true) {
+        const normalizedValue = String(value || '').trim();
+        const hidden = document.getElementById('typosApodoxon_Hidden');
+        const typApodHidden = document.getElementById('typ_apod');
+
+        if (hidden) hidden.value = normalizedValue;
+        if (typApodHidden) typApodHidden.value = normalizedValue;
+
+        const tom = await waitForTomSelect(typoiApodoxonDropdown);
+
+        if (!normalizedValue) {
+            if (tom) {
+                tom.clear(silent);
+                tom.refreshItems();
+            } else if (typoiApodoxonDropdown) {
+                typoiApodoxonDropdown.value = '';
+            }
+            return;
+        }
+
+        await ensureTyposApodoxonOption(normalizedValue);
+
+        if (tom) {
+            if (tom.getValue() !== normalizedValue) {
+                tom.setValue(normalizedValue, silent);
+            }
+            tom.refreshItems();
+            tom.refreshOptions(false);
+            return;
+        }
+
+        if (typoiApodoxonDropdown) {
+            if (!Array.from(typoiApodoxonDropdown.options || []).some((option) => option.value === normalizedValue)) {
+                const item = await ensureTyposApodoxonOption(normalizedValue);
+                typoiApodoxonDropdown.appendChild(new Option(item?.label || normalizedValue, normalizedValue));
+            }
+            typoiApodoxonDropdown.value = normalizedValue;
+        }
+    }
+
+    function normalizePeriodosOption(item = {}) {
+        const kodikos = String(item.kodikos ?? item.value ?? item.id ?? '').trim();
+        const rawPerigrafh = String(item.perigrafh ?? item.label ?? item.text ?? '').trim();
+        const label = rawPerigrafh ? removeGreekAccentsAndToUpper(rawPerigrafh) : kodikos;
+
+        return {
+            ...item,
+            value: kodikos,
+            id: kodikos,
+            kodikos,
+            label,
+            text: label,
+            perigrafh: rawPerigrafh
+        };
+    }
+
+    async function ensurePeriodosOption(value) {
+        const normalizedValue = String(value || '').trim();
+        if (!normalizedValue) return null;
+
+        const tom = await waitForTomSelect(periodoiDropdown);
+
+        if (tom?.options?.[normalizedValue]) {
+            return tom.options[normalizedValue];
+        }
+
+        const xrhsh = getInputValue('etos') || new Date().getFullYear().toString();
+        const items = await fetchStaticLookupArray(
+            `dropdown:periodoi:${xrhsh}:value:${normalizedValue}`,
+            `/api/dropdown/periodoi?xrhsh=${encodeURIComponent(xrhsh)}&value=${encodeURIComponent(normalizedValue)}&search=&page=1&limit=1`
+        );
+
+        const item = normalizePeriodosOption(items[0] || { kodikos: normalizedValue });
+
+        if (tom && item.value) {
+            tom.addOption(item);
+            tom.refreshOptions(false);
+        }
+
+        return item;
+    }
+
+    async function setPeriodosTomValue(value, silent = true) {
+        const normalizedValue = String(value || '').trim();
+        const periodosHidden = document.getElementById('periodos_Hidden');
+        const mhnasHidden = document.getElementById('mhnas');
+
+        if (periodosHidden) periodosHidden.value = normalizedValue;
+        if (mhnasHidden) mhnasHidden.value = normalizedValue;
+
+        const tom = await waitForTomSelect(periodoiDropdown);
+
+        if (!normalizedValue) {
+            if (tom) {
+                tom.clear(silent);
+                tom.refreshItems();
+            } else if (periodoiDropdown) {
+                periodoiDropdown.value = '';
+            }
+            return;
+        }
+
+        await ensurePeriodosOption(normalizedValue);
+
+        if (tom) {
+            if (tom.getValue() !== normalizedValue) {
+                tom.setValue(normalizedValue, silent);
+            }
+            tom.refreshItems();
+            tom.refreshOptions(false);
+            return;
+        }
+
+        if (periodoiDropdown) {
+            if (!Array.from(periodoiDropdown.options || []).some((option) => option.value === normalizedValue)) {
+                const item = await ensurePeriodosOption(normalizedValue);
+                periodoiDropdown.appendChild(new Option(item?.label || normalizedValue, normalizedValue));
+            }
+            periodoiDropdown.value = normalizedValue;
+        }
+    }
+
+    function normalizeErgazomenosOption(item = {}) {
+        const kodikos = String(item.kodikos ?? item.value ?? '').trim();
+        const eponymo = String(item.eponymo ?? '').trim().toUpperCase();
+        const patronymo = String(item.patronymo ?? '').trim().toUpperCase();
+        const onoma = String(item.onoma ?? '').trim().toUpperCase();
+        const id = String(item.id ?? item._id ?? item.value ?? '').trim();
+        const ypokatasthma = String(item.ypokatasthma ?? '').trim();
+        const afm = String(item.afm ?? '').trim();
+        const amka = String(item.amka ?? '').trim();
+        const fullName = String(item.fullName ?? `${eponymo} ${patronymo} ${onoma}`).trim();
+        const label = String(
+            item.label ||
+                item.text ||
+                [eponymo, patronymo, onoma, kodikos].filter(Boolean).join(' ')
+        ).trim();
+
+        return {
+            ...item,
+            value: kodikos,
+            label,
+            text: label,
+            id,
+            _id: id,
+            kodikos,
+            eponymo,
+            patronymo,
+            onoma,
+            ypokatasthma,
+            afm,
+            amka,
+            fullName
+        };
+    }
+
+    function resetErgazomenoiTomDropdown() {
+        const tom = getErgazomenoiTomSelect();
+
+        ergazomenoiOptionsCache = [];
+
+        if (tom) {
+            tom.clear(true);
+            tom.clearOptions();
+            tom.refreshOptions(false);
+            return;
+        }
+
+        if (ergazomenoiDropdown) {
+            ergazomenoiDropdown.innerHTML = '';
+            const emptyOption = new Option('', '');
+            ergazomenoiDropdown.appendChild(emptyOption);
+        }
+    }
+
+    function setErgazomenoiDropdownOptions(items = []) {
+        const normalizedItems = items
+            .map((item) => normalizeErgazomenosOption(item))
+            .filter((item) => item.value);
+
+        ergazomenoiOptionsCache = normalizedItems;
+
+        const tom = getErgazomenoiTomSelect();
+
+        if (tom) {
+            tom.clear(true);
+            tom.clearOptions();
+            normalizedItems.forEach((item) => tom.addOption(item));
+            tom.refreshOptions(false);
+
+            if (normalizedItems.length > 0) {
+                tom.setValue(normalizedItems[0].value, false);
+            }
+
+            return;
+        }
+
+        ergazomenoiDropdown.innerHTML = '';
+        const emptyOption = new Option('', '');
+        ergazomenoiDropdown.appendChild(emptyOption);
+
+        normalizedItems.forEach((item) => {
+            const option = new Option(item.label, item.value);
+            option.dataset.id = item.id;
+            option.dataset.kodikos = item.kodikos;
+            ergazomenoiDropdown.appendChild(option);
+        });
+
+        if (normalizedItems.length > 0) {
+            ergazomenoiDropdown.value = normalizedItems[0].value;
+            const event = new Event('change', { bubbles: true });
+            ergazomenoiDropdown.dispatchEvent(event);
+        }
+    }
+
+    function getSelectedErgazomenosRecord() {
+        const selectedValue = String(ergazomenoiDropdown?.value || '').trim();
+
+        if (!selectedValue) return null;
+
+        const tom = getErgazomenoiTomSelect();
+        const tomRecord = tom?.options?.[selectedValue];
+
+        if (tomRecord) {
+            return normalizeErgazomenosOption(tomRecord);
+        }
+
+        const cachedRecord = ergazomenoiOptionsCache.find(
+            (item) => item.value === selectedValue || item.kodikos === selectedValue
+        );
+
+        if (cachedRecord) return cachedRecord;
+
+        const selectedOption = ergazomenoiDropdown?.options?.[ergazomenoiDropdown.selectedIndex];
+
+        if (!selectedOption) return null;
+
+        return normalizeErgazomenosOption({
+            value: selectedOption.value,
+            kodikos: selectedOption.dataset?.kodikos || selectedOption.value,
+            id: selectedOption.dataset?.id || selectedOption.value,
+            label: selectedOption.textContent || selectedOption.text || selectedOption.value
+        });
+    }
+
+    function buildErgazomenoiDropdownQueryString(energoi, ypokatasthma) {
+        const hmeromhniaArxhsPeriodoy =
+            getInputValue('etos') + '-' + getInputValue('mhnas') + '-01T00:00:00.000';
+        const syncedEnergoiValue = syncEnergoiHidden(energoi ?? getEnergoiSelection());
+
+        const params = new URLSearchParams({
+            team: getInputValue('team'),
+            company: getInputValue('company_kod'),
+            ypokatasthma: normalizeYpokatasthmaValue(ypokatasthma || syncYpokatasthmaHidden()),
+            energoi: syncedEnergoiValue,
+            hmeromhnia_arxhs_periodoy: hmeromhniaArxhsPeriodoy,
+            search: '',
+            page: '1',
+            limit: '500'
+        });
+
+        return params.toString();
+    }
+
+    function buildEmployeeDetailsCacheKey(kodikos) {
+        return [
+            getInputValue('team'),
+            getInputValue('company_kod'),
+            String(kodikos || '').trim()
+        ].join('|');
+    }
+
+    function pruneEmployeeDetailsCache() {
+        const now = Date.now();
+
+        employeeDetailsCache.forEach((entry, key) => {
+            if (!entry || now - entry.timestamp > EMPLOYEE_DETAILS_CACHE_TTL_MS) {
+                employeeDetailsCache.delete(key);
+            }
+        });
+    }
+
+    function getCachedEmployeeDetails(kodikos) {
+        pruneEmployeeDetailsCache();
+
+        const key = buildEmployeeDetailsCacheKey(kodikos);
+        const entry = employeeDetailsCache.get(key);
+
+        if (!entry) return null;
+
+        return entry.payload;
+    }
+
+    function setCachedEmployeeDetails(kodikos, payload) {
+        if (!kodikos || !payload?.ergazomenoi) return;
+
+        employeeDetailsCache.set(buildEmployeeDetailsCacheKey(kodikos), {
+            timestamp: Date.now(),
+            payload
+        });
+    }
+
+    function pruneTimedCache(cache, ttlMs) {
+        const now = Date.now();
+
+        cache.forEach((entry, key) => {
+            if (!entry || now - entry.timestamp > ttlMs) {
+                cache.delete(key);
+            }
+        });
+    }
+
+    function getTimedCache(cache, key, ttlMs) {
+        pruneTimedCache(cache, ttlMs);
+
+        const entry = cache.get(key);
+        if (!entry) return null;
+
+        return entry.payload;
+    }
+
+    function setTimedCache(cache, key, payload) {
+        cache.set(key, {
+            timestamp: Date.now(),
+            payload
+        });
+    }
+
+    async function fetchJsonWithCache(cache, inFlightCache, cacheKey, url, ttlMs) {
+        const cachedPayload = getTimedCache(cache, cacheKey, ttlMs);
+        if (cachedPayload !== null) return cachedPayload;
+
+        const inFlightRequest = inFlightCache.get(cacheKey);
+        if (inFlightRequest) return inFlightRequest;
+
+        const request = fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin'
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Fetch failed with status ${response.status}: ${url}`);
+                }
+
+                const payload = await response.json();
+                setTimedCache(cache, cacheKey, payload);
+
+                return payload;
+            })
+            .finally(() => {
+                inFlightCache.delete(cacheKey);
+            });
+
+        inFlightCache.set(cacheKey, request);
+
+        return request;
+    }
+
+    async function fetchStaticLookupArray(cacheKey, url) {
+        const payload = await fetchJsonWithCache(
+            staticLookupCache,
+            staticLookupInFlight,
+            cacheKey,
+            url,
+            STATIC_LOOKUP_CACHE_TTL_MS
+        );
+
+        return extractResponseArray(payload);
+    }
+
+    function getAdjacentRecordsForPrefetch(currentRecord = {}) {
+        const currentValue = String(currentRecord.value || currentRecord.kodikos || '').trim();
+
+        if (!currentValue || !ergazomenoiOptionsCache.length) return [];
+
+        const currentIndex = ergazomenoiOptionsCache.findIndex(
+            (item) => item.value === currentValue || item.kodikos === currentValue
+        );
+
+        if (currentIndex < 0) return [];
+
+        const records = [];
+
+        for (let distance = 1; distance <= ADJACENT_PREFETCH_RADIUS; distance += 1) {
+            [currentIndex - distance, currentIndex + distance].forEach((index) => {
+                const record = ergazomenoiOptionsCache[index];
+
+                if (record?.kodikos) {
+                    records.push({ record, distance });
+                }
+            });
+        }
+
+        return records;
+    }
+
+    function clearPayrollDataCaches() {
+        apasxolhseisCache.clear();
+        apasxolhseisInFlight.clear();
+        annualOvertimeCache.clear();
+        annualOvertimeInFlight.clear();
+        calcTotalsCache.clear();
+        calcTotalsInFlight.clear();
+    }
+
+    function buildAnnualOvertimeCacheKey(employeeKod) {
+        return [
+            getInputValue('team'),
+            getInputValue('company_kod'),
+            String(employeeKod || '').trim(),
+            getInputValue('etos')
+        ].join('|');
+    }
+
+    async function fetchAnnualOvertime(employeeKod) {
+        const normalizedKodikos = String(employeeKod || '').trim();
+        if (!normalizedKodikos) return {};
+
+        const cacheKey = buildAnnualOvertimeCacheKey(normalizedKodikos);
+        const params = new URLSearchParams({
+            team: getInputValue('team'),
+            company: getInputValue('company_kod'),
+            employeeKod: normalizedKodikos,
+            xrhsh: getInputValue('etos')
+        });
+
+        return fetchJsonWithCache(
+            annualOvertimeCache,
+            annualOvertimeInFlight,
+            cacheKey,
+            `/api/kinhseis/getEthsioSynoloYperorion?${params.toString()}`,
+            ANNUAL_OVERTIME_CACHE_TTL_MS
+        );
+    }
+
+    async function fetchApasxolhseis(queryString) {
+        const normalizedQueryString = String(queryString || '').trim();
+        if (!normalizedQueryString) return null;
+
+        return fetchJsonWithCache(
+            apasxolhseisCache,
+            apasxolhseisInFlight,
+            normalizedQueryString,
+            `/api/kinhseis/getApasxolhseis?${normalizedQueryString}`,
+            PAYROLL_DATA_CACHE_TTL_MS
+        );
+    }
+
+    function buildCalcTotalsQueryString(employeeKod, startDateISOString, endDateISOString) {
+        const params = new URLSearchParams({
+            team: getInputValue('team'),
+            company: getInputValue('company_kod'),
+            employeeKod: String(employeeKod || '').trim(),
+            startDate: startDateISOString,
+            endDate: endDateISOString
+        });
+
+        return params.toString();
+    }
+
+    async function fetchCalcTotals(employeeKod, startDateISOString, endDateISOString) {
+        const queryString = buildCalcTotalsQueryString(
+            employeeKod,
+            startDateISOString,
+            endDateISOString
+        );
+
+        return fetchJsonWithCache(
+            calcTotalsCache,
+            calcTotalsInFlight,
+            queryString,
+            `/api/kinhseis/calcTotals?${queryString}`,
+            PAYROLL_DATA_CACHE_TTL_MS
+        );
+    }
+
+    async function fetchEmployeeDetails(kodikos) {
+        const normalizedKodikos = String(kodikos || '').trim();
+
+        if (!normalizedKodikos) return null;
+
+        const cachedPayload = getCachedEmployeeDetails(normalizedKodikos);
+        if (cachedPayload) return cachedPayload;
+
+        const cacheKey = buildEmployeeDetailsCacheKey(normalizedKodikos);
+        const inFlightRequest = employeeDetailsInFlight.get(cacheKey);
+
+        if (inFlightRequest) return inFlightRequest;
+
+        const request = fetch(
+            `/api/kinhseis/getLoipaStoixeiaErgazomenoy/${selectedTeam}/${selectedCompany}/${normalizedKodikos}`,
+            {
+                method: 'GET',
+                credentials: 'same-origin'
+            }
+        )
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`Employee details fetch failed with status ${response.status}`);
+                }
+
+                const payload = await response.json();
+                setCachedEmployeeDetails(normalizedKodikos, payload);
+
+                return payload;
+            })
+            .finally(() => {
+                employeeDetailsInFlight.delete(cacheKey);
+            });
+
+        employeeDetailsInFlight.set(cacheKey, request);
+
+        return request;
+    }
+
+    function prefetchAdjacentEmployeeDetails(currentRecord = {}) {
+        getAdjacentRecordsForPrefetch(currentRecord).forEach(({ record, distance }) => {
+            if (getCachedEmployeeDetails(record.kodikos)) return;
+
+            window.setTimeout(() => {
+                fetchEmployeeDetails(record.kodikos).catch(() => {
+                    // Background prefetch only. Do not interrupt the user flow.
+                });
+            }, (distance - 1) * 120);
+        });
+    }
+
+    function getApasxolhseisYpokatasthmaForQuery() {
+        const selectedFilterYpokatasthma = normalizeYpokatasthmaValue(
+            getInputValue('ypokatasthma_Hidden')
+        );
+
+        if (selectedFilterYpokatasthma) return selectedFilterYpokatasthma;
+
+        const selectedRecordYpokatasthma = normalizeYpokatasthmaValue(
+            getSelectedErgazomenosRecord()?.ypokatasthma
+        );
+
+        if (selectedRecordYpokatasthma) return selectedRecordYpokatasthma;
+
+        return normalizeYpokatasthmaValue(_ergazomenoi?.ypokatasthma);
+    }
+
+    function buildApasxolhseisQueryString(overrides = {}) {
+        syncYpokatasthmaHidden();
+
+        const params = new URLSearchParams({
+            team: getInputValue('team'),
+            company: getInputValue('company_kod'),
+            ypokatasthma: normalizeYpokatasthmaValue(
+                overrides.ypokatasthma ?? getApasxolhseisYpokatasthmaForQuery()
+            ),
+            employeeKod: String(overrides.employeeKod ?? getInputValue('kodikosHidden')).trim(),
+            xrhsh: getInputValue('etos'),
+            periodos: String(overrides.periodos ?? periodoiDropdown.value ?? '').trim(),
+            typos_apodoxon: String(overrides.typos_apodoxon ?? typoiApodoxonDropdown.value ?? '').trim(),
+            aa_misthodosias: String(
+                overrides.aa_misthodosias ?? getInputValue('aaMisthodosias', '1')
+            ).trim()
+        });
+
+        return params.toString();
+    }
+
+    function prefetchAdjacentPayrollData(currentRecord = {}, startDateISOString, endDateISOString) {
+        if (!periodoiDropdown.value || !typoiApodoxonDropdown.value) return;
+
+        getAdjacentRecordsForPrefetch(currentRecord).forEach(({ record, distance }) => {
+            window.setTimeout(() => {
+                fetchAnnualOvertime(record.kodikos).catch(() => {
+                    // Background prefetch only. Do not interrupt the user flow.
+                });
+
+                const queryString = buildApasxolhseisQueryString({
+                    employeeKod: record.kodikos,
+                    ypokatasthma: record.ypokatasthma
+                });
+
+                fetchApasxolhseis(queryString).catch(() => {
+                    // Background prefetch only. Do not interrupt the user flow.
+                });
+
+                if (startDateISOString && endDateISOString) {
+                    fetchCalcTotals(record.kodikos, startDateISOString, endDateISOString).catch(() => {
+                        // Background prefetch only. Do not interrupt the user flow.
+                    });
+                }
+            }, (distance - 1) * 120);
+        });
+    }
+
+    syncYpokatasthmaHidden();
+    syncEnergoiHidden();
+
+    const selectEmployesCheckbox = document.getElementById('selectEmployes');
+    if (selectEmployesCheckbox) {
+        selectEmployesCheckbox.addEventListener('change', function () {
+            syncEnergoiHidden();
+        });
+    }
+
+    if (ypokatasthmataDropdown) {
+        ypokatasthmataDropdown.addEventListener('change', function () {
+            syncYpokatasthmaHidden();
+            window.setTimeout(syncYpokatasthmaHidden, 0);
+            clearPayrollDataCaches();
+
+            if (typeof window.loadErgazomenoi === 'function') {
+                window.loadErgazomenoi(getEnergoiSelection(), syncYpokatasthmaHidden());
+            }
+        });
+    }
+
+    ['saveButton', 'editButton', 'undoButton', 'deleteButton'].forEach((buttonId) => {
+        const button = document.getElementById(buttonId);
+
+        if (!button) return;
+
+        button.addEventListener('click', function () {
+            window.setTimeout(clearPayrollDataCaches, 1000);
+        });
+    });
+
+    function restoreErgazomenosSelectionFromRecord(record = {}, silent = true) {
+        const value = String(record.value || '').trim();
+
+        if (!value || !ergazomenoiDropdown) return false;
+
+        const tom = getErgazomenoiTomSelect();
+
+        if (tom) {
+            if (!tom.options[value]) {
+                tom.addOption(record);
+            }
+
+            tom.setValue(value, silent);
+            tom.refreshItems();
+            tom.refreshOptions(false);
+
+            if (typeof tom.close === 'function') {
+                tom.close();
+            }
+
+            return true;
+        }
+
+        ergazomenoiDropdown.value = value;
+
+        if (!silent) {
+            const event = new Event('change', { bubbles: true });
+            ergazomenoiDropdown.dispatchEvent(event);
+        }
+
+        return true;
+    }
+
+    // Προσθήκη event listeners στα κουμπιά προηγούμενου/επόμενου εργαζομένου.
+    if (prevButton) {
+        prevButton.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            navigateDropdown(-1);
+        });
+    }
+
+    if (nextButton) {
+        nextButton.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            navigateDropdown(1);
+        });
+    }
+
+    // Συνάρτηση για πλοήγηση στο dropdown εργαζομένων.
+    function navigateDropdown(direction) {
+        if (!ergazomenoiOptionsCache.length) {
+            updateButtonStates();
+            return;
+        }
+
+        const currentValue = String(ergazomenoiDropdown.value || '').trim();
+        let currentIndex = ergazomenoiOptionsCache.findIndex((item) => item.value === currentValue);
+
+        if (currentIndex < 0) {
+            currentIndex = direction > 0 ? -1 : ergazomenoiOptionsCache.length;
+        }
+
         let newIndex = currentIndex + direction;
 
-        // Έλεγχος ορίων
-        if (newIndex < firstIndex) {
-            newIndex = firstIndex;
-        } else if (newIndex >= totalOptions) {
-            newIndex = totalOptions - 1;
+        if (newIndex < 0) newIndex = 0;
+        if (newIndex >= ergazomenoiOptionsCache.length) {
+            newIndex = ergazomenoiOptionsCache.length - 1;
         }
 
-        // Ενημέρωση της επιλογής στο dropdown
-        ergazomenoiDropdown.selectedIndex = newIndex;
-        document.getElementById('ergazomenos_Hidden').value = ergazomenoiDropdown.value; // Ενημερώνουμε το hidden field με την προεπιλεγμένη τιμή.
-        updateLabelsFromHidden('ergazomenos_Hidden', [
-            'ergazomenosLabel_Krathseis',
-            'ergazomenosLabel_Foroi',
-            'ergazomenosLabel_Astheneia',
-            'ergazomenosLabel_Adeies'
-        ]);
+        if (newIndex === currentIndex) {
+            updateButtonStates();
+            return;
+        }
 
-        // Ενεργοποίηση του event 'change'
-        const event = new Event('change', { bubbles: true });
-        ergazomenoiDropdown.dispatchEvent(event);
+        const nextRecord = ergazomenoiOptionsCache[newIndex];
 
-        // Ενημέρωση της κατάστασης των κουμπιών
+        if (!nextRecord?.value) {
+            updateButtonStates();
+            return;
+        }
+
+        forcedErgazomenosRecordForNavigation = nextRecord;
+        restoreErgazomenosSelectionFromRecord(nextRecord, true);
+        handleDropdownChange();
         updateButtonStates();
     }
 
@@ -203,30 +1141,37 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleDropdownChange() {
         updateButtonStates();
 
-        if (loaderContainer) loaderContainer.style.display = 'grid';
+        const forcedRecord = forcedErgazomenosRecordForNavigation;
+        forcedErgazomenosRecordForNavigation = null;
+
+        beginApasxolhseisPipelineLoader();
 
         try {
             await clearFormFields();
 
+            if (forcedRecord) {
+                restoreErgazomenosSelectionFromRecord(forcedRecord, true);
+            }
+
             document.getElementById('synoloMiktonApodoxon_Hidden').value = 0;
 
-            const selectedErgazomenos = ergazomenoiDropdown.value;
-            document.getElementById('idHidden').value = selectedErgazomenos;
+            const selectedErgazomenos = forcedRecord
+                ? String(forcedRecord.value || '').trim()
+                : String(ergazomenoiDropdown.value || '').trim();
+            const selectedRecord = forcedRecord || getSelectedErgazomenosRecord();
 
-            const selectedOption = ergazomenoiDropdown.options[ergazomenoiDropdown.selectedIndex];
+            if (selectedErgazomenos && selectedRecord?.kodikos) {
+                _SELECTED_ERGAZOMENOS = selectedRecord.id || selectedErgazomenos; // Ορισμός global μεταβλητής
 
-            if (selectedOption.value) {
-                _SELECTED_ERGAZOMENOS = selectedOption.value; // Ορισμός global μεταβλητής
-
-                const txtContent = selectedOption.text;
-                const lastFourChars = txtContent.slice(-4).trim();
-                document.getElementById('kodikosHidden').value = lastFourChars;
-                const selectedKodikos = lastFourChars;
+                document.getElementById('idHidden').value = selectedRecord.id || selectedErgazomenos;
+                document.getElementById('kodikosHidden').value = selectedRecord.kodikos;
+                const selectedKodikos = selectedRecord.kodikos;
                 try {
-                    const response = await fetch(
-                        `/api/kinhseis/getLoipaStoixeiaErgazomenoy/${selectedTeam}/${selectedCompany}/${selectedKodikos}`
-                    );
-                    const result = await response.json();
+                    const result = await fetchEmployeeDetails(selectedKodikos);
+
+                    if (!result?.ergazomenoi) {
+                        throw new Error('Δεν βρέθηκαν στοιχεία εργαζομένου.');
+                    }
 
                     // Ανάθεση τιμών στις global μεταβλητές
                     _ergazomenoi = result.ergazomenoi;
@@ -363,29 +1308,13 @@ document.addEventListener('DOMContentLoaded', function () {
                         meioshErgatikhsEisforas.disabled = true;
                     }
 
-                    loadPeriods();
-                    loadTypoiApodoxon();
-
-                    document.getElementById('synoloApodoxon').value = parseFloat(
-                        _ergazomenoi.synolo_symbashs_basei_oron_ergasias
-                    ).toFixed(2);
-                    document.getElementById('symfonhtheisMisthos').value = parseFloat(
-                        _ergazomenoi.symfonhtheis_misthos_apasxolhseis
-                    ).toFixed(2);
-                    document.getElementById('pragmatikoOromisthio').value = parseFloat(
-                        _ergazomenoi.pragmatikoOromisthio
-                    ).toFixed(2);
-                    document.getElementById('pragmatikoHmeromisthio').value = parseFloat(
-                        _ergazomenoi.pragmatikoHmeromisthio
-                    ).toFixed(2);
-                    document.getElementById('nomimoOromisthio').value = parseFloat(
-                        _ergazomenoi.nomimoOromisthio
-                    ).toFixed(2);
-                    document.getElementById('nomimoHmeromisthio').value = parseFloat(
-                        _ergazomenoi.nomimoHmeromisthio
-                    ).toFixed(2);
-
+                    applySelectedEmployeeBaseValues();
                     document.getElementById('oresErgasias').focus();
+                    await loadTypoiApodoxon();
+                    await loadPeriods();
+                    await runEmployeePeriodFlowOnce('employee-change');
+
+                    prefetchAdjacentEmployeeDetails(selectedRecord);
                 } catch (error) {
                     console.error('Fetch error:', error);
                 }
@@ -395,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Dropdown change error:', error);
         } finally {
-            if (loaderContainer) loaderContainer.style.display = 'none';
+            endApasxolhseisPipelineLoader();
         }
     }
 
@@ -405,173 +1334,114 @@ document.addEventListener('DOMContentLoaded', function () {
     // Η κλήση κατά την αρχική φόρτωση των εργαζομένων γίνεται από το toggleLabelKinhseis.js
 
     async function loadErgazomenoi(energoi, ypokatasthma) {
-        // Ανάκτηση των τιμών team και company
-        const ergazomenoiDropdown = document.getElementById('ergazomenos_kin');
-        // const ergazomenoiDropdown = document.getElementById("ergazomenoi");
-        let selectedTeam = document.getElementById('team')
-            ? document.getElementById('team').value
-            : null;
-        const hmeromhnia_arxhs_periodoy =
-            document.getElementById('etos').value +
-            '-' +
-            document.getElementById('mhnas').value +
-            '-01' +
-            'T00:00:00.000';
-        let selectedCompany = document.getElementById('company_kod')
-            ? document.getElementById('company_kod').value
-            : null;
+        syncEnergoiHidden(energoi ?? getEnergoiSelection());
+        pruneEmployeeDetailsCache();
+        clearPayrollDataCaches();
 
-        ergazomenoiDropdown.innerHTML = '';
-        const emptyOption = new Option('', '');
-        ergazomenoiDropdown.appendChild(emptyOption);
+        const selectedTeamValue = getInputValue('team');
+        const selectedCompanyValue = getInputValue('company_kod');
+        const ypokatasthmaForQuery = normalizeYpokatasthmaValue(
+            ypokatasthma || syncYpokatasthmaHidden()
+        );
+
+        resetErgazomenoiTomDropdown();
 
         try {
-            const response = await fetch(
-                `/api/kinhseis/getErgazomenoi/${selectedTeam}/${selectedCompany}?energoi=${energoi}&ypokatasthma=${ypokatasthma}&hmeromhnia_arxhs_periodoy=${hmeromhnia_arxhs_periodoy}`
+            const ergazomenoiQueryString = buildErgazomenoiDropdownQueryString(
+                energoi,
+                ypokatasthmaForQuery
             );
-            const data = await response.json();
+
+            const response = await fetch(
+                `/api/dropdown/kinhseis/apasxolhseis/ergazomenoi?${ergazomenoiQueryString}`,
+                {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                }
+            );
+
+            const payload = await response.json();
+            const data = extractResponseArray(payload);
+
             if (data.length === 0) {
                 const menuLinks = document.querySelectorAll('.menu_Links ul li');
                 menuLinks.forEach((link) => {
-                    link.classList.add('disabled'); // Προσθέτει την κλάση 'disabled'
+                    link.classList.add('disabled');
                 });
+
+                await clearFormFields();
+                await clearValueFields();
+
                 message = `
             <p class="bold-text">Προσοχή !!!)</p>
             <p>&nbsp;</p>
             <p>Δεν βρέθηκαν εργαζόμενοι που να πληρούν τα κριτήρια αναζήτησης.</p>`;
                 showAlert(message);
-                return;
-            } else {
-                // Enable τα menu links αν υπάρχουν δεδομένα
-                const menuLinks = document.querySelectorAll('.menu_Links ul li');
-                menuLinks.forEach((link) => {
-                    link.classList.remove('disabled'); // Αφαιρεί την κλάση 'disabled'
-                });
-                data.forEach((data) => {
-                    let txtContent =
-                        data.eponymo.substring(0, 25).padEnd(26, '\u00A0') +
-                        data.patronymo.substring(0, 3).padEnd(4, '\u00A0') +
-                        data.onoma.substring(0, 14).padEnd(15, '\u00A0') +
-                        data.kodikos.substring(0, 4);
-
-                    const option = new Option(txtContent, data._id);
-                    ergazomenoiDropdown.appendChild(option);
-                });
-
-                const options = ergazomenoiDropdown.options;
-                if (options && options.length > 1) {
-                    const firstValidIndex = options[0].value === '' ? 1 : 0;
-                    ergazomenoiDropdown.selectedIndex = firstValidIndex;
-                    // Χωρίζουμε το string σε λέξεις χρησιμοποιώντας την `split` με βάση τα κενά (whitespace)
-                    const trimmedWords = options[1].text
-                        .split(/\s+/)
-                        .filter((word) => word.length > 0);
-                    // Παίρνουμε τις πρώτες 3 λέξεις
-                    const firstThreeWords = trimmedWords.slice(0, 3);
-                    // Επανασυνδέουμε τις λέξεις με ένα κενό ανάμεσά τους
-                    const result = firstThreeWords.join(' ');
-
-                    // Ενεργοποίηση του event 'change'
-                    const event = new Event('change', { bubbles: true });
-                    ergazomenoiDropdown.dispatchEvent(event);
-                } else {
-                    await clearFormFields();
-                    await clearValueFields();
-                }
-
-                // Ενημέρωση της κατάστασης των κουμπιών
                 updateButtonStates();
+                return;
             }
+
+            const menuLinks = document.querySelectorAll('.menu_Links ul li');
+            menuLinks.forEach((link) => {
+                link.classList.remove('disabled');
+            });
+
+            setErgazomenoiDropdownOptions(data);
+            updateButtonStates();
         } catch (error) {
-            console.error(error);
+            console.error('Error loading ergazomenoi dropdown:', {
+                error,
+                selectedTeamValue,
+                selectedCompanyValue,
+                ypokatasthmaForQuery
+            });
         }
     }
     // Συνάρτηση για ενημέρωση της κατάστασης των κουμπιών
     function updateButtonStates() {
-        const options = ergazomenoiDropdown.options;
-        const currentIndex = ergazomenoiDropdown.selectedIndex;
+        if (!prevButton || !nextButton) return;
 
-        const firstIndex = options[0].value === '' ? 1 : 0;
-        const lastIndex = options.length - 1;
+        const currentValue = String(ergazomenoiDropdown?.value || '').trim();
+        const currentIndex = ergazomenoiOptionsCache.findIndex((item) => item.value === currentValue);
+        const hasOptions = ergazomenoiOptionsCache.length > 0;
 
-        prevButton.disabled = currentIndex <= firstIndex;
-        nextButton.disabled = currentIndex >= lastIndex;
+        prevButton.disabled = !hasOptions || currentIndex <= 0;
+        nextButton.disabled = !hasOptions || currentIndex < 0 || currentIndex >= ergazomenoiOptionsCache.length - 1;
     }
 
     window.loadErgazomenoi = loadErgazomenoi;
     window.navigateDropdown = navigateDropdown;
 
     async function loadYpokatasthmata() {
-        _YPOKATASTHMA = document.getElementById('ypokatasthma').value;
+        /*
+            Το υποκατάστημα πλέον αρχικοποιείται από το κοινό TomDropdown σύστημα
+            μέσω dropdownManager.js / dropdown-item.js και του data-api στο EJS:
+            /api/dropdown/ergazomenoi/ypokatasthma
 
-        ypokatasthmataDropdown.innerHTML = '';
-        const emptyOption = new Option('ΟΛΑ...', '');
-        ypokatasthmataDropdown.appendChild(emptyOption);
-        document.getElementById('ypokatasthma_Hidden').value = 'ΟΛΑ...';
+            Κρατάμε αυτή τη συνάρτηση μόνο για συμβατότητα, ώστε αν την καλέσει
+            παλιός κώδικας να μην φορτώσει ξανά native options από /api/ypokatasthmata.
+        */
+        syncYpokatasthmaHidden();
         updateLabelsFromHidden('ypokatasthma_Hidden', [
             'ypokatasthmaLabel_Krathseis',
             'ypokatasthmaLabel_Foroi',
             'ypokatasthmaLabel_Astheneia'
         ]);
-
-        try {
-            const response = await fetch('/api/ypokatasthmata');
-            const data = await response.json();
-            let textToConvert;
-
-            data.forEach((data) => {
-                textToConvert = removeGreekAccentsAndToUpper(data.perigrafh);
-                const option = document.createElement('option');
-                option.value = data.kodikos;
-                option.textContent = textToConvert;
-
-                ypokatasthmataDropdown.appendChild(option);
-
-                if (data.kodikos === _YPOKATASTHMA) {
-                    option.selected = true;
-                    // Προσομοίωση της αλλαγής για την ενεργοποίηση του event listener
-                    ypokatasthmataDropdown.value = data.kodikos;
-
-                    const changeEvent = new Event('change', { bubbles: true });
-                    ypokatasthmataDropdown.dispatchEvent(changeEvent);
-                }
-            });
-        } catch (error) {
-            console.error(error);
-        }
     }
 
     // Συνάρτηση φόρτωσης περιόδων
     async function loadPeriods() {
         if (!_SELECTED_ERGAZOMENOS) return;
 
-        _MHNAS_APASXOLHSHS = document.getElementById('mhnas').value;
+        _MHNAS_APASXOLHSHS = String(document.getElementById('mhnas')?.value || '').trim();
 
-        periodoiDropdown.innerHTML = '';
-        const emptyOption = new Option('', '');
-        periodoiDropdown.appendChild(emptyOption);
+        if (!_MHNAS_APASXOLHSHS) return;
 
         try {
-            const response = await fetch('/api/periodoi');
-            const data = await response.json();
-            let textToConvert;
-
-            data.forEach((data) => {
-                textToConvert = removeGreekAccentsAndToUpper(data.perigrafh);
-                const option = document.createElement('option');
-                option.value = data.kodikos;
-                option.textContent = textToConvert;
-
-                periodoiDropdown.appendChild(option);
-
-                if (data.kodikos === _MHNAS_APASXOLHSHS) {
-                    option.selected = true;
-                    // Προσομοίωση της αλλαγής για την ενεργοποίηση του event listener
-                    periodoiDropdown.value = data.kodikos;
-                    const changeEvent = new Event('change', { bubbles: true });
-                    periodoiDropdown.dispatchEvent(changeEvent);
-                }
-            });
+            // Στην αλλαγή εργαζομένου η περίοδος μπαίνει silent.
+            // Δεν πυροδοτούμε periodos change εδώ, γιατί αυτό άνοιγε ξανά
+            // το ίδιο sharedParams / getApasxolhseis flow πολλές φορές.
+            await setPeriodosTomValue(_MHNAS_APASXOLHSHS, true);
         } catch (error) {
             console.error(error);
         }
@@ -580,315 +1450,515 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatValue(value) {
         return value && !isNaN(value) ? parseFloat(value).toFixed(4) : 0;
     }
+    function setNumericInputValue(id, value, decimals = 2) {
+        const element = document.getElementById(id);
+        if (!element) return;
 
-    periodoiDropdown.addEventListener('change', async () => {
-        // sharedParams = Αντικείμενο που περιέχει διάφορες μεταβλητές και το οποίο χρησιμοποιείται σε περίπτωση change μιας τιμής πχ περίοδος, όταν το addEventListener βρίσκεται σε εξωτερικό αρχείο JS
-        window.sharedParams = {
-            ergazomenoi: _ergazomenoi,
-            sxeshErgasias: _sxeshErgasias,
-            kathestosApasxolhshs: _kathestosApasxolhshs,
-            oikogeneiakhKatastash: _oikogeneiakhKatastash,
-            typosErgazomenoy: _typosErgazomenoy,
-            genikesParametroi: _genikesParametroi,
-            asfalistikesKlaseis: _asfalistikesKlaseis,
-            astheneies: _astheneies,
-            etaireia: _etaireia,
-            _TEAM: document.getElementById('team').value,
-            _COMPANY: document.getElementById('company_kod').value,
-            _XRHSH: document.getElementById('etos').value,
-            _KODIKOS_ETAIREIAS: _etaireia.kod,
-            _SYNOLO_ERGASIMON_HMERON_MHNA: 0,
-            _ERGASIMES_HMERES_MHNA: 0,
-            _MH_ERGASIMES_HMERES_MHNA: 0,
-            _ETHSIES_ORES_YPERORION: 0,
-            _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
-            startDate: null,
-            endDate: null
+        const parsed = parseFloat(value);
+        element.value = Number.isFinite(parsed) ? parsed.toFixed(decimals) : (0).toFixed(decimals);
+    }
+
+    function applySelectedEmployeeBaseValues() {
+        if (!_ergazomenoi) return;
+
+        setNumericInputValue('synoloApodoxon', _ergazomenoi.synolo_symbashs_basei_oron_ergasias, 2);
+        setNumericInputValue('symfonhtheisMisthos', _ergazomenoi.symfonhtheis_misthos_apasxolhseis, 2);
+        setNumericInputValue('pragmatikoOromisthio', _ergazomenoi.pragmatikoOromisthio, 2);
+        setNumericInputValue('pragmatikoHmeromisthio', _ergazomenoi.pragmatikoHmeromisthio, 2);
+        setNumericInputValue('nomimoOromisthio', _ergazomenoi.nomimoOromisthio, 2);
+        setNumericInputValue('nomimoHmeromisthio', _ergazomenoi.nomimoHmeromisthio, 2);
+    }
+
+
+    function buildPeriodDateRange(yearValue, periodValue) {
+        const year = parseInt(String(yearValue || '').trim(), 10);
+        const month = parseInt(String(periodValue || '').trim(), 10);
+
+        if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+            return {
+                startDateISOString: null,
+                endDateISOString: null
+            };
+        }
+
+        const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+        const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+        const endDate = new Date(Date.UTC(year, month - 1, lastDayOfMonth, 0, 0, 0, 0));
+
+        return {
+            startDateISOString: startDate.toISOString(),
+            endDateISOString: endDate.toISOString()
         };
+    }
 
-        let sharedParams = window.sharedParams;
-        console.log(sharedParams);
+    let employeePeriodFlowSeq = 0;
+    let activeEmployeePeriodFlowKey = '';
+    let activeEmployeePeriodFlowPromise = null;
+    let lastCompletedEmployeePeriodFlowKey = '';
 
-        // Δημιουργία του CustomEvent με τις παραμέτρους
-        let event = new CustomEvent('sharedParamsLoaded', { detail: sharedParams });
-        // Πυροδότηση του event
-        document.dispatchEvent(event);
+    function normalizeDateOnly(value) {
+        if (!value) return null;
+        const raw = String(value).slice(0, 10);
+        const date = new Date(`${raw}T00:00:00.000Z`);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
 
-        await clearFormFields();
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('\"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
 
-        const selectedPeriodos = periodoiDropdown.value;
-        const selectedTyposApodoxon = typoiApodoxonDropdown.value;
+    function formatDateForGreekMessage(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}/${month}/${year}`;
+    }
 
-        await updateSessionPeriodos(selectedPeriodos);
+    function isEmployeeHireDateAfterPeriodEnd(employee, endDateISOString) {
+        const hireDate = normalizeDateOnly(employee?.hmeromhnia_proslhpshs);
+        const periodEnd = normalizeDateOnly(endDateISOString);
 
-        const synoloYperorion_data = await fetch(
-            `/api/kinhseis/getEthsioSynoloYperorion?team=${selectedTeam}&company=${selectedCompany}&employeeKod=${document.getElementById('kodikosHidden').value}&xrhsh=${document.getElementById('etos').value}`
-        );
+        if (!hireDate || !periodEnd) {
+            return false;
+        }
 
-        const ethsiesYperories_result = await synoloYperorion_data.json();
-        let _ETHSIES_ORES_YPERORION = parseFloat(ethsiesYperories_result.total_ores_yperorias);
-        document.getElementById('orioYperorion_Hidden').value = _ETHSIES_ORES_YPERORION;
-        document.getElementById('aa_misthodosias_Hidden').value =
-            document.getElementById('aaMisthodosias').value;
+        return hireDate.getTime() > periodEnd.getTime();
+    }
 
-        let etosXrhshs = document.getElementById('etos').value;
-        let mhnasXrhshs = periodoiDropdown.value;
-        const startDate = new Date(
-            Date.UTC(parseInt(etosXrhshs), parseInt(mhnasXrhshs) - 1, 1, 0, 0, 0, 0)
-        );
-        const startDateISOString = startDate.toISOString();
-        const endDate = new Date(
-            Date.UTC(
-                parseInt(etosXrhshs),
-                parseInt(mhnasXrhshs) - 1,
-                new Date(etosXrhshs, mhnasXrhshs, 0).getDate(),
-                0,
-                0,
-                0,
-                0
-            )
-        );
-        const endDateISOString = endDate.toISOString();
+    function showEmployeeOutsidePeriodMessage(employee, endDateISOString) {
+        const hireDate = normalizeDateOnly(employee?.hmeromhnia_proslhpshs);
+        const periodEnd = normalizeDateOnly(endDateISOString);
+        const employeeName = [employee?.eponymo, employee?.onoma].filter(Boolean).join(' ').trim();
+        const safeEmployeeName = escapeHtml(employeeName || 'του/της εργαζόμενου/ης');
+        const hireDateText = escapeHtml(formatDateForGreekMessage(hireDate));
+        const periodEndText = escapeHtml(formatDateForGreekMessage(periodEnd));
 
-        // sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
-        sharedParams.startDate = startDateISOString;
-        sharedParams.endDate = endDateISOString;
+        const message = `
+            <div class="apasxolhseis-outside-period-message">
+                <p>Ο/Η εργαζόμενος/η <strong>${safeEmployeeName}</strong> έχει ημερομηνία πρόσληψης μεταγενέστερη από τη λήξη της επιλεγμένης περιόδου.</p>
+                <div class="apasxolhseis-outside-period-dates">
+                    <div><span>Ημ/νία πρόσληψης:</span> <strong>${hireDateText}</strong></div>
+                    <div><span>Λήξη περιόδου:</span> <strong>${periodEndText}</strong></div>
+                </div>
+                <p class="apasxolhseis-outside-period-footer">Δεν θα γίνουν υπολογισμοί απασχόλησης για αυτή την περίοδο.</p>
+            </div>`;
 
-        const apasxolhseis_data = await fetch(
-            `/api/kinhseis/getApasxolhseis?team=${selectedTeam}&company=${selectedCompany}&employeeKod=${document.getElementById('kodikosHidden').value}&xrhsh=${document.getElementById('etos').value}&periodos=${selectedPeriodos}&typos_apodoxon=${selectedTyposApodoxon}&aa_misthodosias=${document.getElementById('aaMisthodosias').value}`
-        );
-
-        const apasxolhseis_result = await apasxolhseis_data.json();
-
-        if (!apasxolhseis_result || apasxolhseis_result.length === 0) {
-            hasRecord = false;
-
-            document.querySelectorAll('[id^=saveButton]').forEach((saveButton) => {
-                // const section = saveButton.closest("section"); // Βρίσκουμε το section που ανήκει το κουμπί
-                // if (!section) return;
-                applyButtonPermissions(hasRecord);
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire({
+                title: 'Εργαζόμενος εκτός περιόδου',
+                html: message,
+                icon: 'warning',
+                confirmButtonText: 'ΟΚ',
+                allowOutsideClick: false,
+                allowEscapeKey: true
             });
+        }
 
-            _PRAGMATIKES_HMERES_ERGASIAS_MHNA = await ypologismosPragmatikonErgasimonHmeronMhna(
-                document.getElementById('etos').value,
-                selectedPeriodos,
-                document.getElementById('apasxolhshBaseiSymbashs_Hidden').value,
-                _genikesParametroi,
-                _argies,
-                _ergazomenoi.xarakthrismos_ergazomenon,
-                _ergazomenoi.hmeromhnia_proslhpshs,
-                _ergazomenoi.hmeromhnia_apoxorhshs
-            );
+        return showAlert(message);
+    }
 
-            if (_PRAGMATIKES_HMERES_ERGASIAS_MHNA === 0) {
-                message = `
-                <p class="bold-text">Τα στοιχεία του εργαζόμενου είναι ελλιπή.</p>
-                <p>&nbsp;</p>
-                <p style="margin-top: 1.5rem; margin-bottom: 1rem;">Διορθώστε τα στοιχεία του και ξαναπροσπαθήστε...</p>`;
-                showAlert(message);
-            }
+    function queueEmployeeOutsidePeriodMessage(employee, endDateISOString) {
+        const employeeSnapshot = employee ? { ...employee } : employee;
+        const periodEndSnapshot = endDateISOString;
 
-            sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
+        setTimeout(() => {
+            showEmployeeOutsidePeriodMessage(employeeSnapshot, periodEndSnapshot);
+        }, 0);
+    }
 
-            document.dispatchEvent(new Event('sharedParamsReady'));
-            document.getElementById('kodikosHidden').value = sharedParams.ergazomenoi.kodikos;
-            const data = await fetch(
-                `/api/kinhseis/calcTotals?team=${selectedTeam}&company=${selectedCompany}&employeeKod=${document.getElementById('kodikosHidden').value}&startDate=${startDateISOString}&endDate=${endDateISOString}`
-            );
-            const result = await data.json();
+    function getEmployeePeriodFlowKey(selectedPeriodos) {
+        return [
+            getInputValue('team'),
+            getInputValue('company_kod'),
+            getApasxolhseisYpokatasthmaForQuery(),
+            getInputValue('kodikosHidden'),
+            getInputValue('etos'),
+            String(selectedPeriodos || periodoiDropdown.value || '').trim(),
+            String(typoiApodoxonDropdown.value || '').trim(),
+            getInputValue('aaMisthodosias', '1')
+        ].join('|');
+    }
 
-            // Ενημέρωση Ωρών Υπερβάλλουσας Εργασίας
-            document.getElementById('oresArgion').value = formatValue(result.total_ores_argion);
-            document.getElementById('oresNyxtas').value = formatValue(result.total_ores_nyxtas);
+    async function runEmployeePeriodFlowOnce(source = 'unknown', options = {}) {
+        const selectedPeriodos = String(periodoiDropdown.value || '').trim();
 
-            document.getElementById('oresYperergasias').value = formatValue(
-                result.total_ores_yperergasias
-            );
-            document.getElementById('oresYperergasiasArgion').value = formatValue(
-                result.total_ores_yperergasias_argion
-            );
-            document.getElementById('oresYperergasiasNyxtas').value = formatValue(
-                result.total_ores_yperergasias_nyxtas
-            );
-            document.getElementById('oresYperergasiasArgionNyxtas').value = formatValue(
-                result.total_ores_yperergasias_argion_nyxtas
-            );
-
-            document.getElementById('oresNomimhsYperorias').value = formatValue(
-                result.total_ores_nomimhs_yperorias
-            );
-            document.getElementById('oresNomimhsYperoriasArgion').value = formatValue(
-                result.total_ores_nomimhs_yperorias_argion
-            );
-            document.getElementById('oresNomimhsYperoriasNyxtas').value = formatValue(
-                result.total_ores_nomimhs_yperorias_nyxtas
-            );
-            document.getElementById('oresNomimhsYperoriasArgionNyxtas').value = formatValue(
-                result.total_ores_nomimhs_yperorias_argion_nyxtas
-            );
-
-            document.getElementById('oresParanomhsYperorias').value = formatValue(
-                result.total_ores_paranomhs_yperorias
-            );
-            document.getElementById('oresParanomhsYperoriasArgion').value = formatValue(
-                result.total_ores_paranomhs_yperorias_argion
-            );
-            document.getElementById('oresParanomhsYperoriasNyxtas').value = formatValue(
-                result.total_ores_paranomhs_yperorias_nyxtas
-            );
-            document.getElementById('oresParanomhsYperoriasArgionNyxtas').value = formatValue(
-                result.total_ores_paranomhs_yperorias_argion_nyxtas
-            );
-
-            event = new Event('change'); // Δημιουργία του change event
-            document.getElementById('oresArgion').dispatchEvent(event);
-            document.getElementById('oresNyxtas').dispatchEvent(event);
-
-            document.getElementById('oresYperergasias').dispatchEvent(event);
-            document.getElementById('oresYperergasiasArgion').dispatchEvent(event);
-            document.getElementById('oresYperergasiasNyxtas').dispatchEvent(event);
-            document.getElementById('oresYperergasiasArgionNyxtas').dispatchEvent(event);
-
-            document.getElementById('oresNomimhsYperorias').dispatchEvent(event);
-            document.getElementById('oresNomimhsYperoriasArgion').dispatchEvent(event);
-            document.getElementById('oresNomimhsYperoriasNyxtas').dispatchEvent(event);
-            document.getElementById('oresNomimhsYperoriasArgionNyxtas').dispatchEvent(event);
-
-            document.getElementById('oresParanomhsYperorias').dispatchEvent(event);
-            document.getElementById('oresParanomhsYperoriasArgion').dispatchEvent(event);
-            document.getElementById('oresParanomhsYperoriasNyxtas').dispatchEvent(event);
-            document.getElementById('oresParanomhsYperoriasArgionNyxtas').dispatchEvent(event);
-
-            document.getElementById('oresErgasias6Hmeras').dispatchEvent(event);
-
-            document.getElementById('oresProsthethsErgasias').dispatchEvent(event);
-            document.getElementById('taktikesApodoxesMhYpologizomenesSeDora').dispatchEvent(event);
-            document.getElementById('taktikesApodoxesYpologizomenesSeDora').dispatchEvent(event);
-            document.getElementById('epimerizomenesSeMhnesErgasias').dispatchEvent(event);
-            document.getElementById('primBonus').dispatchEvent(event);
-            document.getElementById('apallassomenesForoy').dispatchEvent(event);
-            document.getElementById('apallassomenesKrathseon').dispatchEvent(event);
-
-            var hmeresErgasiasElem = document.getElementById('hmeresErgasias');
-            var oresErgasiasElem = document.getElementById('oresErgasias');
-            window.isManualEntry = false; // Ορισμός σε global scope ενός Flag για να παρακολουθεί αν θα γίνει χειροκίνητη εισαγωγή
-
-            // Ελέγχουμε αν το result είναι κενό
-            if (Object.keys(result).length === 0) {
-                hmeresErgasiasElem.readOnly = false;
-                oresErgasiasElem.readOnly = false;
-                hmeresErgasiasElem.value = 0;
-                oresErgasiasElem.value = 0;
-                window.isManualEntry = true;
-                hmeresErgasiasElem.focus();
-            } else {
-                hmeresErgasiasElem.readOnly = true;
-                oresErgasiasElem.readOnly = false;
-            }
-
-            hmeresErgasiasElem.value =
-                result.countNotAN_ME && !isNaN(result.countNotAN_ME)
-                    ? parseInt(result.countNotAN_ME)
-                    : 0;
-            // oresErgasiasElem.value = (result.total_ores_ergasias && !isNaN(result.total_ores_ergasias)) ? parseFloat(result.total_ores_ergasias).toFixed(4) : 0;
-
-            event = new Event('change'); // Δημιουργία του change event
-            document.getElementById('hmeresErgasias').dispatchEvent(event); // Πυροδότηση του change event
-        } else {
-            await handleFillFields(apasxolhseis_result, sharedParams);
-
-            // document.querySelectorAll("[id^=saveButton]").forEach(saveButton => {
-            // const section = saveButton.closest("section"); // Βρίσκουμε το section που ανήκει το κουμπί
-            // if (!section) return;
-
-            applyButtonPermissions(hasRecord);
-            // });
-
+        // TomSelect μπορεί να πυροδοτήσει change με κενή τιμή κατά το αρχικό init/clear.
+        // Η Περίοδος είναι υποχρεωτικό πεδίο, οπότε δεν συνεχίζουμε με κενή τιμή.
+        if (!selectedPeriodos) {
             return;
         }
+
+        if (!_ergazomenoi || !getInputValue('kodikosHidden')) {
+            return;
+        }
+
+        const flowKey = getEmployeePeriodFlowKey(selectedPeriodos);
+
+        if (!options.force && activeEmployeePeriodFlowPromise && activeEmployeePeriodFlowKey === flowKey) {
+            return activeEmployeePeriodFlowPromise;
+        }
+
+        if (!options.force && !activeEmployeePeriodFlowPromise && lastCompletedEmployeePeriodFlowKey === flowKey) {
+            return;
+        }
+
+        const flowId = ++employeePeriodFlowSeq;
+        activeEmployeePeriodFlowKey = flowKey;
+
+        const isCurrentFlow = () => flowId === employeePeriodFlowSeq;
+
+        activeEmployeePeriodFlowPromise = (async () => {
+            const previousSuppress = window.apasxolhseisSuppressFieldEvents;
+
+            beginApasxolhseisPipelineLoader();
+
+            try {
+                window.apasxolhseisSuppressFieldEvents = true;
+
+                const periodosHidden = document.getElementById('periodos_Hidden');
+                const mhnasHidden = document.getElementById('mhnas');
+                if (periodosHidden) periodosHidden.value = selectedPeriodos;
+                if (mhnasHidden) mhnasHidden.value = selectedPeriodos;
+
+                const etosXrhshs = document.getElementById('etos')?.value || '';
+                const { startDateISOString, endDateISOString } = buildPeriodDateRange(
+                    etosXrhshs,
+                    selectedPeriodos
+                );
+
+                if (!startDateISOString || !endDateISOString) {
+                    console.error('Αδύνατη η δημιουργία ημερομηνιών περιόδου:', {
+                        etosXrhshs,
+                        selectedPeriodos,
+                        source
+                    });
+                    return;
+                }
+
+                sharedParams = {
+                    ergazomenoi: _ergazomenoi,
+                    sxeshErgasias: _sxeshErgasias,
+                    kathestosApasxolhshs: _kathestosApasxolhshs,
+                    oikogeneiakhKatastash: _oikogeneiakhKatastash,
+                    typosErgazomenoy: _typosErgazomenoy,
+                    genikesParametroi: _genikesParametroi,
+                    asfalistikesKlaseis: _asfalistikesKlaseis,
+                    astheneies: _astheneies,
+                    etaireia: _etaireia,
+                    _TEAM: document.getElementById('team').value,
+                    _COMPANY: document.getElementById('company_kod').value,
+                    _YPOKATASTHMA: syncYpokatasthmaHidden(),
+                    _XRHSH: document.getElementById('etos').value,
+                    _KODIKOS_ETAIREIAS: _etaireia.kod,
+                    _SYNOLO_ERGASIMON_HMERON_MHNA: 0,
+                    _ERGASIMES_HMERES_MHNA: 0,
+                    _MH_ERGASIMES_HMERES_MHNA: 0,
+                    _ETHSIES_ORES_YPERORION: 0,
+                    _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
+                    startDate: startDateISOString,
+                    endDate: endDateISOString,
+                    isReady: true
+                };
+
+                window.sharedParams = sharedParams;
+
+                if (!isCurrentFlow()) return;
+
+                if (isEmployeeHireDateAfterPeriodEnd(_ergazomenoi, endDateISOString)) {
+                    await clearFormFields();
+                    if (!isCurrentFlow()) return;
+
+                    applySelectedEmployeeBaseValues();
+                    await setTyposApodoxonTomValue(typoiApodoxonDropdown.value, true);
+                    await setPeriodosTomValue(selectedPeriodos, true);
+                    queueEmployeeOutsidePeriodMessage(_ergazomenoi, endDateISOString);
+                    applyButtonPermissions(false);
+                    lastCompletedEmployeePeriodFlowKey = flowKey;
+                    return;
+                }
+
+                await clearFormFields();
+                if (!isCurrentFlow()) return;
+
+                // Το clearFormFields καθαρίζει τα πεδία αποδοχών. Τα βασικά ποσά
+                // του επιλεγμένου εργαζομένου πρέπει να μπουν ξανά πριν ξεκινήσει
+                // ο υπολογισμός αξιών/κρατήσεων/φόρου.
+                applySelectedEmployeeBaseValues();
+
+                await setTyposApodoxonTomValue(typoiApodoxonDropdown.value, true);
+                await setPeriodosTomValue(selectedPeriodos, true);
+
+                await updateSessionPeriodos(selectedPeriodos);
+                if (!isCurrentFlow()) return;
+
+                const ethsiesYperories_result = await fetchAnnualOvertime(
+                    document.getElementById('kodikosHidden').value
+                );
+                if (!isCurrentFlow()) return;
+
+                const parsedEthsiesOresYperorion = parseFloat(
+                    ethsiesYperories_result?.total_ores_yperorias
+                );
+                let _ETHSIES_ORES_YPERORION = Number.isFinite(parsedEthsiesOresYperorion)
+                    ? parsedEthsiesOresYperorion
+                    : 0;
+                document.getElementById('orioYperorion_Hidden').value = _ETHSIES_ORES_YPERORION;
+                document.getElementById('aa_misthodosias_Hidden').value =
+                    document.getElementById('aaMisthodosias').value;
+
+                sharedParams.startDate = startDateISOString;
+                sharedParams.endDate = endDateISOString;
+
+                const apasxolhseisQueryString = buildApasxolhseisQueryString({ periodos: selectedPeriodos });
+                const apasxolhseis_result = await fetchApasxolhseis(apasxolhseisQueryString);
+                if (!isCurrentFlow()) return;
+
+                if (!apasxolhseis_result || apasxolhseis_result.length === 0) {
+                    hasRecord = false;
+
+                    document.querySelectorAll('[id^=saveButton]').forEach((saveButton) => {
+                        applyButtonPermissions(hasRecord);
+                    });
+
+                    _PRAGMATIKES_HMERES_ERGASIAS_MHNA = await ypologismosPragmatikonErgasimonHmeronMhna(
+                        document.getElementById('etos').value,
+                        selectedPeriodos,
+                        document.getElementById('apasxolhshBaseiSymbashs_Hidden').value,
+                        _genikesParametroi,
+                        _argies,
+                        _ergazomenoi.xarakthrismos_ergazomenon,
+                        _ergazomenoi.hmeromhnia_proslhpshs,
+                        _ergazomenoi.hmeromhnia_apoxorhshs
+                    );
+                    if (!isCurrentFlow()) return;
+
+                    if (_PRAGMATIKES_HMERES_ERGASIAS_MHNA === 0) {
+                        message = `
+                        <p class="bold-text">Τα στοιχεία του εργαζόμενου είναι ελλιπή.</p>
+                        <p>&nbsp;</p>
+                        <p class="apasxolhseis-swal-retry-message">Διορθώστε τα στοιχεία του και ξαναπροσπαθήστε...</p>`;
+                        showAlert(message);
+                    }
+
+                    sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
+
+                    document.dispatchEvent(new Event('sharedParamsReady'));
+                    document.getElementById('kodikosHidden').value = sharedParams.ergazomenoi.kodikos;
+                    const result = await fetchCalcTotals(
+                        document.getElementById('kodikosHidden').value,
+                        startDateISOString,
+                        endDateISOString
+                    );
+                    if (!isCurrentFlow()) return;
+
+                    document.getElementById('oresArgion').value = formatValue(result.total_ores_argion);
+                    document.getElementById('oresNyxtas').value = formatValue(result.total_ores_nyxtas);
+
+                    document.getElementById('oresYperergasias').value = formatValue(
+                        result.total_ores_yperergasias
+                    );
+                    document.getElementById('oresYperergasiasArgion').value = formatValue(
+                        result.total_ores_yperergasias_argion
+                    );
+                    document.getElementById('oresYperergasiasNyxtas').value = formatValue(
+                        result.total_ores_yperergasias_nyxtas
+                    );
+                    document.getElementById('oresYperergasiasArgionNyxtas').value = formatValue(
+                        result.total_ores_yperergasias_argion_nyxtas
+                    );
+
+                    document.getElementById('oresNomimhsYperorias').value = formatValue(
+                        result.total_ores_nomimhs_yperorias
+                    );
+                    document.getElementById('oresNomimhsYperoriasArgion').value = formatValue(
+                        result.total_ores_nomimhs_yperorias_argion
+                    );
+                    document.getElementById('oresNomimhsYperoriasNyxtas').value = formatValue(
+                        result.total_ores_nomimhs_yperorias_nyxtas
+                    );
+                    document.getElementById('oresNomimhsYperoriasArgionNyxtas').value = formatValue(
+                        result.total_ores_nomimhs_yperorias_argion_nyxtas
+                    );
+
+                    document.getElementById('oresParanomhsYperorias').value = formatValue(
+                        result.total_ores_paranomhs_yperorias
+                    );
+                    document.getElementById('oresParanomhsYperoriasArgion').value = formatValue(
+                        result.total_ores_paranomhs_yperorias_argion
+                    );
+                    document.getElementById('oresParanomhsYperoriasNyxtas').value = formatValue(
+                        result.total_ores_paranomhs_yperorias_nyxtas
+                    );
+                    document.getElementById('oresParanomhsYperoriasArgionNyxtas').value = formatValue(
+                        result.total_ores_paranomhs_yperorias_argion_nyxtas
+                    );
+
+                    var hmeresErgasiasElem = document.getElementById('hmeresErgasias');
+                    var oresErgasiasElem = document.getElementById('oresErgasias');
+                    window.isManualEntry = false;
+
+                    if (Object.keys(result).length === 0) {
+                        hmeresErgasiasElem.readOnly = false;
+                        oresErgasiasElem.readOnly = false;
+                        hmeresErgasiasElem.value = 0;
+                        oresErgasiasElem.value = 0;
+                        window.isManualEntry = true;
+                        hmeresErgasiasElem.focus();
+                    } else {
+                        hmeresErgasiasElem.readOnly = true;
+                        oresErgasiasElem.readOnly = false;
+                    }
+
+                    hmeresErgasiasElem.value =
+                        result.countNotAN_ME && !isNaN(result.countNotAN_ME)
+                            ? parseInt(result.countNotAN_ME)
+                            : 0;
+
+                    document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
+                    if (!isCurrentFlow()) return;
+
+                    window.apasxolhseisSuppressFieldEvents = previousSuppress;
+
+                    if (typeof window.recalculateApasxolhseisAfterEmployeeLoad === 'function') {
+                        await window.recalculateApasxolhseisAfterEmployeeLoad({ runHmeresErgasias: true });
+                    } else {
+                        let event = new Event('change');
+                        document.getElementById('hmeresErgasias').dispatchEvent(event);
+                    }
+                    if (!isCurrentFlow()) return;
+
+                    prefetchAdjacentPayrollData(
+                        getSelectedErgazomenosRecord(),
+                        startDateISOString,
+                        endDateISOString
+                    );
+                } else {
+                    document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
+                    if (!isCurrentFlow()) return;
+
+                    await handleFillFields(apasxolhseis_result, sharedParams);
+                    if (!isCurrentFlow()) return;
+
+                    applyButtonPermissions(hasRecord);
+
+                    prefetchAdjacentPayrollData(
+                        getSelectedErgazomenosRecord(),
+                        startDateISOString,
+                        endDateISOString
+                    );
+                }
+
+                lastCompletedEmployeePeriodFlowKey = flowKey;
+            } finally {
+                window.apasxolhseisSuppressFieldEvents = previousSuppress;
+                endApasxolhseisPipelineLoader();
+
+                if (activeEmployeePeriodFlowKey === flowKey) {
+                    activeEmployeePeriodFlowKey = '';
+                    activeEmployeePeriodFlowPromise = null;
+                }
+            }
+        })();
+
+        return activeEmployeePeriodFlowPromise;
+    }
+
+    periodoiDropdown.addEventListener('change', async () => {
+        await runEmployeePeriodFlowOnce('periodos-change');
     });
 
     async function loadTypoiApodoxon() {
         if (!_SELECTED_ERGAZOMENOS) return;
-        let _TYPOS_APODOXON = document.getElementById('typ_apod').value;
 
-        typoiApodoxonDropdown.innerHTML = '';
-        const emptyOption = new Option('', '');
-        typoiApodoxonDropdown.appendChild(emptyOption);
+        const selectedTyposApodoxon = String(
+            document.getElementById('typosApodoxon_Hidden')?.value ||
+            typoiApodoxonDropdown?.value ||
+            document.getElementById('typ_apod')?.value ||
+            ''
+        ).trim();
 
         try {
-            const response = await fetch('/api/kinhseis/typoiApodoxon');
-            const data = await response.json();
-            let textToConvert;
-
-            data.forEach((data) => {
-                textToConvert = removeGreekAccentsAndToUpper(data.perigrafh);
-                const option = document.createElement('option');
-                option.value = data.kodikos;
-                option.textContent = textToConvert;
-                typoiApodoxonDropdown.appendChild(option);
-
-                if (data.kodikos === _TYPOS_APODOXON) {
-                    option.selected = true;
-                    // Προσομοίωση της αλλαγής για την ενεργοποίηση του event listener
-                    typoiApodoxonDropdown.value = data.kodikos;
-                    const changeEvent = new Event('change', { bubbles: true });
-                    typoiApodoxonDropdown.dispatchEvent(changeEvent);
-                }
-            });
+            await setTyposApodoxonTomValue(selectedTyposApodoxon, true);
         } catch (error) {
             console.error(error);
         }
     }
 
     typoiApodoxonDropdown.addEventListener('change', async () => {
-        const selectedTyposApodoxon = typoiApodoxonDropdown.value;
-        document.getElementById('typosApodoxon_Hidden').value = selectedTyposApodoxon
-            ? selectedTyposApodoxon
-            : '';
+        const selectedTyposApodoxon = String(typoiApodoxonDropdown.value || '').trim();
+
+        // TomSelect μπορεί να πυροδοτήσει change με κενή τιμή κατά το αρχικό init/clear.
+        // Ο Τύπος Αποδοχών είναι υποχρεωτικό πεδίο, οπότε δεν στέλνουμε ποτέ κενό
+        // στο /api/update_session_typosApodoxon και δεν μηδενίζουμε τα hidden fields.
+        if (!selectedTyposApodoxon) {
+            return;
+        }
+
+        document.getElementById('typosApodoxon_Hidden').value = selectedTyposApodoxon;
+        const typApodHidden = document.getElementById('typ_apod');
+        if (typApodHidden) typApodHidden.value = selectedTyposApodoxon;
         await updateSession(selectedTyposApodoxon);
 
         if (periodoiDropdown.value) {
-            const changeEvent = new Event('change', { bubbles: true });
-            periodoiDropdown.dispatchEvent(changeEvent);
+            await runEmployeePeriodFlowOnce('typos-apodoxon-change');
         }
     });
 
     async function updateSession(selectedTyposApodoxon) {
+        const normalizedTyposApodoxon = String(selectedTyposApodoxon || '').trim();
+
+        if (!normalizedTyposApodoxon) return;
+        if (lastSessionTyposApodoxonSent === normalizedTyposApodoxon) return;
+
         try {
             const response = await fetch('/api/update_session_typosApodoxon', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ typosApodoxon: selectedTyposApodoxon })
+                headers: getJsonHeaders(),
+                credentials: 'same-origin',
+                body: JSON.stringify({ typosApodoxon: normalizedTyposApodoxon })
             });
 
             const result = await response.json();
 
             if (!result.success) {
                 console.error('Σφάλμα κατά την ενημέρωση του session:', result.message);
+                return;
             }
+
+            lastSessionTyposApodoxonSent = normalizedTyposApodoxon;
         } catch (error) {
             console.error('Σφάλμα κατά την αποστολή των δεδομένων:', error);
         }
     }
 
     async function updateSessionPeriodos(selectedPeriodos) {
+        const normalizedPeriodos = String(selectedPeriodos || '').trim();
+
+        if (!normalizedPeriodos) return;
+        if (lastSessionPeriodosSent === normalizedPeriodos) return;
+
         try {
             const response = await fetch('/api/update_session_periodos', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ periodos: selectedPeriodos })
+                headers: getJsonHeaders(),
+                credentials: 'same-origin',
+                body: JSON.stringify({ periodos: normalizedPeriodos })
             });
 
             const result = await response.json();
 
             if (!result.success) {
                 console.error('Σφάλμα κατά την ενημέρωση του session:', result.message);
+                return;
             }
+
+            lastSessionPeriodosSent = normalizedPeriodos;
         } catch (error) {
             console.error('Σφάλμα κατά την αποστολή των δεδομένων:', error);
         }

@@ -48,6 +48,8 @@ const ekpaideytikaEpipeda = require('../dropdowns/ergazomenoi/ekpaideytikaEpiped
 const eidikothtes = require('../dropdowns/ergazomenoi/eidikothtes');
 const typoiErgazomenon = require('../dropdowns/ergazomenoi/typoiErgazomenon');
 const ypokatasthmaErgazomenon = require('../dropdowns/ergazomenoi/ypokatasthmata');
+const ergazomenoiKinhseon = require('../dropdowns/ergazomenoi/ergazomenoi');
+const typoiApodoxonApasxolhseon = require('../dropdowns/kinhseis/apasxolhseis/typoiApodoxon');
 const eidikothtesErganh = require('../dropdowns/ergazomenoi/eidikothtesErganh');
 const perifereies = require('../dropdowns/ergazomenoi/perifereies');
 const nomoi = require('../dropdowns/ergazomenoi/nomoi');
@@ -397,6 +399,15 @@ router.get(
     '/ergazomenoi/ypokatasthma',
     buildDropdownRoute(YpokatasthmataModel, ypokatasthmaErgazomenon.options)
 );
+router.get(
+    '/kinhseis/apasxolhseis/ergazomenoi',
+    buildDropdownRoute(ergazomenoiKinhseon.model, ergazomenoiKinhseon.options)
+);
+router.get(
+    '/kinhseis/apasxolhseis/typoiApodoxon',
+    buildDropdownRoute(typoiApodoxonApasxolhseon.model, typoiApodoxonApasxolhseon.options)
+);
+
 router.get(
     '/ergazomenoi/eidikothta_erganh',
     buildDropdownRoute(EidikothtesErganhModel, eidikothtesErganh.options)

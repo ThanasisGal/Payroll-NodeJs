@@ -4,7 +4,7 @@
     </label>
 </div>
 
-<div class="row d-flex form-group g-3 align-items-center" style="margin-top: -1.2rem; margin-bottom: 1.5rem;">
+<div class="row d-flex form-group g-3 align-items-center apx-csp-style-013">
     <div class="col-1-4 right-align">
         <label for="selectEmployes" class="col-form-label label-font-size-smaller">
         Επιλογή Εργαζομένων
@@ -12,24 +12,38 @@
     </div>
     <div class="col-1-5 left-align checkbox-flex-center">
         <input type="checkbox" class="form-check-input custom-checkbox checkbox-class notCleared" id="selectEmployes" name="selectEmployes" value="" checked/>
-        <label for="selectEmployes" id="label-selectEmployes" style="margin-left: 0.7rem; font-size: 0.7vw; font-weight: 700;">
+        <label for="selectEmployes" id="label-selectEmployes" class="apx-csp-style-014">
         ΕΝΕΡΓΟΙ
         </label>
     </div>
+    <input type="hidden" id="energoi" name="energoi" value="true" class="notCleared" />
 
-    <div class="col-1 right-align" style="margin-left: 0.3rem;">
+    <div class="col-1 right-align apasxolhseis-ypokatasthma-label-col">
         <label for="ypokatasthma" class="col-form-label label-font-size-smaller">
         Υποκατάστημα
         </label>
     </div>
-    <div class="col-1-4-5 mt-2"> 
-        <select class="form-select selectpicker-dropdown-small mt-2 notCleared" data-live-search="true" name="ypokatasthma" id="ypokatasthma" style="margin-left: 0.7rem;" value=''>
+    <div class="col-1-4-5 mt-14px apasxolhseis-ypokatasthma-col"> 
+        <select
+            class="selectpicker-dropdown-small notCleared apasxolhseis-ypokatasthma-select"
+            name="ypokatasthma"
+            id="ypokatasthma"
+            data-api="/api/dropdown/ergazomenoi/ypokatasthma"
+            data-team-related="true"
+            data-company-related="true"
+            data-preload-all="true"
+            data-placeholder="ΟΛΑ..."
+            placeholder="ΟΛΑ..."
+            data-pad-length="4">
+            <option value="" selected>ΟΛΑ...</option>
         </select>
     </div>
 
-    <div class="col-1 right-align" style="position: relative;">
+    <div class="col-0-5"></div>
+
+    <div class="col-1 right-align apx-csp-style-015">
         <label for="ergazomenos_kin" class="col-form-label label-font-size-smaller field-required hover-label">
-        Εργαζόμενος <i class="bi bi-info-circle-fill" style="font-size: .7rem; color: var(--info)"></i>
+        Εργαζόμενος <i class="bi bi-info-circle-fill apx-csp-style-016"></i>
         </label>
 
         <div id="hoverModal" class="hover-modal">
@@ -37,149 +51,149 @@
                 <h3>Πληροφορίες Εργαζομένου</h3>
             </div>
 
-            <hr class="hr-style-1" style="margin-left: -1rem !important; margin-right: -1rem !important;" />
+            <hr class="hr-style-1 apx-csp-style-017" />
             
             <div class="modal-content">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Κωδικός</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value1" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value1"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Ημ/νία Πρόσληψης</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value2" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value2"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-5" style="text-align: left;"" >
+                    <div class="col-5 apx-csp-style-018" >
                         <label>Ημ/νία Λήξης Σύμβασης</label>
                     </div>
-                    <div class="col-7 modal-item-value" id="value3" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-7 modal-item-value apx-csp-style-019" id="value3"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Ημ/νία Αποχώρησης</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value4" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value4"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-6" style="text-align: left;" >
+                    <div class="col-6 apx-csp-style-018" >
                         <label>Χαρακτηρισμός Εργαζόμενου</label>
                     </div>
-                    <div class="col-6 modal-item-value" id="value5" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-6 modal-item-value apx-csp-style-019" id="value5"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-6" style="text-align: left;" >
+                    <div class="col-6 apx-csp-style-018" >
                         <label>Οικογενειακή Κατάσταση</label>
                     </div>
-                    <div class="col-6 modal-item-value" id="value6" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-6 modal-item-value apx-csp-style-019" id="value6"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Αριθμός Παιδιών</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value7" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value7"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Τύπος Εργαζόμενου</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value8" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value8"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-5" style="text-align: left;" >
+                    <div class="col-5 apx-csp-style-018" >
                         <label>Καθεστώς Απασχόλησης</label>
                     </div>
-                    <div class="col-7 modal-item-value" id="value9" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-7 modal-item-value apx-csp-style-019" id="value9"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-4" style="text-align: left;" >
+                    <div class="col-4 apx-csp-style-018" >
                         <label>Σχέση Εργασίας</label>
                     </div>
-                    <div class="col-8 modal-item-value" id="value10" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-8 modal-item-value apx-csp-style-019" id="value10"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left;" >
+                    <div class="col-9 apx-csp-style-018" >
                         <label>Ώρες Εβδομαδιαίας Απασχόλησης</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value11" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value11"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left;" >
+                    <div class="col-9 apx-csp-style-018" >
                         <label>Ημέρες Εβδομαδιαίας Απασχόλησης</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value12" style="text-align: right; padding-left: 10px; font-weight: 600;"></div>
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value12"></div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left;" >
+                    <div class="col-9 apx-csp-style-018" >
                         <label>Παλιός / Νέος Ασφαλισμένος</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value13" style="text-align: right; padding-left: 10px; font-weight: 600;">
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value13">
                     </div>
                 </div>
             </div>
 
-            <hr class="hr-style-2" style="margin-left: -1rem !important; margin-right: -1rem !important; margin-top: -0.5rem;" />
+            <hr class="hr-style-2 apx-csp-style-021" />
 
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left; font-weight: 700;" >
+                    <div class="col-9 apx-csp-style-022" >
                         <label>Καθαρός Ετήσιος Συμφωνηθείς Μισθός</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value14" style="text-align: right; padding-left: 10px; font-weight: 600;">
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value14">
                     </div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left; font-weight: 700;" >
+                    <div class="col-9 apx-csp-style-022" >
                         <label>Καθαρός Μηνιαίος Συμφωνηθείς Μισθός</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value15" style="text-align: right; padding-left: 10px; font-weight: 600;">
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value15">
                     </div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left; font-weight: 700;" >
+                    <div class="col-9 apx-csp-style-022" >
                         <label>Πακέτο</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value16" style="text-align: right; padding-left: 10px; font-weight: 600;">
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value16">
                     </div>
                 </div>
             </div>
-            <div class="modal-content" style="margin-top: -0.4rem;">
+            <div class="modal-content apx-csp-style-020">
                 <div class="modal-item d-flex">
-                    <div class="col-9" style="text-align: left; font-weight: 700;" >
+                    <div class="col-9 apx-csp-style-022" >
                         <label>Μηνιαία Ρεπό</label>
                     </div>
-                    <div class="col-3 modal-item-value" id="value17" style="text-align: right; padding-left: 10px; font-weight: 600;">
+                    <div class="col-3 modal-item-value apx-csp-style-019" id="value17">
                     </div>
                 </div>
             </div>
@@ -193,51 +207,86 @@
 
     </div>
 
-    <div class="col-4-9 mt-2"> 
-        <select class="form-select selectpicker-dropdown-small mt-1 notCleared ml-n-0-0" data-live-search="true" name="ergazomenos_kin" id="ergazomenos_kin"> 
+    <div class="col-4-4 mt-14px apasxolhseis-ergazomenos-col"> 
+        <select
+            class="selectpicker-dropdown-small notCleared apasxolhseis-ergazomenos-select"
+            name="ergazomenos_kin"
+            id="ergazomenos_kin"
+            data-api="/api/dropdown/kinhseis/apasxolhseis/ergazomenoi"
+            data-team-related="true"
+            data-company-related="true"
+            data-extra-filter="energoi"
+            data-extra-filter2="ypokatasthma"
+            data-extra-filter2-src="ypokatasthma_Hidden"
+            data-preload-all="true"
+            data-placeholder="Επιλέξτε εργαζόμενο"
+            placeholder="Επιλέξτε εργαζόμενο"
+            data-pad-length="4">
         </select>
     </div>
 
+    <div class="col-0-3"></div>
+
     <div class="col-0-3">
-        <button class="btn btn-green buttons-content label-font-size-smaller ml-n-1-0-6" id="prevButton" data-bs-toggle="tooltip" data-bs-title="Προηγούμενη εγγραφή" data-bs-placement="bottom"><i class="bi bi-chevron-up"></i></button>
+        <button type="button" class="btn btn-green buttons-content label-font-size-smaller ml-n-1-0-6" id="prevButton" data-bs-toggle="tooltip" data-bs-title="Προηγούμενη εγγραφή" data-bs-placement="bottom"><i class="bi bi-chevron-up"></i></button>
     </div>
     <div class="col-0-3">
-        <button class="btn btn-green buttons-content label-font-size-smaller ml-n-0-0-4" id="nextButton" data-bs-toggle="tooltip" data-bs-title="Επόμενη εγγραφή" data-bs-placement="bottom"><i class="bi bi-chevron-down"></i></button>
+        <button type="button" class="btn btn-green buttons-content label-font-size-smaller ml-n-0-0-4" id="nextButton" data-bs-toggle="tooltip" data-bs-title="Επόμενη εγγραφή" data-bs-placement="bottom"><i class="bi bi-chevron-down"></i></button>
     </div>
 </div>
 
-<div class="row form-group g-3 align-items-center mb-3" style="margin-top: -2.6rem;">
+<div class="row form-group g-3 align-items-center mb-3 apx-csp-style-023">
 
-    <div class="col-1 right-align" style="margin-left: 11px;">
+    <div class="col-1 right-align apx-csp-style-024">
         <label for="typosApodoxon" class="col-form-label fsrem-72 field-required">
         Τύπος Αποδοχών</label>
     </div>
-    <div class="col-2 mt-2">
-        <select class="form-select selectpicker-dropdown-small mt-2 notCleared" data-live-search="true" name="typosApodoxon" id="typosApodoxon">
+    <div class="col-2 mt-14px">
+        <select
+            class="selectpicker-dropdown-small notCleared apasxolhseis-typos-apodoxon-select"
+            name="typosApodoxon"
+            id="typosApodoxon"
+            data-api="/api/dropdown/kinhseis/apasxolhseis/typoiApodoxon"
+            data-team-related="true"
+            data-company-related="true"
+            data-preload-all="true"
+            data-preselect="typ_apod"
+            data-placeholder="Επιλέξτε τύπο αποδοχών"
+            placeholder="Επιλέξτε τύπο αποδοχών">
         </select>
     </div>
 
-    <div class="col-0-6 right-align" style="margin-left: 4px;">
+    <div class="col-0-6 right-align apx-csp-style-025">
         <label for="periodos" class="col-form-label label-font-size-smaller field-required">
         Περίοδος</label>
     </div>
-    <div class="col-1-5 mt-2">
-        <select class="form-select selectpicker-dropdown-small mt-2 notCleared" data-live-search="true" name="periodos" id="periodos">
+    <div class="col-1-5 mt-14px">
+        <select
+            class="selectpicker-dropdown-small notCleared apasxolhseis-periodos-select"
+            name="periodos"
+            id="periodos"
+            data-api="/api/dropdown/periodoi"
+            data-extra-filter2="xrhsh"
+            data-extra-filter2-src="etos"
+            data-preload-all="true"
+            data-preselect="mhnas"
+            data-placeholder="Επιλέξτε περίοδο"
+            placeholder="Επιλέξτε περίοδο">
         </select>
     </div>
 
     <div class="col-0-1-6"></div>
 
-    <div class="col-1-2 right-align" style="margin-left: .8rem;">
+    <div class="col-1-2 right-align apx-csp-style-026">
         <label for="aaMisthodosias" class="col-form-label label-font-size-smaller field-required">
         α/α Mισθοδοσίας</label>
     </div>
     <div class="col-0-7 mt-2">
-        <input type="number" class="form-control1 input-contents mt-2 notCleared" name="aaMisthodosias" id="aaMisthodosias" min="1" max="9" value="1" style="text-align: center;"></input>
+        <input type="number" class="form-control1 input-contents mt-2 notCleared apx-csp-style-027" name="aaMisthodosias" id="aaMisthodosias" min="1" max="9" value="1"></input>
     </div>
 
     <div class="col-1 right-align">
-        <label for="exoflhsh" class="col-form-label label-font-size-larger" style="font-size: 1rem; font-weight: 700;">
+        <label for="exoflhsh" class="col-form-label label-font-size-larger apx-csp-style-028">
             ΕΞΟΦΛΗΣΗ
         </label>
     </div>
@@ -254,7 +303,7 @@
         </label>
     </div>
     <div class="col-1-4">
-        <input type="number" class="form-control1 input-contents right-align no-spin" name="poso_plhromhs" id="poso_plhromhs" style="background-color: #f5faae61;" min="0" step="0.05" value="0" />
+        <input type="number" class="form-control1 input-contents right-align no-spin apx-csp-style-029" name="poso_plhromhs" id="poso_plhromhs" min="0" step="0.05" value="0" />
     </div>
 
 </div>

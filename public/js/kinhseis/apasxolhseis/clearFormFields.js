@@ -11,6 +11,13 @@ async function clearFormFields() {
       return; // Παράκαμψη του συγκεκριμένου στοιχείου αν έχει την κλάση notCleared
     }
 
+    // TomSelect/TomDropdown δημιουργεί δικά του εσωτερικά inputs μέσα σε .ts-wrapper.
+    // Αυτά ΔΕΝ είναι πραγματικά πεδία της φόρμας. Αν τα καθαρίσουμε εδώ,
+    // μπορεί να χαθεί οπτικά η επιλογή ή να πυροδοτηθούν άσκοπα reloads.
+    if (element.closest && element.closest(".ts-wrapper, .ts-control, .ts-dropdown")) {
+      return;
+    }
+
     if (element.tagName === "INPUT") {
       if (element.type === "checkbox" || element.type === "radio") {
         element.checked = false;

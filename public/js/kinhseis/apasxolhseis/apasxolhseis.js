@@ -44,36 +44,169 @@ async function ypologismosPragmatikonErgasimonHmeronMhna(   year,
         }
 
         if (sharedParams.ergazomenoi.plhrhs_apasxolhsh) {
-            const { mhErgasimes } = await getNotWorkDays({
+            const notWorkDaysResult = await getNotWorkDays({
                 team: sharedParams._TEAM,
                 company_kod: document.getElementById("company_kod").value,
+                ypokatasthma: getCurrentEmployeeYpokatasthmaForNotWorkDays(),
                 kodikos: document.getElementById("kodikosHidden").value,
                 dateStart: startDate,
                 dateEnd: endDate
             });
+            const parsedMhErgasimes = parseFloat(notWorkDaysResult?.mhErgasimes);
+            const mhErgasimes = Number.isFinite(parsedMhErgasimes) ? parsedMhErgasimes : 0;
+
             sharedParams._MH_ERGASIMES_HMERES_MHNA = mhErgasimes;
             sharedParams._SYNOLO_ERGASIMON_HMERON_MHNA = count;
-            count -= mhErgasimes;
+            count = Math.max(0, count - mhErgasimes);
 
         }
-        return count;
+        return Number.isFinite(count) ? count : 0;
     }
 
+function getCurrentEmployeeYpokatasthmaForNotWorkDays() {
+    const directYpokatasthma =
+        document.getElementById('ypokatasthma_Hidden')?.value ||
+        document.getElementById('ypokatasthmaHidden')?.value ||
+        '';
+
+    if (String(directYpokatasthma).trim()) {
+        return String(directYpokatasthma).trim();
+    }
+
+    const employeeYpokatasthma =
+        sharedParams?.ergazomenoi?.ypokatasthma ||
+        sharedParams?.ergazomenoi?.ypokatasthma_kodikos ||
+        '';
+
+    return String(employeeYpokatasthma || '').trim();
+}
+
+let apasxolhseisCsrfTokenCache = '';
+let apasxolhseisCsrfTokenPromise = null;
+
+function readApasxolhseisCsrfTokenFromDom() {
+    return (
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+        document.querySelector('meta[name="csrfToken"]')?.getAttribute('content') ||
+        document.querySelector('input[name="_csrf"]')?.value ||
+        document.querySelector('input[name="csrfToken"]')?.value ||
+        window.csrfToken ||
+        window.CSRF_TOKEN ||
+        ''
+    );
+}
+
+async function getApasxolhseisCsrfToken() {
+    const domToken = readApasxolhseisCsrfTokenFromDom();
+    if (domToken) {
+        apasxolhseisCsrfTokenCache = domToken;
+        return domToken;
+    }
+
+    if (apasxolhseisCsrfTokenCache) {
+        return apasxolhseisCsrfTokenCache;
+    }
+
+    if (!apasxolhseisCsrfTokenPromise) {
+        apasxolhseisCsrfTokenPromise = fetch('/api/csrf-token', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        })
+            .then(async response => {
+                if (!response.ok) return '';
+                const data = await response.json().catch(() => ({}));
+                return data.csrfToken || data._csrf || data.token || '';
+            })
+            .then(token => {
+                apasxolhseisCsrfTokenCache = token || '';
+                return apasxolhseisCsrfTokenCache;
+            })
+            .catch(() => '')
+            .finally(() => {
+                apasxolhseisCsrfTokenPromise = null;
+            });
+    }
+
+    return apasxolhseisCsrfTokenPromise;
+}
+
+async function getApasxolhseisJsonPostHeaders() {
+    const csrfToken = await getApasxolhseisCsrfToken();
+    const headers = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+    };
+
+    if (csrfToken) {
+        headers['CSRF-Token'] = csrfToken;
+        headers['X-CSRF-Token'] = csrfToken;
+        headers['X-XSRF-Token'] = csrfToken;
+    }
+
+    return { headers, csrfToken };
+}
+
 async function getNotWorkDays(params) {
-    const data = await fetch('/api/kinhseis/hmeres_mh_ergasias', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({  team:           params.team,
-                                company_kod:    params.company_kod,
-                                kodikos:        params.kodikos,
-                                startDate:      params.dateStart,     
-                                endDate:        params.dateEnd
-                            })
-    });
-    const result = await data.json();
-    return result;
+    const payload = {
+        team: params.team,
+        company_kod: params.company_kod,
+        ypokatasthma: params.ypokatasthma,
+        kodikos: params.kodikos,
+        startDate: params.dateStart,
+        endDate: params.dateEnd
+    };
+
+    const hasValidDates =
+        payload.startDate &&
+        payload.endDate &&
+        !Number.isNaN(new Date(payload.startDate).getTime()) &&
+        !Number.isNaN(new Date(payload.endDate).getTime());
+
+    if (!payload.team || !payload.company_kod || !payload.kodikos || !hasValidDates) {
+        console.warn('Παράλειψη hmeres_mh_ergasias λόγω ελλιπών στοιχείων:', payload);
+        return { mhErgasimes: 0 };
+    }
+
+    try {
+        const { headers, csrfToken } = await getApasxolhseisJsonPostHeaders();
+        const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
+
+        const data = await fetch('/api/kinhseis/hmeres_mh_ergasias', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers,
+            body: JSON.stringify(requestPayload)
+        });
+
+        let result = {};
+        try {
+            result = await data.json();
+        } catch (jsonError) {
+            result = {};
+        }
+
+        if (!data.ok) {
+            console.warn('Αποτυχία hmeres_mh_ergasias. Χρησιμοποιείται mhErgasimes=0.', {
+                status: data.status,
+                payload,
+                result
+            });
+            return { mhErgasimes: 0 };
+        }
+
+        const parsedMhErgasimes = parseFloat(result?.mhErgasimes);
+        return {
+            ...result,
+            mhErgasimes: Number.isFinite(parsedMhErgasimes) ? parsedMhErgasimes : 0
+        };
+    } catch (error) {
+        console.warn('Σφάλμα στο hmeres_mh_ergasias. Χρησιμοποιείται mhErgasimes=0.', {
+            error,
+            payload
+        });
+        return { mhErgasimes: 0 };
+    }
 }
 
 async function filterArgiesByMonth(argies, year, month) {
@@ -136,6 +269,21 @@ document.addEventListener("DOMContentLoaded", function() {
     const posoPlhromhs = document.getElementById("poso_plhromhs");
     const deleteButton = document.getElementById("deleteButton");
 
+    function safeNumber(value, defaultValue = 0) {
+        if (value === null || value === undefined) return defaultValue;
+        const normalized = String(value).replace(',', '.').trim();
+        if (normalized === '') return defaultValue;
+        const parsed = parseFloat(normalized);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+    }
+
+    function setInputValueSafe(id, value, decimals = 2) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        const parsed = safeNumber(value, 0);
+        element.value = parsed.toFixed(decimals);
+    }
+
     async function formatInputOnBlur(event, decimals) {
         const inputValue = event.target.value;
         if (isNaN(Number(inputValue)) || inputValue === '') {
@@ -149,48 +297,195 @@ document.addEventListener("DOMContentLoaded", function() {
     let plhroteoDebounceTimeout;
     let allaghForoy = false;
 
+    // Debounce/coalesce για τον υπολογισμό πληρωτέου.
+    // Κατά τη μαζική φόρτωση εργαζομένου αλλάζουν πολλά πεδία μαζί και παλαιότερα
+    // καλούσαν το calcPlhroteo δεκάδες/εκατοντάδες φορές. Με αυτό κρατάμε μόνο
+    // έναν τελικό υπολογισμό ανά μικρό burst αλλαγών, χωρίς να αλλάζει η business logic.
+    const CALC_PLHROTEO_DEBOUNCE_MS = 80;
+    let calcPlhroteoTimer = null;
+    let calcPlhroteoRunning = false;
+    let calcPlhroteoPendingAfterRun = false;
+    let calcPlhroteoResolvers = [];
+
+    function resolveCalcPlhroteoQueue() {
+        const resolvers = calcPlhroteoResolvers;
+        calcPlhroteoResolvers = [];
+        resolvers.forEach((resolve) => {
+            try {
+                resolve();
+            } catch (error) {
+                console.warn('Αδυναμία resolve calcPlhroteo promise:', error);
+            }
+        });
+    }
+
+    /**
+     * Coalesced async runner για βαριούς υπολογισμούς.
+     *
+     * Όταν κατά τη φόρτωση/αλλαγή εργαζομένου αλλάζουν πολλά πεδία μαζί,
+     * τα ίδια calculations ζητούνται δεκάδες φορές. Δεν αλλάζουμε τη λογική
+     * τους· απλώς κρατάμε έναν τελικό υπολογισμό ανά μικρό burst αλλαγών.
+     */
+    function createCoalescedAsyncRunner(getCoreFn, debounceMs = 60) {
+        let timer = null;
+        let running = false;
+        let waiters = [];
+
+        const resolveWaiters = (batch, value) => {
+            batch.forEach(({ resolve }) => {
+                try {
+                    resolve(value);
+                } catch (error) {
+                    console.warn('Αδυναμία resolve coalesced calculation:', error);
+                }
+            });
+        };
+
+        const rejectWaiters = (batch, error) => {
+            batch.forEach(({ reject }) => {
+                try {
+                    reject(error);
+                } catch (rejectError) {
+                    console.warn('Αδυναμία reject coalesced calculation:', rejectError);
+                }
+            });
+        };
+
+        const run = async () => {
+            if (running) return;
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+
+            const batch = waiters;
+            waiters = [];
+            if (!batch.length) return;
+
+            running = true;
+            try {
+                const coreFn = getCoreFn();
+                const result = (typeof coreFn === 'function') ? await coreFn() : undefined;
+                resolveWaiters(batch, result);
+            } catch (error) {
+                rejectWaiters(batch, error);
+            } finally {
+                running = false;
+                if (waiters.length && !timer) {
+                    timer = setTimeout(run, debounceMs);
+                }
+            }
+        };
+
+        return () => new Promise((resolve, reject) => {
+            waiters.push({ resolve, reject });
+
+            if (running) return;
+
+            if (timer) {
+                clearTimeout(timer);
+            }
+            timer = setTimeout(run, debounceMs);
+        });
+    }
+
+    let calcSynoloMiktonApodoxonCoreRef = null;
+    const runCalcSynoloMiktonApodoxonCoalesced = createCoalescedAsyncRunner(
+        () => calcSynoloMiktonApodoxonCoreRef,
+        60
+    );
+
+    let handleSynoloMiktonChangeCoreRef = null;
+    const runHandleSynoloMiktonChangeCoalesced = createCoalescedAsyncRunner(
+        () => handleSynoloMiktonChangeCoreRef,
+        60
+    );
+
+    // Pipeline φόρτωσης εργαζομένου:
+    // Κατά τη μαζική συμπλήρωση πεδίων δεν αφήνουμε τα change/input/blur
+    // να ξεκινήσουν 200 φορές την ίδια αλυσίδα υπολογισμών.
+    // Οι τιμές γράφονται silent και στο τέλος εκτελείται μία πλήρης σειρά υπολογισμών.
+    window.apasxolhseisEmployeeLoadPipeline = window.apasxolhseisEmployeeLoadPipeline || false;
+    window.apasxolhseisSuppressFieldEvents = window.apasxolhseisSuppressFieldEvents || false;
+
+    function isEmployeeLoadPipelineActive() {
+        return window.apasxolhseisEmployeeLoadPipeline === true;
+    }
+
+    function shouldIgnoreFieldEventDuringLoad() {
+        return window.apasxolhseisSuppressFieldEvents === true;
+    }
+
+    async function finishValueCalculation(options = {}) {
+        if (isEmployeeLoadPipelineActive()) return;
+
+        if (options.includeAsfalistikhAxia) {
+            await calcSynoloAsfalistikhsAxias();
+        }
+        await calcSynoloMiktonApodoxon();
+
+        if (typeof window.handleSynoloMiktonChange === 'function') {
+            await window.handleSynoloMiktonChange();
+        } else if (typeof handleSynoloMiktonChange === 'function') {
+            await handleSynoloMiktonChange();
+        }
+    }
 
 
     // ========================== ΥΠΟΛΟΓΙΣΜΟΣ ΗΜΕΡΩΝ ΕΡΓΑΣΙΑΣ ============================
-    hmeresErgasias.addEventListener('change', async (event) => {  
-        if (sharedParams && !hasRecord) {
-            const data = await fetch(`/api/kinhseis/calcApoysies?team=${sharedParams._TEAM}&company=${sharedParams._COMPANY}&xrhsh=${sharedParams._XRHSH}&employeeKod=${sharedParams.ergazomenoi.kodikos}&startDate=${sharedParams.startDate}&endDate=${sharedParams.endDate}`);
-            const dataResult = await data.json();
+    async function runHmeresErgasiasCalculationCore() {
+        if (!(sharedParams && !hasRecord)) return;
 
-            // document.getElementById("hmeresErgasias").value = (!isNaN(result.countNotAN_ME)) ? parseInt(result.countNotAN_ME) : 0;
-            let typos_apodoxon = document.getElementById("typosApodoxon_Hidden").value;
-            if (!window.isManualEntry) {
-                await checkHmeresErgasias();
-            } else {
-                await handleTyposApodoxon(typos_apodoxon, sharedParams);
-            }
-            hmeresApoysias.value = (dataResult.total_hmeres_apoysias && !isNaN(dataResult.total_hmeres_apoysias)) ? parseInt(dataResult.total_hmeres_apoysias) : 0;
-            hmeresApoysias.dispatchEvent(new Event("change"));
+        const data = await fetch(`/api/kinhseis/calcApoysies?team=${sharedParams._TEAM}&company=${sharedParams._COMPANY}&xrhsh=${sharedParams._XRHSH}&employeeKod=${sharedParams.ergazomenoi.kodikos}&startDate=${sharedParams.startDate}&endDate=${sharedParams.endDate}`);
+        const dataResult = await data.json();
 
-            oresApoysias.value = (dataResult.total_ores_apoysias && !isNaN(dataResult.total_ores_apoysias)) ? parseFloat(dataResult.total_ores_apoysias).toFixed(2) : 0;
-            
-            // let typos_apodoxon = document.getElementById("typosApodoxon_Hidden").value;
-            await calcOresApoysias();
-            // await calcHmeresErgasiasMeionApoysies();
-            await calcSynoloMiktonApodoxon();
+        let typos_apodoxon = document.getElementById("typosApodoxon_Hidden").value;
+        if (!window.isManualEntry) {
+            await checkHmeresErgasias();
+        } else {
+            await handleTyposApodoxon(typos_apodoxon, sharedParams);
         }
-    })
+
+        hmeresApoysias.value = (dataResult.total_hmeres_apoysias && !isNaN(dataResult.total_hmeres_apoysias))
+            ? parseInt(dataResult.total_hmeres_apoysias)
+            : 0;
+
+        if (isEmployeeLoadPipelineActive()) {
+            await window.calcHmeresErgasiasMeionApoysies();
+        } else {
+            hmeresApoysias.dispatchEvent(new Event("change"));
+        }
+
+        oresApoysias.value = (dataResult.total_ores_apoysias && !isNaN(dataResult.total_ores_apoysias))
+            ? parseFloat(dataResult.total_ores_apoysias).toFixed(2)
+            : 0;
+
+        await calcOresApoysias();
+        await finishValueCalculation();
+    }
+
+    window.apasxolhseisRunHmeresErgasiasCalculation = runHmeresErgasiasCalculationCore;
+
+    hmeresErgasias.addEventListener('change', async (event) => {
+        if (shouldIgnoreFieldEventDuringLoad()) return;
+        await runHmeresErgasiasCalculationCore();
+    });
 
     async function calcOresErgasias() {
         _APODOXES_ORON_ERGASIAS = parseFloat(document.getElementById("oresErgasias").value) * pragmatikoOromisthio.value;
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
-    oresErgasias.addEventListener('input', async (event) => {  
+    oresErgasias.addEventListener('input', async (event) => {
+        if (shouldIgnoreFieldEventDuringLoad()) return;
         await calcOresErgasias();
-    })
+    });
 
-    oresApoysias.addEventListener('input', async (event) => {  
+    oresApoysias.addEventListener('input', async (event) => {
+        if (shouldIgnoreFieldEventDuringLoad()) return;
         _APODOXES_ORON_APOYSIAS = parseFloat(document.getElementById("oresApoysias").value) * pragmatikoOromisthio.value;
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
-    })
+        await finishValueCalculation();
+    });
 
     async function checkHmeresErgasias() {
         let typos_apodoxon = document.getElementById("typosApodoxon_Hidden").value;
@@ -221,12 +516,20 @@ document.addEventListener("DOMContentLoaded", function() {
         if (oresApoysiasVal === 0) {
             // Αν οι ώρες απουσίας είναι 0
             oresErgasiasMeionApoysies.value = "0.00";
-            oresErgasias.dispatchEvent(new Event("input"));
+            if (isEmployeeLoadPipelineActive()) {
+                await calcOresErgasias();
+            } else {
+                oresErgasias.dispatchEvent(new Event("input"));
+            }
             return;
         }
 
         oresErgasiasMeionApoysies.value = parseFloat(oresApoysiasVal).toFixed(2);
-        oresErgasias.dispatchEvent(new Event("input"));
+        if (isEmployeeLoadPipelineActive()) {
+            await calcOresErgasias();
+        } else {
+            oresErgasias.dispatchEvent(new Event("input"));
+        }
     }
 
     window.ypologismosAxiasKrathseon = ypologismosAxiasKrathseon;
@@ -236,7 +539,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let typos_apodoxon = document.getElementById("typosApodoxon_Hidden").value;
         await handleYpologismoi(typos_apodoxon, sharedParams);
-        await calcSynoloMiktonApodoxon();
+        if (!isEmployeeLoadPipelineActive()) {
+            await calcSynoloMiktonApodoxon();
+        }
     }
 
     async function handleYpologismoi(typos_apodoxon, sharedParams) {
@@ -273,7 +578,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
                 
         await calcMiktesApodoxes();
-        await handleSynoloMiktonChange();
+        if (!isEmployeeLoadPipelineActive()) {
+            await handleSynoloMiktonChange();
+        }
     }
 
     async function calcSynoloAsfalistikhsAxias() {
@@ -333,9 +640,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaArgion.value = axia.toFixed(2);
         asfalistikhAxiaArgion.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaNyxterinon() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΥΧΤΕΡΙΝΩΝ
@@ -391,9 +696,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaYperergasion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΥΠΕΡΕΡΓΑΣΙΩΝ
@@ -420,9 +723,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaYperergasias.value = axia.toFixed(2);
         asfalistikhAxiaYperergasias.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaYperergasionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΥΠΕΡΕΡΓΑΣΙΩΝ ΝΥΧΤΑΣ
@@ -454,9 +755,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaYperergasiasNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaYperergasiasnNyxtas.value = asfalistikhAxia.toFixed(2);
         
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaYperergasionArgion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΥΠΕΡΕΡΓΑΣΙΩΝ ΑΡΓΙΩΝ
@@ -488,9 +787,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaYperergasiasArgion.value = axia.toFixed(2);
         asfalistikhAxiaYperergasiasArgion.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaYperergasionArgionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΥΠΕΡΕΡΓΑΣΙΩΝ ΑΡΓΙΩΝ ΝΥΧΤΑΣ
@@ -526,9 +823,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaYperergasiasArgionNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaYperergasiasArgionNyxtas.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaNomimonYperorion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΟΜΙΜΩΝ ΥΠΕΡΩΡΙΩΝ
@@ -562,9 +857,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaNomimhsYperorias.value = axia.toFixed(2);
         asfalistikhAxiaNomimhsYperorias.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaNomimonYperorionArgion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΟΜΙΜΩΝ ΥΠΕΡΩΡΙΩΝ ΑΡΓΙΩΝ
@@ -596,9 +889,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaNomimhsYperoriasArgion.value = axia.toFixed(2) ;
         asfalistikhAxiaNomimhsYperoriasArgion.value = asfalistikhAxia.toFixed(2) ;
         
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaNomimonYperorionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΟΜΙΜΩΝ ΥΠΕΡΩΡΙΩΝ ΝΥΧΤΑΣ
@@ -630,9 +921,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaNomimhsYperoriasNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaNomimhsYperoriasNyxtas.value = asfalistikhAxia.toFixed(2) ;
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaNomimonYperorionArgionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΟΜΙΜΩΝ ΥΠΕΡΩΡΙΩΝ ΑΡΓΙΩΝ ΝΥΧΤΑΣ
@@ -668,9 +957,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaNomimhsYperoriasArgionNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaNomimhsYperoriasArgionNyxtas.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaParanomonYperorion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΠΑΡΑΝΟΜΩΝ ΥΠΕΡΩΡΙΩΝ
@@ -703,9 +990,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaParanomhsYperorias.value = axia.toFixed(2);
         asfalistikhAxiaParanomhsYperorias.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaParanomonYperorionArgion() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΠΑΡΑΝΟΜΩΝ ΥΠΕΡΩΡΙΩΝ ΑΡΓΙΩΝ
@@ -735,9 +1020,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaParanomhsYperoriasArgion.value = axia.toFixed(2) ;
         asfalistikhAxiaParanomhsYperoriasArgion.value = asfalistikhAxia.toFixed(2) ;
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaParanomonYperorionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΠΑΡΑΝΟΜΩΝ ΥΠΕΡΩΡΙΩΝ ΝΥΧΤΑΣ
@@ -769,9 +1052,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaParanomhsYperoriasNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaParanomhsYperoriasNyxtas.value = asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaParanomonYperorionArgionNyxtas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΝΟΜΙΜΩΝ ΥΠΕΡΩΡΙΩΝ ΑΡΓΙΩΝ ΝΥΧΤΑΣ
@@ -807,9 +1088,7 @@ document.addEventListener("DOMContentLoaded", function() {
         axiaParanomhsYperoriasArgionNyxtas.value = axia.toFixed(2);
         asfalistikhAxiaParanomhsYperoriasArgionNyxtas.value =asfalistikhAxia.toFixed(2);
 
-        await calcSynoloAsfalistikhsAxias();
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation({ includeAsfalistikhAxia: true });
     }
 
     async function calcAxiaErgasias6Hmeras() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΕΡΓΑΣΙΑΣ 6ης ΗΜΕΡΑΣ
@@ -832,8 +1111,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Ενημέρωση πεδίου
         axiaErgasias6Hmeras.value = axia.toFixed(2);
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
     
     async function calcAxiaProsthethsErgasias() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΠΡΟΣΘΕΤΗΣ ΕΡΓΑΣΙΑΣ ΜΕΡΙΚΩΣ ΑΠΑΣΧΟΛΟΥΜΕΝΩΝ
@@ -856,8 +1134,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Ενημέρωση πεδίου
         axiaProsthethsErgasias.value = axia.toFixed(2);
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function calcAxiaMeioshsErgatikhsEisforas() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΑΞΙΑΣ ΜΕΙΩΣΗΣ ΕΡΓΑΤΙΚΗΣ ΕΙΣΦΟΡΑΣ
@@ -894,36 +1171,31 @@ document.addEventListener("DOMContentLoaded", function() {
     async function taktikesApodoxesMhYpologizomenesSeDora() {  // ΤΑΚΤΙΚΕΣ ΑΠΟΔΟΧΕΣ ΜΗ ΥΠΟΛΟΓΙΖΟΜΕΝΕΣ ΣΕ ΔΩΡΑ
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function sympsifisteesApodoxes() {  // ΤΑΚΤΙΚΕΣ ΑΠΟΔΟΧΕΣ ΜΗ ΥΠΟΛΟΓΙΖΟΜΕΝΕΣ ΣΕ ΔΩΡΑ
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function taktikesApodoxesYpologizomenesSeDora() {  // ΤΑΚΤΙΚΕΣ ΑΠΟΔΟΧΕΣ ΥΠΟΛΟΓΙΖΟΜΕΝΕΣ ΣΕ ΔΩΡΑ
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function epimerizomenesSeMhnesErgasias() {  // ΕΚΤΑΚΤΕΣ ΑΠΟΔΟΧΕΣ ΕΠΙΜΕΡΙΖΟΜΕΝΣ ΣΕ ΣΤΟΥΣ ΜΗΝΕΣ ΕΡΓΑΣΙΑΣ
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function primBonus() {  // ΕΚΤΑΚΤΑ ΠΡΙΜ / BONUS
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function apallassomenesForoy() {  // ΕΚΤΑΚΤΕΣ ΑΠΟΔΟΧΕΣ ΑΠΑΛΑΣΣΟΜΕΝΕΣ ΤΟΥ ΦΟΡΟΥ
@@ -931,16 +1203,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
         const isValid = await validateFields();
         if (isValid) {
-            await calcSynoloMiktonApodoxon();
-            await handleSynoloMiktonChange();
+            await finishValueCalculation();
         }
     }
 
     async function apallassomenesKrathseon() {  // ΕΚΤΑΚΤΕΣ ΑΠΟΔΟΧΕΣ ΑΠΑΛΑΣΣΟΜΕΝΕΣ ΤΩΝ ΚΡΑΤΗΣΕΩΝ
         if (hasRecord) return;
 
-        await calcSynoloMiktonApodoxon();
-        await handleSynoloMiktonChange();
+        await finishValueCalculation();
     }
 
     async function synoloForoy() {  // ΑΛΛΑΓΗ ΥΠΟΛΟΓΙΣΜΕΝΟΥ ΠΟΣΟΥ ΦΟΡΟΥ
@@ -1123,7 +1393,7 @@ document.addEventListener("DOMContentLoaded", function() {
         await ypologismosAxiasKrathseon(sharedParams);
     }
 
-    async function calcSynoloMiktonApodoxon() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΟΥ ΜΙΚΤΩΝ ΑΠΟΔΟΧΩΝ
+    async function calcSynoloMiktonApodoxonCore() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΣΥΝΟΛΟΥ ΜΙΚΤΩΝ ΑΠΟΔΟΧΩΝ
         if (hasRecord) return;
 
         let synolo_mikton_apodoxon = 0;
@@ -1185,23 +1455,99 @@ document.addEventListener("DOMContentLoaded", function() {
             parseFloat(document.getElementById("apallassomenesForoy").value || 0) +
             parseFloat(document.getElementById("apallassomenesKrathseon").value || 0)).toFixed(2);
     }
+
+    calcSynoloMiktonApodoxonCoreRef = calcSynoloMiktonApodoxonCore;
+
+    async function calcSynoloMiktonApodoxon() {
+        return runCalcSynoloMiktonApodoxonCoalesced();
+    }
         
-    window.calcPlhroteo = async function() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΠΛΗΡΩΤΕΟΥ ΠΟΣΟΥ
+    async function recalculateAllHourValuesForEmployeeLoad() {
+        // Βήμα Γ pipeline: υπολογισμός αξιών ωρών με τις υπάρχουσες συναρτήσεις.
+        // Το finishValueCalculation() επιστρέφει όσο είναι ενεργό το pipeline, άρα
+        // οι παρακάτω κλήσεις ενημερώνουν αξίες χωρίς να ξεκινούν κρατήσεις/φόρο κάθε φορά.
+        await calcOresErgasias();
+        _APODOXES_ORON_APOYSIAS = safeNumber(document.getElementById("oresApoysias")?.value) * safeNumber(pragmatikoOromisthio?.value);
+
+        await calcAxiaArgion();
+        await calcAxiaNyxterinon();
+        await calcAxiaYperergasion();
+        await calcAxiaYperergasionNyxtas();
+        await calcAxiaYperergasionArgion();
+        await calcAxiaYperergasionArgionNyxtas();
+        await calcAxiaNomimonYperorion();
+        await calcAxiaNomimonYperorionArgion();
+        await calcAxiaNomimonYperorionNyxtas();
+        await calcAxiaNomimonYperorionArgionNyxtas();
+        await calcAxiaParanomonYperorion();
+        await calcAxiaParanomonYperorionArgion();
+        await calcAxiaParanomonYperorionNyxtas();
+        await calcAxiaParanomonYperorionArgionNyxtas();
+        await calcAxiaErgasias6Hmeras();
+        await calcAxiaProsthethsErgasias();
+        await calcSynoloAsfalistikhsAxias();
+    }
+
+    window.recalculateApasxolhseisAfterEmployeeLoad = async function(options = {}) {
+        if (hasRecord) return;
+
+        const previousPipeline = window.apasxolhseisEmployeeLoadPipeline;
+        const previousSuppress = window.apasxolhseisSuppressFieldEvents;
+
+        window.apasxolhseisEmployeeLoadPipeline = true;
+        window.apasxolhseisSuppressFieldEvents = true;
+
+        try {
+            // Α) Αν χρειάζεται, υπολογίζουμε ημέρες/ώρες εργασίας χωρίς change cascade.
+            if (options.runHmeresErgasias !== false) {
+                await runHmeresErgasiasCalculationCore();
+            }
+
+            // Β-Γ) Ώρες από ProdhlomenaOrariaModel υπάρχουν ήδη στα πεδία.
+            // Υπολογίζουμε όλες τις αξίες ωρών με τις ίδιες υπάρχουσες συναρτήσεις.
+            await recalculateAllHourValuesForEmployeeLoad();
+
+            // Δ) Μικτά.
+            await calcSynoloMiktonApodoxonCore();
+
+            // Ε) Κρατήσεις. Καλούμε το core απευθείας για να μη μπει στο debounce/coalescing.
+            if (typeof handleSynoloMiktonChangeCoreRef === 'function') {
+                await handleSynoloMiktonChangeCoreRef();
+            } else {
+                await runHandleSynoloMiktonChangeCoalesced();
+            }
+
+            // ΣΤ) Φόρος + Πληρωτέο. Καλούμε το core απευθείας ώστε το pipeline
+            // να ολοκληρωθεί πραγματικά πριν κλείσει ο loader.
+            await calcPlhroteoCore();
+
+            if (calcPlhroteoTimer) {
+                clearTimeout(calcPlhroteoTimer);
+                calcPlhroteoTimer = null;
+            }
+            resolveCalcPlhroteoQueue();
+        } finally {
+            window.apasxolhseisEmployeeLoadPipeline = previousPipeline;
+            window.apasxolhseisSuppressFieldEvents = previousSuppress;
+        }
+    };
+
+    async function calcPlhroteoCore() {  // ΥΠΟΛΟΓΙΣΜΟΣ ΠΛΗΡΩΤΕΟΥ ΠΟΣΟΥ
         if (hasRecord) return;
 
         let ethsio_forologhteo_eisodhma = 0;
         const originalValue = document.getElementById("synoloKrathseon_I").value;
-        const floatValue = parseFloat(originalValue.replace(',', '.'));
+        const floatValue = safeNumber(originalValue);
         const epimerizomenesSeMhnesErgasias = document.getElementById("epimerizomenesSeMhnesErgasias").value;
-        const floatValue_EpimerizomenesSeMhnesErgasias = parseFloat(epimerizomenesSeMhnesErgasias.replace(',', '.'));
+        const floatValue_EpimerizomenesSeMhnesErgasias = safeNumber(epimerizomenesSeMhnesErgasias);
         const synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro = document.getElementById("synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro").value;
-        const floatValue_synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro = parseFloat(synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro.replace(',', '.'));
+        const floatValue_synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro = safeNumber(synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro);
         const primBonus = document.getElementById("primBonus").value;
-        const floatValue_PrimBonus = parseFloat(primBonus.replace(',', '.'));
+        const floatValue_PrimBonus = safeNumber(primBonus);
         const apallassomenesForoy = document.getElementById("apallassomenesForoy").value;
-        const floatValue_ΑpallassomenesForoy = parseFloat(apallassomenesForoy.replace(',', '.'));
+        const floatValue_ΑpallassomenesForoy = safeNumber(apallassomenesForoy);
         const apallassomenesKrathseon = document.getElementById("apallassomenesKrathseon").value;
-        const floatValue_ApallassomenesKrathseon = parseFloat(apallassomenesKrathseon.replace(',', '.'));
+        const floatValue_ApallassomenesKrathseon = safeNumber(apallassomenesKrathseon);
         const arithmosPaidion = sharedParams.ergazomenoi.arithmos_teknon;
         const forologhteo_poso_taktikon_apodoxon = document.getElementById("forologhteo_poso_taktikon_apodoxon") 
         let plhroteo = document.getElementById("plhroteo");
@@ -1214,7 +1560,7 @@ document.addEventListener("DOMContentLoaded", function() {
             floatValue_ApallassomenesKrathseon
         ).toFixed(2);
 
-        console.log(forologhteo_poso_taktikon_apodoxon.value);
+        // Δεν γράφουμε πλέον κάθε ενδιάμεσο υπολογισμό στην console.
         forologhteo_poso_taktikon_apodoxon.value =
         (
             parseFloat(document.getElementById("synoloMiktonApodoxon").value || 0) -
@@ -1254,7 +1600,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 floatValue - floatValue_SynoloForoy
             ).toFixed(2);
 
-            if (!allaghForoy) {
+            if (!allaghForoy && !isEmployeeLoadPipelineActive()) {
                 clearTimeout(plhroteoDebounceTimeout);
                 plhroteoDebounceTimeout = setTimeout(async () => {
                     await updatePlhroteoWithComparison();
@@ -1265,6 +1611,44 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById("poso_plhromhs").value = parseFloat(plhroteo.value) || 0;
             document.getElementById("poso_plhromhs_Hidden").value = parseFloat(plhroteo.value) || 0;
         }
+    }
+
+    window.calcPlhroteo = function() {
+        if (hasRecord) return Promise.resolve();
+
+        const promise = new Promise((resolve) => {
+            calcPlhroteoResolvers.push(resolve);
+        });
+
+        if (calcPlhroteoTimer) {
+            clearTimeout(calcPlhroteoTimer);
+        }
+
+        calcPlhroteoTimer = setTimeout(async () => {
+            calcPlhroteoTimer = null;
+
+            if (calcPlhroteoRunning) {
+                calcPlhroteoPendingAfterRun = true;
+                return;
+            }
+
+            calcPlhroteoRunning = true;
+            try {
+                await calcPlhroteoCore();
+            } catch (error) {
+                console.error('Σφάλμα στον υπολογισμό πληρωτέου:', error);
+            } finally {
+                calcPlhroteoRunning = false;
+                resolveCalcPlhroteoQueue();
+            }
+
+            if (calcPlhroteoPendingAfterRun) {
+                calcPlhroteoPendingAfterRun = false;
+                window.calcPlhroteo();
+            }
+        }, CALC_PLHROTEO_DEBOUNCE_MS);
+
+        return promise;
     }
     
     // ----------------------------- E V E N T   L I S T E N E R S ----------------------------------
@@ -1299,12 +1683,6 @@ document.addEventListener("DOMContentLoaded", function() {
         { id: "primBonus", functions: { calc: primBonus, blur: (event) => formatInputOnBlur(event, 2) } },
         { id: "apallassomenesForoy", functions: { calc: apallassomenesForoy, blur: (event) => formatInputOnBlur(event, 2) } },
         { id: "apallassomenesKrathseon", functions: { calc: apallassomenesKrathseon, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "taktikesApodoxesMhYpologizomenesSeDora", functions: { calc: taktikesApodoxesMhYpologizomenesSeDora, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "taktikesApodoxesYpologizomenesSeDora", functions: { calc: taktikesApodoxesYpologizomenesSeDora, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "epimerizomenesSeMhnesErgasias", functions: { calc: epimerizomenesSeMhnesErgasias, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "primBonus", functions: { calc: primBonus, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "apallassomenesForoy", functions: { calc: apallassomenesForoy, blur: (event) => formatInputOnBlur(event, 2) } },
-        { id: "apallassomenesKrathseon", functions: { calc: apallassomenesKrathseon, blur: (event) => formatInputOnBlur(event, 2) } },
         { id: "synoloForoy", functions: { calc: synoloForoy, blur: (event) => formatInputOnBlur(event, 2) } },
     
         // Προσθήκη του plhroteo (dblclick -> αφαίρεση readonly -> focus)
@@ -1318,8 +1696,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         event.target.setAttribute("readonly", true); // Επαναφορά του readonly
                     }
                     await calcMiktesApodoxesApoPlhroteo();
-                    await calcSynoloMiktonApodoxon();
-                    await handleSynoloMiktonChange();
+                    await finishValueCalculation();
                     if (_DOTO_PLHROTEO) {
                         document.getElementById("dotoPlhroteo_Hidden").value = true;
                         await calcNeesSympsifisteesApodoxes();
@@ -1353,6 +1730,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
         // 1. change
         element.addEventListener("change", async () => {
+            if (shouldIgnoreFieldEventDuringLoad()) return;
             if (typeof calc === "function") {
                 await calc();
             }
@@ -1360,6 +1738,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
         // 2. keyup
         element.addEventListener("keyup", async (event) => {
+            if (shouldIgnoreFieldEventDuringLoad()) return;
             if (id === "plhroteo" && disableKeyupForPlhroteo) return;
             // if (id === "synoloForoy" && allaghForoy) return;
             // Μόνο αν το πλήκτρο είναι στα επιτρεπόμενα, κάνουμε calc
@@ -1379,6 +1758,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         
         element.addEventListener("blur", async (event) => {
+            if (shouldIgnoreFieldEventDuringLoad()) return;
             // Αν το πεδίο είναι το plhroteo και δεν έχει γίνει dblclick, επιστρέφουμε
             if (id === "plhroteo" && !dblclickHappened) {
                 return;
@@ -1728,7 +2108,7 @@ document.addEventListener("DOMContentLoaded", function() {
          *    Όταν αλλάζει το "synoloMiktonApodoxon", ενημερώνουμε
          *    asfalistikesApodoxes και τα επιμέρους πεδία
          ***************************************************************/
-        async function handleSynoloMiktonChange() {
+        async function handleSynoloMiktonChangeCore() {
             const apallassomenesKrathseon = document.getElementById("apallassomenesKrathseon");
             
             let miktesApodoxesPlusAstheneia = parseFloat(synoloMiktonApodoxon.value || '0') - parseFloat((document.getElementById("synoloAsfalistikhsAxias").value || '0').replace(',', '.')) - (parseFloat(document.getElementById("apallassomenesKrathseon").value || 0));   // + parseFloat(document.getElementById("geniko_synolo_astheneias").value || 0));
@@ -1753,13 +2133,18 @@ document.addEventListener("DOMContentLoaded", function() {
             await calculateValues();
         }
 
+        handleSynoloMiktonChangeCoreRef = handleSynoloMiktonChangeCore;
+
+        async function handleSynoloMiktonChange() {
+            return runHandleSynoloMiktonChangeCoalesced();
+        }
+
         /***************************************************************
          * 9. Συνάρτηση: handleAsfalistikesApodoxesChange
          ***************************************************************/
         async function handleAsfalistikesApodoxesChange() {
             // Αν το flag isUpdating είναι ενεργό, αγνοούμε την αλλαγή
             if (isUpdating) {
-                console.log('Change ignored due to isUpdating flag.');
                 return;
             }
 
@@ -1769,8 +2154,6 @@ document.addEventListener("DOMContentLoaded", function() {
             if (isNaN(newVal)) {
                 newVal = 0;
             }
-
-            console.log(`handleAsfalistikesApodoxesChange triggered with oldValue: ${oldValue}, newVal: ${newVal}`);
 
             // Ενημέρωση previousValue
             previousValue = newVal;
@@ -1822,18 +2205,25 @@ document.addEventListener("DOMContentLoaded", function() {
         /***************************************************************
          * 12. Event Listeners
          ***************************************************************/
-        synoloMiktonApodoxon.addEventListener('change', async () => {
-            await handleSynoloMiktonChange();
-        });
+        if (!window.__apasxAsfalistikesListenersAttached) {
+            synoloMiktonApodoxon.addEventListener('change', async () => {
+                if (shouldIgnoreFieldEventDuringLoad()) return;
+                await handleSynoloMiktonChange();
+            });
 
         // Όταν γράφει ο χρήστης μέσα στο asfalistikesApodoxes
-        asfalistikesApodoxes.addEventListener('input', async () => {
-            await handleAsfalistikesApodoxesChange();
-        });
+            asfalistikesApodoxes.addEventListener('input', async () => {
+                if (shouldIgnoreFieldEventDuringLoad()) return;
+                await handleAsfalistikesApodoxesChange();
+            });
 
-        asfalistikesApodoxes.addEventListener('change', async () => {
-            await handleAsfalistikesApodoxesChange();
-        });
+            asfalistikesApodoxes.addEventListener('change', async () => {
+                if (shouldIgnoreFieldEventDuringLoad()) return;
+                await handleAsfalistikesApodoxesChange();
+            });
+
+            window.__apasxAsfalistikesListenersAttached = true;
+        }
     }
 
     async function updatePlhroteoWithComparison() {
