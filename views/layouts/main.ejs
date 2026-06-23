@@ -509,6 +509,7 @@
                 }
 
                 let pendingTimer = null;
+                let hideTimer = null;
                 let activeCount = 0;
                 let shownAt = 0;
 
@@ -518,6 +519,11 @@
                 window.AppLoader = {
                     begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
                         activeCount++;
+
+                        if (hideTimer) {
+                            clearTimeout(hideTimer);
+                            hideTimer = null;
+                        }
 
                         // αν ήδη φαίνεται, απλά ανανέωσε text
                         const root = simpleRoot();
@@ -557,7 +563,10 @@
                         // κράτα το λίγο για να μην “αναβοσβήνει”
                         const elapsed = Date.now() - shownAt;
                         const wait = Math.max(0, MIN_VISIBLE - elapsed);
-                        setTimeout(() => hideSimple(), wait);
+                        hideTimer = setTimeout(() => {
+                            hideTimer = null;
+                            if (activeCount === 0) hideSimple();
+                        }, wait);
                     },
 
                     // helper για promises
@@ -574,7 +583,9 @@
                     hide() {
                         activeCount = 0;
                         if (pendingTimer) clearTimeout(pendingTimer);
+                        if (hideTimer) clearTimeout(hideTimer);
                         pendingTimer = null;
+                        hideTimer = null;
                         hideSimple();
                     }
                 };
