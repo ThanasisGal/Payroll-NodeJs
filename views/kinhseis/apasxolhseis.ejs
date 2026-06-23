@@ -184,43 +184,31 @@
     window.RUNTIME_ENV = "<%= NODE_ENV %>";
 </script>
 
+
 <% const payrollTypos = ['001']; %>
 
-        <% payrollTypos.forEach(function(typos) { %>
-            <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/typoiApodoxon/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
-            <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/<%= typos %><%= NODE_ENV === 'production' ? '.min.js' : '.js' %>"></script>
-        <% }); %>
+<% payrollTypos.forEach(function(typos) { %>
+    <script nonce="<%= nonce %>" src="<%= script('kinhseis/typoiApodoxon/' + typos) %>"></script>
+    <script nonce="<%= nonce %>" src="<%= script('kinhseis/ypologismoi/' + typos) %>"></script>
+<% }); %>
 
 <script src="<%= script('kinhseis/ypologismoi/axiaKrathseon') %>"></script>
 <script src="<%= script('kinhseis/ypologismoi/fillFieldsKinhseon') %>"></script>
 <script src="<%= script('kinhseis/ypologismoi/klimakiaForoy') %>"></script>
 
-
-
-
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/ypologismoi/klimakiaForoy<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/moveByEnter<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatDates<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/formatTimes<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/buttonPermissions<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/allaghReadonlyFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/loadDropdowns<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/removeGreekAccentsAndToUpper<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/modal<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/apasxolhseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/toggleLabelKinhseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/updateLabelFromHidden<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/clearFormFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/clearValueFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/showModal<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/scrollToTop<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/common/getFocusNumberFields<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/loadKrathseis<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/astheneies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/ypologismoiForoy<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/adeies<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
-        <script nonce="<%= nonce %>" src="/static/<%= NODE_ENV === 'production' ? 'min.js' : 'js' %>/kinhseis/apasxolhseis/putFieldValues<%= NODE_ENV === 'production' ? '.min' : '' %>.js"></script>
+<script src="<%= script('kinhseis/apasxolhseis/buttonPermissions') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/allaghReadonlyFields') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/loadDropdowns') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/apasxolhseis') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/toggleLabelKinhseis') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/updateLabelFromHidden') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/clearFormFields') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/loadKrathseis') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/astheneies') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/ypologismoiForoy') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/adeies') %>"></script>
+<script src="<%= script('kinhseis/apasxolhseis/putFieldValues') %>"></script>
         
 
 

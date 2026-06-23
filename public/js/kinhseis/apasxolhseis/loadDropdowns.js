@@ -144,9 +144,67 @@ let anapaysh_repo_hmeromhnies,
     ypoloipo_adeias_astheneias_timh;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-// Σημ.: Το .loader-container δεν υπάρχει σε αυτή τη σελίδα.
-// Ο ορατός loader ελέγχεται αποκλειστικά μέσω window.AppLoader (βλ. main.ejs).
-// Όλος ο παλιός arbiter / pipeline-loader κώδικας αφαιρέθηκε.
+const loaderContainer = document.querySelector('.loader-container');
+let apasxolhseisPipelineLoaderDepth = 0;
+let apasxolhseisPipelineLoaderLockDepth = 0;
+
+function setApasxolhseisPipelineLoaderVisible(visible) {
+    window.apasxolhseisPipelineLoaderActive = !!visible;
+    if (loaderContainer) {
+        loaderContainer.style.display = visible ? 'grid' : 'none';
+    }
+}
+
+function setApasxolhseisLoaderLockClass(locked) {
+    document.body?.classList.toggle('apasxolhseis-loader-locked', !!locked);
+    window.apasxolhseisLoaderLocked = !!locked;
+}
+
+function beginApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderLockDepth += 1;
+    apasxolhseisPipelineLoaderDepth = Math.max(apasxolhseisPipelineLoaderDepth, 1);
+    setApasxolhseisLoaderLockClass(true);
+    setApasxolhseisPipelineLoaderVisible(true);
+}
+
+function endApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderLockDepth = Math.max(0, apasxolhseisPipelineLoaderLockDepth - 1);
+    if (apasxolhseisPipelineLoaderLockDepth === 0) {
+        apasxolhseisPipelineLoaderDepth = 0;
+        setApasxolhseisLoaderLockClass(false);
+        setApasxolhseisPipelineLoaderVisible(false);
+    }
+}
+
+function showApasxolhseisPipelineLoader() {
+    if (apasxolhseisPipelineLoaderLockDepth > 0) {
+        setApasxolhseisPipelineLoaderVisible(true);
+        return;
+    }
+
+    apasxolhseisPipelineLoaderDepth += 1;
+    setApasxolhseisPipelineLoaderVisible(true);
+}
+
+function hideApasxolhseisPipelineLoader() {
+    if (apasxolhseisPipelineLoaderLockDepth > 0) {
+        // Όταν τρέχει employee/pipeline flow, κανένας εσωτερικός υπολογισμός
+        // δεν επιτρέπεται να κρύψει τον loader. Κρύβεται μόνο στο τελικό end().
+        return;
+    }
+
+    apasxolhseisPipelineLoaderDepth = Math.max(0, apasxolhseisPipelineLoaderDepth - 1);
+    if (apasxolhseisPipelineLoaderDepth === 0) {
+        setApasxolhseisPipelineLoaderVisible(false);
+    }
+}
+
+function resetApasxolhseisPipelineLoader() {
+    apasxolhseisPipelineLoaderDepth = 0;
+    apasxolhseisPipelineLoaderLockDepth = 0;
+    setApasxolhseisLoaderLockClass(false);
+    setApasxolhseisPipelineLoaderVisible(false);
+}
 
 const saveButton = document.getElementById('saveButton');
 const updateButton = document.getElementById('updateButton');
@@ -1086,21 +1144,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const forcedRecord = forcedErgazomenosRecordForNavigation;
         forcedErgazomenosRecordForNavigation = null;
 
-        const previousSuppress = window.apasxolhseisSuppressFieldEvents;
-        const previousEmployeePipeline = window.apasxolhseisEmployeeLoadPipeline;
-
-        // Outer AppLoader span για ΟΛΗ τη ροή φόρτωσης εργαζομένου.
-        // Κρατά το AppLoader ανοιχτό ώστε τα επιμέρους fetch να μην κλείνουν
-        // τον loader ανάμεσα στα αιτήματα (αντί-flicker).
-        let outerLoaderBegun = false;
-        if (window.AppLoader?.begin) {
-            window.AppLoader.begin('Φόρτωση εργαζομένου...', 0);
-            outerLoaderBegun = true;
-        }
+        beginApasxolhseisPipelineLoader();
 
         try {
-            window.apasxolhseisEmployeeLoadPipeline = true;
-            window.apasxolhseisSuppressFieldEvents = true;
             await clearFormFields();
 
             if (forcedRecord) {
@@ -1266,7 +1312,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('oresErgasias').focus();
                     await loadTypoiApodoxon();
                     await loadPeriods();
-                    await runEmployeePeriodFlowOnce('employee-change', { useExistingLoader: true });
+                    await runEmployeePeriodFlowOnce('employee-change');
 
                     prefetchAdjacentEmployeeDetails(selectedRecord);
                 } catch (error) {
@@ -1278,12 +1324,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Dropdown change error:', error);
         } finally {
-            window.apasxolhseisSuppressFieldEvents = previousSuppress;
-            window.apasxolhseisEmployeeLoadPipeline = previousEmployeePipeline;
-            // Κλείνουμε τον outer AppLoader span αφού ολοκληρωθεί ΟΛΗ η αλυσίδα.
-            if (outerLoaderBegun) {
-                window.AppLoader.end();
-            }
+            endApasxolhseisPipelineLoader();
         }
     }
 
@@ -1406,8 +1447,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function formatValue(value) {
-        return value && !isNaN(value) ? parseFloat(value).toFixed(4) : 0;
+    function formatValue(value, decimals = 2) {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed.toFixed(decimals) : (0).toFixed(decimals);
     }
     function setNumericInputValue(id, value, decimals = 2) {
         const element = document.getElementById(id);
@@ -1422,9 +1464,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         setNumericInputValue('synoloApodoxon', _ergazomenoi.synolo_symbashs_basei_oron_ergasias, 2);
         setNumericInputValue('symfonhtheisMisthos', _ergazomenoi.symfonhtheis_misthos_apasxolhseis, 2);
-        setNumericInputValue('pragmatikoOromisthio', _ergazomenoi.pragmatikoOromisthio, 2);
+        // Τα ωρομίσθια πρέπει να παραμένουν με 4 δεκαδικά, όπως στη ΒΔ,
+        // γιατί χρησιμοποιούνται ως βάση στους υπολογισμούς αξιών ωρών/απουσιών.
+        setNumericInputValue('pragmatikoOromisthio', _ergazomenoi.pragmatikoOromisthio, 4);
         setNumericInputValue('pragmatikoHmeromisthio', _ergazomenoi.pragmatikoHmeromisthio, 2);
-        setNumericInputValue('nomimoOromisthio', _ergazomenoi.nomimoOromisthio, 2);
+        setNumericInputValue('nomimoOromisthio', _ergazomenoi.nomimoOromisthio, 4);
         setNumericInputValue('nomimoHmeromisthio', _ergazomenoi.nomimoHmeromisthio, 2);
     }
 
@@ -1490,54 +1534,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return hireDate.getTime() > periodEnd.getTime();
     }
 
-    function ensureOutsidePeriodSwalCss() {
-        if (document.getElementById('apasxolhseis-outside-period-swal-style')) return;
-
-        const style = document.createElement('style');
-        style.id = 'apasxolhseis-outside-period-swal-style';
-        style.textContent = `
-            .swal2-popup.apasxolhseis-outside-period-swal {
-                width: 28rem !important;
-                max-width: min(28rem, calc(100vw - 2rem)) !important;
-                min-width: 0 !important;
-                box-sizing: border-box !important;
-                padding-left: 1.75rem !important;
-                padding-right: 1.75rem !important;
-            }
-            .swal2-popup.apasxolhseis-outside-period-swal .swal2-title {
-                font-size: 1.35rem !important;
-                line-height: 1.25 !important;
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-            }
-            .swal2-popup.apasxolhseis-outside-period-swal .swal2-html-container {
-                margin-left: 0 !important;
-                margin-right: 0 !important;
-                line-height: 1.35 !important;
-            }
-            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-message,
-            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-message p,
-            .swal2-popup.apasxolhseis-outside-period-swal .apasxolhseis-outside-period-dates {
-                max-width: 100% !important;
-                white-space: normal !important;
-                overflow-wrap: anywhere !important;
-                word-break: normal !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    function forceOutsidePeriodSwalWidth(popup) {
-        if (!popup) return;
-        popup.classList.add('apasxolhseis-outside-period-swal');
-        popup.style.setProperty('width', '28rem', 'important');
-        popup.style.setProperty('max-width', 'min(28rem, calc(100vw - 2rem))', 'important');
-        popup.style.setProperty('min-width', '0', 'important');
-        popup.style.setProperty('box-sizing', 'border-box', 'important');
-    }
-
     function showEmployeeOutsidePeriodMessage(employee, endDateISOString) {
-        ensureOutsidePeriodSwalCss();
         const hireDate = normalizeDateOnly(employee?.hmeromhnia_proslhpshs);
         const periodEnd = normalizeDateOnly(endDateISOString);
         const employeeName = [employee?.eponymo, employee?.onoma].filter(Boolean).join(' ').trim();
@@ -1561,12 +1558,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 html: message,
                 icon: 'warning',
                 confirmButtonText: 'ΟΚ',
-                width: '28rem',
-                customClass: {
-                    popup: 'apasxolhseis-outside-period-swal'
-                },
-                didOpen: forceOutsidePeriodSwalWidth,
-                didRender: forceOutsidePeriodSwalWidth,
                 allowOutsideClick: false,
                 allowEscapeKey: true
             });
@@ -1627,23 +1618,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         activeEmployeePeriodFlowPromise = (async () => {
             const previousSuppress = window.apasxolhseisSuppressFieldEvents;
-            const previousEmployeePipeline = window.apasxolhseisEmployeeLoadPipeline;
-            const shouldControlLoader = options.useExistingLoader !== true;
 
-            // Outer AppLoader span: ξεκινά αμέσως (delay=0) πριν οποιοδήποτε fetch,
-            // κλείνει αφού ολοκληρωθεί ΟΛΗ η αλυσίδα. Έτσι το AppLoader παραμένει
-            // ανοιχτό ανάμεσα στα επιμέρους αιτήματα και ο loader δεν κλείνει/ανοίγει
-            // πολλές φορές (αντί-flicker για .app-loader--simple).
-            let outerLoaderBegun = false;
-            if (shouldControlLoader) {
-                if (window.AppLoader?.begin) {
-                    window.AppLoader.begin('Φόρτωση εργαζομένου...', 0);
-                    outerLoaderBegun = true;
-                }
-            }
+            beginApasxolhseisPipelineLoader();
 
             try {
-                window.apasxolhseisEmployeeLoadPipeline = true;
                 window.apasxolhseisSuppressFieldEvents = true;
 
                 const periodosHidden = document.getElementById('periodos_Hidden');
@@ -1784,6 +1762,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     document.getElementById('oresArgion').value = formatValue(result.total_ores_argion);
                     document.getElementById('oresNyxtas').value = formatValue(result.total_ores_nyxtas);
+                    document.getElementById('oresApoysias').value = formatValue(result.total_ores_apoysias);
+                    document.getElementById('hmeresApoysias').value =
+                        result.total_hmeres_apoysias && !isNaN(result.total_hmeres_apoysias)
+                            ? parseInt(result.total_hmeres_apoysias)
+                            : 0;
 
                     document.getElementById('oresYperergasias').value = formatValue(
                         result.total_ores_yperergasias
@@ -1848,9 +1831,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
                     if (!isCurrentFlow()) return;
 
-                    // Κρατάμε suppress/pipeline ενεργά μέχρι να ολοκληρωθεί ΟΛΗ η αλυσίδα.
-                    // Αν απελευθερωθούν εδώ, τα input/change listeners ξεκινούν δεύτερες
-                    // κρατήσεις/φόρο/πληρωτέο και προκαλούν flickering στον loader.
+                    window.apasxolhseisSuppressFieldEvents = previousSuppress;
+
                     if (typeof window.recalculateApasxolhseisAfterEmployeeLoad === 'function') {
                         await window.recalculateApasxolhseisAfterEmployeeLoad({ runHmeresErgasias: true });
                     } else {
@@ -1883,11 +1865,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 lastCompletedEmployeePeriodFlowKey = flowKey;
             } finally {
                 window.apasxolhseisSuppressFieldEvents = previousSuppress;
-                window.apasxolhseisEmployeeLoadPipeline = previousEmployeePipeline;
-                // Κλείνουμε τον outer span ακριβώς μία φορά αφού ολοκληρωθεί η αλυσίδα.
-                if (outerLoaderBegun) {
-                    window.AppLoader.end();
-                }
+                endApasxolhseisPipelineLoader();
 
                 if (activeEmployeePeriodFlowKey === flowKey) {
                     activeEmployeePeriodFlowKey = '';
@@ -1900,7 +1878,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     periodoiDropdown.addEventListener('change', async () => {
-        if (window.apasxolhseisSuppressFieldEvents === true) return;
         await runEmployeePeriodFlowOnce('periodos-change');
     });
 
@@ -1922,8 +1899,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     typoiApodoxonDropdown.addEventListener('change', async () => {
-        if (window.apasxolhseisSuppressFieldEvents === true) return;
-
         const selectedTyposApodoxon = String(typoiApodoxonDropdown.value || '').trim();
 
         // TomSelect μπορεί να πυροδοτήσει change με κενή τιμή κατά το αρχικό init/clear.
@@ -2139,10 +2114,6 @@ document.addEventListener('DOMContentLoaded', function () {
         await ypologismosAxiasKrathseon();
     }
 
-    function isNumberInputField(field) {
-        return field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number';
-    }
-
     function setValue(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
         const field = document.getElementById(fieldId);
 
@@ -2161,15 +2132,14 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
+        const parsedValue = parseFloat(value);
 
         if (isNaN(parsedValue)) {
             field.value = decimalPlaces ? `0.${'0'.repeat(decimalPlaces)}` : '';
         } else {
-            const fixedValue = parsedValue.toFixed(decimalPlaces);
-            field.value = format && !isNumberInputField(field)
-                ? fixedValue.replace('.', ',')
-                : fixedValue;
+            field.value = format
+                ? parsedValue.toFixed(decimalPlaces).replace('.', ',')
+                : parsedValue.toFixed(decimalPlaces);
         }
     }
 

@@ -743,9 +743,24 @@ declare -a ergazomenoi=(
 )
 
 declare -a kinhseis=(
+    "public/js/kinhseis//kinhseis/typoiApodoxon/001.js"
+    "public/js/kinhseis/ypologismoi/001.js"
     "public/js/kinhseis/ypologismoi/axiaKrathseon.js"
     "public/js/kinhseis/ypologismoi/fillFieldsKinhseon.js"
     "public/js/kinhseis/ypologismoi/klimakiaForoy.js"
+    "public/js/kinhseis/apasxolhseis/buttonPermissions.js"
+    "public/js/kinhseis/apasxolhseis/allaghReadonlyFields.js"
+    "public/js/kinhseis/apasxolhseis/loadDropdowns.js"
+    "public/js/kinhseis/apasxolhseis/apasxolhseis.js"
+    "public/js/kinhseis/apasxolhseis/toggleLabelKinhseis.js"
+    "public/js/kinhseis/apasxolhseis/toggleLabelKinhseon_Astheneies.js"
+    "public/js/kinhseis/apasxolhseis/updateLabelFromHidden.js"
+    "public/js/kinhseis/apasxolhseis/clearFormFields.js"
+    "public/js/kinhseis/apasxolhseis/loadKrathseis.js"
+    "public/js/kinhseis/apasxolhseis/astheneies.js"
+    "public/js/kinhseis/apasxolhseis/ypologismoiForoy.js"
+    "public/js/kinhseis/apasxolhseis/adeies.js"
+    "public/js/kinhseis/apasxolhseis/putFieldValues.js"
 )
 
 declare -a no_obfuscate=(

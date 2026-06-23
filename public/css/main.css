@@ -912,6 +912,10 @@ small,
     flex: 0 0 auto;
     width: 9.4% !important;
 }
+.col-1-1-7-0 {
+    flex: 0 0 auto;
+    width: 9.59% !important;
+}
 .col-1-1-71 {
     flex: 0 0 auto;
     width: 9.67% !important;
@@ -12527,7 +12531,6 @@ body.loader-active > *:not(.app-loader) {
     box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important;
 }
 
-
 /* ============================================================================
    APASXOLHSEIS_TOMDROPDOWN_UI_FIX_START
    Κινήσεις -> Απασχολήσεις -> Υποκατάστημα TomDropdown/TomSelect
@@ -12607,7 +12610,6 @@ body.loader-active > *:not(.app-loader) {
     text-align: left !important;
 }
 
-
 #apasxolhseisForm .ts-wrapper.apasxolhseis-ypokatasthma-select .ts-control,
 #apasxolhseisForm .ts-wrapper.apasxolhseis-ypokatasthma-select .item,
 #apasxolhseisForm .ts-wrapper.apasxolhseis-ypokatasthma-select .ts-dropdown .option,
@@ -12617,8 +12619,6 @@ body.loader-active > *:not(.app-loader) {
 }
 
 /* APASXOLHSEIS_TOMDROPDOWN_UI_FIX_END */
-
-
 
 /* ============================================================================
    APASXOLHSEIS_ERGAZOMENOS_TOMDROPDOWN_START
@@ -12705,37 +12705,149 @@ body.loader-active > *:not(.app-loader) {
 
 /* APASXOLHSEIS_CSP_INLINE_STYLE_MIGRATION_START */
 /* Inline styles removed from Apasxolhseis EJS files for CSP compliance. */
-.apx-csp-style-001 { margin-top: -2rem; margin-bottom: 0.4rem; }
-.apx-csp-style-002 { height: 82vh; width: 99%; margin-left: .5%; margin-top: -0.2rem; overflow: hidden !important; }
-.apx-csp-style-003 { background-color: #ffffff; margin-top: -0.5rem; }
-.apx-csp-style-004 { max-height: 72.5vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important; }
-.apx-csp-style-005 { height: 72vh !important; background-color: #ffffff; margin-top: -0.5rem; }
-.apx-csp-style-006 { max-height: 62.5vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important; }
-.apx-csp-style-007 { background-color: #ffffff; margin-top: -0.5rem; overflow-x: hidden !important; }
-.apx-csp-style-008 { height: 78vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important; }
-.apx-csp-style-009 { height: 61.6vh; background-color: #ffffff; margin-top: -0.5rem; overflow-x: hidden !important; }
-.apx-csp-style-010 { height: 80vh; width: 97%; margin-left: 1.5%; margin-top: -0.2rem; overflow: hidden !important; }
-.apx-csp-style-011 { height: 58vh; background-color: #ffffff; margin-top: -0.5rem; overflow-x: hidden !important; }
-.apx-csp-style-012 { width: 97%; margin-left: 1.5%; margin-top: -0.2rem; }
-.apx-csp-style-013 { margin-top: -1.2rem; margin-bottom: 1.5rem; }
-.apx-csp-style-014 { margin-left: 0.7rem; font-size: 0.7vw; font-weight: 700; }
-.apx-csp-style-015 { position: relative; }
-.apx-csp-style-016 { font-size: .7rem; color: var(--info); }
-.apx-csp-style-017 { margin-left: -1rem !important; margin-right: -1rem !important; }
-.apx-csp-style-018 { text-align: left; }
-.apx-csp-style-019 { text-align: right; padding-left: 10px; font-weight: 600; }
-.apx-csp-style-020 { margin-top: -0.4rem; }
-.apx-csp-style-021 { margin-left: -1rem !important; margin-right: -1rem !important; margin-top: -0.5rem; }
-.apx-csp-style-022 { text-align: left; font-weight: 700; }
-.apx-csp-style-023 { margin-top: -2.6rem; }
-.apx-csp-style-024 { margin-left: 11px; }
-.apx-csp-style-025 { margin-left: 4px; }
-.apx-csp-style-026 { margin-left: .8rem; }
-.apx-csp-style-027 { text-align: center; }
-.apx-csp-style-028 { font-size: 1rem; font-weight: 700; }
-.apx-csp-style-029 { background-color: #f5faae61; }
-.apx-csp-style-030 { margin-top: -0.5rem !important; margin-bottom: -1rem !important; margin-left: 10px !important; margin-right: 10px !important;  justify-content: space-around; }
-.apasxolhseis-swal-retry-message { margin-top: 1.5rem; margin-bottom: 1rem; }
+.apx-csp-style-001 {
+    margin-top: -2rem;
+    margin-bottom: 0.4rem;
+}
+.apx-csp-style-002 {
+    height: 82vh;
+    width: 99%;
+    margin-left: 0.5%;
+    margin-top: -0.2rem;
+    overflow: hidden !important;
+}
+.apx-csp-style-003 {
+    background-color: #ffffff;
+    margin-top: -0.5rem;
+}
+.apx-csp-style-004 {
+    max-height: 72.5vh;
+    width: 97%;
+    margin-left: 1.5%;
+    margin-top: -0.2rem;
+    overflow: hidden !important;
+}
+.apx-csp-style-005 {
+    height: 72vh !important;
+    background-color: #ffffff;
+    margin-top: -0.5rem;
+}
+.apx-csp-style-006 {
+    max-height: 62.5vh;
+    width: 97%;
+    margin-left: 1.5%;
+    margin-top: -0.2rem;
+    overflow: hidden !important;
+}
+.apx-csp-style-007 {
+    background-color: #ffffff;
+    margin-top: -0.5rem;
+    overflow-x: hidden !important;
+}
+.apx-csp-style-008 {
+    height: 78vh;
+    width: 97%;
+    margin-left: 1.5%;
+    margin-top: -0.2rem;
+    overflow: hidden !important;
+}
+.apx-csp-style-009 {
+    height: 61.6vh;
+    background-color: #ffffff;
+    margin-top: -0.5rem;
+    overflow-x: hidden !important;
+}
+.apx-csp-style-010 {
+    height: 80vh;
+    width: 97%;
+    margin-left: 1.5%;
+    margin-top: -0.2rem;
+    overflow: hidden !important;
+}
+.apx-csp-style-011 {
+    height: 58vh;
+    background-color: #ffffff;
+    margin-top: -0.5rem;
+    overflow-x: hidden !important;
+}
+.apx-csp-style-012 {
+    width: 97%;
+    margin-left: 1.5%;
+    margin-top: -0.2rem;
+}
+.apx-csp-style-013 {
+    margin-top: -1.2rem;
+    margin-bottom: 1.5rem;
+}
+.apx-csp-style-014 {
+    margin-left: 0.7rem;
+    font-size: 0.95vw;
+    font-weight: 700;
+}
+.apx-csp-style-015 {
+    position: relative;
+}
+.apx-csp-style-016 {
+    font-size: 0.7rem;
+    color: var(--info);
+}
+.apx-csp-style-017 {
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+}
+.apx-csp-style-018 {
+    text-align: left;
+}
+.apx-csp-style-019 {
+    text-align: right;
+    padding-left: 10px;
+    font-weight: 600;
+}
+.apx-csp-style-020 {
+    margin-top: -0.4rem;
+}
+.apx-csp-style-021 {
+    margin-left: -1rem !important;
+    margin-right: -1rem !important;
+    margin-top: -0.5rem;
+}
+.apx-csp-style-022 {
+    text-align: left;
+    font-weight: 700;
+}
+.apx-csp-style-023 {
+    margin-top: -2.6rem;
+}
+.apx-csp-style-024 {
+    margin-left: 11px;
+}
+.apx-csp-style-025 {
+    margin-left: 4px;
+}
+.apx-csp-style-026 {
+    margin-left: 0.8rem;
+}
+.apx-csp-style-027 {
+    text-align: center;
+}
+.apx-csp-style-028 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+.apx-csp-style-029 {
+    background-color: #f5faae61;
+}
+.apx-csp-style-030 {
+    margin-top: -0.5rem !important;
+    margin-bottom: -1rem !important;
+    margin-left: 10px !important;
+    margin-right: 10px !important;
+    justify-content: space-around;
+}
+.apasxolhseis-swal-retry-message {
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
 /* APASXOLHSEIS_CSP_INLINE_STYLE_MIGRATION_END */
 
 /* ============================================================================
@@ -12817,7 +12929,6 @@ body.loader-active > *:not(.app-loader) {
 
 /* APASXOLHSEIS_TYPOS_APODOXON_TOMDROPDOWN_END */
 
-
 /* ============================================================================
    APASXOLHSEIS_PERIODOS_TOMDROPDOWN_START
    Κινήσεις -> Απασχολήσεις -> Περίοδος TomDropdown/TomSelect
@@ -12897,8 +13008,6 @@ body.loader-active > *:not(.app-loader) {
 
 /* APASXOLHSEIS_PERIODOS_TOMDROPDOWN_END */
 
-
-
 .apasxolhseis-alert-message {
     text-align: center;
 }
@@ -12911,4 +13020,97 @@ body.loader-active > *:not(.app-loader) {
     margin-bottom: 0.45rem;
 }
 
-/* APASXOLHSEIS_PIPELINE_LOADER_LOCK_END */
+/* CSP classes moved from inline style attributes of Επικολλημένος κώδικας(4).html.
+   Paste this block into public/css/main.css (or a loaded CSS file). */
+
+.apx-csp-mt-n-145 {
+    margin-top: -1.45rem;
+}
+
+.apx-csp-mt-n-02 {
+    margin-top: -0.2rem;
+}
+
+.apx-csp-mt-n-03 {
+    margin-top: -0.3rem;
+}
+
+.apx-csp-ml-n-03 {
+    margin-left: -0.3rem;
+}
+
+.apx-csp-bg-soft-yellow {
+    background-color: #faf7ae5a;
+}
+
+.apx-csp-bg-soft-green {
+    background-color: #86cf5b30;
+}
+
+.apx-csp-bg-soft-green-ml-03 {
+    background-color: #86cf5b30;
+    margin-left: 0.3rem;
+}
+
+.apx-csp-ml-n-1 {
+    margin-left: -1rem;
+}
+
+.apx-csp-ml-1 {
+    margin-left: 1rem;
+}
+
+.apx-csp-bg-work-minus-absence {
+    background-color: #5d943d61;
+}
+
+.apx-csp-fw-700-darkgreen {
+    font-weight: 700;
+    color: darkgreen;
+}
+
+.apx-csp-color-dark-4c {
+    color: #4c4c4c !important;
+}
+
+.apx-csp-color-gray-676 {
+    color: #676767 !important;
+}
+
+.apx-csp-fs-069vw {
+    font-size: 0.69vw !important;
+}
+
+.apx-csp-date-left-08vw {
+    font-size: 0.8vw !important;
+    text-align: left !important;
+}
+
+.apx-csp-mb-n-08 {
+    margin-bottom: -0.8rem;
+}
+
+.apx-csp-bg-soft-gold {
+    background-color: #eae86341;
+}
+
+.apx-csp-bg-soft-gold-bold-1vw {
+    font-size: 1vw !important;
+    font-weight: 700 !important;
+    background-color: #eae86341;
+}
+
+.apx-csp-mb-n-1 {
+    margin-bottom: -1rem;
+}
+
+.apx-csp-color-green {
+    color: green;
+}
+
+.apx-csp-plhroteo-total {
+    background-color: #012b0fb2;
+    color: #ffffff;
+    font-size: 1.1rem !important;
+    font-weight: 800;
+}

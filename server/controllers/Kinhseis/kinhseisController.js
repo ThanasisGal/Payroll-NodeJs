@@ -31,7 +31,9 @@ const { CompaniesModel, AntistoixiseisModel } = Models_C;
 
 const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 
-const { ApoysiesModel, ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
+// Το ApoysiesModel δεν χρησιμοποιείται πλέον στις Απασχολήσεις.
+// Οι ώρες απουσίας διαβάζονται από ProdhlomenaOrariaModel.ores_apoysias_apologistika.
+const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -482,7 +484,11 @@ class kinhseisController {
                 }
             };
 
-            if (ypokatasthma !== undefined && ypokatasthma !== null && String(ypokatasthma).trim() !== '') {
+            if (
+                ypokatasthma !== undefined &&
+                ypokatasthma !== null &&
+                String(ypokatasthma).trim() !== ''
+            ) {
                 matchFilter.ypokatasthma = String(ypokatasthma).trim();
             }
 
@@ -497,6 +503,9 @@ class kinhseisController {
                         _id: null, // Δεν χρειαζόμαστε ομαδοποίηση με βάση κάποιο πεδίο
                         total_ores_ergasias: { $sum: '$ores_ergasias_apologistika' },
                         total_ores_nyxtas: { $sum: '$ores_nyxtas_apologistika' },
+                        total_ores_apoysias: {
+                            $sum: { $ifNull: ['$ores_apoysias_apologistika', 0] }
+                        },
                         total_ores_argion: { $sum: '$ores_argion_prosayxhsh_apologistika' },
                         total_ores_yperergasias: { $sum: '$ores_yperergasias_apologistika' },
                         total_ores_yperergasias_argion: {
@@ -562,6 +571,7 @@ class kinhseisController {
                         _id: 0, // Αφαιρούμε το _id από τα αποτελέσματα
                         total_ores_ergasias: 1, // Προσθέτουμε το total_ores_.... στα αποτελέσματα
                         total_ores_nyxtas: 1,
+                        total_ores_apoysias: 1,
                         total_ores_argion: 1,
                         total_ores_yperergasias: 1,
                         total_ores_yperergasias_argion: 1,
@@ -587,18 +597,21 @@ class kinhseisController {
         }
     }
 
-    static async getApoysies(team, company, xrhsh, employeeKod, startDate, endDate) {
+    static async getApoysies(team, company, xrhsh, employeeKod, startDate, endDate, ypokatasthma = '') {
         try {
-            // Δημιουργία των ημερομηνιών σε UTC
+            // ΑΚΥΡΩΜΕΝΗ παλιά διαδικασία ApoysiesModel:
+            // Δεν γίνεται πλέον καμία ανάγνωση από ApoysiesModel.
+            // Κρατάμε το ίδιο method name για συμβατότητα με υπάρχοντα routes/frontend.
+
             const start = new Date(
                 Date.UTC(
-                    parseInt(startDate.substring(0, 4)), // Έτος
-                    parseInt(startDate.substring(5, 7)) - 1, // Μήνας (0-11)
-                    parseInt(startDate.substring(8, 10)), // Ημέρα
+                    parseInt(startDate.substring(0, 4)),
+                    parseInt(startDate.substring(5, 7)) - 1,
+                    parseInt(startDate.substring(8, 10)),
                     0,
                     0,
                     0,
-                    0 // Ώρα, λεπτά, δευτερόλεπτα, milliseconds
+                    0
                 )
             );
 
@@ -614,39 +627,70 @@ class kinhseisController {
                 )
             );
 
-            // Δημιουργία του aggregation pipeline
-            const result = await ApoysiesModel.aggregate([
+            const matchFilter = {
+                team: team,
+                company_kod: company,
+                kodikos: employeeKod,
+                hmeromhnia: {
+                    $gte: start,
+                    $lte: end
+                }
+            };
+
+            if (
+                ypokatasthma !== undefined &&
+                ypokatasthma !== null &&
+                String(ypokatasthma).trim() !== ''
+            ) {
+                matchFilter.ypokatasthma = String(ypokatasthma).trim();
+            }
+
+            const result = await ProdhlomenaOrariaModel.aggregate([
                 {
-                    $match: {
-                        team: team,
-                        company_kod: company,
-                        xrhsh: xrhsh,
-                        kodikos: employeeKod,
-                        hmeromhnia: {
-                            $gte: start, // Ημερομηνία από
-                            $lte: end // Ημερομηνία έως
+                    $match: matchFilter
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total_hmeres_apoysias: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $gt: [
+                                            { $ifNull: ['$ores_apoysias_apologistika', 0] },
+                                            0
+                                        ]
+                                    },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+                        total_ores_apoysias: {
+                            $sum: { $ifNull: ['$ores_apoysias_apologistika', 0] }
                         }
                     }
                 },
                 {
-                    $group: {
-                        _id: null, // Δεν χρειαζόμαστε ομαδοποίηση με βάση κάποιο πεδίο
-                        total_hmeres_apoysias: { $sum: '$hmeres_apoysias' },
-                        total_ores_apoysias: { $sum: '$ores_apoysias' }
-                    }
-                },
-                {
                     $project: {
-                        _id: 0, // Αφαιρούμε το _id από τα αποτελέσματα
+                        _id: 0,
                         total_hmeres_apoysias: 1,
                         total_ores_apoysias: 1
                     }
                 }
             ]);
 
-            return result.length > 0 ? result[0] : {}; // Επιστροφή του αποτελέσματος ως αντικείμενο
+            return result.length > 0
+                ? result[0]
+                : {
+                      total_hmeres_apoysias: 0,
+                      total_ores_apoysias: 0
+                  };
         } catch (error) {
-            console.error('Σφάλμα κατά την ανάκτηση των συνολικών τιμών:', error);
+            console.error(
+                'Σφάλμα κατά την ανάκτηση απουσιών από ProdhlomenaOrariaModel:',
+                error
+            );
             throw error;
         }
     }
@@ -687,7 +731,8 @@ class kinhseisController {
         try {
             const team = req.query.team;
             const company = req.query.company;
-            const xrhsh = req.query.xrhsh;
+            const xrhsh = req.query.xrhsh; // Διατηρείται για συμβατότητα, δεν χρησιμοποιείται στο ProdhlomenaOrariaModel.
+            const ypokatasthma = req.query.ypokatasthma;
             const employeeKod = req.query.employeeKod;
             const startDate = req.query.startDate;
             const endDate = req.query.endDate;
@@ -699,14 +744,16 @@ class kinhseisController {
                     .json({ error: 'Παρακαλώ παρέχετε τα employeeKod, startDate και endDate' });
             }
 
-            // Κλήση της συνάρτησης για να λάβουμε τα δεδομένα
+            // Κλήση της συνάρτησης για να λάβουμε τα δεδομένα από ProdhlomenaOrariaModel.
+            // Δεν γίνεται πλέον καμία ανάγνωση από ApoysiesModel.
             const apoysies = await kinhseisController.getApoysies(
                 team,
                 company,
                 xrhsh,
                 employeeKod,
                 startDate,
-                endDate
+                endDate,
+                ypokatasthma
             );
 
             // Αποστολή των αποτελεσμάτων στον πελάτη
@@ -1025,7 +1072,11 @@ class kinhseisController {
                 hmeromhnia: dateFilter
             };
 
-            if (ypokatasthma !== undefined && ypokatasthma !== null && String(ypokatasthma).trim() !== '') {
+            if (
+                ypokatasthma !== undefined &&
+                ypokatasthma !== null &&
+                String(ypokatasthma).trim() !== ''
+            ) {
                 baseFilter.ypokatasthma = String(ypokatasthma).trim();
             }
 
