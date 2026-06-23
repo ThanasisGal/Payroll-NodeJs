@@ -5,6 +5,41 @@ let _EKPTOSH_FOROY = [];
 let _APODOXES_PRO_EKPTOSHS_FOROY = Array.from(Array(2), () => new Array(11));
 let _APODOXES_PRO_EKPTOSHS_FOROY_PIN0 = Array.from(Array(11), () => new Array(9));
 let _APODOXES_PRO_EKPTOSHS_FOROY_PIN1 = Array.from(Array(11), () => new Array(9));
+const taxEndpointCache = new Map();
+const taxEndpointInFlight = new Map();
+
+function cloneJson(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+async function getCachedTaxEndpointJson(cacheKey, url) {
+    if (taxEndpointCache.has(cacheKey)) {
+        return cloneJson(taxEndpointCache.get(cacheKey));
+    }
+
+    if (!taxEndpointInFlight.has(cacheKey)) {
+        const request = fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const payload = await response.json();
+                taxEndpointCache.set(cacheKey, payload);
+                return payload;
+            })
+            .finally(() => {
+                taxEndpointInFlight.delete(cacheKey);
+            });
+
+        taxEndpointInFlight.set(cacheKey, request);
+    }
+
+    return cloneJson(await taxEndpointInFlight.get(cacheKey));
+}
 
 // Συνάρτηση που θα εκτελείται όταν φορτώνει το DOM
 async function initializeKlimakiaForoy() {
@@ -18,16 +53,11 @@ async function initializeKlimakiaForoy() {
 // Συνάρτηση λήψης δεδομένων
 async function fetchData() {
     try {
-        const response = await fetch(`/api/kinhseis/getKlimakiaForoy?xrhsh=${sharedParams._XRHSH}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const klimakia = await response.json();
+        const xrhsh = sharedParams._XRHSH;
+        const klimakia = await getCachedTaxEndpointJson(
+            `getKlimakiaForoy:${xrhsh}`,
+            `/api/kinhseis/getKlimakiaForoy?xrhsh=${xrhsh}`
+        );
 
         klimakia.forEach((item, i) => {
             if (i < 8) {
@@ -49,16 +79,10 @@ async function fetchData() {
 // Συνάρτηση λήψης εκπτώσεων φόρου
 async function fetchEkptoshForoy() {
     try {
-        const response = await fetch(`/api/kinhseis/getEkptoshForoy`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const ekptosh = await response.json();
+        const ekptosh = await getCachedTaxEndpointJson(
+            'getEkptoshForoy',
+            '/api/kinhseis/getEkptoshForoy'
+        );
 
         ekptosh.forEach((item, i) => {
             _EKPTOSH_FOROY[i] = item.posoEkptoshs;  // Η προηγούμενη γραμμή αντικαθίσταται
@@ -73,16 +97,11 @@ async function fetchEkptoshForoy() {
 // Συνάρτηση λήψης εισοδήματος πριν την έκπτωση φόρου
 async function fetchEisodhmaProForoyMeioshs() {
     try {
-        const response = await fetch(`/api/kinhseis/getEisodhmaProForoyMeioshs?xrhsh=${sharedParams._XRHSH}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const xrhsh = sharedParams._XRHSH;
+        const data = await getCachedTaxEndpointJson(
+            `getEisodhmaProForoyMeioshs:${xrhsh}`,
+            `/api/kinhseis/getEisodhmaProForoyMeioshs?xrhsh=${xrhsh}`
+        );
 
         const len = data.length;
         const l1 = Math.floor(len / 2);
