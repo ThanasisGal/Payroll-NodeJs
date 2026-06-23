@@ -743,7 +743,7 @@ declare -a ergazomenoi=(
 )
 
 declare -a kinhseis=(
-    "public/js/kinhseis//kinhseis/typoiApodoxon/001.js"
+    "public/js/kinhseis/kinhseis/typoiApodoxon/001.js"
     "public/js/kinhseis/ypologismoi/001.js"
     "public/js/kinhseis/ypologismoi/axiaKrathseon.js"
     "public/js/kinhseis/ypologismoi/fillFieldsKinhseon.js"
