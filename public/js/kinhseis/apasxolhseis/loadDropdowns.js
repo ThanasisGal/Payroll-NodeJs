@@ -1878,6 +1878,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     periodoiDropdown.addEventListener('change', async () => {
+        const selectedPeriodos = String(periodoiDropdown.value || '').trim();
+
+        if (window.apasxolhseisSuppressFieldEvents === true || window.apasxolhseisEmployeeLoadPipeline === true) {
+            if (selectedPeriodos) {
+                const periodosHidden = document.getElementById('periodos_Hidden');
+                const mhnasHidden = document.getElementById('mhnas');
+                if (periodosHidden) periodosHidden.value = selectedPeriodos;
+                if (mhnasHidden) mhnasHidden.value = selectedPeriodos;
+            }
+            return;
+        }
+
         await runEmployeePeriodFlowOnce('periodos-change');
     });
 
@@ -1911,6 +1923,11 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('typosApodoxon_Hidden').value = selectedTyposApodoxon;
         const typApodHidden = document.getElementById('typ_apod');
         if (typApodHidden) typApodHidden.value = selectedTyposApodoxon;
+
+        if (window.apasxolhseisSuppressFieldEvents === true || window.apasxolhseisEmployeeLoadPipeline === true) {
+            return;
+        }
+
         await updateSession(selectedTyposApodoxon);
 
         if (periodoiDropdown.value) {
