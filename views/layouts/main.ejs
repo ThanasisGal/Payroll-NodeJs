@@ -515,6 +515,7 @@
 
                 const DEFAULT_DELAY = 250; // anti-flicker: δείξε μόνο αν αργήσει > 250ms
                 const MIN_VISIBLE = 200; // αν εμφανιστεί, κράτα το τουλάχιστον 200ms
+                const IDLE_GRACE = 150; // κράτα λίγο ανοιχτό για κοντινά fetch bursts
 
                 window.AppLoader = {
                     begin(text = 'Παρακαλώ περιμένετε...', delayMs = DEFAULT_DELAY) {
@@ -562,7 +563,7 @@
 
                         // κράτα το λίγο για να μην “αναβοσβήνει”
                         const elapsed = Date.now() - shownAt;
-                        const wait = Math.max(0, MIN_VISIBLE - elapsed);
+                        const wait = Math.max(IDLE_GRACE, MIN_VISIBLE - elapsed);
                         hideTimer = setTimeout(() => {
                             hideTimer = null;
                             if (activeCount === 0) hideSimple();
