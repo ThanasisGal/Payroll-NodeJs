@@ -12959,6 +12959,90 @@ body.loader-active > *:not(.app-loader) {
     margin-top: 1.5rem;
     margin-bottom: 1rem;
 }
+
+.apasxolhseis-krathseis-row {
+    background-color: #ffffff;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-bottom: -0.6rem !important;
+}
+
+.apasxolhseis-krathseis-input {
+    font-weight: 400 !important;
+}
+
+#apasxolhseisForm .apasxolhseis-krathsh-select {
+    font-weight: 400 !important;
+    font-size: 0.8rem !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select {
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select.single .ts-control,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-control {
+    width: 100% !important;
+    min-height: 1.9rem !important;
+    height: 1.9rem !important;
+    padding: 0.12rem 1.35rem 0.12rem 0.45rem !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 0.35rem !important;
+    background-color: #fff !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    font-size: 0.8rem !important;
+    font-weight: 400 !important;
+    line-height: 1.35 !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select.focus .ts-control,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select.input-active .ts-control {
+    border-color: #86b7fe !important;
+    box-shadow: 0 0 0 0.12rem rgba(13, 110, 253, 0.12) !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-control > input {
+    min-width: 0 !important;
+    font-size: 0.8rem !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-dropdown {
+    width: 100% !important;
+    min-width: 28rem !important;
+    font-size: 0.8rem;
+    text-align: left !important;
+}
+
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-control,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .item,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-dropdown .option,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-dropdown .active,
+#apasxolhseisForm .ts-wrapper.apasxolhseis-krathsh-select .ts-dropdown .create {
+    text-align: left !important;
+}
+
+.apasxolhseis-krathseis-total-percent {
+    background-color: #f5faae61;
+}
+
+.apasxolhseis-krathseis-total-amount {
+    background-color: #86cf5b30;
+}
 /* APASXOLHSEIS_CSP_INLINE_STYLE_MIGRATION_END */
 
 /* ============================================================================
