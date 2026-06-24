@@ -2350,6 +2350,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return num.toFixed(decimals);
         }
 
+        function formatCurrencyInput2(value) {
+            const num = Number(String(value ?? '0').replace(',', '.'));
+            return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+        }
+
         // 3.2 Μορφοποίηση αριθμών για εμφάνιση (με κόμμα)
         function formatNumberForDisplay(value, decimals = 2) {
             const num = parseFloat(value || '0');
@@ -2543,12 +2548,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     totals.ergodothMhYpologizomenhStoForo += axiaErgod;
                 }
 
-                // Ενημερώνουμε τις αξίες στα αντίστοιχα πεδία (με τελεία, 4 δεκαδικά)
+                // Ενημερώνουμε τις αξίες στα αντίστοιχα πεδία (με τελεία, 2 δεκαδικά)
                 if (fields.axiaErgazomenoy) {
-                    fields.axiaErgazomenoy.value = formatNumberForInput(axiaErgaz, 4);
+                    fields.axiaErgazomenoy.value = formatCurrencyInput2(axiaErgaz);
                 }
                 if (fields.axiaErgodoth) {
-                    fields.axiaErgodoth.value = formatNumberForInput(axiaErgod, 4);
+                    fields.axiaErgodoth.value = formatCurrencyInput2(axiaErgod);
                 }
             }
 
@@ -2557,39 +2562,35 @@ document.addEventListener('DOMContentLoaded', function () {
             // να γράφεται με τελεία και όχι με κόμμα. Αν γράψουμε π.χ. "190,61",
             // ο browser εμφανίζει warning: "The specified value cannot be parsed".
             if (synoloAxiasFields.ergazomenoy) {
-                synoloAxiasFields.ergazomenoy.value = formatNumberForInput(totals.ergazomenoy, 2);
+                synoloAxiasFields.ergazomenoy.value = formatCurrencyInput2(totals.ergazomenoy);
             }
             if (synoloAxiasFields.ergodoth) {
-                synoloAxiasFields.ergodoth.value = formatNumberForInput(totals.ergodoth, 2);
+                synoloAxiasFields.ergodoth.value = formatCurrencyInput2(totals.ergodoth);
             }
             if (synoloAxiasFields.ergazomenoyYpologizomenhStoForo) {
-                synoloAxiasFields.ergazomenoyYpologizomenhStoForo.value = formatNumberForInput(
-                    totals.ergazomenoyYpologizomenhStoForo,
-                    2
+                synoloAxiasFields.ergazomenoyYpologizomenhStoForo.value = formatCurrencyInput2(
+                    totals.ergazomenoyYpologizomenhStoForo
                 );
             }
             if (synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo) {
-                synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo.value = formatNumberForInput(
-                    totals.ergazomenoyMhYpologizomenhStoForo,
-                    2
+                synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo.value = formatCurrencyInput2(
+                    totals.ergazomenoyMhYpologizomenhStoForo
                 );
             }
             if (synoloAxiasFields.ergodothYpologizomenhStoForo) {
-                synoloAxiasFields.ergodothYpologizomenhStoForo.value = formatNumberForInput(
-                    totals.ergodothYpologizomenhStoForo,
-                    2
+                synoloAxiasFields.ergodothYpologizomenhStoForo.value = formatCurrencyInput2(
+                    totals.ergodothYpologizomenhStoForo
                 );
             }
             if (synoloAxiasFields.ergodothMhYpologizomenhStoForo) {
-                synoloAxiasFields.ergodothMhYpologizomenhStoForo.value = formatNumberForInput(
-                    totals.ergodothMhYpologizomenhStoForo,
-                    2
+                synoloAxiasFields.ergodothMhYpologizomenhStoForo.value = formatCurrencyInput2(
+                    totals.ergodothMhYpologizomenhStoForo
                 );
             }
 
             // Σύνολο Κρατήσεων Ι: επίσης number input, άρα τελεία.
             if (synoloAxiasFields.krathseon) {
-                synoloAxiasFields.krathseon.value = formatNumberForInput(totals.ergazomenoy, 2);
+                synoloAxiasFields.krathseon.value = formatCurrencyInput2(totals.ergazomenoy);
             }
 
             // Αν υπάρχει κάποια συνάρτηση calcPlhroteo() για έξτρα υπολογισμούς

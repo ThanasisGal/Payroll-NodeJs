@@ -1,4 +1,9 @@
 async function fillFields(result, sharedParams, loaderContainer) {
+    const formatCurrencyInput2 = (value) => {
+        const num = Number(String(value ?? '0').replace(',', '.'));
+        return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+    };
+
     // Ο loader ελέγχεται από τον outer AppLoader span του employee pipeline.
     // Εδώ δεν χρειαζόμαστε ανεξάρτητο έλεγχο loader αν τρέχει το pipeline.
     const fillFieldsOwnsLoader =
@@ -192,14 +197,14 @@ async function fillFields(result, sharedParams, loaderContainer) {
     const data = await fetchKrathseisData(); // Μία κλήση στον server
     await generateSelectRowsOfKrathseis(data, sharedParams); // Δημιουργία dropdowns
 
-    await loadKrathseis_Edit(data, result); // Γέμισμα dropdowns
+    await loadKrathseis_Edit(data, result, sharedParams); // Γέμισμα dropdowns
     
-    document.getElementById("synolo_axias_krathshs_ergazomenoy").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth").value = parseFloat(result.synolo_axias_krathshs_ergodoth).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro).toFixed(2); 
+    document.getElementById("synolo_axias_krathshs_ergazomenoy").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy);
+    document.getElementById("synolo_axias_krathshs_ergodoth").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth);
+    document.getElementById("synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro);
 
     // ΦΟΡΟΙ
     document.getElementById("analogoyn_foros_pro_ekptoshs").value = parseFloat(result.analogoyn_foros_pro_ekptoshs).toFixed(2); 
@@ -254,21 +259,22 @@ async function fillFields(result, sharedParams, loaderContainer) {
 
     // }
 
+    if (fillFieldsOwnsLoader) {
+        loaderContainer.style.display = "none";
+    }
 
 }
 
-async function loadKrathseis_Edit(data, result) {
-    let flag = 0;
-
+async function loadKrathseis_Edit(data, result, sharedParams = window.sharedParams) {
     const previousBulkLoading = window.apasxolhseisKrathseisBulkLoading;
     window.apasxolhseisKrathseisBulkLoading = true;
     const fieldsStoixeionKrathseon = ['kodikos', 'krathsh', 'asfalistikesApodoxes', 'pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'plasmatikh_axia', 'apaiteitai_apodoxes_asfalishs', 'anotato_orio_palion', 'anotato_orio_neon', 'kad', 'eidikothta', 'kpk', 'se_typos_apodoxon', 'epa'];
 
     // Ορίζουμε ποια fields είναι numbers με Fixed(4)
-    const numberFieldsKrathseon_4 = new Set(['pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth']);
+    const numberFieldsKrathseon_4 = new Set(['pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs']);
 
     // Ορίζουμε ποια fields είναι numbers με Fixed(2)
-    const numberFieldsKrathseon_2 = new Set(['asfalistikesApodoxes', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'plasmatikh_axia', 'anotato_orio_palion', 'anotato_orio_neon']);
+    const numberFieldsKrathseon_2 = new Set(['asfalistikesApodoxes', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'plasmatikh_axia', 'anotato_orio_palion', 'anotato_orio_neon']);
 
     // Ορίζουμε ποια fields είναι booleans
     const booleanFieldsKrathseon = new Set(['ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'apaiteitai_apodoxes_asfalishs']);
@@ -283,91 +289,47 @@ async function loadKrathseis_Edit(data, result) {
         const resultKrathsh = result[`krathsh_${index}`] || '';
         const krathseisDropdown = document.getElementById(`krathsh_${index}`);
         let kodikos_krathshs = document.getElementById(`kodikos_${index}`);
-        
-
-        flag = index === "01" ? 1 : 0;
+        if (!krathseisDropdown || !kodikos_krathshs) continue;
 
         // Δημιουργία της αρχικής επιλογής
+        if (krathseisDropdown.tomselect) krathseisDropdown.tomselect.destroy();
         krathseisDropdown.innerHTML = '<option value="" selected></option>';
 
         for (const krathsh of data) {
-            const textToConvert = removeGreekAccentsAndToUpper(krathsh.perigrafh);
-            const option = new Option(
-                krathsh.kodikos.padEnd(10, '\u00A0') + textToConvert,
-                krathsh.kodikos
+            const option = window.createKrathshOption(
+                krathsh,
+                result[`asfalistikesApodoxes_${index}`] || result["asfalistikes_apodoxes"] || 0
             );
-
-            // Προσθήκη δεδομένων στο option
-            if (krathsh.pososta) {
-                Object.assign(option.dataset, {
-                    posostoErgazomenoy: krathsh.pososta.pososto_ergazomenoy || '',
-                    posostoErgodoth: krathsh.pososta.pososto_ergodoth || '',
-                    synoloPososton: krathsh.pososta.synolo_pososton || '',
-                    posoErgazomenoy: krathsh.pososta.poso_ergazomenoy || '',
-                    posoErgodoth: krathsh.pososta.poso_ergodoth || '',
-                    synoloPoson: krathsh.pososta.synolo_poson || '',
-                    anotatoOrioPalion: krathsh.pososta.anotato_orio_palion || '',
-                    anotatoOrioNeon: krathsh.pososta.anotato_orio_neon || '',
-                    plasmatikhAxia: krathsh.pososta.plasmatikh_axia || '',
-                    ypologizomenoStoForo: krathsh.ypologizetaiStoForo || false,
-                    ypologizomenoEpiPlasmatikhs: krathsh.ypologizetaiEpiPlasmatikhs || false,
-                    asfalistikesApodoxes: krathsh.ypologizetaiEpiPlasmatikhs === true ? krathsh.pososta.plasmatikh_axia || '' : (result[`asfalistikesApodoxes_${index}`] || result["asfalistikes_apodoxes"] || 0),
-                    apaiteitaiApodoxesAsfalishs: krathsh.apaiteitai_apodoxes_asfalishs || false,
-                });
-            }
 
             if (krathsh.kodikos === resultKrathsh) {
                 option.selected = true;
                 kodikos_krathshs.value = krathsh.kodikos;
-                try {
-                    const apoTyposApodoxonValue = document.getElementById("typosApodoxon_Hidden").value;
-                    const teamValue = document.getElementById("team").value;
-                    const kodikosEtaireias = sharedParams._KODIKOS_ETAIREIAS;
-                    // Fetch δεδομένων για AntistoixiseisModel
-                    const antistoixiseisResponse = await fetch(`/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon?team=${encodeURIComponent(teamValue)}&etaireia=${encodeURIComponent(kodikosEtaireias)}&krathshKod=${encodeURIComponent(kodikos_krathshs.value)}&apo_typos_apodoxon=${encodeURIComponent(apoTyposApodoxonValue)}`, {
-                        method: 'GET',
-                        headers: { 'Content-Type': 'application/json' },
-                    });
-                    const antistoixiseisData = await antistoixiseisResponse.json();
-
-                    // Προσθήκη επιπλέον δεδομένων στο dataset του option από τα μοντέλα
-                    const data = antistoixiseisData || {
-                        kad: sharedParams.ergazomenoi.kad_efka || '',
-                        eidikothta: sharedParams.ergazomenoi.eidikothta_efka || '',
-                        kpk: sharedParams.ergazomenoi.kpk_efka || '',
-                        se_typos_apodoxon: apoTyposApodoxonValue || '',
-                        epa: flag === 1 ? sharedParams.ergazomenoi.epa_efka || '' : "00"
-                    };
-                
-                    Object.assign(option.dataset, {
-                        kad: data.kad,
-                        eidikothta: data.eidikothta,
-                        kpk: data.kpk,
-                        se_typos_apodoxon: data.se_typos_apodoxon,
-                        epa: data.epa,
-                    });
-                } catch (error) {
-                    console.error('Σφάλμα κατά την ανάκτηση δεδομένων:', error);
-                }
+                await window.applyKrathshAntistoixiseisDataset(index, option, {
+                    sharedParams,
+                    fallbackSource: sharedParams.ergazomenoi
+                });
             }
             krathseisDropdown.appendChild(option);
         };
 
-        // === ΕΔΩ προσθέτουμε τον event listener ===
-        // Κάθε φορά που αλλάζει η επιλεγμένη κράτηση, ενημερώνει το αντίστοιχο πεδίο kodikos_{index}.
-        krathseisDropdown.addEventListener('change', (event) => {
-            kodikos_krathshs.value = event.target.value;
-
-            // Αν θέλετε να πάρετε δεδομένα από το dataset του επιλεγμένου option:
-            const selectedOption = event.target.options[event.target.selectedIndex];
-            // Παράδειγμα: console.log(selectedOption.dataset.posostoErgazomenoy);
-        });
+        window.initKrathseisTomSelect(krathseisDropdown);
+        window.setKrathseisTomSelectValue(krathseisDropdown, resultKrathsh, true);
 
         // Ενημέρωση των πεδίων με βάση την αρχική τιμή
         await updatePosostaFields_Edit(i);
 
         // Προσθήκη event listener (μόνο μία φορά)
-        krathseisDropdown.addEventListener('change', () => updatePosostaFields_Edit(i));
+        krathseisDropdown.addEventListener('change', async () => {
+            if (window.apasxolhseisKrathseisBulkLoading === true) return;
+
+            kodikos_krathshs.value = krathseisDropdown.value || '';
+            const selectedOption = window.getSelectedKrathshOption(krathseisDropdown);
+            await window.applyKrathshAntistoixiseisDataset(index, selectedOption, {
+                sharedParams,
+                fallbackSource: sharedParams.ergazomenoi
+            });
+            await updatePosostaFields_Edit(i);
+        });
 
         // Προσθήκη event listener στο κουμπί καθαρισμού
         const clearButton = document.getElementById(`clearSelectKrathseon_${index}`);
@@ -377,7 +339,11 @@ async function loadKrathseis_Edit(data, result) {
 
         document.getElementById(`asfalistikesApodoxes_${index}`).addEventListener('input', () => { 
             if (!window.apasxolhseisKrathseisBulkLoading) {
-                ypologismosAxiasKrathseon();
+                Promise.resolve(ypologismosAxiasKrathseon()).then(() => {
+                    if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+                        window.scheduleKrathseisAmountsFormatting();
+                    }
+                });
             }
         });
     }
@@ -386,23 +352,24 @@ async function loadKrathseis_Edit(data, result) {
 
         if (typeof ypologismosAxiasKrathseon === 'function') {
             await ypologismosAxiasKrathseon(window.sharedParams);
+            if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+                window.scheduleKrathseisAmountsFormatting();
+            }
         }
     } finally {
         window.apasxolhseisKrathseisBulkLoading = previousBulkLoading;
     }
 
     // await calcPlhroteo();
-
-    if (fillFieldsOwnsLoader) {
-        loaderContainer.style.display = "none";
-    }
     
 };
 
 async function updatePosostaFields_Edit(i) {
     const index = i.toString().padStart(2, '0');
     const dropdown = document.getElementById(`krathsh_${index}`);
-    const selectedOption = dropdown.options[dropdown.selectedIndex];
+    if (!dropdown) return;
+
+    const selectedOption = window.getSelectedKrathshOption(dropdown);
 
     if (!selectedOption) return;
 
@@ -453,6 +420,9 @@ async function updatePosostaFields_Edit(i) {
     // Υπολογισμός αξίας κρατήσεων
     if (!window.apasxolhseisKrathseisBulkLoading) {
         await ypologismosAxiasKrathseon();
+        if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+            window.scheduleKrathseisAmountsFormatting();
+        }
     }
 
 }
@@ -494,6 +464,7 @@ function setValue_Edit(fieldId, value, decimalPlaces = null, isBoolean = false, 
 async function clearRowFields_Edit(index) {
     const fields = [
         `krathsh_${index}`,
+        `kodikos_${index}`,
         `pososto_krathshs_ergazomenoy_${index}`,
         `pososto_krathshs_ergodoth_${index}`,
         `synolo_pososton_krathshs_${index}`,
@@ -518,7 +489,7 @@ async function clearRowFields_Edit(index) {
         const field = document.getElementById(fieldId);
         if (field) {
             if (field.tagName === 'SELECT') {
-                field.selectedIndex = 0; // Επαναφορά της επιλογής
+                window.setKrathseisTomSelectValue(field, '', true);
             } else {
                 field.value = ''; // Επαναφορά της τιμής
             }
@@ -550,5 +521,8 @@ async function clearRowFields_Edit(index) {
   
   // Ενημέρωση των πεδίων μετά τον καθαρισμό
   await ypologismosAxiasKrathseon();
+  if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+    window.scheduleKrathseisAmountsFormatting();
+  }
 
 }
