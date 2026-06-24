@@ -12150,6 +12150,117 @@ body.loader-active > *:not(.app-loader) {
 }
 
 /* Krathseis */
+.krathseis-header-row {
+    margin-top: -1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.krathseis-header-label {
+    color: #000000;
+}
+
+.krathseis-header-value {
+    color: #0000007a;
+    font-weight: 600;
+}
+
+.krathseis-header-separator {
+    margin-top: -1.2rem;
+}
+
+.krathseis-apodoxes-row {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    font-size: 0.8rem;
+    margin-top: -1rem;
+    margin-bottom: 1rem;
+}
+
+.krathseis-apodoxes-input {
+    text-align: right;
+    font-size: 1.2rem;
+}
+
+.krathseis-band-row {
+    background-color: #3d4e001e !important;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    font-size: 0.8rem;
+    margin-top: -1rem;
+}
+
+.krathseis-band-title-row {
+    margin-bottom: 1rem;
+}
+
+.krathseis-band-labels-row {
+    margin-bottom: -0.5rem;
+}
+
+.krathseis-band-title {
+    font-size: .9rem;
+    margin-top: 1rem;
+    margin-bottom: -1rem;
+}
+
+.krathseis-column-label {
+    font-size: .9rem;
+    margin-top: -0.7rem;
+}
+
+.krathseis-column-icon {
+    font-size: 20px;
+}
+
+.krathseis-total-row {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+}
+
+.krathseis-total-label {
+    font-size: 1.1rem !important;
+}
+
+.krathseis-body-separator {
+    margin-top: 0.7rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+}
+
+.krathseis-tax-row {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-top: -.5rem;
+    font-size: 0.8rem;
+}
+
+.krathseis-tax-label {
+    margin-top: -0.7rem;
+}
+
+.krathseis-tax-summary-row {
+    margin-left: -1rem;
+    margin-right: -1rem;
+}
+
+.krathseis-total-employee-input {
+    background-color: #f5faae61;
+}
+
+.krathseis-total-employer-input {
+    background-color: #86cf5b30;
+}
+
+.krathseis-footer-actions {
+    margin-top: -0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    margin-left: 10px !important;
+    margin-right: 10px !important;
+    justify-content: space-around;
+}
+
 .istoriko-krathseis-table .istoriko-modal-aa-col {
     width: 4.5%;
     text-align: center;
