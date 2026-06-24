@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (!window.apasxolhseisEmployeeLoadPipeline && typeof calcPlhroteo === 'function') {
                 await calcPlhroteo();
+                if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+                    window.scheduleKrathseisAmountsFormatting();
+                }
                 firstTimeCalcPlhroteo = true;
             }
         })().catch(function (error) {
@@ -31,10 +34,13 @@ document.addEventListener('DOMContentLoaded', function () {
 // Ενιαία κλήση στον server
 window.fetchKrathseisData = async function () {
     try {
-        const response = await fetch(`/api/kinhseis/getKrathseis?startDate=${sharedParams.startDate}&endDate=${sharedParams.endDate}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch(
+            `/api/kinhseis/getKrathseis?startDate=${sharedParams.startDate}&endDate=${sharedParams.endDate}`,
+            {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -140,7 +146,7 @@ window.generateSelectRowsOfKrathseis = async function (data, sharedParams) {
                     data-bs-toggle="tooltip" tabIndex="-1"
                     data-bs-title="Καθαρισμός του πεδίου Κράτηση"
                     data-bs-placement="bottom" data-target="krathsh_${index}">
-                    <i class="bi bi-trash text-danger"></i>
+                    <i class="bi bi-trash3 text-danger"></i>
                 </button>
             </div>
 
@@ -164,10 +170,7 @@ window.generateSelectRowsOfKrathseis = async function (data, sharedParams) {
 
 window.createKrathshOption = function (krathsh, asfalistikesApodoxesValue) {
     const textToConvert = removeGreekAccentsAndToUpper(krathsh.perigrafh);
-    const option = new Option(
-        krathsh.kodikos.padEnd(10, '\u00A0') + textToConvert,
-        krathsh.kodikos
-    );
+    const option = new Option(`${krathsh.kodikos} - ${textToConvert}`, krathsh.kodikos);
 
     if (krathsh.pososta) {
         Object.assign(option.dataset, {
@@ -182,9 +185,10 @@ window.createKrathshOption = function (krathsh, asfalistikesApodoxesValue) {
             plasmatikhAxia: krathsh.pososta.plasmatikh_axia || '',
             ypologizomenoStoForo: krathsh.ypologizetaiStoForo || false,
             ypologizomenoEpiPlasmatikhs: krathsh.ypologizetaiEpiPlasmatikhs || false,
-            asfalistikesApodoxes: krathsh.ypologizetaiEpiPlasmatikhs === true
-                ? krathsh.pososta.plasmatikh_axia || ''
-                : asfalistikesApodoxesValue || '',
+            asfalistikesApodoxes:
+                krathsh.ypologizetaiEpiPlasmatikhs === true
+                    ? krathsh.pososta.plasmatikh_axia || ''
+                    : asfalistikesApodoxesValue || '',
             apaiteitaiApodoxesAsfalishs: krathsh.apaiteitai_apodoxes_asfalishs || false
         });
     }
@@ -195,13 +199,90 @@ window.createKrathshOption = function (krathsh, asfalistikesApodoxesValue) {
 window.getSelectedKrathshOption = function (dropdown) {
     if (!dropdown) return null;
 
-    const selectedValue = dropdown.tomselect && typeof dropdown.tomselect.getValue === 'function'
-        ? dropdown.tomselect.getValue()
-        : dropdown.value;
+    const selectedValue =
+        dropdown.tomselect && typeof dropdown.tomselect.getValue === 'function'
+            ? dropdown.tomselect.getValue()
+            : dropdown.value;
 
-    return Array.from(dropdown.options).find(function (option) {
-        return option.value === selectedValue;
-    }) || dropdown.options[dropdown.selectedIndex] || null;
+    return (
+        Array.from(dropdown.options).find(function (option) {
+            return option.value === selectedValue;
+        }) ||
+        dropdown.options[dropdown.selectedIndex] ||
+        null
+    );
+};
+
+window.formatKrathseisCurrency2 = function (value) {
+    if (typeof value === 'string' && value.trim() === '') return '';
+
+    const normalizedValue = String(value ?? '')
+        .trim()
+        .replace(',', '.');
+    if (normalizedValue === '') return '';
+
+    const parsedValue = Number(normalizedValue);
+    return Number.isFinite(parsedValue) ? parsedValue.toFixed(2) : '';
+};
+
+window.formatKrathseisAmountForDisplay = function (value) {
+    return window.formatKrathseisCurrency2(value);
+};
+
+window.formatKrathseisAmountsForDisplay = function () {
+    const rowsCount = parseInt(window.sharedParams?.genikesParametroi?.[23]?.timh || '0');
+
+    for (let i = 1; i <= rowsCount; i++) {
+        const index = i.toString().padStart(2, '0');
+        [`axia_krathshs_ergazomenoy_${index}`, `axia_krathshs_ergodoth_${index}`].forEach(
+            function (fieldId) {
+                const field = document.getElementById(fieldId);
+                if (!field || field.value === '') return;
+
+                const formattedValue = window.formatKrathseisAmountForDisplay(field.value);
+                if (formattedValue !== '') field.value = formattedValue;
+            }
+        );
+    }
+
+    [
+        'synolo_axias_krathshs_ergazomenoy',
+        'synolo_axias_krathshs_ergodoth',
+        'synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro',
+        'synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro',
+        'synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro',
+        'synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro'
+    ].forEach(function (fieldId) {
+        const field = document.getElementById(fieldId);
+        if (!field || field.value === '') return;
+
+        const formattedValue = window.formatKrathseisAmountForDisplay(field.value);
+        if (formattedValue !== '') field.value = formattedValue;
+    });
+};
+
+window.scheduleKrathseisAmountsFormatting = function () {
+    if (typeof window.formatKrathseisAmountsForDisplay !== 'function') return;
+
+    window.formatKrathseisAmountsForDisplay();
+
+    if (window.krathseisAmountsFormattingPending === true) return;
+    window.krathseisAmountsFormattingPending = true;
+
+    const runFormatting = function () {
+        if (typeof window.formatKrathseisAmountsForDisplay === 'function') {
+            window.formatKrathseisAmountsForDisplay();
+        }
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(runFormatting);
+    }
+
+    window.setTimeout(function () {
+        window.krathseisAmountsFormattingPending = false;
+        runFormatting();
+    }, 50);
 };
 
 window.applyKrathshAntistoixiseisDataset = async function (index, option, context = {}) {
@@ -215,10 +296,13 @@ window.applyKrathshAntistoixiseisDataset = async function (index, option, contex
     const kodikosEtaireias = params._KODIKOS_ETAIREIAS || '';
 
     try {
-        const antistoixiseisResponse = await fetch(`/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon?team=${encodeURIComponent(teamValue)}&etaireia=${encodeURIComponent(kodikosEtaireias)}&krathshKod=${encodeURIComponent(option.value)}&apo_typos_apodoxon=${encodeURIComponent(apoTyposApodoxonValue)}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const antistoixiseisResponse = await fetch(
+            `/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon?team=${encodeURIComponent(teamValue)}&etaireia=${encodeURIComponent(kodikosEtaireias)}&krathshKod=${encodeURIComponent(option.value)}&apo_typos_apodoxon=${encodeURIComponent(apoTyposApodoxonValue)}`,
+            {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
 
         const antistoixiseisData = await antistoixiseisResponse.json();
         const antistoixish = antistoixiseisData || {
@@ -326,15 +410,26 @@ async function loadKrathseis(data, sharedParams, options = {}) {
 
                 kodikosKrathshs.value = krathseisDropdown.value || '';
                 const selectedOption = window.getSelectedKrathshOption(krathseisDropdown);
-                await window.applyKrathshAntistoixiseisDataset(index, selectedOption, { sharedParams });
+                await window.applyKrathshAntistoixiseisDataset(index, selectedOption, {
+                    sharedParams
+                });
                 await updatePosostaFields(i);
             });
 
-            const asfalistikesApodoxesField = document.getElementById(`asfalistikesApodoxes_${index}`);
+            const asfalistikesApodoxesField = document.getElementById(
+                `asfalistikesApodoxes_${index}`
+            );
             if (asfalistikesApodoxesField) {
                 asfalistikesApodoxesField.addEventListener('input', function () {
-                    if (window.apasxolhseisSuppressFieldEvents === true || window.apasxolhseisEmployeeLoadPipeline === true || window.apasxolhseisKrathseisBulkLoading === true) return;
-                    ypologismosAxiasKrathseon();
+                    if (
+                        window.apasxolhseisSuppressFieldEvents === true ||
+                        window.apasxolhseisEmployeeLoadPipeline === true ||
+                        window.apasxolhseisKrathseisBulkLoading === true
+                    )
+                        return;
+                    Promise.resolve(ypologismosAxiasKrathseon()).then(function () {
+                        window.scheduleKrathseisAmountsFormatting();
+                    });
                 });
             }
 
@@ -351,6 +446,7 @@ async function loadKrathseis(data, sharedParams, options = {}) {
 
     if (typeof ypologismosAxiasKrathseon === 'function') {
         await ypologismosAxiasKrathseon();
+        window.scheduleKrathseisAmountsFormatting();
     }
 }
 
@@ -363,23 +459,86 @@ async function updatePosostaFields(i, options = {}) {
     const selectedOption = window.getSelectedKrathshOption(dropdown);
     if (!selectedOption) return;
 
-    setValue(`pososto_krathshs_ergazomenoy_${index}`, selectedOption.dataset.posostoErgazomenoy, 4, false, true);
-    setValue(`pososto_krathshs_ergodoth_${index}`, selectedOption.dataset.posostoErgodoth, 4, false, true);
-    setValue(`synolo_pososton_krathshs_${index}`, selectedOption.dataset.synoloPososton, 4, false, true);
-    setValue(`poso_krathshs_ergazomenoy_${index}`, selectedOption.dataset.posoErgazomenoy, 2, false, true);
-    setValue(`poso_krathshs_ergodoth_${index}`, selectedOption.dataset.posoErgodoth, 2, false, true);
+    setValue(
+        `pososto_krathshs_ergazomenoy_${index}`,
+        selectedOption.dataset.posostoErgazomenoy,
+        4,
+        false,
+        true
+    );
+    setValue(
+        `pososto_krathshs_ergodoth_${index}`,
+        selectedOption.dataset.posostoErgodoth,
+        4,
+        false,
+        true
+    );
+    setValue(
+        `synolo_pososton_krathshs_${index}`,
+        selectedOption.dataset.synoloPososton,
+        4,
+        false,
+        true
+    );
+    setValue(
+        `poso_krathshs_ergazomenoy_${index}`,
+        selectedOption.dataset.posoErgazomenoy,
+        2,
+        false,
+        true
+    );
+    setValue(
+        `poso_krathshs_ergodoth_${index}`,
+        selectedOption.dataset.posoErgodoth,
+        2,
+        false,
+        true
+    );
     setValue(`synolo_poson_krathshs_${index}`, selectedOption.dataset.synoloPoson, 2, false, true);
-    setValue(`anotato_orio_palion_${index}`, selectedOption.dataset.anotatoOrioPalion, 2, false, true);
+    setValue(
+        `anotato_orio_palion_${index}`,
+        selectedOption.dataset.anotatoOrioPalion,
+        2,
+        false,
+        true
+    );
     setValue(`anotato_orio_neon_${index}`, selectedOption.dataset.anotatoOrioNeon, 2, false, true);
-    setValue(`ypologizomenoStoForo_${index}`, selectedOption.dataset.ypologizomenoStoForo, null, true);
-    setValue(`ypologizomenoEpiPlasmatikhs_${index}`, selectedOption.dataset.ypologizomenoEpiPlasmatikhs, null, true);
+    setValue(
+        `ypologizomenoStoForo_${index}`,
+        selectedOption.dataset.ypologizomenoStoForo,
+        null,
+        true
+    );
+    setValue(
+        `ypologizomenoEpiPlasmatikhs_${index}`,
+        selectedOption.dataset.ypologizomenoEpiPlasmatikhs,
+        null,
+        true
+    );
     setValue(`plasmatikh_axia_${index}`, selectedOption.dataset.plasmatikhAxia, 2, false, true);
-    setValue(`asfalistikesApodoxes_${index}`, selectedOption.dataset.asfalistikesApodoxes, 2, false, true);
-    setValue(`apaiteitai_apodoxes_asfalishs_${index}`, selectedOption.dataset.apaiteitaiApodoxesAsfalishs, null, true);
+    setValue(
+        `asfalistikesApodoxes_${index}`,
+        selectedOption.dataset.asfalistikesApodoxes,
+        2,
+        false,
+        true
+    );
+    setValue(
+        `apaiteitai_apodoxes_asfalishs_${index}`,
+        selectedOption.dataset.apaiteitaiApodoxesAsfalishs,
+        null,
+        true
+    );
     setValue(`kad_${index}`, selectedOption.dataset.kad, null, false, false);
     setValue(`eidikothta_${index}`, selectedOption.dataset.eidikothta, null, false, false);
     setValue(`kpk_${index}`, selectedOption.dataset.kpk, null, false, false);
-    setValue(`se_typos_apodoxon_${index}`, selectedOption.dataset.se_typos_apodoxon, null, false, false);
+    setValue(
+        `se_typos_apodoxon_${index}`,
+        selectedOption.dataset.se_typos_apodoxon,
+        null,
+        false,
+        false
+    );
     setValue(`epa_${index}`, selectedOption.dataset.epa, null, false, false);
 
     const readonlyFields = [
@@ -403,11 +562,14 @@ async function updatePosostaFields(i, options = {}) {
 
     if (!options.skipCalc && typeof ypologismosAxiasKrathseon === 'function') {
         await ypologismosAxiasKrathseon();
+        window.scheduleKrathseisAmountsFormatting();
     }
 }
 
 function isNumberInputField(field) {
-    return field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number';
+    return (
+        field && field.tagName === 'INPUT' && String(field.type || '').toLowerCase() === 'number'
+    );
 }
 
 function setValue(fieldId, value, decimalPlaces = null, isBoolean = false, format = false) {
@@ -434,9 +596,8 @@ function setValue(fieldId, value, decimalPlaces = null, isBoolean = false, forma
         field.value = decimalPlaces ? `0.${'0'.repeat(decimalPlaces)}` : '';
     } else {
         const fixedValue = parsedValue.toFixed(decimalPlaces);
-        field.value = format && !isNumberInputField(field)
-            ? fixedValue.replace('.', ',')
-            : fixedValue;
+        field.value =
+            format && !isNumberInputField(field) ? fixedValue.replace('.', ',') : fixedValue;
     }
 }
 
@@ -497,5 +658,6 @@ async function clearRowFields(index) {
 
     if (typeof ypologismosAxiasKrathseon === 'function') {
         await ypologismosAxiasKrathseon();
+        window.scheduleKrathseisAmountsFormatting();
     }
 }

@@ -61,6 +61,20 @@ async function ypologismosAxiasKrathseon(sharedParams) {
           return num.toFixed(decimals).replace('.', ',');
       }
 
+      function formatKrathseisCurrency2(value) {
+          if (typeof window.formatKrathseisCurrency2 === 'function') {
+              return window.formatKrathseisCurrency2(value);
+          }
+
+          if (typeof value === 'string' && value.trim() === '') return '';
+
+          const normalizedValue = String(value ?? '').trim().replace(',', '.');
+          if (normalizedValue === '') return '';
+
+          const parsedValue = Number(normalizedValue);
+          return Number.isFinite(parsedValue) ? parsedValue.toFixed(2) : '';
+      }
+
       // 3.3 getAnotatoOrio - Υπολογισμός του ανώτατου ορίου από sharedParams
       function getAnotatoOrio(index) {
           if (!sharedParams?.ergazomenoi || typeof sharedParams.ergazomenoi.palios_neos === 'undefined') {
@@ -231,37 +245,37 @@ async function ypologismosAxiasKrathseon(sharedParams) {
                   totals.ergodothMhYpologizomenhStoForo += axiaErgod;
               }
 
-              // Ενημερώνουμε τις αξίες στα αντίστοιχα πεδία (με τελεία, 4 δεκαδικά)
+              // Ενημερώνουμε τις εμφανιζόμενες αξίες στα αντίστοιχα πεδία (με τελεία, 2 δεκαδικά)
               if (fields.axiaErgazomenoy) {
-                  fields.axiaErgazomenoy.value = formatNumberForInput(axiaErgaz, 4);
+                  fields.axiaErgazomenoy.value = formatKrathseisCurrency2(axiaErgaz);
               }
               if (fields.axiaErgodoth) {
-                  fields.axiaErgodoth.value = formatNumberForInput(axiaErgod, 4);
+                  fields.axiaErgodoth.value = formatKrathseisCurrency2(axiaErgod);
               }
           }
 
-          // Ενημέρωση συνόλων με κόμμα για εμφάνιση
+          // Ενημέρωση συνόλων αξίας κρατήσεων με τελεία και 2 δεκαδικά
           if (synoloAxiasFields.ergazomenoy) {
-              synoloAxiasFields.ergazomenoy.value = formatNumberForDisplay(totals.ergazomenoy, 2);
+              synoloAxiasFields.ergazomenoy.value = formatKrathseisCurrency2(totals.ergazomenoy);
           }
           if (synoloAxiasFields.ergodoth) {
-              synoloAxiasFields.ergodoth.value = formatNumberForDisplay(totals.ergodoth, 2);
+              synoloAxiasFields.ergodoth.value = formatKrathseisCurrency2(totals.ergodoth);
           }
           if (synoloAxiasFields.ergazomenoyYpologizomenhStoForo) {
               synoloAxiasFields.ergazomenoyYpologizomenhStoForo.value =
-                  formatNumberForDisplay(totals.ergazomenoyYpologizomenhStoForo, 2);
+                  formatKrathseisCurrency2(totals.ergazomenoyYpologizomenhStoForo);
           }
           if (synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo) {
               synoloAxiasFields.ergazomenoyMhYpologizomenhStoForo.value =
-                  formatNumberForDisplay(totals.ergazomenoyMhYpologizomenhStoForo, 2);
+                  formatKrathseisCurrency2(totals.ergazomenoyMhYpologizomenhStoForo);
           }
           if (synoloAxiasFields.ergodothYpologizomenhStoForo) {
               synoloAxiasFields.ergodothYpologizomenhStoForo.value =
-                  formatNumberForDisplay(totals.ergodothYpologizomenhStoForo, 2);
+                  formatKrathseisCurrency2(totals.ergodothYpologizomenhStoForo);
           }
           if (synoloAxiasFields.ergodothMhYpologizomenhStoForo) {
               synoloAxiasFields.ergodothMhYpologizomenhStoForo.value =
-                  formatNumberForDisplay(totals.ergodothMhYpologizomenhStoForo, 2);
+                  formatKrathseisCurrency2(totals.ergodothMhYpologizomenhStoForo);
           }
 
           // Για παράδειγμα, το σύνολο των κρατήσεων (εργαζόμενου) στο πεδίο krathseon
@@ -272,6 +286,12 @@ async function ypologismosAxiasKrathseon(sharedParams) {
           // Αν υπάρχει κάποια συνάρτηση calcPlhroteo() για έξτρα υπολογισμούς
           if (typeof calcPlhroteo === 'function') {
               await calcPlhroteo();
+          }
+
+          if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+              window.scheduleKrathseisAmountsFormatting();
+          } else if (typeof window.formatKrathseisAmountsForDisplay === 'function') {
+              window.formatKrathseisAmountsForDisplay();
           }
       }
 

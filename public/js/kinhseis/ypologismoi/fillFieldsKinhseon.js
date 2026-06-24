@@ -1,4 +1,9 @@
 async function fillFields(result, sharedParams, loaderContainer) {
+    const formatCurrencyInput2 = (value) => {
+        const num = Number(String(value ?? '0').replace(',', '.'));
+        return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+    };
+
     // Ο loader ελέγχεται από τον outer AppLoader span του employee pipeline.
     // Εδώ δεν χρειαζόμαστε ανεξάρτητο έλεγχο loader αν τρέχει το pipeline.
     const fillFieldsOwnsLoader =
@@ -194,12 +199,12 @@ async function fillFields(result, sharedParams, loaderContainer) {
 
     await loadKrathseis_Edit(data, result, sharedParams); // Γέμισμα dropdowns
     
-    document.getElementById("synolo_axias_krathshs_ergazomenoy").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth").value = parseFloat(result.synolo_axias_krathshs_ergodoth).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro).toFixed(2); 
-    document.getElementById("synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro").value = parseFloat(result.synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro).toFixed(2); 
+    document.getElementById("synolo_axias_krathshs_ergazomenoy").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy);
+    document.getElementById("synolo_axias_krathshs_ergodoth").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth);
+    document.getElementById("synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro);
+    document.getElementById("synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro").value = formatCurrencyInput2(result.synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro);
 
     // ΦΟΡΟΙ
     document.getElementById("analogoyn_foros_pro_ekptoshs").value = parseFloat(result.analogoyn_foros_pro_ekptoshs).toFixed(2); 
@@ -266,10 +271,10 @@ async function loadKrathseis_Edit(data, result, sharedParams = window.sharedPara
     const fieldsStoixeionKrathseon = ['kodikos', 'krathsh', 'asfalistikesApodoxes', 'pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'plasmatikh_axia', 'apaiteitai_apodoxes_asfalishs', 'anotato_orio_palion', 'anotato_orio_neon', 'kad', 'eidikothta', 'kpk', 'se_typos_apodoxon', 'epa'];
 
     // Ορίζουμε ποια fields είναι numbers με Fixed(4)
-    const numberFieldsKrathseon_4 = new Set(['pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth']);
+    const numberFieldsKrathseon_4 = new Set(['pososto_krathshs_ergazomenoy', 'pososto_krathshs_ergodoth', 'synolo_pososton_krathshs']);
 
     // Ορίζουμε ποια fields είναι numbers με Fixed(2)
-    const numberFieldsKrathseon_2 = new Set(['asfalistikesApodoxes', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'plasmatikh_axia', 'anotato_orio_palion', 'anotato_orio_neon']);
+    const numberFieldsKrathseon_2 = new Set(['asfalistikesApodoxes', 'poso_krathshs_ergazomenoy', 'poso_krathshs_ergodoth', 'synolo_poson_krathshs', 'axia_krathshs_ergazomenoy', 'axia_krathshs_ergodoth', 'plasmatikh_axia', 'anotato_orio_palion', 'anotato_orio_neon']);
 
     // Ορίζουμε ποια fields είναι booleans
     const booleanFieldsKrathseon = new Set(['ypologizomenoStoForo', 'ypologizomenoEpiPlasmatikhs', 'apaiteitai_apodoxes_asfalishs']);
@@ -334,7 +339,11 @@ async function loadKrathseis_Edit(data, result, sharedParams = window.sharedPara
 
         document.getElementById(`asfalistikesApodoxes_${index}`).addEventListener('input', () => { 
             if (!window.apasxolhseisKrathseisBulkLoading) {
-                ypologismosAxiasKrathseon();
+                Promise.resolve(ypologismosAxiasKrathseon()).then(() => {
+                    if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+                        window.scheduleKrathseisAmountsFormatting();
+                    }
+                });
             }
         });
     }
@@ -343,6 +352,9 @@ async function loadKrathseis_Edit(data, result, sharedParams = window.sharedPara
 
         if (typeof ypologismosAxiasKrathseon === 'function') {
             await ypologismosAxiasKrathseon(window.sharedParams);
+            if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+                window.scheduleKrathseisAmountsFormatting();
+            }
         }
     } finally {
         window.apasxolhseisKrathseisBulkLoading = previousBulkLoading;
@@ -408,6 +420,9 @@ async function updatePosostaFields_Edit(i) {
     // Υπολογισμός αξίας κρατήσεων
     if (!window.apasxolhseisKrathseisBulkLoading) {
         await ypologismosAxiasKrathseon();
+        if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+            window.scheduleKrathseisAmountsFormatting();
+        }
     }
 
 }
@@ -506,5 +521,8 @@ async function clearRowFields_Edit(index) {
   
   // Ενημέρωση των πεδίων μετά τον καθαρισμό
   await ypologismosAxiasKrathseon();
+  if (typeof window.scheduleKrathseisAmountsFormatting === 'function') {
+    window.scheduleKrathseisAmountsFormatting();
+  }
 
 }

@@ -732,6 +732,15 @@ small,
     text-align: right !important;
 }
 
+#synolo_axias_krathshs_ergazomenoy,
+#synolo_axias_krathshs_ergodoth,
+#synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro {
+    text-align: right !important;
+}
+
 /* Όπου θέλεις το περιεχόμενο δεξιά: βάλε τη κλάση στο div.col-… */
 .right-align-header {
     justify-content: flex-end; /* αυτό “σπρώχνει” τα παιδιά δεξιά σε flex */
@@ -12245,6 +12254,21 @@ body.loader-active > *:not(.app-loader) {
     margin-right: -1rem;
 }
 
+.krathseis-total-employee-input,
+.krathseis-total-employer-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    font-size: 0.9vw;
+    font-weight: 600;
+    line-height: 0.7;
+    text-align: right !important;
+    direction: ltr;
+}
+
 .krathseis-total-employee-input {
     background-color: #f5faae61;
 }
@@ -13308,4 +13332,24 @@ body.loader-active > *:not(.app-loader) {
     color: #ffffff;
     font-size: 1.1rem !important;
     font-weight: 800;
+}
+
+#synolo_axias_krathshs_ergazomenoy,
+#synolo_axias_krathshs_ergodoth,
+#synolo_axias_krathshs_ergazomenoy_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergodoth_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergazomenoy_mh_ypologizomenh_sto_foro,
+#synolo_axias_krathshs_ergodoth_mh_ypologizomenh_sto_foro {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    text-align: right !important;
+    direction: ltr !important;
+    font-size: 0.9vw !important;
+    font-weight: 600 !important;
+    line-height: 0.7 !important;
+    font-variant-numeric: tabular-nums;
 }
