@@ -202,36 +202,6 @@ const checkFileAuth = (req, res, next) => {
     next();
 };
 
-// ============================================================================
-// Serve Uploads (Protected) - UPDATED FOR EDGE COMPATIBILITY
-// ============================================================================
-
-app.use(
-    '/uploads',
-    checkFileAuth,
-    express.static(path.join(__dirname, 'uploads'), {
-        maxAge: 0,
-        dotfiles: 'deny',
-        index: false,
-        setHeaders: (res, filepath) => {
-            res.set('X-Content-Type-Options', 'nosniff');
-            res.set('X-Frame-Options', 'SAMEORIGIN'); // ✅ ΑΛΛΑΓΗ ΑΠΟ DENY
-            res.set('Referrer-Policy', 'no-referrer');
-            res.set('Access-Control-Allow-Origin', '*');
-            res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-
-            if (filepath.endsWith('.pdf')) {
-                res.set('Content-Type', 'application/pdf');
-                res.set('Content-Disposition', 'inline');
-                res.set(
-                    'Content-Security-Policy',
-                    "default-src 'none'; style-src 'unsafe-inline'; object-src 'self';" // ✅ ΕΝΗΜΕΡΩΣΗ
-                );
-            }
-        }
-    })
-);
-
 try {
     const packageJsonPath = path.join(__dirname, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -276,6 +246,36 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+// ============================================================================
+// Serve Uploads (Protected) - UPDATED FOR EDGE COMPATIBILITY
+// ============================================================================
+
+app.use(
+    '/uploads',
+    checkFileAuth,
+    express.static(path.join(__dirname, 'uploads'), {
+        maxAge: 0,
+        dotfiles: 'deny',
+        index: false,
+        setHeaders: (res, filepath) => {
+            res.set('X-Content-Type-Options', 'nosniff');
+            res.set('X-Frame-Options', 'SAMEORIGIN'); // ✅ ΑΛΛΑΓΗ ΑΠΟ DENY
+            res.set('Referrer-Policy', 'no-referrer');
+            res.set('Access-Control-Allow-Origin', '*');
+            res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+
+            if (filepath.endsWith('.pdf')) {
+                res.set('Content-Type', 'application/pdf');
+                res.set('Content-Disposition', 'inline');
+                res.set(
+                    'Content-Security-Policy',
+                    "default-src 'none'; style-src 'unsafe-inline'; object-src 'self';" // ✅ ΕΝΗΜΕΡΩΣΗ
+                );
+            }
+        }
+    })
+);
 
 logger.info(
     `Sessions: ${mongoUrl ? 'MongoStore' : 'MemoryStore'} ενεργοποιημένο (ttl=${diarkeia_session}m, secure=${isProd})`

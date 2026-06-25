@@ -48,7 +48,13 @@ const {
 const { savePdfFromBase64, deletePdf } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
-const { generatePresignedUrl, downloadS3UriToTempFile, isS3Url } = require('../../utils/s3Helper');
+const {
+    generatePresignedUrl,
+    downloadS3UriToTempFile,
+    isS3Url,
+    fileExistsInS3,
+    convertHttpsToS3Uri
+} = require('../../utils/s3Helper');
 
 let nextPageSearchTerm = '';
 let nextPageAnenergh = '';
@@ -62,6 +68,70 @@ function buildErgazomenoiActiveInactiveFilter(showInactive) {
         archived: { $ne: true },
         ...(showInactive ? {} : { energos: true })
     };
+}
+
+function resolveStoredPdfS3Key(storedValue) {
+    const value = String(storedValue ?? '').trim();
+    const safeDecode = (rawValue) => {
+        try {
+            return decodeURIComponent(rawValue);
+        } catch {
+            return rawValue;
+        }
+    };
+
+    if (!value) {
+        return '';
+    }
+
+    if (value.startsWith('/uploads/s3-mock/')) {
+        return safeDecode(value.replace('/uploads/s3-mock/', ''));
+    }
+
+    if (value.startsWith('uploads/s3-mock/')) {
+        return safeDecode(value.replace('uploads/s3-mock/', ''));
+    }
+
+    if (value.startsWith('s3://')) {
+        return parseS3Uri(value)?.key || '';
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+        try {
+            const parsedUrl = new URL(value);
+
+            if (parsedUrl.pathname.startsWith('/uploads/s3-mock/')) {
+                return safeDecode(parsedUrl.pathname.replace('/uploads/s3-mock/', ''));
+            }
+        } catch {
+            return '';
+        }
+
+        if (isS3Url(value)) {
+            const s3Uri = convertHttpsToS3Uri(value);
+            return parseS3Uri(s3Uri)?.key || '';
+        }
+
+        return '';
+    }
+
+    return value.replace(/^\/+/, '');
+}
+
+async function buildVerifiedPdfUrl(storedValue) {
+    const s3Key = resolveStoredPdfS3Key(storedValue);
+
+    if (!s3Key) {
+        return null;
+    }
+
+    const exists = await fileExistsInS3(s3Key);
+
+    if (!exists) {
+        return null;
+    }
+
+    return generatePresignedUrl(s3Key, 600);
 }
 
 const fieldsStoixeionSymbashs = [
@@ -4728,18 +4798,12 @@ class ergazomenoiController {
                 return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
             }
 
-            const s3Key = ergazomenos.arxeio_nomimopoihtikon_eggrafon_path;
+            const pdfUrl = await buildVerifiedPdfUrl(
+                ergazomenos.arxeio_nomimopoihtikon_eggrafon_path
+            );
 
-            if (!s3Key || String(s3Key).trim() === '') {
+            if (!pdfUrl) {
                 return res.status(404).send('Δεν βρέθηκε PDF νομιμοποιητικών εγγράφων.');
-            }
-
-            let pdfUrl;
-
-            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
-                pdfUrl = String(s3Key).trim();
-            } else {
-                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
             }
 
             const escapeHtml = (value) =>
@@ -4938,11 +5002,19 @@ class ergazomenoiController {
             const ergazomenosId = req.params.id;
             const companyId = req.session?.companyInUse;
 
-            if (!ergazomenosId) {
+            if (!ergazomenosId || !ObjectId.isValid(ergazomenosId)) {
                 return res.status(400).send('Μη έγκυρο ID εργαζόμενου.');
             }
 
-            const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId)
+            const query = {
+                _id: ergazomenosId
+            };
+
+            if (companyId) {
+                query.company_kod = companyId;
+            }
+
+            const ergazomenos = await ErgazomenoiModel.findOne(query)
                 .select('bibliario_anhlikoy_path')
                 .lean();
 
@@ -4950,18 +5022,10 @@ class ergazomenoiController {
                 return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
             }
 
-            const s3Key = ergazomenos.bibliario_anhlikoy_path;
+            const pdfUrl = await buildVerifiedPdfUrl(ergazomenos.bibliario_anhlikoy_path);
 
-            if (!s3Key || String(s3Key).trim() === '') {
+            if (!pdfUrl) {
                 return res.status(404).send('Δεν βρέθηκε PDF βιβλιαρίου ανηλίκου.');
-            }
-
-            let pdfUrl;
-            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
-                pdfUrl = String(s3Key).trim();
-            } else {
-                // generatePresignedUrl πρέπει να υπάρχει στο s3Helper import
-                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
             }
 
             const escapeHtml = (value) =>
@@ -5163,18 +5227,10 @@ class ergazomenoiController {
                 return res.status(404).send('Δεν βρέθηκε ο εργαζόμενος.');
             }
 
-            const s3Key = ergazomenos.arxeio_symbashs_daneismoy_path;
+            const pdfUrl = await buildVerifiedPdfUrl(ergazomenos.arxeio_symbashs_daneismoy_path);
 
-            if (!s3Key || String(s3Key).trim() === '') {
+            if (!pdfUrl) {
                 return res.status(404).send('Δεν βρέθηκε PDF σύμβασης δανεισμού.');
-            }
-
-            let pdfUrl;
-
-            if (String(s3Key).startsWith('http://') || String(s3Key).startsWith('https://')) {
-                pdfUrl = String(s3Key).trim();
-            } else {
-                pdfUrl = await generatePresignedUrl(String(s3Key).trim(), 600);
             }
 
             const escapeHtml = (value) =>

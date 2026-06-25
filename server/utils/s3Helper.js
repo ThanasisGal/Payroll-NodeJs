@@ -453,7 +453,12 @@ async function deleteFromLocalStorage(s3Key) {
 }
 
 async function fileExistsLocally(s3Key) {
-    const localPath = path.join(LOCAL_STORAGE_DIR, s3Key);
+    const localPath = path.resolve(LOCAL_STORAGE_DIR, s3Key);
+    const localRoot = path.resolve(LOCAL_STORAGE_DIR);
+
+    if (localPath !== localRoot && !localPath.startsWith(`${localRoot}${path.sep}`)) {
+        return false;
+    }
 
     try {
         await fs.access(localPath);
@@ -464,9 +469,19 @@ async function fileExistsLocally(s3Key) {
 }
 
 async function getLocalFileUrl(s3Key) {
-    const localPath = path.join(LOCAL_STORAGE_DIR, s3Key);
+    const exists = await fileExistsLocally(s3Key);
+
+    if (!exists) {
+        throw new Error(`Local file not found: ${s3Key}`);
+    }
+
+    const encodedKey = String(s3Key)
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+
     // Return relative path for serving via express static
-    return `/uploads/s3-mock/${s3Key}`;
+    return `/uploads/s3-mock/${encodedKey}`;
 }
 
 // =========================================================================
