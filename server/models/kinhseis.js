@@ -282,6 +282,7 @@ const ApasxolhseisSchema = new Schema(
         ekptosh_logo_oikogeneiakhs_katastashs: { type: Number, default: 0 },
         mhniaia_ekptosh_logo_oikogeneiakhs_katastashs: { type: Number, default: 0 },
         analogoyn_foros_meta_thn_ekptosh: { type: Number, default: 0 },
+        analogoyn_foros_epoxikon: { type: Number, default: 0 },
         synolo_ektakton_amoibon: { type: Number, default: 0 },
         analogoyn_foros_ektakton_amoibon: { type: Number, default: 0 },
         synolo_foroy: { type: Number, default: 0 },

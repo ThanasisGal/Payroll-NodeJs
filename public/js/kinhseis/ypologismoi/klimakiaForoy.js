@@ -54,9 +54,23 @@ async function initializeKlimakiaForoy() {
 async function fetchData() {
     try {
         const xrhsh = sharedParams._XRHSH;
+        const forologikhKlimaka = sharedParams.ergazomenoi?.forologikh_klimaka;
+        const kodikosKlimakas = typeof forologikhKlimaka === 'string' && forologikhKlimaka.trim().length >= 8
+            ? forologikhKlimaka.trim().slice(4, 8).trim()
+            : '';
+        const epoxikos = Boolean(sharedParams.ergazomenoi?.epoxikos);
+        const params = new URLSearchParams({
+            xrhsh,
+            epoxikos: String(epoxikos),
+        });
+
+        if (kodikosKlimakas) {
+            params.set('kodikos_klimakas', kodikosKlimakas);
+        }
+
         const klimakia = await getCachedTaxEndpointJson(
-            `getKlimakiaForoy:${xrhsh}`,
-            `/api/kinhseis/getKlimakiaForoy?xrhsh=${xrhsh}`
+            `getKlimakiaForoy:${xrhsh}:${kodikosKlimakas}:${epoxikos}`,
+            `/api/kinhseis/getKlimakiaForoy?${params.toString()}`
         );
 
         klimakia.forEach((item, i) => {

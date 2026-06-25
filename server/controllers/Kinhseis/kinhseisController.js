@@ -1726,6 +1726,9 @@ class kinhseisController {
                     analogoyn_foros_meta_thn_ekptosh: parseFloat(
                         formData.analogoyn_foros_meta_thn_ekptosh.replace(',', '.')
                     ),
+                    analogoyn_foros_epoxikon:
+                        parseFloat((formData.analogoyn_foros_epoxikon || '0').replace(',', '.')) ||
+                        0,
                     synolo_ektakton_amoibon: parseFloat(
                         formData.synolo_ektakton_amoibon.replace(',', '.')
                     ),

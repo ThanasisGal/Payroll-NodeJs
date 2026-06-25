@@ -214,6 +214,7 @@ async function fillFields(result, sharedParams, loaderContainer) {
     document.getElementById("mhniaia_ekptosh_logo_oikogeneiakhs_katastashs").value = parseFloat(result.mhniaia_ekptosh_logo_oikogeneiakhs_katastashs).toFixed(2); 
     document.getElementById("mhniaia_ekptosh_logo_oikogeneiakhs_katastashs").value = parseFloat(result.mhniaia_ekptosh_logo_oikogeneiakhs_katastashs).toFixed(2); 
     document.getElementById("analogoyn_foros_meta_thn_ekptosh").value = parseFloat(result.analogoyn_foros_meta_thn_ekptosh).toFixed(2); 
+    document.getElementById("analogoyn_foros_epoxikon").value = (parseFloat(result.analogoyn_foros_epoxikon) || 0).toFixed(2);
     document.getElementById("synolo_ektakton_amoibon").value = parseFloat(result.synolo_ektakton_amoibon).toFixed(2); 
     document.getElementById("analogoyn_foros_ektakton_amoibon").value = parseFloat(result.analogoyn_foros_ektakton_amoibon).toFixed(2); 
 

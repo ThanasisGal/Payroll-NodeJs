@@ -33,9 +33,47 @@ const mhniaia_ekptosh_logo_oikogeneiakhs_katastashs = document.getElementById("m
 const analogoyn_foros_meta_thn_ekptosh = document.getElementById("analogoyn_foros_meta_thn_ekptosh");
 const synolo_ektakton_amoibon = document.getElementById("synolo_ektakton_amoibon");
 const analogoyn_foros_ektakton_amoibon = document.getElementById("analogoyn_foros_ektakton_amoibon");
+const analogoyn_foros_epoxikon_row = document.getElementById("analogoyn_foros_epoxikon_row");
+const foroiCard = analogoyn_foros_epoxikon_row ? analogoyn_foros_epoxikon_row.closest(".card") : null;
+const analogoyn_foros_epoxikon = document.getElementById("analogoyn_foros_epoxikon");
 const synolo_foroy = document.getElementById("synolo_foroy");
 // const synoloForoy = document.getElementById("synolo_foroy");
 let allaghPlhroteoy = document.getElementById("allaghPlhroteoy_Hidden");
+
+function parseDateOnlyUtc(value) {
+    if (!value) {
+        return null;
+    }
+
+    const rawValue = value instanceof Date ? value.toISOString() : String(value);
+    const match = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) {
+        return null;
+    }
+
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const day = parseInt(match[3], 10);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+        return null;
+    }
+
+    return date;
+}
+
+function getInclusiveDays(startValue, endValue) {
+    const startDate = parseDateOnlyUtc(startValue);
+    const endDate = parseDateOnlyUtc(endValue);
+
+    if (!startDate || !endDate || endDate < startDate) {
+        return 0;
+    }
+
+    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+    return Math.floor((endDate - startDate) / millisecondsPerDay) + 1;
+}
 
 async function calcForos() {
     const _AA_FOROLOGIKHS_KLIMAKAS = window._AA_FOROLOGIKHS_KLIMAKAS;
@@ -137,8 +175,44 @@ async function calcForos() {
         foros_ektakton_amoibon = (parseFloat(synolo_ektakton_amoibon.value) * (parseFloat(_SYNTELESTHS_PARAKRATHSHS_FOROY_EKTAKTON_AMOIBON / 100)) || 0).toFixed(2);
     }
     analogoyn_foros_ektakton_amoibon.value = parseFloat(foros_ektakton_amoibon).toFixed(2);
-    
-    synolo_foroy.value = (parseFloat(foros_meta_thn_ekptosh) - parseFloat(parakratheis_foros) + parseFloat(foros_ektakton_amoibon)).toFixed(2);
+
+    const analogoynForosMetaThnEkptosh = parseFloat(analogoyn_foros_meta_thn_ekptosh.value) || 0;
+    const analogoynForosEktaktonAmoibon = parseFloat(analogoyn_foros_ektakton_amoibon.value) || 0;
+    const ergazomenos = sharedParams.ergazomenoi || {};
+    const einaiEpoxikos = ergazomenos.epoxikos === true;
+
+    if (einaiEpoxikos) {
+        if (foroiCard) {
+            foroiCard.classList.add("foroi-card-epoxikos");
+        }
+        if (analogoyn_foros_epoxikon_row) {
+            analogoyn_foros_epoxikon_row.hidden = false;
+            analogoyn_foros_epoxikon_row.classList.remove("d-none");
+        }
+
+        const hmeresEpoxikoy = getInclusiveDays(
+            ergazomenos.hmeromhnia_proslhpshs,
+            ergazomenos.hmeromhnia_lhxhs_symbashs
+        );
+        const forosEpoxikoy = hmeresEpoxikoy > 0 ? (analogoynForosMetaThnEkptosh / 365) * hmeresEpoxikoy : 0;
+
+        if (analogoyn_foros_epoxikon) {
+            analogoyn_foros_epoxikon.value = parseFloat(forosEpoxikoy).toFixed(2);
+        }
+        synolo_foroy.value = (forosEpoxikoy + analogoynForosEktaktonAmoibon).toFixed(2);
+    } else {
+        if (foroiCard) {
+            foroiCard.classList.remove("foroi-card-epoxikos");
+        }
+        if (analogoyn_foros_epoxikon_row) {
+            analogoyn_foros_epoxikon_row.hidden = true;
+            analogoyn_foros_epoxikon_row.classList.add("d-none");
+        }
+        if (analogoyn_foros_epoxikon) {
+            analogoyn_foros_epoxikon.value = parseFloat(0).toFixed(2);
+        }
+        synolo_foroy.value = (analogoynForosMetaThnEkptosh + analogoynForosEktaktonAmoibon).toFixed(2);
+    }
     
     if (hasRecord) {
         if (metrhths > 5 && metrhths < 7) {

@@ -27,10 +27,16 @@ function toUTCDate(dateString) {
 class forosController {
     static getKlimakiaForoy = async (req, res) => {
         const { xrhsh } = req.query; // Διαβάζουμε την παράμετρο από το query string
+        const kodikos_klimakas = typeof req.query?.kodikos_klimakas === 'string'
+            ? req.query.kodikos_klimakas.trim()
+            : '';
 
         try {
             // Δημιουργία βασικού φίλτρου με team και company_kod
             const filter =  {  xrhsh: xrhsh };
+            if (kodikos_klimakas) {
+                filter.kodikos_klimakas = kodikos_klimakas;
+            }
 
             const klimakiaForoy = await Klimaka_ForoyModel.find(filter)
                 .sort({ xrhsh: 1, apo_poso: 1 }) // Ταξινόμηση κατά xrhsh και apo_poso σε αύξουσα σειρά
