@@ -365,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return ergazomenoiDropdown?.tomselect || null;
     }
 
-
     function getTyposApodoxonTomSelect() {
         return typoiApodoxonDropdown?.tomselect || null;
     }
@@ -457,9 +456,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (typoiApodoxonDropdown) {
-            if (!Array.from(typoiApodoxonDropdown.options || []).some((option) => option.value === normalizedValue)) {
+            if (
+                !Array.from(typoiApodoxonDropdown.options || []).some(
+                    (option) => option.value === normalizedValue
+                )
+            ) {
                 const item = await ensureTyposApodoxonOption(normalizedValue);
-                typoiApodoxonDropdown.appendChild(new Option(item?.label || normalizedValue, normalizedValue));
+                typoiApodoxonDropdown.appendChild(
+                    new Option(item?.label || normalizedValue, normalizedValue)
+                );
             }
             typoiApodoxonDropdown.value = normalizedValue;
         }
@@ -539,9 +544,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (periodoiDropdown) {
-            if (!Array.from(periodoiDropdown.options || []).some((option) => option.value === normalizedValue)) {
+            if (
+                !Array.from(periodoiDropdown.options || []).some(
+                    (option) => option.value === normalizedValue
+                )
+            ) {
                 const item = await ensurePeriodosOption(normalizedValue);
-                periodoiDropdown.appendChild(new Option(item?.label || normalizedValue, normalizedValue));
+                periodoiDropdown.appendChild(
+                    new Option(item?.label || normalizedValue, normalizedValue)
+                );
             }
             periodoiDropdown.value = normalizedValue;
         }
@@ -549,9 +560,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function normalizeErgazomenosOption(item = {}) {
         const kodikos = String(item.kodikos ?? item.value ?? '').trim();
-        const eponymo = String(item.eponymo ?? '').trim().toUpperCase();
-        const patronymo = String(item.patronymo ?? '').trim().toUpperCase();
-        const onoma = String(item.onoma ?? '').trim().toUpperCase();
+        const eponymo = String(item.eponymo ?? '')
+            .trim()
+            .toUpperCase();
+        const patronymo = String(item.patronymo ?? '')
+            .trim()
+            .toUpperCase();
+        const onoma = String(item.onoma ?? '')
+            .trim()
+            .toUpperCase();
         const id = String(item.id ?? item._id ?? item.value ?? '').trim();
         const ypokatasthma = String(item.ypokatasthma ?? '').trim();
         const afm = String(item.afm ?? '').trim();
@@ -944,11 +961,14 @@ document.addEventListener('DOMContentLoaded', function () {
         getAdjacentRecordsForPrefetch(currentRecord).forEach(({ record, distance }) => {
             if (getCachedEmployeeDetails(record.kodikos)) return;
 
-            window.setTimeout(() => {
-                fetchEmployeeDetails(record.kodikos).catch(() => {
-                    // Background prefetch only. Do not interrupt the user flow.
-                });
-            }, (distance - 1) * 120);
+            window.setTimeout(
+                () => {
+                    fetchEmployeeDetails(record.kodikos).catch(() => {
+                        // Background prefetch only. Do not interrupt the user flow.
+                    });
+                },
+                (distance - 1) * 120
+            );
         });
     }
 
@@ -980,7 +1000,9 @@ document.addEventListener('DOMContentLoaded', function () {
             employeeKod: String(overrides.employeeKod ?? getInputValue('kodikosHidden')).trim(),
             xrhsh: getInputValue('etos'),
             periodos: String(overrides.periodos ?? periodoiDropdown.value ?? '').trim(),
-            typos_apodoxon: String(overrides.typos_apodoxon ?? typoiApodoxonDropdown.value ?? '').trim(),
+            typos_apodoxon: String(
+                overrides.typos_apodoxon ?? typoiApodoxonDropdown.value ?? ''
+            ).trim(),
             aa_misthodosias: String(
                 overrides.aa_misthodosias ?? getInputValue('aaMisthodosias', '1')
             ).trim()
@@ -993,26 +1015,31 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!periodoiDropdown.value || !typoiApodoxonDropdown.value) return;
 
         getAdjacentRecordsForPrefetch(currentRecord).forEach(({ record, distance }) => {
-            window.setTimeout(() => {
-                fetchAnnualOvertime(record.kodikos).catch(() => {
-                    // Background prefetch only. Do not interrupt the user flow.
-                });
-
-                const queryString = buildApasxolhseisQueryString({
-                    employeeKod: record.kodikos,
-                    ypokatasthma: record.ypokatasthma
-                });
-
-                fetchApasxolhseis(queryString).catch(() => {
-                    // Background prefetch only. Do not interrupt the user flow.
-                });
-
-                if (startDateISOString && endDateISOString) {
-                    fetchCalcTotals(record.kodikos, startDateISOString, endDateISOString).catch(() => {
+            window.setTimeout(
+                () => {
+                    fetchAnnualOvertime(record.kodikos).catch(() => {
                         // Background prefetch only. Do not interrupt the user flow.
                     });
-                }
-            }, (distance - 1) * 120);
+
+                    const queryString = buildApasxolhseisQueryString({
+                        employeeKod: record.kodikos,
+                        ypokatasthma: record.ypokatasthma
+                    });
+
+                    fetchApasxolhseis(queryString).catch(() => {
+                        // Background prefetch only. Do not interrupt the user flow.
+                    });
+
+                    if (startDateISOString && endDateISOString) {
+                        fetchCalcTotals(record.kodikos, startDateISOString, endDateISOString).catch(
+                            () => {
+                                // Background prefetch only. Do not interrupt the user flow.
+                            }
+                        );
+                    }
+                },
+                (distance - 1) * 120
+            );
         });
     }
 
@@ -1163,7 +1190,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectedErgazomenos && selectedRecord?.kodikos) {
                 _SELECTED_ERGAZOMENOS = selectedRecord.id || selectedErgazomenos; // Ορισμός global μεταβλητής
 
-                document.getElementById('idHidden').value = selectedRecord.id || selectedErgazomenos;
+                document.getElementById('idHidden').value =
+                    selectedRecord.id || selectedErgazomenos;
                 document.getElementById('kodikosHidden').value = selectedRecord.kodikos;
                 const selectedKodikos = selectedRecord.kodikos;
                 try {
@@ -1402,11 +1430,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!prevButton || !nextButton) return;
 
         const currentValue = String(ergazomenoiDropdown?.value || '').trim();
-        const currentIndex = ergazomenoiOptionsCache.findIndex((item) => item.value === currentValue);
+        const currentIndex = ergazomenoiOptionsCache.findIndex(
+            (item) => item.value === currentValue
+        );
         const hasOptions = ergazomenoiOptionsCache.length > 0;
 
         prevButton.disabled = !hasOptions || currentIndex <= 0;
-        nextButton.disabled = !hasOptions || currentIndex < 0 || currentIndex >= ergazomenoiOptionsCache.length - 1;
+        nextButton.disabled =
+            !hasOptions || currentIndex < 0 || currentIndex >= ergazomenoiOptionsCache.length - 1;
     }
 
     window.loadErgazomenoi = loadErgazomenoi;
@@ -1463,7 +1494,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!_ergazomenoi) return;
 
         setNumericInputValue('synoloApodoxon', _ergazomenoi.synolo_symbashs_basei_oron_ergasias, 2);
-        setNumericInputValue('symfonhtheisMisthos', _ergazomenoi.symfonhtheis_misthos_apasxolhseis, 2);
+        setNumericInputValue(
+            'symfonhtheisMisthos',
+            _ergazomenoi.symfonhtheis_misthos_apasxolhseis,
+            2
+        );
         // Τα ωρομίσθια πρέπει να παραμένουν με 4 δεκαδικά, όπως στη ΒΔ,
         // γιατί χρησιμοποιούνται ως βάση στους υπολογισμούς αξιών ωρών/απουσιών.
         setNumericInputValue('pragmatikoOromisthio', _ergazomenoi.pragmatikoOromisthio, 4);
@@ -1471,7 +1506,6 @@ document.addEventListener('DOMContentLoaded', function () {
         setNumericInputValue('nomimoOromisthio', _ergazomenoi.nomimoOromisthio, 4);
         setNumericInputValue('nomimoHmeromisthio', _ergazomenoi.nomimoHmeromisthio, 2);
     }
-
 
     function buildPeriodDateRange(yearValue, periodValue) {
         const year = parseInt(String(yearValue || '').trim(), 10);
@@ -1603,11 +1637,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const flowKey = getEmployeePeriodFlowKey(selectedPeriodos);
 
-        if (!options.force && activeEmployeePeriodFlowPromise && activeEmployeePeriodFlowKey === flowKey) {
+        if (
+            !options.force &&
+            activeEmployeePeriodFlowPromise &&
+            activeEmployeePeriodFlowKey === flowKey
+        ) {
             return activeEmployeePeriodFlowPromise;
         }
 
-        if (!options.force && !activeEmployeePeriodFlowPromise && lastCompletedEmployeePeriodFlowKey === flowKey) {
+        if (
+            !options.force &&
+            !activeEmployeePeriodFlowPromise &&
+            lastCompletedEmployeePeriodFlowKey === flowKey
+        ) {
             return;
         }
 
@@ -1669,6 +1711,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     isReady: true
                 };
 
+                console.log('Shared parameters updated:', sharedParams);
+
                 window.sharedParams = sharedParams;
 
                 if (!isCurrentFlow()) return;
@@ -1718,7 +1762,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 sharedParams.startDate = startDateISOString;
                 sharedParams.endDate = endDateISOString;
 
-                const apasxolhseisQueryString = buildApasxolhseisQueryString({ periodos: selectedPeriodos });
+                const apasxolhseisQueryString = buildApasxolhseisQueryString({
+                    periodos: selectedPeriodos
+                });
                 const apasxolhseis_result = await fetchApasxolhseis(apasxolhseisQueryString);
                 if (!isCurrentFlow()) return;
 
@@ -1729,16 +1775,17 @@ document.addEventListener('DOMContentLoaded', function () {
                         applyButtonPermissions(hasRecord);
                     });
 
-                    _PRAGMATIKES_HMERES_ERGASIAS_MHNA = await ypologismosPragmatikonErgasimonHmeronMhna(
-                        document.getElementById('etos').value,
-                        selectedPeriodos,
-                        document.getElementById('apasxolhshBaseiSymbashs_Hidden').value,
-                        _genikesParametroi,
-                        _argies,
-                        _ergazomenoi.xarakthrismos_ergazomenon,
-                        _ergazomenoi.hmeromhnia_proslhpshs,
-                        _ergazomenoi.hmeromhnia_apoxorhshs
-                    );
+                    _PRAGMATIKES_HMERES_ERGASIAS_MHNA =
+                        await ypologismosPragmatikonErgasimonHmeronMhna(
+                            document.getElementById('etos').value,
+                            selectedPeriodos,
+                            document.getElementById('apasxolhshBaseiSymbashs_Hidden').value,
+                            _genikesParametroi,
+                            _argies,
+                            _ergazomenoi.xarakthrismos_ergazomenon,
+                            _ergazomenoi.hmeromhnia_proslhpshs,
+                            _ergazomenoi.hmeromhnia_apoxorhshs
+                        );
                     if (!isCurrentFlow()) return;
 
                     if (_PRAGMATIKES_HMERES_ERGASIAS_MHNA === 0) {
@@ -1752,7 +1799,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
 
                     document.dispatchEvent(new Event('sharedParamsReady'));
-                    document.getElementById('kodikosHidden').value = sharedParams.ergazomenoi.kodikos;
+                    document.getElementById('kodikosHidden').value =
+                        sharedParams.ergazomenoi.kodikos;
                     const result = await fetchCalcTotals(
                         document.getElementById('kodikosHidden').value,
                         startDateISOString,
@@ -1760,9 +1808,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     );
                     if (!isCurrentFlow()) return;
 
-                    document.getElementById('oresArgion').value = formatValue(result.total_ores_argion);
-                    document.getElementById('oresNyxtas').value = formatValue(result.total_ores_nyxtas);
-                    document.getElementById('oresApoysias').value = formatValue(result.total_ores_apoysias);
+                    document.getElementById('oresArgion').value = formatValue(
+                        result.total_ores_argion
+                    );
+                    document.getElementById('oresNyxtas').value = formatValue(
+                        result.total_ores_nyxtas
+                    );
+                    document.getElementById('oresApoysias').value = formatValue(
+                        result.total_ores_apoysias
+                    );
                     document.getElementById('hmeresApoysias').value =
                         result.total_hmeres_apoysias && !isNaN(result.total_hmeres_apoysias)
                             ? parseInt(result.total_hmeres_apoysias)
@@ -1803,9 +1857,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('oresParanomhsYperoriasNyxtas').value = formatValue(
                         result.total_ores_paranomhs_yperorias_nyxtas
                     );
-                    document.getElementById('oresParanomhsYperoriasArgionNyxtas').value = formatValue(
-                        result.total_ores_paranomhs_yperorias_argion_nyxtas
-                    );
+                    document.getElementById('oresParanomhsYperoriasArgionNyxtas').value =
+                        formatValue(result.total_ores_paranomhs_yperorias_argion_nyxtas);
 
                     var hmeresErgasiasElem = document.getElementById('hmeresErgasias');
                     var oresErgasiasElem = document.getElementById('oresErgasias');
@@ -1828,13 +1881,17 @@ document.addEventListener('DOMContentLoaded', function () {
                             ? parseInt(result.countNotAN_ME)
                             : 0;
 
-                    document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
+                    document.dispatchEvent(
+                        new CustomEvent('sharedParamsLoaded', { detail: sharedParams })
+                    );
                     if (!isCurrentFlow()) return;
 
                     window.apasxolhseisSuppressFieldEvents = previousSuppress;
 
                     if (typeof window.recalculateApasxolhseisAfterEmployeeLoad === 'function') {
-                        await window.recalculateApasxolhseisAfterEmployeeLoad({ runHmeresErgasias: true });
+                        await window.recalculateApasxolhseisAfterEmployeeLoad({
+                            runHmeresErgasias: true
+                        });
                     } else {
                         let event = new Event('change');
                         document.getElementById('hmeresErgasias').dispatchEvent(event);
@@ -1847,7 +1904,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         endDateISOString
                     );
                 } else {
-                    document.dispatchEvent(new CustomEvent('sharedParamsLoaded', { detail: sharedParams }));
+                    document.dispatchEvent(
+                        new CustomEvent('sharedParamsLoaded', { detail: sharedParams })
+                    );
                     if (!isCurrentFlow()) return;
 
                     await handleFillFields(apasxolhseis_result, sharedParams);
@@ -1880,7 +1939,10 @@ document.addEventListener('DOMContentLoaded', function () {
     periodoiDropdown.addEventListener('change', async () => {
         const selectedPeriodos = String(periodoiDropdown.value || '').trim();
 
-        if (window.apasxolhseisSuppressFieldEvents === true || window.apasxolhseisEmployeeLoadPipeline === true) {
+        if (
+            window.apasxolhseisSuppressFieldEvents === true ||
+            window.apasxolhseisEmployeeLoadPipeline === true
+        ) {
             if (selectedPeriodos) {
                 const periodosHidden = document.getElementById('periodos_Hidden');
                 const mhnasHidden = document.getElementById('mhnas');
@@ -1898,9 +1960,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const selectedTyposApodoxon = String(
             document.getElementById('typosApodoxon_Hidden')?.value ||
-            typoiApodoxonDropdown?.value ||
-            document.getElementById('typ_apod')?.value ||
-            ''
+                typoiApodoxonDropdown?.value ||
+                document.getElementById('typ_apod')?.value ||
+                ''
         ).trim();
 
         try {
@@ -1924,7 +1986,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const typApodHidden = document.getElementById('typ_apod');
         if (typApodHidden) typApodHidden.value = selectedTyposApodoxon;
 
-        if (window.apasxolhseisSuppressFieldEvents === true || window.apasxolhseisEmployeeLoadPipeline === true) {
+        if (
+            window.apasxolhseisSuppressFieldEvents === true ||
+            window.apasxolhseisEmployeeLoadPipeline === true
+        ) {
             return;
         }
 
