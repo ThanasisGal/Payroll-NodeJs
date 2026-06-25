@@ -12914,6 +12914,29 @@ body.loader-active > *:not(.app-loader) {
     margin-top: -1.2rem;
     margin-bottom: 1.5rem;
 }
+
+#apasxolhseisForm .foroi-header-row {
+    margin-top: -1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+#apasxolhseisForm .foroi-header-label {
+    color: #000000;
+}
+
+#apasxolhseisForm .foroi-header-value {
+    color: #0000007a;
+    font-weight: 600;
+}
+
+#apasxolhseisForm .foroi-header-separator {
+    margin-top: -1.2rem;
+}
+
+#apasxolhseisForm .foroi-header-separator + .card-body.apx-csp-style-007 {
+    padding-top: 0;
+}
+
 .apx-csp-style-014 {
     margin-left: 0.7rem;
     font-size: 0.95vw;
@@ -13352,4 +13375,37 @@ body.loader-active > *:not(.app-loader) {
     font-weight: 600 !important;
     line-height: 0.7 !important;
     font-variant-numeric: tabular-nums;
+}
+
+#apasxolhseisForm .foroi-body-row {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    font-size: 0.8rem;
+}
+
+#apasxolhseisForm .foroi-body-readonly {
+    background-color: #f5faae61;
+}
+
+#apasxolhseisForm .foroi-body-calculated {
+    background-color: #86cf5b30 !important;
+}
+
+#apasxolhseisForm .foroi-body-separator {
+    margin-top: 0.7rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+}
+
+#apasxolhseisForm .foroi-body-total {
+    font-size: 1.1vw;
+    background-color: #5d924154 !important;
+}
+
+#apasxolhseisForm .foroi-footer-actions {
+    margin-top: -0.5rem !important;
+    margin-bottom: -1rem !important;
+    margin-left: 10px !important;
+    margin-right: 10px !important;
+    justify-content: space-around;
 }
