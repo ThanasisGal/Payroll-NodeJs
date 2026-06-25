@@ -12937,6 +12937,10 @@ body.loader-active > *:not(.app-loader) {
     padding-top: 0;
 }
 
+#apasxolhseisForm .card.apx-csp-style-006.foroi-card-epoxikos {
+    max-height: calc(62.5vh + 1.2rem);
+}
+
 .apx-csp-style-014 {
     margin-left: 0.7rem;
     font-size: 0.95vw;
