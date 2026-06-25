@@ -203,11 +203,11 @@
         window.addEventListener('message', handleIncomingMessage, false);
     });
 
-    window.addEventListener('unload', () => {
+    window.addEventListener('pagehide', () => {
         try {
             window.removeEventListener('message', handleIncomingMessage);
         } catch (error) {
             // ignore
         }
-    });
+    }, { once: true });
 })();

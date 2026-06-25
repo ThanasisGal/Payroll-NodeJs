@@ -205,10 +205,10 @@
         window.addEventListener('message', handleIncomingMessage, false);
     });
 
-    // Clean-up on unload (προαιρετικό)
-    window.addEventListener('unload', () => {
+    // Clean-up on pagehide (προαιρετικό)
+    window.addEventListener('pagehide', () => {
         try {
             window.removeEventListener('message', handleIncomingMessage);
         } catch (e) {}
-    });
+    }, { once: true });
 })();
