@@ -1,4 +1,7 @@
 const { PayrollPrecalcSettingsModel } = require('../../models/kinhseis');
+const {
+    computeNextMonthlyRunAt
+} = require('./workFactsScheduleUtils');
 
 const SOURCE_VERSION = 'workFactsPrecalc:v1';
 const DEFAULTS = {
@@ -176,6 +179,13 @@ async function upsertPayrollPrecalcSettings(input = {}) {
     }
 
     const query = buildSettingsQuery(normalized);
+    const nextRunAt = normalized.precalcEnabled
+        ? computeNextMonthlyRunAt({
+            monthlyRunDay: normalized.monthlyRunDay,
+            monthlyRunTime: normalized.monthlyRunTime,
+            timezone: normalized.timezone
+        })
+        : null;
     const settings = await PayrollPrecalcSettingsModel.findOneAndUpdate(
         query,
         {
@@ -186,6 +196,7 @@ async function upsertPayrollPrecalcSettings(input = {}) {
                 timezone: normalized.timezone,
                 periodMode: normalized.periodMode,
                 scope: normalized.scope,
+                nextRunAt,
                 updatedBy: normalized.updatedBy,
                 notes: normalized.notes,
                 sourceVersion: SOURCE_VERSION
@@ -194,8 +205,7 @@ async function upsertPayrollPrecalcSettings(input = {}) {
                 team: normalized.team,
                 company_kod: normalized.company_kod,
                 ypokatasthma: normalized.ypokatasthma,
-                lastRunAt: null,
-                nextRunAt: null
+                lastRunAt: null
             }
         },
         {
