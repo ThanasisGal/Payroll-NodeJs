@@ -14,7 +14,7 @@
 // ============================================================================
 
 const mongoose = require('mongoose');
-const IstorikoProslhpseonAllagonModel = require('../../models/IstorikoProslhpseonAllagonModel');
+const { IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 
 function normalizeDateOnly(value) {
     if (!value) return null;

@@ -1,4 +1,26 @@
 async function handleTypos001(sharedParams) {
+    function getOperationalPayrollPhaseCode(sharedParams) {
+        const sharedCode =
+            sharedParams?.operationalPayrollPhaseContext?.operationalPhaseCode;
+        if (sharedCode !== undefined && sharedCode !== null) {
+            return String(sharedCode).trim();
+        }
+
+        if (typeof window !== "undefined") {
+            const windowCode =
+                window.apasxolhseisOperationalPayrollPhaseContext?.operationalPhaseCode;
+            if (windowCode !== undefined && windowCode !== null) {
+                return String(windowCode).trim();
+            }
+        }
+
+        return "";
+    }
+
+    const operationalPayrollPhaseCode = getOperationalPayrollPhaseCode(sharedParams);
+    const usesOperationalHours =
+        operationalPayrollPhaseCode === "1" || operationalPayrollPhaseCode === "2";
+
     // Λογική για τον τύπο αποδοχών 001 (Τακτικές Αποδοχές)
     switch(sharedParams.ergazomenoi.xarakthrismos_ergazomenon) {
         case true:    // ΥΠΑΛΛΗΛΟΣ
@@ -24,6 +46,10 @@ async function handleTypos001(sharedParams) {
 
                     switch(sharedParams.ergazomenoi.kathestos_apasxolhshs) {
                         case "0":    // ΠΛΗΡΗΣ
+                            if (usesOperationalHours) {
+                                break;
+                            }
+
                             hmeresErgasias.value = sharedParams._ERGASIMES_HMERES_MHNA;
                             if (hmeresErgasias.value >= parseFloat(sharedParams.genikesParametroi[5].timh)) {
                                 hmeresErgasias.value = parseFloat(sharedParams.genikesParametroi[5].timh);

@@ -45,6 +45,19 @@ var sharedParams = window.sharedParams || createSafeSharedParams();
 window.sharedParams = sharedParams;
 let hasRecord = false;
 
+function setOperationalPayrollPhaseContext(operationalPhaseContext) {
+    const usableContext =
+        operationalPhaseContext?.hasUsableSingleOperationalPhase === true
+            ? operationalPhaseContext
+            : null;
+
+    window.apasxolhseisOperationalPayrollPhaseContext = usableContext;
+
+    if (sharedParams) {
+        sharedParams.operationalPayrollPhaseContext = usableContext;
+    }
+}
+
 // Συνάρτηση φόρτωσης εργαζομένων
 // export async function loadErgazomenoi(energoi, ypokatasthma) {
 
@@ -147,12 +160,64 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const loaderContainer = document.querySelector('.loader-container');
 let apasxolhseisPipelineLoaderDepth = 0;
 let apasxolhseisPipelineLoaderLockDepth = 0;
+let apasxolhseisPipelineLoaderVisible = loaderContainer
+    ? window.getComputedStyle(loaderContainer).display !== 'none'
+    : false;
+let apasxolhseisPipelineLoaderHideTimer = null;
+
+async function waitForApasxolhseisKrathseisLoading() {
+    const loadingPromise = window.apasxolhseisKrathseisLoadingPromise;
+
+    if (!loadingPromise || typeof loadingPromise.then !== 'function') {
+        return;
+    }
+
+    await loadingPromise;
+}
 
 function setApasxolhseisPipelineLoaderVisible(visible) {
-    window.apasxolhseisPipelineLoaderActive = !!visible;
-    if (loaderContainer) {
-        loaderContainer.style.display = visible ? 'grid' : 'none';
+    if (visible) {
+        if (apasxolhseisPipelineLoaderHideTimer) {
+            window.clearTimeout(apasxolhseisPipelineLoaderHideTimer);
+            apasxolhseisPipelineLoaderHideTimer = null;
+        }
+
+        if (apasxolhseisPipelineLoaderVisible) {
+            window.apasxolhseisPipelineLoaderActive = true;
+            return;
+        }
+
+        apasxolhseisPipelineLoaderVisible = true;
+        window.apasxolhseisPipelineLoaderActive = true;
+        if (loaderContainer) {
+            loaderContainer.style.display = 'grid';
+        }
+        return;
     }
+
+    if (apasxolhseisPipelineLoaderHideTimer) {
+        window.clearTimeout(apasxolhseisPipelineLoaderHideTimer);
+        apasxolhseisPipelineLoaderHideTimer = null;
+    }
+
+    if (!apasxolhseisPipelineLoaderVisible) {
+        window.apasxolhseisPipelineLoaderActive = false;
+        return;
+    }
+
+    apasxolhseisPipelineLoaderHideTimer = window.setTimeout(() => {
+        apasxolhseisPipelineLoaderHideTimer = null;
+
+        if (apasxolhseisPipelineLoaderDepth > 0 || apasxolhseisPipelineLoaderLockDepth > 0) {
+            return;
+        }
+
+        apasxolhseisPipelineLoaderVisible = false;
+        window.apasxolhseisPipelineLoaderActive = false;
+        if (loaderContainer) {
+            loaderContainer.style.display = 'none';
+        }
+    }, 100);
 }
 
 function setApasxolhseisLoaderLockClass(locked) {
@@ -916,6 +981,59 @@ document.addEventListener('DOMContentLoaded', function () {
             `/api/kinhseis/calcTotals?${queryString}`,
             PAYROLL_DATA_CACHE_TTL_MS
         );
+    }
+
+    async function fetchOperationalPayrollPhaseContext(employeeKod, ypokatasthma) {
+        const normalizedEmployeeKod = String(employeeKod || '').trim();
+        if (!normalizedEmployeeKod) return null;
+
+        const params = new URLSearchParams({
+            employeeKod: normalizedEmployeeKod
+        });
+        const normalizedYpokatasthma = normalizeYpokatasthmaValue(ypokatasthma);
+        if (normalizedYpokatasthma) {
+            params.set('ypokatasthma', normalizedYpokatasthma);
+        }
+
+        try {
+            const response = await fetch(`/api/kinhseis/detectPayrollPhases?${params.toString()}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!response.ok) return null;
+
+            const payload = await response.json();
+            const data = payload?.data || {};
+            const operationalPhases = Array.isArray(data.operationalPhases)
+                ? data.operationalPhases
+                : [];
+            const operationalPhasesCount =
+                Number.isInteger(data.operationalPhasesCount)
+                    ? data.operationalPhasesCount
+                    : operationalPhases.length;
+            const hasOperationalSplit = data.hasOperationalSplit === true;
+            const operationalPhase =
+                operationalPhasesCount === 1 ? operationalPhases[0] || null : null;
+            const operationalPhaseCode = operationalPhase
+                ? String(operationalPhase.detectedKathestosCode || '').trim()
+                : '';
+            const hasUsableSingleOperationalPhase =
+                operationalPhasesCount === 1 && ['0', '1', '2'].includes(operationalPhaseCode);
+
+            return {
+                hasUsableSingleOperationalPhase,
+                operationalPhaseCode,
+                operationalPhase,
+                operationalPhasesCount,
+                hasOperationalSplit
+            };
+        } catch (error) {
+            return null;
+        }
     }
 
     async function fetchEmployeeDetails(kodikos) {
@@ -1708,12 +1826,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     _PROSAYXHSH_HMERON_5MERHS_ERGASIAS: 0,
                     startDate: startDateISOString,
                     endDate: endDateISOString,
+                    operationalPayrollPhaseContext: null,
                     isReady: true
                 };
 
                 console.log('Shared parameters updated:', sharedParams);
 
                 window.sharedParams = sharedParams;
+                setOperationalPayrollPhaseContext(null);
 
                 if (!isCurrentFlow()) return;
 
@@ -1799,6 +1919,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
 
                     document.dispatchEvent(new Event('sharedParamsReady'));
+                    await waitForApasxolhseisKrathseisLoading();
+                    if (!isCurrentFlow()) return;
+
                     document.getElementById('kodikosHidden').value =
                         sharedParams.ergazomenoi.kodikos;
                     const result = await fetchCalcTotals(
@@ -1876,15 +1999,48 @@ document.addEventListener('DOMContentLoaded', function () {
                         oresErgasiasElem.readOnly = false;
                     }
 
-                    hmeresErgasiasElem.value =
-                        result.countNotAN_ME && !isNaN(result.countNotAN_ME)
-                            ? parseInt(result.countNotAN_ME)
-                            : 0;
-
-                    document.dispatchEvent(
-                        new CustomEvent('sharedParamsLoaded', { detail: sharedParams })
-                    );
+                    const totalOresErgasias = _ergazomenoi.karta_ergasias
+                        ? result.total_ores_ergasias_apologistika
+                        : result.total_ores_ergasias_prodhlomenes;
+                    const operationalPhaseContext =
+                        await fetchOperationalPayrollPhaseContext(
+                            document.getElementById('kodikosHidden').value,
+                            getApasxolhseisYpokatasthmaForQuery()
+                        );
                     if (!isCurrentFlow()) return;
+                    setOperationalPayrollPhaseContext(operationalPhaseContext);
+
+                    const useOperationalPhaseRule =
+                        operationalPhaseContext?.hasUsableSingleOperationalPhase === true;
+                    const operationalPhaseCode =
+                        operationalPhaseContext?.operationalPhaseCode || '';
+                    const shouldUpdateHmeresErgasias =
+                        !useOperationalPhaseRule || operationalPhaseCode === '0';
+                    const shouldUpdateOresErgasias =
+                        !useOperationalPhaseRule ||
+                        operationalPhaseCode === '1' ||
+                        operationalPhaseCode === '2';
+
+                    if (shouldUpdateOresErgasias) {
+                        oresErgasiasElem.value = formatValue(
+                            totalOresErgasias ?? result.total_ores_ergasias,
+                            4
+                        );
+                    } else if (useOperationalPhaseRule && operationalPhaseCode === '0') {
+                        oresErgasiasElem.value = '0.0000';
+                    }
+
+                    if (shouldUpdateHmeresErgasias) {
+                        hmeresErgasiasElem.value =
+                            result.countNotAN_ME && !isNaN(result.countNotAN_ME)
+                                ? parseInt(result.countNotAN_ME)
+                                : 0;
+                    } else if (
+                        useOperationalPhaseRule &&
+                        (operationalPhaseCode === '1' || operationalPhaseCode === '2')
+                    ) {
+                        hmeresErgasiasElem.value = '0';
+                    }
 
                     window.apasxolhseisSuppressFieldEvents = previousSuppress;
 
@@ -1898,18 +2054,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     if (!isCurrentFlow()) return;
 
+                    document.dispatchEvent(
+                        new CustomEvent('sharedParamsLoaded', { detail: sharedParams })
+                    );
+                    if (!isCurrentFlow()) return;
+
                     prefetchAdjacentPayrollData(
                         getSelectedErgazomenosRecord(),
                         startDateISOString,
                         endDateISOString
                     );
                 } else {
+                    await handleFillFields(apasxolhseis_result, sharedParams);
+                    if (!isCurrentFlow()) return;
+
                     document.dispatchEvent(
                         new CustomEvent('sharedParamsLoaded', { detail: sharedParams })
                     );
-                    if (!isCurrentFlow()) return;
-
-                    await handleFillFields(apasxolhseis_result, sharedParams);
                     if (!isCurrentFlow()) return;
 
                     applyButtonPermissions(hasRecord);

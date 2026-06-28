@@ -1,4 +1,12 @@
 async function handleCalcs001(sharedParams) {
+	function shouldDeferSynoloMiktonApodoxonToCore() {
+		return (
+			typeof window !== "undefined" &&
+			(window.apasxolhseisUseCoreGrossTotal === true ||
+				window.apasxolhseisEmployeeLoadPipeline === true)
+		);
+	}
+
 	switch(sharedParams.ergazomenoi.xarakthrismos_ergazomenon) {
 		case true:    // ΥΠΑΛΛΗΛΟΣ
 			switch(sharedParams.ergazomenoi.typos_ergazomenon) {
@@ -30,13 +38,17 @@ async function handleCalcs001(sharedParams) {
 							
 							document.getElementById("pragmatikoHmeromisthioAstheneias").value = parseFloat(document.getElementById("hmeresAsfalishs").value) === 0 ? parseFloat(pragmatikoHmeromisthioAstheneias) : (parseFloat(parseFloat(pragmatikoHmeromisthioAstheneias)) || 0).toFixed(4);
 
-							synoloMiktonApodoxon.value = (misthosApodoxes - kostosOronApoysias + synoloProsayxhseon).toFixed(2);
-							if (synoloMiktonApodoxon.value <= 0) synoloMiktonApodoxon.value = 0;
-							document.getElementById("synoloMiktonApodoxon").value = synoloMiktonApodoxon.value - apodoxesAstheneiasParsed;
-							break;
+								if (!shouldDeferSynoloMiktonApodoxonToCore()) {
+									synoloMiktonApodoxon.value = (misthosApodoxes - kostosOronApoysias + synoloProsayxhseon).toFixed(2);
+									if (synoloMiktonApodoxon.value <= 0) synoloMiktonApodoxon.value = 0;
+									document.getElementById("synoloMiktonApodoxon").value = synoloMiktonApodoxon.value - apodoxesAstheneiasParsed;
+								}
+								break;
 						case "1":    // ΜΕΡΙΚΗ
 							break;
 						case "2":    // ΕΚ ΠΕΡΙΤΡΟΠΗΣ
+							document.getElementById("synoloApodoxon").value = "0.00";
+							document.getElementById("synoloMiktonApodoxon_Hidden").value = "0.00";
 							break;
 					}
 					break;

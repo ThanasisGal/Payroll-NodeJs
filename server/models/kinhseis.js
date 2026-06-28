@@ -478,6 +478,257 @@ ApasxolhseisSchema.index(
 
 const ApasxolhseisModel = model('Apasxolhseis', ApasxolhseisSchema);
 
+const ApasxolhseisPeriodFactsSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: '' },
+        kodikos: { type: String, required: true, trim: true },
+
+        apo: { type: Date, required: true },
+        eos: { type: Date, required: true },
+        scope: {
+            type: String,
+            enum: ['MONTHLY', 'TERMINATION', 'MANUAL'],
+            required: true,
+            default: 'MANUAL'
+        },
+
+        status: {
+            type: String,
+            enum: ['READY', 'LOCKED', 'STALE', 'FAILED'],
+            default: 'READY'
+        },
+
+        generatedAt: { type: Date },
+        generatedBy: { type: String, trim: true },
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' },
+
+        locked: { type: Boolean, default: false },
+        lockedAt: { type: Date },
+        lockedBy: { type: String, trim: true },
+        lockReason: { type: String, trim: true },
+
+        phases: { type: Schema.Types.Mixed, default: [] },
+        phaseSummary: { type: Schema.Types.Mixed, default: [] },
+        dailyFacts: { type: Schema.Types.Mixed, default: [] },
+        totals: { type: Schema.Types.Mixed, default: {} },
+        warnings: [{ type: String, trim: true }],
+
+        inputFingerprint: { type: String, trim: true, default: '' }
+    },
+    {
+        collection: 'Apasxolhseis_Period_Facts',
+        timestamps: true
+    }
+);
+
+ApasxolhseisPeriodFactsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        kodikos: 1,
+        apo: 1,
+        eos: 1,
+        scope: 1
+    },
+    {
+        unique: true,
+        name: 'uniq_apasx_period_facts_employee_range_scope'
+    }
+);
+
+ApasxolhseisPeriodFactsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        apo: 1,
+        eos: 1,
+        scope: 1,
+        status: 1
+    },
+    {
+        name: 'idx_apasx_period_facts_range_scope_status'
+    }
+);
+
+ApasxolhseisPeriodFactsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        kodikos: 1,
+        status: 1
+    },
+    {
+        name: 'idx_apasx_period_facts_employee_status'
+    }
+);
+
+const ApasxolhseisPeriodFactsModel = model(
+    'ApasxolhseisPeriodFacts',
+    ApasxolhseisPeriodFactsSchema
+);
+
+const PayrollPrecalcJobSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: '' },
+
+        apo: { type: Date, required: true },
+        eos: { type: Date, required: true },
+        scope: {
+            type: String,
+            enum: ['MONTHLY', 'TERMINATION', 'MANUAL'],
+            default: 'MONTHLY'
+        },
+
+        status: {
+            type: String,
+            enum: ['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'],
+            default: 'QUEUED'
+        },
+
+        jobKey: { type: String, required: true, trim: true },
+        requestedBy: { type: String, trim: true },
+        startedAt: { type: Date },
+        finishedAt: { type: Date },
+
+        employeesTotal: { type: Number, default: 0 },
+        employeesDone: { type: Number, default: 0 },
+        employeesSkipped: { type: Number, default: 0 },
+        employeesFailed: { type: Number, default: 0 },
+
+        processedKodikos: [{ type: String, trim: true }],
+        failedEmployees: [
+            {
+                kodikos: { type: String, trim: true },
+                errorMessage: { type: String, trim: true }
+            }
+        ],
+
+        warnings: [{ type: String, trim: true }],
+        errorMessage: { type: String, trim: true },
+
+        force: { type: Boolean, default: false },
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' }
+    },
+    {
+        collection: 'Payroll_Precalc_Jobs',
+        timestamps: true
+    }
+);
+
+PayrollPrecalcJobSchema.index(
+    { jobKey: 1 },
+    { unique: true, name: 'uniq_payroll_precalc_job_key' }
+);
+
+PayrollPrecalcJobSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        apo: 1,
+        eos: 1,
+        scope: 1,
+        status: 1
+    },
+    {
+        name: 'idx_payroll_precalc_job_range_scope_status'
+    }
+);
+
+PayrollPrecalcJobSchema.index(
+    {
+        status: 1,
+        startedAt: 1
+    },
+    {
+        name: 'idx_payroll_precalc_job_status_started'
+    }
+);
+
+const PayrollPrecalcJobModel = model('PayrollPrecalcJob', PayrollPrecalcJobSchema);
+
+const PayrollPrecalcSettingsSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: '' },
+
+        precalcEnabled: { type: Boolean, default: false },
+        monthlyRunDay: { type: Number, min: 1, max: 28, default: 2 },
+        monthlyRunTime: {
+            type: String,
+            trim: true,
+            default: '02:30',
+            match: /^([01]\d|2[0-3]):[0-5]\d$/
+        },
+        timezone: { type: String, trim: true, default: 'Europe/Athens' },
+
+        periodMode: {
+            type: String,
+            enum: ['PREVIOUS_MONTH'],
+            default: 'PREVIOUS_MONTH'
+        },
+        scope: {
+            type: String,
+            enum: ['MONTHLY'],
+            default: 'MONTHLY'
+        },
+
+        lastRunAt: { type: Date },
+        nextRunAt: { type: Date },
+
+        updatedBy: { type: String, trim: true },
+        notes: { type: String, trim: true },
+
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' }
+    },
+    {
+        collection: 'Payroll_Precalc_Settings',
+        timestamps: true
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        ypokatasthma: 1
+    },
+    {
+        unique: true,
+        name: 'uniq_payroll_precalc_settings_company_branch'
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        precalcEnabled: 1,
+        nextRunAt: 1
+    },
+    {
+        name: 'idx_payroll_precalc_settings_enabled_next_run'
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        precalcEnabled: 1
+    },
+    {
+        name: 'idx_payroll_precalc_settings_company_enabled'
+    }
+);
+
+const PayrollPrecalcSettingsModel = model(
+    'PayrollPrecalcSettings',
+    PayrollPrecalcSettingsSchema
+);
+
 const AstheneiesSchema = new Schema({
     team: { type: String, trim: true },
     company_kod: { type: String, trim: true },
@@ -577,4 +828,12 @@ const AdeiesSchema = new Schema({
     apodoxes_adeias_05: { type: Number, default: 0 }
 });
 const AdeiesModel = model('Adeies', AdeiesSchema);
-module.exports = { ApoysiesModel, ApasxolhseisModel, AstheneiesModel, AdeiesModel };
+module.exports = {
+    ApoysiesModel,
+    ApasxolhseisModel,
+    ApasxolhseisPeriodFactsModel,
+    PayrollPrecalcJobModel,
+    PayrollPrecalcSettingsModel,
+    AstheneiesModel,
+    AdeiesModel
+};

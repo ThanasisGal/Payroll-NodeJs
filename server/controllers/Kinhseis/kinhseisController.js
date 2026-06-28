@@ -34,6 +34,7 @@ const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 // Το ApoysiesModel δεν χρησιμοποιείται πλέον στις Απασχολήσεις.
 // Οι ώρες απουσίας διαβάζονται από ProdhlomenaOrariaModel.ores_apoysias_apologistika.
 const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
+const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -493,7 +494,7 @@ class kinhseisController {
             }
 
             // Δημιουργία του aggregation pipeline από ProdhlomenaOrariaModel.
-            // Χρησιμοποιούνται μόνο τα πεδία *_apologistika.
+            // Το total_ores_ergasias παραμένει backward-compatible με τις απολογιστικές ώρες.
             const result = await ProdhlomenaOrariaModel.aggregate([
                 {
                     $match: matchFilter
@@ -502,6 +503,10 @@ class kinhseisController {
                     $group: {
                         _id: null, // Δεν χρειαζόμαστε ομαδοποίηση με βάση κάποιο πεδίο
                         total_ores_ergasias: { $sum: '$ores_ergasias_apologistika' },
+                        total_ores_ergasias_apologistika: {
+                            $sum: '$ores_ergasias_apologistika'
+                        },
+                        total_ores_ergasias_prodhlomenes: { $sum: '$ores_ergasias' },
                         total_ores_nyxtas: { $sum: '$ores_nyxtas_apologistika' },
                         total_ores_apoysias: {
                             $sum: { $ifNull: ['$ores_apoysias_apologistika', 0] }
@@ -570,6 +575,8 @@ class kinhseisController {
                     $project: {
                         _id: 0, // Αφαιρούμε το _id από τα αποτελέσματα
                         total_ores_ergasias: 1, // Προσθέτουμε το total_ores_.... στα αποτελέσματα
+                        total_ores_ergasias_apologistika: 1,
+                        total_ores_ergasias_prodhlomenes: 1,
                         total_ores_nyxtas: 1,
                         total_ores_apoysias: 1,
                         total_ores_argion: 1,
@@ -761,6 +768,54 @@ class kinhseisController {
         } catch (error) {
             console.error('Σφάλμα στο API endpoint:', error);
             res.status(500).json({ error: 'Κάτι πήγε στραβά' });
+        }
+    };
+
+    static detectPayrollPhases = async (req, res) => {
+        try {
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const year = String(req.session?.yearInUse || '').trim();
+            const period = String(req.session?.periodInUse || '').trim();
+            const kodikos = String(req.query.employeeKod || req.query.kodikos || '').trim();
+            const ypokatasthma = String(
+                req.query.ypokatasthma || req.query.ypokatasthma_Hidden || ''
+            ).trim();
+
+            const missingFields = [];
+            if (!team) missingFields.push('session.userTeam');
+            if (!company_kod) missingFields.push('session.companyInUse');
+            if (!year) missingFields.push('session.yearInUse');
+            if (!period) missingFields.push('session.periodInUse');
+            if (!kodikos) missingFields.push('employeeKod');
+
+            if (missingFields.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία για την ανίχνευση φάσεων.',
+                    missingFields
+                });
+            }
+
+            const data = await phaseDetectorService.detectPayrollPhases({
+                team,
+                company_kod,
+                kodikos,
+                ypokatasthma,
+                year,
+                period
+            });
+
+            return res.json({ success: true, data });
+        } catch (error) {
+            console.error('Error into kinhseisController -> detectPayrollPhases :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά την ανίχνευση φάσεων απασχόλησης.'
+            });
         }
     };
 
