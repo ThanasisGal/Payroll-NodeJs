@@ -13413,3 +13413,37 @@ body.loader-active > *:not(.app-loader) {
     margin-right: 10px !important;
     justify-content: space-around;
 }
+
+#payrollPhasesPanelShell .payroll-phases-icon-btn {
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    font-size: 1.35rem;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.22);
+}
+
+#payrollPhasesPanelShell .payroll-phases-icon-btn:hover,
+#payrollPhasesPanelShell .payroll-phases-icon-btn:focus {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.34);
+}
+
+#payrollPhasesPanelShell .payroll-phases-info-btn {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.55rem;
+    z-index: 3;
+    background: rgba(13, 202, 240, 0.88);
+}
+
+#payrollPhasesPanelShell .payroll-phases-info-btn:hover,
+#payrollPhasesPanelShell .payroll-phases-info-btn:focus {
+    background: rgba(13, 202, 240, 1);
+}
