@@ -51,6 +51,9 @@ const logger = require('./server/utils/logger');
 // ============================================================================
 const textLoader = require('./server/utils/textLoader');
 const textCacheManager = require('./server/utils/textCacheManager');
+const {
+    startPayrollPrecalcScheduler
+} = require('./server/services/kinhseis/workFactsSchedulerRunner');
 
 const app = express();
 app.disable('x-powered-by');
@@ -883,6 +886,8 @@ async function startServer() {
 
         // Και μετά κάθε 5 λεπτά
         setInterval(cleanupOrphanedSessions, 5 * 60 * 1000);
+
+        app.locals.payrollPrecalcScheduler = startPayrollPrecalcScheduler();
 
         // ============================================================================
         // ✅ START SERVER (changed from app.listen to server.listen)
