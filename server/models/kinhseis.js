@@ -569,6 +569,87 @@ const ApasxolhseisPeriodFactsModel = model(
     ApasxolhseisPeriodFactsSchema
 );
 
+const PayrollPrecalcJobSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: '' },
+
+        apo: { type: Date, required: true },
+        eos: { type: Date, required: true },
+        scope: {
+            type: String,
+            enum: ['MONTHLY', 'TERMINATION', 'MANUAL'],
+            default: 'MONTHLY'
+        },
+
+        status: {
+            type: String,
+            enum: ['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'],
+            default: 'QUEUED'
+        },
+
+        jobKey: { type: String, required: true, trim: true },
+        requestedBy: { type: String, trim: true },
+        startedAt: { type: Date },
+        finishedAt: { type: Date },
+
+        employeesTotal: { type: Number, default: 0 },
+        employeesDone: { type: Number, default: 0 },
+        employeesSkipped: { type: Number, default: 0 },
+        employeesFailed: { type: Number, default: 0 },
+
+        processedKodikos: [{ type: String, trim: true }],
+        failedEmployees: [
+            {
+                kodikos: { type: String, trim: true },
+                errorMessage: { type: String, trim: true }
+            }
+        ],
+
+        warnings: [{ type: String, trim: true }],
+        errorMessage: { type: String, trim: true },
+
+        force: { type: Boolean, default: false },
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' }
+    },
+    {
+        collection: 'Payroll_Precalc_Jobs',
+        timestamps: true
+    }
+);
+
+PayrollPrecalcJobSchema.index(
+    { jobKey: 1 },
+    { unique: true, name: 'uniq_payroll_precalc_job_key' }
+);
+
+PayrollPrecalcJobSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        apo: 1,
+        eos: 1,
+        scope: 1,
+        status: 1
+    },
+    {
+        name: 'idx_payroll_precalc_job_range_scope_status'
+    }
+);
+
+PayrollPrecalcJobSchema.index(
+    {
+        status: 1,
+        startedAt: 1
+    },
+    {
+        name: 'idx_payroll_precalc_job_status_started'
+    }
+);
+
+const PayrollPrecalcJobModel = model('PayrollPrecalcJob', PayrollPrecalcJobSchema);
+
 const AstheneiesSchema = new Schema({
     team: { type: String, trim: true },
     company_kod: { type: String, trim: true },
@@ -672,6 +753,7 @@ module.exports = {
     ApoysiesModel,
     ApasxolhseisModel,
     ApasxolhseisPeriodFactsModel,
+    PayrollPrecalcJobModel,
     AstheneiesModel,
     AdeiesModel
 };
