@@ -8,6 +8,7 @@ const {
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
 const SOURCE_VERSION = 'workFactsPrecalc:v1';
+const COMPANY_WIDE_JOB_KEY_YP = 'ALL';
 
 function toTrimmedString(value) {
     return String(value ?? '').trim();
@@ -85,8 +86,19 @@ function validateBatchInput({ team, company_kod, apo, eos, scope }) {
     };
 }
 
-function buildJobKey({ team, company_kod, apoYMD, eosYMD, scope }) {
-    return [team, company_kod, apoYMD, eosYMD, scope].join('|');
+function normalizeYpokatasthmaForJobKey(ypokatasthma) {
+    return toTrimmedString(ypokatasthma) || COMPANY_WIDE_JOB_KEY_YP;
+}
+
+function buildJobKey({ team, company_kod, ypokatasthma, apoYMD, eosYMD, scope }) {
+    return [
+        team,
+        company_kod,
+        normalizeYpokatasthmaForJobKey(ypokatasthma),
+        apoYMD,
+        eosYMD,
+        scope
+    ].join('|');
 }
 
 function normalizeJobForReturn(job, extra = {}) {
@@ -273,14 +285,15 @@ async function generateWorkFactsForCompanyPeriod({
         };
     }
 
+    const cleanYpokatasthma = toTrimmedString(ypokatasthma);
     const cleanKodikoi = normalizeKodikoi(kodikoi);
-    const jobKey = buildJobKey(key);
+    const jobKey = buildJobKey({ ...key, ypokatasthma: cleanYpokatasthma });
     const runningJob = await markJobRunning({
         key,
         jobKey,
         requestedBy,
         force,
-        ypokatasthma
+        ypokatasthma: cleanYpokatasthma
     });
 
     if (runningJob.skipped) {
@@ -300,7 +313,7 @@ async function generateWorkFactsForCompanyPeriod({
             company_kod: key.company_kod,
             apo: key.apo,
             eos: key.eos,
-            ypokatasthma,
+            ypokatasthma: cleanYpokatasthma,
             kodikoi: cleanKodikoi
         });
 
