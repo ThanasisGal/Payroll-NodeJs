@@ -1,6 +1,8 @@
 const phaseDetectorService = require('./phaseDetectorService');
+const { ApasxolhseisPeriodFactsModel } = require('../../models/kinhseis');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
+const SOURCE_VERSION = 'workFactsPrecalc:v1';
 const HOURS_FIELDS = [
     'workingHours',
     'absenceHours',
@@ -56,6 +58,11 @@ function formatDateYMD(date) {
     return `${year}-${month}-${day}`;
 }
 
+function dateOnlyUTC(value) {
+    const date = parseDateOnlyUTC(value);
+    return date ? date : null;
+}
+
 function normalizeScope(scope, warnings) {
     const normalizedScope = toTrimmedString(scope).toUpperCase();
 
@@ -67,6 +74,11 @@ function normalizeScope(scope, warnings) {
         `Invalid scope "${toTrimmedString(scope)}". Χρησιμοποιήθηκε scope MANUAL.`
     );
     return 'MANUAL';
+}
+
+function normalizeScopeValue(scope) {
+    const warnings = [];
+    return normalizeScope(scope, warnings);
 }
 
 function buildFailedPayload({ team, company_kod, kodikos, apo, eos, scope, requestedBy, warnings }) {
@@ -284,6 +296,82 @@ function validateInput({ team, company_kod, kodikos, apo, eos }) {
     };
 }
 
+function normalizeSnapshotKey({ team, company_kod, kodikos, apo, eos, scope = 'MANUAL' }) {
+    const input = validateInput({ team, company_kod, kodikos, apo, eos });
+    const warnings = [...input.warnings];
+    const normalizedScope = normalizeScope(scope, warnings);
+    const apoDate = dateOnlyUTC(input.apo);
+    const eosDate = dateOnlyUTC(input.eos);
+
+    return {
+        isValid: input.isValid && Boolean(apoDate && eosDate),
+        warnings,
+        team: input.team,
+        company_kod: input.company_kod,
+        kodikos: input.kodikos,
+        apo: apoDate,
+        eos: eosDate,
+        apoYMD: input.apo,
+        eosYMD: input.eos,
+        scope: normalizedScope
+    };
+}
+
+function snapshotQueryFromKey(key) {
+    return {
+        team: key.team,
+        company_kod: key.company_kod,
+        kodikos: key.kodikos,
+        apo: key.apo,
+        eos: key.eos,
+        scope: key.scope
+    };
+}
+
+function normalizeSnapshotForReturn(snapshot, extra = {}) {
+    if (!snapshot) return null;
+
+    const plain = typeof snapshot.toObject === 'function' ? snapshot.toObject() : { ...snapshot };
+
+    return {
+        ...plain,
+        ...extra,
+        apo: formatDateYMD(plain.apo),
+        eos: formatDateYMD(plain.eos),
+        generatedAt: plain.generatedAt instanceof Date
+            ? plain.generatedAt.toISOString()
+            : plain.generatedAt
+    };
+}
+
+function buildSnapshotDocument(payload, key) {
+    const generatedAtDate = payload.generatedAt
+        ? new Date(payload.generatedAt)
+        : new Date();
+
+    return {
+        team: key.team,
+        company_kod: key.company_kod,
+        ypokatasthma: toTrimmedString(payload.ypokatasthma),
+        kodikos: key.kodikos,
+        apo: key.apo,
+        eos: key.eos,
+        scope: key.scope,
+        status: ['READY', 'LOCKED', 'STALE', 'FAILED'].includes(toTrimmedString(payload.status))
+            ? toTrimmedString(payload.status)
+            : 'FAILED',
+        generatedAt: Number.isNaN(generatedAtDate.getTime()) ? new Date() : generatedAtDate,
+        generatedBy: toTrimmedString(payload.generatedBy || payload.requestedBy),
+        sourceVersion: toTrimmedString(payload.sourceVersion) || SOURCE_VERSION,
+        phases: Array.isArray(payload.phases) ? payload.phases : [],
+        phaseSummary: Array.isArray(payload.phaseSummary) ? payload.phaseSummary : [],
+        dailyFacts: Array.isArray(payload.dailyFacts) ? payload.dailyFacts : [],
+        totals: payload.totals && typeof payload.totals === 'object' ? payload.totals : {},
+        warnings: Array.isArray(payload.warnings) ? payload.warnings.map(toTrimmedString) : [],
+        inputFingerprint: toTrimmedString(payload.inputFingerprint)
+    };
+}
+
 async function generateWorkFactsForEmployeePeriod({
     team,
     company_kod,
@@ -354,6 +442,137 @@ async function generateWorkFactsForEmployeePeriod({
     }
 }
 
+async function findWorkFactsSnapshot({ team, company_kod, kodikos, apo, eos, scope = 'MANUAL' }) {
+    const key = normalizeSnapshotKey({ team, company_kod, kodikos, apo, eos, scope });
+
+    if (!key.isValid) {
+        return null;
+    }
+
+    const snapshot = await ApasxolhseisPeriodFactsModel.findOne(snapshotQueryFromKey(key)).lean();
+    return normalizeSnapshotForReturn(snapshot);
+}
+
+async function saveWorkFactsSnapshot(payload, { force = false } = {}) {
+    const key = normalizeSnapshotKey({
+        team: payload?.team,
+        company_kod: payload?.company_kod,
+        kodikos: payload?.kodikos,
+        apo: payload?.apo,
+        eos: payload?.eos,
+        scope: payload?.scope
+    });
+
+    if (!key.isValid) {
+        const error = new Error(`Invalid work facts snapshot key: ${key.warnings.join(' ')}`);
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const query = snapshotQueryFromKey(key);
+    const existing = await ApasxolhseisPeriodFactsModel.findOne(query).lean();
+
+    if (existing?.locked === true && force !== true) {
+        return normalizeSnapshotForReturn(existing, {
+            saveStatus: 'LOCKED_SKIPPED',
+            warnings: [
+                ...new Set([
+                    ...(Array.isArray(existing.warnings) ? existing.warnings : []),
+                    'LOCKED_SNAPSHOT_SKIPPED: Το snapshot είναι locked και δεν έγινε overwrite.'
+                ])
+            ]
+        });
+    }
+
+    const snapshotDocument = buildSnapshotDocument(payload, key);
+
+    if (force === true && existing?.locked === true) {
+        snapshotDocument.locked = false;
+        snapshotDocument.lockedAt = undefined;
+        snapshotDocument.lockedBy = '';
+        snapshotDocument.lockReason = '';
+    }
+
+    const saved = await ApasxolhseisPeriodFactsModel.findOneAndUpdate(
+        query,
+        {
+            $set: snapshotDocument,
+            $setOnInsert: {
+                locked: false
+            }
+        },
+        {
+            upsert: true,
+            returnDocument: 'after',
+            runValidators: true,
+            setDefaultsOnInsert: true
+        }
+    ).lean();
+
+    return normalizeSnapshotForReturn(saved, {
+        saveStatus: existing ? 'UPDATED' : 'CREATED'
+    });
+}
+
+async function generateAndSaveWorkFactsForEmployeePeriod({
+    team,
+    company_kod,
+    kodikos,
+    apo,
+    eos,
+    scope = 'MANUAL',
+    requestedBy = '',
+    force = false
+}) {
+    const normalizedScope = normalizeScopeValue(scope);
+    const key = normalizeSnapshotKey({
+        team,
+        company_kod,
+        kodikos,
+        apo,
+        eos,
+        scope: normalizedScope
+    });
+
+    if (key.isValid) {
+        const existing = await ApasxolhseisPeriodFactsModel.findOne(snapshotQueryFromKey(key)).lean();
+
+        if (existing?.locked === true && force !== true) {
+            return normalizeSnapshotForReturn(existing, {
+                saveStatus: 'LOCKED_SKIPPED',
+                warnings: [
+                    ...new Set([
+                        ...(Array.isArray(existing.warnings) ? existing.warnings : []),
+                        'LOCKED_SNAPSHOT_SKIPPED: Το snapshot είναι locked και δεν έγινε overwrite.'
+                    ])
+                ]
+            });
+        }
+    }
+
+    const payload = await generateWorkFactsForEmployeePeriod({
+        team,
+        company_kod,
+        kodikos,
+        apo,
+        eos,
+        scope: normalizedScope,
+        requestedBy
+    });
+
+    return saveWorkFactsSnapshot(
+        {
+            ...payload,
+            generatedBy: requestedBy,
+            sourceVersion: SOURCE_VERSION
+        },
+        { force }
+    );
+}
+
 module.exports = {
-    generateWorkFactsForEmployeePeriod
+    generateWorkFactsForEmployeePeriod,
+    generateAndSaveWorkFactsForEmployeePeriod,
+    findWorkFactsSnapshot,
+    saveWorkFactsSnapshot
 };
