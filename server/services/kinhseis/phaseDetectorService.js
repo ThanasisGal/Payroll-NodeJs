@@ -60,6 +60,17 @@ function buildPeriodRange(year, period) {
     return { periodStart, periodEnd };
 }
 
+function buildExplicitPeriodRange(periodApo, periodEos) {
+    const periodStart = parseDateOnlyUTC(periodApo);
+    const periodEnd = parseDateOnlyUTC(periodEos);
+
+    if (!periodStart || !periodEnd || periodStart > periodEnd) {
+        return { periodStart: null, periodEnd: null };
+    }
+
+    return { periodStart, periodEnd };
+}
+
 function maxDate(a, b) {
     if (!a) return b;
     if (!b) return a;
@@ -546,6 +557,31 @@ function buildExpectedWorkInfo(row, kartaErgasias, warnings = []) {
     };
 }
 
+function buildDailyFactHours(orario = null) {
+    return {
+        absenceHours: toNumberOrZero(orario?.ores_apoysias_apologistika),
+        nightHours: toNumberOrZero(orario?.ores_nyxtas_apologistika),
+        holidayHours: toNumberOrZero(orario?.ores_argion_prosayxhsh_apologistika),
+        yperergasiaHours:
+            toNumberOrZero(orario?.ores_yperergasias_apologistika) +
+            toNumberOrZero(orario?.ores_yperergasias_nyxtas_apologistika) +
+            toNumberOrZero(orario?.ores_yperergasias_argion_apologistika) +
+            toNumberOrZero(orario?.ores_yperergasias_argion_nyxtas_apologistika),
+        nomimiYperoriaHours:
+            toNumberOrZero(orario?.ores_nominhs_yperorias_apologistika) +
+            toNumberOrZero(orario?.ores_nominhs_yperorias_nyxtas_apologistika) +
+            toNumberOrZero(orario?.ores_nominhs_yperorias_argion_apologistika) +
+            toNumberOrZero(orario?.ores_nominhs_yperorias_argion_nyxtas_apologistika),
+        paranomiYperoriaHours:
+            toNumberOrZero(orario?.ores_paranomhs_yperorias_apologistika) +
+            toNumberOrZero(orario?.ores_paranomhs_yperorias_nyxtas_apologistika) +
+            toNumberOrZero(orario?.ores_paranomhs_yperorias_argion_apologistika) +
+            toNumberOrZero(orario?.ores_paranomhs_yperorias_argion_nyxtas_apologistika),
+        sixthDayHours: 0,
+        prosthetiErgasiaHours: toNumberOrZero(orario?.ores_prostheths_ergasias_apologistika)
+    };
+}
+
 function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, kartaErgasias, warnings }) {
     const rows = [];
 
@@ -557,6 +593,7 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
         const fullDailyHours = buildFullDailyHours({ ...terms, hmeromhnia: date }, dayWarnings);
         const expectedWorkInfo = buildExpectedWorkInfo(orario, kartaErgasias, dayWarnings);
         const classification = classifyDay(expectedWorkInfo.classificationHours, fullDailyHours);
+        const dailyFactHours = buildDailyFactHours(orario);
 
         if (!orario) {
             dayWarnings.push(
@@ -594,6 +631,14 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
             repo: expectedWorkInfo.repo,
             repo_apologistika: expectedWorkInfo.repo_apologistika,
             isRepoDay: expectedWorkInfo.isRepoDay,
+            absenceHours: dailyFactHours.absenceHours,
+            nightHours: dailyFactHours.nightHours,
+            holidayHours: dailyFactHours.holidayHours,
+            yperergasiaHours: dailyFactHours.yperergasiaHours,
+            nomimiYperoriaHours: dailyFactHours.nomimiYperoriaHours,
+            paranomiYperoriaHours: dailyFactHours.paranomiYperoriaHours,
+            sixthDayHours: dailyFactHours.sixthDayHours,
+            prosthetiErgasiaHours: dailyFactHours.prosthetiErgasiaHours,
             relevantHours: expectedWorkInfo.relevantHours,
             termsSource: terms.source || '',
             kathestos_apasxolhshs: terms.typos_apasxolhshs || '',
@@ -775,6 +820,14 @@ function buildPhaseFromDays(days, index, employee, kartaErgasias) {
             repo: day.repo,
             repo_apologistika: day.repo_apologistika,
             isRepoDay: day.isRepoDay,
+            absenceHours: day.absenceHours,
+            nightHours: day.nightHours,
+            holidayHours: day.holidayHours,
+            yperergasiaHours: day.yperergasiaHours,
+            nomimiYperoriaHours: day.nomimiYperoriaHours,
+            paranomiYperoriaHours: day.paranomiYperoriaHours,
+            sixthDayHours: day.sixthDayHours,
+            prosthetiErgasiaHours: day.prosthetiErgasiaHours,
             termsSource: day.termsSource,
             kathestos_apasxolhshs: day.kathestos_apasxolhshs,
             typos_ebdomadas: day.typos_ebdomadas,
@@ -887,13 +940,22 @@ async function detectPayrollPhases({
     kodikos,
     ypokatasthma = '',
     year,
-    period
+    period,
+    periodApoOverride,
+    periodEosOverride
 }) {
     const warnings = [];
-    const { periodStart, periodEnd } = buildPeriodRange(year, period);
+    const hasExplicitPeriodRange = Boolean(periodApoOverride || periodEosOverride);
+    const { periodStart, periodEnd } = hasExplicitPeriodRange
+        ? buildExplicitPeriodRange(periodApoOverride, periodEosOverride)
+        : buildPeriodRange(year, period);
 
     if (!periodStart || !periodEnd) {
-        const error = new Error('Λείπει ή δεν είναι έγκυρη η μισθολογική περίοδος.');
+        const error = new Error(
+            hasExplicitPeriodRange
+                ? 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                : 'Λείπει ή δεν είναι έγκυρη η μισθολογική περίοδος.'
+        );
         error.statusCode = 400;
         throw error;
     }
@@ -1043,7 +1105,26 @@ async function detectPayrollPhases({
     };
 }
 
+async function detectPayrollPhasesForDateRange({
+    team,
+    company_kod,
+    kodikos,
+    ypokatasthma = '',
+    apo,
+    eos
+}) {
+    return detectPayrollPhases({
+        team,
+        company_kod,
+        kodikos,
+        ypokatasthma,
+        periodApoOverride: apo,
+        periodEosOverride: eos
+    });
+}
+
 module.exports = {
     detectPayrollPhases,
+    detectPayrollPhasesForDateRange,
     buildPeriodRange
 };
