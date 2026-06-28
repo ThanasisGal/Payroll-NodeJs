@@ -650,6 +650,85 @@ PayrollPrecalcJobSchema.index(
 
 const PayrollPrecalcJobModel = model('PayrollPrecalcJob', PayrollPrecalcJobSchema);
 
+const PayrollPrecalcSettingsSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: '' },
+
+        precalcEnabled: { type: Boolean, default: false },
+        monthlyRunDay: { type: Number, min: 1, max: 28, default: 2 },
+        monthlyRunTime: {
+            type: String,
+            trim: true,
+            default: '02:30',
+            match: /^([01]\d|2[0-3]):[0-5]\d$/
+        },
+        timezone: { type: String, trim: true, default: 'Europe/Athens' },
+
+        periodMode: {
+            type: String,
+            enum: ['PREVIOUS_MONTH'],
+            default: 'PREVIOUS_MONTH'
+        },
+        scope: {
+            type: String,
+            enum: ['MONTHLY'],
+            default: 'MONTHLY'
+        },
+
+        lastRunAt: { type: Date },
+        nextRunAt: { type: Date },
+
+        updatedBy: { type: String, trim: true },
+        notes: { type: String, trim: true },
+
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' }
+    },
+    {
+        collection: 'Payroll_Precalc_Settings',
+        timestamps: true
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        ypokatasthma: 1
+    },
+    {
+        unique: true,
+        name: 'uniq_payroll_precalc_settings_company_branch'
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        precalcEnabled: 1,
+        nextRunAt: 1
+    },
+    {
+        name: 'idx_payroll_precalc_settings_enabled_next_run'
+    }
+);
+
+PayrollPrecalcSettingsSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        precalcEnabled: 1
+    },
+    {
+        name: 'idx_payroll_precalc_settings_company_enabled'
+    }
+);
+
+const PayrollPrecalcSettingsModel = model(
+    'PayrollPrecalcSettings',
+    PayrollPrecalcSettingsSchema
+);
+
 const AstheneiesSchema = new Schema({
     team: { type: String, trim: true },
     company_kod: { type: String, trim: true },
@@ -754,6 +833,7 @@ module.exports = {
     ApasxolhseisModel,
     ApasxolhseisPeriodFactsModel,
     PayrollPrecalcJobModel,
+    PayrollPrecalcSettingsModel,
     AstheneiesModel,
     AdeiesModel
 };
