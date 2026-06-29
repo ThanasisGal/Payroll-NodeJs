@@ -100,6 +100,7 @@ const {
     logoutErgani,
     cancelSubmittedDocument
 } = require('../../utils/erganh/erganiRestClient');
+const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -2865,7 +2866,110 @@ function reviewEffectiveKathgoria(row = {}) {
     return apologistiki || String(row.kathgoria_ergasias || '').trim();
 }
 
+function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phaseCode = '') {
+    const declaredKathgoria = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const apologistikiKathgoria = String(row.kathgoria_ergasias_apologistika || '').trim();
+    const reviewPhaseCode = String(phaseCode || '').trim();
+    const isNonFullPhase =
+        reviewPhaseCode === '1' ||
+        reviewPhaseCode === '2' ||
+        (!reviewPhaseCode && !isFullTimeWorkTerms(effectiveProfile));
+
+    if (
+        isNonFullPhase &&
+        declaredKathgoria === 'ΕΡΓ' &&
+        apologistikiKathgoria === 'ΑΝ'
+    ) {
+        return {
+            ...row,
+            kathgoria_ergasias_apologistika: 'ΜΕ',
+            review_phase_code: reviewPhaseCode,
+            review_kathestos_code: reviewPhaseCode
+        };
+    }
+
+    return {
+        ...row,
+        review_phase_code: reviewPhaseCode,
+        review_kathestos_code: reviewPhaseCode
+    };
+}
+
+function findReviewOperationalPhaseForDate(phases = [], dateKey = '') {
+    if (!dateKey) return null;
+
+    return (
+        phases.find((phase) => {
+            const apoKey = String(phase?.apo || '').slice(0, 10);
+            const eosKey = String(phase?.eos || '').slice(0, 10);
+            return apoKey && eosKey && dateKey >= apoKey && dateKey <= eosKey;
+        }) || null
+    );
+}
+
+async function buildReviewPhaseContextByKodikos({
+    team,
+    company_kod,
+    kodikoi = [],
+    ypokatasthma = '',
+    periodStart,
+    periodEnd
+}) {
+    const phaseContextByKodikos = new Map();
+
+    if (!team || !company_kod || !periodStart || !periodEnd || kodikoi.length === 0) {
+        return phaseContextByKodikos;
+    }
+
+    const apo = dateKeyUtc(periodStart);
+    const eos = dateKeyUtc(periodEnd);
+
+    await Promise.all(
+        kodikoi.map(async (kodikos) => {
+            const key = String(kodikos || '').trim();
+            if (!key) return;
+
+            try {
+                const phaseContext = await phaseDetectorService.detectPayrollPhasesForDateRange({
+                    team,
+                    company_kod,
+                    kodikos: key,
+                    ypokatasthma,
+                    apo,
+                    eos
+                });
+                phaseContextByKodikos.set(key, phaseContext);
+            } catch (error) {
+                console.error(
+                    '[buildReviewPhaseContextByKodikos] phase detection failed:',
+                    key,
+                    error.message
+                );
+            }
+        })
+    );
+
+    return phaseContextByKodikos;
+}
+
+function getReviewPhaseCodeForRow(row = {}, phaseContextByKodikos = new Map()) {
+    const key = String(row.kodikos || '').trim();
+    const phaseContext = phaseContextByKodikos.get(key);
+    const phases = Array.isArray(phaseContext?.operationalPhases)
+        ? phaseContext.operationalPhases
+        : [];
+    const phase = findReviewOperationalPhaseForDate(phases, dateKeyUtc(row.hmeromhnia));
+
+    return String(phase?.detectedKathestosCode || '').trim();
+}
+
 function reviewIsFullTimeProfile(row = {}) {
+    const reviewPhaseCode = String(row.review_phase_code ?? row.review_kathestos_code ?? '').trim();
+    if (reviewPhaseCode === '0') return true;
+    if (reviewPhaseCode === '1' || reviewPhaseCode === '2') return false;
+
     return (
         row.effective_is_full_time === true ||
         row.effective_is_full_time === 'true' ||
@@ -2895,12 +2999,23 @@ function reviewProgramDisplay(row = {}) {
 function reviewApologistikoDisplay(row = {}) {
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
     const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
+    const isFullTimeProfile = reviewIsFullTimeProfile(row);
 
-    if (row.apologistiko_biblio === true && effectiveKathgoria === 'ΑΝ' && hasNoCards) {
+    if (
+        row.apologistiko_biblio === true &&
+        effectiveKathgoria === 'ΑΝ' &&
+        hasNoCards &&
+        isFullTimeProfile
+    ) {
         return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'repo' };
     }
 
-    if (row.apologistiko_biblio === true && effectiveKathgoria === 'ΜΕ' && hasNoCards) {
+    if (
+        row.apologistiko_biblio === true &&
+        (effectiveKathgoria === 'ΜΕ' ||
+            (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
+        hasNoCards
+    ) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
@@ -3301,6 +3416,15 @@ async function getReviewRowsForExport(req) {
         .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
         .lean();
 
+    const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
+        team: req.session.userTeam,
+        company_kod: req.session.companyInUse,
+        kodikoi,
+        ypokatasthma: String(req.query.ypokatasthma || '').trim(),
+        periodStart,
+        periodEnd
+    });
+
     const enrichedRows = rows.map((row) => {
         const erg = ergByKodikos.get(row.kodikos) || {};
         const istorikoRowsForEmployee =
@@ -3310,23 +3434,37 @@ async function getReviewRowsForExport(req) {
             istorikoRowsForEmployee,
             erg || {}
         );
-        const effectiveKathgoria = getEffectiveKathgoriaErgasias(row);
+        const reviewPhaseCode = getReviewPhaseCodeForRow(row, phaseContextByKodikos);
+        const normalizedRow = normalizeReviewNonFullNonWorkRow(
+            row,
+            effectiveProfile,
+            reviewPhaseCode
+        );
+        const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
 
         return {
-            ...row,
-            kathgoria_ergasias_original: row.kathgoria_ergasias || '',
+            ...normalizedRow,
+            kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
             kathgoria_ergasias: effectiveKathgoria,
             kathgoria_ergasias_effective: effectiveKathgoria,
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
-            exportYpokatasthma: row.ypokatasthma || erg.ypokatasthma || '',
+            exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
             effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-            effective_is_full_time: isFullTimeWorkTerms(effectiveProfile),
+            effective_is_full_time:
+                reviewPhaseCode === '0'
+                    ? true
+                    : reviewPhaseCode === '1' || reviewPhaseCode === '2'
+                      ? false
+                      : isFullTimeWorkTerms(effectiveProfile),
             effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
             effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
             effective_profile_source: effectiveProfile.source || '',
-            effective_profile_date: getProfileDateForDeviation(effectiveProfile, row.hmeromhnia),
+            effective_profile_date: getProfileDateForDeviation(
+                effectiveProfile,
+                normalizedRow.hmeromhnia
+            ),
             effective_profile_istoriko_id: effectiveProfile.istorikoId || null
         };
     });
@@ -4437,9 +4575,17 @@ class erganhController {
                 .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
                 .lean();
 
+            const phaseContextByKodikos = await buildReviewPhaseContextByKodikos({
+                team: sessionTeam,
+                company_kod: companyId,
+                kodikoi: kodikoiRows,
+                ypokatasthma: String(ypokatasthma || '').trim(),
+                periodStart: reviewPeriodStart,
+                periodEnd: reviewPeriodEnd
+            });
+
             const enrichedRows = rows.map((r) => {
                 const erg = ergByKodikos.get(r.kodikos);
-                const effectiveKathgoria = getEffectiveKathgoriaErgasias(r);
                 const istorikoRowsForEmployee =
                     istorikoRowsByKodikos.get(String(r.kodikos || '').trim()) || [];
                 const effectiveProfile = getOrarioTermsForDate(
@@ -4447,10 +4593,17 @@ class erganhController {
                     istorikoRowsForEmployee,
                     erg || {}
                 );
+                const reviewPhaseCode = getReviewPhaseCodeForRow(r, phaseContextByKodikos);
+                const normalizedRow = normalizeReviewNonFullNonWorkRow(
+                    r,
+                    effectiveProfile,
+                    reviewPhaseCode
+                );
+                const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
 
                 return {
-                    ...r,
-                    kathgoria_ergasias_original: r.kathgoria_ergasias || '',
+                    ...normalizedRow,
+                    kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
                     kathgoria_ergasias: effectiveKathgoria,
                     kathgoria_ergasias_effective: effectiveKathgoria,
                     eponymo: erg?.eponymo || '',
@@ -4461,13 +4614,18 @@ class erganhController {
                     // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
                     // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
                     effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-                    effective_is_full_time: isFullTimeWorkTerms(effectiveProfile),
+                    effective_is_full_time:
+                        reviewPhaseCode === '0'
+                            ? true
+                            : reviewPhaseCode === '1' || reviewPhaseCode === '2'
+                              ? false
+                              : isFullTimeWorkTerms(effectiveProfile),
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
                     effective_profile_source: effectiveProfile.source || '',
                     effective_profile_date: getProfileDateForDeviation(
                         effectiveProfile,
-                        r.hmeromhnia
+                        normalizedRow.hmeromhnia
                     ),
                     effective_profile_istoriko_id: effectiveProfile.istorikoId || null
                 };
