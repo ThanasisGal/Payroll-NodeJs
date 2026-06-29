@@ -282,6 +282,13 @@ function resetApasxolhseisPipelineLoader() {
     const MIN_VISIBLE_MS = 420;
     const STYLE_ID = 'apasxolhseisCompactLoaderStyles';
     const LOADER_ID = 'apasxolhseisCompactLoader';
+    const LEGACY_LOADER_SELECTORS = [
+        '#appLoader',
+        '.app-loader',
+        '.app-loader--simple',
+        '.loader-container',
+        '.content-dim-overlay'
+    ];
 
     let depth = 0;
     let showTimer = null;
@@ -306,7 +313,7 @@ function resetApasxolhseisPipelineLoader() {
     position: fixed;
     top: 50%;
     left: 50%;
-    z-index: 1040;
+    z-index: 100000000;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -328,8 +335,16 @@ function resetApasxolhseisPipelineLoader() {
     opacity: 1;
     transform: translate(-50%, -50%);
 }
-body.apasxolhseis-compact-loader-active .loader-container {
+body.apasxolhseis-compact-loader-active #appLoader,
+body.apasxolhseis-compact-loader-active .app-loader,
+body.apasxolhseis-compact-loader-active .app-loader--simple,
+body.apasxolhseis-compact-loader-active .loader-container,
+body.apasxolhseis-compact-loader-active .content-dim-overlay,
+.apasxolhseis-legacy-loader-suppressed {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 .apasxolhseis-compact-loader__spinner {
     width: 14px;
@@ -401,6 +416,12 @@ body.apasxolhseis-compact-loader-active .loader-container {
 
     function setBodyActive(active) {
         document.body?.classList.toggle('apasxolhseis-compact-loader-active', !!active);
+        LEGACY_LOADER_SELECTORS.forEach((selector) => {
+            document.querySelectorAll(selector).forEach((element) => {
+                if (element.closest(`#${LOADER_ID}`)) return;
+                element.classList.toggle('apasxolhseis-legacy-loader-suppressed', !!active);
+            });
+        });
     }
 
     function clearTimers() {
