@@ -1058,6 +1058,196 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function getSnapshotPhaseSummaryForOperationalPhase(phaseSummary, operationalPhase) {
+        if (!Array.isArray(phaseSummary) || !phaseSummary.length || !operationalPhase) {
+            return null;
+        }
+
+        const operationalPhaseNo = Number.parseInt(operationalPhase?.phaseNo, 10);
+        const phaseKey = String(operationalPhase?.phaseKey || '').trim();
+
+        return phaseSummary.find((summary) => {
+            const summaryOperationalPhaseNo = Number.parseInt(
+                summary?.operationalPhaseNo,
+                10
+            );
+
+            if (
+                Number.isInteger(operationalPhaseNo) &&
+                Number.isInteger(summaryOperationalPhaseNo) &&
+                operationalPhaseNo === summaryOperationalPhaseNo
+            ) {
+                return true;
+            }
+
+            return phaseKey && String(summary?.phaseKey || '').trim() === phaseKey;
+        }) || null;
+    }
+
+    function buildOperationalPayrollPhaseContextFromSnapshot(snapshotResponse) {
+        const snapshot = snapshotResponse?.snapshot;
+        const capabilities = snapshotResponse?.capabilities || {};
+        const hasUsableWorkFacts =
+            capabilities.hasDailyFacts === true || capabilities.hasPhaseSummary === true;
+
+        if (
+            snapshotResponse?.success !== true ||
+            snapshotResponse?.usable !== true ||
+            snapshotResponse?.source !== 'snapshot' ||
+            snapshotResponse?.status !== 'READY' ||
+            !snapshot ||
+            !hasUsableWorkFacts
+        ) {
+            return null;
+        }
+
+        const operationalPhases = Array.isArray(snapshot.operationalPhases)
+            ? snapshot.operationalPhases
+            : [];
+        if (!operationalPhases.length) return null;
+
+        const phaseSummary = Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [];
+        const enrichedOperationalPhases = operationalPhases.map((phase) => {
+            const summary = getSnapshotPhaseSummaryForOperationalPhase(phaseSummary, phase);
+            if (!summary || phase?.absenceHours !== undefined) return phase;
+
+            return {
+                ...phase,
+                absenceHours: summary.absenceHours
+            };
+        });
+        const operationalPhasesCount = enrichedOperationalPhases.length;
+        const hasOperationalSplit = operationalPhasesCount > 1;
+        const operationalPhase =
+            operationalPhasesCount === 1 ? enrichedOperationalPhases[0] || null : null;
+        const operationalPhaseCode = operationalPhase
+            ? String(operationalPhase.detectedKathestosCode || '').trim()
+            : '';
+        const hasUsableSingleOperationalPhase =
+            operationalPhasesCount === 1 && ['0', '1', '2'].includes(operationalPhaseCode);
+
+        return {
+            hasUsableSingleOperationalPhase,
+            operationalPhaseCode,
+            operationalPhase,
+            operationalPhases: enrichedOperationalPhases,
+            operationalPhasesCount,
+            hasOperationalSplit,
+            phases: Array.isArray(snapshot.phases) ? snapshot.phases : [],
+            phaseSummary,
+            dailyFacts: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts : [],
+            totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
+            warnings: Array.isArray(snapshot.warnings) ? snapshot.warnings : [],
+            source: 'snapshot',
+            sourceReason: '',
+            snapshotId: snapshot.id || '',
+            snapshotGeneratedAt: snapshot.generatedAt || null,
+            snapshotStatus: snapshotResponse.status,
+            snapshotSourceVersion: snapshot.sourceVersion || '',
+            snapshotInputFingerprint: snapshot.inputFingerprint || ''
+        };
+    }
+
+    async function fetchWorkFactsSnapshotContext({
+        employeeKod,
+        startDateISOString,
+        endDateISOString,
+        ypokatasthma
+    } = {}) {
+        const normalizedEmployeeKod = String(employeeKod || '').trim();
+        if (!normalizedEmployeeKod || !startDateISOString || !endDateISOString) {
+            return {
+                ok: false,
+                source: 'none',
+                reason: 'missing_required_params',
+                context: null
+            };
+        }
+
+        const params = new URLSearchParams({
+            kodikos: normalizedEmployeeKod,
+            apo: startDateISOString,
+            eos: endDateISOString
+        });
+        const normalizedYpokatasthma = normalizeYpokatasthmaValue(ypokatasthma);
+        if (normalizedYpokatasthma) {
+            params.set('ypokatasthma', normalizedYpokatasthma);
+        }
+
+        try {
+            const response = await fetch(`/api/kinhseis/workFactsSnapshot?${params.toString()}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                return {
+                    ok: false,
+                    source: 'error',
+                    reason: `http_${response.status}`,
+                    context: null
+                };
+            }
+
+            const payload = await response.json();
+            const context = buildOperationalPayrollPhaseContextFromSnapshot(payload);
+
+            if (context) {
+                return {
+                    ok: true,
+                    source: 'snapshot',
+                    reason: '',
+                    context
+                };
+            }
+
+            return {
+                ok: false,
+                source: payload?.source || 'none',
+                reason: payload?.reason || 'not_usable',
+                context: null
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                source: 'error',
+                reason: 'fetch_error',
+                context: null
+            };
+        }
+    }
+
+    async function fetchOperationalPayrollPhaseContextWithSnapshotFallback({
+        employeeKod,
+        startDateISOString,
+        endDateISOString,
+        ypokatasthma
+    }) {
+        const snapshotResult = await fetchWorkFactsSnapshotContext({
+            employeeKod,
+            startDateISOString,
+            endDateISOString,
+            ypokatasthma
+        });
+
+        if (snapshotResult.ok && snapshotResult.context) {
+            return snapshotResult.context;
+        }
+
+        const liveContext = await fetchOperationalPayrollPhaseContext(employeeKod, ypokatasthma);
+
+        return liveContext
+            ? {
+                ...liveContext,
+                source: 'live',
+                sourceReason: snapshotResult.reason || 'snapshot_unavailable'
+            }
+            : null;
+    }
+
     async function fetchEmployeeDetails(kodikos) {
         const normalizedKodikos = String(kodikos || '').trim();
 
@@ -2060,10 +2250,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         ? result.total_ores_ergasias_apologistika
                         : result.total_ores_ergasias_prodhlomenes;
                     const operationalPhaseContext =
-                        await fetchOperationalPayrollPhaseContext(
-                            document.getElementById('kodikosHidden').value,
-                            getApasxolhseisYpokatasthmaForQuery()
-                        );
+                        await fetchOperationalPayrollPhaseContextWithSnapshotFallback({
+                            employeeKod: document.getElementById('kodikosHidden').value,
+                            startDateISOString,
+                            endDateISOString,
+                            ypokatasthma: getApasxolhseisYpokatasthmaForQuery()
+                        });
                     if (!isCurrentFlow()) return;
                     setOperationalPayrollPhaseContext(operationalPhaseContext);
 
