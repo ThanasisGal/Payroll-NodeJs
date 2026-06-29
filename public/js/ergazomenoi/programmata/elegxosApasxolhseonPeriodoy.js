@@ -766,22 +766,28 @@ async function loadResults() {
             const effectiveTyposApasxolhshs = String(
                 row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? ''
             ).trim();
+            const reviewPhaseCode = String(
+                row.review_phase_code ?? row.review_kathestos_code ?? ''
+            ).trim();
 
-            const isFullTimeProfile =
-                row.effective_is_full_time === true ||
-                row.effective_is_full_time === 'true' ||
-                row.effective_is_full_time === 1 ||
-                row.effective_is_full_time === '1' ||
-                effectiveTyposApasxolhshs === '0';
+            const isFullTimeProfile = reviewPhaseCode
+                ? reviewPhaseCode === '0'
+                : row.effective_is_full_time === true ||
+                  row.effective_is_full_time === 'true' ||
+                  row.effective_is_full_time === 1 ||
+                  row.effective_is_full_time === '1' ||
+                  effectiveTyposApasxolhshs === '0';
 
             const isApologistikoRepoRow =
                 row.apologistiko_biblio === true &&
                 effectiveKathgoria === 'ΑΝ' &&
-                num(row.cards_ores_ergasias) === 0;
+                num(row.cards_ores_ergasias) === 0 &&
+                isFullTimeProfile;
 
             const isApologistikoNonWorkRow =
                 row.apologistiko_biblio === true &&
-                effectiveKathgoria === 'ΜΕ' &&
+                (effectiveKathgoria === 'ΜΕ' ||
+                    (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
                 num(row.cards_ores_ergasias) === 0;
 
             const apologistikoDisplayText = isApologistikoRepoRow
