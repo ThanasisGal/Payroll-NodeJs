@@ -352,6 +352,416 @@ document.addEventListener('DOMContentLoaded', function () {
         return operationalPayrollPhaseCode === '1' || operationalPayrollPhaseCode === '2';
     }
 
+    function shouldSubtractAbsenceValueFromGross(params) {
+        return params?.etaireia?.apoysies_meionoyn_apodoxes === true;
+    }
+
+    function getSingleFullOperationalPhase(params) {
+        const context =
+            params?.operationalPayrollPhaseContext ||
+            window.apasxolhseisOperationalPayrollPhaseContext;
+        if (!context || context.hasUsableSingleOperationalPhase !== true) return null;
+        if (context.hasOperationalSplit === true || context.operationalPhasesCount !== 1) {
+            return null;
+        }
+
+        const phase = context.operationalPhase || null;
+        const phaseCode = String(
+            context.operationalPhaseCode || phase?.detectedKathestosCode || ''
+        ).trim();
+
+        return phaseCode === '0' ? phase : null;
+    }
+
+    function isPureFullSalariedEmployee(params) {
+        return (
+            params?.ergazomenoi?.xarakthrismos_ergazomenon === true &&
+            params?.ergazomenoi?.typos_ergazomenon === 'Μ' &&
+            params?.ergazomenoi?.kathestos_apasxolhshs === '0' &&
+            getSingleFullOperationalPhase(params) !== null
+        );
+    }
+
+    function getOperationalPhases(params) {
+        const context =
+            params?.operationalPayrollPhaseContext ||
+            window.apasxolhseisOperationalPayrollPhaseContext;
+        return Array.isArray(context?.operationalPhases) ? context.operationalPhases : [];
+    }
+
+    function isMixedFullRotationalSalariedEmployee(params) {
+        const context =
+            params?.operationalPayrollPhaseContext ||
+            window.apasxolhseisOperationalPayrollPhaseContext;
+        const phases = getOperationalPhases(params);
+        const phaseCodes = phases.map((phase) =>
+            String(phase?.detectedKathestosCode || '').trim()
+        );
+
+        return (
+            params?.ergazomenoi?.xarakthrismos_ergazomenon === true &&
+            params?.ergazomenoi?.typos_ergazomenon === 'Μ' &&
+            params?.ergazomenoi?.kathestos_apasxolhshs === '0' &&
+            context?.hasOperationalSplit === true &&
+            phases.length > 1 &&
+            phaseCodes.includes('0') &&
+            phaseCodes.some((code) => code === '1' || code === '2') &&
+            phaseCodes.every((code) => code === '0' || code === '1' || code === '2')
+        );
+    }
+
+    function hasMixedFullNonFullOperationalSplit(params) {
+        const context =
+            params?.operationalPayrollPhaseContext ||
+            window.apasxolhseisOperationalPayrollPhaseContext;
+        const phases = getOperationalPhases(params);
+        const phaseCodes = phases.map((phase) =>
+            String(phase?.detectedKathestosCode || '').trim()
+        );
+
+        return (
+            context?.hasOperationalSplit === true &&
+            phases.length > 1 &&
+            phaseCodes.includes('0') &&
+            phaseCodes.some((code) => code === '1' || code === '2') &&
+            phaseCodes.every((code) => code === '0' || code === '1' || code === '2')
+        );
+    }
+
+    function toDateKey(value) {
+        if (!value) return '';
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+    }
+
+    function buildPayrollPeriodDateRange(params) {
+        const year = parseInt(String(params?._XRHSH || '').trim(), 10);
+        const month = parseInt(String(document.getElementById('periodos')?.value || '').trim(), 10);
+
+        if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+            return null;
+        }
+
+        return {
+            apo: `${year}-${String(month).padStart(2, '0')}-01`,
+            eos: `${year}-${String(month).padStart(2, '0')}-${String(
+                new Date(year, month, 0).getDate()
+            ).padStart(2, '0')}`
+        };
+    }
+
+    const premiumReviewRowsCache = new Map();
+    const premiumReviewRowsInFlight = new Map();
+
+    async function fetchPremiumReviewRowsForCurrentEmployee(params) {
+        const periodRange = buildPayrollPeriodDateRange(params);
+        const employeeKod = String(document.getElementById('kodikosHidden')?.value || '').trim();
+        if (!periodRange || !employeeKod) return [];
+
+        const queryParams = new URLSearchParams({
+            apo_hmeromhnia: periodRange.apo,
+            eos_hmeromhnia: periodRange.eos,
+            kodikos: employeeKod,
+            only_apologistiko: false,
+            only_nyxta: false,
+            only_argia: false,
+            only_yperergasia: false,
+            page: 1,
+            limit: 10000
+        });
+        const ypokatasthma = getCurrentEmployeeYpokatasthmaForNotWorkDays();
+        if (ypokatasthma) {
+            queryParams.set('ypokatasthma', ypokatasthma);
+        }
+
+        const cacheKey = queryParams.toString();
+        if (premiumReviewRowsCache.has(cacheKey)) {
+            return premiumReviewRowsCache.get(cacheKey);
+        }
+        if (premiumReviewRowsInFlight.has(cacheKey)) {
+            return premiumReviewRowsInFlight.get(cacheKey);
+        }
+
+        const request = (async () => {
+            const csrfToken = await getApasxolhseisCsrfToken();
+            const headers = { Accept: 'application/json' };
+            if (csrfToken) headers['CSRF-Token'] = csrfToken;
+
+            const response = await fetch(`/api/prodhlomena-oraria/review?${cacheKey}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers
+            });
+            if (!response.ok) return [];
+
+            const payload = await response.json().catch(() => ({}));
+            const rows = payload?.success === true && Array.isArray(payload.rows)
+                ? payload.rows
+                : [];
+            premiumReviewRowsCache.set(cacheKey, rows);
+            return rows;
+        })()
+            .catch(() => [])
+            .finally(() => {
+                premiumReviewRowsInFlight.delete(cacheKey);
+            });
+
+        premiumReviewRowsInFlight.set(cacheKey, request);
+        return request;
+    }
+
+    function findOperationalPhaseForDate(phases, dateKey) {
+        if (!dateKey) return null;
+
+        return phases.find((phase) => {
+            const apoKey = toDateKey(phase?.apo);
+            const eosKey = toDateKey(phase?.eos);
+            return apoKey && eosKey && dateKey >= apoKey && dateKey <= eosKey;
+        }) || null;
+    }
+
+    const premiumAsfalistikhExclusionFields = [
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaArgion',
+            hoursId: 'oresArgion',
+            rowField: 'ores_argion_prosayxhsh_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaNyxtas',
+            hoursId: 'oresNyxtas',
+            rowField: 'ores_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaYperergasias',
+            hoursId: 'oresYperergasias',
+            rowField: 'ores_yperergasias_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaYperergasiasNyxtas',
+            hoursId: 'oresYperergasiasNyxtas',
+            rowField: 'ores_yperergasias_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaYperergasiasArgion',
+            hoursId: 'oresYperergasiasArgion',
+            rowField: 'ores_yperergasias_argion_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaYperergasiasArgionNyxtas',
+            hoursId: 'oresYperergasiasArgionNyxtas',
+            rowField: 'ores_yperergasias_argion_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaNomimhsYperorias',
+            hoursId: 'oresNomimhsYperorias',
+            rowField: 'ores_nominhs_yperorias_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaNomimhsYperoriasArgion',
+            hoursId: 'oresNomimhsYperoriasArgion',
+            rowField: 'ores_nominhs_yperorias_argion_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaNomimhsYperoriasNyxtas',
+            hoursId: 'oresNomimhsYperoriasNyxtas',
+            rowField: 'ores_nominhs_yperorias_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaNomimhsYperoriasArgionNyxtas',
+            hoursId: 'oresNomimhsYperoriasArgionNyxtas',
+            rowField: 'ores_nominhs_yperorias_argion_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaParanomhsYperorias',
+            hoursId: 'oresParanomhsYperorias',
+            rowField: 'ores_paranomhs_yperorias_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaParanomhsYperoriasArgion',
+            hoursId: 'oresParanomhsYperoriasArgion',
+            rowField: 'ores_paranomhs_yperorias_argion_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaParanomhsYperoriasNyxtas',
+            hoursId: 'oresParanomhsYperoriasNyxtas',
+            rowField: 'ores_paranomhs_yperorias_nyxtas_apologistika'
+        },
+        {
+            asfalistikhAxiaId: 'asfalistikhAxiaParanomhsYperoriasArgionNyxtas',
+            hoursId: 'oresParanomhsYperoriasArgionNyxtas',
+            rowField: 'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+        }
+    ];
+
+    function getPhaseAwareInsuranceOriginalValue(element) {
+        const currentValue = safeNumber(element?.value);
+        const originalValue = safeNumber(element?.dataset?.phaseAwareInsuranceOriginal, NaN);
+        const correctedValue = safeNumber(element?.dataset?.phaseAwareInsuranceCorrected, NaN);
+
+        if (
+            Number.isFinite(originalValue) &&
+            Number.isFinite(correctedValue) &&
+            Math.abs(currentValue - correctedValue) < 0.005
+        ) {
+            return originalValue;
+        }
+
+        return currentValue;
+    }
+
+    function restorePhaseAwareInsurancePremiumValues() {
+        premiumAsfalistikhExclusionFields.forEach((field) => {
+            const element = document.getElementById(field.asfalistikhAxiaId);
+            if (!element) return;
+
+            const originalValue = safeNumber(element.dataset.phaseAwareInsuranceOriginal, NaN);
+            const correctedValue = safeNumber(element.dataset.phaseAwareInsuranceCorrected, NaN);
+            const currentValue = safeNumber(element.value);
+
+            if (
+                Number.isFinite(originalValue) &&
+                Number.isFinite(correctedValue) &&
+                Math.abs(currentValue - correctedValue) < 0.005
+            ) {
+                element.value = originalValue.toFixed(2);
+            }
+
+            delete element.dataset.phaseAwareInsuranceOriginal;
+            delete element.dataset.phaseAwareInsuranceCorrected;
+        });
+    }
+
+    async function applyPhaseAwareInsurancePremiumValues(params) {
+        if (!hasMixedFullNonFullOperationalSplit(params)) {
+            restorePhaseAwareInsurancePremiumValues();
+            window.apasxolhseisNonFullPhasePremiumAsfalistikhExclusion = 0;
+            return;
+        }
+
+        const phases = getOperationalPhases(params);
+        const rows = await fetchPremiumReviewRowsForCurrentEmployee(params);
+        if (!rows.length) {
+            restorePhaseAwareInsurancePremiumValues();
+            window.apasxolhseisNonFullPhasePremiumAsfalistikhExclusion = 0;
+            return;
+        }
+
+        const nonFullRows = rows.filter((row) => {
+            const phase = findOperationalPhaseForDate(phases, toDateKey(row?.hmeromhnia));
+            const phaseCode = String(phase?.detectedKathestosCode || '').trim();
+            return phaseCode === '1' || phaseCode === '2';
+        });
+        if (!nonFullRows.length) {
+            restorePhaseAwareInsurancePremiumValues();
+            window.apasxolhseisNonFullPhasePremiumAsfalistikhExclusion = 0;
+            return;
+        }
+
+        const totalExclusion = premiumAsfalistikhExclusionFields.reduce((sum, field) => {
+            const element = document.getElementById(field.asfalistikhAxiaId);
+            if (!element) return sum;
+
+            const totalHours = safeNumber(document.getElementById(field.hoursId)?.value);
+            const totalAsfalistikhAxia = getPhaseAwareInsuranceOriginalValue(element);
+
+            const nonFullHours = nonFullRows.reduce(
+                (hoursSum, row) => hoursSum + safeNumber(row?.[field.rowField]),
+                0
+            );
+            if (totalHours <= 0 || totalAsfalistikhAxia <= 0 || nonFullHours <= 0) {
+                element.value = totalAsfalistikhAxia.toFixed(2);
+                element.dataset.phaseAwareInsuranceOriginal = totalAsfalistikhAxia.toFixed(6);
+                element.dataset.phaseAwareInsuranceCorrected = totalAsfalistikhAxia.toFixed(6);
+                return sum;
+            }
+
+            const allocatedHours = Math.min(nonFullHours, totalHours);
+            const correctedValue = Math.max(
+                0,
+                totalAsfalistikhAxia * ((totalHours - allocatedHours) / totalHours)
+            );
+
+            element.value = correctedValue.toFixed(2);
+            element.dataset.phaseAwareInsuranceOriginal = totalAsfalistikhAxia.toFixed(6);
+            element.dataset.phaseAwareInsuranceCorrected = correctedValue.toFixed(6);
+
+            return sum + (totalAsfalistikhAxia - correctedValue);
+        }, 0);
+
+        window.apasxolhseisNonFullPhasePremiumAsfalistikhExclusion = totalExclusion;
+    }
+
+    function getPureFullSalariedPeriodBase(params, fallbackBase) {
+        if (!isPureFullSalariedEmployee(params)) return fallbackBase;
+
+        const fullMonthlySalary = safeNumber(
+            params?.ergazomenoi?.synolo_symbashs_basei_oron_ergasias,
+            fallbackBase
+        );
+        const maxDays = safeNumber(params?.genikesParametroi?.[5]?.timh, 25);
+        const hmeresErgasiasValue = safeNumber(document.getElementById('hmeresErgasias')?.value);
+
+        if (fullMonthlySalary <= 0 || maxDays <= 0 || hmeresErgasiasValue <= 0) {
+            return fallbackBase;
+        }
+
+        return Math.min(hmeresErgasiasValue, maxDays) >= maxDays
+            ? fullMonthlySalary
+            : (fullMonthlySalary / maxDays) * hmeresErgasiasValue;
+    }
+
+    function getSafeHourlyWageForOperationalWorkBase() {
+        const hourlyWage = safeNumber(pragmatikoOromisthio?.value);
+        return hourlyWage > 0 ? hourlyWage : null;
+    }
+
+    function getMixedFullRotationalPeriodBase(params, fallbackBase) {
+        if (!isMixedFullRotationalSalariedEmployee(params)) return fallbackBase;
+
+        const phases = getOperationalPhases(params);
+        const fullMonthlySalary = safeNumber(
+            params?.ergazomenoi?.synolo_symbashs_basei_oron_ergasias,
+            fallbackBase
+        );
+        const maxDays = safeNumber(params?.genikesParametroi?.[5]?.timh, 25);
+        const fullPhaseMultiplier = 1.2;
+        const safeHourlyWage = getSafeHourlyWageForOperationalWorkBase();
+
+        if (fullMonthlySalary <= 0 || maxDays <= 0 || safeHourlyWage === null) {
+            return fallbackBase;
+        }
+
+        let fullPhasePayrollDays = 0;
+        let rotationalWorkingHours = 0;
+
+        phases.forEach((phase) => {
+            const phaseCode = String(phase?.detectedKathestosCode || '').trim();
+
+            if (phaseCode === '0') {
+                const actualFullWorkDays = safeNumber(phase?.workedDays);
+                fullPhasePayrollDays += actualFullWorkDays * fullPhaseMultiplier;
+            } else if (phaseCode === '1' || phaseCode === '2') {
+                rotationalWorkingHours += safeNumber(phase?.totalHours);
+            }
+        });
+
+        const cappedFullPhasePayrollDays = Math.min(fullPhasePayrollDays, maxDays);
+        const fullPhasesBase = (fullMonthlySalary / maxDays) * cappedFullPhasePayrollDays;
+        const rotationalPhasesBase = rotationalWorkingHours * safeHourlyWage;
+        const mixedPeriodBase = fullPhasesBase + rotationalPhasesBase;
+
+        return Number.isFinite(mixedPeriodBase) && mixedPeriodBase > 0
+            ? mixedPeriodBase
+            : fallbackBase;
+    }
+
     function shouldSuppressInsuranceExemptionsForSingleOperationalNonFull(params) {
         const context =
             params?.operationalPayrollPhaseContext ||
@@ -726,6 +1136,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof synolo_asfalistikhs_axias === 'undefined') {
             synolo_asfalistikhs_axias = 0;
         }
+        await applyPhaseAwareInsurancePremiumValues(sharedParams);
         synolo_asfalistikhs_axias = parseFloat(
             parseFloat(document.getElementById('asfalistikhAxiaArgion').value) +
                 parseFloat(document.getElementById('asfalistikhAxiaNyxtas').value) +
@@ -1827,24 +2238,41 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('synoloApodoxon')?.value,
             safeNumber(document.getElementById('synoloMiktonApodoxon_Hidden')?.value)
         );
+        const usesMixedFullRotationalBase = isMixedFullRotationalSalariedEmployee(sharedParams);
+        const periodSynoloApodoxonBase = getPureFullSalariedPeriodBase(
+            sharedParams,
+            synoloApodoxonBase
+        );
+        const mixedPeriodSynoloApodoxonBase = getMixedFullRotationalPeriodBase(
+            sharedParams,
+            periodSynoloApodoxonBase
+        );
+        if (isPureFullSalariedEmployee(sharedParams)) {
+            const synoloApodoxonElement = document.getElementById('synoloApodoxon');
+            if (synoloApodoxonElement) {
+                synoloApodoxonElement.value = periodSynoloApodoxonBase.toFixed(2);
+            }
+        }
         const effectiveSynoloApodoxonBase = usesOperationalPayrollHours(sharedParams)
             ? 0
-            : synoloApodoxonBase;
+            : mixedPeriodSynoloApodoxonBase;
         const axiaOresErgasias = safeNumber(_APODOXES_ORON_ERGASIAS);
         const axiaOresApoysias =
             safeNumber(document.getElementById('oresApoysias')?.value) *
             safeNumber(pragmatikoOromisthio?.value);
+        const effectiveAxiaOresErgasias = usesMixedFullRotationalBase ? 0 : axiaOresErgasias;
+        const effectiveAxiaOresApoysias = shouldSubtractAbsenceValueFromGross(sharedParams)
+            ? axiaOresApoysias
+            : 0;
 
-        // Το synoloMiktonApodoxon_Hidden σε αρκετές ροές είναι ήδη μειωμένο
-        // κατά την αξία των απουσιών. Για να μη γίνεται διπλή αφαίρεση,
-        // το Σύνολο Μικτών ξεκινά από το εμφανιζόμενο Σύνολο Αποδοχών
-        // και αφαιρεί την αξία απουσιών μία φορά εδώ.
+        // Η αξία απουσιών αφαιρείται από τα μικτά μόνο όταν το company flag το ζητά.
+        // Για mixed splits η βάση έχει ήδη χτιστεί από τις operational φάσεις.
         _APODOXES_ORON_APOYSIAS = axiaOresApoysias;
 
         synolo_mikton_apodoxon =
             effectiveSynoloApodoxonBase +
-            axiaOresErgasias -
-            axiaOresApoysias +
+            effectiveAxiaOresErgasias -
+            effectiveAxiaOresApoysias +
             safeNumber(document.getElementById('synoloProsayxhseon')?.value) +
             safeNumber(document.getElementById('taktikesApodoxesMhYpologizomenesSeDora')?.value) +
             safeNumber(document.getElementById('taktikesApodoxesYpologizomenesSeDora')?.value) +

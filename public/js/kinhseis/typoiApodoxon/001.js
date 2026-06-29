@@ -21,6 +21,123 @@ async function handleTypos001(sharedParams) {
     const usesOperationalHours =
         operationalPayrollPhaseCode === "1" || operationalPayrollPhaseCode === "2";
 
+    function toNumber(value, defaultValue = 0) {
+        const parsed = parseFloat(String(value ?? "").replace(",", "."));
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+    }
+
+    function getSingleFullOperationalPhase(sharedParams) {
+        const context =
+            sharedParams?.operationalPayrollPhaseContext ||
+            (typeof window !== "undefined"
+                ? window.apasxolhseisOperationalPayrollPhaseContext
+                : null);
+
+        if (!context || context.hasUsableSingleOperationalPhase !== true) return null;
+        if (context.hasOperationalSplit === true || context.operationalPhasesCount !== 1) {
+            return null;
+        }
+
+        const phase = context.operationalPhase || null;
+        const phaseCode = String(
+            context.operationalPhaseCode || phase?.detectedKathestosCode || ""
+        ).trim();
+
+        return phaseCode === "0" ? phase : null;
+    }
+
+    function getOperationalPhases(sharedParams) {
+        const context =
+            sharedParams?.operationalPayrollPhaseContext ||
+            (typeof window !== "undefined"
+                ? window.apasxolhseisOperationalPayrollPhaseContext
+                : null);
+        return Array.isArray(context?.operationalPhases) ? context.operationalPhases : [];
+    }
+
+    function isPureFullSalariedEmployee(sharedParams) {
+        return (
+            sharedParams?.ergazomenoi?.xarakthrismos_ergazomenon === true &&
+            sharedParams?.ergazomenoi?.typos_ergazomenon === "Μ" &&
+            sharedParams?.ergazomenoi?.kathestos_apasxolhshs === "0" &&
+            getSingleFullOperationalPhase(sharedParams) !== null
+        );
+    }
+
+    function getFullTimePayrollDaysFromActualWorkDays(sharedParams) {
+        const phase = getSingleFullOperationalPhase(sharedParams);
+        const actualWorkDays = toNumber(phase?.workedDays, NaN);
+        if (!Number.isFinite(actualWorkDays)) return null;
+
+        const maxDays = toNumber(sharedParams?.genikesParametroi?.[5]?.timh, 25);
+        const fullPhaseMultiplier = 1.2;
+        const hmeresErgasias = Math.min(actualWorkDays * fullPhaseMultiplier, maxDays);
+
+        return {
+            actualWorkDays,
+            hmeresErgasias,
+            hmeresAsfalishs: Math.min(Math.round(actualWorkDays * fullPhaseMultiplier), maxDays)
+        };
+    }
+
+    function isMixedFullRotationalSalariedEmployee(sharedParams) {
+        const context =
+            sharedParams?.operationalPayrollPhaseContext ||
+            (typeof window !== "undefined"
+                ? window.apasxolhseisOperationalPayrollPhaseContext
+                : null);
+        const phases = getOperationalPhases(sharedParams);
+        const phaseCodes = phases.map((phase) =>
+            String(phase?.detectedKathestosCode || "").trim()
+        );
+
+        return (
+            sharedParams?.ergazomenoi?.xarakthrismos_ergazomenon === true &&
+            sharedParams?.ergazomenoi?.typos_ergazomenon === "Μ" &&
+            sharedParams?.ergazomenoi?.kathestos_apasxolhshs === "0" &&
+            context?.hasOperationalSplit === true &&
+            phases.length > 1 &&
+            phaseCodes.includes("0") &&
+            phaseCodes.some((code) => code === "1" || code === "2") &&
+            phaseCodes.every((code) => code === "0" || code === "1" || code === "2")
+        );
+    }
+
+    function getMixedFullRotationalPayrollDays(sharedParams) {
+        const phases = getOperationalPhases(sharedParams);
+        if (!phases.length) return null;
+
+        const maxDays = toNumber(sharedParams?.genikesParametroi?.[5]?.timh, 25);
+        const fullPhaseMultiplier = 1.2;
+        const absencesAffectInsuranceDays =
+            sharedParams?.etaireia?.apousies_epireazoun_asfalistikes_hmeres === true;
+        let fullPayrollDays = 0;
+        let nonFullHours = 0;
+        let nonFullAbsenceHours = 0;
+
+        phases.forEach((phase) => {
+            const phaseCode = String(phase?.detectedKathestosCode || "").trim();
+
+            if (phaseCode === "0") {
+                const actualFullWorkDays = toNumber(phase?.workedDays, 0);
+                const phasePayrollDays = actualFullWorkDays * fullPhaseMultiplier;
+                fullPayrollDays += phasePayrollDays;
+            } else if (phaseCode === "1" || phaseCode === "2") {
+                nonFullHours += toNumber(phase?.totalHours, 0);
+                nonFullAbsenceHours += toNumber(phase?.absenceHours, 0);
+            }
+        });
+
+        const effectiveNonFullInsuranceHours = absencesAffectInsuranceDays
+            ? Math.max(0, nonFullHours - nonFullAbsenceHours)
+            : nonFullHours;
+
+        return {
+            hmeresErgasias: Math.min(fullPayrollDays, maxDays),
+            hmeresAsfalishs: fullPayrollDays + effectiveNonFullInsuranceHours / 8
+        };
+    }
+
     // Λογική για τον τύπο αποδοχών 001 (Τακτικές Αποδοχές)
     switch(sharedParams.ergazomenoi.xarakthrismos_ergazomenon) {
         case true:    // ΥΠΑΛΛΗΛΟΣ
@@ -44,13 +161,42 @@ async function handleTypos001(sharedParams) {
                     let fromDate = new Date(Date.UTC(parseInt(sharedParams._XRHSH, 10), parseInt(mhnas, 10) - 1, 1)).toISOString();
                     let toDate = new Date(Date.UTC(parseInt(sharedParams._XRHSH, 10), parseInt(mhnas, 10), 0)).toISOString();
 
-                    switch(sharedParams.ergazomenoi.kathestos_apasxolhshs) {
-                        case "0":    // ΠΛΗΡΗΣ
-                            if (usesOperationalHours) {
-                                break;
-                            }
+	                    switch(sharedParams.ergazomenoi.kathestos_apasxolhshs) {
+	                        case "0":    // ΠΛΗΡΗΣ
+	                            if (usesOperationalHours) {
+	                                break;
+	                            }
 
-                            hmeresErgasias.value = sharedParams._ERGASIMES_HMERES_MHNA;
+	                            if (isMixedFullRotationalSalariedEmployee(sharedParams)) {
+	                                const payrollDays =
+	                                    getMixedFullRotationalPayrollDays(sharedParams);
+	                                if (payrollDays) {
+	                                    hmeresErgasias.value = payrollDays.hmeresErgasias.toFixed(2);
+	                                    hmeresAsfalishs.value = Math.max(
+	                                        0,
+	                                        Math.round(payrollDays.hmeresAsfalishs)
+	                                    );
+	                                    _CHECK_HMERES_ASFALISHS = true;
+	                                    break;
+	                                }
+	                            }
+
+	                            if (isPureFullSalariedEmployee(sharedParams)) {
+	                                const payrollDays =
+	                                    getFullTimePayrollDaysFromActualWorkDays(sharedParams);
+	                                if (payrollDays) {
+	                                    const hmeresApoysiasValue = toNumber(hmeresApoysias.value, 0);
+	                                    hmeresErgasias.value = payrollDays.hmeresErgasias.toFixed(2);
+	                                    hmeresAsfalishs.value = Math.max(
+	                                        0,
+	                                        payrollDays.hmeresAsfalishs - hmeresApoysiasValue
+	                                    );
+	                                    _CHECK_HMERES_ASFALISHS = true;
+	                                    break;
+	                                }
+	                            }
+
+	                            hmeresErgasias.value = sharedParams._ERGASIMES_HMERES_MHNA;
                             if (hmeresErgasias.value >= parseFloat(sharedParams.genikesParametroi[5].timh)) {
                                 hmeresErgasias.value = parseFloat(sharedParams.genikesParametroi[5].timh);
                             } 
@@ -164,9 +310,9 @@ async function handleTypos001(sharedParams) {
         const param9 = parseFloat(sharedParams.genikesParametroi[9].timh);
         const param4 = parseFloat(sharedParams.genikesParametroi[4].timh);
         const param5 = parseFloat(sharedParams.genikesParametroi[5].timh);
-    
+
         const calculateHmeresErgasias = (currentValue) => {
-            let tmp_hmeres = sharedParams.ergazomenoi.apasxolhsh_basei_symbashs === "5" ? parseFloat(currentValue) * (param9 / param4) : parseFloat(currentValue);
+            let tmp_hmeres = parseFloat(currentValue) * 1.2;
             return Math.min(tmp_hmeres, param5).toFixed(2);
         };
     

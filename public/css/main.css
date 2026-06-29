@@ -1574,6 +1574,16 @@ input.disabled {
     max-height: 100%;
 }
 
+.company-diafora-scroll-container {
+    min-height: 0;
+    height: calc(100dvh - 300px);
+    max-height: calc(100dvh - 300px);
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 5rem;
+    overscroll-behavior: contain;
+}
+
 .card-footer {
     height: 6vh !important;
     color: var(--bs-card-cap-color) !important;
@@ -2863,6 +2873,22 @@ a {
     box-shadow:
         0 27px 24px 0 rgb(0, 0, 0, 0.5),
         0 40px 37px 0 rgba(0, 0, 0, 0.22) !important;
+}
+
+.swal2-popup.swal-employee-out-of-period {
+    width: min(92vw, 560px) !important;
+    max-width: 560px !important;
+    padding: 1.75rem 1.5rem !important;
+    left: auto !important;
+}
+
+.swal2-popup.swal-employee-out-of-period .swal2-html-container {
+    max-width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    overflow-x: hidden !important;
+    white-space: normal !important;
+    word-break: normal;
 }
 
 .swal2-container {
