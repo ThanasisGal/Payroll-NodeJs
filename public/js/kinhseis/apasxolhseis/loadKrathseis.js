@@ -31,27 +31,111 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+const krathseisDataCache = new Map();
+const krathseisDataInFlight = new Map();
+const antistoixiseisCache = new Map();
+const antistoixiseisInFlight = new Map();
+
+function getKrathseisTyposApodoxonValue() {
+    return (
+        document.getElementById('typosApodoxon_Hidden')?.value ||
+        document.getElementById('typ_apod')?.value ||
+        document.getElementById('typosApodoxon')?.value ||
+        '001'
+    );
+}
+
+function buildKrathseisDataRequest() {
+    const params = new URLSearchParams({
+        startDate: String(window.sharedParams?.startDate || ''),
+        endDate: String(window.sharedParams?.endDate || ''),
+        typos: String(getKrathseisTyposApodoxonValue() || '001').trim() || '001'
+    });
+    const key = params.toString();
+
+    return {
+        key,
+        url: `/api/kinhseis/getKrathseis?${key}`
+    };
+}
+
+function buildAntistoixiseisKey({ team, etaireia, krathshKod, typosApodoxon }) {
+    return [
+        String(team || '').trim(),
+        String(etaireia || '').trim(),
+        String(krathshKod || '').trim(),
+        String(typosApodoxon || '').trim()
+    ].join('|');
+}
+
+async function fetchAntistoixiseisWithCache({ team, etaireia, krathshKod, typosApodoxon }) {
+    const key = buildAntistoixiseisKey({ team, etaireia, krathshKod, typosApodoxon });
+    if (antistoixiseisCache.has(key)) return antistoixiseisCache.get(key);
+    if (antistoixiseisInFlight.has(key)) return antistoixiseisInFlight.get(key);
+
+    const params = new URLSearchParams({
+        team,
+        etaireia,
+        krathshKod,
+        apo_typos_apodoxon: typosApodoxon
+    });
+    const request = fetch(`/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(async function (response) {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const payload = await response.json();
+            antistoixiseisCache.set(key, payload);
+            return payload;
+        })
+        .finally(function () {
+            antistoixiseisInFlight.delete(key);
+        });
+
+    antistoixiseisInFlight.set(key, request);
+    return request;
+}
+
 // Ενιαία κλήση στον server
 window.fetchKrathseisData = async function () {
-    try {
-        const response = await fetch(
-            `/api/kinhseis/getKrathseis?startDate=${sharedParams.startDate}&endDate=${sharedParams.endDate}`,
-            {
+    const request = buildKrathseisDataRequest();
+
+    if (krathseisDataCache.has(request.key)) {
+        return krathseisDataCache.get(request.key);
+    }
+
+    if (krathseisDataInFlight.has(request.key)) {
+        return krathseisDataInFlight.get(request.key);
+    }
+
+    const inFlightRequest = (async function () {
+        try {
+            const response = await fetch(request.url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        );
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            krathseisDataCache.set(request.key, data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching krathseis:', error);
+            return [];
+        } finally {
+            krathseisDataInFlight.delete(request.key);
         }
+    })();
 
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error('Error fetching krathseis:', error);
-        return [];
-    }
+    krathseisDataInFlight.set(request.key, inFlightRequest);
+    return inFlightRequest;
 };
 
 window.generateSelectRowsOfKrathseis = async function (data, sharedParams) {
@@ -296,15 +380,12 @@ window.applyKrathshAntistoixiseisDataset = async function (index, option, contex
     const kodikosEtaireias = params._KODIKOS_ETAIREIAS || '';
 
     try {
-        const antistoixiseisResponse = await fetch(
-            `/api/kinhseis/getAntistoixiseisByKrathshAndTypoApodoxon?team=${encodeURIComponent(teamValue)}&etaireia=${encodeURIComponent(kodikosEtaireias)}&krathshKod=${encodeURIComponent(option.value)}&apo_typos_apodoxon=${encodeURIComponent(apoTyposApodoxonValue)}`,
-            {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
-
-        const antistoixiseisData = await antistoixiseisResponse.json();
+        const antistoixiseisData = await fetchAntistoixiseisWithCache({
+            team: teamValue,
+            etaireia: kodikosEtaireias,
+            krathshKod: option.value,
+            typosApodoxon: apoTyposApodoxonValue
+        });
         const antistoixish = antistoixiseisData || {
             kad: fallbackSource.kad_efka || '',
             eidikothta: fallbackSource.eidikothta_efka || '',
@@ -369,6 +450,8 @@ window.setKrathseisTomSelectValue = function (select, value, silent = true) {
 async function loadKrathseis(data, sharedParams, options = {}) {
     const rowsCount = parseInt(sharedParams.genikesParametroi[23].timh);
     const previousBulkLoading = window.apasxolhseisKrathseisBulkLoading;
+    const rowIndexes = [];
+    const selectedAntistoixiseisTasks = [];
     window.apasxolhseisKrathseisBulkLoading = true;
 
     try {
@@ -381,6 +464,7 @@ async function loadKrathseis(data, sharedParams, options = {}) {
             const kodikosKrathshs = document.getElementById(`kodikos_${index}`);
 
             if (!krathseisDropdown || !kodikosKrathshs) continue;
+            rowIndexes.push(index);
 
             if (krathseisDropdown.tomselect) krathseisDropdown.tomselect.destroy();
             krathseisDropdown.innerHTML = '<option value="" selected></option>';
@@ -394,7 +478,9 @@ async function loadKrathseis(data, sharedParams, options = {}) {
                 if (krathsh.kodikos === ergazomenoiField) {
                     option.selected = true;
                     kodikosKrathshs.value = krathsh.kodikos;
-                    await window.applyKrathshAntistoixiseisDataset(index, option, { sharedParams });
+                    selectedAntistoixiseisTasks.push(
+                        window.applyKrathshAntistoixiseisDataset(index, option, { sharedParams })
+                    );
                 }
 
                 krathseisDropdown.appendChild(option);
@@ -402,8 +488,6 @@ async function loadKrathseis(data, sharedParams, options = {}) {
 
             window.initKrathseisTomSelect(krathseisDropdown);
             window.setKrathseisTomSelectValue(krathseisDropdown, ergazomenoiField, true);
-
-            await updatePosostaFields(i, { skipCalc: true });
 
             krathseisDropdown.addEventListener('change', async function () {
                 if (window.apasxolhseisKrathseisBulkLoading === true) return;
@@ -439,6 +523,14 @@ async function loadKrathseis(data, sharedParams, options = {}) {
                     await clearRowFields(index);
                 });
             }
+        }
+
+        await Promise.all(selectedAntistoixiseisTasks);
+        if (options.loadSeq && options.loadSeq !== window.apasxolhseisKrathseisLoadSeq) return;
+
+        for (const index of rowIndexes) {
+            if (options.loadSeq && options.loadSeq !== window.apasxolhseisKrathseisLoadSeq) return;
+            await updatePosostaFields(index, { skipCalc: true });
         }
     } finally {
         window.apasxolhseisKrathseisBulkLoading = previousBulkLoading;
