@@ -81,10 +81,21 @@ function normalizeScopeValue(scope) {
     return normalizeScope(scope, warnings);
 }
 
-function buildFailedPayload({ team, company_kod, kodikos, apo, eos, scope, requestedBy, warnings }) {
+function buildFailedPayload({
+    team,
+    company_kod,
+    ypokatasthma,
+    kodikos,
+    apo,
+    eos,
+    scope,
+    requestedBy,
+    warnings
+}) {
     return {
         team: toTrimmedString(team),
         company_kod: toTrimmedString(company_kod),
+        ypokatasthma: toTrimmedString(ypokatasthma),
         kodikos: toTrimmedString(kodikos),
         apo,
         eos,
@@ -379,6 +390,7 @@ async function generateWorkFactsForEmployeePeriod({
     apo,
     eos,
     scope = 'MANUAL',
+    ypokatasthma = '',
     requestedBy = ''
 }) {
     const input = validateInput({ team, company_kod, kodikos, apo, eos });
@@ -389,6 +401,7 @@ async function generateWorkFactsForEmployeePeriod({
         return buildFailedPayload({
             team: input.team,
             company_kod: input.company_kod,
+            ypokatasthma: toTrimmedString(ypokatasthma),
             kodikos: input.kodikos,
             apo: input.apo,
             eos: input.eos,
@@ -415,6 +428,7 @@ async function generateWorkFactsForEmployeePeriod({
         return {
             team: input.team,
             company_kod: input.company_kod,
+            ypokatasthma,
             kodikos: input.kodikos,
             apo: input.apo,
             eos: input.eos,
@@ -432,6 +446,7 @@ async function generateWorkFactsForEmployeePeriod({
         return buildFailedPayload({
             team: input.team,
             company_kod: input.company_kod,
+            ypokatasthma,
             kodikos: input.kodikos,
             apo: input.apo,
             eos: input.eos,
@@ -521,6 +536,7 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
     apo,
     eos,
     scope = 'MANUAL',
+    ypokatasthma = '',
     requestedBy = '',
     force = false
 }) {
@@ -557,6 +573,7 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
         apo,
         eos,
         scope: normalizedScope,
+        ypokatasthma,
         requestedBy
     });
 

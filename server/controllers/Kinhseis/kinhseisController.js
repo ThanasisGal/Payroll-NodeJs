@@ -36,6 +36,7 @@ const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 const {
+    generateAndSaveWorkFactsForEmployeePeriod,
     findWorkFactsSnapshot
 } = require('../../services/kinhseis/workFactsPrecalcService');
 
@@ -105,6 +106,29 @@ function buildSnapshotPayload(snapshot = {}) {
     }
 
     return payload;
+}
+
+function buildSnapshotSummaryPayload(snapshot = {}) {
+    return {
+        id: snapshot._id ? String(snapshot._id) : '',
+        kodikos: snapshot.kodikos || '',
+        apo: snapshot.apo || '',
+        eos: snapshot.eos || '',
+        scope: snapshot.scope || '',
+        generatedAt: snapshot.generatedAt || null,
+        totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
+        phaseSummary: Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [],
+        dailyFactsCount: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts.length : 0,
+        warnings: Array.isArray(snapshot.warnings) ? snapshot.warnings : []
+    };
+}
+
+function parseBooleanParam(value, defaultValue = false) {
+    if (value === undefined || value === null || value === '') return defaultValue;
+    if (typeof value === 'boolean') return value;
+
+    const normalized = String(value).trim().toLowerCase();
+    return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
 }
 
 // Έλεγχος και δημιουργία του φακέλου downloads αν δεν υπάρχει
@@ -990,6 +1014,144 @@ class kinhseisController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση του precalc snapshot.'
+            });
+        }
+    };
+
+    static generateWorkFactsSnapshot = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const requestedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+            const kodikos = String(body.kodikos || body.employeeKod || '').trim();
+            const apo = normalizeSnapshotDateParam(body.apo || body.apo_hmeromhnia);
+            const eos = normalizeSnapshotDateParam(body.eos || body.eos_hmeromhnia);
+            const ypokatasthma = String(body.ypokatasthma || '').trim();
+            const scope = String(body.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
+            const force = parseBooleanParam(body.force, false);
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            if (!kodikos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο κωδικός εργαζομένου.'
+                });
+            }
+
+            if (!apo || !eos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                });
+            }
+
+            if (apo > eos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Το apo πρέπει να είναι μικρότερο ή ίσο από το eos.'
+                });
+            }
+
+            const existingSnapshot = await findWorkFactsSnapshot({
+                team,
+                company_kod,
+                kodikos,
+                apo,
+                eos,
+                scope
+            });
+            const hasYpokatasthmaMismatch = Boolean(
+                ypokatasthma &&
+                    String(existingSnapshot?.ypokatasthma || '').trim() &&
+                    String(existingSnapshot?.ypokatasthma || '').trim() !== ypokatasthma
+            );
+
+            if (
+                existingSnapshot?.locked === true ||
+                String(existingSnapshot?.status || '').trim() === 'LOCKED'
+            ) {
+                return res.status(409).json({
+                    success: false,
+                    generated: false,
+                    reused: false,
+                    status: String(existingSnapshot.status || 'LOCKED').trim() || 'LOCKED',
+                    reason: 'locked_snapshot',
+                    message: 'Το snapshot είναι locked και δεν έγινε regenerate.',
+                    snapshotId: existingSnapshot._id ? String(existingSnapshot._id) : '',
+                    source: 'existing',
+                    snapshot: buildSnapshotSummaryPayload(existingSnapshot)
+                });
+            }
+
+            if (
+                force !== true &&
+                existingSnapshot &&
+                String(existingSnapshot.status || '').trim() === 'READY' &&
+                !hasYpokatasthmaMismatch
+            ) {
+                return res.json({
+                    success: true,
+                    generated: false,
+                    reused: true,
+                    status: 'READY',
+                    snapshotId: existingSnapshot._id ? String(existingSnapshot._id) : '',
+                    source: 'existing',
+                    snapshot: buildSnapshotSummaryPayload(existingSnapshot)
+                });
+            }
+
+            const snapshot = await generateAndSaveWorkFactsForEmployeePeriod({
+                team,
+                company_kod,
+                kodikos,
+                apo,
+                eos,
+                scope,
+                ypokatasthma,
+                requestedBy,
+                force
+            });
+            const status = String(snapshot?.status || '').trim() || 'FAILED';
+
+            if (status !== 'READY') {
+                return res.status(500).json({
+                    success: false,
+                    generated: true,
+                    reused: false,
+                    status,
+                    message: 'Η παραγωγή snapshot δεν ολοκληρώθηκε ως READY.',
+                    snapshotId: snapshot?._id ? String(snapshot._id) : '',
+                    source: 'generated',
+                    snapshot: buildSnapshotSummaryPayload(snapshot)
+                });
+            }
+
+            return res.json({
+                success: true,
+                generated: true,
+                reused: false,
+                status: 'READY',
+                snapshotId: snapshot._id ? String(snapshot._id) : '',
+                source: 'generated',
+                snapshot: buildSnapshotSummaryPayload(snapshot)
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> generateWorkFactsSnapshot :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά την παραγωγή του precalc snapshot.'
             });
         }
     };
