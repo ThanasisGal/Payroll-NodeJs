@@ -46,8 +46,12 @@ window.sharedParams = sharedParams;
 let hasRecord = false;
 
 function setOperationalPayrollPhaseContext(operationalPhaseContext) {
+    const hasOperationalPhases =
+        Array.isArray(operationalPhaseContext?.operationalPhases) &&
+        operationalPhaseContext.operationalPhases.length > 0;
     const usableContext =
-        operationalPhaseContext?.hasUsableSingleOperationalPhase === true
+        operationalPhaseContext?.hasUsableSingleOperationalPhase === true ||
+        (operationalPhaseContext?.hasOperationalSplit === true && hasOperationalPhases)
             ? operationalPhaseContext
             : null;
 
@@ -697,10 +701,6 @@ document.addEventListener('DOMContentLoaded', function () {
             normalizedItems.forEach((item) => tom.addOption(item));
             tom.refreshOptions(false);
 
-            if (normalizedItems.length > 0) {
-                tom.setValue(normalizedItems[0].value, false);
-            }
-
             return;
         }
 
@@ -714,12 +714,6 @@ document.addEventListener('DOMContentLoaded', function () {
             option.dataset.kodikos = item.kodikos;
             ergazomenoiDropdown.appendChild(option);
         });
-
-        if (normalizedItems.length > 0) {
-            ergazomenoiDropdown.value = normalizedItems[0].value;
-            const event = new Event('change', { bubbles: true });
-            ergazomenoiDropdown.dispatchEvent(event);
-        }
     }
 
     function getSelectedErgazomenosRecord() {
@@ -1011,13 +1005,40 @@ document.addEventListener('DOMContentLoaded', function () {
             const operationalPhases = Array.isArray(data.operationalPhases)
                 ? data.operationalPhases
                 : [];
+            const diagnosticPhases = Array.isArray(data.phases) ? data.phases : [];
             const operationalPhasesCount =
                 Number.isInteger(data.operationalPhasesCount)
                     ? data.operationalPhasesCount
                     : operationalPhases.length;
             const hasOperationalSplit = data.hasOperationalSplit === true;
+            const absenceHoursByDiagnosticPhase = new Map(
+                diagnosticPhases.map((phase) => {
+                    const phaseNo = Number.parseInt(phase?.phaseNo, 10);
+                    const dailyRows = Array.isArray(phase?.daily) ? phase.daily : [];
+                    const absenceHours = dailyRows.reduce((sum, day) => {
+                        const parsed = parseFloat(day?.absenceHours || 0);
+                        return sum + (Number.isFinite(parsed) ? parsed : 0);
+                    }, 0);
+
+                    return [phaseNo, absenceHours];
+                })
+            );
+            const enrichedOperationalPhases = operationalPhases.map((phase) => {
+                const sourcePhaseNos = Array.isArray(phase?.sourcePhaseNos)
+                    ? phase.sourcePhaseNos
+                    : [];
+                const absenceHours = sourcePhaseNos.reduce((sum, phaseNo) => {
+                    const parsedPhaseNo = Number.parseInt(phaseNo, 10);
+                    return sum + (absenceHoursByDiagnosticPhase.get(parsedPhaseNo) || 0);
+                }, 0);
+
+                return {
+                    ...phase,
+                    absenceHours: +absenceHours.toFixed(4)
+                };
+            });
             const operationalPhase =
-                operationalPhasesCount === 1 ? operationalPhases[0] || null : null;
+                operationalPhasesCount === 1 ? enrichedOperationalPhases[0] || null : null;
             const operationalPhaseCode = operationalPhase
                 ? String(operationalPhase.detectedKathestosCode || '').trim()
                 : '';
@@ -1028,6 +1049,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 hasUsableSingleOperationalPhase,
                 operationalPhaseCode,
                 operationalPhase,
+                operationalPhases: enrichedOperationalPhases,
                 operationalPhasesCount,
                 hasOperationalSplit
             };
@@ -1600,6 +1622,37 @@ document.addEventListener('DOMContentLoaded', function () {
         const parsed = parseFloat(value);
         return Number.isFinite(parsed) ? parsed.toFixed(decimals) : (0).toFixed(decimals);
     }
+
+    function getMixedOperationalNonFullHours(operationalPhaseContext) {
+        const phases = Array.isArray(operationalPhaseContext?.operationalPhases)
+            ? operationalPhaseContext.operationalPhases
+            : [];
+        if (operationalPhaseContext?.hasOperationalSplit !== true || phases.length <= 1) {
+            return null;
+        }
+
+        const phaseCodes = phases.map((phase) =>
+            String(phase?.detectedKathestosCode || '').trim()
+        );
+        const hasFullPhase = phaseCodes.includes('0');
+        const hasNonFullPhase = phaseCodes.some((code) => code === '1' || code === '2');
+        const hasOnlyKnownPayrollCodes = phaseCodes.every(
+            (code) => code === '0' || code === '1' || code === '2'
+        );
+
+        if (!hasFullPhase || !hasNonFullPhase || !hasOnlyKnownPayrollCodes) {
+            return null;
+        }
+
+        return phases.reduce((sum, phase) => {
+            const phaseCode = String(phase?.detectedKathestosCode || '').trim();
+            if (phaseCode !== '1' && phaseCode !== '2') return sum;
+
+            const parsedHours = parseFloat(String(phase?.totalHours ?? '').replace(',', '.'));
+            return sum + (Number.isFinite(parsedHours) ? parsedHours : 0);
+        }, 0);
+    }
+
     function setNumericInputValue(id, value, decimals = 2) {
         const element = document.getElementById(id);
         if (!element) return;
@@ -1709,6 +1762,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 title: 'Εργαζόμενος εκτός περιόδου',
                 html: message,
                 icon: 'warning',
+                width: 'min(560px, 92vw)',
+                customClass: {
+                    popup: 'swal-employee-out-of-period'
+                },
                 confirmButtonText: 'ΟΚ',
                 allowOutsideClick: false,
                 allowEscapeKey: true
@@ -2020,8 +2077,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         !useOperationalPhaseRule ||
                         operationalPhaseCode === '1' ||
                         operationalPhaseCode === '2';
+                    const mixedOperationalNonFullHours =
+                        getMixedOperationalNonFullHours(operationalPhaseContext);
 
-                    if (shouldUpdateOresErgasias) {
+                    if (mixedOperationalNonFullHours !== null) {
+                        oresErgasiasElem.value = formatValue(mixedOperationalNonFullHours, 4);
+                    } else if (shouldUpdateOresErgasias) {
                         oresErgasiasElem.value = formatValue(
                             totalOresErgasias ?? result.total_ores_ergasias,
                             4
