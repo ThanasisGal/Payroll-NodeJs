@@ -304,8 +304,8 @@ function resetApasxolhseisPipelineLoader() {
         style.textContent = `
 .apasxolhseis-compact-loader {
     position: fixed;
-    top: 84px;
-    right: 24px;
+    top: 50%;
+    left: 50%;
     z-index: 1040;
     display: inline-flex;
     align-items: center;
@@ -321,12 +321,15 @@ function resetApasxolhseisPipelineLoader() {
     line-height: 1.2;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(-6px);
+    transform: translate(-50%, calc(-50% - 6px));
     transition: opacity 140ms ease, transform 140ms ease;
 }
 .apasxolhseis-compact-loader-visible {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, -50%);
+}
+body.apasxolhseis-compact-loader-active .loader-container {
+    display: none !important;
 }
 .apasxolhseis-compact-loader__spinner {
     width: 14px;
@@ -396,6 +399,10 @@ function resetApasxolhseisPipelineLoader() {
         }
     }
 
+    function setBodyActive(active) {
+        document.body?.classList.toggle('apasxolhseis-compact-loader-active', !!active);
+    }
+
     function clearTimers() {
         if (showTimer) {
             window.clearTimeout(showTimer);
@@ -411,6 +418,7 @@ function resetApasxolhseisPipelineLoader() {
         show(message) {
             depth += 1;
             setMessage(message);
+            setBodyActive(true);
 
             if (hideTimer) {
                 window.clearTimeout(hideTimer);
@@ -436,12 +444,16 @@ function resetApasxolhseisPipelineLoader() {
             if (showTimer) {
                 window.clearTimeout(showTimer);
                 showTimer = null;
+                setBodyActive(false);
                 return;
             }
 
             const isVisible =
                 loaderElement?.classList.contains('apasxolhseis-compact-loader-visible') === true;
-            if (!isVisible) return;
+            if (!isVisible) {
+                setBodyActive(false);
+                return;
+            }
 
             const elapsed = Date.now() - shownAt;
             const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
@@ -449,6 +461,7 @@ function resetApasxolhseisPipelineLoader() {
                 hideTimer = null;
                 if (depth === 0) {
                     setVisible(false);
+                    setBodyActive(false);
                 }
             }, remaining);
         },
@@ -456,6 +469,7 @@ function resetApasxolhseisPipelineLoader() {
         reset() {
             depth = 0;
             clearTimers();
+            setBodyActive(false);
             if (loaderElement) {
                 loaderElement.classList.remove('apasxolhseis-compact-loader-visible');
             }
