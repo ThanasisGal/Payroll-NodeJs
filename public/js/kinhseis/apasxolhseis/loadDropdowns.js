@@ -2334,17 +2334,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
 
+                    const calcTotalsEmployeeKod = sharedParams.ergazomenoi.kodikos;
+                    const calcTotalsPromise = fetchCalcTotals(
+                        calcTotalsEmployeeKod,
+                        startDateISOString,
+                        endDateISOString
+                    ).then(
+                        (result) => ({ result }),
+                        (error) => ({ error })
+                    );
+
                     document.dispatchEvent(new Event('sharedParamsReady'));
                     await waitForApasxolhseisKrathseisLoading();
                     if (!isCurrentFlow()) return;
 
-                    document.getElementById('kodikosHidden').value =
-                        sharedParams.ergazomenoi.kodikos;
-                    const result = await fetchCalcTotals(
-                        document.getElementById('kodikosHidden').value,
-                        startDateISOString,
-                        endDateISOString
-                    );
+                    document.getElementById('kodikosHidden').value = calcTotalsEmployeeKod;
+                    const calcTotalsState = await calcTotalsPromise;
+                    if (calcTotalsState.error) {
+                        throw calcTotalsState.error;
+                    }
+                    const result = calcTotalsState.result;
                     if (!isCurrentFlow()) return;
 
                     document.getElementById('oresArgion').value = formatValue(
