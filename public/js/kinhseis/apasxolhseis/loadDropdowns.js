@@ -275,6 +275,194 @@ function resetApasxolhseisPipelineLoader() {
     setApasxolhseisPipelineLoaderVisible(false);
 }
 
+(function setupApasxolhseisCompactLoader() {
+    if (window.apasxolhseisCompactLoader) return;
+
+    const SHOW_DELAY_MS = 160;
+    const MIN_VISIBLE_MS = 420;
+    const STYLE_ID = 'apasxolhseisCompactLoaderStyles';
+    const LOADER_ID = 'apasxolhseisCompactLoader';
+
+    let depth = 0;
+    let showTimer = null;
+    let hideTimer = null;
+    let shownAt = 0;
+    let loaderElement = null;
+
+    function ensureStyles() {
+        if (document.getElementById(STYLE_ID)) return;
+
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        const nonce =
+            document.querySelector('script[nonce]')?.nonce ||
+            document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') ||
+            '';
+        if (nonce) {
+            style.setAttribute('nonce', nonce);
+        }
+        style.textContent = `
+.apasxolhseis-compact-loader {
+    position: fixed;
+    top: 84px;
+    right: 24px;
+    z-index: 1040;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 7px 11px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+    color: #1f2937;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+.apasxolhseis-compact-loader-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.apasxolhseis-compact-loader__spinner {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    border: 2px solid rgba(37, 99, 235, 0.2);
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: apasxolhseisCompactLoaderSpin 700ms linear infinite;
+}
+.apasxolhseis-compact-loader__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@keyframes apasxolhseisCompactLoaderSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}`;
+        document.head.appendChild(style);
+    }
+
+    function ensureLoaderElement() {
+        if (loaderElement && document.body.contains(loaderElement)) {
+            return loaderElement;
+        }
+
+        ensureStyles();
+
+        loaderElement = document.getElementById(LOADER_ID);
+        if (!loaderElement) {
+            loaderElement = document.createElement('div');
+            loaderElement.id = LOADER_ID;
+            loaderElement.className = 'apasxolhseis-compact-loader';
+            loaderElement.setAttribute('role', 'status');
+            loaderElement.setAttribute('aria-live', 'polite');
+
+            const spinner = document.createElement('span');
+            spinner.className = 'apasxolhseis-compact-loader__spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+
+            const text = document.createElement('span');
+            text.className = 'apasxolhseis-compact-loader__text';
+            text.textContent = 'Φόρτωση απασχολήσεων...';
+
+            loaderElement.append(spinner, text);
+            document.body.appendChild(loaderElement);
+        }
+
+        return loaderElement;
+    }
+
+    function setMessage(message) {
+        const element = ensureLoaderElement();
+        const text = element.querySelector('.apasxolhseis-compact-loader__text');
+        if (text) {
+            text.textContent = message || 'Φόρτωση απασχολήσεων...';
+        }
+    }
+
+    function setVisible(visible) {
+        const element = ensureLoaderElement();
+        element.classList.toggle('apasxolhseis-compact-loader-visible', visible);
+        if (visible) {
+            shownAt = Date.now();
+        }
+    }
+
+    function clearTimers() {
+        if (showTimer) {
+            window.clearTimeout(showTimer);
+            showTimer = null;
+        }
+        if (hideTimer) {
+            window.clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+    }
+
+    window.apasxolhseisCompactLoader = {
+        show(message) {
+            depth += 1;
+            setMessage(message);
+
+            if (hideTimer) {
+                window.clearTimeout(hideTimer);
+                hideTimer = null;
+            }
+
+            if (showTimer || loaderElement?.classList.contains('apasxolhseis-compact-loader-visible')) {
+                return;
+            }
+
+            showTimer = window.setTimeout(() => {
+                showTimer = null;
+                if (depth > 0) {
+                    setVisible(true);
+                }
+            }, SHOW_DELAY_MS);
+        },
+
+        hide() {
+            depth = Math.max(0, depth - 1);
+            if (depth > 0) return;
+
+            if (showTimer) {
+                window.clearTimeout(showTimer);
+                showTimer = null;
+                return;
+            }
+
+            const isVisible =
+                loaderElement?.classList.contains('apasxolhseis-compact-loader-visible') === true;
+            if (!isVisible) return;
+
+            const elapsed = Date.now() - shownAt;
+            const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+            hideTimer = window.setTimeout(() => {
+                hideTimer = null;
+                if (depth === 0) {
+                    setVisible(false);
+                }
+            }, remaining);
+        },
+
+        reset() {
+            depth = 0;
+            clearTimers();
+            if (loaderElement) {
+                loaderElement.classList.remove('apasxolhseis-compact-loader-visible');
+            }
+        }
+    };
+})();
+
 const saveButton = document.getElementById('saveButton');
 const updateButton = document.getElementById('updateButton');
 const undoButton = document.getElementById('undoButton');
@@ -1670,7 +1858,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const forcedRecord = forcedErgazomenosRecordForNavigation;
         forcedErgazomenosRecordForNavigation = null;
 
-        beginApasxolhseisPipelineLoader();
+        window.apasxolhseisCompactLoader?.reset();
+        window.apasxolhseisCompactLoader?.show('Φόρτωση απασχολήσεων...');
 
         try {
             await clearFormFields();
@@ -1851,7 +2040,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Dropdown change error:', error);
         } finally {
-            endApasxolhseisPipelineLoader();
+            window.apasxolhseisCompactLoader?.hide();
         }
     }
 
@@ -2195,7 +2384,7 @@ document.addEventListener('DOMContentLoaded', function () {
         activeEmployeePeriodFlowPromise = (async () => {
             const previousSuppress = window.apasxolhseisSuppressFieldEvents;
 
-            beginApasxolhseisPipelineLoader();
+            window.apasxolhseisCompactLoader?.show('Φόρτωση απασχολήσεων...');
 
             try {
                 window.apasxolhseisSuppressFieldEvents = true;
@@ -2516,7 +2705,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 lastCompletedEmployeePeriodFlowKey = flowKey;
             } finally {
                 window.apasxolhseisSuppressFieldEvents = previousSuppress;
-                endApasxolhseisPipelineLoader();
+                window.apasxolhseisCompactLoader?.hide();
 
                 if (activeEmployeePeriodFlowKey === flowKey) {
                     activeEmployeePeriodFlowKey = '';
