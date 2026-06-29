@@ -35,12 +35,101 @@ const { ErgazomenoiModel, OrariaModel, ProdhlomenaOrariaModel } = Models_D;
 // Οι ώρες απουσίας διαβάζονται από ProdhlomenaOrariaModel.ores_apoysias_apologistika.
 const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
+const {
+    generateAndSaveWorkFactsForEmployeePeriod,
+    findWorkFactsSnapshot
+} = require('../../services/kinhseis/workFactsPrecalcService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
 
 const host = process.env.HOST || 'localhost';
 const port = process.env.PORT || 5000;
+
+function normalizeSnapshotDateParam(value) {
+    const raw = String(value || '').trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+
+    const [year, month, day] = raw.split('-').map((part) => Number.parseInt(part, 10));
+    const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return '';
+    }
+
+    return raw;
+}
+
+function buildSnapshotCapabilities(snapshot = {}) {
+    return {
+        hasDailyFacts: Array.isArray(snapshot.dailyFacts) && snapshot.dailyFacts.length > 0,
+        hasTotals:
+            snapshot.totals &&
+            typeof snapshot.totals === 'object' &&
+            Object.keys(snapshot.totals).length > 0,
+        hasPhaseSummary:
+            Array.isArray(snapshot.phaseSummary) && snapshot.phaseSummary.length > 0,
+        hasOperationalPhases:
+            Array.isArray(snapshot.operationalPhases) && snapshot.operationalPhases.length > 0,
+        hasPayrollAmounts: false
+    };
+}
+
+function buildSnapshotPayload(snapshot = {}) {
+    const payload = {
+        id: snapshot._id ? String(snapshot._id) : '',
+        team: snapshot.team || '',
+        company_kod: snapshot.company_kod || '',
+        ypokatasthma: snapshot.ypokatasthma || '',
+        kodikos: snapshot.kodikos || '',
+        apo: snapshot.apo || '',
+        eos: snapshot.eos || '',
+        scope: snapshot.scope || '',
+        generatedAt: snapshot.generatedAt || null,
+        generatedBy: snapshot.generatedBy || '',
+        sourceVersion: snapshot.sourceVersion || '',
+        inputFingerprint: snapshot.inputFingerprint || '',
+        locked: snapshot.locked === true,
+        totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
+        phaseSummary: Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [],
+        phases: Array.isArray(snapshot.phases) ? snapshot.phases : [],
+        dailyFacts: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts : [],
+        warnings: Array.isArray(snapshot.warnings) ? snapshot.warnings : []
+    };
+
+    if (Array.isArray(snapshot.operationalPhases)) {
+        payload.operationalPhases = snapshot.operationalPhases;
+    }
+
+    return payload;
+}
+
+function buildSnapshotSummaryPayload(snapshot = {}) {
+    return {
+        id: snapshot._id ? String(snapshot._id) : '',
+        kodikos: snapshot.kodikos || '',
+        apo: snapshot.apo || '',
+        eos: snapshot.eos || '',
+        scope: snapshot.scope || '',
+        generatedAt: snapshot.generatedAt || null,
+        totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
+        phaseSummary: Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [],
+        dailyFactsCount: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts.length : 0,
+        warnings: Array.isArray(snapshot.warnings) ? snapshot.warnings : []
+    };
+}
+
+function parseBooleanParam(value, defaultValue = false) {
+    if (value === undefined || value === null || value === '') return defaultValue;
+    if (typeof value === 'boolean') return value;
+
+    const normalized = String(value).trim().toLowerCase();
+    return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
+}
 
 // Έλεγχος και δημιουργία του φακέλου downloads αν δεν υπάρχει
 const handleProductionDownloadPath = async () => {
@@ -815,6 +904,254 @@ class kinhseisController {
                 message: error.statusCode
                     ? error.message
                     : 'Σφάλμα κατά την ανίχνευση φάσεων απασχόλησης.'
+            });
+        }
+    };
+
+    static getWorkFactsSnapshot = async (req, res) => {
+        try {
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const kodikos = String(req.query.kodikos || req.query.employeeKod || '').trim();
+            const apo = normalizeSnapshotDateParam(req.query.apo || req.query.apo_hmeromhnia);
+            const eos = normalizeSnapshotDateParam(req.query.eos || req.query.eos_hmeromhnia);
+            const scope = String(req.query.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
+            const ypokatasthma = String(req.query.ypokatasthma || '').trim();
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            if (!kodikos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο κωδικός εργαζομένου.'
+                });
+            }
+
+            if (!apo || !eos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                });
+            }
+
+            const snapshot = await findWorkFactsSnapshot({
+                team,
+                company_kod,
+                kodikos,
+                apo,
+                eos,
+                scope
+            });
+
+            if (!snapshot) {
+                return res.json({
+                    success: true,
+                    found: false,
+                    source: 'none',
+                    usable: false,
+                    reason: 'not_found'
+                });
+            }
+
+            const capabilities = buildSnapshotCapabilities(snapshot);
+            const status = String(snapshot.status || '').trim();
+
+            if (status !== 'READY') {
+                return res.json({
+                    success: true,
+                    found: true,
+                    source: 'snapshot',
+                    usable: false,
+                    reason: 'status_not_ready',
+                    status,
+                    sourceVersion: snapshot.sourceVersion || '',
+                    generatedAt: snapshot.generatedAt || null,
+                    inputFingerprint: snapshot.inputFingerprint || '',
+                    locked: snapshot.locked === true,
+                    capabilities
+                });
+            }
+
+            if (
+                ypokatasthma &&
+                String(snapshot.ypokatasthma || '').trim() &&
+                String(snapshot.ypokatasthma || '').trim() !== ypokatasthma
+            ) {
+                return res.json({
+                    success: true,
+                    found: true,
+                    source: 'snapshot',
+                    usable: false,
+                    reason: 'ypokatasthma_mismatch',
+                    status,
+                    sourceVersion: snapshot.sourceVersion || '',
+                    generatedAt: snapshot.generatedAt || null,
+                    inputFingerprint: snapshot.inputFingerprint || '',
+                    locked: snapshot.locked === true,
+                    snapshotYpokatasthma: snapshot.ypokatasthma || '',
+                    requestedYpokatasthma: ypokatasthma,
+                    capabilities
+                });
+            }
+
+            return res.json({
+                success: true,
+                found: true,
+                usable: true,
+                source: 'snapshot',
+                status: 'READY',
+                snapshot: buildSnapshotPayload(snapshot),
+                capabilities
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> getWorkFactsSnapshot :', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάκτηση του precalc snapshot.'
+            });
+        }
+    };
+
+    static generateWorkFactsSnapshot = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const requestedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+            const kodikos = String(body.kodikos || body.employeeKod || '').trim();
+            const apo = normalizeSnapshotDateParam(body.apo || body.apo_hmeromhnia);
+            const eos = normalizeSnapshotDateParam(body.eos || body.eos_hmeromhnia);
+            const ypokatasthma = String(body.ypokatasthma || '').trim();
+            const scope = String(body.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
+            const force = parseBooleanParam(body.force, false);
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            if (!kodikos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ο κωδικός εργαζομένου.'
+                });
+            }
+
+            if (!apo || !eos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                });
+            }
+
+            if (apo > eos) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Το apo πρέπει να είναι μικρότερο ή ίσο από το eos.'
+                });
+            }
+
+            const existingSnapshot = await findWorkFactsSnapshot({
+                team,
+                company_kod,
+                kodikos,
+                apo,
+                eos,
+                scope
+            });
+            const hasYpokatasthmaMismatch = Boolean(
+                ypokatasthma &&
+                    String(existingSnapshot?.ypokatasthma || '').trim() &&
+                    String(existingSnapshot?.ypokatasthma || '').trim() !== ypokatasthma
+            );
+
+            if (
+                existingSnapshot?.locked === true ||
+                String(existingSnapshot?.status || '').trim() === 'LOCKED'
+            ) {
+                return res.status(409).json({
+                    success: false,
+                    generated: false,
+                    reused: false,
+                    status: String(existingSnapshot.status || 'LOCKED').trim() || 'LOCKED',
+                    reason: 'locked_snapshot',
+                    message: 'Το snapshot είναι locked και δεν έγινε regenerate.',
+                    snapshotId: existingSnapshot._id ? String(existingSnapshot._id) : '',
+                    source: 'existing',
+                    snapshot: buildSnapshotSummaryPayload(existingSnapshot)
+                });
+            }
+
+            if (
+                force !== true &&
+                existingSnapshot &&
+                String(existingSnapshot.status || '').trim() === 'READY' &&
+                !hasYpokatasthmaMismatch
+            ) {
+                return res.json({
+                    success: true,
+                    generated: false,
+                    reused: true,
+                    status: 'READY',
+                    snapshotId: existingSnapshot._id ? String(existingSnapshot._id) : '',
+                    source: 'existing',
+                    snapshot: buildSnapshotSummaryPayload(existingSnapshot)
+                });
+            }
+
+            const snapshot = await generateAndSaveWorkFactsForEmployeePeriod({
+                team,
+                company_kod,
+                kodikos,
+                apo,
+                eos,
+                scope,
+                ypokatasthma,
+                requestedBy,
+                force
+            });
+            const status = String(snapshot?.status || '').trim() || 'FAILED';
+
+            if (status !== 'READY') {
+                return res.status(500).json({
+                    success: false,
+                    generated: true,
+                    reused: false,
+                    status,
+                    message: 'Η παραγωγή snapshot δεν ολοκληρώθηκε ως READY.',
+                    snapshotId: snapshot?._id ? String(snapshot._id) : '',
+                    source: 'generated',
+                    snapshot: buildSnapshotSummaryPayload(snapshot)
+                });
+            }
+
+            return res.json({
+                success: true,
+                generated: true,
+                reused: false,
+                status: 'READY',
+                snapshotId: snapshot._id ? String(snapshot._id) : '',
+                source: 'generated',
+                snapshot: buildSnapshotSummaryPayload(snapshot)
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> generateWorkFactsSnapshot :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά την παραγωγή του precalc snapshot.'
             });
         }
     };

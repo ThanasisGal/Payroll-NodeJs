@@ -1058,6 +1058,365 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function getSnapshotPhaseSummaryForOperationalPhase(phaseSummary, operationalPhase) {
+        if (!Array.isArray(phaseSummary) || !phaseSummary.length || !operationalPhase) {
+            return null;
+        }
+
+        const operationalPhaseNo = Number.parseInt(operationalPhase?.phaseNo, 10);
+        const phaseKey = String(operationalPhase?.phaseKey || '').trim();
+
+        return phaseSummary.find((summary) => {
+            const summaryOperationalPhaseNo = Number.parseInt(
+                summary?.operationalPhaseNo,
+                10
+            );
+
+            if (
+                Number.isInteger(operationalPhaseNo) &&
+                Number.isInteger(summaryOperationalPhaseNo) &&
+                operationalPhaseNo === summaryOperationalPhaseNo
+            ) {
+                return true;
+            }
+
+            return phaseKey && String(summary?.phaseKey || '').trim() === phaseKey;
+        }) || null;
+    }
+
+    function toSnapshotNumber(value, fallback = 0) {
+        const parsed = Number(String(value ?? '').replace(',', '.').trim());
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function normalizeSnapshotDateOnly(value) {
+        const raw = String(value || '').trim().slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+    }
+
+    function getSnapshotDailyFactsForSummary(dailyFacts, summary) {
+        const phaseKey = String(summary?.phaseKey || '').trim();
+        const operationalPhaseNo = Number.parseInt(summary?.operationalPhaseNo, 10);
+        const summaryApo = normalizeSnapshotDateOnly(summary?.apo);
+        const summaryEos = normalizeSnapshotDateOnly(summary?.eos);
+        let matchedDailyFacts = [];
+
+        if (phaseKey) {
+            matchedDailyFacts = dailyFacts.filter(
+                (day) => String(day?.phaseKey || '').trim() === phaseKey
+            );
+        }
+
+        if (
+            !matchedDailyFacts.length &&
+            Number.isInteger(operationalPhaseNo)
+        ) {
+            matchedDailyFacts = dailyFacts.filter((day) => {
+                const dayOperationalPhaseNo = Number.parseInt(day?.operationalPhaseNo, 10);
+                return (
+                    Number.isInteger(dayOperationalPhaseNo) &&
+                    dayOperationalPhaseNo === operationalPhaseNo
+                );
+            });
+        }
+
+        if (!matchedDailyFacts.length && summaryApo && summaryEos) {
+            matchedDailyFacts = dailyFacts.filter((day) => {
+                const dayDate = normalizeSnapshotDateOnly(day?.date);
+                return dayDate && dayDate >= summaryApo && dayDate <= summaryEos;
+            });
+        }
+
+        return matchedDailyFacts;
+    }
+
+    function buildSnapshotOperationalPhasesFromFacts(snapshot = {}, diagnostics = {}) {
+        const phaseSummary = Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [];
+        const dailyFacts = Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts : [];
+        const debug = {
+            phaseSummaryCount: phaseSummary.length,
+            dailyFactsCount: dailyFacts.length,
+            matchedPhaseSummaryCount: 0,
+            derivedOperationalPhasesCount: 0
+        };
+
+        if (!phaseSummary.length || !dailyFacts.length) {
+            diagnostics.reason = 'snapshot_missing_operational_structure';
+            diagnostics.debug = debug;
+            return [];
+        }
+
+        const derivedOperationalPhases = phaseSummary
+            .map((summary) => {
+                const daily = getSnapshotDailyFactsForSummary(dailyFacts, summary);
+                if (!daily.length) return null;
+
+                const workingHours = toSnapshotNumber(summary?.workingHours);
+                const workedDays = daily.filter(
+                    (day) => toSnapshotNumber(day?.workingHours) > 0
+                ).length;
+
+                return {
+                    phaseKey: summary.phaseKey || '',
+                    phaseNo: summary.phaseNo || null,
+                    operationalPhaseNo: summary.operationalPhaseNo || null,
+                    apo: summary.apo || '',
+                    eos: summary.eos || '',
+                    detectedKathestosCode: summary.effectiveKathestosCode || '',
+                    detectedKathestos: summary.effectiveKathestos || '',
+                    totalHours: workingHours,
+                    workingHours,
+                    workedDays,
+                    absenceHours: toSnapshotNumber(summary?.absenceHours),
+                    insuranceExemptionEligible:
+                        summary.insuranceExemptionEligible === true,
+                    warnings: Array.isArray(summary.warnings) ? summary.warnings : [],
+                    source: summary.source || 'SNAPSHOT_PHASE_SUMMARY',
+                    daily
+                };
+            })
+            .filter(Boolean);
+
+        debug.matchedPhaseSummaryCount = derivedOperationalPhases.length;
+        debug.derivedOperationalPhasesCount = derivedOperationalPhases.length;
+
+        diagnostics.debug = debug;
+
+        if (derivedOperationalPhases.length !== phaseSummary.length) {
+            diagnostics.reason = 'snapshot_phase_daily_match_failed';
+            return [];
+        }
+
+        return derivedOperationalPhases.length === phaseSummary.length
+            ? derivedOperationalPhases
+            : [];
+    }
+
+    function buildOperationalPayrollPhaseContextFromSnapshot(snapshotResponse, diagnostics = {}) {
+        const snapshot = snapshotResponse?.snapshot;
+        const capabilities = snapshotResponse?.capabilities || {};
+        const hasUsableWorkFacts =
+            capabilities.hasDailyFacts === true || capabilities.hasPhaseSummary === true;
+
+        diagnostics.debug = {
+            success: snapshotResponse?.success === true,
+            usable: snapshotResponse?.usable === true,
+            source: snapshotResponse?.source || '',
+            status: snapshotResponse?.status || '',
+            hasSnapshot: Boolean(snapshot),
+            capabilities,
+            operationalPhasesCount: Array.isArray(snapshot?.operationalPhases)
+                ? snapshot.operationalPhases.length
+                : 0,
+            phaseSummaryCount: Array.isArray(snapshot?.phaseSummary)
+                ? snapshot.phaseSummary.length
+                : 0,
+            dailyFactsCount: Array.isArray(snapshot?.dailyFacts) ? snapshot.dailyFacts.length : 0
+        };
+
+        if (snapshotResponse?.success !== true) {
+            diagnostics.reason = 'snapshot_not_success';
+            return null;
+        }
+
+        if (snapshotResponse?.usable !== true || snapshotResponse?.source !== 'snapshot') {
+            diagnostics.reason = 'snapshot_not_usable';
+            return null;
+        }
+
+        if (snapshotResponse?.status !== 'READY') {
+            diagnostics.reason = 'snapshot_not_ready';
+            return null;
+        }
+
+        if (!snapshot) {
+            diagnostics.reason = 'snapshot_missing_payload';
+            return null;
+        }
+
+        if (!hasUsableWorkFacts) {
+            diagnostics.reason = 'snapshot_missing_work_facts';
+            return null;
+        }
+
+        const operationalPhases = Array.isArray(snapshot.operationalPhases)
+            ? snapshot.operationalPhases
+            : [];
+        const derivedOperationalPhases = operationalPhases.length
+            ? operationalPhases
+            : buildSnapshotOperationalPhasesFromFacts(snapshot, diagnostics);
+        if (!derivedOperationalPhases.length) {
+            diagnostics.reason = diagnostics.reason || 'snapshot_missing_operational_structure';
+            return null;
+        }
+
+        const phaseSummary = Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [];
+        const enrichedOperationalPhases = derivedOperationalPhases.map((phase) => {
+            const summary = getSnapshotPhaseSummaryForOperationalPhase(phaseSummary, phase);
+            if (!summary || phase?.absenceHours !== undefined) return phase;
+
+            return {
+                ...phase,
+                absenceHours: summary.absenceHours
+            };
+        });
+        const operationalPhasesCount = enrichedOperationalPhases.length;
+        const hasOperationalSplit = operationalPhasesCount > 1;
+        const operationalPhase =
+            operationalPhasesCount === 1 ? enrichedOperationalPhases[0] || null : null;
+        const operationalPhaseCode = operationalPhase
+            ? String(operationalPhase.detectedKathestosCode || '').trim()
+            : '';
+        const hasUsableSingleOperationalPhase =
+            operationalPhasesCount === 1 && ['0', '1', '2'].includes(operationalPhaseCode);
+
+        diagnostics.reason = '';
+        diagnostics.debug = {
+            ...diagnostics.debug,
+            operationalPhasesCount,
+            hasOperationalSplit,
+            source: operationalPhases.length ? 'persisted_operational_phases' : 'derived_facts'
+        };
+
+        return {
+            hasUsableSingleOperationalPhase,
+            operationalPhaseCode,
+            operationalPhase,
+            operationalPhases: enrichedOperationalPhases,
+            operationalPhasesCount,
+            hasOperationalSplit,
+            phases: Array.isArray(snapshot.phases) ? snapshot.phases : [],
+            phaseSummary,
+            dailyFacts: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts : [],
+            totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
+            warnings: Array.isArray(snapshot.warnings) ? snapshot.warnings : [],
+            source: 'snapshot',
+            sourceReason: '',
+            snapshotId: snapshot.id || '',
+            snapshotGeneratedAt: snapshot.generatedAt || null,
+            snapshotStatus: snapshotResponse.status,
+            snapshotSourceVersion: snapshot.sourceVersion || '',
+            snapshotInputFingerprint: snapshot.inputFingerprint || ''
+        };
+    }
+
+    async function fetchWorkFactsSnapshotContext({
+        employeeKod,
+        startDateISOString,
+        endDateISOString,
+        ypokatasthma
+    } = {}) {
+        const normalizedEmployeeKod = String(employeeKod || '').trim();
+        if (!normalizedEmployeeKod || !startDateISOString || !endDateISOString) {
+            return {
+                ok: false,
+                source: 'none',
+                reason: 'missing_required_params',
+                context: null
+            };
+        }
+
+        const params = new URLSearchParams({
+            kodikos: normalizedEmployeeKod,
+            apo: startDateISOString,
+            eos: endDateISOString
+        });
+        const normalizedYpokatasthma = normalizeYpokatasthmaValue(ypokatasthma);
+        if (normalizedYpokatasthma) {
+            params.set('ypokatasthma', normalizedYpokatasthma);
+        }
+
+        try {
+            const response = await fetch(`/api/kinhseis/workFactsSnapshot?${params.toString()}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                return {
+                    ok: false,
+                    source: 'error',
+                    reason: `http_${response.status}`,
+                    debug: null,
+                    context: null
+                };
+            }
+
+            const payload = await response.json();
+            const diagnostics = {};
+            let context = null;
+
+            try {
+                context = buildOperationalPayrollPhaseContextFromSnapshot(payload, diagnostics);
+            } catch (error) {
+                diagnostics.reason = 'snapshot_context_build_failed';
+                diagnostics.debug = {
+                    message: error?.message || ''
+                };
+            }
+
+            if (context) {
+                return {
+                    ok: true,
+                    source: 'snapshot',
+                    reason: '',
+                    debug: diagnostics.debug || null,
+                    context
+                };
+            }
+
+            return {
+                ok: false,
+                source: payload?.source || 'none',
+                reason: diagnostics.reason || payload?.reason || 'snapshot_context_build_failed',
+                debug: diagnostics.debug || null,
+                context: null
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                source: 'error',
+                reason: 'fetch_error',
+                debug: {
+                    message: error?.message || ''
+                },
+                context: null
+            };
+        }
+    }
+
+    async function fetchOperationalPayrollPhaseContextWithSnapshotFallback({
+        employeeKod,
+        startDateISOString,
+        endDateISOString,
+        ypokatasthma
+    }) {
+        const snapshotResult = await fetchWorkFactsSnapshotContext({
+            employeeKod,
+            startDateISOString,
+            endDateISOString,
+            ypokatasthma
+        });
+
+        if (snapshotResult.ok && snapshotResult.context) {
+            return snapshotResult.context;
+        }
+
+        const liveContext = await fetchOperationalPayrollPhaseContext(employeeKod, ypokatasthma);
+
+        return liveContext
+            ? {
+                ...liveContext,
+                source: 'live',
+                sourceReason: snapshotResult.reason || 'snapshot_unavailable',
+                snapshotFallbackDebug: snapshotResult.debug || null
+            }
+            : null;
+    }
+
     async function fetchEmployeeDetails(kodikos) {
         const normalizedKodikos = String(kodikos || '').trim();
 
@@ -2060,10 +2419,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         ? result.total_ores_ergasias_apologistika
                         : result.total_ores_ergasias_prodhlomenes;
                     const operationalPhaseContext =
-                        await fetchOperationalPayrollPhaseContext(
-                            document.getElementById('kodikosHidden').value,
-                            getApasxolhseisYpokatasthmaForQuery()
-                        );
+                        await fetchOperationalPayrollPhaseContextWithSnapshotFallback({
+                            employeeKod: document.getElementById('kodikosHidden').value,
+                            startDateISOString,
+                            endDateISOString,
+                            ypokatasthma: getApasxolhseisYpokatasthmaForQuery()
+                        });
                     if (!isCurrentFlow()) return;
                     setOperationalPayrollPhaseContext(operationalPhaseContext);
 
