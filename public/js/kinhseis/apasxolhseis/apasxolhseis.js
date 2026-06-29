@@ -3396,9 +3396,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             await klimakiaForoyModule.initializeKlimakiaForoy();
-            await klimakiaForoyModule.fetchData();
-            await klimakiaForoyModule.fetchEkptoshForoy();
-            await klimakiaForoyModule.fetchEisodhmaProForoyMeioshs();
+            await Promise.all([
+                klimakiaForoyModule.fetchData(),
+                klimakiaForoyModule.fetchEkptoshForoy(),
+                klimakiaForoyModule.fetchEisodhmaProForoyMeioshs()
+            ]);
 
             // Επιστρέφουμε όλα τα αντικείμενα (Κλίμακα φόρου, έκπτωση φόρου κλπ)
             return klimakiaForoyModule.getAllArraysFromKlimakiaForoy();
