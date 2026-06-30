@@ -1158,9 +1158,13 @@ router.get('/api/kinhseis/calcApoysies', kinhseisController.getTotals_Apoysion);
 
 router.get('/api/kinhseis/detectPayrollPhases', kinhseisController.detectPayrollPhases);
 
-router.get('/api/kinhseis/workFactsSnapshot', kinhseisController.getWorkFactsSnapshot);
+router.get('/api/kinhseis/workFactsSnapshot', checkAuth, kinhseisController.getWorkFactsSnapshot);
 
-router.post('/api/kinhseis/workFactsSnapshot/generate', kinhseisController.generateWorkFactsSnapshot);
+router.post(
+    '/api/kinhseis/workFactsSnapshot/generate',
+    checkAuth,
+    kinhseisController.generateWorkFactsSnapshot
+);
 
 router.get('/api/kinhseis/getApasxolhseis', kinhseisController.getApasxolhseis);
 
