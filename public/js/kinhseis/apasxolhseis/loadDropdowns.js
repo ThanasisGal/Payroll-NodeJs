@@ -541,6 +541,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const generateWorkFactsSnapshotButton = document.getElementById(
         'generateWorkFactsSnapshotButton'
     );
+    const generateBatchWorkFactsSnapshotsButton = document.getElementById(
+        'generateBatchWorkFactsSnapshotsButton'
+    );
     let ergazomenoiOptionsCache = [];
     let forcedErgazomenosRecordForNavigation = null;
 
@@ -618,6 +621,120 @@ document.addEventListener('DOMContentLoaded', function () {
         return Promise.resolve();
     }
 
+    function escapeSnapshotSummaryHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getSnapshotSummaryTotals(data = {}) {
+        const totals = data.totals && typeof data.totals === 'object' ? data.totals : {};
+
+        return {
+            eligible: Number.parseInt(totals.eligible, 10) || 0,
+            generated: Number.parseInt(totals.generated, 10) || 0,
+            reused: Number.parseInt(totals.reused, 10) || 0,
+            locked: Number.parseInt(totals.locked, 10) || 0,
+            failed: Number.parseInt(totals.failed, 10) || 0,
+            skippedExistingReady: Number.parseInt(totals.skippedExistingReady, 10) || 0,
+            dryRunEligible: Number.parseInt(totals.dryRunEligible, 10) || 0
+        };
+    }
+
+    function buildBatchSnapshotSummaryHtml(data = {}, options = {}) {
+        const totals = getSnapshotSummaryTotals(data);
+        const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+        const rows = [
+            ['Περίοδος', `${data.apo || '-'} έως ${data.eos || '-'}`],
+            ['Max εργαζόμενοι', data.maxEmployees || 5],
+            ['Eligible', totals.eligible],
+            ['Dry-run eligible', totals.dryRunEligible],
+            ['Generated', totals.generated],
+            ['Reused READY', totals.reused],
+            ['Locked', totals.locked],
+            ['Failed', totals.failed],
+            ['Skipped existing READY', totals.skippedExistingReady]
+        ];
+        const summaryRows = rows
+            .map(([label, value]) => (
+                `<div><strong>${escapeSnapshotSummaryHtml(label)}:</strong> ` +
+                `${escapeSnapshotSummaryHtml(value)}</div>`
+            ))
+            .join('');
+        const warningHtml = warnings.length
+            ? '<hr><div><strong>Warnings:</strong></div>' +
+              warnings
+                  .slice(0, 5)
+                  .map((warning) => `<div>${escapeSnapshotSummaryHtml(warning)}</div>`)
+                  .join('')
+            : '';
+        const intro = options.intro ? `<p>${escapeSnapshotSummaryHtml(options.intro)}</p>` : '';
+
+        return intro + summaryRows + warningHtml;
+    }
+
+    async function confirmBatchSnapshotGenerate(dryRunData) {
+        const html = buildBatchSnapshotSummaryHtml(dryRunData, {
+            intro:
+                'Θα δημιουργηθούν snapshots για έως 5 εργαζόμενους της περιόδου. ' +
+                'Δεν θα γίνει overwrite σε υπάρχοντα READY ή locked snapshots.'
+        });
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            const result = await window.Swal.fire({
+                icon: 'question',
+                title: 'Επιβεβαίωση batch snapshots',
+                html,
+                showCancelButton: true,
+                confirmButtonText: 'Δημιουργία',
+                cancelButtonText: 'Ακύρωση',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                    cancelButton: 'class-secondary custom-cancel-button custom-swal-button'
+                }
+            });
+
+            return result.isConfirmed === true;
+        }
+
+        return window.confirm(
+            'Θα δημιουργηθούν snapshots για έως 5 εργαζόμενους της περιόδου. Συνέχεια;'
+        );
+    }
+
+    async function showBatchSnapshotResult(data = {}) {
+        const totals = getSnapshotSummaryTotals(data);
+        const icon = data.success === false
+            ? 'error'
+            : totals.failed > 0 || data.partialFailure === true
+                ? 'warning'
+                : 'success';
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire({
+                icon,
+                title: data.success === false
+                    ? 'Αποτυχία batch snapshot'
+                    : 'Ολοκληρώθηκε batch snapshot',
+                html: buildBatchSnapshotSummaryHtml(data),
+                confirmButtonText: 'Εντάξει',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button'
+                }
+            });
+        }
+
+        return showSnapshotActionMessage(
+            icon,
+            data.success === false ? 'Αποτυχία batch snapshot' : 'Ολοκληρώθηκε batch snapshot',
+            `Generated: ${totals.generated}, Reused: ${totals.reused}, ` +
+                `Locked: ${totals.locked}, Failed: ${totals.failed}`
+        );
+    }
+
     function getSnapshotActionPayload() {
         const currentSharedParams = window.sharedParams || sharedParams || {};
         const employee = currentSharedParams.ergazomenoi || {};
@@ -638,6 +755,48 @@ document.addEventListener('DOMContentLoaded', function () {
             scope: 'MONTHLY',
             force: false
         };
+    }
+
+    function getBatchSnapshotActionPayload(dryRun) {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const apo = currentSharedParams.startDate;
+        const eos = currentSharedParams.endDate;
+        const ypokatasthma =
+            normalizeYpokatasthmaValue(currentSharedParams._YPOKATASTHMA) ||
+            normalizeYpokatasthmaValue(currentSharedParams.ypokatasthma) ||
+            normalizeYpokatasthmaValue(getInputValue('ypokatasthma_Hidden')) ||
+            '0000';
+
+        return {
+            apo,
+            eos,
+            ypokatasthma,
+            scope: 'MONTHLY',
+            force: false,
+            maxEmployees: 5,
+            dryRun: dryRun === true
+        };
+    }
+
+    async function postBatchSnapshotAction(payload) {
+        const csrfToken = getCsrfToken();
+        const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
+        const response = await fetch('/api/kinhseis/workFactsSnapshot/batch-generate', {
+            method: 'POST',
+            credentials: 'same-origin',
+            skipLoader: true,
+            headers: getJsonHeaders(),
+            body: JSON.stringify(requestPayload)
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok && data?.success !== true) {
+            const error = new Error(data?.message || data?.reason || 'Αποτυχία batch snapshot.');
+            error.payload = data;
+            throw error;
+        }
+
+        return data;
     }
 
     async function handleGenerateWorkFactsSnapshotClick(event) {
@@ -708,6 +867,64 @@ document.addEventListener('DOMContentLoaded', function () {
                 'error',
                 'Σφάλμα',
                 'Αποτυχία δημιουργίας snapshot.'
+            );
+        } finally {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
+    }
+
+    async function handleGenerateBatchWorkFactsSnapshotsClick(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
+
+        const dryRunPayload = getBatchSnapshotActionPayload(true);
+
+        if (!dryRunPayload.apo || !dryRunPayload.eos) {
+            await showSnapshotActionMessage(
+                'warning',
+                'Λείπει περίοδος',
+                'Επιλέξτε περίοδο πρώτα.'
+            );
+            return;
+        }
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = 'Έλεγχος...';
+
+        try {
+            const dryRunData = await postBatchSnapshotAction(dryRunPayload);
+            const dryRunTotals = getSnapshotSummaryTotals(dryRunData);
+
+            if (dryRunTotals.eligible === 0) {
+                await showSnapshotActionMessage(
+                    'info',
+                    'Δεν βρέθηκαν εργαζόμενοι',
+                    'Δεν βρέθηκαν εργαζόμενοι που τέμνουν την επιλεγμένη περίοδο.'
+                );
+                return;
+            }
+
+            const confirmed = await confirmBatchSnapshotGenerate(dryRunData);
+            if (!confirmed) return;
+
+            button.innerHTML = 'Δημιουργία...';
+            const generateData = await postBatchSnapshotAction(
+                getBatchSnapshotActionPayload(false)
+            );
+
+            await showBatchSnapshotResult(generateData);
+        } catch (error) {
+            if (error.payload) {
+                await showBatchSnapshotResult(error.payload);
+                return;
+            }
+
+            await showSnapshotActionMessage(
+                'error',
+                'Σφάλμα',
+                'Αποτυχία batch snapshot.'
             );
         } finally {
             button.innerHTML = originalHtml;
@@ -1908,6 +2125,13 @@ document.addEventListener('DOMContentLoaded', function () {
         generateWorkFactsSnapshotButton.addEventListener(
             'click',
             handleGenerateWorkFactsSnapshotClick
+        );
+    }
+
+    if (generateBatchWorkFactsSnapshotsButton) {
+        generateBatchWorkFactsSnapshotsButton.addEventListener(
+            'click',
+            handleGenerateBatchWorkFactsSnapshotsClick
         );
     }
 
