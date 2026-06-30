@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const { ErgazomenoiModel } = require('../../models/ergazomenoi');
 const { PayrollPrecalcJobModel } = require('../../models/kinhseis');
 const {
-    generateAndSaveWorkFactsForEmployeePeriod
+    generateAndSaveWorkFactsForEmployeePeriod,
+    findWorkFactsSnapshot
 } = require('./workFactsPrecalcService');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
@@ -59,13 +60,44 @@ function normalizeKodikoi(kodikoi) {
     return [...new Set(kodikoi.map(toTrimmedString).filter(Boolean))];
 }
 
-function validateBatchInput({ team, company_kod, apo, eos, scope }) {
+function normalizeOptionalPositiveInteger(value, fieldName, warnings) {
+    if (value === undefined || value === null || value === '') return null;
+
+    const raw = String(value).trim();
+    if (!/^\d+$/.test(raw)) {
+        warnings.push(`Το ${fieldName} πρέπει να είναι θετικός ακέραιος.`);
+        return null;
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isSafeInteger(parsed) || parsed < 1) {
+        warnings.push(`Το ${fieldName} πρέπει να είναι θετικός ακέραιος.`);
+        return null;
+    }
+
+    return parsed;
+}
+
+function resolveEmployeeLimit({ limit, maxEmployees, warnings }) {
+    const cleanLimit = normalizeOptionalPositiveInteger(limit, 'limit', warnings);
+    const cleanMaxEmployees = normalizeOptionalPositiveInteger(
+        maxEmployees,
+        'maxEmployees',
+        warnings
+    );
+    const candidates = [cleanLimit, cleanMaxEmployees].filter((value) => value !== null);
+
+    return candidates.length > 0 ? Math.min(...candidates) : null;
+}
+
+function validateBatchInput({ team, company_kod, apo, eos, scope, limit, maxEmployees }) {
     const warnings = [];
     const cleanTeam = toTrimmedString(team);
     const cleanCompany = toTrimmedString(company_kod);
     const apoDate = parseDateOnlyUTC(apo);
     const eosDate = parseDateOnlyUTC(eos);
     const normalizedScope = normalizeScope(scope, warnings);
+    const employeeLimit = resolveEmployeeLimit({ limit, maxEmployees, warnings });
 
     if (!cleanTeam) warnings.push('Λείπει team.');
     if (!cleanCompany) warnings.push('Λείπει company_kod.');
@@ -82,7 +114,8 @@ function validateBatchInput({ team, company_kod, apo, eos, scope }) {
         eos: eosDate,
         apoYMD: apoDate ? formatDateYMD(apoDate) : toTrimmedString(apo),
         eosYMD: eosDate ? formatDateYMD(eosDate) : toTrimmedString(eos),
-        scope: normalizedScope
+        scope: normalizedScope,
+        employeeLimit
     };
 }
 
@@ -141,13 +174,26 @@ function buildEmployeeQuery({ team, company_kod, apo, eos, ypokatasthma, kodikoi
     return query;
 }
 
-async function loadEmployeesForBatch({ team, company_kod, apo, eos, ypokatasthma, kodikoi }) {
-    return ErgazomenoiModel.find(
+async function loadEmployeesForBatch({
+    team,
+    company_kod,
+    apo,
+    eos,
+    ypokatasthma,
+    kodikoi,
+    limit
+}) {
+    const query = ErgazomenoiModel.find(
         buildEmployeeQuery({ team, company_kod, apo, eos, ypokatasthma, kodikoi })
     )
         .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
-        .sort({ kodikos: 1 })
-        .lean();
+        .sort({ kodikos: 1 });
+
+    if (limit !== null) {
+        query.limit(limit);
+    }
+
+    return query.lean();
 }
 
 async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma }) {
@@ -258,6 +304,90 @@ async function finishJob({ jobKey, update }) {
     return normalizeJobForReturn(job, { batchStatus: update.status });
 }
 
+async function updateJobProgress({ jobKey, progress }) {
+    const job = await PayrollPrecalcJobModel.findOneAndUpdate(
+        { jobKey },
+        { $set: progress },
+        {
+            returnDocument: 'after',
+            runValidators: true
+        }
+    ).lean();
+
+    return normalizeJobForReturn(job, { batchStatus: job?.status });
+}
+
+function snapshotYpokatasthmaMatches(snapshot, ypokatasthma) {
+    const requestedYpokatasthma = toTrimmedString(ypokatasthma);
+    const snapshotYpokatasthma = toTrimmedString(snapshot?.ypokatasthma);
+
+    if (!requestedYpokatasthma) return true;
+    if (!snapshotYpokatasthma) return true;
+
+    return snapshotYpokatasthma === requestedYpokatasthma;
+}
+
+function buildBaseBatchResult({
+    success,
+    job,
+    jobKey,
+    status,
+    dryRun,
+    key,
+    ypokatasthma,
+    totals,
+    items,
+    warnings,
+    failedEmployees
+}) {
+    return {
+        success,
+        batchStatus: status,
+        jobId: job?._id ? String(job._id) : '',
+        jobKey,
+        status,
+        dryRun,
+        scope: key.scope,
+        apo: key.apoYMD,
+        eos: key.eosYMD,
+        ypokatasthma,
+        totals,
+        items,
+        warnings,
+        failedEmployees,
+        employeesTotal: totals.eligible,
+        employeesDone: totals.generated,
+        employeesSkipped: totals.reused + totals.locked + totals.skippedExistingReady,
+        employeesFailed: totals.failed,
+        processedKodikos: items.map((item) => item.kodikos).filter(Boolean)
+    };
+}
+
+function buildFailedBatchResult({ key, jobKey = '', dryRun = false, warnings }) {
+    const totals = {
+        eligible: 0,
+        generated: 0,
+        reused: 0,
+        locked: 0,
+        skippedExistingReady: 0,
+        failed: 0
+    };
+
+    return buildBaseBatchResult({
+        success: false,
+        job: null,
+        jobKey,
+        status: 'FAILED',
+        dryRun,
+        key,
+        ypokatasthma: '',
+        totals,
+        items: [],
+        warnings,
+        failedEmployees: []
+    });
+}
+
 async function generateWorkFactsForCompanyPeriod({
     team,
     company_kod,
@@ -267,45 +397,55 @@ async function generateWorkFactsForCompanyPeriod({
     requestedBy = '',
     force = false,
     ypokatasthma = '',
-    kodikoi = []
+    kodikoi = [],
+    reuseExistingReady = true,
+    dryRun = false,
+    limit = null,
+    maxEmployees = null,
+    updateProgressEachEmployee = false
 }) {
-    const key = validateBatchInput({ team, company_kod, apo, eos, scope });
+    const key = validateBatchInput({ team, company_kod, apo, eos, scope, limit, maxEmployees });
 
     if (!key.isValid) {
-        return {
-            batchStatus: 'FAILED',
-            status: 'FAILED',
-            warnings: key.warnings,
-            employeesTotal: 0,
-            employeesDone: 0,
-            employeesSkipped: 0,
-            employeesFailed: 0,
-            processedKodikos: [],
-            failedEmployees: []
-        };
+        return buildFailedBatchResult({
+            key,
+            dryRun: dryRun === true,
+            warnings: key.warnings
+        });
     }
 
     const cleanYpokatasthma = toTrimmedString(ypokatasthma);
     const cleanKodikoi = normalizeKodikoi(kodikoi);
     const jobKey = buildJobKey({ ...key, ypokatasthma: cleanYpokatasthma });
-    const runningJob = await markJobRunning({
-        key,
-        jobKey,
-        requestedBy,
-        force,
-        ypokatasthma: cleanYpokatasthma
-    });
+    let activeJob = null;
 
-    if (runningJob.skipped) {
-        return runningJob.job;
+    if (dryRun !== true) {
+        const runningJob = await markJobRunning({
+            key,
+            jobKey,
+            requestedBy,
+            force,
+            ypokatasthma: cleanYpokatasthma
+        });
+
+        if (runningJob.skipped) {
+            return runningJob.job;
+        }
+
+        activeJob = runningJob.job;
     }
 
     const warnings = [];
-    const processedKodikos = [];
     const failedEmployees = [];
-    let employeesDone = 0;
-    let employeesSkipped = 0;
-    let employeesFailed = 0;
+    const items = [];
+    const totals = {
+        eligible: 0,
+        generated: 0,
+        reused: 0,
+        locked: 0,
+        skippedExistingReady: 0,
+        failed: 0
+    };
 
     try {
         const employees = await loadEmployeesForBatch({
@@ -314,18 +454,75 @@ async function generateWorkFactsForCompanyPeriod({
             apo: key.apo,
             eos: key.eos,
             ypokatasthma: cleanYpokatasthma,
-            kodikoi: cleanKodikoi
+            kodikoi: cleanKodikoi,
+            limit: key.employeeLimit
         });
+        totals.eligible = employees.length;
 
         for (const employee of employees) {
             const kodikos = toTrimmedString(employee.kodikos);
             if (!kodikos) {
-                employeesSkipped += 1;
+                totals.failed += 1;
                 warnings.push('SKIPPED_EMPLOYEE_WITHOUT_KODIKOS');
+                items.push({
+                    kodikos: '',
+                    status: 'FAILED',
+                    reason: 'missing_kodikos',
+                    message: 'Λείπει ο κωδικός εργαζομένου.'
+                });
                 continue;
             }
 
             try {
+                const existingSnapshot = await findWorkFactsSnapshot({
+                    team: key.team,
+                    company_kod: key.company_kod,
+                    kodikos,
+                    apo: key.apoYMD,
+                    eos: key.eosYMD,
+                    scope: key.scope
+                });
+                const existingStatus = toTrimmedString(existingSnapshot?.status);
+
+                if (existingSnapshot?.locked === true || existingStatus === 'LOCKED') {
+                    totals.locked += 1;
+                    warnings.push(`LOCKED_SKIPPED:${kodikos}`);
+                    items.push({ kodikos, status: 'LOCKED_SKIPPED' });
+                    continue;
+                }
+
+                if (existingSnapshot && existingStatus === 'READY' && force !== true) {
+                    if (!snapshotYpokatasthmaMatches(existingSnapshot, cleanYpokatasthma)) {
+                        totals.skippedExistingReady += 1;
+                        warnings.push(`SKIPPED_EXISTING_READY_YP_MISMATCH:${kodikos}`);
+                        items.push({
+                            kodikos,
+                            status: 'SKIPPED_EXISTING_READY',
+                            reason: 'ypokatasthma_mismatch'
+                        });
+                        continue;
+                    }
+
+                    if (reuseExistingReady === true) {
+                        totals.reused += 1;
+                        items.push({ kodikos, status: 'REUSED_READY' });
+                        continue;
+                    }
+
+                    totals.skippedExistingReady += 1;
+                    items.push({
+                        kodikos,
+                        status: 'SKIPPED_EXISTING_READY',
+                        reason: 'reuse_existing_ready_disabled'
+                    });
+                    continue;
+                }
+
+                if (dryRun === true) {
+                    items.push({ kodikos, status: 'DRY_RUN_GENERATE' });
+                    continue;
+                }
+
                 const snapshot = await generateAndSaveWorkFactsForEmployeePeriod({
                     team: key.team,
                     company_kod: key.company_kod,
@@ -337,32 +534,62 @@ async function generateWorkFactsForCompanyPeriod({
                     force
                 });
 
-                processedKodikos.push(kodikos);
-
                 if (snapshot?.saveStatus === 'LOCKED_SKIPPED') {
-                    employeesSkipped += 1;
+                    totals.locked += 1;
                     warnings.push(`LOCKED_SKIPPED:${kodikos}`);
+                    items.push({ kodikos, status: 'LOCKED_SKIPPED' });
                     continue;
                 }
 
                 if (snapshot?.status === 'FAILED') {
-                    employeesFailed += 1;
+                    totals.failed += 1;
                     failedEmployees.push({
                         kodikos,
                         errorMessage: Array.isArray(snapshot.warnings)
                             ? snapshot.warnings.join(' | ')
                             : 'FAILED snapshot'
                     });
+                    items.push({
+                        kodikos,
+                        status: 'FAILED',
+                        message: Array.isArray(snapshot.warnings)
+                            ? snapshot.warnings.join(' | ')
+                            : 'Η παραγωγή snapshot δεν ολοκληρώθηκε ως READY.'
+                    });
                     continue;
                 }
 
-                employeesDone += 1;
+                totals.generated += 1;
+                items.push({ kodikos, status: 'GENERATED' });
             } catch (error) {
-                employeesFailed += 1;
+                totals.failed += 1;
                 failedEmployees.push({
                     kodikos,
                     errorMessage: error.message || 'Σφάλμα παραγωγής snapshot εργαζομένου.'
                 });
+                items.push({
+                    kodikos,
+                    status: 'FAILED',
+                    message: error.message || 'Σφάλμα παραγωγής snapshot εργαζομένου.'
+                });
+            } finally {
+                if (dryRun !== true && updateProgressEachEmployee === true) {
+                    await updateJobProgress({
+                        jobKey,
+                        progress: {
+                            employeesTotal: totals.eligible,
+                            employeesDone: totals.generated,
+                            employeesSkipped:
+                                totals.reused + totals.locked + totals.skippedExistingReady,
+                            employeesFailed: totals.failed,
+                            processedKodikos: items
+                                .map((item) => item.kodikos)
+                                .filter(Boolean),
+                            failedEmployees,
+                            warnings
+                        }
+                    });
+                }
             }
         }
 
@@ -370,23 +597,43 @@ async function generateWorkFactsForCompanyPeriod({
             warnings.push('Δεν βρέθηκαν εργαζόμενοι που τέμνουν το ζητούμενο διάστημα.');
         }
 
-        if (employeesFailed > 0 && employeesFailed < employees.length) {
+        const successfulItems =
+            totals.generated + totals.reused + totals.locked + totals.skippedExistingReady;
+
+        if (totals.failed > 0 && successfulItems > 0) {
             warnings.push('PARTIAL_FAILURE: Κάποιοι εργαζόμενοι απέτυχαν, το job σημειώθηκε SUCCESS.');
         }
 
-        const finalStatus = employees.length > 0 && employeesFailed === employees.length
+        const finalStatus = employees.length > 0 && totals.failed === employees.length
             ? 'FAILED'
             : 'SUCCESS';
+        const result = buildBaseBatchResult({
+            success: finalStatus !== 'FAILED',
+            job: activeJob,
+            jobKey,
+            status: finalStatus,
+            dryRun: dryRun === true,
+            key,
+            ypokatasthma: cleanYpokatasthma,
+            totals,
+            items,
+            warnings,
+            failedEmployees
+        });
 
-        return finishJob({
+        if (dryRun === true) {
+            return result;
+        }
+
+        const finishedJob = await finishJob({
             jobKey,
             update: {
                 status: finalStatus,
-                employeesTotal: employees.length,
-                employeesDone,
-                employeesSkipped,
-                employeesFailed,
-                processedKodikos,
+                employeesTotal: totals.eligible,
+                employeesDone: totals.generated,
+                employeesSkipped: totals.reused + totals.locked + totals.skippedExistingReady,
+                employeesFailed: totals.failed,
+                processedKodikos: items.map((item) => item.kodikos).filter(Boolean),
                 failedEmployees,
                 warnings,
                 errorMessage: finalStatus === 'FAILED'
@@ -394,21 +641,62 @@ async function generateWorkFactsForCompanyPeriod({
                     : ''
             }
         });
+
+        return {
+            ...finishedJob,
+            ...result,
+            jobId: finishedJob?._id ? String(finishedJob._id) : result.jobId
+        };
     } catch (error) {
-        return finishJob({
+        warnings.push(error.message || 'Σφάλμα batch παραγωγής work facts.');
+
+        if (dryRun === true) {
+            return buildBaseBatchResult({
+                success: false,
+                job: null,
+                jobKey,
+                status: 'FAILED',
+                dryRun: true,
+                key,
+                ypokatasthma: cleanYpokatasthma,
+                totals,
+                items,
+                warnings,
+                failedEmployees
+            });
+        }
+
+        const finishedJob = await finishJob({
             jobKey,
             update: {
                 status: 'FAILED',
-                employeesTotal: 0,
-                employeesDone,
-                employeesSkipped,
-                employeesFailed,
-                processedKodikos,
+                employeesTotal: totals.eligible,
+                employeesDone: totals.generated,
+                employeesSkipped: totals.reused + totals.locked + totals.skippedExistingReady,
+                employeesFailed: totals.failed,
+                processedKodikos: items.map((item) => item.kodikos).filter(Boolean),
                 failedEmployees,
                 warnings,
                 errorMessage: error.message || 'Σφάλμα batch παραγωγής work facts.'
             }
         });
+
+        return {
+            ...finishedJob,
+            success: false,
+            jobId: finishedJob?._id ? String(finishedJob._id) : '',
+            jobKey,
+            status: 'FAILED',
+            dryRun: false,
+            scope: key.scope,
+            apo: key.apoYMD,
+            eos: key.eosYMD,
+            ypokatasthma: cleanYpokatasthma,
+            totals,
+            items,
+            warnings,
+            failedEmployees
+        };
     }
 }
 
