@@ -151,6 +151,10 @@ function normalizeJobForReturn(job, extra = {}) {
     };
 }
 
+function getJobId(job) {
+    return toTrimmedString(job?._id || job?.id);
+}
+
 function normalizeBatchJobForStatus(job) {
     const normalized = normalizeJobForReturn(job);
     if (!normalized) return null;
@@ -315,9 +319,19 @@ async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma })
     };
 }
 
-async function finishJob({ jobKey, update }) {
+function buildJobIdentityFilter({ jobId, jobKey }) {
+    const cleanJobId = toTrimmedString(jobId);
+
+    if (cleanJobId && mongoose.Types.ObjectId.isValid(cleanJobId)) {
+        return { _id: cleanJobId };
+    }
+
+    return { jobKey };
+}
+
+async function finishJob({ jobKey, jobId = '', update }) {
     const job = await PayrollPrecalcJobModel.findOneAndUpdate(
-        { jobKey },
+        buildJobIdentityFilter({ jobId, jobKey }),
         {
             $set: {
                 ...update,
@@ -333,9 +347,9 @@ async function finishJob({ jobKey, update }) {
     return normalizeJobForReturn(job, { batchStatus: update.status });
 }
 
-async function updateJobProgress({ jobKey, progress }) {
+async function updateJobProgress({ jobKey, jobId = '', progress }) {
     const job = await PayrollPrecalcJobModel.findOneAndUpdate(
-        { jobKey },
+        buildJobIdentityFilter({ jobId, jobKey }),
         { $set: progress },
         {
             returnDocument: 'after',
@@ -547,6 +561,7 @@ async function generateWorkFactsForCompanyPeriod({
     } = context;
     let activeJob = null;
     const hasStartedJob = Boolean(startedJob && startedJob.jobKey === jobKey);
+    const startedJobId = hasStartedJob ? getJobId(startedJob) : '';
 
     if (hasStartedJob) {
         activeJob = startedJob;
@@ -707,6 +722,7 @@ async function generateWorkFactsForCompanyPeriod({
                 if (dryRun !== true && updateProgressEachEmployee === true) {
                     await updateJobProgress({
                         jobKey,
+                        jobId: startedJobId,
                         progress: {
                             employeesTotal: totals.eligible,
                             employeesDone: totals.generated,
@@ -758,6 +774,7 @@ async function generateWorkFactsForCompanyPeriod({
 
         const finishedJob = await finishJob({
             jobKey,
+            jobId: startedJobId,
             update: {
                 status: finalStatus,
                 employeesTotal: totals.eligible,
@@ -799,6 +816,7 @@ async function generateWorkFactsForCompanyPeriod({
 
         const finishedJob = await finishJob({
             jobKey,
+            jobId: startedJobId,
             update: {
                 status: 'FAILED',
                 employeesTotal: totals.eligible,
@@ -838,11 +856,19 @@ async function getWorkFactsBatchJobStatus({ idOrJobKey, team, company_kod }) {
 
     if (!cleanIdOrJobKey || !cleanTeam || !cleanCompany) return null;
 
-    const identityQuery = mongoose.Types.ObjectId.isValid(cleanIdOrJobKey)
-        ? { _id: cleanIdOrJobKey }
-        : { jobKey: cleanIdOrJobKey };
+    if (mongoose.Types.ObjectId.isValid(cleanIdOrJobKey)) {
+        const jobById = await PayrollPrecalcJobModel.findById(cleanIdOrJobKey).lean();
+        if (
+            jobById &&
+            toTrimmedString(jobById.team) === cleanTeam &&
+            toTrimmedString(jobById.company_kod) === cleanCompany
+        ) {
+            return normalizeBatchJobForStatus(jobById);
+        }
+    }
+
     const job = await PayrollPrecalcJobModel.findOne({
-        ...identityQuery,
+        jobKey: cleanIdOrJobKey,
         team: cleanTeam,
         company_kod: cleanCompany
     }).lean();
