@@ -544,6 +544,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const generateBatchWorkFactsSnapshotsButton = document.getElementById(
         'generateBatchWorkFactsSnapshotsButton'
     );
+    const generateAllWorkFactsSnapshotsJobButton = document.getElementById(
+        'generateAllWorkFactsSnapshotsJobButton'
+    );
     let ergazomenoiOptionsCache = [];
     let forcedErgazomenosRecordForNavigation = null;
 
@@ -778,6 +781,25 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
+    function getAllBatchSnapshotJobPayload() {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const apo = currentSharedParams.startDate;
+        const eos = currentSharedParams.endDate;
+        const ypokatasthma =
+            normalizeYpokatasthmaValue(currentSharedParams._YPOKATASTHMA) ||
+            normalizeYpokatasthmaValue(currentSharedParams.ypokatasthma) ||
+            normalizeYpokatasthmaValue(getInputValue('ypokatasthma_Hidden')) ||
+            '0000';
+
+        return {
+            apo,
+            eos,
+            ypokatasthma,
+            scope: 'MONTHLY',
+            force: false
+        };
+    }
+
     async function postBatchSnapshotAction(payload) {
         const csrfToken = getCsrfToken();
         const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
@@ -797,6 +819,214 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         return data;
+    }
+
+    function buildBatchJobProgressHtml(job = {}) {
+        const employeesTotal = Number.parseInt(job.employeesTotal, 10) || 0;
+        const employeesDone = Number.parseInt(job.employeesDone, 10) || 0;
+        const employeesSkipped = Number.parseInt(job.employeesSkipped, 10) || 0;
+        const employeesFailed = Number.parseInt(job.employeesFailed, 10) || 0;
+        const completed = employeesDone + employeesSkipped + employeesFailed;
+        const percent = employeesTotal > 0
+            ? Math.min(100, Math.round((completed / employeesTotal) * 100))
+            : 0;
+        const processedKodikos = Array.isArray(job.processedKodikos)
+            ? job.processedKodikos
+            : [];
+        const lastProcessedKodikos = processedKodikos.length
+            ? processedKodikos[processedKodikos.length - 1]
+            : '-';
+        const warningsCount = Array.isArray(job.warnings) ? job.warnings.length : 0;
+
+        return [
+            ['Status', job.status || '-'],
+            ['Σύνολο εργαζομένων', employeesTotal],
+            ['Generated', employeesDone],
+            ['Skipped', employeesSkipped],
+            ['Failed', employeesFailed],
+            ['Progress', employeesTotal > 0 ? `${percent}%` : '-'],
+            ['Τελευταίος κωδικός', lastProcessedKodikos],
+            ['Warnings', warningsCount]
+        ]
+            .map(([label, value]) => (
+                `<div><strong>${escapeSnapshotSummaryHtml(label)}:</strong> ` +
+                `${escapeSnapshotSummaryHtml(value)}</div>`
+            ))
+            .join('');
+    }
+
+    function buildBatchJobFinalHtml(job = {}) {
+        const failedEmployees = Array.isArray(job.failedEmployees) ? job.failedEmployees : [];
+        const warningsCount = Array.isArray(job.warnings) ? job.warnings.length : 0;
+        const failedHtml = failedEmployees.length
+            ? '<hr><div><strong>Failed employees:</strong></div>' +
+              failedEmployees
+                  .slice(0, 5)
+                  .map((employee) => (
+                      '<div>' +
+                      `${escapeSnapshotSummaryHtml(employee.kodikos || '-')}: ` +
+                      `${escapeSnapshotSummaryHtml(employee.errorMessage || '-')}` +
+                      '</div>'
+                  ))
+                  .join('')
+            : '';
+        const errorHtml = job.errorMessage
+            ? `<hr><div><strong>Error:</strong> ${escapeSnapshotSummaryHtml(job.errorMessage)}</div>`
+            : '';
+
+        return buildBatchJobProgressHtml({
+            ...job,
+            warnings: Array.from({ length: warningsCount })
+        }) + failedHtml + errorHtml;
+    }
+
+    async function confirmAllBatchSnapshotJob() {
+        const text =
+            'Θα ξεκινήσει batch job για όλους τους eligible εργαζόμενους της περιόδου. ' +
+            'Δεν θα γίνει overwrite σε υπάρχοντα READY ή locked snapshots. ' +
+            'Το job θα συνεχίσει στο background όσο η εφαρμογή τρέχει.';
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            const result = await window.Swal.fire({
+                icon: 'question',
+                title: 'Snapshots για όλη την περίοδο',
+                text,
+                showCancelButton: true,
+                confirmButtonText: 'Δημιουργία',
+                cancelButtonText: 'Ακύρωση',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                    cancelButton: 'class-secondary custom-cancel-button custom-swal-button'
+                }
+            });
+
+            return result.isConfirmed === true;
+        }
+
+        return window.confirm(text);
+    }
+
+    async function postAllBatchSnapshotJob(payload) {
+        const csrfToken = getCsrfToken();
+        const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
+        const response = await fetch('/api/kinhseis/workFactsSnapshot/batch-jobs', {
+            method: 'POST',
+            credentials: 'same-origin',
+            skipLoader: true,
+            headers: getJsonHeaders(),
+            body: JSON.stringify(requestPayload)
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok && data?.success !== true) {
+            const error = new Error(data?.message || data?.reason || 'Αποτυχία εκκίνησης job.');
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return data;
+    }
+
+    async function fetchBatchSnapshotJobStatus(jobId) {
+        const response = await fetch(
+            `/api/kinhseis/workFactsSnapshot/batch-jobs/${encodeURIComponent(jobId)}`,
+            {
+                method: 'GET',
+                credentials: 'same-origin',
+                skipLoader: true
+            }
+        );
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data?.success !== true) {
+            const error = new Error(data?.message || data?.reason || 'Αποτυχία status job.');
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return data.job || {};
+    }
+
+    async function showBatchJobProgress(job = {}) {
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            window.Swal.fire({
+                title: 'Batch snapshots σε εξέλιξη',
+                html: buildBatchJobProgressHtml(job),
+                allowOutsideClick: false,
+                allowEscapeKey: true,
+                showConfirmButton: false
+            });
+            return Promise.resolve();
+        }
+
+        window.alert('Batch snapshots σε εξέλιξη.');
+    }
+
+    function updateBatchJobProgress(job = {}) {
+        if (
+            window.Swal &&
+            typeof window.Swal.update === 'function' &&
+            typeof window.Swal.isVisible === 'function' &&
+            window.Swal.isVisible()
+        ) {
+            window.Swal.update({
+                title: 'Batch snapshots σε εξέλιξη',
+                html: buildBatchJobProgressHtml(job)
+            });
+        }
+    }
+
+    async function showBatchJobFinalResult(job = {}) {
+        const status = String(job.status || '').trim();
+        const isFailed = status === 'FAILED' || status === 'CANCELLED';
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire({
+                icon: isFailed ? 'error' : 'success',
+                title: isFailed
+                    ? 'Απέτυχε batch snapshots'
+                    : 'Ολοκληρώθηκε batch snapshots',
+                html: buildBatchJobFinalHtml(job),
+                confirmButtonText: 'Εντάξει',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button'
+                }
+            });
+        }
+
+        return showSnapshotActionMessage(
+            isFailed ? 'error' : 'success',
+            isFailed ? 'Απέτυχε batch snapshots' : 'Ολοκληρώθηκε batch snapshots',
+            `Status: ${status || '-'}`
+        );
+    }
+
+    async function pollBatchSnapshotJob(jobId) {
+        const terminalStatuses = new Set(['SUCCESS', 'FAILED', 'CANCELLED']);
+        const timeoutMs = 10 * 60 * 1000;
+        const intervalMs = 2000;
+        const startedAt = Date.now();
+        let lastJob = {};
+
+        while (Date.now() - startedAt <= timeoutMs) {
+            const job = await fetchBatchSnapshotJobStatus(jobId);
+            lastJob = job;
+            updateBatchJobProgress(job);
+
+            if (terminalStatuses.has(String(job.status || '').trim())) {
+                return job;
+            }
+
+            await new Promise((resolve) => {
+                window.setTimeout(resolve, intervalMs);
+            });
+        }
+
+        const timeoutError = new Error('batch_job_poll_timeout');
+        timeoutError.lastJob = lastJob;
+        throw timeoutError;
     }
 
     async function handleGenerateWorkFactsSnapshotClick(event) {
@@ -925,6 +1155,113 @@ document.addEventListener('DOMContentLoaded', function () {
                 'error',
                 'Σφάλμα',
                 'Αποτυχία batch snapshot.'
+            );
+        } finally {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
+    }
+
+    async function handleGenerateAllWorkFactsSnapshotsJobClick(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
+
+        if (button.dataset.allowed === '0') {
+            await showSnapshotActionMessage(
+                'warning',
+                'Δεν έχετε δικαίωμα',
+                'Δεν έχετε δικαίωμα για batch snapshots.'
+            );
+            return;
+        }
+
+        const payload = getAllBatchSnapshotJobPayload();
+
+        if (!payload.apo || !payload.eos) {
+            await showSnapshotActionMessage(
+                'warning',
+                'Λείπει περίοδος',
+                'Επιλέξτε περίοδο πρώτα.'
+            );
+            return;
+        }
+
+        const confirmed = await confirmAllBatchSnapshotJob();
+        if (!confirmed) return;
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = 'Εκκίνηση...';
+
+        try {
+            const startedJob = await postAllBatchSnapshotJob(payload);
+            const jobId = startedJob.jobId;
+
+            if (!jobId) {
+                throw new Error('missing_job_id');
+            }
+
+            if (startedJob.reason === 'already_running') {
+                await showSnapshotActionMessage(
+                    'info',
+                    'Υπάρχει ενεργό job',
+                    'Υπάρχει ήδη ενεργό batch snapshot job. Θα συνεχιστεί η παρακολούθηση.'
+                );
+            }
+
+            await showBatchJobProgress({
+                status: startedJob.status || 'RUNNING',
+                employeesTotal: 0,
+                employeesDone: 0,
+                employeesSkipped: 0,
+                employeesFailed: 0,
+                processedKodikos: [],
+                warnings: []
+            });
+
+            const finalJob = await pollBatchSnapshotJob(jobId);
+            await showBatchJobFinalResult(finalJob);
+        } catch (error) {
+            if (error.message === 'batch_job_poll_timeout') {
+                await showSnapshotActionMessage(
+                    'warning',
+                    'Το job συνεχίζει',
+                    'Το polling σταμάτησε λόγω χρόνου. Το job μπορεί να συνεχίζει στο background.'
+                );
+                return;
+            }
+
+            if (error.status === 403 || error.payload?.reason === 'insufficient_privileges') {
+                await showSnapshotActionMessage(
+                    'warning',
+                    'Δεν έχετε δικαίωμα',
+                    'Δεν έχετε δικαίωμα για batch snapshots.'
+                );
+                return;
+            }
+
+            if (error.status === 404 || error.payload?.reason === 'not_found') {
+                await showSnapshotActionMessage(
+                    'error',
+                    'Δεν βρέθηκε job',
+                    'Δεν βρέθηκε το batch job.'
+                );
+                return;
+            }
+
+            if (error.payload?.reason === 'force_not_allowed') {
+                await showSnapshotActionMessage(
+                    'error',
+                    'Μη επιτρεπτή ενέργεια',
+                    'Το force:true δεν επιτρέπεται.'
+                );
+                return;
+            }
+
+            await showSnapshotActionMessage(
+                'error',
+                'Σφάλμα',
+                error.payload?.message || 'Αποτυχία batch snapshot job.'
             );
         } finally {
             button.innerHTML = originalHtml;
@@ -2132,6 +2469,13 @@ document.addEventListener('DOMContentLoaded', function () {
         generateBatchWorkFactsSnapshotsButton.addEventListener(
             'click',
             handleGenerateBatchWorkFactsSnapshotsClick
+        );
+    }
+
+    if (generateAllWorkFactsSnapshotsJobButton) {
+        generateAllWorkFactsSnapshotsJobButton.addEventListener(
+            'click',
+            handleGenerateAllWorkFactsSnapshotsJobClick
         );
     }
 
