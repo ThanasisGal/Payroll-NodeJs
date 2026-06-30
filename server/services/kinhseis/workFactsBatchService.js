@@ -151,6 +151,35 @@ function normalizeJobForReturn(job, extra = {}) {
     };
 }
 
+function normalizeBatchJobForStatus(job) {
+    const normalized = normalizeJobForReturn(job);
+    if (!normalized) return null;
+
+    return {
+        id: normalized._id ? String(normalized._id) : '',
+        jobKey: normalized.jobKey || '',
+        status: normalized.status || '',
+        scope: normalized.scope || '',
+        apo: normalized.apo || '',
+        eos: normalized.eos || '',
+        ypokatasthma: normalized.ypokatasthma || '',
+        startedAt: normalized.startedAt || null,
+        finishedAt: normalized.finishedAt || null,
+        employeesTotal: normalized.employeesTotal || 0,
+        employeesDone: normalized.employeesDone || 0,
+        employeesSkipped: normalized.employeesSkipped || 0,
+        employeesFailed: normalized.employeesFailed || 0,
+        processedKodikos: Array.isArray(normalized.processedKodikos)
+            ? normalized.processedKodikos
+            : [],
+        failedEmployees: Array.isArray(normalized.failedEmployees)
+            ? normalized.failedEmployees
+            : [],
+        warnings: Array.isArray(normalized.warnings) ? normalized.warnings : [],
+        errorMessage: normalized.errorMessage || ''
+    };
+}
+
 function buildEmployeeQuery({ team, company_kod, apo, eos, ypokatasthma, kodikoi }) {
     const query = {
         team,
@@ -388,6 +417,96 @@ function buildFailedBatchResult({ key, jobKey = '', dryRun = false, warnings }) 
     });
 }
 
+function buildBatchRunContext({
+    team,
+    company_kod,
+    apo,
+    eos,
+    scope,
+    ypokatasthma,
+    kodikoi,
+    limit,
+    maxEmployees,
+    dryRun
+}) {
+    const key = validateBatchInput({ team, company_kod, apo, eos, scope, limit, maxEmployees });
+
+    if (!key.isValid) {
+        return {
+            isValid: false,
+            result: buildFailedBatchResult({
+                key,
+                dryRun: dryRun === true,
+                warnings: key.warnings
+            })
+        };
+    }
+
+    const cleanYpokatasthma = toTrimmedString(ypokatasthma);
+    const cleanKodikoi = normalizeKodikoi(kodikoi);
+    const jobKey = buildJobKey({ ...key, ypokatasthma: cleanYpokatasthma });
+
+    return {
+        isValid: true,
+        key,
+        cleanYpokatasthma,
+        cleanKodikoi,
+        jobKey
+    };
+}
+
+async function startWorkFactsBatchJob({
+    team,
+    company_kod,
+    apo,
+    eos,
+    scope = 'MONTHLY',
+    requestedBy = '',
+    force = false,
+    ypokatasthma = '',
+    kodikoi = [],
+    dryRun = false,
+    limit = null,
+    maxEmployees = null
+}) {
+    const context = buildBatchRunContext({
+        team,
+        company_kod,
+        apo,
+        eos,
+        scope,
+        ypokatasthma,
+        kodikoi,
+        limit,
+        maxEmployees,
+        dryRun
+    });
+
+    if (!context.isValid) {
+        return {
+            success: false,
+            statusCode: 400,
+            reason: 'invalid_batch_input',
+            result: context.result
+        };
+    }
+
+    const runningJob = await markJobRunning({
+        key: context.key,
+        jobKey: context.jobKey,
+        requestedBy,
+        force,
+        ypokatasthma: context.cleanYpokatasthma
+    });
+
+    return {
+        success: true,
+        alreadyRunning: runningJob.skipped === true,
+        job: runningJob.job,
+        jobKey: context.jobKey
+    };
+}
+
 async function generateWorkFactsForCompanyPeriod({
     team,
     company_kod,
@@ -402,24 +521,36 @@ async function generateWorkFactsForCompanyPeriod({
     dryRun = false,
     limit = null,
     maxEmployees = null,
-    updateProgressEachEmployee = false
+    updateProgressEachEmployee = false,
+    startedJob = null
 }) {
-    const key = validateBatchInput({ team, company_kod, apo, eos, scope, limit, maxEmployees });
+    const context = buildBatchRunContext({
+        team,
+        company_kod,
+        apo,
+        eos,
+        scope,
+        ypokatasthma,
+        kodikoi,
+        limit,
+        maxEmployees,
+        dryRun
+    });
 
-    if (!key.isValid) {
-        return buildFailedBatchResult({
-            key,
-            dryRun: dryRun === true,
-            warnings: key.warnings
-        });
-    }
+    if (!context.isValid) return context.result;
 
-    const cleanYpokatasthma = toTrimmedString(ypokatasthma);
-    const cleanKodikoi = normalizeKodikoi(kodikoi);
-    const jobKey = buildJobKey({ ...key, ypokatasthma: cleanYpokatasthma });
+    const {
+        key,
+        cleanYpokatasthma,
+        cleanKodikoi,
+        jobKey
+    } = context;
     let activeJob = null;
+    const hasStartedJob = Boolean(startedJob && startedJob.jobKey === jobKey);
 
-    if (dryRun !== true) {
+    if (hasStartedJob) {
+        activeJob = startedJob;
+    } else if (dryRun !== true) {
         const runningJob = await markJobRunning({
             key,
             jobKey,
@@ -621,7 +752,7 @@ async function generateWorkFactsForCompanyPeriod({
             failedEmployees
         });
 
-        if (dryRun === true) {
+        if (dryRun === true && !activeJob) {
             return result;
         }
 
@@ -650,7 +781,7 @@ async function generateWorkFactsForCompanyPeriod({
     } catch (error) {
         warnings.push(error.message || 'Σφάλμα batch παραγωγής work facts.');
 
-        if (dryRun === true) {
+        if (dryRun === true && !activeJob) {
             return buildBaseBatchResult({
                 success: false,
                 job: null,
@@ -700,6 +831,27 @@ async function generateWorkFactsForCompanyPeriod({
     }
 }
 
+async function getWorkFactsBatchJobStatus({ idOrJobKey, team, company_kod }) {
+    const cleanIdOrJobKey = toTrimmedString(idOrJobKey);
+    const cleanTeam = toTrimmedString(team);
+    const cleanCompany = toTrimmedString(company_kod);
+
+    if (!cleanIdOrJobKey || !cleanTeam || !cleanCompany) return null;
+
+    const identityQuery = mongoose.Types.ObjectId.isValid(cleanIdOrJobKey)
+        ? { _id: cleanIdOrJobKey }
+        : { jobKey: cleanIdOrJobKey };
+    const job = await PayrollPrecalcJobModel.findOne({
+        ...identityQuery,
+        team: cleanTeam,
+        company_kod: cleanCompany
+    }).lean();
+
+    return normalizeBatchJobForStatus(job);
+}
+
 module.exports = {
-    generateWorkFactsForCompanyPeriod
+    generateWorkFactsForCompanyPeriod,
+    startWorkFactsBatchJob,
+    getWorkFactsBatchJobStatus
 };

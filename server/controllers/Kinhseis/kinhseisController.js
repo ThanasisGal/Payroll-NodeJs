@@ -39,6 +39,11 @@ const {
     generateAndSaveWorkFactsForEmployeePeriod,
     findWorkFactsSnapshot
 } = require('../../services/kinhseis/workFactsPrecalcService');
+const {
+    generateWorkFactsForCompanyPeriod,
+    startWorkFactsBatchJob,
+    getWorkFactsBatchJobStatus
+} = require('../../services/kinhseis/workFactsBatchService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -159,6 +164,34 @@ function parseBatchMaxEmployees(value) {
     return { value: parsed };
 }
 
+function parseOptionalPositiveIntegerParam(value, fieldName) {
+    if (value === undefined || value === null || value === '') {
+        return { value: null };
+    }
+
+    const raw = String(value).trim();
+    if (!/^\d+$/.test(raw)) {
+        return {
+            error: {
+                reason: `invalid_${fieldName}`,
+                message: `Το ${fieldName} πρέπει να είναι θετικός ακέραιος.`
+            }
+        };
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isSafeInteger(parsed) || parsed < 1) {
+        return {
+            error: {
+                reason: `invalid_${fieldName}`,
+                message: `Το ${fieldName} πρέπει να είναι θετικός ακέραιος.`
+            }
+        };
+    }
+
+    return { value: parsed };
+}
+
 function parseSnapshotDateUTC(dateString) {
     const normalized = normalizeSnapshotDateParam(dateString);
     if (!normalized) return null;
@@ -204,6 +237,27 @@ function snapshotYpokatasthmaMatches(snapshot, ypokatasthma) {
     if (!snapshotYpokatasthma) return true;
 
     return snapshotYpokatasthma === requestedYpokatasthma;
+}
+
+function hasPrivilegeValue(value) {
+    return value === true || String(value || '').trim().toLowerCase() === 'true';
+}
+
+async function hasApasxolhseisBatchPrivilege(req) {
+    const userId = String(req.session?.userId || '').trim();
+    if (!userId) return false;
+
+    const userPrivileges = await UserPrivilegesModel.findOne({
+        userId,
+        form: 'Apasxolhseis'
+    }).lean();
+    const privileges = userPrivileges?.privileges || {};
+
+    return (
+        hasPrivilegeValue(privileges.admin) ||
+        hasPrivilegeValue(privileges.update) ||
+        hasPrivilegeValue(privileges.create)
+    );
 }
 
 // Έλεγχος και δημιουργία του φακέλου downloads αν δεν υπάρχει
@@ -1464,6 +1518,222 @@ class kinhseisController {
                 message: error.statusCode
                     ? error.message
                     : 'Σφάλμα κατά το batch generate precalc snapshots.'
+            });
+        }
+    };
+
+    static startWorkFactsSnapshotBatchJob = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const requestedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+            const apo = normalizeSnapshotDateParam(body.apo || body.apo_hmeromhnia);
+            const eos = normalizeSnapshotDateParam(body.eos || body.eos_hmeromhnia);
+            const apoDate = parseSnapshotDateUTC(apo);
+            const eosDate = parseSnapshotDateUTC(eos);
+            const ypokatasthma = String(body.ypokatasthma || '').trim();
+            const scope = String(body.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
+            const force = parseBooleanParam(body.force, false);
+            const dryRun = parseBooleanParam(body.dryRun, false);
+            const limitResult = parseOptionalPositiveIntegerParam(body.limit, 'limit');
+            const maxEmployeesResult = parseOptionalPositiveIntegerParam(
+                body.maxEmployees,
+                'maxEmployees'
+            );
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'missing_session',
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            const hasPrivilege = await hasApasxolhseisBatchPrivilege(req);
+            if (!hasPrivilege) {
+                return res.status(403).json({
+                    success: false,
+                    reason: 'insufficient_privileges',
+                    message: 'Δεν έχετε δικαίωμα για batch snapshots Απασχολήσεων.'
+                });
+            }
+
+            if (!apo || !eos || !apoDate || !eosDate) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'invalid_period',
+                    message: 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                });
+            }
+
+            if (apoDate > eosDate) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'invalid_period_order',
+                    message: 'Το apo πρέπει να είναι μικρότερο ή ίσο από το eos.'
+                });
+            }
+
+            if (scope !== 'MONTHLY') {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'unsupported_scope',
+                    message: 'Για batch job υποστηρίζεται μόνο scope MONTHLY.'
+                });
+            }
+
+            if (force === true) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'force_not_allowed',
+                    message: 'Το force:true δεν επιτρέπεται στο batch job.'
+                });
+            }
+
+            if (limitResult.error) {
+                return res.status(400).json({
+                    success: false,
+                    ...limitResult.error
+                });
+            }
+
+            if (maxEmployeesResult.error) {
+                return res.status(400).json({
+                    success: false,
+                    ...maxEmployeesResult.error
+                });
+            }
+
+            const kodikoi = normalizeBatchKodikoi(body.kodikoi);
+            const limit = limitResult.value;
+            const maxEmployees = maxEmployeesResult.value;
+            const startedJob = await startWorkFactsBatchJob({
+                team,
+                company_kod,
+                apo,
+                eos,
+                scope,
+                requestedBy,
+                force: false,
+                ypokatasthma,
+                kodikoi,
+                dryRun,
+                limit,
+                maxEmployees
+            });
+
+            if (startedJob.success !== true) {
+                return res.status(startedJob.statusCode || 400).json({
+                    success: false,
+                    reason: startedJob.reason || 'invalid_batch_job',
+                    message: 'Δεν ήταν δυνατή η εκκίνηση του batch snapshot job.',
+                    details: startedJob.result || null
+                });
+            }
+
+            const job = startedJob.job || {};
+            const responsePayload = {
+                success: true,
+                jobId: job._id ? String(job._id) : '',
+                jobKey: startedJob.jobKey || job.jobKey || '',
+                status: job.status || 'RUNNING',
+                message: startedJob.alreadyRunning
+                    ? 'Υπάρχει ήδη ενεργό batch snapshot job.'
+                    : 'Το batch snapshot job ξεκίνησε.'
+            };
+
+            if (startedJob.alreadyRunning) {
+                responsePayload.reason = 'already_running';
+                return res.json(responsePayload);
+            }
+
+            res.json(responsePayload);
+
+            setImmediate(() => {
+                generateWorkFactsForCompanyPeriod({
+                    team,
+                    company_kod,
+                    apo,
+                    eos,
+                    scope,
+                    requestedBy,
+                    force: false,
+                    ypokatasthma,
+                    kodikoi,
+                    reuseExistingReady: true,
+                    dryRun,
+                    limit,
+                    maxEmployees,
+                    updateProgressEachEmployee: true,
+                    startedJob: job
+                }).catch((error) => {
+                    console.error(
+                        'Background work facts snapshot batch job failed:',
+                        error
+                    );
+                });
+            });
+        } catch (error) {
+            console.error(
+                'Error into kinhseisController -> startWorkFactsSnapshotBatchJob :',
+                error
+            );
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά την εκκίνηση batch snapshot job.'
+            });
+        }
+    };
+
+    static getWorkFactsSnapshotBatchJobStatus = async (req, res) => {
+        try {
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const jobId = String(req.params?.jobId || '').trim();
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'missing_session',
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            const job = await getWorkFactsBatchJobStatus({
+                idOrJobKey: jobId,
+                team,
+                company_kod
+            });
+
+            if (!job) {
+                return res.status(404).json({
+                    success: false,
+                    reason: 'not_found',
+                    message: 'Δεν βρέθηκε batch snapshot job.'
+                });
+            }
+
+            return res.json({
+                success: true,
+                job
+            });
+        } catch (error) {
+            console.error(
+                'Error into kinhseisController -> getWorkFactsSnapshotBatchJobStatus :',
+                error
+            );
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα ανάγνωσης batch snapshot job.'
             });
         }
     };
