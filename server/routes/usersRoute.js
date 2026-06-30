@@ -1166,6 +1166,12 @@ router.post(
     kinhseisController.generateWorkFactsSnapshot
 );
 
+router.post(
+    '/api/kinhseis/workFactsSnapshot/batch-generate',
+    checkAuth,
+    kinhseisController.batchGenerateWorkFactsSnapshots
+);
+
 router.get('/api/kinhseis/getApasxolhseis', kinhseisController.getApasxolhseis);
 
 router.get('/api/kinhseis/getEthsioSynoloYperorion', kinhseisController.getEthsioSynoloYperorion);
