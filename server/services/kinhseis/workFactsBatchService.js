@@ -329,14 +329,41 @@ function buildJobIdentityFilter({ jobId, jobKey }) {
     return { jobKey };
 }
 
+function pickMutableJobUpdateFields(update = {}) {
+    const allowedFields = [
+        'status',
+        'startedAt',
+        'finishedAt',
+        'employeesTotal',
+        'employeesDone',
+        'employeesSkipped',
+        'employeesFailed',
+        'processedKodikos',
+        'failedEmployees',
+        'warnings',
+        'errorMessage',
+        'force',
+        'sourceVersion'
+    ];
+    const picked = {};
+
+    for (const field of allowedFields) {
+        if (Object.prototype.hasOwnProperty.call(update, field)) {
+            picked[field] = update[field];
+        }
+    }
+
+    return picked;
+}
+
 async function finishJob({ jobKey, jobId = '', update }) {
     const job = await PayrollPrecalcJobModel.findOneAndUpdate(
         buildJobIdentityFilter({ jobId, jobKey }),
         {
-            $set: {
+            $set: pickMutableJobUpdateFields({
                 ...update,
                 finishedAt: new Date()
-            }
+            })
         },
         {
             returnDocument: 'after',
@@ -350,7 +377,7 @@ async function finishJob({ jobKey, jobId = '', update }) {
 async function updateJobProgress({ jobKey, jobId = '', progress }) {
     const job = await PayrollPrecalcJobModel.findOneAndUpdate(
         buildJobIdentityFilter({ jobId, jobKey }),
-        { $set: progress },
+        { $set: pickMutableJobUpdateFields(progress) },
         {
             returnDocument: 'after',
             runValidators: true
