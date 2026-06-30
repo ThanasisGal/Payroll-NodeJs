@@ -538,6 +538,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const typoiApodoxonDropdown = document.getElementById('typosApodoxon');
     const prevButton = document.getElementById('prevButton');
     const nextButton = document.getElementById('nextButton');
+    const generateWorkFactsSnapshotButton = document.getElementById(
+        'generateWorkFactsSnapshotButton'
+    );
     let ergazomenoiOptionsCache = [];
     let forcedErgazomenosRecordForNavigation = null;
 
@@ -596,6 +599,120 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         return headers;
+    }
+
+    function showSnapshotActionMessage(icon, title, text) {
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            return window.Swal.fire({
+                icon,
+                title,
+                text,
+                confirmButtonText: 'Εντάξει',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button'
+                }
+            });
+        }
+
+        window.alert(text || title);
+        return Promise.resolve();
+    }
+
+    function getSnapshotActionPayload() {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const employee = currentSharedParams.ergazomenoi || {};
+        const kodikos = String(employee.kodikos || getInputValue('kodikosHidden')).trim();
+        const apo = currentSharedParams.startDate;
+        const eos = currentSharedParams.endDate;
+        const ypokatasthma =
+            normalizeYpokatasthmaValue(currentSharedParams._YPOKATASTHMA) ||
+            normalizeYpokatasthmaValue(currentSharedParams.ypokatasthma) ||
+            normalizeYpokatasthmaValue(getInputValue('ypokatasthma_Hidden')) ||
+            '0000';
+
+        return {
+            kodikos,
+            apo,
+            eos,
+            ypokatasthma,
+            scope: 'MONTHLY',
+            force: false
+        };
+    }
+
+    async function handleGenerateWorkFactsSnapshotClick(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
+
+        const payload = getSnapshotActionPayload();
+
+        if (!payload.kodikos || !payload.apo || !payload.eos) {
+            await showSnapshotActionMessage(
+                'warning',
+                'Λείπουν στοιχεία',
+                'Επιλέξτε εργαζόμενο και περίοδο πρώτα.'
+            );
+            return;
+        }
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = 'Δημιουργία...';
+
+        try {
+            const csrfToken = getCsrfToken();
+            const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
+            const response = await fetch('/api/kinhseis/workFactsSnapshot/generate', {
+                method: 'POST',
+                credentials: 'same-origin',
+                skipLoader: true,
+                headers: getJsonHeaders(),
+                body: JSON.stringify(requestPayload)
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (response.status === 409 && data?.reason === 'locked_snapshot') {
+                await showSnapshotActionMessage(
+                    'warning',
+                    'Κλειδωμένο snapshot',
+                    'Το snapshot είναι κλειδωμένο και δεν μπορεί να αλλάξει.'
+                );
+                return;
+            }
+
+            if (!response.ok || data?.success !== true) {
+                await showSnapshotActionMessage(
+                    'error',
+                    'Σφάλμα',
+                    data?.message || data?.reason || 'Αποτυχία δημιουργίας snapshot.'
+                );
+                return;
+            }
+
+            if (data.reused === true) {
+                await showSnapshotActionMessage(
+                    'info',
+                    'Υπάρχον snapshot',
+                    'Υπάρχει ήδη έτοιμο snapshot για την περίοδο.'
+                );
+                return;
+            }
+
+            await showSnapshotActionMessage(
+                'success',
+                'Ολοκληρώθηκε',
+                'Δημιουργήθηκε snapshot περιόδου.'
+            );
+        } catch (error) {
+            await showSnapshotActionMessage(
+                'error',
+                'Σφάλμα',
+                'Αποτυχία δημιουργίας snapshot.'
+            );
+        } finally {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
     }
 
     function extractResponseArray(payload) {
@@ -1785,6 +1902,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.loadErgazomenoi(getEnergoiSelection(), syncYpokatasthmaHidden());
             }
         });
+    }
+
+    if (generateWorkFactsSnapshotButton) {
+        generateWorkFactsSnapshotButton.addEventListener(
+            'click',
+            handleGenerateWorkFactsSnapshotClick
+        );
     }
 
     ['saveButton', 'editButton', 'undoButton', 'deleteButton'].forEach((buttonId) => {
