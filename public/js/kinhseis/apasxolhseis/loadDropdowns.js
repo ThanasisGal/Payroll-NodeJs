@@ -275,6 +275,229 @@ function resetApasxolhseisPipelineLoader() {
     setApasxolhseisPipelineLoaderVisible(false);
 }
 
+(function setupApasxolhseisCompactLoader() {
+    if (window.apasxolhseisCompactLoader) return;
+
+    const SHOW_DELAY_MS = 160;
+    const MIN_VISIBLE_MS = 420;
+    const STYLE_ID = 'apasxolhseisCompactLoaderStyles';
+    const LOADER_ID = 'apasxolhseisCompactLoader';
+    const LEGACY_LOADER_SELECTORS = [
+        '#appLoader',
+        '.app-loader',
+        '.app-loader--simple',
+        '.loader-container',
+        '.content-dim-overlay'
+    ];
+
+    let depth = 0;
+    let showTimer = null;
+    let hideTimer = null;
+    let shownAt = 0;
+    let loaderElement = null;
+
+    function ensureStyles() {
+        if (document.getElementById(STYLE_ID)) return;
+
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        const nonce =
+            document.querySelector('script[nonce]')?.nonce ||
+            document.querySelector('meta[name="csp-nonce"]')?.getAttribute('content') ||
+            '';
+        if (nonce) {
+            style.setAttribute('nonce', nonce);
+        }
+        style.textContent = `
+.apasxolhseis-compact-loader {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 100000000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 7px 11px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+    color: #1f2937;
+    font-size: 0.82rem;
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, calc(-50% - 6px));
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+.apasxolhseis-compact-loader-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+}
+body.apasxolhseis-compact-loader-active #appLoader,
+body.apasxolhseis-compact-loader-active .app-loader,
+body.apasxolhseis-compact-loader-active .app-loader--simple,
+body.apasxolhseis-compact-loader-active .loader-container,
+body.apasxolhseis-compact-loader-active .content-dim-overlay,
+.apasxolhseis-legacy-loader-suppressed {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+.apasxolhseis-compact-loader__spinner {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    border: 2px solid rgba(37, 99, 235, 0.2);
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: apasxolhseisCompactLoaderSpin 700ms linear infinite;
+}
+.apasxolhseis-compact-loader__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@keyframes apasxolhseisCompactLoaderSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}`;
+        document.head.appendChild(style);
+    }
+
+    function ensureLoaderElement() {
+        if (loaderElement && document.body.contains(loaderElement)) {
+            return loaderElement;
+        }
+
+        ensureStyles();
+
+        loaderElement = document.getElementById(LOADER_ID);
+        if (!loaderElement) {
+            loaderElement = document.createElement('div');
+            loaderElement.id = LOADER_ID;
+            loaderElement.className = 'apasxolhseis-compact-loader';
+            loaderElement.setAttribute('role', 'status');
+            loaderElement.setAttribute('aria-live', 'polite');
+
+            const spinner = document.createElement('span');
+            spinner.className = 'apasxolhseis-compact-loader__spinner';
+            spinner.setAttribute('aria-hidden', 'true');
+
+            const text = document.createElement('span');
+            text.className = 'apasxolhseis-compact-loader__text';
+            text.textContent = 'Φόρτωση απασχολήσεων...';
+
+            loaderElement.append(spinner, text);
+            document.body.appendChild(loaderElement);
+        }
+
+        return loaderElement;
+    }
+
+    function setMessage(message) {
+        const element = ensureLoaderElement();
+        const text = element.querySelector('.apasxolhseis-compact-loader__text');
+        if (text) {
+            text.textContent = message || 'Φόρτωση απασχολήσεων...';
+        }
+    }
+
+    function setVisible(visible) {
+        const element = ensureLoaderElement();
+        element.classList.toggle('apasxolhseis-compact-loader-visible', visible);
+        if (visible) {
+            shownAt = Date.now();
+        }
+    }
+
+    function setBodyActive(active) {
+        document.body?.classList.toggle('apasxolhseis-compact-loader-active', !!active);
+        LEGACY_LOADER_SELECTORS.forEach((selector) => {
+            document.querySelectorAll(selector).forEach((element) => {
+                if (element.closest(`#${LOADER_ID}`)) return;
+                element.classList.toggle('apasxolhseis-legacy-loader-suppressed', !!active);
+            });
+        });
+    }
+
+    function clearTimers() {
+        if (showTimer) {
+            window.clearTimeout(showTimer);
+            showTimer = null;
+        }
+        if (hideTimer) {
+            window.clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+    }
+
+    window.apasxolhseisCompactLoader = {
+        show(message) {
+            depth += 1;
+            setMessage(message);
+            setBodyActive(true);
+
+            if (hideTimer) {
+                window.clearTimeout(hideTimer);
+                hideTimer = null;
+            }
+
+            if (showTimer || loaderElement?.classList.contains('apasxolhseis-compact-loader-visible')) {
+                return;
+            }
+
+            showTimer = window.setTimeout(() => {
+                showTimer = null;
+                if (depth > 0) {
+                    setVisible(true);
+                }
+            }, SHOW_DELAY_MS);
+        },
+
+        hide() {
+            depth = Math.max(0, depth - 1);
+            if (depth > 0) return;
+
+            if (showTimer) {
+                window.clearTimeout(showTimer);
+                showTimer = null;
+                setBodyActive(false);
+                return;
+            }
+
+            const isVisible =
+                loaderElement?.classList.contains('apasxolhseis-compact-loader-visible') === true;
+            if (!isVisible) {
+                setBodyActive(false);
+                return;
+            }
+
+            const elapsed = Date.now() - shownAt;
+            const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+            hideTimer = window.setTimeout(() => {
+                hideTimer = null;
+                if (depth === 0) {
+                    setVisible(false);
+                    setBodyActive(false);
+                }
+            }, remaining);
+        },
+
+        reset() {
+            depth = 0;
+            clearTimers();
+            setBodyActive(false);
+            if (loaderElement) {
+                loaderElement.classList.remove('apasxolhseis-compact-loader-visible');
+            }
+        }
+    };
+})();
+
 const saveButton = document.getElementById('saveButton');
 const updateButton = document.getElementById('updateButton');
 const undoButton = document.getElementById('undoButton');
@@ -1670,7 +1893,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const forcedRecord = forcedErgazomenosRecordForNavigation;
         forcedErgazomenosRecordForNavigation = null;
 
-        beginApasxolhseisPipelineLoader();
+        window.apasxolhseisCompactLoader?.reset();
+        window.apasxolhseisCompactLoader?.show('Φόρτωση απασχολήσεων...');
 
         try {
             await clearFormFields();
@@ -1851,7 +2075,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error('Dropdown change error:', error);
         } finally {
-            endApasxolhseisPipelineLoader();
+            window.apasxolhseisCompactLoader?.hide();
         }
     }
 
@@ -2195,7 +2419,7 @@ document.addEventListener('DOMContentLoaded', function () {
         activeEmployeePeriodFlowPromise = (async () => {
             const previousSuppress = window.apasxolhseisSuppressFieldEvents;
 
-            beginApasxolhseisPipelineLoader();
+            window.apasxolhseisCompactLoader?.show('Φόρτωση απασχολήσεων...');
 
             try {
                 window.apasxolhseisSuppressFieldEvents = true;
@@ -2334,17 +2558,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     sharedParams._ERGASIMES_HMERES_MHNA = _PRAGMATIKES_HMERES_ERGASIAS_MHNA;
 
+                    const calcTotalsEmployeeKod = sharedParams.ergazomenoi.kodikos;
+                    const calcTotalsPromise = fetchCalcTotals(
+                        calcTotalsEmployeeKod,
+                        startDateISOString,
+                        endDateISOString
+                    ).then(
+                        (result) => ({ result }),
+                        (error) => ({ error })
+                    );
+
                     document.dispatchEvent(new Event('sharedParamsReady'));
                     await waitForApasxolhseisKrathseisLoading();
                     if (!isCurrentFlow()) return;
 
-                    document.getElementById('kodikosHidden').value =
-                        sharedParams.ergazomenoi.kodikos;
-                    const result = await fetchCalcTotals(
-                        document.getElementById('kodikosHidden').value,
-                        startDateISOString,
-                        endDateISOString
-                    );
+                    document.getElementById('kodikosHidden').value = calcTotalsEmployeeKod;
+                    const calcTotalsState = await calcTotalsPromise;
+                    if (calcTotalsState.error) {
+                        throw calcTotalsState.error;
+                    }
+                    const result = calcTotalsState.result;
                     if (!isCurrentFlow()) return;
 
                     document.getElementById('oresArgion').value = formatValue(
@@ -2507,7 +2740,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 lastCompletedEmployeePeriodFlowKey = flowKey;
             } finally {
                 window.apasxolhseisSuppressFieldEvents = previousSuppress;
-                endApasxolhseisPipelineLoader();
+                window.apasxolhseisCompactLoader?.hide();
 
                 if (activeEmployeePeriodFlowKey === flowKey) {
                     activeEmployeePeriodFlowKey = '';

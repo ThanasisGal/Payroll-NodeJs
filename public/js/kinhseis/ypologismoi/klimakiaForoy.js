@@ -7,6 +7,7 @@ let _APODOXES_PRO_EKPTOSHS_FOROY_PIN0 = Array.from(Array(11), () => new Array(9)
 let _APODOXES_PRO_EKPTOSHS_FOROY_PIN1 = Array.from(Array(11), () => new Array(9));
 const taxEndpointCache = new Map();
 const taxEndpointInFlight = new Map();
+let klimakiaForoySharedParamsListenerRegistered = false;
 
 function cloneJson(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -43,6 +44,11 @@ async function getCachedTaxEndpointJson(cacheKey, url) {
 
 // Συνάρτηση που θα εκτελείται όταν φορτώνει το DOM
 async function initializeKlimakiaForoy() {
+    if (klimakiaForoySharedParamsListenerRegistered) {
+        return;
+    }
+
+    klimakiaForoySharedParamsListenerRegistered = true;
     document.addEventListener('sharedParamsReady', async function () {
         const sharedParams = window.sharedParams;
         _AA_FOROLOGIKHS_KLIMAKAS = parseFloat(sharedParams.genikesParametroi[27].timh);
