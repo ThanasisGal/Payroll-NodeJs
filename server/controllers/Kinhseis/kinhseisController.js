@@ -131,6 +131,81 @@ function parseBooleanParam(value, defaultValue = false) {
     return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
 }
 
+function parseBatchMaxEmployees(value) {
+    if (value === undefined || value === null || value === '') {
+        return { value: 5 };
+    }
+
+    const parsed = Number.parseInt(String(value), 10);
+
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return {
+            error: {
+                reason: 'invalid_max_employees',
+                message: 'Το maxEmployees πρέπει να είναι θετικός ακέραιος.'
+            }
+        };
+    }
+
+    if (parsed > 5) {
+        return {
+            error: {
+                reason: 'max_employees_limit',
+                message: 'Το maxEmployees δεν μπορεί να είναι μεγαλύτερο από 5.'
+            }
+        };
+    }
+
+    return { value: parsed };
+}
+
+function parseSnapshotDateUTC(dateString) {
+    const normalized = normalizeSnapshotDateParam(dateString);
+    if (!normalized) return null;
+
+    const [year, month, day] = normalized.split('-').map((part) => Number.parseInt(part, 10));
+    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+}
+
+function normalizeBatchKodikoi(value) {
+    if (!Array.isArray(value)) return [];
+
+    return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+}
+
+function buildBatchEmployeeQuery({ team, company_kod, apoDate, eosDate, ypokatasthma, kodikoi }) {
+    const query = {
+        team,
+        company_kod,
+        hmeromhnia_proslhpshs: mongoose.trusted({ $lte: eosDate }),
+        $or: mongoose.trusted([
+            { hmeromhnia_apoxorhshs: null },
+            { hmeromhnia_apoxorhshs: mongoose.trusted({ $gte: apoDate }) }
+        ])
+    };
+
+    const cleanYpokatasthma = String(ypokatasthma || '').trim();
+    if (cleanYpokatasthma) {
+        query.ypokatasthma = cleanYpokatasthma;
+    }
+
+    if (kodikoi.length > 0) {
+        query.kodikos = mongoose.trusted({ $in: kodikoi });
+    }
+
+    return query;
+}
+
+function snapshotYpokatasthmaMatches(snapshot, ypokatasthma) {
+    const requestedYpokatasthma = String(ypokatasthma || '').trim();
+    const snapshotYpokatasthma = String(snapshot?.ypokatasthma || '').trim();
+
+    if (!requestedYpokatasthma) return true;
+    if (!snapshotYpokatasthma) return true;
+
+    return snapshotYpokatasthma === requestedYpokatasthma;
+}
+
 // Έλεγχος και δημιουργία του φακέλου downloads αν δεν υπάρχει
 const handleProductionDownloadPath = async () => {
     if (isProduction) {
@@ -1152,6 +1227,243 @@ class kinhseisController {
                 message: error.statusCode
                     ? error.message
                     : 'Σφάλμα κατά την παραγωγή του precalc snapshot.'
+            });
+        }
+    };
+
+    static batchGenerateWorkFactsSnapshots = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const requestedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+            const apo = normalizeSnapshotDateParam(body.apo || body.apo_hmeromhnia);
+            const eos = normalizeSnapshotDateParam(body.eos || body.eos_hmeromhnia);
+            const apoDate = parseSnapshotDateUTC(apo);
+            const eosDate = parseSnapshotDateUTC(eos);
+            const ypokatasthma = String(body.ypokatasthma || '').trim();
+            const scope = String(body.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
+            const force = parseBooleanParam(body.force, false);
+            const dryRun = parseBooleanParam(body.dryRun, false);
+            const maxEmployeesResult = parseBatchMaxEmployees(body.maxEmployees);
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'missing_session',
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            if (!apo || !eos || !apoDate || !eosDate) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'invalid_period',
+                    message: 'Λείπει ή δεν είναι έγκυρο το ημερομηνιακό διάστημα.'
+                });
+            }
+
+            if (apo > eos) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'invalid_period_order',
+                    message: 'Το apo πρέπει να είναι μικρότερο ή ίσο από το eos.'
+                });
+            }
+
+            if (scope !== 'MONTHLY') {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'unsupported_scope',
+                    message: 'Για batch generate υποστηρίζεται μόνο scope MONTHLY.'
+                });
+            }
+
+            if (force === true) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'force_not_allowed',
+                    message: 'Το force:true δεν επιτρέπεται στο batch generate.'
+                });
+            }
+
+            if (maxEmployeesResult.error) {
+                return res.status(400).json({
+                    success: false,
+                    ...maxEmployeesResult.error
+                });
+            }
+
+            const maxEmployees = maxEmployeesResult.value;
+            const kodikoi = normalizeBatchKodikoi(body.kodikoi);
+            const employees = await ErgazomenoiModel.find(
+                buildBatchEmployeeQuery({
+                    team,
+                    company_kod,
+                    apoDate,
+                    eosDate,
+                    ypokatasthma,
+                    kodikoi
+                })
+            )
+                .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs')
+                .sort({ kodikos: 1 })
+                .limit(maxEmployees)
+                .lean();
+
+            const totals = {
+                eligible: employees.length,
+                generated: 0,
+                reused: 0,
+                locked: 0,
+                failed: 0,
+                skippedExistingReady: 0,
+                dryRunEligible: 0
+            };
+            const items = [];
+            const warnings = [];
+
+            for (const employee of employees) {
+                const kodikos = String(employee?.kodikos || '').trim();
+
+                if (!kodikos) {
+                    totals.failed += 1;
+                    items.push({
+                        kodikos: '',
+                        status: 'FAILED',
+                        reason: 'missing_kodikos',
+                        message: 'Λείπει ο κωδικός εργαζομένου.'
+                    });
+                    continue;
+                }
+
+                try {
+                    const existingSnapshot = await findWorkFactsSnapshot({
+                        team,
+                        company_kod,
+                        kodikos,
+                        apo,
+                        eos,
+                        scope
+                    });
+                    const existingStatus = String(existingSnapshot?.status || '').trim();
+
+                    if (
+                        existingSnapshot?.locked === true ||
+                        existingStatus === 'LOCKED'
+                    ) {
+                        totals.locked += 1;
+                        items.push({ kodikos, status: 'LOCKED_SKIPPED' });
+                        continue;
+                    }
+
+                    if (existingSnapshot && existingStatus === 'READY') {
+                        if (snapshotYpokatasthmaMatches(existingSnapshot, ypokatasthma)) {
+                            totals.reused += 1;
+                            items.push({ kodikos, status: 'REUSED_READY' });
+                            continue;
+                        }
+
+                        totals.skippedExistingReady += 1;
+                        warnings.push(`SKIPPED_EXISTING_READY_YP_MISMATCH:${kodikos}`);
+                        items.push({
+                            kodikos,
+                            status: 'SKIPPED_EXISTING_READY',
+                            reason: 'ypokatasthma_mismatch'
+                        });
+                        continue;
+                    }
+
+                    if (dryRun) {
+                        totals.dryRunEligible += 1;
+                        items.push({ kodikos, status: 'DRY_RUN_ELIGIBLE' });
+                        continue;
+                    }
+
+                    const snapshot = await generateAndSaveWorkFactsForEmployeePeriod({
+                        team,
+                        company_kod,
+                        kodikos,
+                        apo,
+                        eos,
+                        scope,
+                        ypokatasthma,
+                        requestedBy,
+                        force: false
+                    });
+                    const generatedStatus = String(snapshot?.status || '').trim();
+
+                    if (snapshot?.saveStatus === 'LOCKED_SKIPPED') {
+                        totals.locked += 1;
+                        items.push({ kodikos, status: 'LOCKED_SKIPPED' });
+                        continue;
+                    }
+
+                    if (generatedStatus === 'READY') {
+                        totals.generated += 1;
+                        items.push({ kodikos, status: 'GENERATED' });
+                        continue;
+                    }
+
+                    totals.failed += 1;
+                    items.push({
+                        kodikos,
+                        status: generatedStatus || 'FAILED',
+                        message: Array.isArray(snapshot?.warnings)
+                            ? snapshot.warnings.join(' | ')
+                            : 'Η παραγωγή snapshot δεν ολοκληρώθηκε ως READY.'
+                    });
+                } catch (error) {
+                    totals.failed += 1;
+                    items.push({
+                        kodikos,
+                        status: 'FAILED',
+                        message: error.message || 'Σφάλμα παραγωγής snapshot εργαζομένου.'
+                    });
+                }
+            }
+
+            if (employees.length === 0) {
+                warnings.push('Δεν βρέθηκαν εργαζόμενοι που τέμνουν το ζητούμενο διάστημα.');
+            }
+
+            const hasSuccessfulItems =
+                totals.generated +
+                    totals.reused +
+                    totals.locked +
+                    totals.skippedExistingReady +
+                    totals.dryRunEligible >
+                0;
+            const partialFailure = totals.failed > 0 && hasSuccessfulItems;
+            const success = totals.failed === 0 || partialFailure;
+
+            if (partialFailure) {
+                warnings.push('PARTIAL_FAILURE: Κάποιοι εργαζόμενοι απέτυχαν.');
+            }
+
+            return res.status(success ? 200 : 500).json({
+                success,
+                partialFailure,
+                dryRun,
+                scope,
+                apo,
+                eos,
+                ypokatasthma,
+                maxEmployees,
+                totals,
+                items,
+                warnings
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> batchGenerateWorkFactsSnapshots :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά το batch generate precalc snapshots.'
             });
         }
     };
