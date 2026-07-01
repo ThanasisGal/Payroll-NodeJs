@@ -13520,3 +13520,24 @@ body.loader-active > *:not(.app-loader) {
     background-color: #d8f3dc;
     color: #000;
 }
+
+.swal2-popup.apasxolhseis-snapshot-confirm-popup,
+.apasxolhseis-snapshot-confirm-popup {
+    width: min(720px, calc(100vw - 2rem));
+    max-width: 720px;
+    padding: 1.5rem !important;
+}
+
+.swal2-html-container.apasxolhseis-snapshot-confirm-html,
+.apasxolhseis-snapshot-confirm-html {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.45 !important;
+    white-space: normal;
+}
+
+.swal2-actions.apasxolhseis-snapshot-confirm-actions,
+.apasxolhseis-snapshot-confirm-actions {
+    gap: 0.75rem;
+}
