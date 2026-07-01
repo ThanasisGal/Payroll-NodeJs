@@ -13486,3 +13486,37 @@ body.loader-active > *:not(.app-loader) {
     color: #000;
     border-color: #1b4332;
 }
+
+.apasxolhseis-title-bar {
+    position: relative;
+    z-index: 5000;
+    overflow: visible;
+}
+
+.apasxolhseis-actions-dropdown-wrap {
+    z-index: 6000;
+}
+
+.apasxolhseis-actions-dropdown-menu {
+    z-index: 7000;
+    opacity: 1;
+    background-color: #fff;
+    color: #000;
+}
+
+.apasxolhseis-actions-dropdown-menu.show {
+    z-index: 7000;
+    opacity: 1;
+    animation: none;
+}
+
+.apasxolhseis-actions-dropdown-menu .dropdown-item {
+    color: #000;
+    opacity: 1;
+}
+
+.apasxolhseis-actions-dropdown-menu .dropdown-item:hover,
+.apasxolhseis-actions-dropdown-menu .dropdown-item:focus {
+    background-color: #d8f3dc;
+    color: #000;
+}
