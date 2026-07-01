@@ -1160,6 +1160,18 @@ router.get('/api/kinhseis/detectPayrollPhases', kinhseisController.detectPayroll
 
 router.get('/api/kinhseis/workFactsSnapshot', checkAuth, kinhseisController.getWorkFactsSnapshot);
 
+router.get(
+    '/api/kinhseis/workFactsSchedulerSlots/available',
+    checkAuth,
+    kinhseisController.getAvailableWorkFactsSchedulerSlots
+);
+
+router.post(
+    '/api/kinhseis/workFactsSchedulerSlots/reserve',
+    checkAuth,
+    kinhseisController.reserveWorkFactsSchedulerSlot
+);
+
 router.post(
     '/api/kinhseis/workFactsSnapshot/generate',
     checkAuth,

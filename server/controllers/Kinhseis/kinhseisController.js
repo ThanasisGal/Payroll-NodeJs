@@ -44,6 +44,10 @@ const {
     startWorkFactsBatchJob,
     getWorkFactsBatchJobStatus
 } = require('../../services/kinhseis/workFactsBatchService');
+const {
+    getAvailablePayrollPrecalcSchedulerSlots,
+    reservePayrollPrecalcSchedulerSlot
+} = require('../../services/kinhseis/workFactsSchedulerSlotService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -1143,6 +1147,112 @@ class kinhseisController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση του precalc snapshot.'
+            });
+        }
+    };
+
+    static getAvailableWorkFactsSchedulerSlots = async (req, res) => {
+        try {
+            const result = await getAvailablePayrollPrecalcSchedulerSlots({
+                startDate: req.query.startDate,
+                startTime: req.query.startTime,
+                timezone: req.query.timezone,
+                stepMinutes: req.query.stepMinutes,
+                limit: req.query.limit,
+                maxDays: req.query.maxDays
+            });
+
+            if (result.success !== true) {
+                return res.status(result.statusCode || 400).json({
+                    success: false,
+                    warnings: result.warnings || [],
+                    message: result.message || 'Δεν ήταν δυνατή η ανάκτηση διαθέσιμων slots.'
+                });
+            }
+
+            return res.json({
+                success: true,
+                slots: result.slots || []
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> getAvailableWorkFactsSchedulerSlots :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά την ανάκτηση διαθέσιμων scheduler slots.'
+            });
+        }
+    };
+
+    static reserveWorkFactsSchedulerSlot = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const reservedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'missing_session',
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            const hasPrivilege = await hasApasxolhseisBatchPrivilege(req);
+            if (!hasPrivilege) {
+                return res.status(403).json({
+                    success: false,
+                    reason: 'insufficient_privileges',
+                    message: 'Δεν έχετε δικαίωμα για scheduler slot reservations Απασχολήσεων.'
+                });
+            }
+
+            const result = await reservePayrollPrecalcSchedulerSlot({
+                team,
+                company_kod,
+                ypokatasthma: body.ypokatasthma,
+                slotDate: body.slotDate,
+                slotTime: body.slotTime,
+                timezone: body.timezone,
+                stepMinutes: body.stepMinutes,
+                reservedBy
+            });
+
+            if (result.success === true) {
+                return res.json({
+                    success: true,
+                    conflict: false,
+                    slot: result.slot
+                });
+            }
+
+            if (result.conflict === true) {
+                return res.status(409).json({
+                    success: false,
+                    conflict: true,
+                    message: result.message || 'Η ώρα δεσμεύτηκε ήδη. Επιλέξτε άλλη διαθέσιμη ώρα.'
+                });
+            }
+
+            return res.status(result.statusCode || 400).json({
+                success: false,
+                conflict: false,
+                warnings: result.warnings || [],
+                message: result.message || 'Δεν ήταν δυνατή η δέσμευση scheduler slot.'
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> reserveWorkFactsSchedulerSlot :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά τη δέσμευση scheduler slot.'
             });
         }
     };
