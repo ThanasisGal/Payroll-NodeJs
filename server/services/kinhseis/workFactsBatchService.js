@@ -10,6 +10,10 @@ const {
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
 const SOURCE_VERSION = 'workFactsPrecalc:v1';
 const COMPANY_WIDE_JOB_KEY_YP = 'ALL';
+const STALE_RUNNING_JOB_THRESHOLD_MS = 60 * 60 * 1000;
+const STALE_RUNNING_JOB_WARNING = 'STALE_RUNNING_RECOVERED';
+const STALE_RUNNING_JOB_ERROR_MESSAGE =
+    'Stale RUNNING job recovered after process restart or timeout.';
 
 function toTrimmedString(value) {
     return String(value ?? '').trim();
@@ -229,7 +233,67 @@ async function loadEmployeesForBatch({
     return query.lean();
 }
 
+function getStaleRunningJobTimestamp(job) {
+    if (job?.startedAt instanceof Date && !Number.isNaN(job.startedAt.getTime())) {
+        return { field: 'startedAt', value: job.startedAt };
+    }
+
+    if (job?.updatedAt instanceof Date && !Number.isNaN(job.updatedAt.getTime())) {
+        return { field: 'updatedAt', value: job.updatedAt };
+    }
+
+    return null;
+}
+
+function isStaleRunningJob(job, now = new Date()) {
+    if (!job || job.status !== 'RUNNING') return false;
+
+    const timestamp = getStaleRunningJobTimestamp(job);
+    if (!timestamp) return false;
+
+    return timestamp.value.getTime() < now.getTime() - STALE_RUNNING_JOB_THRESHOLD_MS;
+}
+
+async function recoverStaleRunningJobByKey(jobKey, now = new Date()) {
+    const runningJob = await PayrollPrecalcJobModel.findOne({
+        jobKey,
+        status: 'RUNNING'
+    }).lean();
+
+    if (!isStaleRunningJob(runningJob, now)) return null;
+
+    const timestamp = getStaleRunningJobTimestamp(runningJob);
+    if (!timestamp) return null;
+
+    return PayrollPrecalcJobModel.findOneAndUpdate(
+        {
+            _id: runningJob._id,
+            jobKey,
+            status: 'RUNNING',
+            [timestamp.field]: mongoose.trusted({
+                $lt: new Date(now.getTime() - STALE_RUNNING_JOB_THRESHOLD_MS)
+            })
+        },
+        {
+            $set: {
+                status: 'FAILED',
+                finishedAt: now,
+                errorMessage: STALE_RUNNING_JOB_ERROR_MESSAGE
+            },
+            $addToSet: {
+                warnings: STALE_RUNNING_JOB_WARNING
+            }
+        },
+        {
+            returnDocument: 'after',
+            runValidators: true
+        }
+    ).lean();
+}
+
 async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma }) {
+    const recoveredStaleJob = await recoverStaleRunningJobByKey(jobKey);
+
     const runningFields = {
         team: key.team,
         company_kod: key.company_kod,
@@ -247,7 +311,7 @@ async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma })
         employeesFailed: 0,
         processedKodikos: [],
         failedEmployees: [],
-        warnings: [],
+        warnings: recoveredStaleJob ? [STALE_RUNNING_JOB_WARNING] : [],
         errorMessage: '',
         force: force === true,
         sourceVersion: SOURCE_VERSION
