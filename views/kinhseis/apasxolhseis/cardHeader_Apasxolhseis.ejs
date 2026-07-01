@@ -1,7 +1,35 @@
-<div class="card-header mb-2">
-    <label class="text-center headers-content">
+<div class="card-header mb-2 position-relative">
+    <label class="text-center headers-content mb-0">
         Α π α σ χ ο λ ή σ ε ι ς
     </label>
+    <div class="dropdown position-absolute top-50 end-0 translate-middle-y me-3">
+        <button type="button" class="btn btn-sm text-dark border-dark fw-semibold dropdown-toggle label-font-size-smaller apasxolhseis-actions-dropdown-btn" id="apasxolhseisActionsDropdownButton" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-list"></i> Ενέργειες
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="apasxolhseisActionsDropdownButton">
+            <li>
+                <button type="button" class="dropdown-item d-none" id="payrollPhasesInfoBtn">
+                    <i class="bi bi-info-circle me-1"></i> Panel φάσεων
+                </button>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <button type="button" class="dropdown-item" id="generateWorkFactsSnapshotButton">
+                    Snapshot περιόδου
+                </button>
+            </li>
+            <li>
+                <button type="button" class="dropdown-item" id="generateBatchWorkFactsSnapshotsButton">
+                    Snapshots έως 5
+                </button>
+            </li>
+            <li>
+                <button type="button" class="dropdown-item <%= (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) ? 'disabled-link' : '' %>" id="generateAllWorkFactsSnapshotsJobButton" data-allowed="<%= (userPrivileges.admin || userPrivileges.update || userPrivileges.create) ? '1' : '0' %>">
+                    Snapshots όλα
+                </button>
+            </li>
+        </ul>
+    </div>
 </div>
 
 <div class="row form-group g-3 align-items-center apx-csp-style-013">
@@ -232,35 +260,6 @@
     </div>
     <div class="col-0-3">
         <button type="button" class="btn btn-green buttons-content label-font-size-smaller ml-n-0-0-4" id="nextButton" data-bs-toggle="tooltip" data-bs-title="Επόμενη εγγραφή" data-bs-placement="bottom"><i class="bi bi-chevron-down"></i></button>
-    </div>
-    <div class="col-auto">
-        <button type="button" class="btn btn-outline-info btn-sm label-font-size-smaller d-none" id="payrollPhasesInfoBtn" data-bs-toggle="tooltip" data-bs-title="Εμφάνιση μισθολογικών φάσεων" data-bs-placement="bottom" aria-label="Εμφάνιση μισθολογικών φάσεων">
-            <i class="bi bi-info-circle"></i> Panel φάσεων
-        </button>
-    </div>
-    <div class="col-auto">
-        <div class="dropdown">
-            <button type="button" class="btn btn-outline-primary btn-sm label-font-size-smaller dropdown-toggle" id="workFactsSnapshotsDropdownButton" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-camera"></i> Snapshots
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="workFactsSnapshotsDropdownButton">
-                <li>
-                    <button type="button" class="dropdown-item" id="generateWorkFactsSnapshotButton">
-                        <i class="bi bi-database-check"></i> Snapshot περιόδου
-                    </button>
-                </li>
-                <li>
-                    <button type="button" class="dropdown-item" id="generateBatchWorkFactsSnapshotsButton">
-                        <i class="bi bi-database-check"></i> Snapshots έως 5
-                    </button>
-                </li>
-                <li>
-                    <button type="button" class="dropdown-item <%= (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) ? 'disabled-link' : '' %>" id="generateAllWorkFactsSnapshotsJobButton" data-allowed="<%= (userPrivileges.admin || userPrivileges.update || userPrivileges.create) ? '1' : '0' %>">
-                        <i class="bi bi-database-check"></i> Snapshots όλα
-                    </button>
-                </li>
-            </ul>
-        </div>
     </div>
 </div>
 

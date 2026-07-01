@@ -13473,3 +13473,16 @@ body.loader-active > *:not(.app-loader) {
 #payrollPhasesPanelShell .payroll-phases-info-btn:focus {
     background: rgba(13, 202, 240, 1);
 }
+
+.apasxolhseis-actions-dropdown-btn {
+    background-color: #d8f3dc;
+    color: #000;
+    border-color: #1b4332;
+}
+
+.apasxolhseis-actions-dropdown-btn:hover,
+.apasxolhseis-actions-dropdown-btn:focus {
+    background-color: #b7e4c7;
+    color: #000;
+    border-color: #1b4332;
+}
