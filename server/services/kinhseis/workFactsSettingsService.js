@@ -72,6 +72,10 @@ function normalizeTimezone(value, warnings) {
     return DEFAULTS.timezone;
 }
 
+function normalizeNextRunAtOverride(value) {
+    return value instanceof Date && !Number.isNaN(value.getTime()) ? value : null;
+}
+
 function normalizePayrollPrecalcSettingsInput(input = {}) {
     const warnings = [];
     const team = toTrimmedString(input.team);
@@ -92,6 +96,7 @@ function normalizePayrollPrecalcSettingsInput(input = {}) {
         scope: DEFAULTS.scope,
         updatedBy: toTrimmedString(input.updatedBy),
         notes: toTrimmedString(input.notes),
+        nextRunAtOverride: normalizeNextRunAtOverride(input.nextRunAtOverride),
         sourceVersion: SOURCE_VERSION,
         warnings
     };
@@ -180,7 +185,7 @@ async function upsertPayrollPrecalcSettings(input = {}) {
 
     const query = buildSettingsQuery(normalized);
     const nextRunAt = normalized.precalcEnabled
-        ? computeNextMonthlyRunAt({
+        ? normalized.nextRunAtOverride || computeNextMonthlyRunAt({
             monthlyRunDay: normalized.monthlyRunDay,
             monthlyRunTime: normalized.monthlyRunTime,
             timezone: normalized.timezone
