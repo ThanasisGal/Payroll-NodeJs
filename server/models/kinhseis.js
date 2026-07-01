@@ -729,6 +729,78 @@ const PayrollPrecalcSettingsModel = model(
     PayrollPrecalcSettingsSchema
 );
 
+const PayrollPrecalcSchedulerSlotSchema = new Schema(
+    {
+        team: { type: String, required: true, trim: true },
+        company_kod: { type: String, required: true, trim: true },
+        ypokatasthma: { type: String, trim: true, default: 'ALL' },
+
+        slotKey: { type: String, required: true, trim: true },
+        slotAt: { type: Date, required: true },
+        slotDate: { type: String, required: true, trim: true },
+        slotTime: { type: String, required: true, trim: true },
+        timezone: { type: String, trim: true, default: 'Europe/Athens' },
+        stepMinutes: { type: Number, default: 5 },
+
+        status: {
+            type: String,
+            enum: ['RESERVED', 'RELEASED', 'CANCELLED'],
+            default: 'RESERVED'
+        },
+
+        settingId: { type: Schema.Types.ObjectId },
+        reservedBy: { type: String, trim: true },
+        reservedAt: { type: Date, default: Date.now },
+
+        releasedAt: { type: Date },
+        releasedBy: { type: String, trim: true },
+        releaseReason: { type: String, trim: true },
+
+        notes: { type: String, trim: true },
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' }
+    },
+    {
+        collection: 'Payroll_Precalc_Scheduler_Slots',
+        timestamps: true
+    }
+);
+
+PayrollPrecalcSchedulerSlotSchema.index(
+    { slotKey: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { status: 'RESERVED' },
+        name: 'idx_payroll_precalc_scheduler_slot_reserved_unique'
+    }
+);
+
+PayrollPrecalcSchedulerSlotSchema.index(
+    {
+        status: 1,
+        slotAt: 1
+    },
+    {
+        name: 'idx_payroll_precalc_scheduler_slot_status_at'
+    }
+);
+
+PayrollPrecalcSchedulerSlotSchema.index(
+    {
+        team: 1,
+        company_kod: 1,
+        ypokatasthma: 1,
+        status: 1
+    },
+    {
+        name: 'idx_payroll_precalc_scheduler_slot_target_status'
+    }
+);
+
+const PayrollPrecalcSchedulerSlotModel = model(
+    'PayrollPrecalcSchedulerSlot',
+    PayrollPrecalcSchedulerSlotSchema
+);
+
 const AstheneiesSchema = new Schema({
     team: { type: String, trim: true },
     company_kod: { type: String, trim: true },
@@ -834,6 +906,7 @@ module.exports = {
     ApasxolhseisPeriodFactsModel,
     PayrollPrecalcJobModel,
     PayrollPrecalcSettingsModel,
+    PayrollPrecalcSchedulerSlotModel,
     AstheneiesModel,
     AdeiesModel
 };
