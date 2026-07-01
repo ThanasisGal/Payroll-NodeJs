@@ -239,19 +239,28 @@
         </button>
     </div>
     <div class="col-auto">
-        <button type="button" class="btn btn-outline-secondary btn-sm label-font-size-smaller" id="generateWorkFactsSnapshotButton" data-bs-toggle="tooltip" data-bs-title="Δημιουργία snapshot για τον τρέχοντα εργαζόμενο και περίοδο" data-bs-placement="bottom">
-            <i class="bi bi-database-check"></i> Snapshot περιόδου
-        </button>
-    </div>
-    <div class="col-auto">
-        <button type="button" class="btn btn-outline-warning btn-sm label-font-size-smaller" id="generateBatchWorkFactsSnapshotsButton" data-bs-toggle="tooltip" data-bs-title="Limited batch snapshots για έως 5 εργαζόμενους της περιόδου" data-bs-placement="bottom">
-            <i class="bi bi-database-check"></i> Snapshots έως 5
-        </button>
-    </div>
-    <div class="col-auto">
-        <button type="button" class="btn btn-outline-primary btn-sm label-font-size-smaller <%= (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) ? 'disabled-link' : '' %>" id="generateAllWorkFactsSnapshotsJobButton" data-allowed="<%= (userPrivileges.admin || userPrivileges.update || userPrivileges.create) ? '1' : '0' %>" data-bs-toggle="tooltip" data-bs-title="Batch snapshots για όλους τους eligible εργαζόμενους της περιόδου με progress" data-bs-placement="bottom">
-            <i class="bi bi-database-check"></i> Snapshots όλα
-        </button>
+        <div class="dropdown">
+            <button type="button" class="btn btn-outline-primary btn-sm label-font-size-smaller dropdown-toggle" id="workFactsSnapshotsDropdownButton" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-camera"></i> Snapshots
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="workFactsSnapshotsDropdownButton">
+                <li>
+                    <button type="button" class="dropdown-item" id="generateWorkFactsSnapshotButton">
+                        <i class="bi bi-database-check"></i> Snapshot περιόδου
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="dropdown-item" id="generateBatchWorkFactsSnapshotsButton">
+                        <i class="bi bi-database-check"></i> Snapshots έως 5
+                    </button>
+                </li>
+                <li>
+                    <button type="button" class="dropdown-item <%= (!userPrivileges.admin && !userPrivileges.update && !userPrivileges.create) ? 'disabled-link' : '' %>" id="generateAllWorkFactsSnapshotsJobButton" data-allowed="<%= (userPrivileges.admin || userPrivileges.update || userPrivileges.create) ? '1' : '0' %>">
+                        <i class="bi bi-database-check"></i> Snapshots όλα
+                    </button>
+                </li>
+            </ul>
+        </div>
     </div>
 </div>
 
