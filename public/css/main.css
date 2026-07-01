@@ -13473,3 +13473,71 @@ body.loader-active > *:not(.app-loader) {
 #payrollPhasesPanelShell .payroll-phases-info-btn:focus {
     background: rgba(13, 202, 240, 1);
 }
+
+.apasxolhseis-actions-dropdown-btn {
+    background-color: #d8f3dc;
+    color: #000;
+    border-color: #1b4332;
+}
+
+.apasxolhseis-actions-dropdown-btn:hover,
+.apasxolhseis-actions-dropdown-btn:focus {
+    background-color: #b7e4c7;
+    color: #000;
+    border-color: #1b4332;
+}
+
+.apasxolhseis-title-bar {
+    position: relative;
+    z-index: 5000;
+    overflow: visible;
+}
+
+.apasxolhseis-actions-dropdown-wrap {
+    z-index: 6000;
+}
+
+.apasxolhseis-actions-dropdown-menu {
+    z-index: 7000;
+    opacity: 1;
+    background-color: #fff;
+    color: #000;
+}
+
+.apasxolhseis-actions-dropdown-menu.show {
+    z-index: 7000;
+    opacity: 1;
+    animation: none;
+}
+
+.apasxolhseis-actions-dropdown-menu .dropdown-item {
+    color: #000;
+    opacity: 1;
+}
+
+.apasxolhseis-actions-dropdown-menu .dropdown-item:hover,
+.apasxolhseis-actions-dropdown-menu .dropdown-item:focus {
+    background-color: #d8f3dc;
+    color: #000;
+}
+
+.swal2-popup.apasxolhseis-snapshot-confirm-popup,
+.apasxolhseis-snapshot-confirm-popup {
+    width: min(720px, calc(100vw - 2rem));
+    max-width: 720px;
+    padding: 1.5rem !important;
+}
+
+.swal2-html-container.apasxolhseis-snapshot-confirm-html,
+.apasxolhseis-snapshot-confirm-html {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.45 !important;
+    white-space: normal;
+}
+
+.swal2-actions.apasxolhseis-snapshot-confirm-actions,
+.apasxolhseis-snapshot-confirm-actions {
+    gap: 0.75rem;
+}

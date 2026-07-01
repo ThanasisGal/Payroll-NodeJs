@@ -885,16 +885,26 @@ document.addEventListener('DOMContentLoaded', function () {
             'Θα ξεκινήσει batch job για όλους τους eligible εργαζόμενους της περιόδου. ' +
             'Δεν θα γίνει overwrite σε υπάρχοντα READY ή locked snapshots. ' +
             'Το job θα συνεχίσει στο background όσο η εφαρμογή τρέχει.';
+        const html = `
+            <div class="apasxolhseis-snapshot-confirm-html">
+                <p>Θα ξεκινήσει batch job για όλους τους eligible εργαζόμενους της περιόδου.</p>
+                <p class="mb-0">Δεν θα γίνει overwrite σε υπάρχοντα READY ή locked snapshots. Το job θα συνεχίσει στο background όσο η εφαρμογή τρέχει.</p>
+            </div>
+        `;
 
         if (window.Swal && typeof window.Swal.fire === 'function') {
             const result = await window.Swal.fire({
                 icon: 'question',
                 title: 'Snapshots για όλη την περίοδο',
-                text,
+                html,
+                width: 'min(720px, calc(100vw - 2rem))',
                 showCancelButton: true,
                 confirmButtonText: 'Δημιουργία',
                 cancelButtonText: 'Ακύρωση',
                 customClass: {
+                    popup: 'apasxolhseis-snapshot-confirm-popup',
+                    htmlContainer: 'apasxolhseis-snapshot-confirm-html',
+                    actions: 'apasxolhseis-snapshot-confirm-actions',
                     confirmButton: 'class-info custom-confirm-button custom-swal-button',
                     cancelButton: 'class-secondary custom-cancel-button custom-swal-button'
                 }
