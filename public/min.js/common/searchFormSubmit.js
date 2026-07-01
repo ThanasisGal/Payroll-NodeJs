@@ -1,1 +1,1 @@
-document['addEventListener']('DOMContentLoaded',function(){document['getElementById']('searchInput')['addEventListener']('keydown',function(O){'Enter'===O['key']&&(O['preventDefault'](),document['querySelector']('form[name=\x27SearchForm\x27]')['submit']());});});
+document['addEventListener']('DOMContentLoaded',function(){document['getElementById']('searchInput')['addEventListener']('keydown',function(G){'Enter'===G['key']&&(G['preventDefault'](),document['querySelector']('form[name=\x27SearchForm\x27]')['submit']());});});
