@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const { PayrollPrecalcSchedulerSlotModel } = require('../../models/kinhseis');
+const { upsertPayrollPrecalcSettings } = require('./workFactsSettingsService');
 
 const DEFAULT_TIMEZONE = 'Europe/Athens';
 const DEFAULT_STEP_MINUTES = 5;
@@ -169,6 +170,12 @@ function normalizeMaxDays(value) {
     }
 
     return DEFAULT_MAX_DAYS;
+}
+
+function normalizeSettingYpokatasthma(value) {
+    const normalized = normalizeSchedulerSlotYpokatasthma(value);
+
+    return normalized === 'ALL' ? '' : normalized;
 }
 
 function buildPayrollPrecalcSchedulerSlotKey({ slotDate, slotTime, timezone }) {
@@ -478,11 +485,202 @@ async function releasePayrollPrecalcSchedulerSlot(input = {}) {
     };
 }
 
+async function releaseActivePayrollPrecalcSchedulerSlotsForTarget(input = {}) {
+    const team = toTrimmedString(input.team);
+    const company_kod = toTrimmedString(input.company_kod);
+    const ypokatasthma = normalizeSchedulerSlotYpokatasthma(input.ypokatasthma);
+
+    if (!team || !company_kod) {
+        return {
+            success: false,
+            statusCode: 400,
+            releasedCount: 0,
+            message: 'Λείπει team ή company_kod.'
+        };
+    }
+
+    const filter = {
+        team,
+        company_kod,
+        ypokatasthma,
+        status: 'RESERVED'
+    };
+    const exceptSlotKey = toTrimmedString(input.exceptSlotKey);
+
+    if (exceptSlotKey) {
+        filter.slotKey = mongoose.trusted({ $ne: exceptSlotKey });
+    }
+
+    const result = await PayrollPrecalcSchedulerSlotModel.updateMany(
+        filter,
+        {
+            $set: mongoose.trusted({
+                status: 'RELEASED',
+                releasedAt: new Date(),
+                releasedBy: toTrimmedString(input.releasedBy),
+                releaseReason: toTrimmedString(input.releaseReason)
+            })
+        },
+        { runValidators: true }
+    );
+
+    return {
+        success: true,
+        releasedCount: result.modifiedCount || 0
+    };
+}
+
+async function attachPayrollPrecalcSchedulerSlotToSetting(input = {}) {
+    const slotId = toTrimmedString(input.slotId);
+    const slotKey = toTrimmedString(input.slotKey);
+    const settingId = toTrimmedString(input.settingId);
+
+    if (!settingId || !mongoose.Types.ObjectId.isValid(settingId)) {
+        return {
+            success: false,
+            notFound: false,
+            statusCode: 400,
+            message: 'Λείπει ή δεν είναι έγκυρο το settingId.'
+        };
+    }
+
+    if (!slotId && !slotKey) {
+        return {
+            success: false,
+            notFound: true,
+            statusCode: 404,
+            message: 'Δεν βρέθηκε ενεργή δέσμευση slot.'
+        };
+    }
+
+    const filter = {
+        status: 'RESERVED'
+    };
+
+    if (slotId && mongoose.Types.ObjectId.isValid(slotId)) {
+        filter._id = slotId;
+    } else {
+        filter.slotKey = slotKey;
+    }
+
+    const slot = await PayrollPrecalcSchedulerSlotModel.findOneAndUpdate(
+        filter,
+        {
+            $set: mongoose.trusted({
+                settingId
+            })
+        },
+        {
+            returnDocument: 'after',
+            runValidators: true
+        }
+    ).lean();
+
+    if (!slot) {
+        return {
+            success: false,
+            notFound: true,
+            statusCode: 404,
+            message: 'Δεν βρέθηκε ενεργή δέσμευση slot.'
+        };
+    }
+
+    return {
+        success: true,
+        notFound: false,
+        slot: normalizeSlotForReturn(slot)
+    };
+}
+
+async function configurePayrollPrecalcSchedulerSlotForSetting(input = {}) {
+    const reservedSlotResult = await reservePayrollPrecalcSchedulerSlot(input);
+
+    if (reservedSlotResult.success !== true) {
+        return reservedSlotResult;
+    }
+
+    const slot = reservedSlotResult.slot;
+    const parsedDate = parseSlotDate(slot.slotDate);
+    const monthlyRunDay = parsedDate?.day;
+    const reservedBy = toTrimmedString(input.reservedBy);
+    const releaseNewSlot = async (releaseReason) => releasePayrollPrecalcSchedulerSlot({
+        slotKey: slot.slotKey,
+        releasedBy: reservedBy,
+        releaseReason
+    });
+
+    if (!Number.isInteger(monthlyRunDay) || monthlyRunDay < 1 || monthlyRunDay > 28) {
+        await releaseNewSlot('configure_failed_invalid_monthly_run_day');
+        return {
+            success: false,
+            conflict: false,
+            statusCode: 400,
+            warnings: ['INVALID_MONTHLY_RUN_DAY: Επιτρέπονται μόνο ημέρες 1-28 για monthly scheduler settings.'],
+            message: 'Η ημέρα του slot πρέπει να είναι από 1 έως 28.'
+        };
+    }
+
+    try {
+        const setting = await upsertPayrollPrecalcSettings({
+            team: slot.team,
+            company_kod: slot.company_kod,
+            ypokatasthma: normalizeSettingYpokatasthma(slot.ypokatasthma),
+            precalcEnabled: true,
+            monthlyRunDay,
+            monthlyRunTime: slot.slotTime,
+            timezone: slot.timezone,
+            periodMode: input.periodMode,
+            scope: input.scope,
+            updatedBy: toTrimmedString(input.updatedBy),
+            notes: toTrimmedString(input.notes),
+            nextRunAtOverride: slot.slotAt
+        });
+
+        const attachResult = await attachPayrollPrecalcSchedulerSlotToSetting({
+            slotKey: slot.slotKey,
+            settingId: setting?._id
+        });
+
+        if (attachResult.success !== true) {
+            await releaseNewSlot('configure_failed_attach_setting');
+            return {
+                success: false,
+                conflict: false,
+                statusCode: attachResult.statusCode || 500,
+                message: attachResult.message || 'Δεν ήταν δυνατή η σύνδεση slot με settings.'
+            };
+        }
+
+        const releasePreviousResult = await releaseActivePayrollPrecalcSchedulerSlotsForTarget({
+            team: slot.team,
+            company_kod: slot.company_kod,
+            ypokatasthma: slot.ypokatasthma,
+            exceptSlotKey: slot.slotKey,
+            releasedBy: reservedBy,
+            releaseReason: 'replaced_by_scheduler_slot_configure'
+        });
+
+        return {
+            success: true,
+            slot: attachResult.slot,
+            setting,
+            releasedPreviousSlots: releasePreviousResult.releasedCount || 0
+        };
+    } catch (error) {
+        await releaseNewSlot('configure_failed_settings_upsert');
+        error.statusCode = error.statusCode || 500;
+        throw error;
+    }
+}
+
 module.exports = {
     normalizeSchedulerSlotYpokatasthma,
     buildPayrollPrecalcSchedulerSlotKey,
     validateSchedulerSlotInput,
     getAvailablePayrollPrecalcSchedulerSlots,
     reservePayrollPrecalcSchedulerSlot,
-    releasePayrollPrecalcSchedulerSlot
+    releasePayrollPrecalcSchedulerSlot,
+    releaseActivePayrollPrecalcSchedulerSlotsForTarget,
+    attachPayrollPrecalcSchedulerSlotToSetting,
+    configurePayrollPrecalcSchedulerSlotForSetting
 };

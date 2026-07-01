@@ -1173,6 +1173,12 @@ router.post(
 );
 
 router.post(
+    '/api/kinhseis/workFactsSchedulerSlots/configure',
+    checkAuth,
+    kinhseisController.configureWorkFactsSchedulerSlot
+);
+
+router.post(
     '/api/kinhseis/workFactsSnapshot/generate',
     checkAuth,
     kinhseisController.generateWorkFactsSnapshot

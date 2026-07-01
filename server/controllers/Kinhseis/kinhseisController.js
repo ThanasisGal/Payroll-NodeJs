@@ -46,7 +46,8 @@ const {
 } = require('../../services/kinhseis/workFactsBatchService');
 const {
     getAvailablePayrollPrecalcSchedulerSlots,
-    reservePayrollPrecalcSchedulerSlot
+    reservePayrollPrecalcSchedulerSlot,
+    configurePayrollPrecalcSchedulerSlotForSetting
 } = require('../../services/kinhseis/workFactsSchedulerSlotService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
@@ -1253,6 +1254,82 @@ class kinhseisController {
                 message: error.statusCode
                     ? error.message
                     : 'Σφάλμα κατά τη δέσμευση scheduler slot.'
+            });
+        }
+    };
+
+    static configureWorkFactsSchedulerSlot = async (req, res) => {
+        try {
+            const body = req.body || {};
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const requestedBy = String(
+                req.session?.userName || req.session?.userId || req.session?.user || ''
+            ).trim();
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    reason: 'missing_session',
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            const hasPrivilege = await hasApasxolhseisBatchPrivilege(req);
+            if (!hasPrivilege) {
+                return res.status(403).json({
+                    success: false,
+                    reason: 'insufficient_privileges',
+                    message: 'Δεν έχετε δικαίωμα για scheduler slot configuration Απασχολήσεων.'
+                });
+            }
+
+            const result = await configurePayrollPrecalcSchedulerSlotForSetting({
+                team,
+                company_kod,
+                ypokatasthma: body.ypokatasthma,
+                slotDate: body.slotDate,
+                slotTime: body.slotTime,
+                timezone: body.timezone,
+                stepMinutes: body.stepMinutes,
+                periodMode: body.periodMode,
+                scope: body.scope,
+                reservedBy: requestedBy,
+                updatedBy: requestedBy,
+                notes: body.notes
+            });
+
+            if (result.success === true) {
+                return res.json({
+                    success: true,
+                    slot: result.slot,
+                    setting: result.setting,
+                    releasedPreviousSlots: result.releasedPreviousSlots || 0
+                });
+            }
+
+            if (result.conflict === true) {
+                return res.status(409).json({
+                    success: false,
+                    conflict: true,
+                    message: result.message || 'Η ώρα δεσμεύτηκε ήδη. Επιλέξτε άλλη διαθέσιμη ώρα.'
+                });
+            }
+
+            return res.status(result.statusCode || 400).json({
+                success: false,
+                conflict: false,
+                warnings: result.warnings || [],
+                message: result.message || 'Δεν ήταν δυνατή η ρύθμιση scheduler slot.'
+            });
+        } catch (error) {
+            console.error('Error into kinhseisController -> configureWorkFactsSchedulerSlot :', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode
+                    ? error.message
+                    : 'Σφάλμα κατά τη ρύθμιση scheduler slot.'
             });
         }
     };
