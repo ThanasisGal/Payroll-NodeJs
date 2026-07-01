@@ -35,6 +35,40 @@ function normalizeLimit(value) {
     return limit;
 }
 
+function parsePayrollPrecalcSchedulerTargets(value) {
+    const rawValue = String(value ?? '').trim();
+
+    if (!rawValue) return [];
+
+    return rawValue
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .reduce((targets, entry) => {
+            const parts = entry.split(':').map((part) => part.trim());
+
+            if (parts.length !== 3) {
+                console.warn(`Skipping invalid PAYROLL_PRECALC_SCHEDULER_TARGETS entry: ${entry}`);
+                return targets;
+            }
+
+            const [team, company_kod, ypokatasthma] = parts;
+
+            if (!team || !company_kod || !ypokatasthma) {
+                console.warn(`Skipping invalid PAYROLL_PRECALC_SCHEDULER_TARGETS entry: ${entry}`);
+                return targets;
+            }
+
+            targets.push({
+                team,
+                company_kod,
+                ypokatasthma
+            });
+
+            return targets;
+        }, []);
+}
+
 function resolveEnabled(options) {
     if (hasOwn(options, 'enabled')) {
         return options.enabled === true;
@@ -59,10 +93,22 @@ function startPayrollPrecalcScheduler(options = {}) {
     const enabled = resolveEnabled(options);
 
     if (enabled !== true) {
+        console.log('Payroll precalc scheduler disabled.');
         return {
             enabled: false,
             started: false,
             reason: 'disabled'
+        };
+    }
+
+    const targets = parsePayrollPrecalcSchedulerTargets(process.env.PAYROLL_PRECALC_SCHEDULER_TARGETS);
+
+    if (targets.length < 1) {
+        console.log('Payroll precalc scheduler disabled: missing valid PAYROLL_PRECALC_SCHEDULER_TARGETS.');
+        return {
+            enabled: true,
+            started: false,
+            reason: 'missing-valid-targets'
         };
     }
 
@@ -102,7 +148,8 @@ function startPayrollPrecalcScheduler(options = {}) {
         try {
             return await runDuePayrollPrecalcJobs({
                 limit,
-                requestedBy: REQUESTED_BY
+                requestedBy: REQUESTED_BY,
+                allowedTargets: targets
             });
         } catch (error) {
             console.error('Payroll precalc scheduler run failed:', error);
@@ -136,10 +183,7 @@ function startPayrollPrecalcScheduler(options = {}) {
         runOnce();
     }, intervalMs);
 
-    console.log(
-        `Payroll precalc scheduler enabled: intervalMs=${intervalMs}, ` +
-        `initialDelayMs=${initialDelayMs}, limit=${limit}`
-    );
+    console.log(`Payroll precalc scheduler enabled with ${targets.length} allowed target(s).`);
 
     return {
         enabled: true,
@@ -147,11 +191,13 @@ function startPayrollPrecalcScheduler(options = {}) {
         intervalMs,
         initialDelayMs,
         limit,
+        allowedTargets: targets,
         stop,
         runOnce
     };
 }
 
 module.exports = {
+    parsePayrollPrecalcSchedulerTargets,
     startPayrollPrecalcScheduler
 };

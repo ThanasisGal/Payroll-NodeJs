@@ -36,6 +36,26 @@ function buildSettingsIdentity(setting) {
     };
 }
 
+function normalizeSchedulerYpokatasthma(value) {
+    const normalized = toTrimmedString(value);
+
+    return normalized || 'ALL';
+}
+
+function isPayrollPrecalcSchedulerTargetAllowed(setting, targets) {
+    if (!Array.isArray(targets) || targets.length < 1) return false;
+
+    const team = toTrimmedString(setting?.team);
+    const company_kod = toTrimmedString(setting?.company_kod);
+    const ypokatasthma = normalizeSchedulerYpokatasthma(setting?.ypokatasthma);
+
+    return targets.some((target) => (
+        team === target.team &&
+        company_kod === target.company_kod &&
+        ypokatasthma === target.ypokatasthma
+    ));
+}
+
 function normalizeSettingForRun(setting) {
     return {
         ...buildSettingsIdentity(setting),
@@ -135,7 +155,8 @@ async function runSingleDueSetting({ setting, now, requestedBy }) {
 async function runDuePayrollPrecalcJobs({
     now = new Date(),
     limit = 5,
-    requestedBy = DEFAULT_REQUESTED_BY
+    requestedBy = DEFAULT_REQUESTED_BY,
+    allowedTargets = []
 } = {}) {
     const runNow = normalizeDate(now);
     const cleanLimit = normalizeLimit(limit, 5);
@@ -143,17 +164,28 @@ async function runDuePayrollPrecalcJobs({
         now: runNow,
         limit: cleanLimit
     });
+    const allowedSettings = dueSettings.filter((setting) => (
+        isPayrollPrecalcSchedulerTargetAllowed(setting, allowedTargets)
+    ));
+
+    console.log(
+        `Payroll precalc scheduler due settings: total=${dueSettings.length} ` +
+        `allowed=${allowedSettings.length} skippedByAllowlist=${dueSettings.length - allowedSettings.length}`
+    );
+
     const summary = {
         requestedBy: toTrimmedString(requestedBy) || DEFAULT_REQUESTED_BY,
         now: runNow,
         totalDue: dueSettings.length,
+        allowedDue: allowedSettings.length,
+        skippedByAllowlist: dueSettings.length - allowedSettings.length,
         succeeded: 0,
         failed: 0,
         skipped: 0,
         results: []
     };
 
-    for (const setting of dueSettings) {
+    for (const setting of allowedSettings) {
         try {
             const result = await runSingleDueSetting({
                 setting,
@@ -227,6 +259,7 @@ async function refreshPayrollPrecalcNextRun({
 
 module.exports = {
     findDuePayrollPrecalcSettings,
+    isPayrollPrecalcSchedulerTargetAllowed,
     runDuePayrollPrecalcJobs,
     refreshPayrollPrecalcNextRun
 };
