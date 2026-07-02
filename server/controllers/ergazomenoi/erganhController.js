@@ -21,6 +21,9 @@ const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
+const {
+    compareE3NPreSubmit
+} = require('../../services/ergani/e3nPreSubmitComparisonService');
 const { generateMAJSON } = require('../../utils/xmlGenerators/e3_MA_v1Generator');
 const { generateE5NJSON } = require('../../utils/xmlGenerators/e5N_v1Generator');
 const {
@@ -7213,6 +7216,26 @@ class erganhController {
     //   "erganiUploadMethod": "xml" | "rest"    // default: "xml"
     // }
     // ============================================================================
+    static compareE3NBeforeRestSubmit = async (req, res) => {
+        try {
+            const result = await compareE3NPreSubmit({
+                sessionTeam: req.session?.userTeam,
+                companyId: req.session?.companyInUse,
+                body: req.body || {}
+            });
+
+            return res.status(200).json(result);
+        } catch (error) {
+            console.error('[compareE3NBeforeRestSubmit] ❌', error.message || error);
+
+            return res.status(error.status || 500).json({
+                success: false,
+                message: error.message || 'Σφάλμα κατά τον έλεγχο πριν την οριστική Ε3Ν.',
+                error: error.message || String(error)
+            });
+        }
+    };
+
     static submitE3NToErganh = async (req, res) => {
         try {
             const sessionTeam = req.session?.userTeam;
