@@ -1345,20 +1345,74 @@ document.addEventListener('DOMContentLoaded', function () {
         return data;
     }
 
+    function formatPayrollPhaseLabel(value) {
+        const raw = String(value || '').trim();
+        const normalized = raw.toUpperCase();
+        const map = {
+            PLHRHS: 'ΠΛΗΡΗΣ',
+            PLIHRIS: 'ΠΛΗΡΗΣ',
+            FULL: 'ΠΛΗΡΗΣ',
+            MERIKH: 'ΜΕΡΙΚΗ',
+            MERIKI: 'ΜΕΡΙΚΗ',
+            PARTIAL: 'ΜΕΡΙΚΗ',
+            EK_PERITROPHS: 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ',
+            EK_PERITROPIS: 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ',
+            EK_PERITROPH: 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ',
+            ROTATING: 'ΕΚ ΠΕΡΙΤΡΟΠΗΣ'
+        };
+
+        return map[normalized] || raw;
+    }
+
+    function formatPayrollPreviewDate(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (!match) return raw;
+        return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    function formatPayrollPreviewWarning(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+
+        const employeeMatch = raw.match(/^EMPLOYEE:([^:]+):(.*)$/);
+        const employeePrefix = employeeMatch ? `Εργαζόμενος ${employeeMatch[1]}: ` : '';
+        const message = employeeMatch ? employeeMatch[2] : raw;
+        const warningMap = {
+            CONTRACT_HISTORY_MISSING: 'Δεν βρέθηκε ιστορικό σύμβασης',
+            PREDECLARED_HOURS_MISSING: 'Προδηλωμένη εργασία χωρίς απολογιστικές ώρες'
+        };
+        const code = Object.keys(warningMap).find((warningCode) =>
+            message.includes(warningCode)
+        );
+
+        if (!code) {
+            return employeePrefix + message;
+        }
+
+        return employeePrefix + message.replace(code, warningMap[code]);
+    }
+
     function buildPreviewPhaseGroupsHtml(groupsByPhase = []) {
         if (!Array.isArray(groupsByPhase) || groupsByPhase.length === 0) {
-            return '<div class="text-muted">Δεν υπάρχουν groups ανά φάση.</div>';
+            return '<div class="text-muted small">Δεν υπάρχουν ομάδες ανά φάση.</div>';
         }
 
         return groupsByPhase
-            .map((group) => (
-                '<div class="border rounded p-2 mb-2">' +
-                    `<div><strong>${escapeSnapshotSummaryHtml(group.phaseLabel || group.printPhaseKey || '-')}</strong></div>` +
+            .map((group) => {
+                const phaseLabel = formatPayrollPhaseLabel(
+                    group.phaseLabel || group.printPhaseKey || '-'
+                );
+
+                return (
+                    '<div class="border rounded p-2 mb-2 bg-white">' +
+                    `<div><strong>${escapeSnapshotSummaryHtml(phaseLabel)}</strong></div>` +
                     `<div>Εργαζόμενοι: ${escapeSnapshotSummaryHtml(group.employeesCount || 0)}</div>` +
-                    `<div>Calculation units: ${escapeSnapshotSummaryHtml(group.calculationUnitsCount || 0)}</div>` +
-                    `<div>Print groups: ${escapeSnapshotSummaryHtml(group.printGroupsCount || 0)}</div>` +
-                '</div>'
-            ))
+                    `<div>Μισθοδοσίες: ${escapeSnapshotSummaryHtml(group.calculationUnitsCount || 0)}</div>` +
+                    `<div>Εκτυπώσεις: ${escapeSnapshotSummaryHtml(group.printGroupsCount || 0)}</div>` +
+                    '</div>'
+                );
+            })
             .join('');
     }
 
@@ -1367,35 +1421,47 @@ document.addEventListener('DOMContentLoaded', function () {
         const printGroups = Array.isArray(employee.printGroups) ? employee.printGroups : [];
         const unitsHtml = units.length
             ? units
-                  .map((unit) => (
-                      '<li>' +
-                          `#${escapeSnapshotSummaryHtml(unit.aa_misthodosias || '-')} ` +
-                          `${escapeSnapshotSummaryHtml(unit.fromDate || '-')} έως ${escapeSnapshotSummaryHtml(unit.toDate || '-')} ` +
-                          `(${escapeSnapshotSummaryHtml(unit.phaseLabel || '-')})` +
-                      '</li>'
-                  ))
+                  .map((unit) => {
+                      const phaseLabel = formatPayrollPhaseLabel(unit.phaseLabel || '-');
+                      const fromDate = formatPayrollPreviewDate(unit.fromDate || '-');
+                      const toDate = formatPayrollPreviewDate(unit.toDate || '-');
+
+                      return (
+                          '<li class="mb-1">' +
+                          `α/α ${escapeSnapshotSummaryHtml(unit.aa_misthodosias || '-')} ` +
+                          `${escapeSnapshotSummaryHtml(fromDate || '-')} έως ${escapeSnapshotSummaryHtml(toDate || '-')} ` +
+                          `(${escapeSnapshotSummaryHtml(phaseLabel)})` +
+                          '</li>'
+                      );
+                  })
                   .join('')
-            : '<li class="text-muted">Δεν υπάρχουν units.</li>';
+            : '<li class="text-muted">Δεν υπάρχουν μισθοδοσίες.</li>';
         const printGroupsHtml = printGroups.length
             ? printGroups
-                  .map((group) => (
-                      '<li>' +
-                          `${escapeSnapshotSummaryHtml(group.phaseLabel || group.printPhaseKey || '-')} ` +
-                          `aa: ${escapeSnapshotSummaryHtml((group.aa_misthodosiasList || []).join(', ') || '-')} ` +
-                          `intervals: ${escapeSnapshotSummaryHtml(group.intervalsCount || 0)}` +
-                      '</li>'
-                  ))
+                  .map((group) => {
+                      const phaseLabel = formatPayrollPhaseLabel(
+                          group.phaseLabel || group.printPhaseKey || '-'
+                      );
+
+                      return (
+                          '<li class="mb-1">' +
+                          `${escapeSnapshotSummaryHtml(phaseLabel)} ` +
+                          `α/α: ${escapeSnapshotSummaryHtml((group.aa_misthodosiasList || []).join(', ') || '-')} ` +
+                          `διαστήματα: ${escapeSnapshotSummaryHtml(group.intervalsCount || 0)}` +
+                          '</li>'
+                      );
+                  })
                   .join('')
-            : '<li class="text-muted">Δεν υπάρχουν print groups.</li>';
+            : '<li class="text-muted">Δεν υπάρχουν εκτυπώσεις.</li>';
 
         return `
-            <div class="border rounded p-2 mb-2">
+            <div class="border rounded p-2 mb-2 bg-white">
                 <div><strong>${escapeSnapshotSummaryHtml(employee.kodikos || '-')}</strong> ${escapeSnapshotSummaryHtml(employee.fullName || '')}</div>
-                <div>Calculation units: ${escapeSnapshotSummaryHtml(employee.calculationUnitsCount || 0)}</div>
-                <div>Print groups: ${escapeSnapshotSummaryHtml(employee.printGroupsCount || 0)}</div>
-                <div class="mt-2"><strong>Units</strong></div>
-                <ul class="mb-2">${unitsHtml}</ul>
-                <div><strong>Print groups</strong></div>
+                <div>Μισθοδοσίες: ${escapeSnapshotSummaryHtml(employee.calculationUnitsCount || 0)}</div>
+                <div>Εκτυπώσεις: ${escapeSnapshotSummaryHtml(employee.printGroupsCount || 0)}</div>
+                <div class="mt-2"><strong>Μισθοδοσίες</strong></div>
+                <ul class="mb-2 ps-3">${unitsHtml}</ul>
+                <div><strong>Εκτυπώσεις</strong></div>
                 <ul class="mb-0">${printGroupsHtml}</ul>
             </div>
         `;
@@ -1403,30 +1469,64 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function buildPayrollCalculationUnitsPreviewHtml(data = {}) {
         const totals = data.totals && typeof data.totals === 'object' ? data.totals : {};
+        const period = data.period && typeof data.period === 'object' ? data.period : {};
+        const periodApo = formatPayrollPreviewDate(period.apo || '');
+        const periodEos = formatPayrollPreviewDate(period.eos || '');
+        const periodHtml = periodApo || periodEos
+            ? `<div class="small text-muted mb-3">Περίοδος: ${escapeSnapshotSummaryHtml(periodApo || '-')} έως ${escapeSnapshotSummaryHtml(periodEos || '-')}</div>`
+            : '';
         const employees = Array.isArray(data.employees) ? data.employees : [];
         const warnings = Array.isArray(data.warnings) ? data.warnings : [];
         const employeesHtml = employees.length
             ? employees.map(buildPreviewEmployeeHtml).join('')
             : '<div class="text-muted">Δεν βρέθηκαν εργαζόμενοι.</div>';
         const warningsHtml = warnings.length
-            ? '<hr><div><strong>Warnings:</strong></div>' +
+            ? '<hr><h6>Προειδοποιήσεις</h6><div class="d-grid gap-2">' +
               warnings
-                  .slice(0, 8)
-                  .map((warning) => `<div>${escapeSnapshotSummaryHtml(warning)}</div>`)
-                  .join('')
+                  .slice(0, 12)
+                  .map((warning) => (
+                      '<div class="alert alert-warning py-2 px-2 mb-0 small apasxolhseis-preview-warning">' +
+                      escapeSnapshotSummaryHtml(formatPayrollPreviewWarning(warning)) +
+                      '</div>'
+                  ))
+                  .join('') +
+              '</div>'
             : '';
 
         return `
-            <div class="text-start">
+            <div class="text-start apasxolhseis-preview-modal-content">
                 <div class="alert alert-info py-2">
                     Δεν έγινε αποθήκευση. Το preview είναι μόνο ενημερωτικό.
                 </div>
-                <div><strong>Employees:</strong> ${escapeSnapshotSummaryHtml(totals.employeesCount || 0)}</div>
-                <div><strong>Calculation units:</strong> ${escapeSnapshotSummaryHtml(totals.calculationUnitsCount || 0)}</div>
-                <div><strong>Save operations:</strong> ${escapeSnapshotSummaryHtml(totals.saveOperationsCount || 0)}</div>
-                <div><strong>Print groups:</strong> ${escapeSnapshotSummaryHtml(totals.printGroupsCount || 0)}</div>
+                ${periodHtml}
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-lg-3">
+                        <div class="border rounded p-2 bg-white h-100">
+                            <div class="small text-muted">Εργαζόμενοι</div>
+                            <div class="fw-semibold">${escapeSnapshotSummaryHtml(totals.employeesCount || 0)}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="border rounded p-2 bg-white h-100">
+                            <div class="small text-muted">Μισθοδοσίες</div>
+                            <div class="fw-semibold">${escapeSnapshotSummaryHtml(totals.calculationUnitsCount || 0)}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="border rounded p-2 bg-white h-100">
+                            <div class="small text-muted">Αποθηκεύσεις</div>
+                            <div class="fw-semibold">${escapeSnapshotSummaryHtml(totals.saveOperationsCount || 0)}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="border rounded p-2 bg-white h-100">
+                            <div class="small text-muted">Εκτυπώσεις</div>
+                            <div class="fw-semibold">${escapeSnapshotSummaryHtml(totals.printGroupsCount || 0)}</div>
+                        </div>
+                    </div>
+                </div>
                 <hr>
-                <h6>Groups by phase</h6>
+                <h6>Ομάδες ανά φάση</h6>
                 ${buildPreviewPhaseGroupsHtml(data.groupsByPhase)}
                 <hr>
                 <h6>Ανά εργαζόμενο</h6>
@@ -1708,6 +1808,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 width: 'min(960px, calc(100vw - 2rem))',
                 confirmButtonText: 'Εντάξει',
                 customClass: {
+                    popup: 'apasxolhseis-preview-swal-popup',
+                    htmlContainer: 'apasxolhseis-preview-swal-html',
                     confirmButton: 'class-info custom-confirm-button custom-swal-button'
                 }
             });
