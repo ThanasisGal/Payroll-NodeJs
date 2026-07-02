@@ -12,7 +12,7 @@
 
 const { formatCurrencyForErgani: formatCurrency } = require('../erganh/erganiFormatters');
 
-async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
+async function generateE3XML(ergazomenos, companyData, ypokatasthmataData, options = {}) {
     try {
         console.log('🔧 [E3-GENERATOR] Starting XML generation...');
         console.log('   Employee AFM:', ergazomenos.afm);
@@ -335,6 +335,17 @@ async function generateE3XML(ergazomenos, companyData, ypokatasthmataData) {
         console.log('   Foreign docs:', foreignPdfBase64 ? 'YES' : 'NO');
         console.log('   Young docs:', youngPdfBase64 ? 'YES' : 'NO');
         console.log('   Epikouriki:', epikourikiSelections.length);
+
+        if (options.skipSave === true) {
+            return {
+                success: true,
+                xml,
+                s3Key: null,
+                s3Url: null,
+                filename: null,
+                skippedSave: true
+            };
+        }
 
         // =====================================================================
         // ✅ SAVE XML TO S3

@@ -467,6 +467,12 @@ router.post(
 );
 
 router.post(
+    '/ergazomenoi/ergazomenoi/e3n/pre-submit-comparison',
+    checkAuth,
+    erganhController.compareE3NBeforeRestSubmit
+);
+
+router.post(
     '/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh',
     checkAuth,
     erganhController.submitWTOWeekToErganh

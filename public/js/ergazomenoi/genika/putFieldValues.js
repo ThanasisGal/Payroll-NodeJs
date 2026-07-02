@@ -1416,9 +1416,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             try {
                                 console.log('[E3-REST-UPLOAD] Submitting E3N via REST JSON...');
 
-                                showE3NRestProgressSwal();
-
                                 e3Result = await submitE3NRestToErganh(data.data._id);
+                                if (e3Result?.cancelled) {
+                                    return { e3Result, maResult, wtoResult };
+                                }
 
                                 Swal.close();
 
@@ -2471,17 +2472,161 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================================
     // ✅ E3N REST JSON UPLOAD
     // ============================================================================
-    async function submitE3NRestToErganh(ergazomenosId) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-        const ypokatasthma =
+    function getSelectedE3NYpokatasthma() {
+        return (
             document.getElementById('ypokatasthma')?.value ||
             document.getElementById('ypokatasthmata')?.value ||
             document.getElementById('ypokatasthmata_stathera')?.value ||
             document.querySelector('[name="ypokatasthma"]')?.value ||
             document.querySelector('[name="ypokatasthmata"]')?.value ||
             document.querySelector('[name="ypokatasthmata_stathera"]')?.value ||
-            '0';
+            '0'
+        );
+    }
+
+    function escapeE3NPreflightHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderE3NPreflightDifferences(differences = []) {
+        return `
+            <div class="e3n-preflight-list">
+                ${differences
+                    .map(
+                        (item) => `
+                            <div class="e3n-preflight-card">
+                                <div><strong>Πεδίο:</strong> ${escapeE3NPreflightHtml(item.label)}</div>
+                                <div><strong>ΒΔ:</strong> ${escapeE3NPreflightHtml(item.dbDisplay ?? item.dbValue ?? '')}</div>
+                                <div><strong>XML:</strong> ${escapeE3NPreflightHtml(item.xmlDisplay ?? item.xmlValue ?? '')}</div>
+                                <div><strong>REST JSON:</strong> ${escapeE3NPreflightHtml(item.jsonDisplay ?? item.jsonValue ?? '')}</div>
+                            </div>
+                        `
+                    )
+                    .join('')}
+            </div>
+        `;
+    }
+
+    async function showE3NPreSubmitComparisonSwal(comparison) {
+        const hasDifferences = comparison?.hasDifferences === true;
+        const html = hasDifferences
+            ? renderE3NPreflightDifferences(comparison.differences || [])
+            : '<p>Δεν βρέθηκαν ασυμφωνίες μεταξύ ΒΔ, XML και REST JSON.</p>';
+
+        const result = await Swal.fire({
+            backdrop: false,
+            allowOutsideClick: false,
+            icon: hasDifferences ? 'warning' : 'question',
+            title: hasDifferences
+                ? 'Βρέθηκαν ασυμφωνίες πριν την Οριστική Υποβολή Ε3'
+                : 'Έλεγχος Οριστικής Υποβολής Ε3',
+            html,
+            showCancelButton: true,
+            confirmButtonText: 'Συνέχεια σε Οριστική Υποβολή',
+            cancelButtonText: 'Ακύρωση',
+            customClass: {
+                confirmButton: 'class-warning custom-confirm-button custom-swal-button',
+                cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
+                title: 'custom-title',
+                popup: 'custom-swal-popup',
+                htmlContainer: 'custom-html-container'
+            },
+            didOpen: () => {
+                const htmlContainer = Swal.getHtmlContainer();
+                const list = htmlContainer?.querySelector('.e3n-preflight-list');
+                const cards = htmlContainer?.querySelectorAll('.e3n-preflight-card') || [];
+
+                if (htmlContainer) {
+                    htmlContainer.style.setProperty('max-height', '62vh');
+                    htmlContainer.style.setProperty('overflow-y', 'auto');
+                    htmlContainer.style.setProperty('text-align', 'left');
+                    htmlContainer.style.setProperty('overflow-wrap', 'anywhere');
+                }
+                if (list) {
+                    list.style.setProperty('display', 'grid');
+                    list.style.setProperty('gap', '0.5rem');
+                }
+                cards.forEach((card) => {
+                    card.style.setProperty('border', '1px solid #dee2e6');
+                    card.style.setProperty('border-radius', '6px');
+                    card.style.setProperty('padding', '0.5rem 0.75rem');
+                    card.style.setProperty('font-size', '0.9rem');
+                    card.style.setProperty('background', '#fff');
+                });
+            }
+        });
+
+        if (!result.isConfirmed) {
+            await Swal.fire({
+                backdrop: false,
+                icon: 'info',
+                title: 'Ακύρωση',
+                text: 'Δεν έγινε οριστική υποβολή στο ΕΡΓΑΝΗ.',
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'class-secondary custom-confirm-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
+            });
+            return false;
+        }
+
+        return true;
+    }
+
+    async function runE3NPreSubmitComparison(ergazomenosId, ypokatasthma, csrfToken) {
+        const response = await fetch('/ergazomenoi/ergazomenoi/e3n/pre-submit-comparison', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                ergazomenosId,
+                ypokatasthma,
+                erganiUploadMethod: 'rest'
+            })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+            ? await response.json()
+            : { success: response.ok, message: await response.text() };
+
+        if (!response.ok || data?.success !== true) {
+            throw new Error(
+                data?.message ||
+                    data?.error ||
+                    `E3N pre-submit comparison failed with HTTP ${response.status}`
+            );
+        }
+
+        return data;
+    }
+
+    async function submitE3NRestToErganh(ergazomenosId) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const ypokatasthma = getSelectedE3NYpokatasthma();
+
+        const comparison = await runE3NPreSubmitComparison(ergazomenosId, ypokatasthma, csrfToken);
+        const canProceed = await showE3NPreSubmitComparisonSwal(comparison);
+
+        if (!canProceed) {
+            return {
+                success: false,
+                cancelled: true,
+                message: 'Δεν έγινε οριστική υποβολή στο ΕΡΓΑΝΗ.'
+            };
+        }
+
+        showE3NRestProgressSwal();
 
         const response = await fetch('/ergazomenoi/ergazomenoi/submit-e3n-to-erganh', {
             method: 'POST',
