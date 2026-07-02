@@ -9,6 +9,12 @@ function toTrimmedString(value) {
     return String(value ?? '').trim();
 }
 
+function normalizePreviewYpokatasthma(value) {
+    const normalized = toTrimmedString(value);
+    if (!normalized || normalized.toUpperCase() === 'ALL') return '';
+    return normalized;
+}
+
 function parseDateOnlyUTC(value) {
     const raw = toTrimmedString(value).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
@@ -85,7 +91,7 @@ function buildEmployeeScopeQuery({
         }
     }
 
-    const cleanYpokatasthma = toTrimmedString(ypokatasthma);
+    const cleanYpokatasthma = normalizePreviewYpokatasthma(ypokatasthma);
     if (cleanYpokatasthma) {
         query.ypokatasthma = cleanYpokatasthma;
     }
@@ -318,7 +324,7 @@ function validatePreviewInput(input = {}) {
         apoDate,
         eosDate,
         employeeId: toTrimmedString(input.employeeId),
-        ypokatasthma: toTrimmedString(input.ypokatasthma),
+        ypokatasthma: normalizePreviewYpokatasthma(input.ypokatasthma),
         period: buildPeriodMetadata(input.period, apo, eos)
     };
 }
