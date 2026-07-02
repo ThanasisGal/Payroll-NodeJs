@@ -547,6 +547,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const generateAllWorkFactsSnapshotsJobButton = document.getElementById(
         'generateAllWorkFactsSnapshotsJobButton'
     );
+    const configureWorkFactsSchedulerSlotButton = document.getElementById(
+        'configureWorkFactsSchedulerSlotButton'
+    );
     let ergazomenoiOptionsCache = [];
     let forcedErgazomenosRecordForNavigation = null;
 
@@ -631,6 +634,406 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    function getSchedulerSlotTimezone() {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Athens';
+    }
+
+    function formatDateInputValue(date) {
+        return [
+            String(date.getFullYear()).padStart(4, '0'),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-');
+    }
+
+    function formatTimeInputValue(date) {
+        return [
+            String(date.getHours()).padStart(2, '0'),
+            String(date.getMinutes()).padStart(2, '0')
+        ].join(':');
+    }
+
+    function getRoundedSchedulerSlotStartTime(stepMinutes = 5) {
+        const date = new Date();
+        const step = Number.parseInt(stepMinutes, 10) || 5;
+        const roundedMinutes = Math.ceil(date.getMinutes() / step) * step;
+        date.setMinutes(roundedMinutes, 0, 0);
+
+        return formatTimeInputValue(date);
+    }
+
+    function getSchedulerSlotYpokatasthmaValue() {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const ypokatasthma =
+            normalizeYpokatasthmaValue(currentSharedParams._YPOKATASTHMA) ||
+            normalizeYpokatasthmaValue(currentSharedParams.ypokatasthma) ||
+            normalizeYpokatasthmaValue(getInputValue('ypokatasthma_Hidden')) ||
+            normalizeYpokatasthmaValue(ypokatasthmataDropdown?.value);
+
+        return ypokatasthma || 'ALL';
+    }
+
+    function buildSchedulerSlotOptionLabel(slot = {}) {
+        const slotDate = slot.slotDate || '-';
+        const slotTime = slot.slotTime || '-';
+        const timezone = slot.timezone || getSchedulerSlotTimezone();
+
+        return `${slotDate} ${slotTime} (${timezone})`;
+    }
+
+    function buildSchedulerSlotModalHtml(state = {}) {
+        const slots = Array.isArray(state.slots) ? state.slots : [];
+        const selectedYpokatasthma = state.ypokatasthma || getSchedulerSlotYpokatasthmaValue();
+        const selectedStepMinutes = String(state.stepMinutes || '5');
+        const selectedSlotKey = state.selectedSlotKey || slots[0]?.slotKey || '';
+        const slotsHtml = slots.length
+            ? `
+                <div class="mb-2 text-start">
+                    <label for="availableSchedulerSlotSelect" class="form-label mb-1">Διαθέσιμες ώρες</label>
+                    <select id="availableSchedulerSlotSelect" class="form-select form-select-sm">
+                        ${slots.map((slot) => {
+                            const value = escapeSnapshotSummaryHtml(slot.slotKey || `${slot.slotDate}|${slot.slotTime}`);
+                            const selected = value === escapeSnapshotSummaryHtml(selectedSlotKey) ? ' selected' : '';
+                            return `<option value="${value}"${selected}>${escapeSnapshotSummaryHtml(buildSchedulerSlotOptionLabel(slot))}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+            `
+            : `
+                <div class="alert alert-secondary py-2 mb-2 text-start">
+                    Πατήστε "Αναζήτηση διαθέσιμων ωρών" για να εμφανιστούν διαθέσιμα slots.
+                </div>
+            `;
+        const messageHtml = state.message
+            ? `<div id="schedulerSlotValidationMessage" class="alert alert-${escapeSnapshotSummaryHtml(state.messageType || 'info')} py-2 mb-2 text-start">${escapeSnapshotSummaryHtml(state.message)}</div>`
+            : '<div id="schedulerSlotValidationMessage" class="d-none"></div>';
+
+        return `
+            <div class="text-start">
+                ${messageHtml}
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label for="schedulerSlotStartDate" class="form-label mb-1">Ημερομηνία έναρξης</label>
+                        <input type="date" id="schedulerSlotStartDate" class="form-control form-control-sm" value="${escapeSnapshotSummaryHtml(state.startDate || formatDateInputValue(new Date()))}">
+                    </div>
+                    <div class="col-6">
+                        <label for="schedulerSlotStartTime" class="form-label mb-1">Ώρα έναρξης</label>
+                        <input type="time" id="schedulerSlotStartTime" class="form-control form-control-sm" step="300" value="${escapeSnapshotSummaryHtml(state.startTime || getRoundedSchedulerSlotStartTime(5))}">
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label for="schedulerSlotStepMinutes" class="form-label mb-1">Βήμα</label>
+                        <select id="schedulerSlotStepMinutes" class="form-select form-select-sm">
+                            <option value="5"${selectedStepMinutes === '5' ? ' selected' : ''}>5 λεπτά</option>
+                            <option value="10"${selectedStepMinutes === '10' ? ' selected' : ''}>10 λεπτά</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="schedulerSlotYpokatasthma" class="form-label mb-1">Υποκατάστημα</label>
+                        <input type="text" id="schedulerSlotYpokatasthma" class="form-control form-control-sm" value="${escapeSnapshotSummaryHtml(selectedYpokatasthma)}" readonly>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <label for="schedulerSlotNotes" class="form-label mb-1">Notes</label>
+                    <textarea id="schedulerSlotNotes" class="form-control form-control-sm" rows="2">${escapeSnapshotSummaryHtml(state.notes || '')}</textarea>
+                </div>
+                ${slotsHtml}
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button type="button" class="btn btn-sm btn-secondary" id="schedulerSlotCancelButton">Ακύρωση</button>
+                    <button type="button" class="btn btn-sm btn-info" id="schedulerSlotSearchButton">Αναζήτηση διαθέσιμων ωρών</button>
+                    <button type="button" class="btn btn-sm btn-success" id="schedulerSlotConfigureButton"${slots.length ? '' : ' disabled'}>Δέσμευση και ρύθμιση</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function getSchedulerSlotModalStateFromDom(previousState = {}) {
+        return {
+            ...previousState,
+            startDate: getInputValue('schedulerSlotStartDate', previousState.startDate || ''),
+            startTime: getInputValue('schedulerSlotStartTime', previousState.startTime || ''),
+            timezone: previousState.timezone || getSchedulerSlotTimezone(),
+            stepMinutes: getInputValue('schedulerSlotStepMinutes', previousState.stepMinutes || '5'),
+            ypokatasthma: getInputValue(
+                'schedulerSlotYpokatasthma',
+                previousState.ypokatasthma || getSchedulerSlotYpokatasthmaValue()
+            ),
+            notes: getInputValue('schedulerSlotNotes', previousState.notes || ''),
+            selectedSlotKey: getInputValue(
+                'availableSchedulerSlotSelect',
+                previousState.selectedSlotKey || ''
+            )
+        };
+    }
+
+    function getSchedulerSlotApiMessage(response, data, fallbackMessage) {
+        if (response.status === 400) {
+            const warnings = Array.isArray(data?.warnings) ? data.warnings.join(' | ') : '';
+            return data?.message || warnings || 'Ελέγξτε τα στοιχεία της φόρμας.';
+        }
+
+        if (response.status === 403) {
+            return 'Δεν έχετε δικαίωμα για ρύθμιση scheduler.';
+        }
+
+        if (response.status === 409) {
+            return 'Η ώρα δεσμεύτηκε ήδη. Επιλέξτε άλλη διαθέσιμη ώρα.';
+        }
+
+        if (response.status >= 500) {
+            return 'Παρουσιάστηκε σφάλμα. Δοκιμάστε ξανά αργότερα.';
+        }
+
+        return data?.message || fallbackMessage;
+    }
+
+    async function fetchAvailableSchedulerSlots(state = {}) {
+        const params = new URLSearchParams({
+            startDate: state.startDate,
+            startTime: state.startTime,
+            timezone: state.timezone || getSchedulerSlotTimezone(),
+            stepMinutes: String(state.stepMinutes || '5'),
+            limit: '20',
+            maxDays: '31'
+        });
+        const response = await fetch(
+            `/api/kinhseis/workFactsSchedulerSlots/available?${params.toString()}`,
+            {
+                method: 'GET',
+                credentials: 'same-origin',
+                skipLoader: true
+            }
+        );
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data?.success !== true) {
+            const error = new Error(
+                getSchedulerSlotApiMessage(
+                    response,
+                    data,
+                    'Δεν ήταν δυνατή η ανάκτηση διαθέσιμων slots.'
+                )
+            );
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return Array.isArray(data.slots) ? data.slots : [];
+    }
+
+    async function postConfigureSchedulerSlot(state = {}) {
+        const slot = (Array.isArray(state.slots) ? state.slots : []).find((item) => {
+            const key = item.slotKey || `${item.slotDate}|${item.slotTime}`;
+            return key === state.selectedSlotKey;
+        });
+
+        if (!slot) {
+            const error = new Error('Επιλέξτε διαθέσιμη ώρα.');
+            error.status = 400;
+            throw error;
+        }
+
+        const payload = {
+            slotDate: slot.slotDate,
+            slotTime: slot.slotTime,
+            timezone: slot.timezone || state.timezone || getSchedulerSlotTimezone(),
+            stepMinutes: Number.parseInt(state.stepMinutes, 10) || 5,
+            ypokatasthma: state.ypokatasthma || 'ALL',
+            notes: state.notes || ''
+        };
+        const response = await fetch('/api/kinhseis/workFactsSchedulerSlots/configure', {
+            method: 'POST',
+            credentials: 'same-origin',
+            skipLoader: true,
+            headers: getJsonHeaders(),
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data?.success !== true) {
+            const error = new Error(
+                getSchedulerSlotApiMessage(
+                    response,
+                    data,
+                    'Δεν ήταν δυνατή η ρύθμιση scheduler slot.'
+                )
+            );
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return {
+            data,
+            slot
+        };
+    }
+
+    function updateSchedulerSlotModal(state) {
+        window.Swal.update({
+            html: buildSchedulerSlotModalHtml(state)
+        });
+        attachSchedulerSlotModalHandlers(state);
+    }
+
+    function setSchedulerSlotButtonLoading(button, loadingText) {
+        if (!button) return () => {};
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = loadingText;
+
+        return () => {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        };
+    }
+
+    function attachSchedulerSlotModalHandlers(state) {
+        const cancelButton = document.getElementById('schedulerSlotCancelButton');
+        const searchButton = document.getElementById('schedulerSlotSearchButton');
+        const configureButton = document.getElementById('schedulerSlotConfigureButton');
+
+        if (cancelButton) {
+            cancelButton.addEventListener('click', function () {
+                window.Swal.close();
+            });
+        }
+
+        if (searchButton) {
+            searchButton.addEventListener('click', async function () {
+                const nextState = getSchedulerSlotModalStateFromDom(state);
+                if (!nextState.startDate || !nextState.startTime) {
+                    updateSchedulerSlotModal({
+                        ...nextState,
+                        messageType: 'warning',
+                        message: 'Συμπληρώστε ημερομηνία και ώρα έναρξης.'
+                    });
+                    return;
+                }
+
+                const restoreButton = setSchedulerSlotButtonLoading(
+                    searchButton,
+                    'Αναζήτηση...'
+                );
+
+                try {
+                    const slots = await fetchAvailableSchedulerSlots(nextState);
+                    updateSchedulerSlotModal({
+                        ...nextState,
+                        slots,
+                        selectedSlotKey: slots[0]?.slotKey || '',
+                        messageType: slots.length ? 'info' : 'warning',
+                        message: slots.length
+                            ? `Βρέθηκαν ${slots.length} διαθέσιμα slots.`
+                            : 'Δεν βρέθηκαν διαθέσιμες ώρες με τα κριτήρια που δώσατε.'
+                    });
+                } catch (error) {
+                    updateSchedulerSlotModal({
+                        ...nextState,
+                        slots: [],
+                        messageType: error.status === 403 ? 'warning' : 'danger',
+                        message: error.message || 'Δεν ήταν δυνατή η ανάκτηση διαθέσιμων slots.'
+                    });
+                } finally {
+                    restoreButton();
+                }
+            });
+        }
+
+        if (configureButton) {
+            configureButton.addEventListener('click', async function () {
+                const nextState = getSchedulerSlotModalStateFromDom(state);
+                const restoreButton = setSchedulerSlotButtonLoading(
+                    configureButton,
+                    'Ρύθμιση...'
+                );
+
+                try {
+                    const result = await postConfigureSchedulerSlot(nextState);
+                    window.Swal.close();
+                    await showSnapshotActionMessage(
+                        'success',
+                        'Ολοκληρώθηκε',
+                        `Ρυθμίστηκε scheduler slot για ${result.slot.slotDate} ${result.slot.slotTime}.`
+                    );
+                } catch (error) {
+                    if (error.status === 409) {
+                        const refreshedState = {
+                            ...nextState,
+                            messageType: 'warning',
+                            message: 'Η ώρα δεσμεύτηκε ήδη. Επιλέξτε άλλη διαθέσιμη ώρα.'
+                        };
+
+                        try {
+                            const slots = await fetchAvailableSchedulerSlots(refreshedState);
+                            updateSchedulerSlotModal({
+                                ...refreshedState,
+                                slots,
+                                selectedSlotKey: slots[0]?.slotKey || ''
+                            });
+                        } catch (refreshError) {
+                            updateSchedulerSlotModal({
+                                ...refreshedState,
+                                slots: [],
+                                message:
+                                    refreshError.message ||
+                                    'Η ώρα δεσμεύτηκε ήδη. Δεν ήταν δυνατή η ανανέωση διαθέσιμων ωρών.'
+                            });
+                        }
+                        return;
+                    }
+
+                    updateSchedulerSlotModal({
+                        ...nextState,
+                        messageType: error.status === 403 ? 'warning' : 'danger',
+                        message: error.message || 'Δεν ήταν δυνατή η ρύθμιση scheduler slot.'
+                    });
+                } finally {
+                    restoreButton();
+                }
+            });
+        }
+    }
+
+    async function handleConfigureWorkFactsSchedulerSlotClick(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
+
+        if (!window.Swal || typeof window.Swal.fire !== 'function') {
+            await showSnapshotActionMessage(
+                'error',
+                'Μη διαθέσιμο',
+                'Δεν είναι διαθέσιμο το παράθυρο ρύθμισης scheduler.'
+            );
+            return;
+        }
+
+        const initialState = {
+            startDate: formatDateInputValue(new Date()),
+            startTime: getRoundedSchedulerSlotStartTime(5),
+            timezone: getSchedulerSlotTimezone(),
+            stepMinutes: '5',
+            ypokatasthma: getSchedulerSlotYpokatasthmaValue(),
+            notes: '',
+            slots: []
+        };
+
+        await window.Swal.fire({
+            title: 'Ρύθμιση scheduler',
+            html: buildSchedulerSlotModalHtml(initialState),
+            width: 'min(720px, calc(100vw - 2rem))',
+            showConfirmButton: false,
+            showCancelButton: false,
+            allowOutsideClick: false,
+            didOpen: function () {
+                attachSchedulerSlotModalHandlers(initialState);
+            }
+        });
     }
 
     function getSnapshotSummaryTotals(data = {}) {
@@ -2486,6 +2889,13 @@ document.addEventListener('DOMContentLoaded', function () {
         generateAllWorkFactsSnapshotsJobButton.addEventListener(
             'click',
             handleGenerateAllWorkFactsSnapshotsJobClick
+        );
+    }
+
+    if (configureWorkFactsSchedulerSlotButton) {
+        configureWorkFactsSchedulerSlotButton.addEventListener(
+            'click',
+            handleConfigureWorkFactsSchedulerSlotClick
         );
     }
 
