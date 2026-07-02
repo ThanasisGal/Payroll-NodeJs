@@ -49,6 +49,9 @@ const {
     reservePayrollPrecalcSchedulerSlot,
     configurePayrollPrecalcSchedulerSlotForSetting
 } = require('../../services/kinhseis/workFactsSchedulerSlotService');
+const {
+    buildPayrollCalculationUnitsPreview
+} = require('../../services/kinhseis/payrollCalculationUnitsPreviewService');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -1148,6 +1151,56 @@ class kinhseisController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση του precalc snapshot.'
+            });
+        }
+    };
+
+    static previewPayrollCalculationUnits = async (req, res) => {
+        try {
+            const team = String(req.session?.userTeam || '').trim();
+            const company_kod = String(req.session?.companyInUse || '').trim();
+            const periodInUse = String(req.session?.periodInUse || '').trim();
+            const periodInUseDescr = String(req.session?.periodInUseDescr || '').trim();
+            const yearInUse = String(req.session?.yearInUse || '').trim();
+            const apoDate = req.query.apoDate || req.query.apo;
+            const eosDate = req.query.eosDate || req.query.eos;
+
+            if (!team || !company_kod) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+
+            const result = await buildPayrollCalculationUnitsPreview({
+                team,
+                company_kod,
+                period: {
+                    period: periodInUse,
+                    description: periodInUseDescr,
+                    year: yearInUse
+                },
+                apoDate,
+                eosDate,
+                employeeId: req.query.employeeId,
+                ypokatasthma: req.query.ypokatasthma
+            });
+
+            return res.status(200).json(result);
+        } catch (error) {
+            console.error('Error into kinhseisController -> previewPayrollCalculationUnits :', error);
+
+            if (error.statusCode === 400) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message || 'Λείπουν ή δεν είναι έγκυρα στοιχεία.',
+                    warnings: Array.isArray(error.warnings) ? error.warnings : []
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά το preview calculation units μισθοδοσίας.'
             });
         }
     };

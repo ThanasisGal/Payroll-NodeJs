@@ -1161,6 +1161,12 @@ router.get('/api/kinhseis/detectPayrollPhases', kinhseisController.detectPayroll
 router.get('/api/kinhseis/workFactsSnapshot', checkAuth, kinhseisController.getWorkFactsSnapshot);
 
 router.get(
+    '/api/kinhseis/payrollCalculationUnits/preview',
+    checkAuth,
+    kinhseisController.previewPayrollCalculationUnits
+);
+
+router.get(
     '/api/kinhseis/workFactsSchedulerSlots/available',
     checkAuth,
     kinhseisController.getAvailableWorkFactsSchedulerSlots
