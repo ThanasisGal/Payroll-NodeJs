@@ -547,6 +547,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const generateAllWorkFactsSnapshotsJobButton = document.getElementById(
         'generateAllWorkFactsSnapshotsJobButton'
     );
+    const previewPayrollCalculationUnitsButton = document.getElementById(
+        'previewPayrollCalculationUnitsButton'
+    );
     const configureWorkFactsSchedulerSlotButton = document.getElementById(
         'configureWorkFactsSchedulerSlotButton'
     );
@@ -1203,6 +1206,236 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
+    function normalizePreviewDateInputValue(value) {
+        const raw = String(value || '').trim().slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+    }
+
+    function getPreviewYpokatasthmaValue() {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const ypokatasthma =
+            normalizeYpokatasthmaValue(currentSharedParams._YPOKATASTHMA) ||
+            normalizeYpokatasthmaValue(currentSharedParams.ypokatasthma) ||
+            normalizeYpokatasthmaValue(getInputValue('ypokatasthma_Hidden')) ||
+            normalizeYpokatasthmaValue(ypokatasthmataDropdown?.value);
+
+        return ypokatasthma || 'ALL';
+    }
+
+    function getPreviewActionDefaults() {
+        const currentSharedParams = window.sharedParams || sharedParams || {};
+        const employee = currentSharedParams.ergazomenoi || {};
+        const employeeId = String(employee.kodikos || getInputValue('kodikosHidden')).trim();
+
+        return {
+            apoDate: normalizePreviewDateInputValue(currentSharedParams.startDate),
+            eosDate: normalizePreviewDateInputValue(currentSharedParams.endDate),
+            employeeId,
+            ypokatasthma: getPreviewYpokatasthmaValue()
+        };
+    }
+
+    async function promptPayrollCalculationUnitsPreviewParams(defaults = {}) {
+        if (!window.Swal || typeof window.Swal.fire !== 'function') {
+            return null;
+        }
+
+        const result = await window.Swal.fire({
+            icon: 'info',
+            title: 'Preview μισθοδοσιών',
+            html: `
+                <div class="text-start">
+                    <div class="alert alert-info py-2 mb-3">
+                        Δεν έγινε αποθήκευση. Το preview είναι μόνο ενημερωτικό.
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label for="previewPayrollApoDate" class="form-label mb-1">Από</label>
+                            <input type="date" id="previewPayrollApoDate" class="form-control form-control-sm" value="${escapeSnapshotSummaryHtml(defaults.apoDate || '')}">
+                        </div>
+                        <div class="col-6">
+                            <label for="previewPayrollEosDate" class="form-label mb-1">Έως</label>
+                            <input type="date" id="previewPayrollEosDate" class="form-control form-control-sm" value="${escapeSnapshotSummaryHtml(defaults.eosDate || '')}">
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        Εργαζόμενος: ${escapeSnapshotSummaryHtml(defaults.employeeId || 'όλοι οι εργαζόμενοι του scope')}
+                    </div>
+                    <div class="small text-muted">
+                        Υποκατάστημα: ${escapeSnapshotSummaryHtml(defaults.ypokatasthma || 'ALL')}
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Προβολή preview',
+            cancelButtonText: 'Ακύρωση',
+            focusConfirm: false,
+            customClass: {
+                confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                cancelButton: 'class-secondary custom-cancel-button custom-swal-button'
+            },
+            preConfirm: function () {
+                const apoDate = normalizePreviewDateInputValue(
+                    document.getElementById('previewPayrollApoDate')?.value
+                );
+                const eosDate = normalizePreviewDateInputValue(
+                    document.getElementById('previewPayrollEosDate')?.value
+                );
+
+                if (!apoDate || !eosDate) {
+                    window.Swal.showValidationMessage('Συμπληρώστε ημερομηνίες Από και Έως.');
+                    return false;
+                }
+
+                if (apoDate > eosDate) {
+                    window.Swal.showValidationMessage('Η ημερομηνία Από πρέπει να είναι <= Έως.');
+                    return false;
+                }
+
+                return {
+                    apoDate,
+                    eosDate,
+                    employeeId: defaults.employeeId || '',
+                    ypokatasthma: defaults.ypokatasthma || 'ALL'
+                };
+            }
+        });
+
+        return result.isConfirmed ? result.value : null;
+    }
+
+    function buildPayrollCalculationUnitsPreviewUrl(params = {}) {
+        const query = new URLSearchParams();
+        query.set('apoDate', params.apoDate);
+        query.set('eosDate', params.eosDate);
+
+        if (params.employeeId) {
+            query.set('employeeId', params.employeeId);
+        }
+
+        if (params.ypokatasthma) {
+            query.set('ypokatasthma', params.ypokatasthma);
+        }
+
+        return `/api/kinhseis/payrollCalculationUnits/preview?${query.toString()}`;
+    }
+
+    async function fetchPayrollCalculationUnitsPreview(params = {}) {
+        const response = await fetch(buildPayrollCalculationUnitsPreviewUrl(params), {
+            method: 'GET',
+            credentials: 'same-origin',
+            skipLoader: true
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data?.success !== true) {
+            const error = new Error(
+                data?.message ||
+                    (response.status === 400
+                        ? 'Λείπουν ή δεν είναι έγκυρα στοιχεία.'
+                        : response.status === 403
+                            ? 'Δεν έχετε δικαίωμα για το preview.'
+                            : 'Αποτυχία preview μισθοδοσιών.')
+            );
+            error.status = response.status;
+            error.payload = data;
+            throw error;
+        }
+
+        return data;
+    }
+
+    function buildPreviewPhaseGroupsHtml(groupsByPhase = []) {
+        if (!Array.isArray(groupsByPhase) || groupsByPhase.length === 0) {
+            return '<div class="text-muted">Δεν υπάρχουν groups ανά φάση.</div>';
+        }
+
+        return groupsByPhase
+            .map((group) => (
+                '<div class="border rounded p-2 mb-2">' +
+                    `<div><strong>${escapeSnapshotSummaryHtml(group.phaseLabel || group.printPhaseKey || '-')}</strong></div>` +
+                    `<div>Εργαζόμενοι: ${escapeSnapshotSummaryHtml(group.employeesCount || 0)}</div>` +
+                    `<div>Calculation units: ${escapeSnapshotSummaryHtml(group.calculationUnitsCount || 0)}</div>` +
+                    `<div>Print groups: ${escapeSnapshotSummaryHtml(group.printGroupsCount || 0)}</div>` +
+                '</div>'
+            ))
+            .join('');
+    }
+
+    function buildPreviewEmployeeHtml(employee = {}) {
+        const units = Array.isArray(employee.units) ? employee.units : [];
+        const printGroups = Array.isArray(employee.printGroups) ? employee.printGroups : [];
+        const unitsHtml = units.length
+            ? units
+                  .map((unit) => (
+                      '<li>' +
+                          `#${escapeSnapshotSummaryHtml(unit.aa_misthodosias || '-')} ` +
+                          `${escapeSnapshotSummaryHtml(unit.fromDate || '-')} έως ${escapeSnapshotSummaryHtml(unit.toDate || '-')} ` +
+                          `(${escapeSnapshotSummaryHtml(unit.phaseLabel || '-')})` +
+                      '</li>'
+                  ))
+                  .join('')
+            : '<li class="text-muted">Δεν υπάρχουν units.</li>';
+        const printGroupsHtml = printGroups.length
+            ? printGroups
+                  .map((group) => (
+                      '<li>' +
+                          `${escapeSnapshotSummaryHtml(group.phaseLabel || group.printPhaseKey || '-')} ` +
+                          `aa: ${escapeSnapshotSummaryHtml((group.aa_misthodosiasList || []).join(', ') || '-')} ` +
+                          `intervals: ${escapeSnapshotSummaryHtml(group.intervalsCount || 0)}` +
+                      '</li>'
+                  ))
+                  .join('')
+            : '<li class="text-muted">Δεν υπάρχουν print groups.</li>';
+
+        return `
+            <div class="border rounded p-2 mb-2">
+                <div><strong>${escapeSnapshotSummaryHtml(employee.kodikos || '-')}</strong> ${escapeSnapshotSummaryHtml(employee.fullName || '')}</div>
+                <div>Calculation units: ${escapeSnapshotSummaryHtml(employee.calculationUnitsCount || 0)}</div>
+                <div>Print groups: ${escapeSnapshotSummaryHtml(employee.printGroupsCount || 0)}</div>
+                <div class="mt-2"><strong>Units</strong></div>
+                <ul class="mb-2">${unitsHtml}</ul>
+                <div><strong>Print groups</strong></div>
+                <ul class="mb-0">${printGroupsHtml}</ul>
+            </div>
+        `;
+    }
+
+    function buildPayrollCalculationUnitsPreviewHtml(data = {}) {
+        const totals = data.totals && typeof data.totals === 'object' ? data.totals : {};
+        const employees = Array.isArray(data.employees) ? data.employees : [];
+        const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+        const employeesHtml = employees.length
+            ? employees.map(buildPreviewEmployeeHtml).join('')
+            : '<div class="text-muted">Δεν βρέθηκαν εργαζόμενοι.</div>';
+        const warningsHtml = warnings.length
+            ? '<hr><div><strong>Warnings:</strong></div>' +
+              warnings
+                  .slice(0, 8)
+                  .map((warning) => `<div>${escapeSnapshotSummaryHtml(warning)}</div>`)
+                  .join('')
+            : '';
+
+        return `
+            <div class="text-start">
+                <div class="alert alert-info py-2">
+                    Δεν έγινε αποθήκευση. Το preview είναι μόνο ενημερωτικό.
+                </div>
+                <div><strong>Employees:</strong> ${escapeSnapshotSummaryHtml(totals.employeesCount || 0)}</div>
+                <div><strong>Calculation units:</strong> ${escapeSnapshotSummaryHtml(totals.calculationUnitsCount || 0)}</div>
+                <div><strong>Save operations:</strong> ${escapeSnapshotSummaryHtml(totals.saveOperationsCount || 0)}</div>
+                <div><strong>Print groups:</strong> ${escapeSnapshotSummaryHtml(totals.printGroupsCount || 0)}</div>
+                <hr>
+                <h6>Groups by phase</h6>
+                ${buildPreviewPhaseGroupsHtml(data.groupsByPhase)}
+                <hr>
+                <h6>Ανά εργαζόμενο</h6>
+                ${employeesHtml}
+                ${warningsHtml}
+            </div>
+        `;
+    }
+
     async function postBatchSnapshotAction(payload) {
         const csrfToken = getCsrfToken();
         const requestPayload = csrfToken ? { ...payload, _csrf: csrfToken } : payload;
@@ -1440,6 +1673,60 @@ document.addEventListener('DOMContentLoaded', function () {
         const timeoutError = new Error('batch_job_poll_timeout');
         timeoutError.lastJob = lastJob;
         throw timeoutError;
+    }
+
+    async function handlePreviewPayrollCalculationUnitsClick(event) {
+        const button = event.currentTarget;
+        if (!button || button.disabled) return;
+
+        if (!window.Swal || typeof window.Swal.fire !== 'function') {
+            await showSnapshotActionMessage(
+                'error',
+                'Μη διαθέσιμο',
+                'Δεν είναι διαθέσιμο το παράθυρο preview.'
+            );
+            return;
+        }
+
+        const params = await promptPayrollCalculationUnitsPreviewParams(
+            getPreviewActionDefaults()
+        );
+
+        if (!params) return;
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = 'Preview...';
+
+        try {
+            const data = await fetchPayrollCalculationUnitsPreview(params);
+
+            await window.Swal.fire({
+                icon: 'info',
+                title: 'Preview μισθοδοσιών',
+                html: buildPayrollCalculationUnitsPreviewHtml(data),
+                width: 'min(960px, calc(100vw - 2rem))',
+                confirmButtonText: 'Εντάξει',
+                customClass: {
+                    confirmButton: 'class-info custom-confirm-button custom-swal-button'
+                }
+            });
+        } catch (error) {
+            const title = error.status === 400
+                ? 'Λάθος στοιχεία'
+                : error.status === 403
+                    ? 'Δεν έχετε δικαίωμα'
+                    : 'Σφάλμα preview';
+
+            await showSnapshotActionMessage(
+                error.status === 400 || error.status === 403 ? 'warning' : 'error',
+                title,
+                error.payload?.message || error.message || 'Αποτυχία preview μισθοδοσιών.'
+            );
+        } finally {
+            button.innerHTML = originalHtml;
+            button.disabled = false;
+        }
     }
 
     async function handleGenerateWorkFactsSnapshotClick(event) {
@@ -2889,6 +3176,13 @@ document.addEventListener('DOMContentLoaded', function () {
         generateAllWorkFactsSnapshotsJobButton.addEventListener(
             'click',
             handleGenerateAllWorkFactsSnapshotsJobClick
+        );
+    }
+
+    if (previewPayrollCalculationUnitsButton) {
+        previewPayrollCalculationUnitsButton.addEventListener(
+            'click',
+            handlePreviewPayrollCalculationUnitsClick
         );
     }
 
