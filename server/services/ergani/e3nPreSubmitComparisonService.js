@@ -421,9 +421,33 @@ function normalizeTime(value) {
 function normalizeNumber(value) {
     const s = normalizeCommon(value);
     if (!s) return EMPTY;
-    const normalized = s.replace(/\./g, '').replace(',', '.');
+    const normalized = normalizeNumericString(s);
     const n = Number(normalized);
     return Number.isFinite(n) ? String(n) : s;
+}
+
+function normalizeNumericString(value) {
+    const s = normalizeCommon(value);
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+
+    if (lastDot !== -1 && lastComma !== -1) {
+        return lastDot > lastComma
+            ? s.replace(/,/g, '')
+            : s.replace(/\./g, '').replace(',', '.');
+    }
+
+    if (lastComma !== -1) {
+        const decimals = s.length - lastComma - 1;
+        return decimals >= 1 && decimals <= 2 ? s.replace(',', '.') : s.replace(/,/g, '');
+    }
+
+    if (lastDot !== -1) {
+        const decimals = s.length - lastDot - 1;
+        return decimals >= 1 && decimals <= 2 ? s : s.replace(/\./g, '');
+    }
+
+    return s;
 }
 
 function normalizeInteger(value) {
