@@ -132,7 +132,7 @@ const fieldRegistry = [
     { label: 'Όροι δοκιμαστικής περιόδου / ημερομηνία λήξης', dbPath: 'ergazomenos.hmnia_lhxhs_dokimastikhs_periodoy', xmlPath: 'f_trial_date_to', jsonPath: 'f_trial_date_to', normalize: normalizeDate },
     { label: 'Αποδοχή ουσιωδών όρων', dbPath: 'ergazomenos.oysiodeis_oroi', xmlPath: 'f_basics_acceptance', jsonPath: 'f_basics_acceptance', normalize: normalizeBoolean, displayMap: 'boolean' },
     { label: 'Αρχείο όρων', dbPath: null, xmlPath: 'f_file', jsonPath: 'f_file', normalize: normalizeFilePresence, displayMap: 'filePresence' },
-    { label: 'Αρχείο σύμβασης', dbPath: 'ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path', xmlPath: 'f_file_symbash', jsonPath: 'f_file_symbash', normalize: normalizeFilePresence, displayMap: 'filePresence' },
+    { label: 'Αρχείο σύμβασης', dbPath: 'ergazomenos.arxeio_apodoxhs_oron_atomikhs_symbashs_path', xmlPath: 'f_file_symbash', jsonPath: 'f_file_symbash', normalize: normalizeFilePresence, displayMap: 'filePresence', dbWhen: ({ ergazomenos }) => normalizeCommon(ergazomenos.oysiodeis_oroi) === '0' },
     { label: 'Παρατηρήσεις', dbPath: 'ergazomenos.parathrhseis', xmlPath: 'f_comments', jsonPath: 'f_comments' },
     { label: 'Αρχείο νομιμοποιητικών εγγράφων', dbPath: 'ergazomenos.arxeio_nomimopoihtikon_eggrafon_path', xmlPath: 'f_foreign_file', jsonPath: 'f_foreign_file', normalize: normalizeFilePresence, displayMap: 'filePresence' },
     { label: 'Αρχείο εγγράφων ανηλίκου', dbPath: 'ergazomenos.bibliario_anhlikoy_path', xmlPath: 'f_young_file', jsonPath: 'f_young_file', normalize: normalizeFilePresence, displayMap: 'filePresence' },
@@ -148,7 +148,7 @@ const fieldRegistry = [
     { label: 'Ελάχιστη ειδοποίηση πριν την ανάθεση', dbPath: 'ergazomenos.eidopoihsh_prin_thn_anathesh', xmlPath: 'f_paraggelia_min_notification', jsonPath: 'f_paraggelia_min_notification' },
     { label: 'Όροι καταγγελίας / ακύρωσης ανάθεσης', dbPath: 'ergazomenos.prothesmia_akyroshs_ths_anatheshs', xmlPath: 'f_paraggelia_notes', jsonPath: 'f_paraggelia_notes' },
     { label: 'Τόπος εργασίας', dbPath: 'ergazomenos.topos_ergasias', xmlPath: 'f_topos_ergasias', jsonPath: 'f_topos_ergasias', normalize: normalizeBoolean, displayMap: 'boolean' },
-    { label: 'Παρατηρήσεις τόπου εργασίας', dbPath: 'ergazomenos.topos_ergasias_parathrhseis', xmlPath: 'f_topos_ergasias_comment', jsonPath: 'f_topos_ergasias_comment' }
+    { label: 'Παρατηρήσεις τόπου εργασίας', dbPath: 'ergazomenos.topos_ergasias_parathrhseis', xmlPath: 'f_topos_ergasias_comment', jsonPath: 'f_topos_ergasias_comment', dbWhen: ({ ergazomenos }) => normalizeBoolean(ergazomenos.topos_ergasias) === '1' }
 ];
 
 async function compareE3NPreSubmit({ sessionTeam, companyId, body = {} }) {
