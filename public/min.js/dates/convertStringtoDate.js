@@ -1,1 +1,1 @@
-function convertStringToDate(E){const g=E['split']('/'),q=g[0x0],M=g[0x1],H=g[0x2];return new Date(H+'-'+M+'-'+q);}const myDateString='31/12/2023',myDate=convertStringToDate('31/12/2023');
+function convertStringToDate(B){const m=B['split']('/'),y=m[0x0],Q=m[0x1],l=m[0x2];return new Date(l+'-'+Q+'-'+y);}const myDateString='31/12/2023',myDate=convertStringToDate('31/12/2023');
