@@ -637,7 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function getSchedulerSlotTimezone() {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Athens';
+        return 'Europe/Athens';
     }
 
     function formatDateInputValue(date) {
