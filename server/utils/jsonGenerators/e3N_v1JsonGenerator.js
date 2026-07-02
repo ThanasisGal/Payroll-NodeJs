@@ -109,7 +109,7 @@ async function generateE3NJsonPayload(ergazomenos, companyData, ypokatasthmataDa
             f_onoma_patros: upper(ergazomenos.patronymo),
             f_onoma_mitros: upper(ergazomenos.mhtronymo),
             f_birthdate: formatDateForErganh(ergazomenos.hmeromhnia_gennhshs),
-            f_sex: enumValue(ergazomenos.fylo, ['0', '1'], '0'),
+            f_sex: booleanToErgani01(ergazomenos.fylo, '0'),
             f_yphkoothta: normalizeYphkoothta(ergazomenos.yphkoothta, '348'),
             f_typos_taytothtas: toStr(ergazomenos.typos_taytothtas || 'ΔΑΤ'),
             f_ar_taytothtas: toStr(ergazomenos.adt || 'Α00000000'),
@@ -194,7 +194,7 @@ async function generateE3NJsonPayload(ergazomenos, companyData, ypokatasthmataDa
 
             // EMPLOYMENT STATUS
             f_kathestosapasxolisis: toStr(ergazomenos.kathestos_apasxolhshs || '0'),
-            f_xaraktirismos: enumValue(ergazomenos.xarakthrismos_ergazomenon, ['0', '1'], '0'),
+            f_xaraktirismos: booleanToErgani01(ergazomenos.xarakthrismos_ergazomenon, '0'),
             f_special_case: enumValue(ergazomenos.eidikh_periptosh, ['', '2', '3'], ''),
             f_responsible_position: enumValue(
                 ergazomenos.thesh_eythynhs,
@@ -384,6 +384,25 @@ function normalizeWeekDays(value) {
 
 function bool01(value) {
     return value ? '1' : '0';
+}
+
+function booleanToErgani01(value, fallback = '0') {
+    if (value === true) return '1';
+    if (value === false) return '0';
+
+    const normalized = String(value ?? '')
+        .trim()
+        .toLowerCase();
+
+    if (['1', 'true', 'yes', 'y', 'nai', 'ναι'].includes(normalized)) {
+        return '1';
+    }
+
+    if (['0', 'false', 'no', 'n', 'oxi', 'όχι', 'οχι'].includes(normalized)) {
+        return '0';
+    }
+
+    return fallback;
 }
 
 function enumValue(value, allowed, fallback = '') {
