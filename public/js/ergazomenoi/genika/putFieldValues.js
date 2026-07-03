@@ -1782,6 +1782,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             result.value
                         );
 
+                        const uploadResults = await runXmlUploads();
+
+                        if (
+                            uploadResults?.e3Result?.success === false ||
+                            uploadResults?.maResult?.success === false ||
+                            uploadResults?.wtoResult?.success === false
+                        ) {
+                            console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
+                            return;
+                        }
+
+                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+
                         // =====================================================================
                         // ✅ CASE B: createContract=true αλλά showPreview=false → swal + modal
                         // =====================================================================
@@ -1827,6 +1840,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 data.data?._id,
                                 result.value
                             );
+
+                            const uploadResults = await runXmlUploads();
+
+                            if (
+                                uploadResults?.e3Result?.success === false ||
+                                uploadResults?.maResult?.success === false ||
+                                uploadResults?.wtoResult?.success === false
+                            ) {
+                                console.warn(
+                                    '[REDIRECT] Skipped because ERGANI REST upload failed.'
+                                );
+                                return;
+                            }
+
+                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         }
                         return;
 
@@ -2809,6 +2837,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('[CONTRACT-DEBUG] closeModal invoked');
                 modal.classList.add('hidden');
                 iframe.src = '';
+                resolve();
+                return;
 
                 const isPermanent = filesToUpdate?.isPermanent === true;
                 const e3AnaggeliaProslhpshs = filesToUpdate?.e3_anaggelia_proslhpshs === true;
