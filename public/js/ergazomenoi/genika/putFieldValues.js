@@ -2096,6 +2096,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function hideGlobalLoaderForE7NRest() {
+        if (typeof window.hideLoader === 'function') window.hideLoader();
+        if (window.AppLoader && typeof window.AppLoader.hide === 'function') {
+            window.AppLoader.hide();
+        }
+    }
+
     async function showE7NRestResultSwal(e7Result) {
         await showGenericRestResultSwal({
             result: e7Result,
@@ -4166,10 +4173,10 @@ document.addEventListener('DOMContentLoaded', () => {
             erganiUploadInProgress = true;
 
             try {
-                if (window.applyServerProgress) {
-                    window.applyServerProgress(0, 'Οριστική υποβολή E7N μέσω REST API', 1, 4);
-                } else if (window.showLoader) {
-                    window.showLoader('Οριστική υποβολή E7N μέσω REST API');
+                hideGlobalLoaderForE7NRest();
+
+                if (!Swal.isVisible()) {
+                    showE7NRestProgressSwal();
                 }
 
                 const uploadResponse = await fetch(
@@ -4178,6 +4185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
                         credentials: 'include',
+                        skipLoader: true,
                         body: JSON.stringify({
                             ergazomenosId,
                             erganiUploadMethod: 'rest'
