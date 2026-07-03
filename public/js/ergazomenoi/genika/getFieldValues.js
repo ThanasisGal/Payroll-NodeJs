@@ -1675,6 +1675,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 const htmlContainer = Swal.getHtmlContainer();
                 const list = htmlContainer?.querySelector('.e3n-preflight-list');
                 const cards = htmlContainer?.querySelectorAll('.e3n-preflight-card') || [];
+                const actions = Swal.getActions();
+                const confirmButton = Swal.getConfirmButton();
+                const cancelButton = Swal.getCancelButton();
+
+                if (actions) {
+                    actions.style.setProperty('display', 'flex');
+                    actions.style.setProperty('align-items', 'center');
+                    actions.style.setProperty('justify-content', 'center');
+                    actions.style.setProperty('gap', '0.75rem');
+                    actions.style.setProperty('flex-wrap', 'nowrap');
+                }
+
+                if (confirmButton) {
+                    confirmButton.innerHTML = '<span>Συνέχεια σε<br>Οριστική Υποβολή</span>';
+
+                    confirmButton.style.setProperty('display', 'inline-flex');
+                    confirmButton.style.setProperty('align-items', 'center');
+                    confirmButton.style.setProperty('justify-content', 'center');
+                    confirmButton.style.setProperty('width', '11.5rem');
+                    confirmButton.style.setProperty('min-width', '11.5rem');
+                    confirmButton.style.setProperty('max-width', '11.5rem');
+                    confirmButton.style.setProperty('height', '3.25rem');
+                    confirmButton.style.setProperty('min-height', '3.25rem');
+                    confirmButton.style.setProperty('padding', '0.45rem 0.8rem');
+                    confirmButton.style.setProperty('line-height', '1.15');
+                    confirmButton.style.setProperty('white-space', 'normal');
+                    confirmButton.style.setProperty('text-align', 'center');
+                    confirmButton.style.setProperty('overflow', 'hidden');
+
+                    const confirmLabel = confirmButton.querySelector('span');
+                    if (confirmLabel) {
+                        confirmLabel.style.setProperty('display', 'block');
+                        confirmLabel.style.setProperty('line-height', '1.15');
+                    }
+                }
+
+                if (cancelButton) {
+                    cancelButton.style.setProperty('display', 'inline-flex');
+                    cancelButton.style.setProperty('align-items', 'center');
+                    cancelButton.style.setProperty('justify-content', 'center');
+                    cancelButton.style.setProperty('width', '8.5rem');
+                    cancelButton.style.setProperty('min-width', '8.5rem');
+                    cancelButton.style.setProperty('height', '3.25rem');
+                    cancelButton.style.setProperty('min-height', '3.25rem');
+                }
 
                 if (htmlContainer) {
                     htmlContainer.style.setProperty('max-height', '62vh');
