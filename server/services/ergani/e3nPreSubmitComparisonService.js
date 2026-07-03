@@ -106,8 +106,8 @@ const fieldRegistry = [
     { label: 'Κωδικός ειδικότητας', dbPath: 'ergazomenos.eidikothta_erganh', xmlPath: 'f_eidikothta', jsonPath: 'f_eidikothta' },
     { label: 'Ειδικότητα αναλυτικά', dbPath: 'ergazomenos.antikeimeno_ergasion', xmlPath: 'f_eidikothta_anal', jsonPath: 'f_eidikothta_anal' },
     { label: 'Προϋπηρεσία', dbPath: 'ergazomenos.proyphresia_se_eth', xmlPath: 'f_proipiresia', jsonPath: 'f_proipiresia', normalize: normalizeNumber },
-    { label: 'Σύνολο μεικτών αποδοχών', dbPaths: ['ergazomenos.pragmatikosMisthos', 'ergazomenos.synolo_symbashs'], xmlPath: 'f_apodoxes', jsonPath: 'f_apodoxes', normalize: normalizeNumber },
-    { label: 'Ωρομίσθιο', dbPath: 'ergazomenos.pragmatikoOromisthio', xmlPath: 'f_hour_apodoxes', jsonPath: 'f_hour_apodoxes', normalize: normalizeNumber },
+    { label: 'Σύνολο μεικτών αποδοχών', dbPaths: ['ergazomenos.pragmatikosMisthos', 'ergazomenos.synolo_symbashs'], xmlPath: 'f_apodoxes', jsonPath: 'f_apodoxes', normalize: normalizeCurrency2Decimals },
+    { label: 'Ωρομίσθιο', dbPath: 'ergazomenos.pragmatikoOromisthio', xmlPath: 'f_hour_apodoxes', jsonPath: 'f_hour_apodoxes', normalize: normalizeCurrency2Decimals },
     { label: 'Σχέση εργασίας', dbPath: 'ergazomenos.sxesh_ergasias', xmlPath: 'f_sxeshapasxolisis', jsonPath: 'f_sxeshapasxolisis', displayMap: 'f_sxeshapasxolisis' },
     { label: 'Από ημερομηνία', dbPath: 'ergazomenos.hmeromhnia_proslhpshs', xmlPath: 'f_orismenou_apo', jsonPath: 'f_orismenou_apo', normalize: normalizeDate, dbWhen: ({ ergazomenos }) => normalizeCommon(ergazomenos.sxesh_ergasias) === '1' },
     { label: 'Έως ημερομηνία', dbPath: 'ergazomenos.hmeromhnia_lhxhs_symbashs', xmlPath: 'f_orismenou_ews', jsonPath: 'f_orismenou_ews', normalize: normalizeDate, dbWhen: ({ ergazomenos }) => normalizeCommon(ergazomenos.sxesh_ergasias) === '1' },
@@ -426,6 +426,38 @@ function normalizeNumber(value) {
     return Number.isFinite(n) ? String(n) : s;
 }
 
+function normalizeCurrency2Decimals(value) {
+    if (value === null || value === undefined) return EMPTY;
+
+    const normalized = normalizeCurrencyNumericString(value);
+    if (!normalized) return EMPTY;
+
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n.toFixed(2) : normalizeCommon(value);
+}
+
+function normalizeCurrencyNumericString(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : EMPTY;
+
+    const s = normalizeCommon(value).replace(/\s/g, '');
+    if (!s) return EMPTY;
+
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+
+    if (lastDot !== -1 && lastComma !== -1) {
+        return lastDot > lastComma
+            ? s.replace(/,/g, '')
+            : s.replace(/\./g, '').replace(',', '.');
+    }
+
+    if (lastComma !== -1) {
+        return s.replace(',', '.');
+    }
+
+    return s;
+}
+
 function normalizeNumericString(value) {
     const s = normalizeCommon(value);
     const lastDot = s.lastIndexOf('.');
@@ -533,5 +565,6 @@ module.exports = {
     normalizeDate,
     normalizeTime,
     normalizeNumber,
+    normalizeCurrency2Decimals,
     normalizeBoolean
 };
