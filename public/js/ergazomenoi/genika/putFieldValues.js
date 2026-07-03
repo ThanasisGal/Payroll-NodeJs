@@ -813,10 +813,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? 'rest'
                             : 'xml';
 
+                    const forceContractPdfBeforeE3NRest =
+                        isPermanent === true &&
+                        erganiUploadMethod === 'rest' &&
+                        e3AnaggeliaProslhpshs === true;
+
                     const filesToUpdate = {
                         isPermanent,
                         erganiUploadMethod,
-                        create_contract: createContract,
+                        create_contract: createContract || forceContractPdfBeforeE3NRest,
                         e3_anaggelia_proslhpshs: e3AnaggeliaProslhpshs,
                         wto_pshfiakh_organosh_xronoy_ergasias: wtoPshfiakhOrganoshXronoy,
                         e3_metaboles_ergasiakhs_sxeshs: e3Enabled_1,
@@ -1425,6 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 console.log('[E3-REST-UPLOAD] Result:', e3Result);
 
+                                await showE3NSubmittedPdfIfAvailable(e3Result);
                                 await showE3NRestResultSwal(e3Result);
                             } catch (e) {
                                 Swal.close();
@@ -1781,6 +1787,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             result.value
                         );
 
+                        const uploadResults = await runXmlUploads();
+
+                        if (
+                            uploadResults?.e3Result?.success === false ||
+                            uploadResults?.maResult?.success === false ||
+                            uploadResults?.wtoResult?.success === false
+                        ) {
+                            console.warn('[REDIRECT] Skipped because ERGANI REST upload failed.');
+                            return;
+                        }
+
+                        window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+
                         // =====================================================================
                         // ✅ CASE B: createContract=true αλλά showPreview=false → swal + modal
                         // =====================================================================
@@ -1826,6 +1845,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 data.data?._id,
                                 result.value
                             );
+
+                            const uploadResults = await runXmlUploads();
+
+                            if (
+                                uploadResults?.e3Result?.success === false ||
+                                uploadResults?.maResult?.success === false ||
+                                uploadResults?.wtoResult?.success === false
+                            ) {
+                                console.warn(
+                                    '[REDIRECT] Skipped because ERGANI REST upload failed.'
+                                );
+                                return;
+                            }
+
+                            window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
                         }
                         return;
 
@@ -1998,6 +2032,16 @@ document.addEventListener('DOMContentLoaded', () => {
             successText: 'Η πρόσληψη υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.',
             errorText: 'Η πρόσληψη δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
         });
+    }
+
+    function hasE3NSubmittedPdf(result) {
+        return Boolean(result?.pdfUrl || result?.pdfS3Url || result?.pdf_url);
+    }
+
+    async function showE3NSubmittedPdfIfAvailable(result) {
+        if (!hasE3NSubmittedPdf(result)) return;
+
+        await showErganiSubmittedPdfModal(result);
     }
 
     // ============================================================================
@@ -2700,18 +2744,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        // ------------------------------------------------------------------------
-        // ✅ Όπως στο E7N:
-        // Πρώτα εμφανίζουμε το υποβληθέν PDF σε iframe με κουμπιά
-        // Άνοιγμα / Αποθήκευση / Εκτύπωση / Κλείσιμο.
-        // Μετά, όταν κλείσει το PDF modal, επιστρέφουμε στο runXmlUploads()
-        // ώστε να εμφανιστεί το τελικό success Swal με πρωτόκολλο.
-        // ------------------------------------------------------------------------
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
-        }
-
         return data;
     }
 
@@ -2810,6 +2842,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('[CONTRACT-DEBUG] closeModal invoked');
                 modal.classList.add('hidden');
                 iframe.src = '';
+                resolve();
+                return;
 
                 const isPermanent = filesToUpdate?.isPermanent === true;
                 const e3AnaggeliaProslhpshs = filesToUpdate?.e3_anaggelia_proslhpshs === true;
