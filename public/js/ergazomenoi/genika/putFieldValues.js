@@ -813,10 +813,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             ? 'rest'
                             : 'xml';
 
+                    const forceContractPdfBeforeE3NRest =
+                        isPermanent === true &&
+                        erganiUploadMethod === 'rest' &&
+                        e3AnaggeliaProslhpshs === true;
+
                     const filesToUpdate = {
                         isPermanent,
                         erganiUploadMethod,
-                        create_contract: createContract,
+                        create_contract: createContract || forceContractPdfBeforeE3NRest,
                         e3_anaggelia_proslhpshs: e3AnaggeliaProslhpshs,
                         wto_pshfiakh_organosh_xronoy_ergasias: wtoPshfiakhOrganoshXronoy,
                         e3_metaboles_ergasiakhs_sxeshs: e3Enabled_1,

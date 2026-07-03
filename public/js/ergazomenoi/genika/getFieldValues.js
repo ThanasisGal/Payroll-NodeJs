@@ -648,6 +648,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const forceContractPdfBeforeE3NRest =
+                result.value?.isPermanent === true &&
+                result.value?.erganiUploadMethod === 'rest' &&
+                result.value?.e3_anaggelia_proslhpshs === true;
+
             // =========================================================================
             // POST REQUEST
             // =========================================================================
@@ -655,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const payload = {
                 formData: formData,
                 filesToUpdate: result.value,
-                skipContract: skipScheduleValidation // ✅ ΝΕΟ: αν "Συνέχεια", δεν φτιάχνουμε σύμβαση
+                skipContract: skipScheduleValidation && !forceContractPdfBeforeE3NRest // ✅ ΝΕΟ: αν "Συνέχεια", δεν φτιάχνουμε σύμβαση
             };
 
             if (!skipScheduleValidation) {
