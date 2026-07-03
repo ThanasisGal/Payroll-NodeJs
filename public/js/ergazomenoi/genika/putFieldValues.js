@@ -1425,6 +1425,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 console.log('[E3-REST-UPLOAD] Result:', e3Result);
 
+                                await showE3NSubmittedPdfIfAvailable(e3Result);
                                 await showE3NRestResultSwal(e3Result);
                             } catch (e) {
                                 Swal.close();
@@ -1998,6 +1999,16 @@ document.addEventListener('DOMContentLoaded', () => {
             successText: 'Η πρόσληψη υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.',
             errorText: 'Η πρόσληψη δεν υποβλήθηκε οριστικά στο ΕΡΓΑΝΗ.'
         });
+    }
+
+    function hasE3NSubmittedPdf(result) {
+        return Boolean(result?.pdfUrl || result?.pdfS3Url || result?.pdf_url);
+    }
+
+    async function showE3NSubmittedPdfIfAvailable(result) {
+        if (!hasE3NSubmittedPdf(result)) return;
+
+        await showErganiSubmittedPdfModal(result);
     }
 
     // ============================================================================
@@ -2698,18 +2709,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     data?.error ||
                     `E3N REST JSON upload failed with HTTP ${response.status}`
             );
-        }
-
-        // ------------------------------------------------------------------------
-        // ✅ Όπως στο E7N:
-        // Πρώτα εμφανίζουμε το υποβληθέν PDF σε iframe με κουμπιά
-        // Άνοιγμα / Αποθήκευση / Εκτύπωση / Κλείσιμο.
-        // Μετά, όταν κλείσει το PDF modal, επιστρέφουμε στο runXmlUploads()
-        // ώστε να εμφανιστεί το τελικό success Swal με πρωτόκολλο.
-        // ------------------------------------------------------------------------
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
         }
 
         return data;

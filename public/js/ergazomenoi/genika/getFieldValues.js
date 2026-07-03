@@ -1607,6 +1607,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function hasE3NSubmittedPdf(result) {
+        return Boolean(result?.pdfUrl || result?.pdfS3Url || result?.pdf_url);
+    }
+
+    async function showE3NSubmittedPdfIfAvailable(result) {
+        if (!hasE3NSubmittedPdf(result)) return;
+
+        await showErganiSubmittedPdfModal(result);
+    }
+
     function getSelectedE3NYpokatasthma() {
         return (
             document.getElementById('ypokatasthma')?.value ||
@@ -1835,11 +1845,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
-        }
-
         return data;
     }
 
@@ -1940,6 +1945,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return { e3Result, wtoResult, skipped: false };
                 }
                 Swal.close();
+                await showE3NSubmittedPdfIfAvailable(e3Result);
                 await showE3NRestResultSwal(e3Result);
             } catch (e) {
                 Swal.close();
