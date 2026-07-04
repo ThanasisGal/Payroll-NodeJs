@@ -388,6 +388,106 @@ function hasTime(value) {
     return value !== null && value !== undefined && String(value).trim() !== '';
 }
 
+function getRawDeclaredIntervals(rec) {
+    return [
+        {
+            index: 1,
+            apo: rec.apo_ora_01,
+            eos: rec.eos_ora_01
+        },
+        {
+            index: 2,
+            apo: rec.apo_ora_02,
+            eos: rec.eos_ora_02
+        },
+        {
+            index: 3,
+            apo: rec.apo_ora_03,
+            eos: rec.eos_ora_03
+        }
+    ]
+        .map((interval) => {
+            const expanded = expandIntervalFromTimes(interval.apo, interval.eos);
+
+            if (!expanded) return null;
+
+            return {
+                ...interval,
+                start: expanded.start,
+                end: expanded.end
+            };
+        })
+        .filter(Boolean);
+}
+
+function checkBrokenProgramVsBrokenCards(context) {
+    const { rec, proorhProseleyshMinutes, evelikthProselefshMinutes } = context;
+
+    const declaredIntervals = getRawDeclaredIntervals(rec);
+    const cardIntervals = getRawCardIntervals(rec);
+
+    if (declaredIntervals.length <= 1 || cardIntervals.length <= 1) return {};
+
+    const cardIntervalsByIndex = new Map(cardIntervals.map((interval) => [interval.index, interval]));
+    const matchedIntervals = [];
+
+    for (const declaredInterval of declaredIntervals) {
+        const cardInterval = cardIntervalsByIndex.get(declaredInterval.index);
+
+        if (!cardInterval) continue;
+
+        matchedIntervals.push({
+            declaredInterval,
+            cardInterval
+        });
+    }
+
+    if (matchedIntervals.length <= 1) return {};
+
+    const hasDeviation = matchedIntervals.some(({ declaredInterval, cardInterval }) => {
+        const earlyLimit = declaredInterval.start - proorhProseleyshMinutes;
+        const lateStartLimit = declaredInterval.start + evelikthProselefshMinutes;
+
+        return (
+            cardInterval.start < earlyLimit ||
+            cardInterval.start > lateStartLimit ||
+            cardInterval.end > declaredInterval.end
+        );
+    });
+
+    if (!hasDeviation) return {};
+
+    const update = {
+        apologistiko_biblio: true,
+        apo_ora_01_apologistika: '',
+        eos_ora_01_apologistika: '',
+        apo_ora_02_apologistika: '',
+        eos_ora_02_apologistika: '',
+        apo_ora_03_apologistika: '',
+        eos_ora_03_apologistika: ''
+    };
+
+    for (const { declaredInterval, cardInterval } of matchedIntervals) {
+        const p = String(declaredInterval.index).padStart(2, '0');
+        const apoApologField = `apo_ora_${p}_apologistika`;
+        const eosApologField = `eos_ora_${p}_apologistika`;
+        const declaredDuration = Math.max(0, declaredInterval.end - declaredInterval.start);
+        const earlyLimit = declaredInterval.start - proorhProseleyshMinutes;
+        const lateStartLimit = declaredInterval.start + evelikthProselefshMinutes;
+        const segmentNeedsDurationAnchor =
+            cardInterval.start < earlyLimit ||
+            cardInterval.start > lateStartLimit ||
+            cardInterval.end > declaredInterval.end;
+
+        update[apoApologField] = cardInterval.apo || '';
+        update[eosApologField] = segmentNeedsDurationAnchor
+            ? minutesToTimeSafe(cardInterval.start + declaredDuration)
+            : cardInterval.eos || '';
+    }
+
+    return update;
+}
+
 function checkContinuousVsBrokenCards(context) {
     const { rec } = context;
 
@@ -6396,9 +6496,14 @@ class erganhController {
                 };
 
                 const preliminaryUpdate = {};
-                Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 1));
-                Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
-                Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
+                const preliminarySplitUpdate =
+                    checkBrokenProgramVsBrokenCards(preliminaryContext);
+                Object.assign(preliminaryUpdate, preliminarySplitUpdate);
+                if (Object.keys(preliminarySplitUpdate).length === 0) {
+                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 1));
+                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 2));
+                    Object.assign(preliminaryUpdate, checkEarlyOrLateCard(preliminaryContext, 3));
+                }
                 Object.assign(
                     preliminaryUpdate,
                     checkIncompleteCardPairAgainstDeclared(preliminaryContext)
@@ -6446,9 +6551,13 @@ class erganhController {
 
                 const update = {};
 
-                Object.assign(update, checkEarlyOrLateCard(context, 1));
-                Object.assign(update, checkEarlyOrLateCard(context, 2));
-                Object.assign(update, checkEarlyOrLateCard(context, 3));
+                const splitUpdate = checkBrokenProgramVsBrokenCards(context);
+                Object.assign(update, splitUpdate);
+                if (Object.keys(splitUpdate).length === 0) {
+                    Object.assign(update, checkEarlyOrLateCard(context, 1));
+                    Object.assign(update, checkEarlyOrLateCard(context, 2));
+                    Object.assign(update, checkEarlyOrLateCard(context, 3));
+                }
                 Object.assign(update, checkIncompleteCardPairAgainstDeclared(context));
 
                 Object.assign(update, checkContinuousVsBrokenCards(context));
