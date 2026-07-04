@@ -1566,7 +1566,8 @@ async function runWeeklyRepoPostCheck({
                     update.ores_apoysias_apologistika = 0;
                     update.adeia_apologistika = noCardsDisplayStatus === 'ΑΔΕΙΑ';
                     update.argia = noCardsDisplayStatus === 'ΑΡΓΙΑ';
-                    update.kathgoria_adeias_apologistika = '';
+                    update.kathgoria_adeias_apologistika =
+                        noCardsDisplayStatus === 'ΑΔΕΙΑ' ? 'ΑΔΑΛ' : '';
                 }
 
                 if (Object.keys(update).length > 0 && row.is_locked !== true) {
