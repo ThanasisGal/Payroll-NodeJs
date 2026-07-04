@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', function () {
         'ypergolabia',
         'nomiko_prosopo',
         'karta_ergasias',
-        'apasxolhsh_kata_tis_argies'
+        'apasxolhsh_kata_tis_argies',
+        'leitoyrgia_stis_mh_ypoxreotikes_argies'
     ];
 
     // Επανάληψη της λίστας για να καλέσω την setupCheckbox για κάθε checkbox

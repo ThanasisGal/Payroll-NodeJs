@@ -417,6 +417,8 @@ class companiesController {
                 ypologismos_epi_pragmatikoy_oromisthioy:
                     formData.ypologismos_epi_pragmatikoy_oromisthioy,
                 apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
+                leitoyrgia_stis_mh_ypoxreotikes_argies:
+                    formData.leitoyrgia_stis_mh_ypoxreotikes_argies === true,
                 apousies_epireazoun_asfalistikes_hmeres:
                     formData.apousies_epireazoun_asfalistikes_hmeres === true,
                 apoysies_meionoyn_apodoxes: formData.apoysies_meionoyn_apodoxes === true,
@@ -836,6 +838,8 @@ class companiesController {
             ypologismos_epi_pragmatikoy_oromisthioy:
                 formData.ypologismos_epi_pragmatikoy_oromisthioy,
             apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
+            leitoyrgia_stis_mh_ypoxreotikes_argies:
+                formData.leitoyrgia_stis_mh_ypoxreotikes_argies === true,
             apousies_epireazoun_asfalistikes_hmeres:
                 formData.apousies_epireazoun_asfalistikes_hmeres === true,
             apoysies_meionoyn_apodoxes: formData.apoysies_meionoyn_apodoxes === true,
