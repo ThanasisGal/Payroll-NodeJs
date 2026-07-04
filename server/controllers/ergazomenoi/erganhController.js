@@ -1137,6 +1137,79 @@ function isNonZeroHours(value) {
     return Number.isFinite(num) && Math.abs(num) >= 0.000001;
 }
 
+function isNoCardDeclaredWorkRow(row = {}) {
+    return (
+        String(row.kathgoria_ergasias || '').trim() === 'ΕΡΓ' &&
+        isNonZeroHours(row.ores_ergasias) &&
+        isZeroHours(row.cards_ores_ergasias)
+    );
+}
+
+function getCompanyHolidayFlags(company = {}) {
+    return {
+        apasxolhsh_kata_tis_argies: company?.apasxolhsh_kata_tis_argies === true,
+        leitoyrgia_stis_mh_ypoxreotikes_argies:
+            company?.leitoyrgia_stis_mh_ypoxreotikes_argies === true
+    };
+}
+
+function buildArgiesByDateKey(argies = []) {
+    const map = new Map();
+
+    for (const argia of argies) {
+        if (!argia?.hmeromhnia) continue;
+        map.set(dateKeyUtc(argia.hmeromhnia), {
+            ypoxreotikh_argia: argia.ypoxreotikh_argia === true
+        });
+    }
+
+    return map;
+}
+
+function resolveNoCardsDisplayStatus(row = {}, { argiesByDateKey = new Map(), companyFlags = {} } = {}) {
+    if (!isNoCardDeclaredWorkRow(row)) return '';
+
+    const argia = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
+    if (!argia) return 'ΑΔΕΙΑ';
+
+    if (argia.ypoxreotikh_argia === true) {
+        return companyFlags.apasxolhsh_kata_tis_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
+    }
+
+    return companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
+}
+
+async function buildNoCardsDisplayContext({
+    team,
+    companyId,
+    companyKodikos,
+    etos,
+    periodStart,
+    periodEnd
+}) {
+    const [company, argies] = await Promise.all([
+        CompaniesModel.findById(companyId)
+            .select('apasxolhsh_kata_tis_argies leitoyrgia_stis_mh_ypoxreotikes_argies')
+            .lean(),
+        ArgiesModel.find({
+            team,
+            company_kod: companyKodikos || companyId,
+            etos: String(etos || ''),
+            hmeromhnia: mongoose.trusted({
+                $gte: periodStart,
+                $lte: periodEnd
+            })
+        })
+            .select('hmeromhnia ypoxreotikh_argia')
+            .lean()
+    ]);
+
+    return {
+        companyFlags: getCompanyHolidayFlags(company),
+        argiesByDateKey: buildArgiesByDateKey(argies)
+    };
+}
+
 function getExpectedWeeklyRepo(ergazomenos) {
     const raw = ergazomenos?.mhniaia_repo;
     const parsed = Number(raw ?? 0);
@@ -1454,7 +1527,6 @@ async function runWeeklyRepoPostCheck({
                 // χρησιμοποιείται στο review/display, όχι σαν είσοδος του κανόνα.
                 const kathgoriaErgasias = String(row.kathgoria_ergasias || '').trim();
                 const oresErgasiasIsZero = isZeroHours(row.ores_ergasias);
-                const oresErgasiasIsNonZero = isNonZeroHours(row.ores_ergasias);
                 const cardsOresIsZero = isZeroHours(row.cards_ores_ergasias);
                 const cardsOresIsNonZero = isNonZeroHours(row.cards_ores_ergasias);
                 const dailyProfile = getEffectiveRepoProfileForDate(day, istorikoRows, erg);
@@ -1468,19 +1540,11 @@ async function runWeeklyRepoPostCheck({
                     }
                 } else if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsNonZero) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
-                } else if (
-                    kathgoriaErgasias === 'ΕΡΓ' &&
-                    oresErgasiasIsNonZero &&
-                    cardsOresIsZero
-                ) {
-                    update.apologistiko_biblio = true;
-
-                    if (isFullTimeProfile) {
-                        update.kathgoria_ergasias_apologistika = 'ΑΝ';
-                        pragmatikaRepo += 1;
-                    } else {
-                        update.kathgoria_ergasias_apologistika = 'ΜΕ';
-                    }
+                } else if (isNoCardDeclaredWorkRow(row)) {
+                    update.apologistiko_biblio = false;
+                    update.kathgoria_ergasias_apologistika = '';
+                    update.ores_ergasias_apologistika = Number(row.ores_ergasias || 0);
+                    update.ores_apoysias_apologistika = 0;
                 }
 
                 if (Object.keys(update).length > 0 && row.is_locked !== true) {
@@ -3000,6 +3064,11 @@ function reviewProgramDisplay(row = {}) {
 }
 
 function reviewApologistikoDisplay(row = {}) {
+    const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
+    if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
+        return { text: noCardsDisplayStatus, type: `no_cards_${noCardsDisplayStatus}` };
+    }
+
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
     const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
@@ -3428,6 +3497,18 @@ async function getReviewRowsForExport(req) {
         periodEnd
     });
 
+    const noCardsDisplayContext =
+        periodStart && periodEnd
+            ? await buildNoCardsDisplayContext({
+                  team: req.session.userTeam,
+                  companyId: req.session.companyInUse,
+                  companyKodikos: req.session.companyKodikos,
+                  etos: req.session.yearInUse,
+                  periodStart,
+                  periodEnd
+              })
+            : {};
+
     const enrichedRows = rows.map((row) => {
         const erg = ergByKodikos.get(row.kodikos) || {};
         const istorikoRowsForEmployee =
@@ -3450,6 +3531,10 @@ async function getReviewRowsForExport(req) {
             kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
             kathgoria_ergasias: effectiveKathgoria,
             kathgoria_ergasias_effective: effectiveKathgoria,
+            noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+                normalizedRow,
+                noCardsDisplayContext
+            ),
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
@@ -4587,6 +4672,18 @@ class erganhController {
                 periodEnd: reviewPeriodEnd
             });
 
+            const noCardsDisplayContext =
+                reviewPeriodStart && reviewPeriodEnd
+                    ? await buildNoCardsDisplayContext({
+                          team: sessionTeam,
+                          companyId,
+                          companyKodikos: req.session.companyKodikos,
+                          etos: req.session.yearInUse,
+                          periodStart: reviewPeriodStart,
+                          periodEnd: reviewPeriodEnd
+                      })
+                    : {};
+
             const enrichedRows = rows.map((r) => {
                 const erg = ergByKodikos.get(r.kodikos);
                 const istorikoRowsForEmployee =
@@ -4609,6 +4706,10 @@ class erganhController {
                     kathgoria_ergasias_original: normalizedRow.kathgoria_ergasias || '',
                     kathgoria_ergasias: effectiveKathgoria,
                     kathgoria_ergasias_effective: effectiveKathgoria,
+                    noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+                        normalizedRow,
+                        noCardsDisplayContext
+                    ),
                     eponymo: erg?.eponymo || '',
                     onoma: erg?.onoma || '',
 
@@ -6173,19 +6274,16 @@ class erganhController {
                 return new Date(a.hmeromhnia).getTime() - new Date(b.hmeromhnia).getTime();
             });
 
-            const argies = await ArgiesModel.find({
+            const noCardsDisplayContext = await buildNoCardsDisplayContext({
                 team: sessionTeam,
-                company_kod: req.session.companyKodikos,
-                etos: String(req.session.yearInUse),
-                hmeromhnia: mongoose.trusted({
-                    $gte: calculationStartDate,
-                    $lte: eosDate
-                })
-            })
-                .select('hmeromhnia')
-                .lean();
+                companyId,
+                companyKodikos: req.session.companyKodikos,
+                etos: req.session.yearInUse,
+                periodStart: calculationStartDate,
+                periodEnd: eosDate
+            });
 
-            const argiesDateSet = new Set(argies.map((a) => dateKeyUtc(a.hmeromhnia)));
+            const argiesDateSet = new Set(noCardsDisplayContext.argiesByDateKey.keys());
 
             console.log(
                 `[calcApasxolhseisPeriodoy] Προδηλωμένα προς έλεγχο: ${prodhlomena.length}`
