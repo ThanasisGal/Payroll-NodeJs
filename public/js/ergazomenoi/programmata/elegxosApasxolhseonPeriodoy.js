@@ -804,7 +804,9 @@ async function loadResults() {
                     (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
                 num(row.cards_ores_ergasias) === 0;
 
-            const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
+            const noCardsDisplayStatus = String(
+                row.noCardsDisplayStatus || row.no_cards_display_status || ''
+            ).trim();
             const hasNoCardsDisplayStatus =
                 noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
 

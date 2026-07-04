@@ -1166,6 +1166,10 @@ function buildArgiesByDateKey(argies = []) {
     return map;
 }
 
+function isMisthotosEmployee(row = {}) {
+    return String(row.typos_ergazomenon || '').trim() === 'Μ';
+}
+
 function resolveNoCardsDisplayStatus(row = {}, { argiesByDateKey = new Map(), companyFlags = {} } = {}) {
     if (!isNoCardDeclaredWorkRow(row)) return '';
 
@@ -1187,22 +1191,29 @@ async function buildNoCardsDisplayContext({
     periodStart,
     periodEnd
 }) {
-    const [company, argies] = await Promise.all([
-        CompaniesModel.findById(companyId)
-            .select('apasxolhsh_kata_tis_argies leitoyrgia_stis_mh_ypoxreotikes_argies')
-            .lean(),
-        ArgiesModel.find({
-            team,
-            company_kod: companyKodikos || companyId,
-            etos: String(etos || ''),
-            hmeromhnia: mongoose.trusted({
-                $gte: periodStart,
-                $lte: periodEnd
-            })
-        })
-            .select('hmeromhnia ypoxreotikh_argia')
-            .lean()
-    ]);
+    const trimmedCompanyId = String(companyId || '').trim();
+    const companyQuery = mongoose.Types.ObjectId.isValid(trimmedCompanyId)
+        ? { _id: trimmedCompanyId }
+        : { kod: trimmedCompanyId };
+    const company = trimmedCompanyId
+        ? await CompaniesModel.findOne(companyQuery)
+              .select('kod apasxolhsh_kata_tis_argies leitoyrgia_stis_mh_ypoxreotikes_argies')
+              .lean()
+        : null;
+    const resolvedCompanyKodikos = String(companyKodikos || company?.kod || '').trim();
+    const argies = resolvedCompanyKodikos
+        ? await ArgiesModel.find({
+              team,
+              company_kod: resolvedCompanyKodikos,
+              etos: String(etos || ''),
+              hmeromhnia: mongoose.trusted({
+                  $gte: periodStart,
+                  $lte: periodEnd
+              })
+          })
+              .select('hmeromhnia ypoxreotikh_argia')
+              .lean()
+        : [];
 
     return {
         companyFlags: getCompanyHolidayFlags(company),
@@ -1363,7 +1374,8 @@ async function runWeeklyRepoPostCheck({
     companyId,
     apoDate,
     eosDate,
-    selectedYpokatasthma = ''
+    selectedYpokatasthma = '',
+    noCardsDisplayContext = {}
 }) {
     const result = {
         recordsChecked: 0,
@@ -1385,7 +1397,8 @@ async function runWeeklyRepoPostCheck({
         .select(
             'ypokatasthma kodikos eponymo onoma mhniaia_repo ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                'typos_ergazomenon'
         )
         .sort({ kodikos: 1 })
         .lean();
@@ -1541,10 +1554,17 @@ async function runWeeklyRepoPostCheck({
                 } else if (kathgoriaErgasias === 'ΑΝ' && oresErgasiasIsZero && cardsOresIsNonZero) {
                     update.kathgoria_ergasias_apologistika = 'ΕΡΓ';
                 } else if (isNoCardDeclaredWorkRow(row)) {
+                    const noCardsDisplayStatus = resolveNoCardsDisplayStatus(
+                        row,
+                        noCardsDisplayContext
+                    );
                     update.apologistiko_biblio = false;
                     update.kathgoria_ergasias_apologistika = '';
-                    update.ores_ergasias_apologistika = Number(row.ores_ergasias || 0);
+                    update.ores_ergasias_apologistika = isMisthotosEmployee(dailyProfile)
+                        ? Number(row.ores_ergasias || 0)
+                        : 0;
                     update.ores_apoysias_apologistika = 0;
+                    update.adeia_apologistika = noCardsDisplayStatus === 'ΑΔΕΙΑ';
                 }
 
                 if (Object.keys(update).length > 0 && row.is_locked !== true) {
@@ -1826,6 +1846,7 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
         mo_oron_hmerhsias_ergasias: averageDailyHours,
         typos_apasxolhshs: ergazomenos.typos_apasxolhshs || '',
         typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
+        typos_ergazomenon: ergazomenos.typos_ergazomenon || '',
         mhniaia_repo: getNumber(ergazomenos.mhniaia_repo, 0),
         employment_profile_source: 'ERG_AKTUAL',
         hmeromhnia_allaghs_symbashs: null
@@ -1848,6 +1869,7 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
         mo_oron_hmerhsias_ergasias: averageDailyHours,
         typos_apasxolhshs: row.typos_apasxolhshs || fallback.typos_apasxolhshs || '',
         typos_ebdomadas: row.typos_ebdomadas || fallback.typos_ebdomadas || '',
+        typos_ergazomenon: row.typos_ergazomenon || fallback.typos_ergazomenon || '',
         mhniaia_repo: getNumber(row.mhniaia_repo, fallback.mhniaia_repo || 0),
         employment_profile_source: row.employment_profile_source || 'ISTORIKO',
         hmeromhnia_allaghs_symbashs: row.hmeromhnia_allaghs_symbashs || null,
@@ -6448,7 +6470,8 @@ class erganhController {
                 companyId,
                 apoDate,
                 eosDate,
-                selectedYpokatasthma
+                selectedYpokatasthma,
+                noCardsDisplayContext
             });
 
             console.log(
