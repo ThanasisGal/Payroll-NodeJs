@@ -338,7 +338,7 @@ function ensureReviewTableStructure() {
             }
 
             .cell-no-card-adeia {
-                background-color: #fff3cd !important;
+                background-color: #fff9c4 !important;
                 color: #000000 !important;
                 font-weight: 700;
                 text-align: center;
