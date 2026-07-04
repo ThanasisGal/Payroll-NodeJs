@@ -337,6 +337,20 @@ function ensureReviewTableStructure() {
                 text-align: center;
             }
 
+            .cell-no-card-adeia {
+                background-color: #fff9c4 !important;
+                color: #000000 !important;
+                font-weight: 700;
+                text-align: center;
+            }
+
+            .cell-no-card-argia {
+                background-color: #ffd8a8 !important;
+                color: #000000 !important;
+                font-weight: 700;
+                text-align: center;
+            }
+
             .cell-adeia-suggestion {
                 background-color: #fdebd0 !important;
                 color: #7f3300 !important;
@@ -790,13 +804,25 @@ async function loadResults() {
                     (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
                 num(row.cards_ores_ergasias) === 0;
 
-            const apologistikoDisplayText = isApologistikoRepoRow
+            const noCardsDisplayStatus = String(
+                row.noCardsDisplayStatus || row.no_cards_display_status || ''
+            ).trim();
+            const hasNoCardsDisplayStatus =
+                noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
+
+            const apologistikoDisplayText = hasNoCardsDisplayStatus
+                ? noCardsDisplayStatus
+                : isApologistikoRepoRow
                 ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
                 : isApologistikoNonWorkRow
                   ? 'ΜΗ ΕΡΓΑΣΙΑ'
                   : apologistikoText;
 
-            const apologistikoDisplayClass = isApologistikoRepoRow
+            const apologistikoDisplayClass = hasNoCardsDisplayStatus
+                ? noCardsDisplayStatus === 'ΑΔΕΙΑ'
+                    ? 'cell-no-card-adeia'
+                    : 'cell-no-card-argia'
+                : isApologistikoRepoRow
                 ? 'cell-repo-day'
                 : isApologistikoNonWorkRow
                   ? 'cell-non-work-day'
