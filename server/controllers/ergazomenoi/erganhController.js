@@ -1737,6 +1737,13 @@ function isCardsContinuousSchedule(rec) {
     );
 }
 
+function isZeroLengthTimePair(apoOra, eosOra) {
+    const apo = timeToMinutesSafe(apoOra);
+    const eos = timeToMinutesSafe(eosOra);
+
+    return apo !== null && eos !== null && apo === eos;
+}
+
 function getRawCardIntervals(rec) {
     return [
         {
@@ -1756,6 +1763,8 @@ function getRawCardIntervals(rec) {
         }
     ]
         .map((interval) => {
+            if (isZeroLengthTimePair(interval.apo, interval.eos)) return null;
+
             const expanded = expandIntervalFromTimes(interval.apo, interval.eos);
 
             if (!expanded) return null;
@@ -1767,6 +1776,31 @@ function getRawCardIntervals(rec) {
             };
         })
         .filter(Boolean);
+}
+
+function normalizeZeroLengthCardPairs(rec = {}) {
+    let normalized = rec;
+    let changed = false;
+
+    for (let pairNo = 1; pairNo <= 3; pairNo++) {
+        const p = String(pairNo).padStart(2, '0');
+        const apoField = `cards_apo_ora_${p}`;
+        const eosField = `cards_eos_ora_${p}`;
+
+        if (!isZeroLengthTimePair(rec[apoField], rec[eosField])) continue;
+
+        if (!changed) normalized = { ...rec };
+
+        normalized[apoField] = '';
+        normalized[eosField] = '';
+        changed = true;
+    }
+
+    if (changed) {
+        normalized.cards_ores_ergasias = +(getRawDailyCardsMinutes(normalized) / 60).toFixed(2);
+    }
+
+    return normalized;
 }
 
 function getRawDailyCardsMinutes(rec) {
@@ -6319,21 +6353,22 @@ class erganhController {
             for (const rec of prodhlomena) {
                 const ergazomenos = employeesByKodikos.get(rec.kodikos);
                 if (!ergazomenos) continue;
+                const calculationRec = normalizeZeroLengthCardPairs(rec);
 
-                const istorikoRows = istorikoRowsByKodikos.get(rec.kodikos) || [];
+                const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
                 const effectiveErgazomenos = getEffectiveEmployeeForDate(
-                    rec,
+                    calculationRec,
                     ergazomenos,
                     istorikoRows
                 );
 
-                const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
+                const weekKey = `${calculationRec.kodikos}|${getWeekKeySunday(calculationRec.hmeromhnia)}`;
 
                 if (!weeklyStateMap.has(weekKey)) {
                     const rules = getWorkTimeRules(effectiveErgazomenos);
 
                     const periodStartDate = new Date(apoDate);
-                    const weekStartDate = startOfWeekSundayUtc(rec.hmeromhnia);
+                    const weekStartDate = startOfWeekSundayUtc(calculationRec.hmeromhnia);
 
                     const isFirstPartialWeek =
                         weekStartDate < periodStartDate && periodStartDate.getUTCDay() !== 0;
@@ -6351,7 +6386,7 @@ class erganhController {
                 }
 
                 const preliminaryContext = {
-                    rec,
+                    rec: calculationRec,
                     ergazomenos: effectiveErgazomenos,
                     argiesDateSet,
                     proorhProseleyshMinutes,
@@ -6375,7 +6410,7 @@ class erganhController {
                 );
                 Object.assign(preliminaryUpdate, checkNoDeclaredScheduleCards(preliminaryContext));
 
-                const weeklyRec = { ...rec, ...preliminaryUpdate };
+                const weeklyRec = { ...calculationRec, ...preliminaryUpdate };
 
                 if (isRegularWorkingDayForOverwork(weeklyRec, effectiveErgazomenos)) {
                     weeklyStateMap.get(weekKey).weeklyRegularCardsMinutes +=
@@ -6388,16 +6423,17 @@ class erganhController {
             for (const rec of prodhlomena) {
                 const ergazomenos = employeesByKodikos.get(rec.kodikos);
                 if (!ergazomenos) continue;
+                const calculationRec = normalizeZeroLengthCardPairs(rec);
 
-                const istorikoRows = istorikoRowsByKodikos.get(rec.kodikos) || [];
+                const istorikoRows = istorikoRowsByKodikos.get(calculationRec.kodikos) || [];
                 const effectiveErgazomenos = getEffectiveEmployeeForDate(
-                    rec,
+                    calculationRec,
                     ergazomenos,
                     istorikoRows
                 );
 
                 const context = {
-                    rec,
+                    rec: calculationRec,
                     // Από εδώ και κάτω οι υπάρχουσες συναρτήσεις λαμβάνουν effective
                     // εργαζόμενο, δηλαδή current employee + ιστορικούς όρους ημέρας.
                     ergazomenos: effectiveErgazomenos,
@@ -6421,7 +6457,7 @@ class erganhController {
 
                 // Από αυτό το σημείο και μετά οι υπολογισμοί πρέπει να βλέπουν το
                 // ήδη παραγμένο απολογιστικό ωράριο, όχι μόνο το αρχικό rec/raw cards.
-                const workingRec = { ...rec, ...update };
+                const workingRec = { ...calculationRec, ...update };
                 const workingContext = {
                     ...context,
                     rec: workingRec
