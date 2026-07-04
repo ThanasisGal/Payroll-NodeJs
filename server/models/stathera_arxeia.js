@@ -703,8 +703,8 @@ const ArgiesSchema = new Schema(
 );
 
 ArgiesSchema.index(
-    { company_kod: 1, etos: 1, kodikos: 1 },
-    { unique: true, name: 'unique_argia_per_company_etos' }
+    { team: 1, company_kod: 1, etos: 1, kodikos: 1 },
+    { unique: true, name: 'unique_argia_per_team_company_etos' }
 );
 
 const ArgiesModel = model('Argies', ArgiesSchema);
