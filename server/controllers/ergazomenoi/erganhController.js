@@ -110,6 +110,13 @@ const {
 const {
     matchApasxoliseisScenarioFacts
 } = require('../../services/ergazomenoi/apasxoliseisScenarioMatcherService');
+const {
+    getApasxoliseisPolicyCatalog: getApasxoliseisPolicyCatalogDefinitions,
+    getPolicyResultStatuses,
+    getPolicyModes,
+    validateApasxoliseisPolicyCatalog,
+    POLICY_CATEGORIES
+} = require('../../services/ergazomenoi/apasxoliseisPolicyCatalogService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -4944,6 +4951,39 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση των απασχολήσεων.',
+                error: error.message
+            });
+        }
+    };
+
+    static getApasxoliseisPolicyCatalog = async (_req, res) => {
+        try {
+            const validation = validateApasxoliseisPolicyCatalog();
+
+            if (!validation.isValid) {
+                return res.status(500).json({
+                    success: false,
+                    catalogVersion: 'foundation:v1',
+                    validation,
+                    errors: validation.errors
+                });
+            }
+
+            return res.json({
+                success: true,
+                catalogVersion: 'foundation:v1',
+                validation,
+                categories: POLICY_CATEGORIES,
+                modes: getPolicyModes(),
+                resultStatuses: getPolicyResultStatuses(),
+                policies: getApasxoliseisPolicyCatalogDefinitions()
+            });
+        } catch (error) {
+            console.error('[getApasxoliseisPolicyCatalog] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ανάκτηση του policy catalog απασχολήσεων.',
                 error: error.message
             });
         }

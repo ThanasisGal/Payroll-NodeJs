@@ -1238,6 +1238,12 @@ router.get(
 router.get('/api/prodhlomena-oraria/review', erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
+    '/api/prodhlomena-oraria/policies/catalog',
+    checkAuth,
+    erganhController.getApasxoliseisPolicyCatalog
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/scenarios',
     erganhController.getProdhlomenaOrariaScenarioClassifications
 );
