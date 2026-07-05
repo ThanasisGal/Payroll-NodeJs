@@ -42,6 +42,83 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+const scenarioCodeLabels = {
+    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Άγνωστο μοτίβο - προς έλεγχο',
+    DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
+    DECLARED_WORK_NO_CARDS_LEAVE: 'Εργασία χωρίς κάρτες - άδεια',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_REQUIRED: 'Εργασία χωρίς κάρτες - υποχρεωτική αργία',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_CLOSED:
+        'Μη υποχρεωτική αργία - εταιρεία κλειστή',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_WORKS:
+        'Μη υποχρεωτική αργία - εταιρεία λειτουργεί',
+    ZERO_LENGTH_CARD_INTERVAL: 'Μηδενικό διάστημα κάρτας',
+    DECLARED_NON_WORK_WITH_CARDS: 'Μη εργασία με κάρτες',
+    SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'Σπαστό με απόκλιση',
+    REPO_TRANSFER_WITHIN_WEEK: 'Πιθανή μεταφορά ρεπό'
+};
+
+const scenarioConfidenceLabels = {
+    HIGH: 'Υψηλή',
+    MEDIUM: 'Μεσαία',
+    LOW: 'Χαμηλή'
+};
+
+function rowIdentityKey(value) {
+    if (value === null || value === undefined) return '';
+
+    return String(value).trim();
+}
+
+function scenarioLabel(decision = {}) {
+    const code = String(decision.scenario_code || '').trim();
+
+    if (!code) return '';
+    if (decision.requires_review === true) return 'ΠΡΟΣ ΕΛΕΓΧΟ';
+
+    return scenarioCodeLabels[code] || code;
+}
+
+function scenarioTitle(decision = {}) {
+    const code = String(decision.scenario_code || '').trim();
+    const label = scenarioCodeLabels[code] || code;
+
+    if (!code) return '';
+
+    return `${label} / ${code}`;
+}
+
+function scenarioConfidenceLabel(confidence) {
+    const key = String(confidence || '').trim();
+
+    return scenarioConfidenceLabels[key] || key;
+}
+
+function renderScenarioBadge(row) {
+    const decision = row?.scenarioDecision;
+
+    if (!decision || !decision.scenario_code) return '';
+
+    const label = scenarioLabel(decision);
+    const confidence = scenarioConfidenceLabel(decision.confidence);
+    const badgeClass =
+        decision.requires_review === true
+            ? 'review-scenario-badge review-scenario-badge-review'
+            : 'review-scenario-badge review-scenario-badge-classified';
+    const title = scenarioTitle(decision);
+    const confidenceHtml = confidence
+        ? `<span class="review-scenario-confidence">${escapeHtml(confidence)}</span>`
+        : '';
+
+    return `
+        <div class="review-scenario-badge-row">
+            <span class="${badgeClass}" title="${escapeHtml(title)}">
+                ${escapeHtml(label)}
+            </span>
+            ${confidenceHtml}
+        </div>
+    `;
+}
+
 function intervalTextHtml(apo, eos) {
     const a = String(apo || '').trim();
     const e = String(eos || '').trim();
@@ -381,6 +458,50 @@ function ensureReviewTableStructure() {
                 white-space: nowrap;
             }
 
+            .review-scenario-badge-row {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+                gap: 0.25rem;
+                margin-top: 0.25rem;
+            }
+
+            .review-scenario-badge {
+                display: inline-block;
+                padding: 0.12rem 0.4rem;
+                border-radius: 999px;
+                font-size: 0.72rem;
+                font-weight: 700;
+                line-height: 1.25;
+                white-space: nowrap;
+            }
+
+            .review-scenario-badge-review {
+                background-color: #fff3cd;
+                border: 1px solid #ffe69c;
+                color: #856404;
+            }
+
+            .review-scenario-badge-classified {
+                background-color: #e7f1ff;
+                border: 1px solid #b6d4fe;
+                color: #084298;
+            }
+
+            .review-scenario-confidence {
+                display: inline-block;
+                padding: 0.08rem 0.35rem;
+                border-radius: 999px;
+                border: 1px solid #ced4da;
+                color: #495057;
+                background-color: #f8f9fa;
+                font-size: 0.68rem;
+                font-weight: 600;
+                line-height: 1.25;
+                white-space: nowrap;
+            }
+
             .review-hours-note {
                 display: block;
                 margin-top: 2px;
@@ -641,6 +762,83 @@ function appendGrandTotalsRow(tbody, totals) {
     tbody.appendChild(tr);
 }
 
+function buildScenarioReviewParams(baseParams, page) {
+    const params = new URLSearchParams({
+        apo_hmeromhnia: baseParams.get('apo_hmeromhnia') || '',
+        eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
+        ypokatasthma: baseParams.get('ypokatasthma') || '',
+        kodikos: baseParams.get('kodikos') || '',
+        page: String(page),
+        limit: '200'
+    });
+
+    return params;
+}
+
+async function fetchScenarioClassifications(baseParams) {
+    const scenarioRows = [];
+    const maxPages = 50;
+    let totalPages = 1;
+
+    for (let page = 1; page <= totalPages && page <= maxPages; page += 1) {
+        const params = buildScenarioReviewParams(baseParams, page);
+        const response = await fetch(`/api/prodhlomena-oraria/review/scenarios?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'CSRF-Token': csrfToken
+            }
+        });
+
+        const payload = await response.json();
+
+        if (!payload.success) {
+            throw new Error(payload.message || 'Αποτυχία ανάκτησης scenario classifications.');
+        }
+
+        scenarioRows.push(...(payload.rows || []));
+
+        const payloadTotalPages = Number(payload.totalPages || 0);
+        const payloadTotal = Number(payload.total || 0);
+        const payloadLimit = Number(payload.limit || 200);
+
+        totalPages =
+            payloadTotalPages > 0
+                ? payloadTotalPages
+                : payloadTotal > 0
+                  ? Math.ceil(payloadTotal / payloadLimit)
+                  : page;
+
+        if ((payload.rows || []).length === 0) break;
+    }
+
+    return scenarioRows;
+}
+
+function buildScenarioClassificationsMap(scenarioRows = []) {
+    const scenarioByProdhlomenaId = new Map();
+
+    scenarioRows.forEach((scenarioRow) => {
+        const key = rowIdentityKey(scenarioRow.prodhlomena_oraria_id);
+
+        if (!key) return;
+
+        scenarioByProdhlomenaId.set(key, scenarioRow);
+    });
+
+    return scenarioByProdhlomenaId;
+}
+
+function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new Map()) {
+    rows.forEach((row) => {
+        const scenarioRow = scenarioByProdhlomenaId.get(rowIdentityKey(row._id));
+
+        if (!scenarioRow) return;
+
+        row.scenarioDecision = scenarioRow.decision || null;
+        row.scenarioFactsSummary = scenarioRow.facts_summary || null;
+    });
+}
+
 async function loadResults() {
     try {
         const params = new URLSearchParams({
@@ -677,6 +875,14 @@ async function loadResults() {
         ensureReviewTableStructure();
 
         const rows = payload.rows || [];
+        try {
+            const scenarioRows = await fetchScenarioClassifications(params);
+            const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
+            attachScenarioClassifications(rows, scenarioByProdhlomenaId);
+        } catch (scenarioError) {
+            console.warn('[loadResults] Scenario classifications unavailable:', scenarioError);
+        }
+
         const deviationsByKodikos = buildDeviationsByKodikos(payload.deviations || []);
         const rowsByKodikos = new Map();
         rows.forEach((row) => {
@@ -861,6 +1067,7 @@ async function loadResults() {
                 <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
                 <td${tdClass(apologistikoDisplayClass)}>
                     ${apologistikoDisplayText}
+                    ${renderScenarioBadge(row)}
                 </td>
                 <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
                     ${renderHoursCell(row)}
