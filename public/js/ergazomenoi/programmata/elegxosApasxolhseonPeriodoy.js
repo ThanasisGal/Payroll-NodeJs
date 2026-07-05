@@ -394,15 +394,37 @@ function renderScenarioProposedUpdates(proposedUpdates = {}) {
                 Το γέμισμα πεδίων δεν αποθηκεύει αλλαγές. Για αποθήκευση απαιτείται το υπάρχον κουμπί αποθήκευσης.
             </div>
             <table class="table table-sm table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>Πεδίο</th>
+                        <th>Προτεινόμενη τιμή</th>
+                        <th>Τύπος</th>
+                    </tr>
+                </thead>
                 <tbody>
                     ${entries
                         .map(
-                            ([field, value]) => `
-                                <tr>
-                                    <td>${escapeHtml(auditLabel(field))}</td>
-                                    <td>${escapeHtml(formatScenarioValue(value))}</td>
-                                </tr>
-                            `
+                            ([field, value]) => {
+                                const canFillField = canFillScenarioProposedUpdate(field);
+                                const fillabilityLabel = canFillField
+                                    ? 'Μπορεί να γεμίσει πεδίο'
+                                    : 'Μόνο προβολή';
+                                const fillabilityClass = canFillField
+                                    ? 'text-bg-success'
+                                    : 'text-bg-secondary';
+
+                                return `
+                                    <tr>
+                                        <td>${escapeHtml(auditLabel(field))}</td>
+                                        <td>${escapeHtml(formatScenarioValue(value))}</td>
+                                        <td>
+                                            <span class="badge ${fillabilityClass}">
+                                                ${fillabilityLabel}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `;
+                            }
                         )
                         .join('')}
                 </tbody>
