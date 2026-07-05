@@ -10,7 +10,21 @@ const {
 const {
     evaluateApasxoliseisPolicyForScenario
 } = require('./apasxoliseisPolicyEngineService');
-const { POLICY_RESULT_STATUS } = require('./apasxoliseisPolicyCatalogService');
+const {
+    POLICY_RESULT_STATUS,
+    POLICY_MODE,
+    getApasxoliseisPolicyByCode
+} = require('./apasxoliseisPolicyCatalogService');
+
+const BASELINE_POLICY_CODES = Object.freeze({
+    CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK: 'CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK',
+    NO_APOLOGISTIKO_BIBLIO_OK: 'NO_APOLOGISTIKO_BIBLIO_OK'
+});
+
+const OK_REASONS = Object.freeze({
+    EMPLOYEE_CARD_NOT_REQUIRED: 'EMPLOYEE_CARD_NOT_REQUIRED',
+    NO_APOLOGISTIKO_REVIEW_REQUIRED: 'NO_APOLOGISTIKO_REVIEW_REQUIRED'
+});
 
 const REVIEW_REQUIRED_RESULT_STATUSES = new Set([
     POLICY_RESULT_STATUS.NEEDS_REVIEW,
@@ -56,6 +70,11 @@ function getRowContextKey(row = {}) {
     return String(row._id || row.id || dateKeyUtc(row.hmeromhnia) || '').trim();
 }
 
+function getEmployeeContext(row = {}, employeeContextByKodikos) {
+    const kodikos = String(row?.kodikos || '').trim();
+    return getMapValue(employeeContextByKodikos, kodikos);
+}
+
 function buildHolidayContext(row, argiesByDateKey) {
     const argiaRec = getMapValue(argiesByDateKey, dateKeyUtc(row?.hmeromhnia));
     const isHoliday = Boolean(argiaRec);
@@ -83,12 +102,65 @@ function buildScenarioFactsSummary(facts = {}) {
     };
 }
 
+function buildBaselineOkPolicyResult({ policyCode, reason, scenarioDecision, rowContextKey }) {
+    const policy = getApasxoliseisPolicyByCode(policyCode) || {};
+
+    return {
+        success: true,
+        policy_code: policy.policy_code || policyCode,
+        policy_version: policy.policy_version || null,
+        policy_title: policy.title || null,
+        mode: policy.default_mode || POLICY_MODE.REVIEW_ONLY,
+        result_status: POLICY_RESULT_STATUS.OK,
+        confidence: scenarioDecision?.confidence || null,
+        batch_approvable: policy.batch_approvable === true,
+        requires_human_approval: policy.requires_human_approval === true,
+        reasons: [reason],
+        warnings: [],
+        proposed_updates: {},
+        blocked: false,
+        blocked_reasons: [],
+        audit_payload: {
+            policy_code: policy.policy_code || policyCode,
+            policy_version: policy.policy_version || null,
+            mode: policy.default_mode || POLICY_MODE.REVIEW_ONLY,
+            scenario_code: scenarioDecision?.scenario_code || null,
+            scenario_version: scenarioDecision?.scenario_version || null,
+            reasons: [reason],
+            rowContextKey
+        }
+    };
+}
+
+function buildBaselinePolicyResult({ row, employee, scenarioDecision, rowContextKey }) {
+    if (employee && employee.karta_ergasias !== true) {
+        return buildBaselineOkPolicyResult({
+            policyCode: BASELINE_POLICY_CODES.CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK,
+            reason: OK_REASONS.EMPLOYEE_CARD_NOT_REQUIRED,
+            scenarioDecision,
+            rowContextKey
+        });
+    }
+
+    if (row?.apologistiko_biblio !== true) {
+        return buildBaselineOkPolicyResult({
+            policyCode: BASELINE_POLICY_CODES.NO_APOLOGISTIKO_BIBLIO_OK,
+            reason: OK_REASONS.NO_APOLOGISTIKO_REVIEW_REQUIRED,
+            scenarioDecision,
+            rowContextKey
+        });
+    }
+
+    return null;
+}
+
 function buildApasxoliseisPolicyPreviewRows(options = {}) {
     const safeOptions = asObject(options);
     const rows = asArray(safeOptions.rows);
     const argiesByDateKey = safeOptions.argiesByDateKey || new Map();
     const companyFlags = asObject(safeOptions.companyFlags);
     const weeklyContextByRowKey = safeOptions.weeklyContextByRowKey || new Map();
+    const employeeContextByKodikos = safeOptions.employeeContextByKodikos || new Map();
     const defaultPolicyMode = String(safeOptions.defaultPolicyMode || '').trim() || undefined;
     const policyCode = String(safeOptions.policyCode || '').trim() || undefined;
 
@@ -105,17 +177,26 @@ function buildApasxoliseisPolicyPreviewRows(options = {}) {
         const scenarioDecision = matchApasxoliseisScenarioFacts(facts, {
             weeklyContext
         });
-        const policyResult = evaluateApasxoliseisPolicyForScenario({
-            facts,
+        const employee = getEmployeeContext(row, employeeContextByKodikos);
+        const baselinePolicyResult = buildBaselinePolicyResult({
+            row,
+            employee,
             scenarioDecision,
-            policyCode,
-            mode: defaultPolicyMode,
-            parameters: safeOptions.parameters,
-            context: {
-                rowContextKey,
-                weeklyContext
-            }
+            rowContextKey
         });
+        const policyResult =
+            baselinePolicyResult ||
+            evaluateApasxoliseisPolicyForScenario({
+                facts,
+                scenarioDecision,
+                policyCode,
+                mode: defaultPolicyMode,
+                parameters: safeOptions.parameters,
+                context: {
+                    rowContextKey,
+                    weeklyContext
+                }
+            });
 
         return {
             prodhlomena_oraria_id: facts.identity.prodhlomena_oraria_id,
@@ -144,6 +225,8 @@ function summarizeApasxoliseisPolicyPreviewResults(rows = []) {
         by_policy_code: {},
         by_scenario_code: {},
         by_confidence: {},
+        by_ok_reason: {},
+        ok_count: 0,
         blocked_count: 0,
         proposed_updates_count: 0,
         review_required_count: 0
@@ -159,6 +242,19 @@ function summarizeApasxoliseisPolicyPreviewResults(rows = []) {
         incrementGroupedCount(summary.by_policy_code, policyResult.policy_code);
         incrementGroupedCount(summary.by_scenario_code, scenarioDecision.scenario_code);
         incrementGroupedCount(summary.by_confidence, scenarioDecision.confidence);
+
+        if (resultStatus === POLICY_RESULT_STATUS.OK) {
+            summary.ok_count++;
+            asArray(policyResult.reasons).forEach((reason) => {
+                if (reason === OK_REASONS.EMPLOYEE_CARD_NOT_REQUIRED) {
+                    incrementGroupedCount(summary.by_ok_reason, reason);
+                }
+
+                if (reason === OK_REASONS.NO_APOLOGISTIKO_REVIEW_REQUIRED) {
+                    incrementGroupedCount(summary.by_ok_reason, reason);
+                }
+            });
+        }
 
         if (policyResult.blocked === true) {
             summary.blocked_count++;

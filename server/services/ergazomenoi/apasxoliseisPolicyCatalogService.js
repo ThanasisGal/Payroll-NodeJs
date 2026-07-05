@@ -25,6 +25,7 @@ const POLICY_SAFETY_LEVEL = Object.freeze({
 });
 
 const POLICY_CATEGORIES = Object.freeze({
+    BASELINE_OK: 'BASELINE_OK',
     ABSENCE_OR_HOLIDAY: 'ABSENCE_OR_HOLIDAY',
     WEEKLY_REPO: 'WEEKLY_REPO',
     CARDS_ON_NON_WORK: 'CARDS_ON_NON_WORK'
@@ -101,6 +102,52 @@ const POLICY_MODE_DEFINITIONS = deepFreeze([
 ]);
 
 const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
+    {
+        policy_code: 'CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK',
+        policy_version: 'preview:v1',
+        title: 'Χωρίς υποχρέωση κάρτας εργασίας',
+        description:
+            'Τα προδηλωμένα ωράρια θεωρούνται αποδεκτά όταν ο εργαζόμενος δεν έχει υποχρέωση κάρτας εργασίας.',
+        category: POLICY_CATEGORIES.BASELINE_OK,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 10,
+        safety_level: POLICY_SAFETY_LEVEL.LOW_RISK,
+        batch_approvable: false,
+        requires_human_approval: false,
+        required_facts: ['employee.karta_ergasias'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [POLICY_RESULT_STATUS.OK],
+        related_scenario_codes: [],
+        notes: [
+            'Βασική ταξινόμηση μόνο για προεπισκόπηση χωρίς αλλαγές.',
+            'Δεν δημιουργεί προτεινόμενες αλλαγές και δεν εφαρμόζει ενημερώσεις.'
+        ]
+    },
+    {
+        policy_code: 'NO_APOLOGISTIKO_BIBLIO_OK',
+        policy_version: 'preview:v1',
+        title: 'Δεν αφορά απολογιστικό βιβλίο',
+        description:
+            'Η εγγραφή θεωρείται αποδεκτή στην προεπισκόπηση όταν δεν αφορά απολογιστικό βιβλίο.',
+        category: POLICY_CATEGORIES.BASELINE_OK,
+        default_mode: POLICY_MODE.REVIEW_ONLY,
+        supported_modes: [POLICY_MODE.REVIEW_ONLY],
+        default_priority: 20,
+        safety_level: POLICY_SAFETY_LEVEL.LOW_RISK,
+        batch_approvable: false,
+        requires_human_approval: false,
+        required_facts: ['row.apologistiko_biblio'],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [],
+        result_statuses: [POLICY_RESULT_STATUS.OK],
+        related_scenario_codes: [],
+        notes: [
+            'Βασική ταξινόμηση μόνο για προεπισκόπηση χωρίς αλλαγές.',
+            'Δεν δημιουργεί προτεινόμενες αλλαγές και δεν εφαρμόζει ενημερώσεις.'
+        ]
+    },
     {
         policy_code: 'NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY',
         policy_version: 'foundation:v1',
