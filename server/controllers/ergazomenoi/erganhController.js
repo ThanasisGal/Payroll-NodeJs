@@ -117,6 +117,10 @@ const {
     validateApasxoliseisPolicyCatalog,
     POLICY_CATEGORIES
 } = require('../../services/ergazomenoi/apasxoliseisPolicyCatalogService');
+const {
+    buildApasxoliseisPolicyPreviewRows,
+    summarizeApasxoliseisPolicyPreviewResults
+} = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -4984,6 +4988,160 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση του policy catalog απασχολήσεων.',
+                error: error.message
+            });
+        }
+    };
+
+    static getProdhlomenaOrariaPolicyPreview = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+
+            const {
+                apo_hmeromhnia,
+                eos_hmeromhnia,
+                ypokatasthma,
+                kodikos,
+                page = 1,
+                limit = 50,
+                policy_code,
+                mode
+            } = req.query;
+
+            const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+            const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+            const skip = (pageNum - 1) * limitNum;
+            const filter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+            let requestedPeriodStart = null;
+            let requestedPeriodEnd = null;
+
+            if (apo_hmeromhnia || eos_hmeromhnia) {
+                const apoKey = String(apo_hmeromhnia || '').trim();
+                const eosKey = String(eos_hmeromhnia || '').trim();
+
+                if (
+                    !/^\d{4}-\d{2}-\d{2}$/.test(apoKey) ||
+                    !/^\d{4}-\d{2}-\d{2}$/.test(eosKey)
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Μη έγκυρο εύρος ημερομηνιών.'
+                    });
+                }
+
+                requestedPeriodStart = new Date(`${apoKey}T00:00:00.000Z`);
+                requestedPeriodEnd = new Date(`${eosKey}T23:59:59.999Z`);
+
+                if (
+                    Number.isNaN(requestedPeriodStart.getTime()) ||
+                    Number.isNaN(requestedPeriodEnd.getTime()) ||
+                    requestedPeriodStart.toISOString().slice(0, 10) !== apoKey ||
+                    requestedPeriodEnd.toISOString().slice(0, 10) !== eosKey ||
+                    requestedPeriodStart > requestedPeriodEnd
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Μη έγκυρο εύρος ημερομηνιών.'
+                    });
+                }
+
+                filter.hmeromhnia = mongoose.trusted({
+                    $gte: requestedPeriodStart,
+                    $lte: requestedPeriodEnd
+                });
+            }
+
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                filter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+            }
+
+            if (kodikos && String(kodikos).trim() !== '') {
+                filter.kodikos = String(kodikos).trim();
+            }
+
+            const [rows, total] = await Promise.all([
+                ProdhlomenaOrariaModel.find(filter)
+                    .select(
+                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                            'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'apo_ora_01_break eos_ora_01_break apo_ora_02_break eos_ora_02_break apo_ora_03_break eos_ora_03_break ' +
+                            'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
+                            'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
+                            'is_locked locked_by locked_at'
+                    )
+                    .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                    .skip(skip)
+                    .limit(limitNum)
+                    .lean(),
+                ProdhlomenaOrariaModel.countDocuments(filter)
+            ]);
+
+            const rowStartDates = rows
+                .map((row) => clampDateStartUtc(row.hmeromhnia))
+                .filter(Boolean);
+            const rowEndDates = rows
+                .map((row) => clampDateEndUtc(row.hmeromhnia))
+                .filter(Boolean);
+            const periodStart =
+                requestedPeriodStart ||
+                (rowStartDates.length > 0
+                    ? new Date(Math.min(...rowStartDates.map((date) => date.getTime())))
+                    : null);
+            const periodEnd =
+                requestedPeriodEnd ||
+                (rowEndDates.length > 0
+                    ? new Date(Math.max(...rowEndDates.map((date) => date.getTime())))
+                    : null);
+            const scenarioContext =
+                periodStart && periodEnd
+                    ? await buildNoCardsDisplayContext({
+                          team: sessionTeam,
+                          companyId,
+                          companyKodikos: req.session.companyKodikos,
+                          etos: req.session.yearInUse,
+                          periodStart,
+                          periodEnd
+                    })
+                    : { companyFlags: {}, argiesByDateKey: new Map() };
+            const companyFlags = scenarioContext.companyFlags || {};
+            const normalizedCompanyFlags = {
+                companyWorksOnMandatoryHoliday:
+                    companyFlags.apasxolhsh_kata_tis_argies === true,
+                companyWorksOnOptionalHoliday:
+                    companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
+            };
+            const previewRows = buildApasxoliseisPolicyPreviewRows({
+                rows,
+                argiesByDateKey: scenarioContext.argiesByDateKey || new Map(),
+                companyFlags: normalizedCompanyFlags,
+                policyCode: String(policy_code || '').trim(),
+                defaultPolicyMode: String(mode || '').trim()
+            });
+            const summary = summarizeApasxoliseisPolicyPreviewResults(previewRows);
+
+            return res.json({
+                success: true,
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.ceil(total / limitNum),
+                count: previewRows.length,
+                summary,
+                rows: previewRows
+            });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaPolicyPreview] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την παραγωγή προεπισκόπησης πολιτικών απασχολήσεων.',
                 error: error.message
             });
         }
