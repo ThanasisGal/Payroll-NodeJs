@@ -1244,6 +1244,12 @@ router.get(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/policies/preview',
+    checkAuth,
+    erganhController.getProdhlomenaOrariaPolicyPreview
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/scenarios',
     erganhController.getProdhlomenaOrariaScenarioClassifications
 );
