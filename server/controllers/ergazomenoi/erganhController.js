@@ -5083,6 +5083,34 @@ class erganhController {
                 ProdhlomenaOrariaModel.countDocuments(filter)
             ]);
 
+            const kodikoiRows = [
+                ...new Set(
+                    rows
+                        .map((row) => String(row.kodikos || '').trim())
+                        .filter((rowKodikos) => rowKodikos !== '')
+                )
+            ];
+            const employeeContextByKodikos = new Map();
+
+            if (kodikoiRows.length > 0) {
+                const employeeRows = await ErgazomenoiModel.find({
+                    team: sessionTeam,
+                    company_kod: companyId,
+                    kodikos: mongoose.trusted({ $in: kodikoiRows })
+                })
+                    .select('kodikos karta_ergasias')
+                    .lean();
+
+                employeeRows.forEach((employee) => {
+                    const employeeKodikos = String(employee.kodikos || '').trim();
+                    if (!employeeKodikos) return;
+
+                    employeeContextByKodikos.set(employeeKodikos, {
+                        karta_ergasias: employee.karta_ergasias
+                    });
+                });
+            }
+
             const rowStartDates = rows
                 .map((row) => clampDateStartUtc(row.hmeromhnia))
                 .filter(Boolean);
@@ -5121,6 +5149,7 @@ class erganhController {
                 rows,
                 argiesByDateKey: scenarioContext.argiesByDateKey || new Map(),
                 companyFlags: normalizedCompanyFlags,
+                employeeContextByKodikos,
                 policyCode: String(policy_code || '').trim(),
                 defaultPolicyMode: String(mode || '').trim()
             });
