@@ -83,6 +83,38 @@ const scenarioReasonLabels = {
     UNKNOWN_PATTERN: 'Άγνωστο μοτίβο'
 };
 
+const scenarioProposedUpdateFillableFields = new Set([
+    'apo_ora_01_apologistika',
+    'eos_ora_01_apologistika',
+    'apo_ora_02_apologistika',
+    'eos_ora_02_apologistika',
+    'apo_ora_03_apologistika',
+    'eos_ora_03_apologistika',
+    'ores_ergasias_apologistika',
+    'ores_apoysias_apologistika',
+    'ores_nyxtas_apologistika',
+    'ores_argion_prosayxhsh_apologistika',
+    'ores_argion_ergasia_apologistika',
+    'ores_prostheths_ergasias_apologistika',
+    'ores_yperergasias_apologistika',
+    'ores_yperergasias_nyxtas_apologistika',
+    'ores_yperergasias_argion_apologistika',
+    'ores_yperergasias_argion_nyxtas_apologistika',
+    'ores_nominhs_yperorias_apologistika',
+    'ores_nominhs_yperorias_nyxtas_apologistika',
+    'ores_nominhs_yperorias_argion_apologistika',
+    'ores_nominhs_yperorias_argion_nyxtas_apologistika',
+    'ores_paranomhs_yperorias_apologistika',
+    'ores_paranomhs_yperorias_nyxtas_apologistika',
+    'ores_paranomhs_yperorias_argion_apologistika',
+    'ores_paranomhs_yperorias_argion_nyxtas_apologistika',
+    'repo_apologistika',
+    'adeia_apologistika',
+    'astheneia_apologistika',
+    'kyriakes_apologistika',
+    'kathgoria_adeias_apologistika'
+]);
+
 let currentReviewRows = [];
 let currentReviewDeviations = [];
 
@@ -339,9 +371,28 @@ function renderScenarioProposedUpdates(proposedUpdates = {}) {
 
     if (entries.length === 0) return '';
 
+    const canFillAnyField = entries.some(([field]) => canFillScenarioProposedUpdate(field));
+
     return `
         <div class="review-scenario-subsection">
-            <div class="fw-semibold mb-1">Προτεινόμενες ενημερώσεις</div>
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                <div class="fw-semibold">Προτεινόμενες αλλαγές</div>
+                ${
+                    canFillAnyField
+                        ? `
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                id="fillScenarioProposedUpdatesBtn">
+                                Γέμισμα πεδίων από πρόταση
+                            </button>
+                        `
+                        : ''
+                }
+            </div>
+            <div class="small text-muted mb-2">
+                Το γέμισμα πεδίων δεν αποθηκεύει αλλαγές. Για αποθήκευση απαιτείται το υπάρχον κουμπί αποθήκευσης.
+            </div>
             <table class="table table-sm table-bordered mb-0">
                 <tbody>
                     ${entries
@@ -358,6 +409,82 @@ function renderScenarioProposedUpdates(proposedUpdates = {}) {
             </table>
         </div>
     `;
+}
+
+function canFillScenarioProposedUpdate(field) {
+    const key = String(field || '').trim();
+
+    return scenarioProposedUpdateFillableFields.has(key);
+}
+
+function setScenarioProposedUpdateField(field, value) {
+    const key = String(field || '').trim();
+
+    if (!canFillScenarioProposedUpdate(key)) return false;
+
+    if (key === 'kathgoria_adeias_apologistika') {
+        const hidden = document.getElementById('edit_kathgoria_adeias_apologistika_hidden');
+        const select = document.getElementById('edit_kathgoria_adeias_apologistika');
+        const normalizedValue = String(value ?? '');
+
+        if (!hidden && !select) return false;
+
+        if (hidden) hidden.value = normalizedValue;
+
+        if (select?.tomselect) {
+            select.tomselect.addOption({
+                value: normalizedValue,
+                label: normalizedValue,
+                text: normalizedValue
+            });
+            select.tomselect.setValue(normalizedValue, true);
+        } else if (select) {
+            select.value = normalizedValue;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        return true;
+    }
+
+    const input = document.getElementById(`edit_${key}`);
+
+    if (!input) return false;
+
+    if (input.type === 'checkbox') {
+        input.checked = value === true || value === 'true' || value === 1 || value === '1';
+    } else {
+        input.value = value ?? '';
+    }
+
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    return true;
+}
+
+function fillScenarioProposedUpdates(row) {
+    const proposedUpdates = row?.scenarioDecision?.proposed_updates || {};
+    const entries = Object.entries(proposedUpdates);
+    let filledCount = 0;
+
+    entries.forEach(([field, value]) => {
+        if (setScenarioProposedUpdateField(field, value)) {
+            filledCount += 1;
+        }
+    });
+
+    const reasonField = document.getElementById('edit_reason');
+    if (reasonField && !reasonField.value.trim() && filledCount > 0) {
+        reasonField.value = 'Γέμισμα πεδίων από προτεινόμενη ταξινόμηση σεναρίου.';
+    }
+
+    if (filledCount > 0 && window.Swal?.fire) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Πρόταση σεναρίου',
+            text: `Συμπληρώθηκαν ${filledCount} πεδίο/πεδία στο modal. Η αποθήκευση δεν έγινε αυτόματα.`
+        });
+    }
 }
 
 function renderScenarioFactsSummary(factsSummary = {}) {
@@ -1740,6 +1867,8 @@ const auditFieldLabels = {
 
     repo_apologistika: 'Ρεπό',
     adeia_apologistika: 'Άδεια',
+    argia: 'Αργία',
+    kathgoria_ergasias_apologistika: 'Κατηγορία εργασίας απολογιστικά',
     kathgoria_adeias_apologistika: 'Κατηγορία άδειας',
     astheneia_apologistika: 'Ασθένεια',
     kyriakes_apologistika: 'Κυριακή',
@@ -2009,6 +2138,10 @@ function showDetailsModal(row) {
 
     document.getElementById('loadAuditBtn')?.addEventListener('click', () => {
         loadAuditHistory(row._id);
+    });
+
+    document.getElementById('fillScenarioProposedUpdatesBtn')?.addEventListener('click', () => {
+        fillScenarioProposedUpdates(row);
     });
 
     document.getElementById('saveRecordBtn')?.addEventListener('click', async () => {
