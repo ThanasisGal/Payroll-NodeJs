@@ -63,6 +63,26 @@ const scenarioConfidenceLabels = {
     LOW: 'Χαμηλή'
 };
 
+const scenarioDecisionStatusLabels = {
+    PENDING_REVIEW: 'Προς έλεγχο',
+    CLASSIFIED_ONLY: 'Ταξινομημένο'
+};
+
+const scenarioReasonLabels = {
+    DECLARED_WORK_WITHOUT_CARDS: 'Δηλωμένη εργασία χωρίς κάρτες',
+    DECLARED_LEAVE_FOUND: 'Βρέθηκε άδεια',
+    HOLIDAY_REQUIRED_FOUND: 'Βρέθηκε υποχρεωτική αργία',
+    HOLIDAY_OPTIONAL_COMPANY_WORKS: 'Μη υποχρεωτική αργία - εταιρεία λειτουργεί',
+    HOLIDAY_OPTIONAL_COMPANY_CLOSED: 'Μη υποχρεωτική αργία - εταιρεία κλειστή',
+    ZERO_LENGTH_CARD_INTERVAL_FOUND: 'Βρέθηκε μηδενικό διάστημα κάρτας',
+    SPLIT_SHIFT_DEVIATION_FOUND: 'Βρέθηκε σπαστό με απόκλιση',
+    DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
+    DECLARED_NON_WORK_WITH_CARDS: 'Μη εργασία με κάρτες',
+    REPO_TRANSFER_CANDIDATE: 'Πιθανή μεταφορά ρεπό',
+    LEGAL_CLASSIFICATION_REQUIRED: 'Απαιτείται νομοθετική ταξινόμηση',
+    UNKNOWN_PATTERN: 'Άγνωστο μοτίβο'
+};
+
 function rowIdentityKey(value) {
     if (value === null || value === undefined) return '';
 
@@ -93,6 +113,18 @@ function scenarioConfidenceLabel(confidence) {
     return scenarioConfidenceLabels[key] || key;
 }
 
+function scenarioDecisionStatusLabel(status) {
+    const key = String(status || '').trim();
+
+    return scenarioDecisionStatusLabels[key] || key;
+}
+
+function scenarioReasonLabel(reason) {
+    const key = String(reason || '').trim();
+
+    return scenarioReasonLabels[key] || key;
+}
+
 function renderScenarioBadge(row) {
     const decision = row?.scenarioDecision;
 
@@ -115,6 +147,141 @@ function renderScenarioBadge(row) {
                 ${escapeHtml(label)}
             </span>
             ${confidenceHtml}
+        </div>
+    `;
+}
+
+function formatScenarioValue(value) {
+    if (value === true) return 'ΝΑΙ';
+    if (value === false) return 'ΟΧΙ';
+    if (value === null || value === undefined || value === '') return '-';
+    if (typeof value === 'object') return JSON.stringify(value);
+
+    return String(value);
+}
+
+function renderScenarioList(items = [], labelFn = (value) => value) {
+    const listItems = (Array.isArray(items) ? items : [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+        .map(
+            (item) => `
+                <li>
+                    ${escapeHtml(labelFn(item))}
+                    <small class="text-muted">(${escapeHtml(item)})</small>
+                </li>
+            `
+        );
+
+    if (listItems.length === 0) return '';
+
+    return `<ul class="review-scenario-list mb-0">${listItems.join('')}</ul>`;
+}
+
+function renderScenarioProposedUpdates(proposedUpdates = {}) {
+    const entries = Object.entries(proposedUpdates || {});
+
+    if (entries.length === 0) return '';
+
+    return `
+        <div class="review-scenario-subsection">
+            <div class="fw-semibold mb-1">Προτεινόμενες ενημερώσεις</div>
+            <table class="table table-sm table-bordered mb-0">
+                <tbody>
+                    ${entries
+                        .map(
+                            ([field, value]) => `
+                                <tr>
+                                    <td>${escapeHtml(auditLabel(field))}</td>
+                                    <td>${escapeHtml(formatScenarioValue(value))}</td>
+                                </tr>
+                            `
+                        )
+                        .join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderScenarioFactsSummary(factsSummary = {}) {
+    if (!factsSummary || Object.keys(factsSummary).length === 0) return '';
+
+    const items = [
+        ['Προδηλωμένο', factsSummary.declared_category],
+        ['Ώρες καρτών', factsSummary.card_hours],
+        ['Έχει κάρτες', factsSummary.has_cards],
+        ['Αργία', factsSummary.is_holiday],
+        ['Κλειδωμένη', factsSummary.is_locked]
+    ];
+
+    return `
+        <div class="review-scenario-facts">
+            ${items
+                .map(
+                    ([label, value]) => `
+                        <span class="review-scenario-fact">
+                            ${escapeHtml(label)}: ${escapeHtml(formatScenarioValue(value))}
+                        </span>
+                    `
+                )
+                .join('')}
+        </div>
+    `;
+}
+
+function renderScenarioDetailsSection(row) {
+    const decision = row?.scenarioDecision;
+
+    if (!decision) return '';
+
+    const code = String(decision.scenario_code || '').trim();
+    const label = scenarioCodeLabels[code] || code || '-';
+    const confidence = scenarioConfidenceLabel(decision.confidence);
+    const status = scenarioDecisionStatusLabel(decision.decision_status);
+    const reviewText =
+        decision.requires_review === true ? 'ΠΡΟΣ ΕΛΕΓΧΟ' : 'Δεν απαιτείται έλεγχος';
+    const reasonsHtml = renderScenarioList(decision.reasons, scenarioReasonLabel);
+    const warningsHtml = renderScenarioList(decision.warnings);
+    const proposedUpdatesHtml = renderScenarioProposedUpdates(decision.proposed_updates);
+    const factsSummaryHtml = renderScenarioFactsSummary(row.scenarioFactsSummary);
+
+    return `
+        <div class="review-modal-section" id="reviewScenarioDetails">
+            <div class="review-modal-section-title">Ταξινόμηση Σεναρίου</div>
+
+            <div class="review-scenario-summary">
+                <span class="review-badge">${escapeHtml(label)}</span>
+                ${code ? `<span class="review-badge">${escapeHtml(code)}</span>` : ''}
+                ${confidence ? `<span class="review-badge">Βεβαιότητα: ${escapeHtml(confidence)}</span>` : ''}
+                ${status ? `<span class="review-badge">Κατάσταση: ${escapeHtml(status)}</span>` : ''}
+                <span class="review-badge">${escapeHtml(reviewText)}</span>
+            </div>
+
+            ${
+                reasonsHtml
+                    ? `
+                        <div class="review-scenario-subsection">
+                            <div class="fw-semibold mb-1">Λόγοι</div>
+                            ${reasonsHtml}
+                        </div>
+                    `
+                    : ''
+            }
+
+            ${
+                warningsHtml
+                    ? `
+                        <div class="review-scenario-subsection">
+                            <div class="fw-semibold mb-1">Προειδοποιήσεις</div>
+                            ${warningsHtml}
+                        </div>
+                    `
+                    : ''
+            }
+
+            ${proposedUpdatesHtml}
+            ${factsSummaryHtml}
         </div>
     `;
 }
@@ -500,6 +667,31 @@ function ensureReviewTableStructure() {
                 font-weight: 600;
                 line-height: 1.25;
                 white-space: nowrap;
+            }
+
+            .review-scenario-summary,
+            .review-scenario-facts {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.35rem;
+                align-items: center;
+            }
+
+            .review-scenario-subsection {
+                margin-top: 0.75rem;
+            }
+
+            .review-scenario-list {
+                padding-left: 1.25rem;
+            }
+
+            .review-scenario-fact {
+                display: inline-block;
+                padding: 0.18rem 0.45rem;
+                border-radius: 0.25rem;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                font-size: 0.8rem;
             }
 
             .review-hours-note {
@@ -1577,6 +1769,8 @@ function showDetailsModal(row) {
             <span class="review-badge">Αργία: ${row.argia ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
             <span class="review-badge">Κυριακή: ${row.kyriakes_apologistika ? 'ΝΑΙ' : 'ΟΧΙ'}</span>
         </div>
+
+        ${renderScenarioDetailsSection(row)}
 
         <div class="review-modal-section">
             <div class="review-modal-section-title">
