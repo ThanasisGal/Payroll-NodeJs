@@ -104,6 +104,12 @@ const {
     cancelSubmittedDocument
 } = require('../../utils/erganh/erganiRestClient');
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
+const {
+    buildApasxoliseisScenarioFacts
+} = require('../../services/ergazomenoi/apasxoliseisScenarioFactsService');
+const {
+    matchApasxoliseisScenarioFacts
+} = require('../../services/ergazomenoi/apasxoliseisScenarioMatcherService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -1259,7 +1265,8 @@ function buildArgiesByDateKey(argies = []) {
     for (const argia of argies) {
         if (!argia?.hmeromhnia) continue;
         map.set(dateKeyUtc(argia.hmeromhnia), {
-            ypoxreotikh_argia: argia.ypoxreotikh_argia === true
+            ypoxreotikh_argia: argia.ypoxreotikh_argia === true,
+            description: String(argia.perigrafh || argia.perigrafh_argias || '').trim()
         });
     }
 
@@ -1311,7 +1318,7 @@ async function buildNoCardsDisplayContext({
                   $lte: periodEnd
               })
           })
-              .select('hmeromhnia ypoxreotikh_argia')
+              .select('hmeromhnia ypoxreotikh_argia perigrafh perigrafh_argias')
               .lean()
         : [];
 
@@ -4937,6 +4944,186 @@ class erganhController {
             return res.status(500).json({
                 success: false,
                 message: 'Σφάλμα κατά την ανάκτηση των απασχολήσεων.',
+                error: error.message
+            });
+        }
+    };
+
+    static getProdhlomenaOrariaScenarioClassifications = async (req, res) => {
+        try {
+            const sessionTeam = req.session.userTeam;
+            const companyId = req.session.companyInUse;
+
+            const {
+                apo_hmeromhnia,
+                eos_hmeromhnia,
+                ypokatasthma,
+                kodikos,
+                page = 1,
+                limit = 50
+            } = req.query;
+
+            const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+            const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+            const skip = (pageNum - 1) * limitNum;
+            const filter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+            let requestedPeriodStart = null;
+            let requestedPeriodEnd = null;
+
+            if (apo_hmeromhnia || eos_hmeromhnia) {
+                const apoKey = String(apo_hmeromhnia || '').trim();
+                const eosKey = String(eos_hmeromhnia || '').trim();
+
+                if (
+                    !/^\d{4}-\d{2}-\d{2}$/.test(apoKey) ||
+                    !/^\d{4}-\d{2}-\d{2}$/.test(eosKey)
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Μη έγκυρο εύρος ημερομηνιών.'
+                    });
+                }
+
+                requestedPeriodStart = new Date(`${apoKey}T00:00:00.000Z`);
+                requestedPeriodEnd = new Date(`${eosKey}T23:59:59.999Z`);
+
+                if (
+                    Number.isNaN(requestedPeriodStart.getTime()) ||
+                    Number.isNaN(requestedPeriodEnd.getTime()) ||
+                    requestedPeriodStart.toISOString().slice(0, 10) !== apoKey ||
+                    requestedPeriodEnd.toISOString().slice(0, 10) !== eosKey ||
+                    requestedPeriodStart > requestedPeriodEnd
+                ) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Μη έγκυρο εύρος ημερομηνιών.'
+                    });
+                }
+
+                filter.hmeromhnia = mongoose.trusted({
+                    $gte: requestedPeriodStart,
+                    $lte: requestedPeriodEnd
+                });
+            }
+
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                filter.ypokatasthma = String(ypokatasthma).trim().padStart(4, '0');
+            }
+
+            if (kodikos && String(kodikos).trim() !== '') {
+                filter.kodikos = String(kodikos).trim();
+            }
+
+            const [rows, total] = await Promise.all([
+                ProdhlomenaOrariaModel.find(filter)
+                    .select(
+                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                            'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                            'apo_ora_01_break eos_ora_01_break apo_ora_02_break eos_ora_02_break apo_ora_03_break eos_ora_03_break ' +
+                            'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
+                            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
+                            'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
+                            'is_locked locked_by locked_at'
+                    )
+                    .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                    .skip(skip)
+                    .limit(limitNum)
+                    .lean(),
+                ProdhlomenaOrariaModel.countDocuments(filter)
+            ]);
+
+            const rowStartDates = rows
+                .map((row) => clampDateStartUtc(row.hmeromhnia))
+                .filter(Boolean);
+            const rowEndDates = rows
+                .map((row) => clampDateEndUtc(row.hmeromhnia))
+                .filter(Boolean);
+            const periodStart =
+                requestedPeriodStart ||
+                (rowStartDates.length > 0
+                    ? new Date(Math.min(...rowStartDates.map((date) => date.getTime())))
+                    : null);
+            const periodEnd =
+                requestedPeriodEnd ||
+                (rowEndDates.length > 0
+                    ? new Date(Math.max(...rowEndDates.map((date) => date.getTime())))
+                    : null);
+            const scenarioContext =
+                periodStart && periodEnd
+                    ? await buildNoCardsDisplayContext({
+                          team: sessionTeam,
+                          companyId,
+                          companyKodikos: req.session.companyKodikos,
+                          etos: req.session.yearInUse,
+                          periodStart,
+                          periodEnd
+                      })
+                    : { companyFlags: {}, argiesByDateKey: new Map() };
+            const argiesByDateKey = scenarioContext.argiesByDateKey || new Map();
+            const companyFlags = scenarioContext.companyFlags || {};
+
+            const classificationRows = rows.map((row) => {
+                const argiaRec = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
+                const isHoliday = Boolean(argiaRec);
+                const facts = buildApasxoliseisScenarioFacts(row, {
+                    holiday: {
+                        isHoliday,
+                        isMandatoryHoliday: argiaRec?.ypoxreotikh_argia === true,
+                        isOptionalHoliday: isHoliday && argiaRec?.ypoxreotikh_argia !== true,
+                        description: argiaRec?.description || ''
+                    },
+                    companyFlags: {
+                        companyWorksOnMandatoryHoliday:
+                            companyFlags.apasxolhsh_kata_tis_argies === true,
+                        companyWorksOnOptionalHoliday:
+                            companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true
+                    }
+                });
+                const decision = matchApasxoliseisScenarioFacts(facts);
+
+                return {
+                    prodhlomena_oraria_id: facts.identity.prodhlomena_oraria_id,
+                    team: facts.identity.team,
+                    company_kod: facts.identity.company_kod,
+                    ypokatasthma: facts.identity.ypokatasthma,
+                    kodikos: facts.identity.kodikos,
+                    hmeromhnia: facts.identity.hmeromhnia,
+                    facts_summary: {
+                        declared_category: facts.declared.kathgoria_ergasias,
+                        declared_hours: facts.declared.declaredHours,
+                        card_hours: facts.cards.cardHours,
+                        has_cards: facts.cards.hasCards,
+                        has_zero_length_card_interval: facts.cards.hasZeroLengthCardInterval,
+                        is_holiday: facts.holiday.isHoliday,
+                        is_mandatory_holiday: facts.holiday.isMandatoryHoliday,
+                        is_optional_holiday: facts.holiday.isOptionalHoliday,
+                        is_locked: facts.review.is_locked,
+                        has_manual_override: facts.review.hasManualOverride
+                    },
+                    decision
+                };
+            });
+
+            return res.json({
+                success: true,
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.ceil(total / limitNum),
+                count: classificationRows.length,
+                rows: classificationRows
+            });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaScenarioClassifications] ❌', error);
+
+            return res.status(500).json({
+                success: false,
+                message: 'Σφάλμα κατά την ταξινόμηση σεναρίων απασχολήσεων.',
                 error: error.message
             });
         }

@@ -1238,6 +1238,11 @@ router.get(
 router.get('/api/prodhlomena-oraria/review', erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
+    '/api/prodhlomena-oraria/review/scenarios',
+    erganhController.getProdhlomenaOrariaScenarioClassifications
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/export-excel',
     erganhController.exportProdhlomenaOrariaReviewExcel
 );
