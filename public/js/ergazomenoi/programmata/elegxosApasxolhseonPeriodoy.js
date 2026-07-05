@@ -83,6 +83,17 @@ const scenarioReasonLabels = {
     UNKNOWN_PATTERN: 'Άγνωστο μοτίβο'
 };
 
+let currentReviewRows = [];
+let currentReviewDeviations = [];
+
+const reviewFilterDefinitions = [
+    { key: 'onlyApologistiko', id: 'only_apologistiko', label: 'Μόνο Απολογιστικό' },
+    { key: 'onlyNight', id: 'only_nyxta', label: 'Μόνο Νύχτα' },
+    { key: 'onlyHoliday', id: 'only_argia', label: 'Μόνο Αργία' },
+    { key: 'onlyYperergasia', id: 'only_yperergasia', label: 'Μόνο Υπερεργασία' },
+    { key: 'onlyScenarioReview', id: 'scenarioRequiresReviewOnly', label: 'Μόνο προς έλεγχο' }
+];
+
 function rowIdentityKey(value) {
     if (value === null || value === undefined) return '';
 
@@ -149,6 +160,151 @@ function renderScenarioBadge(row) {
             ${confidenceHtml}
         </div>
     `;
+}
+
+function isScenarioReviewRow(row) {
+    return row?.scenarioDecision?.requires_review === true;
+}
+
+function scenarioReviewOnlyEnabled() {
+    return document.getElementById('scenarioRequiresReviewOnly')?.checked === true;
+}
+
+function getActiveReviewFilters() {
+    return reviewFilterDefinitions.reduce((filters, filter) => {
+        filters[filter.key] = document.getElementById(filter.id)?.checked === true;
+        return filters;
+    }, {});
+}
+
+function getActiveReviewFilterLabels(filters = getActiveReviewFilters()) {
+    return reviewFilterDefinitions
+        .filter((filter) => filters[filter.key] === true)
+        .map((filter) => filter.label);
+}
+
+function isAnyReviewFilterActive(filters = getActiveReviewFilters()) {
+    return Object.values(filters).some(Boolean);
+}
+
+function rowPassesActiveReviewFilters(row, filters, holidayLikeDateSet) {
+    if (filters.onlyApologistiko && row.apologistiko_biblio !== true) return false;
+
+    if (filters.onlyNight && !hasPositiveNumber(row.ores_nyxtas_apologistika)) return false;
+
+    if (filters.onlyHoliday && !hasPositiveNumber(calculateHolidayDisplayHours(row, holidayLikeDateSet))) {
+        return false;
+    }
+
+    if (filters.onlyYperergasia && !(sumYperergasia(row) > 0)) return false;
+
+    if (filters.onlyScenarioReview && !isScenarioReviewRow(row)) return false;
+
+    return true;
+}
+
+function getVisibleReviewRows(rows = currentReviewRows) {
+    const filters = getActiveReviewFilters();
+
+    if (!isAnyReviewFilterActive(filters)) return rows;
+
+    const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
+
+    return rows.filter((row) => rowPassesActiveReviewFilters(row, filters, holidayLikeDateSet));
+}
+
+function updateReviewFilterLayoutState() {
+    const cardBody = document.querySelector('.review-card-body');
+
+    if (!cardBody) return;
+
+    cardBody.classList.toggle('review-filters-active', isAnyReviewFilterActive());
+}
+
+function updateScenarioReviewFilterNotice() {
+    const notice = document.getElementById('scenarioRequiresReviewOnlyNotice');
+
+    if (!notice) return;
+
+    const filters = getActiveReviewFilters();
+    const activeFilterLabels = getActiveReviewFilterLabels(filters);
+
+    if (!isAnyReviewFilterActive(filters)) {
+        notice.classList.add('d-none');
+        notice.textContent = '';
+        return;
+    }
+
+    const visibleCount = getVisibleReviewRows().length;
+    const totalCount = currentReviewRows.length;
+    const prefix = activeFilterLabels.length === 1 ? 'Ενεργό φίλτρο' : 'Ενεργά φίλτρα';
+
+    notice.classList.remove('d-none');
+    notice.textContent = `${prefix}: ${activeFilterLabels.join(', ')} (${visibleCount}/${totalCount}).`;
+}
+
+function renderCurrentReviewRows() {
+    renderReviewRows(getVisibleReviewRows(), currentReviewDeviations);
+    updateScenarioReviewFilterNotice();
+    updateReviewFilterLayoutState();
+}
+
+function bindReviewFilterChangeListeners() {
+    reviewFilterDefinitions.forEach((filter) => {
+        const checkbox = document.getElementById(filter.id);
+
+        if (!checkbox || checkbox.dataset.reviewFilterListenerBound === '1') return;
+
+        checkbox.addEventListener('change', () => {
+            renderCurrentReviewRows();
+        });
+
+        checkbox.dataset.reviewFilterListenerBound = '1';
+    });
+}
+
+function ensureScenarioReviewFilterControl() {
+    const filtersRow = document.querySelector('.review-filters-sticky .row.form-group');
+
+    if (!filtersRow) return;
+
+    if (document.getElementById('scenarioRequiresReviewOnly')) {
+        bindReviewFilterChangeListeners();
+        updateReviewFilterLayoutState();
+        return;
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'col-auto d-flex align-items-center gap-2';
+
+    const label = document.createElement('label');
+    label.className = 'col-form-label label-font-size mb-0';
+    label.htmlFor = 'scenarioRequiresReviewOnly';
+    label.textContent = 'Μόνο προς έλεγχο';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'form-check-input custom-checkbox checkbox-class mt-0';
+    checkbox.id = 'scenarioRequiresReviewOnly';
+    checkbox.name = 'scenarioRequiresReviewOnly';
+
+    wrapper.appendChild(label);
+    wrapper.appendChild(checkbox);
+    filtersRow.appendChild(wrapper);
+
+    const notice = document.createElement('div');
+    notice.id = 'scenarioRequiresReviewOnlyNotice';
+    notice.className = 'col-12 small text-muted d-none';
+    filtersRow.appendChild(notice);
+
+    bindReviewFilterChangeListeners();
+    updateReviewFilterLayoutState();
+}
+
+function ensureReviewCardElevation() {
+    const reviewCard = document.querySelector('.review-card-body')?.closest('.card');
+
+    reviewCard?.classList.add('z-depth-5');
 }
 
 function formatScenarioValue(value) {
@@ -694,6 +850,10 @@ function ensureReviewTableStructure() {
                 font-size: 0.8rem;
             }
 
+            .review-card-body.review-filters-active .results-table-wrapper {
+                max-height: calc(100vh - 430px - 4rem);
+            }
+
             .review-hours-note {
                 display: block;
                 margin-top: 2px;
@@ -1031,6 +1191,237 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
+function renderReviewRows(rows = [], deviations = []) {
+    ensureReviewTableStructure();
+
+    const deviationsByKodikos = buildDeviationsByKodikos(deviations);
+    const rowsByKodikos = new Map();
+    rows.forEach((row) => {
+        const key = employeeGroupKey(row);
+        if (!rowsByKodikos.has(key)) rowsByKodikos.set(key, []);
+        rowsByKodikos.get(key).push(row);
+    });
+    const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
+
+    const tbody = document.querySelector('#resultsTable tbody');
+    tbody.innerHTML = '';
+
+    let currentGroup = '';
+    let currentGroupId = '';
+    let employeeTotals = createEmptyTotals();
+    let grandTotals = createEmptyTotals();
+    let currentGroupRows = [];
+
+    for (const row of rows) {
+        const groupKey = employeeGroupKey(row);
+
+        if (groupKey !== currentGroup) {
+            if (currentGroup !== '') {
+                appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+                appendEmployeeDeviationRows(
+                    tbody,
+                    deviationsByKodikos.get(currentGroup) || [],
+                    currentGroupId
+                );
+                employeeTotals = createEmptyTotals();
+                currentGroupRows = [];
+            }
+
+            currentGroup = groupKey;
+
+            const groupId = `group-${String(groupKey).replace(/[^a-zA-Z0-9]/g, '-')}`;
+            currentGroupId = groupId;
+
+            const groupTr = document.createElement('tr');
+            groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
+            groupTr.dataset.groupId = groupId;
+            groupTr.style.cursor = 'pointer';
+
+            const groupDeviations = deviationsByKodikos.get(groupKey) || [];
+            const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
+            const groupHasAdeiaSuggestion = hasAdeiaSuggestionInRows(rowsByKodikos.get(groupKey) || []);
+
+            groupTr.innerHTML = `
+                <td colspan="13" class="fw-bold">
+                    ${row.ypokatasthma || ''}
+                    |
+                    ${row.kodikos || ''}
+                    |
+                    ${row.eponymo || ''}
+                    ${row.onoma || ''}
+                    ${groupHasProfileChange ? '<span class="review-warning-badge">⚠ Αλλαγή όρων</span>' : ''}
+                    ${groupHasAdeiaSuggestion ? '<span class="review-adeia-badge">⚠ Έλεγχος άδειας</span>' : ''}
+                </td>
+            `;
+
+            groupTr.addEventListener('click', () => {
+                groupTr.classList.toggle('collapsed');
+
+                const rows = document.querySelectorAll(
+                    `tr.employee-detail-row[data-group-id="${groupId}"],
+                     tr.employee-subtotal-row[data-group-id="${groupId}"],
+                     tr.employee-deviation-row[data-group-id="${groupId}"]`
+                );
+
+                rows.forEach((r) => {
+                    r.classList.toggle('d-none');
+                });
+            });
+
+            tbody.appendChild(groupTr);
+        }
+
+        const tr = document.createElement('tr');
+        tr.classList.add('employee-detail-row');
+        tr.classList.add('d-none');
+        tr.dataset.groupId = currentGroupId;
+
+        if (row.is_locked) {
+            tr.classList.add('row-locked');
+        }
+
+        // Cell-level coloring is applied below in the <td> elements.
+
+        tr.style.cursor = 'pointer';
+
+        const apologistikoText = renderIntervalCell(row, 'apo_ora', 'eos_ora', '_apologistika');
+
+        const effectiveKathgoria =
+            row.kathgoria_ergasias_apologistika &&
+            String(row.kathgoria_ergasias_apologistika).trim() !== ''
+                ? String(row.kathgoria_ergasias_apologistika).trim()
+                : String(row.kathgoria_ergasias || '').trim();
+
+        const effectiveTyposApasxolhshs = String(
+            row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? ''
+        ).trim();
+        const reviewPhaseCode = String(
+            row.review_phase_code ?? row.review_kathestos_code ?? ''
+        ).trim();
+
+        const isFullTimeProfile = reviewPhaseCode
+            ? reviewPhaseCode === '0'
+            : row.effective_is_full_time === true ||
+              row.effective_is_full_time === 'true' ||
+              row.effective_is_full_time === 1 ||
+              row.effective_is_full_time === '1' ||
+              effectiveTyposApasxolhshs === '0';
+
+        const isApologistikoRepoRow =
+            row.apologistiko_biblio === true &&
+            effectiveKathgoria === 'ΑΝ' &&
+            num(row.cards_ores_ergasias) === 0 &&
+            isFullTimeProfile;
+
+        const isApologistikoNonWorkRow =
+            row.apologistiko_biblio === true &&
+            (effectiveKathgoria === 'ΜΕ' || (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
+            num(row.cards_ores_ergasias) === 0;
+
+        const noCardsDisplayStatus = String(
+            row.noCardsDisplayStatus || row.no_cards_display_status || ''
+        ).trim();
+        const hasNoCardsDisplayStatus =
+            noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
+
+        const apologistikoDisplayText = hasNoCardsDisplayStatus
+            ? noCardsDisplayStatus
+            : isApologistikoRepoRow
+            ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+            : isApologistikoNonWorkRow
+              ? 'ΜΗ ΕΡΓΑΣΙΑ'
+              : apologistikoText;
+
+        const apologistikoDisplayClass = hasNoCardsDisplayStatus
+            ? noCardsDisplayStatus === 'ΑΔΕΙΑ'
+                ? 'cell-no-card-adeia'
+                : 'cell-no-card-argia'
+            : isApologistikoRepoRow
+            ? 'cell-repo-day'
+            : isApologistikoNonWorkRow
+              ? 'cell-non-work-day'
+              : isApologistikoIntervalPresent(row)
+                ? 'cell-apologistiko'
+                : hasAdeiaSuggestion(row)
+                  ? 'cell-adeia-suggestion'
+                  : '';
+
+        const isDeclaredRestOrNonWork =
+            row.apologistiko_biblio !== true &&
+            num(row.ores_ergasias) === 0 &&
+            num(row.cards_ores_ergasias) === 0;
+
+        const declaredText = isDeclaredRestOrNonWork
+            ? isFullTimeProfile
+                ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+                : 'ΜΗ ΕΡΓΑΣΙΑ'
+            : renderIntervalCell(row, 'apo_ora', 'eos_ora');
+
+        const declaredClass = isDeclaredRestOrNonWork
+            ? isFullTimeProfile
+                ? 'cell-declared-repo-day'
+                : 'cell-non-work-day'
+            : '';
+
+        const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
+
+        const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
+
+        tr.innerHTML = `
+            <td>${formatDate(row.hmeromhnia)}</td>
+            <td>${row.ypokatasthma || ''}</td>
+            <td>${row.kodikos || ''}</td>
+            <td${tdClass(declaredClass)}>${declaredText}</td>
+            <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
+            <td${tdClass(apologistikoDisplayClass)}>
+                ${apologistikoDisplayText}
+                ${renderScenarioBadge(row)}
+            </td>
+            <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
+                ${renderHoursCell(row)}
+            </td>
+            <td${tdClass(hasPositiveNumber(row.ores_apoysias_apologistika) ? 'cell-apoysia' : '')}>
+                ${hours(row.ores_apoysias_apologistika)}
+            </td>
+            <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
+                ${hours(row.ores_nyxtas_apologistika)}
+            </td>
+            <td${tdClass(hasPositiveNumber(argiaHoursValue) ? 'cell-argia' : '')}>
+                ${argiaHoursValue}
+            </td>
+            <td${tdClass(hasPositiveNumber(row.ores_prostheths_ergasias_apologistika) ? 'cell-prostheti' : '')}>
+                ${hours(row.ores_prostheths_ergasias_apologistika)}
+            </td>
+            <td${tdClass(sumYperergasia(row) > 0 ? 'cell-yperergasia' : '')}>
+                ${hours(sumYperergasia(row))}
+            </td>
+            <td${tdClass(yperoriaCellClass(row))}>
+                ${hours(yperoriaTotal)}
+            </td>
+        `;
+
+        tr.addEventListener('click', () => {
+            showDetailsModal(row);
+        });
+
+        addRowToTotals(employeeTotals, row);
+        addRowToTotals(grandTotals, row);
+        currentGroupRows.push(row);
+
+        tbody.appendChild(tr);
+    }
+
+    if (currentGroup !== '') {
+        appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
+        appendEmployeeDeviationRows(
+            tbody,
+            deviationsByKodikos.get(currentGroup) || [],
+            currentGroupId
+        );
+        appendGrandTotalsRow(tbody, grandTotals);
+    }
+}
+
 async function loadResults() {
     try {
         const params = new URLSearchParams({
@@ -1065,6 +1456,7 @@ async function loadResults() {
         }
 
         ensureReviewTableStructure();
+        ensureScenarioReviewFilterControl();
 
         const rows = payload.rows || [];
         try {
@@ -1075,235 +1467,9 @@ async function loadResults() {
             console.warn('[loadResults] Scenario classifications unavailable:', scenarioError);
         }
 
-        const deviationsByKodikos = buildDeviationsByKodikos(payload.deviations || []);
-        const rowsByKodikos = new Map();
-        rows.forEach((row) => {
-            const key = employeeGroupKey(row);
-            if (!rowsByKodikos.has(key)) rowsByKodikos.set(key, []);
-            rowsByKodikos.get(key).push(row);
-        });
-        const holidayLikeDateSet = buildHolidayLikeDateSet(rows);
-
-        const tbody = document.querySelector('#resultsTable tbody');
-        tbody.innerHTML = '';
-
-        let currentGroup = '';
-        let currentGroupId = '';
-        let employeeTotals = createEmptyTotals();
-        let grandTotals = createEmptyTotals();
-        let currentGroupRows = [];
-
-        for (const row of rows) {
-            const groupKey = employeeGroupKey(row);
-
-            if (groupKey !== currentGroup) {
-                if (currentGroup !== '') {
-                    appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
-                    appendEmployeeDeviationRows(
-                        tbody,
-                        deviationsByKodikos.get(currentGroup) || [],
-                        currentGroupId
-                    );
-                    employeeTotals = createEmptyTotals();
-                    currentGroupRows = [];
-                }
-
-                currentGroup = groupKey;
-
-                const groupId = `group-${String(groupKey).replace(/[^a-zA-Z0-9]/g, '-')}`;
-                currentGroupId = groupId;
-
-                const groupTr = document.createElement('tr');
-                groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
-                groupTr.dataset.groupId = groupId;
-                groupTr.style.cursor = 'pointer';
-
-                const groupDeviations = deviationsByKodikos.get(groupKey) || [];
-                const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
-                const groupHasAdeiaSuggestion = hasAdeiaSuggestionInRows(
-                    rowsByKodikos.get(groupKey) || []
-                );
-
-                groupTr.innerHTML = `
-                    <td colspan="13" class="fw-bold">
-                        ${row.ypokatasthma || ''}
-                        |
-                        ${row.kodikos || ''}
-                        |
-                        ${row.eponymo || ''}
-                        ${row.onoma || ''}
-                        ${groupHasProfileChange ? '<span class="review-warning-badge">⚠ Αλλαγή όρων</span>' : ''}
-                        ${groupHasAdeiaSuggestion ? '<span class="review-adeia-badge">⚠ Έλεγχος άδειας</span>' : ''}
-                    </td>
-                `;
-
-                groupTr.addEventListener('click', () => {
-                    groupTr.classList.toggle('collapsed');
-
-                    const rows = document.querySelectorAll(
-                        `tr.employee-detail-row[data-group-id="${groupId}"],
-                         tr.employee-subtotal-row[data-group-id="${groupId}"],
-                         tr.employee-deviation-row[data-group-id="${groupId}"]`
-                    );
-
-                    rows.forEach((r) => {
-                        r.classList.toggle('d-none');
-                    });
-                });
-
-                tbody.appendChild(groupTr);
-            }
-
-            const tr = document.createElement('tr');
-            tr.classList.add('employee-detail-row');
-            tr.classList.add('d-none');
-            tr.dataset.groupId = currentGroupId;
-
-            if (row.is_locked) {
-                tr.classList.add('row-locked');
-            }
-
-            // Cell-level coloring is applied below in the <td> elements.
-
-            tr.style.cursor = 'pointer';
-
-            const apologistikoText = renderIntervalCell(row, 'apo_ora', 'eos_ora', '_apologistika');
-
-            const effectiveKathgoria =
-                row.kathgoria_ergasias_apologistika &&
-                String(row.kathgoria_ergasias_apologistika).trim() !== ''
-                    ? String(row.kathgoria_ergasias_apologistika).trim()
-                    : String(row.kathgoria_ergasias || '').trim();
-
-            const effectiveTyposApasxolhshs = String(
-                row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? ''
-            ).trim();
-            const reviewPhaseCode = String(
-                row.review_phase_code ?? row.review_kathestos_code ?? ''
-            ).trim();
-
-            const isFullTimeProfile = reviewPhaseCode
-                ? reviewPhaseCode === '0'
-                : row.effective_is_full_time === true ||
-                  row.effective_is_full_time === 'true' ||
-                  row.effective_is_full_time === 1 ||
-                  row.effective_is_full_time === '1' ||
-                  effectiveTyposApasxolhshs === '0';
-
-            const isApologistikoRepoRow =
-                row.apologistiko_biblio === true &&
-                effectiveKathgoria === 'ΑΝ' &&
-                num(row.cards_ores_ergasias) === 0 &&
-                isFullTimeProfile;
-
-            const isApologistikoNonWorkRow =
-                row.apologistiko_biblio === true &&
-                (effectiveKathgoria === 'ΜΕ' ||
-                    (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
-                num(row.cards_ores_ergasias) === 0;
-
-            const noCardsDisplayStatus = String(
-                row.noCardsDisplayStatus || row.no_cards_display_status || ''
-            ).trim();
-            const hasNoCardsDisplayStatus =
-                noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
-
-            const apologistikoDisplayText = hasNoCardsDisplayStatus
-                ? noCardsDisplayStatus
-                : isApologistikoRepoRow
-                ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
-                : isApologistikoNonWorkRow
-                  ? 'ΜΗ ΕΡΓΑΣΙΑ'
-                  : apologistikoText;
-
-            const apologistikoDisplayClass = hasNoCardsDisplayStatus
-                ? noCardsDisplayStatus === 'ΑΔΕΙΑ'
-                    ? 'cell-no-card-adeia'
-                    : 'cell-no-card-argia'
-                : isApologistikoRepoRow
-                ? 'cell-repo-day'
-                : isApologistikoNonWorkRow
-                  ? 'cell-non-work-day'
-                  : isApologistikoIntervalPresent(row)
-                    ? 'cell-apologistiko'
-                    : hasAdeiaSuggestion(row)
-                      ? 'cell-adeia-suggestion'
-                      : '';
-
-            const isDeclaredRestOrNonWork =
-                row.apologistiko_biblio !== true &&
-                num(row.ores_ergasias) === 0 &&
-                num(row.cards_ores_ergasias) === 0;
-
-            const declaredText = isDeclaredRestOrNonWork
-                ? isFullTimeProfile
-                    ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
-                    : 'ΜΗ ΕΡΓΑΣΙΑ'
-                : renderIntervalCell(row, 'apo_ora', 'eos_ora');
-
-            const declaredClass = isDeclaredRestOrNonWork
-                ? isFullTimeProfile
-                    ? 'cell-declared-repo-day'
-                    : 'cell-non-work-day'
-                : '';
-
-            const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
-
-            const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
-
-            tr.innerHTML = `
-                <td>${formatDate(row.hmeromhnia)}</td>
-                <td>${row.ypokatasthma || ''}</td>
-                <td>${row.kodikos || ''}</td>
-                <td${tdClass(declaredClass)}>${declaredText}</td>
-                <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
-                <td${tdClass(apologistikoDisplayClass)}>
-                    ${apologistikoDisplayText}
-                    ${renderScenarioBadge(row)}
-                </td>
-                <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
-                    ${renderHoursCell(row)}
-                </td>
-                <td${tdClass(hasPositiveNumber(row.ores_apoysias_apologistika) ? 'cell-apoysia' : '')}>
-                    ${hours(row.ores_apoysias_apologistika)}
-                </td>
-                <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
-                    ${hours(row.ores_nyxtas_apologistika)}
-                </td>
-                <td${tdClass(hasPositiveNumber(argiaHoursValue) ? 'cell-argia' : '')}>
-                    ${argiaHoursValue}
-                </td>
-                <td${tdClass(hasPositiveNumber(row.ores_prostheths_ergasias_apologistika) ? 'cell-prostheti' : '')}>
-                    ${hours(row.ores_prostheths_ergasias_apologistika)}
-                </td>
-                <td${tdClass(sumYperergasia(row) > 0 ? 'cell-yperergasia' : '')}>
-                    ${hours(sumYperergasia(row))}
-                </td>
-                <td${tdClass(yperoriaCellClass(row))}>
-                    ${hours(yperoriaTotal)}
-                </td>
-            `;
-
-            tr.addEventListener('click', () => {
-                showDetailsModal(row);
-            });
-
-            addRowToTotals(employeeTotals, row);
-            addRowToTotals(grandTotals, row);
-            currentGroupRows.push(row);
-
-            tbody.appendChild(tr);
-        }
-
-        if (currentGroup !== '') {
-            appendEmployeeTotalsRow(tbody, employeeTotals, currentGroupId);
-            appendEmployeeDeviationRows(
-                tbody,
-                deviationsByKodikos.get(currentGroup) || [],
-                currentGroupId
-            );
-            appendGrandTotalsRow(tbody, grandTotals);
-        }
+        currentReviewRows = rows;
+        currentReviewDeviations = payload.deviations || [];
+        renderCurrentReviewRows();
     } catch (error) {
         console.error(error);
 
@@ -2242,6 +2408,8 @@ document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', (even
 });
 
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
+document.addEventListener('DOMContentLoaded', ensureScenarioReviewFilterControl);
+document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);
