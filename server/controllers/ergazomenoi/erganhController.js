@@ -121,6 +121,9 @@ const {
     buildApasxoliseisPolicyPreviewRows,
     summarizeApasxoliseisPolicyPreviewResults
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewService');
+const {
+    buildApasxoliseisPolicyPreviewGrouping
+} = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -5154,6 +5157,7 @@ class erganhController {
                 defaultPolicyMode: String(mode || '').trim()
             });
             const summary = summarizeApasxoliseisPolicyPreviewResults(previewRows);
+            const grouping = buildApasxoliseisPolicyPreviewGrouping(previewRows);
 
             return res.json({
                 success: true,
@@ -5163,6 +5167,7 @@ class erganhController {
                 totalPages: Math.ceil(total / limitNum),
                 count: previewRows.length,
                 summary,
+                grouping,
                 rows: previewRows
             });
         } catch (error) {
