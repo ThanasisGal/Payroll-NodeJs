@@ -47,6 +47,7 @@ function testEmptyList() {
     const grouping = buildApasxoliseisPolicyPreviewGrouping([]);
 
     assert.strictEqual(grouping.version, 1);
+    assert.strictEqual(grouping.scope, 'page');
     assert.strictEqual(grouping.summary.total, 0);
     assert.strictEqual(grouping.summary.groups_count, 0);
     assert.deepStrictEqual(grouping.groups, []);

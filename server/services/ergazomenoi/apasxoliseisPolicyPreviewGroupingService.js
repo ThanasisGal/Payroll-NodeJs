@@ -245,6 +245,7 @@ function buildApasxoliseisPolicyPreviewGrouping(rows = []) {
 
     return {
         version: 1,
+        scope: 'page',
         summary,
         groups
     };
