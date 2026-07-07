@@ -4,7 +4,8 @@ const {
     authenticateErgani,
     logoutErgani,
     getSubmissions,
-    submitDocument
+    submitDocument,
+    getSubmissionDocument
 } = require('./erganiRestClient');
 
 const {
@@ -133,16 +134,110 @@ function normalizeErrorResult(error, submission = null) {
     };
 }
 
-async function fetchSubmittedPdfIfRequested({ shouldFetch, submissionCode, restResult, creds }) {
+function getPdfFetchTimeoutMs() {
+    const timeoutMs = Number(process.env.ERGANI_REST_PDF_FETCH_TIMEOUT_MS || 8000);
+    return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 8000;
+}
+
+function nowMs() {
+    return Date.now();
+}
+
+function logTiming(label, startedAt, extra = '') {
+    const suffix = extra ? ` ${extra}` : '';
+    console.log(`[ERGANI REST TIMING] ${label}: ${Date.now() - startedAt} ms${suffix}`);
+}
+
+function isPlaywrightPdfFallbackEnabled() {
+    return String(process.env.ERGANI_REST_PDF_PLAYWRIGHT_FALLBACK || '').toLowerCase() === 'true';
+}
+
+function makeDeferredPdfResult(error, source) {
+    return {
+        buffer: null,
+        contentType: null,
+        sizeBytes: 0,
+        error: error?.message || String(error),
+        pdfDeferred: true,
+        source
+    };
+}
+
+function isTimeoutError(err) {
+    return err?.code === 'ERGANI_TIMEOUT' || /timeout/i.test(String(err?.message || err));
+}
+
+async function fetchSubmittedPdfIfRequested({
+    shouldFetch,
+    submissionCode,
+    restResult,
+    creds,
+    accessToken
+}) {
     if (!shouldFetch || !restResult?.success) return null;
 
+    const timeoutMs = getPdfFetchTimeoutMs();
+    const directStartedAt = nowMs();
+
     try {
+        const documentResult = await getSubmissionDocument(accessToken, {
+            submissionCode,
+            protocol: restResult.protocol,
+            issuedDate: restResult.submitDate,
+            timeoutMs
+        });
+
+        if (documentResult?.success && documentResult?.buffer) {
+            if (!isPdfBuffer(documentResult.buffer)) {
+                logTiming('fetchSubmittedPdf.direct', directStartedAt, '/ invalid-pdf');
+                return makeDeferredPdfResult(
+                    new Error('Το Submission Document δεν είναι έγκυρο PDF binary.'),
+                    'direct-invalid-pdf'
+                );
+            }
+
+            logTiming('fetchSubmittedPdf.direct', directStartedAt);
+
+            return {
+                buffer: documentResult.buffer,
+                contentType: 'application/pdf',
+                sizeBytes: documentResult.buffer.length,
+                error: null,
+                rawContentType: documentResult.rawContentType || null,
+                url: documentResult?.source?.url || null,
+                source: documentResult?.source?.mode || 'direct-getsubmitteddocument',
+                pdfDeferred: false
+            };
+        }
+
+        logTiming('fetchSubmittedPdf.direct', directStartedAt, '/ failed');
+
+        if (!isPlaywrightPdfFallbackEnabled()) {
+            return makeDeferredPdfResult(
+                new Error(documentResult?.error || 'Δεν επιστράφηκε PDF από το ΕΡΓΑΝΗ.'),
+                'direct-failed'
+            );
+        }
+    } catch (err) {
+        const timedOut = isTimeoutError(err);
+        logTiming('fetchSubmittedPdf.direct', directStartedAt, timedOut ? '/ timeout' : '/ failed');
+
+        if (!isPlaywrightPdfFallbackEnabled()) {
+            return makeDeferredPdfResult(err, timedOut ? 'direct-timeout' : 'direct-failed');
+        }
+    }
+
+    const playwrightStartedAt = nowMs();
+
+    try {
+        console.log('[ERGANI REST] Submitted PDF Playwright fallback enabled by env flag.');
         const documentResult = await downloadSubmittedErganiPdfWithPlaywright({
             creds,
             submissionCode,
             protocol: restResult.protocol,
             submittedDate: restResult.submitDate,
-            headless: process.env.ERGANI_PDF_HEADLESS !== 'false'
+            headless: process.env.ERGANI_PDF_HEADLESS !== 'false',
+            timeoutMs
         });
 
         if (!documentResult?.success || !documentResult?.buffer) {
@@ -152,7 +247,9 @@ async function fetchSubmittedPdfIfRequested({ shouldFetch, submissionCode, restR
                 sizeBytes: 0,
                 error: documentResult?.error || 'Δεν επιστράφηκε PDF από το ΕΡΓΑΝΗ.',
                 rawContentType: documentResult?.rawContentType || null,
-                url: documentResult?.url || null
+                url: documentResult?.url || null,
+                pdfDeferred: true,
+                source: 'playwright-failed'
             };
         }
 
@@ -163,11 +260,14 @@ async function fetchSubmittedPdfIfRequested({ shouldFetch, submissionCode, restR
                 sizeBytes: 0,
                 error: 'Το Submission Document δεν είναι έγκυρο PDF binary.',
                 rawContentType: documentResult.rawContentType || null,
-                url: documentResult?.url || null
+                url: documentResult?.url || null,
+                pdfDeferred: true,
+                source: 'playwright-invalid-pdf'
             };
         }
 
-        console.log('[ERGANH REST] Submitted PDF fetched with Playwright', {
+        logTiming('fetchSubmittedPdf.playwright', playwrightStartedAt);
+        console.log('[ERGANI REST] Submitted PDF fetched with Playwright', {
             bytes: documentResult.buffer.length,
             contentType: 'application/pdf',
             rawContentType: documentResult.rawContentType || null,
@@ -181,15 +281,17 @@ async function fetchSubmittedPdfIfRequested({ shouldFetch, submissionCode, restR
             error: null,
             rawContentType: documentResult.rawContentType || null,
             url: documentResult.url || null,
-            source: 'playwright-ui-getsubmitteddocument'
+            source: 'playwright-ui-getsubmitteddocument',
+            pdfDeferred: false
         };
     } catch (err) {
-        return {
-            buffer: null,
-            contentType: null,
-            sizeBytes: 0,
-            error: err.message || String(err)
-        };
+        const timedOut = isTimeoutError(err);
+        logTiming(
+            'fetchSubmittedPdf.playwright',
+            playwrightStartedAt,
+            timedOut ? '/ timeout' : '/ failed'
+        );
+        return makeDeferredPdfResult(err, timedOut ? 'playwright-timeout' : 'playwright-failed');
     }
 }
 
@@ -203,6 +305,7 @@ async function uploadJsonDocumentToErgani({
 
     let accessToken = null;
     let refreshToken = null;
+    const totalStartedAt = nowMs();
 
     try {
         if (!submissionCode) throw new Error('Λείπει submissionCode για REST submit.');
@@ -213,13 +316,17 @@ async function uploadJsonDocumentToErgani({
             throw new Error('Λείπουν credentials ΕΡΓΑΝΗ για REST submit.');
         }
 
+        const authStartedAt = nowMs();
         const auth = await authenticateErgani(creds);
+        logTiming('authenticate', authStartedAt);
         accessToken = auth?.accessToken || auth?.AccessToken || auth?.token || auth?.Token;
         refreshToken = auth?.refreshToken || auth?.RefreshToken || null;
 
         if (!accessToken) throw new Error('Το ΕΡΓΑΝΗ δεν επέστρεψε accessToken.');
 
+        const resolveStartedAt = nowMs();
         const submission = await resolveSubmissionByCode(accessToken, submissionCode);
+        logTiming('resolveSubmission', resolveStartedAt);
 
         console.log('========================================');
         console.log('READY TO SUBMIT JSON DOCUMENT TO ERGANI');
@@ -230,28 +337,34 @@ async function uploadJsonDocumentToErgani({
         console.log('Submission Description:', submission.description);
         console.log('Payload root:', Object.keys(payload || {}));
 
+        const submitStartedAt = nowMs();
         const rawSubmitResult = await submitDocument(accessToken, submission.code, payload);
+        logTiming('submitDocument', submitStartedAt);
         const restResult = normalizeSubmitResponse(rawSubmitResult, submission);
 
         restResult.submittedPdf = await fetchSubmittedPdfIfRequested({
             shouldFetch: fetchSubmittedPdf,
             submissionCode: submission.code,
             restResult,
-            creds
+            creds,
+            accessToken
         });
 
-        console.log('========================================');
-        console.log('SUBMITTED PDF DEBUG');
-        console.log('========================================');
-        console.dir(restResult.submittedPdf, {
-            depth: null,
-            colors: true
-        });
+        if (restResult.submittedPdf) {
+            console.log('[ERGANI REST] Submitted PDF result', {
+                fetched: !!restResult.submittedPdf.buffer,
+                bytes: restResult.submittedPdf.sizeBytes || 0,
+                pdfDeferred: restResult.submittedPdf.pdfDeferred === true,
+                source: restResult.submittedPdf.source || null,
+                error: restResult.submittedPdf.error || null
+            });
+        }
 
         return restResult;
     } catch (err) {
         return normalizeErrorResult(err);
     } finally {
+        logTiming('total', totalStartedAt);
         if (accessToken && refreshToken) {
             try {
                 await logoutErgani(accessToken, refreshToken);

@@ -1316,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload</li>
                             <li>Έλεγχο WebE3N στο trial/production περιβάλλον</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -1390,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload WTOWeek</li>
                             <li>Έλεγχο ημερομηνιών και υποκαταστήματος</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -1464,8 +1464,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 : ''
                         }
                         ${
-                            result?.pdfSaved === false && result?.pdfSaveError
-                                ? `<p class="text-warning">⚠️ Η υποβολή έγινε, αλλά το PDF δεν αποθηκεύτηκε: ${escapeHtmlForSwal(result.pdfSaveError)}</p>`
+                            result?.pdfDeferred === true
+                                ? `<p class="text-warning">Η υποβολή ολοκληρώθηκε επιτυχώς. Το PDF δεν ήταν άμεσα διαθέσιμο από το ΕΡΓΑΝΗ και μπορεί να ανακτηθεί αργότερα από το ιστορικό ΕΡΓΑΝΗ.</p>`
+                                : ''
+                        }
+                        ${
+                            result?.pdfDeferred !== true &&
+                            result?.pdfSaved === false &&
+                            result?.pdfSaveError
+                                ? `<p class="text-warning">Η υποβολή έγινε, αλλά το PDF δεν αποθηκεύτηκε: ${escapeHtmlForSwal(result.pdfSaveError)}</p>`
                                 : ''
                         }
                     </div>

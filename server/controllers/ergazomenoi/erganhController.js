@@ -20,6 +20,9 @@ const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generato
 const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e7N_v1Generator');
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
 const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
+const {
+    downloadSubmittedErganiPdfWithPlaywright
+} = require('../../utils/erganh/erganiSubmittedPdfDownloader');
 const { generateE3XML, generateE3NJSON } = require('../../utils/xmlGenerators/e3N_v1Generator');
 const {
     compareE3NPreSubmit
@@ -101,6 +104,7 @@ async function tryGenerateE5NPdfForRest(
 const {
     authenticateErgani,
     logoutErgani,
+    getSubmissionDocument,
     cancelSubmittedDocument
 } = require('../../utils/erganh/erganiRestClient');
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
@@ -3894,10 +3898,18 @@ function sanitizeErganiResultForResponse(restResult) {
                   fetched: !!restResult.submittedPdf.buffer,
                   contentType: restResult.submittedPdf.contentType || null,
                   sizeBytes: restResult.submittedPdf.buffer?.length || 0,
-                  error: restResult.submittedPdf.error || null
+                  error: restResult.submittedPdf.error || null,
+                  pdfDeferred: restResult.submittedPdf.pdfDeferred === true,
+                  source: restResult.submittedPdf.source || null
               }
             : null
     };
+}
+
+function getErganiPdfDeferredWarning(pdfDeferred) {
+    return pdfDeferred
+        ? 'Η υποβολή ολοκληρώθηκε επιτυχώς. Το PDF δεν ήταν άμεσα διαθέσιμο από το ΕΡΓΑΝΗ και μπορεί να ανακτηθεί αργότερα από το ιστορικό ΕΡΓΑΝΗ.'
+        : null;
 }
 
 function getErganiS3BucketFromUrl(url) {
@@ -3942,6 +3954,17 @@ function getErganiS3Bucket(rec = {}) {
 
 function getErganiPdfRoute(id) {
     return id ? `/ergazomenoi/ergazomenoi/ergani/pdf/${id}` : '';
+}
+
+function formatDateDdMmYyyy(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+
+    return `${dd}/${mm}/${yyyy}`;
 }
 
 class erganhController {
@@ -7852,6 +7875,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -7876,6 +7900,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });
@@ -8249,6 +8275,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -8273,6 +8300,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });
@@ -8728,6 +8757,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -8755,6 +8785,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });
@@ -9058,6 +9090,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -9082,6 +9115,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });
@@ -9366,6 +9401,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -9390,6 +9426,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });
@@ -9676,6 +9714,312 @@ class erganhController {
         }
     };
 
+    static retrySubmittedErganiPdf = async (req, res) => {
+        let accessToken = null;
+        let refreshToken = null;
+        let retryContext = {
+            logId: req.params?.id || null,
+            submissionCode: '',
+            protocol: '',
+            submitDate: '',
+            env: process.env.ERGANI_ENV || 'trial'
+        };
+
+        try {
+            const sessionTeam = req.session?.userTeam;
+            const companyId = req.session?.companyInUse;
+            const { id } = req.params || {};
+
+            if (!sessionTeam || !companyId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν υπάρχει ενεργή ομάδα ή επιλεγμένη εταιρεία στο session.'
+                });
+            }
+
+            if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Λείπει ή δεν είναι έγκυρο το ID υποβολής ΕΡΓΑΝΗ.'
+                });
+            }
+
+            const erganhLog = await ErgazomenoiErganhModel.findOne({
+                _id: id,
+                team: sessionTeam,
+                $or: [{ companykod_object: companyId }, { companykod: String(companyId) }]
+            });
+
+            if (!erganhLog) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Δεν βρέθηκε η υποβολή ΕΡΓΑΝΗ για την επιλεγμένη εταιρεία.'
+                });
+            }
+
+            retryContext = {
+                ...retryContext,
+                logId: String(erganhLog._id),
+                submissionCode: erganhLog.submission_code || '',
+                protocol: erganhLog.protocol || '',
+                submitDate:
+                    erganhLog.submit_date_text ||
+                    (erganhLog.submit_date ? formatDateDdMmYyyy(erganhLog.submit_date) : '')
+            };
+
+            const existingPdfUrl = erganhLog.pdf_s3_key
+                ? getErganiPdfRoute(erganhLog._id)
+                : erganhLog.pdf_relative_path
+                  ? `/uploads/s3-mock/${erganhLog.pdf_relative_path}`
+                  : erganhLog.pdf_s3_url || '';
+
+            console.log('[ERGANI PDF RETRY] start', retryContext);
+            console.log('[ERGANI PDF RETRY] existing-pdf', {
+                hasKey: !!erganhLog.pdf_s3_key,
+                hasRelativePath: !!erganhLog.pdf_relative_path,
+                hasS3Url: !!erganhLog.pdf_s3_url
+            });
+
+            if (existingPdfUrl) {
+                return res.json({
+                    success: true,
+                    pdfSaved: true,
+                    pdfUrl: existingPdfUrl,
+                    protocol: erganhLog.protocol || null,
+                    submitDate: erganhLog.submit_date_text || erganhLog.submit_date || null
+                });
+            }
+
+            const submissionCode = erganhLog.submission_code || '';
+            const protocol = erganhLog.protocol || '';
+            const submitDate =
+                erganhLog.submit_date_text ||
+                (erganhLog.submit_date ? formatDateDdMmYyyy(erganhLog.submit_date) : '');
+
+            if (!submissionCode || !protocol || !submitDate) {
+                console.warn('[ERGANI PDF RETRY] unavailable', {
+                    ...retryContext,
+                    reason: 'missing-submissionCode-protocol-submitDate'
+                });
+                return res.json({
+                    success: false,
+                    pdfDeferred: true,
+                    message:
+                        'Η υποβολή έχει ολοκληρωθεί, αλλά δεν υπάρχουν πλήρη στοιχεία για ανάκτηση PDF.'
+                });
+            }
+
+            const erganhPasswordDoc = await PasswordsModel.findOne({
+                team: sessionTeam,
+                companykod_object: companyId,
+                kodikos: '0002'
+            }).lean();
+
+            if (!erganhPasswordDoc?.username || !erganhPasswordDoc?.password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Δεν βρέθηκαν credentials ΕΡΓΑΝΗ με kodikos=0002 για την εταιρεία.'
+                });
+            }
+
+            const auth = await authenticateErgani({
+                username: erganhPasswordDoc.username,
+                password: erganhPasswordDoc.password,
+                userType: process.env.ERGANI_USERTYPE || '01'
+            });
+
+            accessToken = auth?.accessToken || auth?.AccessToken || auth?.token || auth?.Token;
+            refreshToken = auth?.refreshToken || auth?.RefreshToken || null;
+
+            if (!accessToken) {
+                throw new Error('Το ΕΡΓΑΝΗ δεν επέστρεψε accessToken για ανάκτηση PDF.');
+            }
+
+            const timeoutMs = Number(process.env.ERGANI_REST_PDF_RETRY_TIMEOUT_MS || 15000);
+            const retryTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 15000;
+
+            let documentResult = null;
+
+            console.log('[ERGANI PDF RETRY] direct-fetch start', retryContext);
+
+            try {
+                documentResult = await getSubmissionDocument(accessToken, {
+                    submissionCode,
+                    protocol,
+                    issuedDate: submitDate,
+                    timeoutMs: retryTimeoutMs
+                });
+            } catch (err) {
+                documentResult = {
+                    success: false,
+                    buffer: null,
+                    contentType: null,
+                    sizeBytes: 0,
+                    error: err.message || String(err),
+                    source: 'direct-exception'
+                };
+            }
+
+            console.log('[ERGANI PDF RETRY] direct-fetch result', {
+                success: documentResult?.success === true,
+                contentType: documentResult?.contentType || documentResult?.rawContentType || null,
+                sizeBytes: documentResult?.sizeBytes || documentResult?.buffer?.length || 0,
+                source:
+                    documentResult?.source?.mode ||
+                    documentResult?.source ||
+                    documentResult?.source?.path ||
+                    null,
+                error: documentResult?.error || null
+            });
+
+            if (!documentResult?.success || !Buffer.isBuffer(documentResult.buffer)) {
+                console.log('[ERGANI PDF RETRY] playwright-fetch start', retryContext);
+
+                try {
+                    documentResult = await downloadSubmittedErganiPdfWithPlaywright({
+                        creds: {
+                            username: erganhPasswordDoc.username,
+                            password: erganhPasswordDoc.password,
+                            userType: process.env.ERGANI_USERTYPE || '01'
+                        },
+                        submissionCode,
+                        protocol,
+                        submittedDate: submitDate,
+                        headless: process.env.ERGANI_PDF_HEADLESS !== 'false',
+                        timeoutMs: retryTimeoutMs
+                    });
+                } catch (err) {
+                    documentResult = {
+                        success: false,
+                        buffer: null,
+                        contentType: null,
+                        sizeBytes: 0,
+                        error: err.message || String(err),
+                        source: 'playwright-exception',
+                        debugHtmlPath: err.debugHtmlPath || null,
+                        debugScreenshotPath: err.debugScreenshotPath || null
+                    };
+                }
+
+                console.log('[ERGANI PDF RETRY] playwright-fetch result', {
+                    success: documentResult?.success === true,
+                    contentType: documentResult?.contentType || documentResult?.rawContentType || null,
+                    sizeBytes: documentResult?.sizeBytes || documentResult?.buffer?.length || 0,
+                    source: documentResult?.source || null,
+                    error: documentResult?.error || null,
+                    debugHtmlPath: documentResult?.debugHtmlPath || null,
+                    debugScreenshotPath: documentResult?.debugScreenshotPath || null
+                });
+            }
+
+            if (!documentResult?.success || !Buffer.isBuffer(documentResult.buffer)) {
+                console.warn('[ERGANI PDF RETRY] unavailable', {
+                    ...retryContext,
+                    reason: documentResult?.error || 'no-pdf-buffer'
+                });
+                return res.json({
+                    success: false,
+                    pdfDeferred: true,
+                    message:
+                        'Το PDF υπάρχει στο ΕΡΓΑΝΗ, αλλά δεν ανακτήθηκε από την εφαρμογή. Ελέγξτε τα logs [ERGANI PDF RETRY].',
+                    error: documentResult?.error || null
+                });
+            }
+
+            const companyById = mongoose.Types.ObjectId.isValid(String(companyId))
+                ? await CompaniesModel.findById(companyId).lean()
+                : null;
+            const companyData =
+                companyById ||
+                (await CompaniesModel.findOne({
+                    team: sessionTeam,
+                    $or: [
+                        { kod: erganhLog.companykod || String(companyId) },
+                        { kodikos: erganhLog.companykod || String(companyId) }
+                    ]
+                }).lean()) ||
+                {};
+
+            const pdfStorage = await saveSubmittedErganiPdfToS3({
+                pdfBuffer: documentResult.buffer,
+                contentType: documentResult.contentType || 'application/pdf',
+                ergazomenos: {
+                    _id: erganhLog.ergazomenos_object || erganhLog.ergazomenos_kodikos || erganhLog._id,
+                    kodikos: erganhLog.ergazomenos_kodikos || '',
+                    eponymo: erganhLog.ergazomenos_eponymo || '',
+                    onoma: erganhLog.ergazomenos_onoma || '',
+                    team: erganhLog.team || sessionTeam
+                },
+                companyData,
+                restResult: {
+                    protocol,
+                    submitDate
+                },
+                submissionFolder: submissionCode
+            });
+
+            if (!pdfStorage.pdfSaved) {
+                console.warn('[ERGANI PDF RETRY] unavailable', {
+                    ...retryContext,
+                    reason: pdfStorage.pdfSaveError || 'pdf-save-failed'
+                });
+                return res.json({
+                    success: false,
+                    pdfDeferred: true,
+                    message: 'Το PDF ανακτήθηκε, αλλά δεν αποθηκεύτηκε.',
+                    error: pdfStorage.pdfSaveError || null
+                });
+            }
+
+            console.log('[ERGANI PDF RETRY] saved', {
+                pdfSaved: pdfStorage.pdfSaved,
+                pdfS3Key: pdfStorage.pdfS3Key || null,
+                pdfRelativePath: pdfStorage.pdfRelativePath || null,
+                pdfSizeBytes: pdfStorage.pdfSizeBytes || 0
+            });
+
+            erganhLog.pdf_s3_key = pdfStorage.pdfS3Key;
+            erganhLog.pdf_s3_url = pdfStorage.pdfS3Url;
+            erganhLog.pdf_relative_path = pdfStorage.pdfRelativePath;
+            erganhLog.pdf_filename = pdfStorage.pdfFilename;
+            erganhLog.pdf_content_type = pdfStorage.pdfContentType;
+            erganhLog.pdf_size_bytes = pdfStorage.pdfSizeBytes;
+            erganhLog.error_message = null;
+            await erganhLog.save();
+
+            return res.json({
+                success: true,
+                pdfSaved: true,
+                pdfUrl: getErganiPdfRoute(erganhLog._id),
+                protocol,
+                submitDate,
+                erganhLogId: erganhLog._id
+            });
+        } catch (error) {
+            const timedOut = error?.code === 'ERGANI_TIMEOUT' || /timeout/i.test(String(error?.message || error));
+            console.warn('[ERGANI PDF RETRY] unavailable', {
+                ...retryContext,
+                reason: error?.message || String(error)
+            });
+            return res.json({
+                success: false,
+                pdfDeferred: true,
+                message: timedOut
+                    ? 'Το PDF δεν είναι ακόμη διαθέσιμο από το ΕΡΓΑΝΗ.'
+                    : error?.message || 'Αποτυχία ανάκτησης PDF από το ΕΡΓΑΝΗ.',
+                error: error?.message || String(error)
+            });
+        } finally {
+            if (accessToken && refreshToken) {
+                try {
+                    await logoutErgani(accessToken, refreshToken);
+                } catch (err) {
+                    console.warn('[retrySubmittedErganiPdf] Logout failed:', err.message || String(err));
+                }
+            }
+        }
+    };
+
     // ============================================================================
     // ✅ DASHBOARD: Στατιστικά υποβολών ΕΡΓΑΝΗ εταιρείας
     // ============================================================================
@@ -9805,6 +10149,8 @@ class erganhController {
 
             const latest = rows.slice(0, 20).map((r) => ({
                 _id: r._id,
+                id: r._id,
+                erganhLogId: r._id,
                 createdAt: r.createdAt,
                 submitDate: r.submit_date_text || '',
                 protocol: r.protocol || '',
@@ -9813,6 +10159,7 @@ class erganhController {
                     r.ergazomenos_kodikos ||
                     '',
                 employeeAfm: r.ergazomenos_afm || '',
+                submissionCode: r.submission_code || '',
                 processCode: r.process_code || '',
                 processDescription: r.process_description || '',
                 uploadMethod: r.upload_method || '',
@@ -9822,7 +10169,12 @@ class erganhController {
                     ? getErganiPdfRoute(r._id)
                     : r.pdf_relative_path
                       ? `/uploads/s3-mock/${r.pdf_relative_path}`
-                      : ''
+                      : r.pdf_s3_url || '',
+                pdfSaved: !!(r.pdf_s3_key || r.pdf_relative_path || r.pdf_s3_url),
+                pdfDeferred:
+                    r.upload_method === 'REST' &&
+                    !!r.protocol &&
+                    !(r.pdf_s3_key || r.pdf_relative_path || r.pdf_s3_url)
             }));
 
             return res.json({
@@ -10250,6 +10602,7 @@ class erganhController {
             });
 
             const sanitizedErgani = sanitizeErganiResultForResponse(restResult);
+            const pdfDeferred = restResult?.submittedPdf?.pdfDeferred === true;
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
@@ -10274,6 +10627,8 @@ class erganhController {
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
+                pdfDeferred,
+                pdfWarning: getErganiPdfDeferredWarning(pdfDeferred),
                 submission: restResult?.submission || null,
                 erganh: sanitizedErgani
             });

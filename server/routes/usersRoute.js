@@ -517,6 +517,12 @@ router.get(
 router.get('/ergazomenoi/ergazomenoi/ergani/pdf/:id', checkAuth, erganhController.openErganiPdf);
 
 router.post(
+    '/ergazomenoi/ergazomenoi/ergani/pdf/:id/retry',
+    checkAuth,
+    erganhController.retrySubmittedErganiPdf
+);
+
+router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-to-erganh',
     checkAuth,
     ergazomenoiController.uploadWtoToErganh

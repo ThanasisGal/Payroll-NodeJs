@@ -1982,7 +1982,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload</li>
                             <li>Έλεγχο WebE3N στο trial/production περιβάλλον</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -2079,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload</li>
                             <li>Έλεγχο WebE7N στο trial/production περιβάλλον</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -2175,9 +2175,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (success) {
             const protocol = result?.protocol || null;
             const submitDate = result?.submitDate || null;
-            const pdfUrl = result?.pdfUrl || null;
-            const pdfFilename = result?.pdfFilename || null;
-            const erganhLogId = result?.erganhLogId || null;
+            const submissionId = result?.erganhSubmissionId || result?.id || null;
+            const pdfDeferred = result?.pdfDeferred === true;
+            const pdfWarning =
+                result?.pdfWarning ||
+                'Η υποβολή ολοκληρώθηκε επιτυχώς. Το PDF δεν ήταν άμεσα διαθέσιμο από το ΕΡΓΑΝΗ και μπορεί να ανακτηθεί αργότερα από το ιστορικό ΕΡΓΑΝΗ.';
 
             await Swal.fire({
                 backdrop: false,
@@ -2189,17 +2191,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p>${successText}</p>
                         ${
                             protocol
-                                ? `<p><strong>Πρωτόκολλο:</strong> <span class="text-success">${protocol}</span></p>`
+                                ? `<p><strong>Πρωτόκολλο:</strong> <span class="text-success">${escapeHtmlForSwal(protocol)}</span></p>`
                                 : `<p class="text-warning">⚠️ Δεν επιστράφηκε πρωτόκολλο στην απάντηση.</p>`
                         }
                         ${
                             submitDate
-                                ? `<p><strong>Ημερομηνία υποβολής:</strong> ${submitDate}</p>`
+                                ? `<p><strong>Ημερομηνία υποβολής:</strong> ${escapeHtmlForSwal(submitDate)}</p>`
                                 : ''
                         }
                         ${
-                            erganhLogId
-                                ? `<p class="text-muted font-size-rem-0_9">Log ID: ${erganhLogId}</p>`
+                            submissionId
+                                ? `<p><strong>ERGANI ID:</strong> ${escapeHtmlForSwal(submissionId)}</p>`
+                                : ''
+                        }
+                        ${
+                            pdfDeferred
+                                ? `<p class="text-warning">${formatErganiErrorForSwal(pdfWarning)}</p>`
                                 : ''
                         }
                     </div>
@@ -2290,7 +2297,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload</li>
                             <li>Έλεγχο WebMA στο trial/production περιβάλλον</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -3467,7 +3474,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <li>Δημιουργία JSON payload WTOWeek</li>
                             <li>Έλεγχο WTOWeek στο trial/production περιβάλλον</li>
                             <li>Οριστική υποβολή στο ΕΡΓΑΝΗ</li>
-                            <li>Λήψη πρωτοκόλλου και PDF, όπου διατίθεται</li>
+                            <li>Λήψη πρωτοκόλλου</li>
                         </ul>
                     </div>
                 </div>
@@ -3835,7 +3842,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const pdfUrl = payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url || '';
         const protocol = payload?.protocol || '';
         const submitDate = payload?.submitDate || '';
-        const title = protocol ? `ΕΡΓΑΝΗ - Πρωτόκολλο ${protocol}` : 'ΕΡΓΑΝΗ - Υποβληθέν PDF';
+        const safePdfUrl = escapeHtml(pdfUrl);
+        const safeProtocol = escapeHtml(protocol);
+        const safeSubmitDate = escapeHtml(submitDate);
+        const title = protocol
+            ? `ΕΡΓΑΝΗ - Πρωτόκολλο ${safeProtocol}`
+            : 'ΕΡΓΑΝΗ - Υποβληθέν PDF';
 
         if (!pdfUrl) {
             await Swal.fire({
@@ -3843,8 +3855,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'ΕΡΓΑΝΗ ΙΙ - Επιτυχής Υποβολή',
                 html: `
                 <p>Η υποβολή ολοκληρώθηκε επιτυχώς.</p>
-                ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${protocol}</p>` : ''}
-                ${submitDate ? `<p><strong>Ημερομηνία:</strong> ${submitDate}</p>` : ''}
+                ${protocol ? `<p><strong>Πρωτόκολλο:</strong> ${safeProtocol}</p>` : ''}
+                ${submitDate ? `<p><strong>Ημερομηνία:</strong> ${safeSubmitDate}</p>` : ''}
                 <p class="text-muted">Δεν επιστράφηκε διαθέσιμο URL PDF για προεπισκόπηση.</p>
             `,
                 confirmButtonText: 'OK',
@@ -3879,12 +3891,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     flex-wrap:wrap;
                     font-size:0.95rem;
                 ">
-                    ${protocol ? `<span><strong>Πρωτόκολλο:</strong> ${protocol}</span>` : ''}
-                    ${submitDate ? `<span><strong>Ημ/νία:</strong> ${submitDate}</span>` : ''}
+                    ${protocol ? `<span><strong>Πρωτόκολλο:</strong> ${safeProtocol}</span>` : ''}
+                    ${submitDate ? `<span><strong>Ημ/νία:</strong> ${safeSubmitDate}</span>` : ''}
                 </div>
 
                 <iframe
-                    src="${pdfUrl}"
+                    src="${safePdfUrl}"
                     style="
                         width:100%;
                         flex:1 1 auto;
@@ -3910,7 +3922,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </button>
 
                     <a
-                        href="${pdfUrl}"
+                        href="${safePdfUrl}"
                         target="_blank"
                         download
                         class="btn btn-success"
@@ -4895,30 +4907,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const latestRows = latest
             .map((r) => {
-                const pdfButton = r.pdfUrl
+                const logId = r.erganhLogId || r._id || r.id || '';
+                const protocol = r.protocol || '';
+                const submitDate = r.submitDate || '';
+                const submissionCode = r.submissionCode || r.processCode || '';
+                const pdfUrl = r.pdfUrl || '';
+                const commonPdfAttrs = `
+                            data-log-id="${escapeHtml(logId)}"
+                            data-erganh-log-id="${escapeHtml(logId)}"
+                            data-pdf-url="${escapeHtml(pdfUrl)}"
+                            data-protocol="${escapeHtml(protocol)}"
+                            data-submit-date="${escapeHtml(submitDate)}"
+                            data-submission-code="${escapeHtml(submissionCode)}"
+                            data-process-code="${escapeHtml(r.processCode || '')}"`;
+
+                const pdfButton = pdfUrl
                     ? `
                         <button type="button"
-                            class="btn btn-sm btn-primary erganh-dashboard-pdf-btn"
-                            data-pdf-url="${escapeHtml(r.pdfUrl)}"
-                            data-protocol="${escapeHtml(r.protocol || '')}"
-                            data-submit-date="${escapeHtml(r.submitDate || '')}"
+                            class="btn btn-sm btn-primary erganh-dashboard-pdf-btn px-2 py-1"
+                            style="min-width:4.35rem;border-radius:999px;font-size:0.74rem;line-height:1.1;white-space:nowrap;"
+                            ${commonPdfAttrs}
                             title="Άνοιγμα PDF">
-                            <i class="bi bi-file-earmark-pdf"></i>
+                            PDF
+                        </button>
+                    `
+                    : protocol && logId
+                      ? `
+                        <button type="button"
+                            class="btn btn-sm btn-outline-warning erganh-dashboard-pdf-btn px-2 py-1"
+                            style="min-width:5.4rem;border-radius:999px;font-size:0.74rem;line-height:1.1;white-space:nowrap;"
+                            ${commonPdfAttrs}
+                            title="Ανάκτηση PDF από ΕΡΓΑΝΗ">
+                            Ανάκτηση
                         </button>
                     `
                     : '<span class="text-muted">-</span>';
 
-                const protocolCell = r.pdfUrl
+                const protocolCell = protocol
                     ? `
                         <button type="button"
                             class="btn btn-link btn-sm p-0 erganh-dashboard-pdf-btn erganh-dashboard-protocol-btn"
-                            data-pdf-url="${escapeHtml(r.pdfUrl)}"
-                            data-protocol="${escapeHtml(r.protocol || '')}"
-                            data-submit-date="${escapeHtml(r.submitDate || '')}">
-                            ${escapeHtml(r.protocol || '-')}
+                            ${commonPdfAttrs}>
+                            ${escapeHtml(protocol)}
                         </button>
                     `
-                    : escapeHtml(r.protocol || '-');
+                    : '-';
 
                 const statusClass =
                     r.documentStatus === 'CANCELLED'
@@ -4929,18 +4962,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 return `
                     <tr>
-                        <td>${escapeHtml(r.submitDate || '-')}</td>
-                        <td>${protocolCell}</td>
-                        <td>${escapeHtml(r.employee || '-')}</td>
-                        <td>${escapeHtml(r.employeeAfm || '-')}</td>
-                        <td>${escapeHtml(r.processDescription || r.processCode || '-')}</td>
-                        <td class="text-center">${escapeHtml(r.uploadMethod || '-')}</td>
-                        <td class="text-center">
+                        <td style="white-space:nowrap;padding:0.32rem 0.34rem;">${escapeHtml(r.submitDate || '-')}</td>
+                        <td style="white-space:nowrap;padding:0.32rem 0.34rem;">${protocolCell}</td>
+                        <td style="white-space:normal;overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.2;padding:0.32rem 0.34rem;">${escapeHtml(r.employee || '-')}</td>
+                        <td style="white-space:nowrap;padding:0.32rem 0.34rem;">${escapeHtml(r.employeeAfm || '-')}</td>
+                        <td style="white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.2;padding:0.32rem 0.34rem;">${escapeHtml(r.processDescription || r.processCode || '-')}</td>
+                        <td class="text-center" style="white-space:nowrap;padding:0.32rem 0.34rem;">${escapeHtml(r.uploadMethod || '-')}</td>
+                        <td class="text-center" style="white-space:nowrap;padding:0.32rem 0.34rem;">
                             <span class="${statusClass}">
                                 ${escapeHtml(r.documentStatus || r.submissionStatus || '-')}
                             </span>
                         </td>
-                        <td class="text-center">${pdfButton}</td>
+                        <td class="text-center" style="white-space:nowrap;padding:0.32rem 0.5rem 0.32rem 0.34rem;">${pdfButton}</td>
                     </tr>
                 `;
             })
@@ -5036,8 +5069,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <h6 class="mt-3 mb-2">Τελευταίες 20 υποβολές</h6>
-                <div class="table-responsive">
-                    <table class="erganh-history-table">
+                <div class="table-responsive" style="overflow-x:hidden;padding-right:0.25rem;">
+                    <table class="erganh-history-table" style="table-layout:fixed;width:100%;font-size:0.86rem;">
+                        <colgroup>
+                            <col style="width:7.5rem;">
+                            <col style="width:7rem;">
+                            <col style="width:14rem;">
+                            <col style="width:6.5rem;">
+                            <col>
+                            <col style="width:5rem;">
+                            <col style="width:5.5rem;">
+                            <col style="width:7rem;">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>Ημερομηνία</th>
@@ -5231,6 +5274,184 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function handleErganhDashboardPdfClick(btn) {
+        const pdfUrl = btn?.dataset?.pdfUrl || '';
+        const protocol = btn?.dataset?.protocol || '';
+        const submitDate = btn?.dataset?.submitDate || '';
+        const logId = btn?.dataset?.logId || btn?.dataset?.erganhLogId || '';
+        const originalDisabled = btn?.disabled === true;
+        const originalHtml = btn?.innerHTML || '';
+
+        if (pdfUrl) {
+            await showErganiSubmittedPdfModal({
+                pdfUrl,
+                protocol,
+                submitDate
+            });
+            return;
+        }
+
+        if (!logId) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'PDF ΕΡΓΑΝΗ',
+                text: 'Δεν βρέθηκε ID υποβολής για ανάκτηση PDF.',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = 'Ανάκτηση...';
+        }
+
+        if (typeof window.hideLoader === 'function') {
+            window.hideLoader();
+        }
+
+        document
+            .querySelectorAll(
+                [
+                    '#appLoader',
+                    '#globalLoader',
+                    '.app-loader',
+                    '.app-loader--simple',
+                    '.loader-container',
+                    '.global-loader',
+                    '.loader-overlay',
+                    '.loading-overlay',
+                    '.preloader',
+                    '.content-dim-overlay'
+                ].join(', ')
+            )
+            .forEach((loader) => {
+                loader.classList.remove('visible');
+                loader.classList.remove('show');
+                loader.classList.remove('active');
+                loader.classList.remove('app-loader--visible');
+                loader.classList.add('is-hidden');
+                loader.style.display = 'none';
+                loader.style.visibility = 'hidden';
+                loader.style.opacity = '0';
+                loader.setAttribute('aria-hidden', 'true');
+            });
+
+        document.querySelectorAll('[class*="loader"], [class*="loading"], [class*="preloader"]').forEach((loader) => {
+            if (loader.closest('.swal2-container')) {
+                return;
+            }
+
+            const style = window.getComputedStyle(loader);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+                return;
+            }
+
+            loader.classList.remove('visible', 'show', 'active');
+            loader.classList.add('is-hidden');
+            loader.style.display = 'none';
+            loader.style.visibility = 'hidden';
+            loader.style.opacity = '0';
+            loader.setAttribute('aria-hidden', 'true');
+        });
+
+        Swal.fire({
+            title: 'Ανάκτηση PDF από ΕΡΓΑΝΗ...',
+            width: 'min(560px, 94vw)',
+            backdrop: 'rgba(0,0,0,0.60)',
+            html: `
+                <div class="d-flex flex-column align-items-center gap-2 py-2">
+                    <div class="spinner-border text-warning" role="status" aria-label="Ανάκτηση PDF"></div>
+                    <div class="text-muted" style="font-size:0.85rem;line-height:1.3;">
+                        Παρακαλώ περιμένετε
+                    </div>
+                </div>
+            `,
+            allowOutsideClick: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                const title = Swal.getTitle();
+                if (title) {
+                    title.style.fontSize = '1.05rem';
+                    title.style.lineHeight = '1.3';
+                    title.style.padding = '0.35rem 0.75rem 0';
+                }
+            }
+        });
+
+        try {
+            const response = await fetch(
+                `/ergazomenoi/ergazomenoi/ergani/pdf/${encodeURIComponent(logId)}/retry`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({})
+                }
+            );
+
+            const payload = await response.json().catch(async () => ({
+                success: false,
+                message: await response.text()
+            }));
+
+            if (payload?.success === true && payload?.pdfUrl) {
+                Swal.close();
+                if (btn) {
+                    btn.disabled = originalDisabled;
+                    btn.innerHTML = originalHtml;
+                    btn.dataset.pdfUrl = payload.pdfUrl;
+                }
+                await showErganiSubmittedPdfModal({
+                    pdfUrl: payload.pdfUrl,
+                    protocol: payload.protocol || protocol,
+                    submitDate: payload.submitDate || submitDate
+                });
+                return;
+            }
+
+            await Swal.fire({
+                icon: 'warning',
+                title: 'PDF ΕΡΓΑΝΗ',
+                html: `
+                    <div style="text-align:left;line-height:1.5;">
+                        <p>Η υποβολή έχει ολοκληρωθεί επιτυχώς, αλλά το PDF δεν είναι ακόμη διαθέσιμο από το ΕΡΓΑΝΗ.</p>
+                        <p>Δοκιμάστε ξανά αργότερα.</p>
+                        <p class="text-muted">Δεν ανακτήθηκε PDF. Δείτε τα logs [ERGANI PDF RETRY] και [ERGANI PDF PW].</p>
+                        ${
+                            payload?.message
+                                ? `<p class="text-muted">${escapeHtml(payload.message)}</p>`
+                                : ''
+                        }
+                    </div>
+                `,
+                confirmButtonText: 'OK'
+            });
+        } catch (error) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'PDF ΕΡΓΑΝΗ',
+                html: `
+                    <div style="text-align:left;line-height:1.5;">
+                        <p>${escapeHtml(error?.message || 'Η υποβολή έχει ολοκληρωθεί, αλλά το PDF δεν είναι ακόμη διαθέσιμο.')}</p>
+                        <p class="text-muted">Δεν ανακτήθηκε PDF. Δείτε τα logs [ERGANI PDF RETRY] και [ERGANI PDF PW].</p>
+                    </div>
+                `,
+                confirmButtonText: 'OK'
+            });
+        }
+
+        if (btn) {
+            btn.disabled = originalDisabled;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
     async function showErganhDashboardModal(initialPeriod = '30') {
         let currentPeriod = initialPeriod;
 
@@ -5242,22 +5463,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.innerHTML = renderErganhDashboard(payload);
             }
 
+            const popup = Swal.getPopup();
+            if (popup) {
+                popup.style.setProperty('width', 'min(1250px, 96vw)', 'important');
+            }
+
             initErganhDashboardCharts(payload);
 
             document.querySelectorAll('.erganh-dashboard-pdf-btn').forEach((btn) => {
                 btn.addEventListener('click', async () => {
-                    await showErganiSubmittedPdfModal({
-                        pdfUrl: btn.dataset.pdfUrl,
-                        protocol: btn.dataset.protocol,
-                        submitDate: btn.dataset.submitDate
-                    });
+                    await handleErganhDashboardPdfClick(btn);
                 });
             });
         }
 
+        if (typeof window.hideLoader === 'function') {
+            window.hideLoader();
+        }
+
+        document
+            .querySelectorAll('#appLoader, .app-loader, .app-loader--simple, .loader-container, .global-loader, .loader-overlay')
+            .forEach((loader) => {
+                loader.classList.remove('is-visible', 'visible', 'show', 'active');
+                loader.classList.add('is-hidden');
+                loader.style.display = 'none';
+                loader.style.visibility = 'hidden';
+                loader.style.opacity = '0';
+                loader.setAttribute('aria-hidden', 'true');
+            });
+
         await Swal.fire({
             title: 'Dashboard ΕΡΓΑΝΗ Εταιρείας',
-            width: 'min(1250px, 96vw)',
+            width: 'min(580px, 94vw)',
+            backdrop: 'rgba(0,0,0,0.60)',
             heightAuto: false,
             html: `
                 <div class="erganh-history-filterbar">
@@ -5273,7 +5511,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <div id="erganhDashboardContent">
-                    <div class="text-muted p-3">Φόρτωση...</div>
+                    <div class="d-flex flex-column align-items-center gap-2 py-3 text-muted">
+                        <div class="spinner-border text-success" role="status" aria-label="Φόρτωση Dashboard ΕΡΓΑΝΗ"></div>
+                        <div style="font-size:0.9rem;">Φόρτωση...</div>
+                    </div>
                 </div>
             `,
             confirmButtonText: 'Κλείσιμο',
@@ -5284,6 +5525,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 htmlContainer: 'custom-html-container erganh-dashboard-html-container'
             },
             didOpen: async () => {
+                const popup = Swal.getPopup();
+                if (popup) {
+                    popup.style.setProperty('width', 'min(580px, 94vw)', 'important');
+                }
+
                 const periodSelect = document.getElementById('erganhDashboardPeriod');
 
                 if (periodSelect) {
@@ -5293,7 +5539,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         const container = document.getElementById('erganhDashboardContent');
                         if (container) {
-                            container.innerHTML = '<div class="text-muted p-3">Φόρτωση...</div>';
+                            container.innerHTML = `
+                                <div class="d-flex flex-column align-items-center gap-2 py-3 text-muted">
+                                    <div class="spinner-border text-success" role="status" aria-label="Φόρτωση Dashboard ΕΡΓΑΝΗ"></div>
+                                    <div style="font-size:0.9rem;">Φόρτωση...</div>
+                                </div>
+                            `;
                         }
 
                         await refreshDashboardHtml();

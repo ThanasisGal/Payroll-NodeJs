@@ -26,6 +26,15 @@ function getUiBaseUrl() {
     return UI_BASE_URLS[env] || UI_BASE_URLS.trial;
 }
 
+function isErganiPdfDebugEnabled() {
+    return String(process.env.ERGANI_PDF_DEBUG_LOGS || '').toLowerCase() === 'true';
+}
+
+function debugLogDirect(event, payload) {
+    if (!isErganiPdfDebugEnabled()) return;
+    console.log(`[ERGANI PDF DIRECT] ${event}`, payload);
+}
+
 function safeJsonParse(text) {
     try {
         return text ? JSON.parse(text) : null;
@@ -40,6 +49,153 @@ function onlyDate(value) {
             .trim()
             .split(/\s+/)[0] || ''
     );
+}
+
+function formatDateDdMmYyyy(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+
+    return [
+        String(d.getDate()).padStart(2, '0'),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        d.getFullYear()
+    ].join('/');
+}
+
+function formatDateDdMmYyyyHhMm(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+
+    return `${formatDateDdMmYyyy(d)} ${String(d.getHours()).padStart(2, '0')}:${String(
+        d.getMinutes()
+    ).padStart(2, '0')}`;
+}
+
+function buildSubmittedDateCandidates(submittedDate) {
+    const candidates = [];
+    const add = (value) => {
+        const normalized = String(value || '').trim();
+        if (normalized && !candidates.includes(normalized)) candidates.push(normalized);
+    };
+
+    if (submittedDate instanceof Date) {
+        add(formatDateDdMmYyyy(submittedDate));
+        add(formatDateDdMmYyyyHhMm(submittedDate));
+        return candidates;
+    }
+
+    const raw = String(submittedDate || '').trim();
+    add(onlyDate(raw));
+    add(raw);
+
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}$/.test(raw)) {
+        add(`${raw}:00`);
+    }
+
+    return candidates;
+}
+
+function makeErganiTimeoutError(timeoutMs, method, url) {
+    const err = new Error(`ERGANI request timeout after ${timeoutMs}ms: ${method || 'GET'} ${url}`);
+    err.code = 'ERGANI_TIMEOUT';
+    return err;
+}
+
+function getPositiveTimeoutMs(value) {
+    const timeoutMs = Number(value);
+    return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null;
+}
+
+function getRemainingTimeoutMs(deadlineAt) {
+    if (!deadlineAt) return null;
+    return Math.max(0, deadlineAt - Date.now());
+}
+
+function assertNotTimedOut(deadlineAt, timeoutMs, method, url) {
+    if (deadlineAt && getRemainingTimeoutMs(deadlineAt) <= 0) {
+        throw makeErganiTimeoutError(timeoutMs, method, url);
+    }
+}
+
+async function fetchRawWithOptionalTimeout(url, options = {}) {
+    const { timeoutMs: rawTimeoutMs, signal: externalSignal, ...fetchOptions } = options;
+    const timeoutMs = getPositiveTimeoutMs(rawTimeoutMs);
+    const method = fetchOptions.method || 'GET';
+
+    if (!timeoutMs) {
+        const res = await fetch(url, {
+            ...fetchOptions,
+            ...(externalSignal ? { signal: externalSignal } : {})
+        });
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = res.headers.get('content-type') || '';
+        const text = buffer.toString('utf8');
+        const json = safeJsonParse(text);
+
+        return {
+            ok: res.ok,
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
+            contentType,
+            buffer,
+            text,
+            json,
+            url
+        };
+    }
+
+    const controller = new AbortController();
+    let timedOut = false;
+
+    const timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, timeoutMs);
+
+    const onAbort = () => controller.abort();
+    if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else externalSignal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    try {
+        const res = await fetch(url, {
+            ...fetchOptions,
+            signal: controller.signal
+        });
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = res.headers.get('content-type') || '';
+        const text = buffer.toString('utf8');
+        const json = safeJsonParse(text);
+
+        return {
+            ok: res.ok,
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
+            contentType,
+            buffer,
+            text,
+            json,
+            url
+        };
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw makeErganiTimeoutError(timeoutMs, method, url);
+        }
+
+        if (timedOut) {
+            throw makeErganiTimeoutError(timeoutMs, method, url);
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+        if (externalSignal) externalSignal.removeEventListener('abort', onAbort);
+    }
 }
 
 async function erganiFetch(path, options = {}) {
@@ -63,8 +219,6 @@ async function erganiFetch(path, options = {}) {
 
         const text = await res.text();
 
-        console.log('[ERGANI-FETCH] response text first 1000 chars:', text.slice(0, 1000));
-
         const json = safeJsonParse(text);
         const data = json !== null ? json : text;
 
@@ -87,9 +241,7 @@ async function erganiFetch(path, options = {}) {
         return data;
     } catch (error) {
         if (error.name === 'AbortError') {
-            throw new Error(
-                `ERGANI request timeout after ${timeoutMs}ms: ${options.method || 'GET'} ${url}`
-            );
+            throw makeErganiTimeoutError(timeoutMs, options.method || 'GET', url);
         }
 
         console.error('[ERGANI-FETCH] ❌', error.message || error);
@@ -101,64 +253,54 @@ async function erganiFetch(path, options = {}) {
 
 async function erganiRawFetch(path, options = {}) {
     const url = `${getBaseUrl()}${path}`;
-    const res = await fetch(url, options);
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const contentType = res.headers.get('content-type') || '';
-    const text = buffer.toString('utf8');
-    const json = safeJsonParse(text);
+    const raw = await fetchRawWithOptionalTimeout(url, options);
 
-    if (!res.ok) {
+    if (!raw.ok) {
         const message =
-            json?.message ||
-            json?.Message ||
-            json?.error ||
-            json?.Error ||
-            text ||
-            `HTTP ${res.status}`;
+            raw.json?.message ||
+            raw.json?.Message ||
+            raw.json?.error ||
+            raw.json?.Error ||
+            raw.text ||
+            `HTTP ${raw.status}`;
         const err = new Error(message);
-        err.status = res.status;
-        err.contentType = contentType;
-        err.rawText = text;
-        err.rawJson = json;
+        err.status = raw.status;
+        err.contentType = raw.contentType;
+        err.rawText = raw.text;
+        err.rawJson = raw.json;
         throw err;
     }
 
-    return { ok: res.ok, status: res.status, contentType, buffer, text, json };
+    return raw;
 }
 
 async function erganiUiRawFetch(path, options = {}) {
     const url = `${getUiBaseUrl()}${path}`;
-    const res = await fetch(url, options);
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const contentType = res.headers.get('content-type') || '';
-    const text = buffer.toString('utf8');
-    const json = safeJsonParse(text);
+    const raw = await fetchRawWithOptionalTimeout(url, options);
 
-    if (!res.ok) {
+    if (!raw.ok) {
         const message =
-            json?.message ||
-            json?.Message ||
-            json?.error ||
-            json?.Error ||
-            text ||
-            `HTTP ${res.status}`;
+            raw.json?.message ||
+            raw.json?.Message ||
+            raw.json?.error ||
+            raw.json?.Error ||
+            raw.text ||
+            `HTTP ${raw.status}`;
         const err = new Error(message);
-        err.status = res.status;
-        err.contentType = contentType;
-        err.rawText = text;
-        err.rawJson = json;
+        err.status = raw.status;
+        err.contentType = raw.contentType;
+        err.rawText = raw.text;
+        err.rawJson = raw.json;
         throw err;
     }
 
-    return { ok: res.ok, status: res.status, contentType, buffer, text, json, url };
+    return raw;
 }
 
 async function authenticateErgani(creds = {}) {
     console.log({
-        Username: creds.username,
-        Password: '********',
+        Username: creds.username ? '********' : '',
+        Password: creds.password ? '********' : '',
         Usertype: creds.userType || creds.usertype || '01'
     });
 
@@ -304,8 +446,13 @@ function findPdfBufferInsideJson(value, depth = 0) {
     return null;
 }
 
+function getJsonKeys(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return Object.keys(value).slice(0, 20);
+}
+
 function buildSubmittedDocumentUiPath({ submissionCode, protocol, issuedDate }) {
-    const submittedDate = onlyDate(issuedDate);
+    const submittedDate = String(issuedDate || '').trim();
 
     if (!submittedDate) {
         throw new Error('Λείπει submittedDate για λήψη PDF από GetSubmittedDocument.');
@@ -344,17 +491,55 @@ function buildLegacySubmissionDocumentPaths(submissionCode) {
 
 async function fetchSubmissionDocumentFromUiEndpoint(
     accessToken,
-    { submissionCode, protocol, issuedDate }
+    { submissionCode, protocol, issuedDate, timeoutMs, signal }
 ) {
     const path = buildSubmittedDocumentUiPath({ submissionCode, protocol, issuedDate });
+    const url = `${getUiBaseUrl()}${path}`;
 
-    const raw = await erganiUiRawFetch(path, {
+    const raw = await fetchRawWithOptionalTimeout(url, {
         method: 'GET',
+        timeoutMs,
+        signal,
         headers: {
             Authorization: `Bearer ${accessToken}`,
             Accept: 'application/pdf'
         }
     });
+
+    if (raw.json || /application\/json/i.test(raw.contentType || '')) {
+        const jsonKeys = getJsonKeys(raw.json);
+        debugLogDirect('json-response-detected', {
+            submittedDateCandidate: issuedDate,
+            status: raw.status,
+            contentType: raw.contentType || null,
+            jsonKeys
+        });
+
+        const pdfFromJsonResponse = findPdfBufferInsideJson(raw.json);
+        if (pdfFromJsonResponse) {
+            debugLogDirect('candidate-json-pdf', {
+                submittedDateCandidate: issuedDate,
+                status: raw.status,
+                contentType: raw.contentType || null,
+                jsonKeys,
+                bytes: pdfFromJsonResponse.length
+            });
+
+            return {
+                success: true,
+                buffer: pdfFromJsonResponse,
+                contentType: 'application/pdf',
+                sizeBytes: pdfFromJsonResponse.length,
+                rawContentType: raw.contentType,
+                source: {
+                    path,
+                    url: raw.url,
+                    mode: 'ui-get-json-fileContents'
+                },
+                rawJson: raw.json
+            };
+        }
+    }
 
     if (isPdfBuffer(raw.buffer)) {
         return {
@@ -371,29 +556,18 @@ async function fetchSubmissionDocumentFromUiEndpoint(
         };
     }
 
-    const pdfFromJson = findPdfBufferInsideJson(raw.json);
-    if (pdfFromJson) {
-        return {
-            success: true,
-            buffer: pdfFromJson,
-            contentType: 'application/pdf',
-            sizeBytes: pdfFromJson.length,
-            rawContentType: raw.contentType,
-            source: {
-                path,
-                url: raw.url,
-                mode: 'ui-get-json-base64'
-            },
-            rawJson: raw.json
-        };
+    const err = new Error(`${path}: δεν βρέθηκε PDF. contentType=${raw.contentType || 'unknown'}`);
+    err.status = raw.status;
+    err.contentType = raw.contentType;
+    if (isErganiPdfDebugEnabled()) {
+        err.bodySnippet = String(raw.text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
     }
-
-    throw new Error(`${path}: δεν βρέθηκε PDF. contentType=${raw.contentType || 'unknown'}`);
+    throw err;
 }
 
 async function fetchSubmissionDocumentFromLegacyEndpoints(
     accessToken,
-    { submissionCode, protocol, issuedDate }
+    { submissionCode, protocol, issuedDate, timeoutMs, deadlineAt, signal }
 ) {
     const paths = buildLegacySubmissionDocumentPaths(submissionCode);
     const bodies = buildSubmissionDocumentBodies({ submissionCode, protocol, issuedDate });
@@ -401,9 +575,15 @@ async function fetchSubmissionDocumentFromLegacyEndpoints(
 
     for (const path of paths) {
         for (const body of bodies) {
+            assertNotTimedOut(deadlineAt, timeoutMs, 'POST', `${getBaseUrl()}${path}`);
+
             try {
+                const remainingTimeoutMs = getRemainingTimeoutMs(deadlineAt) || timeoutMs;
+
                 const raw = await erganiRawFetch(path, {
                     method: 'POST',
+                    timeoutMs: remainingTimeoutMs,
+                    signal,
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
                         'Content-Type': 'application/json',
@@ -440,6 +620,7 @@ async function fetchSubmissionDocumentFromLegacyEndpoints(
                     `${path}: δεν βρέθηκε PDF. contentType=${raw.contentType || 'unknown'}`
                 );
             } catch (err) {
+                if (err?.code === 'ERGANI_TIMEOUT') throw err;
                 errors.push(`${path}: ${err.message}`);
             }
         }
@@ -462,47 +643,107 @@ async function fetchSubmissionDocumentFromLegacyEndpoints(
  *     ?protocol=...
  *     &submittedDate=dd/MM/yyyy
  */
-async function getSubmissionDocument(accessToken, { submissionCode, protocol, issuedDate }) {
+async function getSubmissionDocument(
+    accessToken,
+    { submissionCode, protocol, issuedDate, timeoutMs }
+) {
     if (!accessToken) throw new Error('Λείπει accessToken για λήψη Submission Document.');
     if (!submissionCode) throw new Error('Λείπει submissionCode για λήψη Submission Document.');
     if (!protocol) throw new Error('Λείπει protocol για λήψη Submission Document.');
     if (!issuedDate) throw new Error('Λείπει issuedDate για λήψη Submission Document.');
 
     const errors = [];
+    const totalTimeoutMs = getPositiveTimeoutMs(timeoutMs);
+    const deadlineAt = totalTimeoutMs ? Date.now() + totalTimeoutMs : null;
+    const controller = totalTimeoutMs ? new AbortController() : null;
+    const timeout = totalTimeoutMs
+        ? setTimeout(() => {
+              controller.abort();
+          }, totalTimeoutMs)
+        : null;
 
     try {
-        return await fetchSubmissionDocumentFromUiEndpoint(accessToken, {
+        const submittedDateCandidates = buildSubmittedDateCandidates(issuedDate);
+        debugLogDirect('submitted-date-candidates', submittedDateCandidates);
+
+        for (const submittedDateCandidate of submittedDateCandidates) {
+            assertNotTimedOut(
+                deadlineAt,
+                totalTimeoutMs,
+                'GET',
+                `${getUiBaseUrl()}/Home/GetSubmittedDocument`
+            );
+
+            try {
+                const result = await fetchSubmissionDocumentFromUiEndpoint(accessToken, {
+                    submissionCode,
+                    protocol,
+                    issuedDate: submittedDateCandidate,
+                    timeoutMs: getRemainingTimeoutMs(deadlineAt) || totalTimeoutMs,
+                    signal: controller?.signal
+                });
+
+                debugLogDirect('candidate-result', {
+                    submittedDateCandidate,
+                    success: true,
+                    status: null,
+                    contentType: result.rawContentType || result.contentType || null,
+                    isPdfBuffer: isPdfBuffer(result.buffer),
+                    error: null
+                });
+
+                return result;
+            } catch (err) {
+                if (err?.code === 'ERGANI_TIMEOUT') throw err;
+
+                debugLogDirect('candidate-result', {
+                    submittedDateCandidate,
+                    success: false,
+                    status: err.status || null,
+                    contentType: err.contentType || null,
+                    isPdfBuffer: false,
+                    error: err.message || String(err)
+                });
+
+                errors.push(
+                    `${submittedDateCandidate}: ${err.message || String(err)}${
+                        err.bodySnippet ? ` body=${err.bodySnippet}` : ''
+                    }`
+                );
+            }
+        }
+
+        assertNotTimedOut(deadlineAt, totalTimeoutMs, 'GET', `${getUiBaseUrl()}/Home/GetSubmittedDocument`);
+
+        const legacyResult = await fetchSubmissionDocumentFromLegacyEndpoints(accessToken, {
             submissionCode,
             protocol,
-            issuedDate
+            issuedDate,
+            timeoutMs: totalTimeoutMs,
+            deadlineAt,
+            signal: controller?.signal
         });
-    } catch (err) {
-        errors.push(err.message || String(err));
+
+        if (legacyResult?.success) {
+            return legacyResult;
+        }
+
+        if (legacyResult?.error) {
+            errors.push(legacyResult.error);
+        }
+
+        return {
+            success: false,
+            buffer: null,
+            contentType: null,
+            sizeBytes: 0,
+            error:
+                'Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF Submission Document. ' +
+                errors.slice(0, 10).join(' | ')
+        };
+    } finally {
+        if (timeout) clearTimeout(timeout);
     }
-
-    const legacyResult = await fetchSubmissionDocumentFromLegacyEndpoints(accessToken, {
-        submissionCode,
-        protocol,
-        issuedDate
-    });
-
-    if (legacyResult?.success) {
-        return legacyResult;
-    }
-
-    if (legacyResult?.error) {
-        errors.push(legacyResult.error);
-    }
-
-    return {
-        success: false,
-        buffer: null,
-        contentType: null,
-        sizeBytes: 0,
-        error:
-            'Το ΕΡΓΑΝΗ δεν επέστρεψε έγκυρο PDF Submission Document. ' +
-            errors.slice(0, 10).join(' | ')
-    };
 }
 
 async function erganiFetchUi(path, options = {}) {
