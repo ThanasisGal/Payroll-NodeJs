@@ -1256,6 +1256,18 @@ router.get(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/policies/approvals',
+    checkAuth,
+    erganhController.getProdhlomenaOrariaPolicyPreviewApprovals
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/policies/approvals',
+    checkAuth,
+    erganhController.createProdhlomenaOrariaPolicyPreviewApproval
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/scenarios',
     erganhController.getProdhlomenaOrariaScenarioClassifications
 );
