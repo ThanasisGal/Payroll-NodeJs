@@ -222,6 +222,9 @@ let currentPolicyPreviewApprovalsError = '';
 let currentPolicyPreviewBaseParams = null;
 let policyPreviewApprovalSubmitting = false;
 let currentApprovalHistoryExpanded = false;
+let currentPolicyPreviewApplyDryRun = null;
+let currentPolicyPreviewApplyDryRunError = '';
+let currentPolicyPreviewApplyDryRunExpanded = false;
 const currentApprovalHistoryFilters = {
     decisionType: '',
     userName: '',
@@ -1225,16 +1228,36 @@ function ensureReviewTableStructure() {
                 padding: 0.12rem 0.4rem;
                 font-size: 0.68rem;
                 line-height: 1.2;
-                background-color: #0dcaf0;
+                background-color: #cff4fc;
                 border-color: #0dcaf0;
-                color: #ffffff;
+                color: #055160;
                 font-weight: 600;
             }
 
             .policy-preview-details-btn:hover,
             .policy-preview-details-btn:focus {
-                background-color: #0d6efd;
-                border-color: #0d6efd;
+                background-color: #0dcaf0;
+                border-color: #0aa2c0;
+                color: #052c65;
+            }
+
+            .policy-preview-history-toggle,
+            .policy-preview-dry-run-toggle,
+            .policy-preview-history-group-btn {
+                background-color: #e2e3e5;
+                border-color: #6c757d;
+                color: #41464b;
+                font-weight: 600;
+            }
+
+            .policy-preview-history-toggle:hover,
+            .policy-preview-history-toggle:focus,
+            .policy-preview-dry-run-toggle:hover,
+            .policy-preview-dry-run-toggle:focus,
+            .policy-preview-history-group-btn:hover,
+            .policy-preview-history-group-btn:focus {
+                background-color: #6c757d;
+                border-color: #565e64;
                 color: #ffffff;
             }
 
@@ -1406,6 +1429,21 @@ function ensureReviewTableStructure() {
             .policy-preview-history-details-items {
                 max-height: 22rem;
                 overflow: auto;
+            }
+
+            .policy-preview-dry-run-swal {
+                max-height: 85vh;
+                overflow: hidden;
+            }
+
+            .policy-preview-dry-run-swal-body {
+                max-height: 65vh;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+
+            .policy-preview-dry-run-items {
+                overflow: visible;
             }
 
             @media (max-width: 991.98px) {
@@ -2179,6 +2217,37 @@ async function fetchPolicyPreviewApprovals(baseParams) {
     };
 }
 
+function buildPolicyPreviewApplyDryRunParams(baseParams) {
+    return new URLSearchParams({
+        apo_hmeromhnia: baseParams.get('apo_hmeromhnia') || '',
+        eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
+        page: '1',
+        limit: '20'
+    });
+}
+
+async function fetchPolicyPreviewApplyDryRun(baseParams) {
+    const params = buildPolicyPreviewApplyDryRunParams(baseParams);
+    const response = await fetch(
+        `/api/prodhlomena-oraria/review/policies/apply-dry-run?${params.toString()}`,
+        {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'CSRF-Token': csrfToken
+            }
+        }
+    );
+    const payload = await response.json();
+
+    if (!response.ok || !payload.success) {
+        throw new Error('Δεν ήταν δυνατή η ανάκτηση της προεπισκόπησης εφαρμογής.');
+    }
+
+    return payload;
+}
+
 function buildPolicyPreviewApprovalsMap(records = []) {
     const approvalsByGroupId = new Map();
 
@@ -2710,6 +2779,393 @@ function bindPolicyPreviewApprovalHistoryEvents(container) {
     });
 
     bindPolicyPreviewHistoryDetails(container);
+}
+
+const policyPreviewApplyDryRunItemStatusLabels = Object.freeze({
+    WOULD_CHANGE: 'Θα άλλαζε',
+    NO_CHANGE: 'Ήδη ίδιο',
+    SKIPPED: 'Παραλείφθηκε'
+});
+
+const policyPreviewApplyDryRunFieldActionLabels = Object.freeze({
+    WOULD_SET: 'Θα οριστεί',
+    ALREADY_SAME: 'Ήδη ίδια',
+    SKIPPED: 'Παραλείφθηκε'
+});
+
+function getPolicyPreviewApplyDryRunItemStatusLabel(status) {
+    const key = String(status || '').trim();
+    return policyPreviewApplyDryRunItemStatusLabels[key] || 'Άγνωστη κατάσταση';
+}
+
+function getPolicyPreviewApplyDryRunFieldActionLabel(action) {
+    const key = String(action || '').trim();
+    return policyPreviewApplyDryRunFieldActionLabels[key] || 'Άγνωστη ενέργεια';
+}
+
+function formatPolicyPreviewDryRunReason(reason) {
+    const text = String(reason || '').trim();
+    if (!text) return '-';
+
+    const exactTranslations = {
+        'Δεν υπάρχουν proposed_values για αξιολόγηση.':
+            'Δεν υπάρχουν προτεινόμενες τιμές για αξιολόγηση.',
+        'Μη έγκυρο prodhlomena_oraria_id.':
+            'Μη έγκυρο ID εγγραφής προδηλωμένου ωραρίου.',
+        'Το πεδίο δεν υποστηρίζεται από το dry-run apply allowlist.':
+            'Το πεδίο δεν υποστηρίζεται από τη λίστα πεδίων της προεπισκόπησης εφαρμογής.'
+    };
+
+    if (exactTranslations[text]) return exactTranslations[text];
+
+    return text
+        .replaceAll('proposed_values', 'προτεινόμενες τιμές')
+        .replaceAll('field_diffs', 'διαφορές πεδίων')
+        .replaceAll('prodhlomena_oraria_id', 'ID εγγραφής προδηλωμένου ωραρίου')
+        .replaceAll('dry-run apply allowlist', 'λίστα υποστηριζόμενων πεδίων της προεπισκόπησης')
+        .replaceAll('current_value', 'τρέχουσα τιμή')
+        .replaceAll('proposed_value', 'προτεινόμενη τιμή');
+}
+
+function getPolicyPreviewApplyDryRunGroupLabel(groupId) {
+    const normalizedGroupId = String(groupId || '').trim();
+    const groups = Array.isArray(currentPolicyPreviewGrouping?.groups)
+        ? currentPolicyPreviewGrouping.groups
+        : [];
+    const group = groups.find(
+        (entry) => String(entry?.group_id || '').trim() === normalizedGroupId
+    );
+
+    if (!group) return 'Ομάδα εκτός τρέχουσας σελίδας';
+    return `${getPolicyPreviewGroupTitle(group)} · ${getPolicyPreviewStatusLabel(group.status).label}`;
+}
+
+function getPolicyPreviewApplyDryRunSummaryValue(summary, key) {
+    const value = Number(summary?.[key]);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function renderPolicyPreviewApplyDryRunSummary(summary = {}) {
+    const entries = [
+        ['Εγκρίσεις που βρέθηκαν', 'approvals_found'],
+        ['Εγκρίσεις που εμφανίζονται', 'approvals_returned'],
+        ['Εγγραφές', 'items_total'],
+        ['Θα άλλαζαν', 'items_with_changes'],
+        ['Ήδη ίδιες', 'items_without_changes'],
+        ['Παραλείφθηκαν', 'items_skipped'],
+        ['Πεδία συνολικά', 'fields_total'],
+        ['Πεδία που θα άλλαζαν', 'fields_would_change'],
+        ['Πεδία ήδη ίδια', 'fields_already_same'],
+        ['Πεδία που παραλείφθηκαν', 'fields_skipped']
+    ];
+
+    return entries
+        .map(
+            ([label, key]) => `
+                <span class="badge text-bg-light border">
+                    ${escapeHtml(label)}: ${escapeHtml(
+                        getPolicyPreviewApplyDryRunSummaryValue(summary, key)
+                    )}
+                </span>
+            `
+        )
+        .join('');
+}
+
+function formatPolicyPreviewApplyDryRunValue(value, field = '') {
+    if (value === null || value === undefined || value === '') return '-';
+    if (typeof value === 'boolean') return value ? 'ΝΑΙ' : 'ΟΧΙ';
+
+    const fieldKey = String(field || '').trim();
+    if (fieldKey.startsWith('ores_') && Number.isFinite(Number(value))) {
+        return Number(value).toFixed(2);
+    }
+
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch (_error) {
+            return '-';
+        }
+    }
+
+    return String(value).trim() || '-';
+}
+
+function getPolicyPreviewApplyDryRunApprovalCounts(approval = {}) {
+    const summary = approval.summary || {};
+    return {
+        items: getPolicyPreviewApplyDryRunSummaryValue(summary, 'items_total'),
+        changes: getPolicyPreviewApplyDryRunSummaryValue(summary, 'items_with_changes'),
+        same: getPolicyPreviewApplyDryRunSummaryValue(summary, 'items_without_changes'),
+        skipped: getPolicyPreviewApplyDryRunSummaryValue(summary, 'items_skipped')
+    };
+}
+
+function renderPolicyPreviewApplyDryRunApprovals() {
+    const approvals = Array.isArray(currentPolicyPreviewApplyDryRun?.approvals)
+        ? currentPolicyPreviewApplyDryRun.approvals
+        : [];
+
+    if (approvals.length === 0) {
+        return `
+            <div class="small text-muted border rounded p-2">
+                Δεν υπάρχουν εγκεκριμένες προτάσεις για προεπισκόπηση εφαρμογής στην τρέχουσα περίοδο.
+            </div>
+        `;
+    }
+
+    return `
+        <div class="policy-preview-history-table-wrapper">
+            <table class="table table-sm table-bordered align-middle mb-0 policy-preview-history-table">
+                <thead>
+                    <tr>
+                        <th>Ημερομηνία απόφασης</th>
+                        <th>Χρήστης</th>
+                        <th>Ομάδα</th>
+                        <th>Σημειώσεις</th>
+                        <th>Εγγραφές</th>
+                        <th>Θα άλλαζαν</th>
+                        <th>Ήδη ίδιες</th>
+                        <th>Παραλείφθηκαν</th>
+                        <th>Λεπτομέρειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${approvals
+                        .map((approval, approvalIndex) => {
+                            const counts = getPolicyPreviewApplyDryRunApprovalCounts(approval);
+                            return `
+                                <tr>
+                                    <td>${escapeHtml(
+                                        formatPolicyPreviewDateTime(approval.created_at)
+                                    )}</td>
+                                    <td>${escapeHtml(approval.created_by_user_name || '-')}</td>
+                                    <td title="${escapeHtml(approval.group_id || '')}">${escapeHtml(
+                                        getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
+                                    )}</td>
+                                    <td title="${escapeHtml(approval.notes || '')}">${escapeHtml(
+                                        truncatePolicyPreviewHistoryText(approval.notes)
+                                    )}</td>
+                                    <td>${escapeHtml(counts.items)}</td>
+                                    <td>${escapeHtml(counts.changes)}</td>
+                                    <td>${escapeHtml(counts.same)}</td>
+                                    <td>${escapeHtml(counts.skipped)}</td>
+                                    <td class="text-nowrap">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm policy-preview-details-btn policy-preview-dry-run-details-btn"
+                                            data-approval-index="${escapeHtml(approvalIndex)}">
+                                            Λεπτομέρειες
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        })
+                        .join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderPolicyPreviewApplyDryRunSection() {
+    if (currentPolicyPreviewApplyDryRunError) {
+        return `
+            <section class="policy-preview-history-card" aria-labelledby="policyPreviewDryRunTitle">
+                <div class="policy-preview-history-header">
+                    <div class="fw-semibold" id="policyPreviewDryRunTitle">
+                        Προεπισκόπηση Εφαρμογής Εγκεκριμένων Προτάσεων
+                    </div>
+                </div>
+                <div class="alert alert-warning py-1 px-2 small m-2">
+                    ${escapeHtml(currentPolicyPreviewApplyDryRunError)}
+                </div>
+            </section>
+        `;
+    }
+
+    const summary = currentPolicyPreviewApplyDryRun?.summary || {};
+    return `
+        <section class="policy-preview-history-card" aria-labelledby="policyPreviewDryRunTitle">
+            <div class="policy-preview-history-header">
+                <div class="fw-semibold" id="policyPreviewDryRunTitle">
+                    Προεπισκόπηση Εφαρμογής Εγκεκριμένων Προτάσεων
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary policy-preview-dry-run-toggle"
+                    aria-expanded="${String(currentPolicyPreviewApplyDryRunExpanded)}">
+                    ${currentPolicyPreviewApplyDryRunExpanded ? 'Απόκρυψη' : 'Εμφάνιση'}
+                </button>
+            </div>
+            <div class="alert alert-info py-1 px-2 small mx-2 mt-2 mb-1">
+                Η προεπισκόπηση είναι μόνο ενημερωτική. Δεν εφαρμόζεται καμία αλλαγή στα Προδηλωμένα.
+            </div>
+            <div class="policy-preview-history-summary">
+                ${renderPolicyPreviewApplyDryRunSummary(summary)}
+            </div>
+            <div class="policy-preview-history-content ${
+                currentPolicyPreviewApplyDryRunExpanded ? '' : 'd-none'
+            }">
+                ${renderPolicyPreviewApplyDryRunApprovals()}
+            </div>
+        </section>
+    `;
+}
+
+function renderPolicyPreviewApplyDryRunFieldDiffs(fieldDiffs = []) {
+    if (!Array.isArray(fieldDiffs) || fieldDiffs.length === 0) {
+        return '<div class="small text-muted">Δεν υπάρχουν διαφορές πεδίων.</div>';
+    }
+
+    return `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Πεδίο</th>
+                        <th>Τρέχουσα τιμή</th>
+                        <th>Προτεινόμενη τιμή</th>
+                        <th>Ενέργεια</th>
+                        <th>Αιτιολογία</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${fieldDiffs
+                        .map(
+                            (diff) => `
+                                <tr>
+                                    <td title="${escapeHtml(diff.field || '')}">${escapeHtml(
+                                        diff.label || getPolicyPreviewFieldLabel(diff.field)
+                                    )}</td>
+                                    <td>${escapeHtml(
+                                        formatPolicyPreviewApplyDryRunValue(
+                                            diff.current_value,
+                                            diff.field
+                                        )
+                                    )}</td>
+                                    <td>${escapeHtml(
+                                        formatPolicyPreviewApplyDryRunValue(
+                                            diff.proposed_value,
+                                            diff.field
+                                        )
+                                    )}</td>
+                                    <td title="${escapeHtml(diff.action || '')}">${escapeHtml(
+                                        getPolicyPreviewApplyDryRunFieldActionLabel(diff.action)
+                                    )}</td>
+                                    <td>${escapeHtml(
+                                        formatPolicyPreviewDryRunReason(diff.reason)
+                                    )}</td>
+                                </tr>
+                            `
+                        )
+                        .join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function showPolicyPreviewApplyDryRunDetails(approval = {}) {
+    const items = Array.isArray(approval.items) ? approval.items : [];
+    const counts = getPolicyPreviewApplyDryRunApprovalCounts(approval);
+    const itemsHtml = items.length
+        ? items
+              .map(
+                  (item) => `
+                      <div class="border rounded p-2 mb-2">
+                          <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                              <span class="fw-semibold">Κωδικός: ${escapeHtml(
+                                  item.employee_kodikos || '-'
+                              )}</span>
+                              <span>Ημ/νία: ${escapeHtml(
+                                  formatPolicyPreviewDate(item.hmeromhnia)
+                              )}</span>
+                              <span class="badge text-bg-light border" title="${escapeHtml(
+                                  item.status || ''
+                              )}">${escapeHtml(
+                                  getPolicyPreviewApplyDryRunItemStatusLabel(item.status)
+                              )}</span>
+                          </div>
+                          <div class="small mb-2">${escapeHtml(
+                              formatPolicyPreviewDryRunReason(item.reason)
+                          )}</div>
+                          ${renderPolicyPreviewApplyDryRunFieldDiffs(item.field_diffs)}
+                      </div>
+                  `
+              )
+              .join('')
+        : '<div class="small text-muted">Δεν υπάρχουν εγγραφές σε αυτή την έγκριση.</div>';
+    const html = `
+        <div class="text-start">
+            <table class="table table-sm table-bordered align-middle mb-2">
+                <tbody>
+                    <tr><th>ID έγκρισης</th><td>${escapeHtml(
+                        approval.approval_id || '-'
+                    )}</td></tr>
+                    <tr><th>Ομάδα</th><td title="${escapeHtml(
+                        approval.group_id || ''
+                    )}">${escapeHtml(
+                        getPolicyPreviewApplyDryRunGroupLabel(approval.group_id)
+                    )}</td></tr>
+                    <tr><th>Τύπος απόφασης</th><td title="${escapeHtml(
+                        approval.decision_type || ''
+                    )}">${escapeHtml(
+                        getPolicyPreviewDecisionLabel(approval.decision_type)
+                    )}</td></tr>
+                    <tr><th>Ημερομηνία</th><td>${escapeHtml(
+                        formatPolicyPreviewDateTime(approval.created_at)
+                    )}</td></tr>
+                    <tr><th>Χρήστης</th><td>${escapeHtml(
+                        approval.created_by_user_name || '-'
+                    )}</td></tr>
+                    <tr><th>Σημειώσεις</th><td>${escapeHtml(
+                        approval.notes || '-'
+                    )}</td></tr>
+                    <tr><th>Εγγραφές</th><td>${escapeHtml(counts.items)}</td></tr>
+                    <tr><th>Θα άλλαζαν</th><td>${escapeHtml(counts.changes)}</td></tr>
+                    <tr><th>Ήδη ίδιες</th><td>${escapeHtml(counts.same)}</td></tr>
+                    <tr><th>Παραλείφθηκαν</th><td>${escapeHtml(counts.skipped)}</td></tr>
+                </tbody>
+            </table>
+            <div class="fw-semibold mb-1">Εγγραφές και διαφορές πεδίων</div>
+            <div class="policy-preview-dry-run-items">${itemsHtml}</div>
+        </div>
+    `;
+
+    Swal.fire({
+        title: 'Λεπτομέρειες προεπισκόπησης εφαρμογής',
+        html,
+        width: '78rem',
+        confirmButtonText: 'Κλείσιμο',
+        customClass: {
+            popup: 'policy-preview-dry-run-swal',
+            htmlContainer: 'policy-preview-dry-run-swal-body'
+        }
+    });
+}
+
+function bindPolicyPreviewApplyDryRunEvents(container) {
+    const toggle = container.querySelector('.policy-preview-dry-run-toggle');
+    const content = toggle
+        ?.closest('.policy-preview-history-card')
+        ?.querySelector('.policy-preview-history-content');
+
+    toggle?.addEventListener('click', () => {
+        currentPolicyPreviewApplyDryRunExpanded = !currentPolicyPreviewApplyDryRunExpanded;
+        content?.classList.toggle('d-none', !currentPolicyPreviewApplyDryRunExpanded);
+        toggle.setAttribute('aria-expanded', String(currentPolicyPreviewApplyDryRunExpanded));
+        toggle.textContent = currentPolicyPreviewApplyDryRunExpanded ? 'Απόκρυψη' : 'Εμφάνιση';
+    });
+
+    container.querySelectorAll('.policy-preview-dry-run-details-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const approvalIndex = Number(button.dataset.approvalIndex);
+            const approval = currentPolicyPreviewApplyDryRun?.approvals?.[approvalIndex];
+            if (approval) showPolicyPreviewApplyDryRunDetails(approval);
+        });
+    });
 }
 
 function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
@@ -3299,6 +3755,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                         : ''
                 }
                 ${renderPolicyPreviewApprovalHistorySection()}
+                ${renderPolicyPreviewApplyDryRunSection()}
                 <hr class="my-2">
                 ${groupsHtml}
             </div>
@@ -3306,6 +3763,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     `;
 
     bindPolicyPreviewApprovalHistoryEvents(container);
+    bindPolicyPreviewApplyDryRunEvents(container);
 
     container.querySelectorAll('.policy-preview-group-toggle').forEach((button) => {
         button.addEventListener('click', () => {
@@ -3395,6 +3853,8 @@ async function loadResults() {
         currentPolicyPreviewApprovalTotal = 0;
         currentPolicyPreviewApprovalsByGroupId = new Map();
         currentPolicyPreviewApprovalsError = '';
+        currentPolicyPreviewApplyDryRun = null;
+        currentPolicyPreviewApplyDryRunError = '';
         currentApprovalHistoryFilters.decisionType = '';
         currentApprovalHistoryFilters.userName = '';
         currentApprovalHistoryFilters.searchText = '';
@@ -3413,23 +3873,42 @@ async function loadResults() {
         currentReviewDeviations = payload.deviations || [];
         renderCurrentReviewRows();
 
-        try {
-            const grouping = await fetchPolicyPreviewGrouping(params);
+        const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
+            fetchPolicyPreviewGrouping(params),
+            refreshPolicyPreviewApprovals(params),
+            fetchPolicyPreviewApplyDryRun(params)
+        ]);
 
-            try {
-                await refreshPolicyPreviewApprovals(params);
-            } catch (approvalError) {
-                console.warn('[loadResults] Policy preview approvals unavailable:', approvalError);
-                currentPolicyPreviewApprovalRecords = [];
-                currentPolicyPreviewApprovalTotal = 0;
-                currentPolicyPreviewApprovalsByGroupId = new Map();
-                currentPolicyPreviewApprovalsError =
-                    approvalError.message ||
-                    'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
-            }
+        if (approvalsResult.status === 'rejected') {
+            console.warn(
+                '[loadResults] Policy preview approvals unavailable:',
+                approvalsResult.reason
+            );
+            currentPolicyPreviewApprovalRecords = [];
+            currentPolicyPreviewApprovalTotal = 0;
+            currentPolicyPreviewApprovalsByGroupId = new Map();
+            currentPolicyPreviewApprovalsError =
+                approvalsResult.reason?.message ||
+                'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
+        }
 
-            renderPolicyPreviewGroups(grouping);
-        } catch (policyPreviewError) {
+        if (dryRunResult.status === 'fulfilled') {
+            currentPolicyPreviewApplyDryRun = dryRunResult.value;
+            currentPolicyPreviewApplyDryRunError = '';
+        } else {
+            console.warn(
+                '[loadResults] Policy preview apply dry-run unavailable:',
+                dryRunResult.reason
+            );
+            currentPolicyPreviewApplyDryRun = null;
+            currentPolicyPreviewApplyDryRunError =
+                'Δεν ήταν δυνατή η ανάκτηση της προεπισκόπησης εφαρμογής.';
+        }
+
+        if (groupingResult.status === 'fulfilled') {
+            renderPolicyPreviewGroups(groupingResult.value);
+        } else {
+            const policyPreviewError = groupingResult.reason;
             console.warn('[loadResults] Policy preview grouping unavailable:', policyPreviewError);
             renderPolicyPreviewGroups(null, {
                 error:
