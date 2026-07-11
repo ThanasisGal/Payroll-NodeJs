@@ -128,6 +128,10 @@ const {
 const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
+const {
+    createPolicyPreviewApprovalRecord,
+    listPolicyPreviewApprovalRecords
+} = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -5200,6 +5204,57 @@ class erganhController {
                 success: false,
                 message: 'Σφάλμα κατά την παραγωγή προεπισκόπησης πολιτικών απασχολήσεων.',
                 error: error.message
+            });
+        }
+    };
+
+    static getProdhlomenaOrariaPolicyPreviewApprovals = async (req, res) => {
+        try {
+            const result = await listPolicyPreviewApprovalRecords({
+                session: req.session,
+                filters: req.query,
+                page: req.query.page,
+                limit: req.query.limit
+            });
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaPolicyPreviewApprovals] ❌', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message:
+                    error.statusCode && error.statusCode < 500
+                        ? error.message
+                        : 'Σφάλμα κατά την ανάκτηση των αποφάσεων πολιτικών απασχολήσεων.'
+            });
+        }
+    };
+
+    static createProdhlomenaOrariaPolicyPreviewApproval = async (req, res) => {
+        try {
+            const approval = await createPolicyPreviewApprovalRecord({
+                session: req.session,
+                payload: req.body
+            });
+
+            return res.status(201).json({
+                success: true,
+                approval_id: approval._id,
+                message: 'Η απόφαση καταγράφηκε επιτυχώς.'
+            });
+        } catch (error) {
+            console.error('[createProdhlomenaOrariaPolicyPreviewApproval] ❌', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message:
+                    error.statusCode && error.statusCode < 500
+                        ? error.message
+                        : 'Σφάλμα κατά την καταγραφή της απόφασης πολιτικής απασχολήσεων.'
             });
         }
     };
