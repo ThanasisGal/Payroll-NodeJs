@@ -165,6 +165,21 @@ const policyPreviewFieldLabels = {
     flags: 'Ενδείξεις'
 };
 
+const policyPreviewDecisionLabels = Object.freeze({
+    APPROVE_PREFILL: 'Έγκριση πρότασης για μελλοντική εφαρμογή',
+    MARK_OK: 'Καταγραφή ως OK',
+    MARK_REVIEWED: 'Καταγραφή ως ελεγμένο',
+    REJECT_PROPOSAL: 'Απόρριψη πρότασης',
+    NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο'
+});
+
+const policyPreviewDecisionButtons = Object.freeze([
+    { type: 'MARK_REVIEWED', className: 'policy-preview-decision-success' },
+    { type: 'NEEDS_MORE_REVIEW', className: 'policy-preview-decision-warning' },
+    { type: 'REJECT_PROPOSAL', className: 'policy-preview-decision-danger' },
+    { type: 'APPROVE_PREFILL', className: 'policy-preview-decision-primary' }
+]);
+
 const scenarioProposedUpdateFillableFields = new Set([
     'apo_ora_01_apologistika',
     'eos_ora_01_apologistika',
@@ -200,6 +215,10 @@ const scenarioProposedUpdateFillableFields = new Set([
 let currentReviewRows = [];
 let currentReviewDeviations = [];
 let currentPolicyPreviewGrouping = null;
+let currentPolicyPreviewApprovalsByGroupId = new Map();
+let currentPolicyPreviewApprovalsError = '';
+let currentPolicyPreviewBaseParams = null;
+let policyPreviewApprovalSubmitting = false;
 
 const reviewFilterDefinitions = [
     { key: 'onlyApologistiko', id: 'only_apologistiko', label: 'Μόνο Απολογιστικό' },
@@ -1204,6 +1223,103 @@ function ensureReviewTableStructure() {
                 color: #ffffff;
             }
 
+            .policy-preview-approval-panel {
+                margin-top: 0.5rem;
+                padding: 0.45rem 0.55rem;
+                border: 1px solid #dee2e6;
+                border-radius: 0.35rem;
+                background-color: #f8f9fa;
+            }
+
+            .policy-preview-approval-details {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem 0.75rem;
+                font-size: 0.75rem;
+            }
+
+            .policy-preview-decision-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.3rem;
+                margin-top: 0.4rem;
+            }
+
+            .policy-preview-decision-btn {
+                font-size: 0.7rem;
+                line-height: 1.2;
+            }
+
+            .policy-preview-decision-success {
+                background-color: #d1e7dd;
+                border-color: #198754;
+                color: #0f5132;
+            }
+
+            .policy-preview-decision-success:not(:disabled):hover,
+            .policy-preview-decision-success:not(:disabled):focus {
+                background-color: #198754;
+                border-color: #198754;
+                color: #ffffff;
+            }
+
+            .policy-preview-decision-warning {
+                background-color: #fff3cd;
+                border-color: #ffc107;
+                color: #664d03;
+            }
+
+            .policy-preview-decision-warning:not(:disabled):hover,
+            .policy-preview-decision-warning:not(:disabled):focus {
+                background-color: #ffc107;
+                border-color: #ffc107;
+                color: #212529;
+            }
+
+            .policy-preview-decision-danger {
+                background-color: #f8d7da;
+                border-color: #dc3545;
+                color: #842029;
+            }
+
+            .policy-preview-decision-danger:not(:disabled):hover,
+            .policy-preview-decision-danger:not(:disabled):focus {
+                background-color: #dc3545;
+                border-color: #dc3545;
+                color: #ffffff;
+            }
+
+            .policy-preview-decision-primary {
+                background-color: #cfe2ff;
+                border-color: #0d6efd;
+                color: #084298;
+            }
+
+            .policy-preview-decision-primary:not(:disabled):hover,
+            .policy-preview-decision-primary:not(:disabled):focus {
+                background-color: #0d6efd;
+                border-color: #0d6efd;
+                color: #ffffff;
+            }
+
+            .policy-preview-decision-info {
+                background-color: #cff4fc;
+                border-color: #0dcaf0;
+                color: #055160;
+            }
+
+            .policy-preview-decision-info:not(:disabled):hover,
+            .policy-preview-decision-info:not(:disabled):focus {
+                background-color: #0dcaf0;
+                border-color: #0dcaf0;
+                color: #052c65;
+            }
+
+            .policy-preview-decision-btn:disabled {
+                opacity: 0.65;
+                cursor: not-allowed;
+            }
+
             .review-card-body.review-filters-active .results-table-wrapper {
                 max-height: calc(100vh - 430px - 4rem);
             }
@@ -1932,6 +2048,301 @@ async function fetchPolicyPreviewGrouping(baseParams) {
     return payload.grouping || null;
 }
 
+function buildPolicyPreviewApprovalsParams(baseParams) {
+    return new URLSearchParams({
+        apo_hmeromhnia: baseParams.get('apo_hmeromhnia') || '',
+        eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
+        decision_status: 'RECORDED',
+        page: '1',
+        limit: '200'
+    });
+}
+
+async function fetchPolicyPreviewApprovals(baseParams) {
+    const params = buildPolicyPreviewApprovalsParams(baseParams);
+    const response = await fetch(
+        `/api/prodhlomena-oraria/review/policies/approvals?${params.toString()}`,
+        {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'CSRF-Token': csrfToken
+            }
+        }
+    );
+    const payload = await response.json();
+
+    if (!response.ok || !payload.success) {
+        throw new Error(
+            payload.message || 'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.'
+        );
+    }
+
+    return Array.isArray(payload.records) ? payload.records : [];
+}
+
+function buildPolicyPreviewApprovalsMap(records = []) {
+    const approvalsByGroupId = new Map();
+
+    records.forEach((record) => {
+        if (String(record?.decision_status || '').trim() !== 'RECORDED') return;
+
+        const groupId = String(record?.group_id || '').trim();
+        if (!groupId) return;
+
+        const existing = approvalsByGroupId.get(groupId) || {
+            latest: null,
+            decisionTypes: new Set()
+        };
+        const decisionType = String(record?.decision_type || '').trim();
+
+        if (decisionType) existing.decisionTypes.add(decisionType);
+
+        const existingTime = new Date(existing.latest?.created_at || 0).getTime() || 0;
+        const recordTime = new Date(record.created_at || 0).getTime() || 0;
+        if (!existing.latest || recordTime > existingTime) existing.latest = record;
+
+        approvalsByGroupId.set(groupId, existing);
+    });
+
+    return approvalsByGroupId;
+}
+
+async function refreshPolicyPreviewApprovals(baseParams) {
+    const records = await fetchPolicyPreviewApprovals(baseParams);
+    currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(records);
+    currentPolicyPreviewApprovalsError = '';
+}
+
+function formatPolicyPreviewDateTime(value) {
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return '-';
+
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(
+        2,
+        '0'
+    )}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(
+        date.getMinutes()
+    ).padStart(2, '0')}`;
+}
+
+function getPolicyPreviewDecisionLabel(decisionType) {
+    const key = String(decisionType || '').trim();
+    return policyPreviewDecisionLabels[key] || 'Άγνωστη απόφαση';
+}
+
+function getPolicyPreviewDecisionButtons(group = {}) {
+    const buttons = [...policyPreviewDecisionButtons];
+
+    if (String(group.status || '').trim() === 'OK') {
+        buttons.splice(1, 0, { type: 'MARK_OK', className: 'policy-preview-decision-info' });
+    }
+
+    return buttons;
+}
+
+function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
+    const groupId = String(group.group_id || '').trim();
+    const approvalState = currentPolicyPreviewApprovalsByGroupId.get(groupId);
+    const latest = approvalState?.latest || null;
+    const existingDecisionTypes = approvalState?.decisionTypes || new Set();
+    const decisionDetails = latest
+        ? `
+            <div class="policy-preview-approval-details">
+                <span><span class="fw-semibold">Απόφαση:</span> ${escapeHtml(
+                    getPolicyPreviewDecisionLabel(latest.decision_type)
+                )}</span>
+                <span><span class="fw-semibold">Κατάσταση:</span> Καταγεγραμμένη</span>
+                <span><span class="fw-semibold">Χρήστης:</span> ${escapeHtml(
+                    latest.created_by_user_name || '-'
+                )}</span>
+                <span><span class="fw-semibold">Ημερομηνία:</span> ${escapeHtml(
+                    formatPolicyPreviewDateTime(latest.created_at)
+                )}</span>
+            </div>
+            ${
+                latest.notes
+                    ? `<div class="small mt-1"><span class="fw-semibold">Σημειώσεις:</span> ${escapeHtml(
+                          latest.notes
+                      )}</div>`
+                    : ''
+            }
+        `
+        : '<div class="small text-muted">Δεν έχει καταγραφεί απόφαση για αυτή την ομάδα.</div>';
+
+    const buttonsHtml = getPolicyPreviewDecisionButtons(group)
+        .map(({ type, className }) => {
+            const alreadyRecorded = existingDecisionTypes.has(type);
+            const title = alreadyRecorded ? 'Έχει ήδη καταγραφεί.' : getPolicyPreviewDecisionLabel(type);
+
+            return `
+                <button
+                    type="button"
+                    class="btn btn-sm ${escapeHtml(
+                        className
+                    )} policy-preview-decision-btn"
+                    data-group-index="${escapeHtml(groupIndex)}"
+                    data-decision-type="${escapeHtml(type)}"
+                    title="${escapeHtml(title)}"
+                    ${alreadyRecorded ? 'disabled aria-disabled="true"' : ''}>
+                    ${escapeHtml(getPolicyPreviewDecisionLabel(type))}
+                    ${alreadyRecorded ? ' · Έχει ήδη καταγραφεί' : ''}
+                </button>
+            `;
+        })
+        .join('');
+
+    return `
+        <div class="policy-preview-approval-panel">
+            <div class="small fw-semibold mb-1">Απόφαση ελέγχου</div>
+            ${decisionDetails}
+            <div class="policy-preview-decision-actions">
+                ${buttonsHtml}
+            </div>
+        </div>
+    `;
+}
+
+async function getPolicyPreviewCsrfToken() {
+    if (csrfToken) return csrfToken;
+
+    const response = await fetch('/csrf-token', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+    });
+    const payload = await response.json();
+    const freshToken = String(payload.csrfToken || '').trim();
+
+    if (!response.ok || !freshToken) {
+        throw new Error('Δεν ήταν δυνατή η ανάκτηση του CSRF token.');
+    }
+
+    return freshToken;
+}
+
+async function confirmPolicyPreviewDecision(decisionType) {
+    const decisionLabel = getPolicyPreviewDecisionLabel(decisionType);
+    const decisionMessage =
+        decisionType === 'APPROVE_PREFILL'
+            ? 'Η πρόταση θα χαρακτηριστεί ως εγκεκριμένη για μελλοντική εφαρμογή, αλλά δεν θα εφαρμοστεί τώρα καμία αλλαγή στα Προδηλωμένα.'
+            : 'Η απόφαση θα καταγραφεί στο ιστορικό approval/audit. Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.';
+    const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Καταγραφή απόφασης ελέγχου',
+        html: `
+            <div class="text-start">
+                <div class="fw-semibold mb-2">${escapeHtml(decisionLabel)}</div>
+                <div class="mb-2">${escapeHtml(decisionMessage)}</div>
+                <div>Βεβαιωθείτε ότι εργάζεστε στη σωστή εταιρεία. Η ενέργεια θα καταγραφεί στο ιστορικό αποφάσεων.</div>
+            </div>
+        `,
+        input: 'textarea',
+        inputLabel: 'Σημειώσεις',
+        inputPlaceholder: 'Προαιρετικές σημειώσεις',
+        inputAttributes: { maxlength: '2000' },
+        showCancelButton: true,
+        confirmButtonText: 'Καταγραφή απόφασης',
+        cancelButtonText: 'Άκυρο',
+        reverseButtons: true
+    });
+
+    return result.isConfirmed ? String(result.value || '').trim() : null;
+}
+
+async function submitPolicyPreviewDecision(group, decisionType) {
+    if (policyPreviewApprovalSubmitting) return;
+    if (!currentPolicyPreviewBaseParams) {
+        throw new Error('Δεν είναι διαθέσιμη η περίοδος της προεπισκόπησης.');
+    }
+    if (!group?.group_id || !group?.group_key || !Array.isArray(group?.items) || !group.items.length) {
+        throw new Error('Η ομάδα δεν περιέχει έγκυρα δεδομένα για καταγραφή απόφασης.');
+    }
+
+    const notes = await confirmPolicyPreviewDecision(decisionType);
+    if (notes === null) return;
+
+    policyPreviewApprovalSubmitting = true;
+
+    try {
+        const activeCsrfToken = await getPolicyPreviewCsrfToken();
+        const response = await fetch('/api/prodhlomena-oraria/review/policies/approvals', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'CSRF-Token': activeCsrfToken,
+                'x-csrf-token': activeCsrfToken
+            },
+            body: JSON.stringify({
+                apo_hmeromhnia: currentPolicyPreviewBaseParams.get('apo_hmeromhnia') || '',
+                eos_hmeromhnia: currentPolicyPreviewBaseParams.get('eos_hmeromhnia') || '',
+                group: {
+                    group_id: group.group_id,
+                    group_key: group.group_key,
+                    scope: currentPolicyPreviewGrouping?.scope || 'page',
+                    status: group.status,
+                    policy_code: group.policy_code,
+                    scenario_code: group.scenario_code,
+                    action_type: group.action_type,
+                    reason_code: group.reason_code
+                },
+                decision_type: decisionType,
+                notes,
+                client_payload_version: 'policy-preview-groups-ui-1',
+                items: group.items
+            })
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (response.status === 409) {
+            try {
+                await refreshPolicyPreviewApprovals(currentPolicyPreviewBaseParams);
+            } catch (approvalRefreshError) {
+                currentPolicyPreviewApprovalsError =
+                    approvalRefreshError.message ||
+                    'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
+            }
+
+            renderPolicyPreviewGroups(currentPolicyPreviewGrouping, {
+                expandedGroupId: group.group_id
+            });
+
+            await Swal.fire({
+                icon: 'info',
+                title: 'Η απόφαση έχει ήδη καταγραφεί',
+                text: 'Υπάρχει ήδη ίδια καταγεγραμμένη απόφαση για αυτή την ομάδα.'
+            });
+            return;
+        }
+
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.');
+        }
+
+        try {
+            await refreshPolicyPreviewApprovals(currentPolicyPreviewBaseParams);
+        } catch (approvalRefreshError) {
+            currentPolicyPreviewApprovalsError =
+                approvalRefreshError.message ||
+                'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
+        }
+
+        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, {
+            expandedGroupId: group.group_id
+        });
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Επιτυχία',
+            text: payload.message || 'Η απόφαση καταγράφηκε επιτυχώς.'
+        });
+    } finally {
+        policyPreviewApprovalSubmitting = false;
+    }
+}
+
 function renderPolicyPreviewStatusBadge(status) {
     const statusCode = String(status || '').trim() || 'UNKNOWN';
     const statusLabel = getPolicyPreviewStatusLabel(statusCode);
@@ -2250,6 +2661,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                       const groupElementId = `policyPreviewGroupItems-${index}`;
                       const groupTitle = getPolicyPreviewGroupTitle(group);
                       const groupDescription = renderPolicyPreviewGroupDescription(group);
+                      const isExpanded = options.expandedGroupId === group.group_id;
 
                       return `
                           <div class="border rounded policy-preview-group-card">
@@ -2273,12 +2685,13 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                                       type="button"
                                       class="btn btn-sm btn-outline-primary policy-preview-group-toggle policy-preview-toggle"
                                       data-target-id="${escapeHtml(groupElementId)}"
-                                      aria-expanded="false">
-                                      Άνοιγμα
+                                      aria-expanded="${String(isExpanded)}">
+                                      ${isExpanded ? 'Κλείσιμο' : 'Άνοιγμα'}
                                   </button>
                               </div>
+                              ${renderPolicyPreviewApprovalPanel(group, index)}
                               <div
-                                  class="policy-preview-group-items d-none mt-2"
+                                  class="policy-preview-group-items ${isExpanded ? '' : 'd-none'} mt-2"
                                   id="${escapeHtml(groupElementId)}">
                                   ${renderPolicyPreviewGroupItems(group.items, index)}
                               </div>
@@ -2302,6 +2715,13 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                     <span class="badge text-bg-light border">Έκδοση: ${escapeHtml(grouping.version ?? '-')}</span>
                 </div>
                 ${renderPolicyPreviewGroupingSummary(grouping)}
+                ${
+                    currentPolicyPreviewApprovalsError
+                        ? `<div class="alert alert-warning py-1 px-2 small mb-2">${escapeHtml(
+                              currentPolicyPreviewApprovalsError
+                          )}</div>`
+                        : ''
+                }
                 <hr class="my-2">
                 ${groupsHtml}
             </div>
@@ -2331,6 +2751,27 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
             if (!item) return;
 
             showPolicyPreviewItemDetails(item);
+        });
+    });
+
+    container.querySelectorAll('.policy-preview-decision-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const groupIndex = Number(button.dataset.groupIndex);
+            const decisionType = String(button.dataset.decisionType || '').trim();
+            const group = groups?.[groupIndex];
+
+            if (!group || !policyPreviewDecisionLabels[decisionType]) return;
+
+            try {
+                await submitPolicyPreviewDecision(group, decisionType);
+            } catch (error) {
+                console.error('[submitPolicyPreviewDecision]', error);
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    text: error.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
+                });
+            }
         });
     });
 }
@@ -2370,6 +2811,9 @@ async function loadResults() {
 
         ensureReviewTableStructure();
         ensureScenarioReviewFilterControl();
+        currentPolicyPreviewBaseParams = new URLSearchParams(params);
+        currentPolicyPreviewApprovalsByGroupId = new Map();
+        currentPolicyPreviewApprovalsError = '';
         renderPolicyPreviewGroups(null, { loading: true });
 
         const rows = payload.rows || [];
@@ -2387,6 +2831,17 @@ async function loadResults() {
 
         try {
             const grouping = await fetchPolicyPreviewGrouping(params);
+
+            try {
+                await refreshPolicyPreviewApprovals(params);
+            } catch (approvalError) {
+                console.warn('[loadResults] Policy preview approvals unavailable:', approvalError);
+                currentPolicyPreviewApprovalsByGroupId = new Map();
+                currentPolicyPreviewApprovalsError =
+                    approvalError.message ||
+                    'Δεν ήταν δυνατή η ανάκτηση των καταγεγραμμένων αποφάσεων.';
+            }
+
             renderPolicyPreviewGroups(grouping);
         } catch (policyPreviewError) {
             console.warn('[loadResults] Policy preview grouping unavailable:', policyPreviewError);
