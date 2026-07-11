@@ -1261,6 +1261,12 @@ router.get(
     erganhController.getProdhlomenaOrariaPolicyPreviewApprovals
 );
 
+router.get(
+    '/api/prodhlomena-oraria/review/policies/apply-dry-run',
+    checkAuth,
+    erganhController.getProdhlomenaOrariaPolicyPreviewApplyDryRun
+);
+
 router.post(
     '/api/prodhlomena-oraria/review/policies/approvals',
     checkAuth,
