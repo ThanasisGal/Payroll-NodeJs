@@ -132,6 +132,9 @@ const {
     createPolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
+const {
+    runPolicyPreviewApplyDryRun
+} = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyDryRunService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -5230,6 +5233,27 @@ class erganhController {
                     error.statusCode && error.statusCode < 500
                         ? error.message
                         : 'Σφάλμα κατά την ανάκτηση των αποφάσεων πολιτικών απασχολήσεων.'
+            });
+        }
+    };
+
+    static getProdhlomenaOrariaPolicyPreviewApplyDryRun = async (req, res) => {
+        try {
+            const result = await runPolicyPreviewApplyDryRun({
+                session: req.session,
+                filters: req.query
+            });
+
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('[getProdhlomenaOrariaPolicyPreviewApplyDryRun] ❌', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message:
+                    error.statusCode && error.statusCode < 500
+                        ? error.message
+                        : 'Σφάλμα κατά την προεπισκόπηση εφαρμογής εγκεκριμένων προτάσεων.'
             });
         }
     };
