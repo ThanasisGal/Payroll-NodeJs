@@ -83,6 +83,88 @@ const scenarioReasonLabels = {
     UNKNOWN_PATTERN: 'Άγνωστο μοτίβο'
 };
 
+const policyPreviewStatusLabels = {
+    OK: {
+        label: 'OK',
+        description: 'Εντάξει',
+        badgeClass: 'text-bg-success'
+    },
+    PREFILLED_PENDING_APPROVAL: {
+        label: 'Προσυμπληρωμένο / αναμονή ελέγχου',
+        description: 'Προσυμπληρωμένο / αναμονή ελέγχου',
+        badgeClass: 'text-bg-warning'
+    },
+    NEEDS_REVIEW: {
+        label: 'Χρειάζεται έλεγχο',
+        description: 'Χρειάζεται έλεγχο',
+        badgeClass: 'text-bg-danger'
+    },
+    UNKNOWN_PATTERN: {
+        label: 'Άγνωστο μοτίβο',
+        description: 'Άγνωστο μοτίβο',
+        badgeClass: 'text-bg-secondary'
+    }
+};
+
+const policyPreviewPolicyLabels = {
+    NO_APOLOGISTIKO_BIBLIO_OK: 'Δεν αφορά απολογιστικό βιβλίο',
+    CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK: 'Δεν απαιτείται κάρτα για προδηλωμένο ωράριο',
+    DECLARED_REPO_OR_NON_WORK_WITH_CARDS: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
+    NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY: 'Εργασία χωρίς κάρτες λόγω άδειας ή αργίας',
+    UNKNOWN: 'Άγνωστη πολιτική'
+};
+
+const policyPreviewScenarioLabels = {
+    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Άγνωστο μοτίβο που χρειάζεται έλεγχο',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_CLOSED:
+        'Εργασία χωρίς κάρτες σε προαιρετική αργία με κλειστή εταιρεία',
+    DECLARED_WORK_NO_CARDS_LEAVE: 'Εργασία χωρίς κάρτες λόγω άδειας',
+    DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
+    DECLARED_NON_WORK_WITH_CARDS: 'Δηλωμένη μη εργασία με κάρτες',
+    UNKNOWN: 'Άγνωστο σενάριο'
+};
+
+const policyPreviewActionLabels = {
+    REVIEW_ONLY: 'Μόνο για έλεγχο',
+    PREFILL: 'Προσυμπλήρωση',
+    OK: 'Καμία ενέργεια',
+    UNKNOWN: 'Άγνωστη ενέργεια'
+};
+
+const policyPreviewReasonLabels = {
+    UNKNOWN_PATTERN: 'Άγνωστο μοτίβο',
+    NO_APOLOGISTIKO_REVIEW_REQUIRED: 'Απαιτείται έλεγχος μη απολογιστικού βιβλίου',
+    DECLARED_LEAVE_FOUND: 'Βρέθηκε δηλωμένη άδεια',
+    DECLARED_HOLIDAY_FOUND: 'Βρέθηκε δηλωμένη αργία',
+    CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
+    EMPLOYEE_CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
+    NO_APOLOGISTIKO_BIBLIO: 'Δεν αφορά απολογιστικό βιβλίο',
+    UNKNOWN: 'Άγνωστη αιτιολογία'
+};
+
+const policyPreviewFlagLabels = {
+    has_cards: 'Υπάρχουν κάρτες',
+    is_holiday: 'Αργία',
+    is_mandatory_holiday: 'Υποχρεωτική αργία',
+    is_optional_holiday: 'Προαιρετική αργία',
+    is_locked: 'Κλειδωμένο',
+    has_manual_override: 'Χειροκίνητη παρέμβαση',
+    blocked: 'Μπλοκαρισμένο',
+    requires_human_approval: 'Απαιτείται ανθρώπινος έλεγχος',
+    batch_approvable: 'Δυνατή μαζική έγκριση'
+};
+
+const policyPreviewFieldLabels = {
+    employee_kodikos: 'Κωδικός',
+    hmeromhnia: 'Ημ/νία',
+    kathgoria_ergasias: 'Προδηλωμένο',
+    kathgoria_ergasias_apologistika: 'Απολογιστικό',
+    cards_ores_ergasias: 'Ώρες καρτών',
+    prodhlomena_oraria_id: 'ID εγγραφής',
+    proposed_values: 'Προτεινόμενες τιμές',
+    flags: 'Ενδείξεις'
+};
+
 const scenarioProposedUpdateFillableFields = new Set([
     'apo_ora_01_apologistika',
     'eos_ora_01_apologistika',
@@ -117,6 +199,7 @@ const scenarioProposedUpdateFillableFields = new Set([
 
 let currentReviewRows = [];
 let currentReviewDeviations = [];
+let currentPolicyPreviewGrouping = null;
 
 const reviewFilterDefinitions = [
     { key: 'onlyApologistiko', id: 'only_apologistiko', label: 'Μόνο Απολογιστικό' },
@@ -999,6 +1082,128 @@ function ensureReviewTableStructure() {
                 font-size: 0.8rem;
             }
 
+            .review-card-body {
+                max-height: calc(100vh - 12rem);
+                overflow-y: auto;
+            }
+
+            .policy-preview-card .card-body {
+                padding: 0.65rem 0.75rem;
+            }
+
+            .policy-preview-group-card {
+                padding: 0.45rem 0.55rem;
+                margin-bottom: 0.45rem;
+            }
+
+            .policy-preview-group-header {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 0.5rem;
+                align-items: start;
+            }
+
+            .policy-preview-group-meta,
+            .policy-preview-summary-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.35rem;
+                align-items: center;
+            }
+
+            .policy-preview-code {
+                font-size: 0.72rem;
+            }
+
+            .policy-preview-group-items {
+                max-height: 240px;
+                overflow-y: auto;
+                overflow-x: auto;
+                position: relative;
+            }
+
+            .policy-preview-group-items.d-none {
+                display: none !important;
+            }
+
+            .policy-preview-items-table {
+                min-width: 760px;
+                font-size: 0.68rem;
+            }
+
+            .policy-preview-items-table th,
+            .policy-preview-items-table td {
+                padding: 0.2rem 0.3rem;
+                white-space: nowrap;
+                vertical-align: top;
+            }
+
+            .policy-preview-items-table thead th {
+                position: sticky;
+                top: 0;
+                z-index: 3;
+                background: #f8f9fa;
+                box-shadow: 0 1px 0 #dee2e6;
+            }
+
+            .policy-preview-compact-values {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+                max-width: 24rem;
+                white-space: normal;
+            }
+
+            .policy-preview-value-chip {
+                display: inline-flex;
+                gap: 0.2rem;
+                align-items: center;
+                padding: 0.08rem 0.35rem;
+                border: 1px solid #dee2e6;
+                border-radius: 0.25rem;
+                background-color: #f8f9fa;
+                line-height: 1.25;
+            }
+
+            .policy-preview-toggle {
+                min-width: 5.5rem;
+                white-space: nowrap;
+                background-color: #ffd8a8;
+                border-color: #f08c00;
+                color: #111111;
+                font-weight: 600;
+            }
+
+            .policy-preview-toggle:hover,
+            .policy-preview-toggle:focus {
+                background-color: #ffa94d;
+                border-color: #e67700;
+                color: #111111;
+            }
+
+            .policy-preview-group-line {
+                font-size: 0.78rem;
+                line-height: 1.25;
+                margin-top: 0.1rem;
+            }
+
+            .policy-preview-details-btn {
+                padding: 0.12rem 0.4rem;
+                font-size: 0.68rem;
+                line-height: 1.2;
+                background-color: #0dcaf0;
+                border-color: #0dcaf0;
+                color: #ffffff;
+                font-weight: 600;
+            }
+
+            .policy-preview-details-btn:hover,
+            .policy-preview-details-btn:focus {
+                background-color: #0d6efd;
+                border-color: #0d6efd;
+                color: #ffffff;
+            }
+
             .review-card-body.review-filters-active .results-table-wrapper {
                 max-height: calc(100vh - 430px - 4rem);
             }
@@ -1571,6 +1776,565 @@ function renderReviewRows(rows = [], deviations = []) {
     }
 }
 
+function getPolicyPreviewStatusLabel(status) {
+    const key = String(status || '').trim();
+
+    return (
+        policyPreviewStatusLabels[key] || {
+            label: 'Άγνωστη τιμή',
+            description: 'Άγνωστη τιμή',
+            badgeClass: 'text-bg-secondary'
+        }
+    );
+}
+
+function getPolicyPreviewScopeLabel(scope) {
+    const key = String(scope || '').trim();
+
+    if (key === 'page') return 'Τρέχουσα σελίδα';
+
+    return key || '-';
+}
+
+function formatPolicyPreviewDate(value) {
+    if (!value) return '-';
+
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (match) {
+        return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    const dt = new Date(value);
+
+    if (Number.isNaN(dt.getTime())) return '-';
+
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const year = dt.getFullYear();
+
+    return `${day}/${month}/${year}`;
+}
+
+function formatPolicyPreviewHours(value) {
+    if (value === null || value === undefined || value === '') return '-';
+
+    const numericValue = Number(value);
+
+    if (Number.isNaN(numericValue)) return '-';
+
+    return numericValue.toFixed(2);
+}
+
+function formatPolicyPreviewUnknownCode(value, fallbackLabel = 'Άγνωστη τιμή') {
+    const key = String(value || '').trim();
+
+    return key ? fallbackLabel : '-';
+}
+
+function getPolicyPreviewPolicyLabel(policyCode) {
+    const key = String(policyCode || '').trim() || 'UNKNOWN';
+
+    return policyPreviewPolicyLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη πολιτική');
+}
+
+function getPolicyPreviewScenarioLabel(scenarioCode) {
+    const key = String(scenarioCode || '').trim() || 'UNKNOWN';
+
+    return (
+        policyPreviewScenarioLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστο σενάριο')
+    );
+}
+
+function getPolicyPreviewActionLabel(actionType) {
+    const key = String(actionType || '').trim() || 'UNKNOWN';
+
+    return policyPreviewActionLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη ενέργεια');
+}
+
+function getPolicyPreviewReasonLabel(reasonCode) {
+    const key = String(reasonCode || '').trim() || 'UNKNOWN';
+
+    return policyPreviewReasonLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη αιτιολογία');
+}
+
+function getPolicyPreviewFlagLabel(flagKey) {
+    const key = String(flagKey || '').trim();
+
+    return policyPreviewFlagLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη ένδειξη');
+}
+
+function getPolicyPreviewFieldLabel(fieldKey) {
+    const key = String(fieldKey || '').trim();
+    const auditFieldLabel = auditLabel(key);
+
+    if (policyPreviewFieldLabels[key]) return policyPreviewFieldLabels[key];
+    if (auditFieldLabel && auditFieldLabel !== key) return auditFieldLabel;
+
+    return formatPolicyPreviewUnknownCode(key);
+}
+
+function getPolicyPreviewGroupTitle(group = {}) {
+    const policyLabel = getPolicyPreviewPolicyLabel(group.policy_code);
+    const scenarioLabel = getPolicyPreviewScenarioLabel(group.scenario_code);
+
+    if (policyLabel && policyLabel !== 'Άγνωστη πολιτική') return policyLabel;
+    if (scenarioLabel && scenarioLabel !== 'Άγνωστο σενάριο') return scenarioLabel;
+
+    return getPolicyPreviewStatusLabel(group.status).label;
+}
+
+function renderPolicyPreviewGroupDescription(group = {}) {
+    const statusLabel = getPolicyPreviewStatusLabel(group.status).label;
+    const policyLabel = getPolicyPreviewPolicyLabel(group.policy_code);
+    const scenarioLabel = getPolicyPreviewScenarioLabel(group.scenario_code);
+    const actionLabel = getPolicyPreviewActionLabel(group.action_type);
+    const reasonLabel = getPolicyPreviewReasonLabel(group.reason_code);
+
+    return [
+        ['Κατάσταση', statusLabel],
+        ['Πολιτική', policyLabel],
+        ['Σενάριο', scenarioLabel],
+        ['Ενέργεια', actionLabel],
+        ['Αιτιολογία', reasonLabel]
+    ]
+        .filter(([, value]) => value && value !== '-')
+        .map(([label, value]) => `${label}: ${value}`)
+        .join(' · ');
+}
+
+function buildPolicyPreviewParams(baseParams) {
+    return new URLSearchParams({
+        apo_hmeromhnia: baseParams.get('apo_hmeromhnia') || '',
+        eos_hmeromhnia: baseParams.get('eos_hmeromhnia') || '',
+        ypokatasthma: baseParams.get('ypokatasthma') || '',
+        kodikos: baseParams.get('kodikos') || '',
+        page: '1',
+        limit: '200'
+    });
+}
+
+async function fetchPolicyPreviewGrouping(baseParams) {
+    const params = buildPolicyPreviewParams(baseParams);
+    const response = await fetch(`/api/prodhlomena-oraria/review/policies/preview?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+            'CSRF-Token': csrfToken
+        }
+    });
+    const payload = await response.json();
+
+    if (!payload.success) {
+        throw new Error(payload.message || 'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.');
+    }
+
+    return payload.grouping || null;
+}
+
+function renderPolicyPreviewStatusBadge(status) {
+    const statusCode = String(status || '').trim() || 'UNKNOWN';
+    const statusLabel = getPolicyPreviewStatusLabel(statusCode);
+
+    return `
+        <span class="badge ${escapeHtml(statusLabel.badgeClass)}" title="${escapeHtml(statusCode)}">
+            ${escapeHtml(statusLabel.label)}
+        </span>
+    `;
+}
+
+function renderPolicyPreviewGroupingSummary(grouping) {
+    const summary = grouping?.summary || {};
+    const byStatus = summary.by_status || {};
+    const statusEntries = Object.entries(byStatus);
+
+    return `
+        <div class="policy-preview-summary-meta mb-2">
+            <span class="badge text-bg-light border">
+                Εμβέλεια: ${escapeHtml(getPolicyPreviewScopeLabel(grouping?.scope))}
+            </span>
+            <span class="badge text-bg-light border">
+                Σύνολο εγγραφών σελίδας: ${escapeHtml(summary.total ?? 0)}
+            </span>
+            <span class="badge text-bg-light border">
+                Ομάδες: ${escapeHtml(summary.groups_count ?? 0)}
+            </span>
+        </div>
+        <div class="small text-muted mb-2">
+            Η ομαδοποίηση αφορά τις εγγραφές της τρέχουσας σελίδας αποτελεσμάτων.
+        </div>
+        <div class="policy-preview-summary-meta">
+            <span class="small fw-semibold">Ανά κατάσταση:</span>
+            ${
+                statusEntries.length > 0
+                    ? statusEntries
+                          .map(
+                              ([status, count]) => `
+                                  <span class="badge text-bg-light border">
+                                      ${renderPolicyPreviewStatusBadge(status)}
+                                      <span class="ms-1">${escapeHtml(count)}</span>
+                                  </span>
+                              `
+                          )
+                          .join('')
+                    : '<span class="small text-muted">-</span>'
+            }
+        </div>
+    `;
+}
+
+function renderPolicyPreviewCompactValues(value) {
+    const entries = Object.entries(value || {});
+
+    if (entries.length === 0) return '<span class="text-muted">-</span>';
+
+    return `
+        <div class="policy-preview-compact-values">
+            ${entries
+                .map(
+                    ([key, entryValue]) => `
+                        <span class="policy-preview-value-chip">
+                            <span class="fw-semibold" title="${escapeHtml(key)}">${escapeHtml(getPolicyPreviewFieldLabel(key))}:</span>
+                            ${escapeHtml(formatScenarioValue(entryValue))}
+                        </span>
+                    `
+                )
+                .join('')}
+        </div>
+    `;
+}
+
+function renderPolicyPreviewFlags(flags = {}) {
+    const trueFlags = Object.entries(flags || {}).filter(([, value]) => value === true);
+
+    if (trueFlags.length === 0) return '<span class="text-muted">-</span>';
+
+    return `
+        <div class="policy-preview-compact-values">
+            ${trueFlags
+                .map(
+                    ([key]) => `
+                        <span class="badge text-bg-light border" title="${escapeHtml(key)}">
+                            ${escapeHtml(getPolicyPreviewFlagLabel(key))}
+                        </span>
+                    `
+                )
+                .join('')}
+        </div>
+    `;
+}
+
+function findPolicyPreviewReviewRow(item = {}) {
+    const itemId = rowIdentityKey(item.prodhlomena_oraria_id || item.preview_id);
+
+    if (!itemId) return null;
+
+    return currentReviewRows.find((row) => rowIdentityKey(row._id || row.id) === itemId) || null;
+}
+
+function formatPolicyPreviewIntervals(row = {}, apoPrefix, eosPrefix, suffix = '') {
+    const lines = [1, 2, 3]
+        .map((n) => {
+            const p = pairNo(n);
+            const apo = row[`${apoPrefix}_${p}${suffix}`];
+            const eos = row[`${eosPrefix}_${p}${suffix}`];
+
+            if (!hasMeaningfulValue(apo) && !hasMeaningfulValue(eos)) return '';
+
+            return intervalText(apo, eos);
+        })
+        .filter(Boolean);
+
+    return lines.length > 0 ? lines.join(' / ') : '-';
+}
+
+function renderPolicyPreviewDetailsRows(item = {}, reviewRow = null) {
+    const row = reviewRow || {};
+    const rows = reviewRow
+        ? [
+              ['Παράρτημα', row.ypokatasthma || '-'],
+              ['Κωδικός εργαζομένου', row.kodikos || item.employee_kodikos || '-'],
+              ['Ημερομηνία', formatPolicyPreviewDate(row.hmeromhnia || item.hmeromhnia)],
+              ['Προδηλωμένο', row.kathgoria_ergasias || item.kathgoria_ergasias || '-'],
+              ['Ωράριο', formatPolicyPreviewIntervals(row, 'apo_ora', 'eos_ora')],
+              ['Προδηλωμένες ώρες', formatPolicyPreviewHours(row.ores_ergasias)],
+              ['Κάρτες', formatPolicyPreviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora')],
+              ['Ώρες καρτών', formatPolicyPreviewHours(row.cards_ores_ergasias ?? item.cards_ores_ergasias)],
+              [
+                  'Απολογιστικό',
+                  row.kathgoria_ergasias_apologistika ||
+                      item.kathgoria_ergasias_apologistika ||
+                      '-'
+              ],
+              [
+                  'Απολογιστικό ωράριο',
+                  formatPolicyPreviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika')
+              ],
+              ['Ώρες εργασίας απολογιστικά', formatPolicyPreviewHours(row.ores_ergasias_apologistika)],
+              ['Ώρες απουσίας', formatPolicyPreviewHours(row.ores_apoysias_apologistika)],
+              ['Ώρες νύχτας', formatPolicyPreviewHours(row.ores_nyxtas_apologistika)],
+              [
+                  'Ώρες αργίας',
+                  formatPolicyPreviewHours(
+                      num(row.ores_argion_prosayxhsh_apologistika) +
+                          num(row.ores_argion_ergasia_apologistika)
+                  )
+              ],
+              ['Κλειδωμένο', row.is_locked ? 'ΝΑΙ' : 'ΟΧΙ'],
+              ['ID εγγραφής', row._id || item.prodhlomena_oraria_id || '-']
+          ]
+        : [
+        ['Κωδικός εργαζομένου', item.employee_kodikos || '-'],
+        ['Ημερομηνία', formatPolicyPreviewDate(item.hmeromhnia)],
+        ['Προδηλωμένο', item.kathgoria_ergasias || '-'],
+        ['Απολογιστικό', item.kathgoria_ergasias_apologistika || '-'],
+        ['Ώρες καρτών', formatPolicyPreviewHours(item.cards_ores_ergasias)],
+        ['ID εγγραφής', item.prodhlomena_oraria_id || '-']
+    ];
+
+    return rows
+        .map(
+            ([label, value]) => `
+                <tr>
+                    <th class="text-start">${escapeHtml(label)}</th>
+                    <td>${escapeHtml(value)}</td>
+                </tr>
+            `
+        )
+        .join('');
+}
+
+function showPolicyPreviewItemDetails(item = {}) {
+    const reviewRow = findPolicyPreviewReviewRow(item);
+    const note = reviewRow
+        ? 'Εμφανίζονται τα στοιχεία που είναι ήδη διαθέσιμα στο τρέχον read-only response της σελίδας.'
+        : 'Τα πλήρη στοιχεία της εγγραφής δεν είναι διαθέσιμα στο τρέχον response. Για πλήρη στοιχεία ProdhlomenaOrariaModel θα χρειαστεί ξεχωριστό read-only endpoint.';
+    const html = `
+        <div class="text-start">
+            <table class="table table-sm table-bordered align-middle mb-2">
+                <tbody>
+                    ${renderPolicyPreviewDetailsRows(item, reviewRow)}
+                    <tr>
+                        <th class="text-start">Προτεινόμενες τιμές</th>
+                        <td>${renderPolicyPreviewCompactValues(item.proposed_values)}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-start">Ενδείξεις</th>
+                        <td>${renderPolicyPreviewFlags(item.flags)}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="small text-muted">
+                Σημείωση: ${escapeHtml(note)}
+            </div>
+        </div>
+    `;
+
+    if (window.Swal?.fire) {
+        Swal.fire({
+            title: 'Πλήρη στοιχεία εγγραφής',
+            html,
+            confirmButtonText: 'Κλείσιμο',
+            width: '48rem'
+        });
+        return;
+    }
+
+    const modalBody = document.getElementById('detailsContainer');
+
+    if (!modalBody) return;
+
+    modalBody.innerHTML = html;
+    new bootstrap.Modal(document.getElementById('detailsModal')).show();
+}
+
+function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return '<div class="text-muted small p-2">Δεν υπάρχουν items για αυτή την ομάδα.</div>';
+    }
+
+    return `
+        <table class="table table-sm table-bordered align-middle mb-0 policy-preview-items-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Κωδικός</th>
+                        <th>Ημ/νία</th>
+                        <th>Προδηλωμένο</th>
+                        <th>Απολογιστικό</th>
+                        <th>Ώρες καρτών</th>
+                        <th>Ενδείξεις</th>
+                        <th>Λεπτομέρειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items
+                        .map(
+                            (item, itemIndex) => `
+                                <tr>
+                                    <td>${escapeHtml(item.employee_kodikos || '-')}</td>
+                                    <td>${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}</td>
+                                    <td>${escapeHtml(item.kathgoria_ergasias || '-')}</td>
+                                    <td>${escapeHtml(item.kathgoria_ergasias_apologistika || '-')}</td>
+                                    <td>${escapeHtml(formatPolicyPreviewHours(item.cards_ores_ergasias))}</td>
+                                    <td>${renderPolicyPreviewFlags(item.flags)}</td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary policy-preview-details-btn"
+                                            data-group-index="${escapeHtml(groupIndex)}"
+                                            data-item-index="${escapeHtml(itemIndex)}">
+                                            Εμφάνιση
+                                        </button>
+                                    </td>
+                                </tr>
+                            `
+                        )
+                        .join('')}
+                </tbody>
+        </table>
+    `;
+}
+
+function renderPolicyPreviewGroups(grouping, options = {}) {
+    const container = document.getElementById('policyPreviewGroupsContainer');
+
+    if (!container) return;
+
+    currentPolicyPreviewGrouping = grouping || null;
+
+    if (options.loading) {
+        container.innerHTML = `
+            <div class="card border rounded">
+                <div class="card-body py-3">
+                    <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
+                    <div class="text-muted small">Φόρτωση ομαδοποίησης...</div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    if (options.error) {
+        container.innerHTML = `
+            <div class="card border rounded">
+                <div class="card-body py-3">
+                    <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
+                    <div class="text-danger small">
+                        ${escapeHtml(options.error)}
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    if (!grouping) {
+        container.innerHTML = `
+            <div class="card border rounded">
+                <div class="card-body py-3">
+                    <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
+                    <div class="text-muted small">
+                        Δεν υπάρχουν διαθέσιμα δεδομένα ομαδοποίησης.
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const groups = Array.isArray(grouping.groups) ? grouping.groups : [];
+    const groupsHtml =
+        groups.length > 0
+            ? groups
+                  .map((group, index) => {
+                      const groupElementId = `policyPreviewGroupItems-${index}`;
+                      const groupTitle = getPolicyPreviewGroupTitle(group);
+                      const groupDescription = renderPolicyPreviewGroupDescription(group);
+
+                      return `
+                          <div class="border rounded policy-preview-group-card">
+                              <div class="policy-preview-group-header">
+                                  <div>
+                                      <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                          ${renderPolicyPreviewStatusBadge(group.status)}
+                                          <span class="fw-semibold">${escapeHtml(groupTitle)}</span>
+                                      </div>
+                                      <div class="policy-preview-group-line text-muted mb-1">
+                                          Εγγραφές: ${escapeHtml(group.count ?? 0)}
+                                          · Εργαζόμενοι: ${escapeHtml(group.employees_count ?? 0)}
+                                          · Από: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}
+                                          · Έως: ${escapeHtml(formatPolicyPreviewDate(group.last_date))}
+                                      </div>
+                                      <div class="policy-preview-group-line text-muted">
+                                          ${escapeHtml(groupDescription)}
+                                      </div>
+                                  </div>
+                                  <button
+                                      type="button"
+                                      class="btn btn-sm btn-outline-primary policy-preview-group-toggle policy-preview-toggle"
+                                      data-target-id="${escapeHtml(groupElementId)}"
+                                      aria-expanded="false">
+                                      Άνοιγμα
+                                  </button>
+                              </div>
+                              <div
+                                  class="policy-preview-group-items d-none mt-2"
+                                  id="${escapeHtml(groupElementId)}">
+                                  ${renderPolicyPreviewGroupItems(group.items, index)}
+                              </div>
+                          </div>
+                      `;
+                  })
+                  .join('')
+            : `
+                <div class="text-muted small border rounded p-2">
+                    Δεν βρέθηκαν ομάδες για τα τρέχοντα φίλτρα.
+                </div>
+            `;
+
+    container.innerHTML = `
+        <div class="card border rounded policy-preview-card">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
+                    <div>
+                        <div class="fw-semibold">Ομαδοποίηση Ελέγχου Πολιτικών</div>
+                    </div>
+                    <span class="badge text-bg-light border">Έκδοση: ${escapeHtml(grouping.version ?? '-')}</span>
+                </div>
+                ${renderPolicyPreviewGroupingSummary(grouping)}
+                <hr class="my-2">
+                ${groupsHtml}
+            </div>
+        </div>
+    `;
+
+    container.querySelectorAll('.policy-preview-group-toggle').forEach((button) => {
+        button.addEventListener('click', () => {
+            const targetId = button.dataset.targetId;
+            const target = targetId ? document.getElementById(targetId) : null;
+
+            if (!target) return;
+
+            const isOpen = !target.classList.contains('d-none');
+            target.classList.toggle('d-none', isOpen);
+            button.setAttribute('aria-expanded', String(!isOpen));
+            button.textContent = isOpen ? 'Άνοιγμα' : 'Κλείσιμο';
+        });
+    });
+
+    container.querySelectorAll('.policy-preview-details-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const groupIndex = Number(button.dataset.groupIndex);
+            const itemIndex = Number(button.dataset.itemIndex);
+            const item = groups?.[groupIndex]?.items?.[itemIndex];
+
+            if (!item) return;
+
+            showPolicyPreviewItemDetails(item);
+        });
+    });
+}
+
 async function loadResults() {
     try {
         const params = new URLSearchParams({
@@ -1606,6 +2370,7 @@ async function loadResults() {
 
         ensureReviewTableStructure();
         ensureScenarioReviewFilterControl();
+        renderPolicyPreviewGroups(null, { loading: true });
 
         const rows = payload.rows || [];
         try {
@@ -1619,6 +2384,18 @@ async function loadResults() {
         currentReviewRows = rows;
         currentReviewDeviations = payload.deviations || [];
         renderCurrentReviewRows();
+
+        try {
+            const grouping = await fetchPolicyPreviewGrouping(params);
+            renderPolicyPreviewGroups(grouping);
+        } catch (policyPreviewError) {
+            console.warn('[loadResults] Policy preview grouping unavailable:', policyPreviewError);
+            renderPolicyPreviewGroups(null, {
+                error:
+                    policyPreviewError.message ||
+                    'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.'
+            });
+        }
     } catch (error) {
         console.error(error);
 
