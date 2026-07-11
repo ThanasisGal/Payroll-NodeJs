@@ -215,10 +215,18 @@ const scenarioProposedUpdateFillableFields = new Set([
 let currentReviewRows = [];
 let currentReviewDeviations = [];
 let currentPolicyPreviewGrouping = null;
+let currentPolicyPreviewApprovalRecords = [];
+let currentPolicyPreviewApprovalTotal = 0;
 let currentPolicyPreviewApprovalsByGroupId = new Map();
 let currentPolicyPreviewApprovalsError = '';
 let currentPolicyPreviewBaseParams = null;
 let policyPreviewApprovalSubmitting = false;
+let currentApprovalHistoryExpanded = false;
+const currentApprovalHistoryFilters = {
+    decisionType: '',
+    userName: '',
+    searchText: ''
+};
 
 const reviewFilterDefinitions = [
     { key: 'onlyApologistiko', id: 'only_apologistiko', label: 'Μόνο Απολογιστικό' },
@@ -1115,6 +1123,13 @@ function ensureReviewTableStructure() {
                 margin-bottom: 0.45rem;
             }
 
+            .policy-preview-group-card.policy-preview-group-highlight {
+                border-color: #0d6efd !important;
+                background-color: #e7f1ff;
+                box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+                transition: background-color 0.25s ease, box-shadow 0.25s ease;
+            }
+
             .policy-preview-group-header {
                 display: grid;
                 grid-template-columns: minmax(0, 1fr) auto;
@@ -1318,6 +1333,85 @@ function ensureReviewTableStructure() {
             .policy-preview-decision-btn:disabled {
                 opacity: 0.65;
                 cursor: not-allowed;
+            }
+
+            .policy-preview-history-card {
+                margin-top: 0.65rem;
+                border: 1px solid #dee2e6;
+                border-radius: 0.4rem;
+                background-color: #ffffff;
+            }
+
+            .policy-preview-history-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.5rem;
+                padding: 0.5rem 0.6rem;
+                background-color: #f8f9fa;
+            }
+
+            .policy-preview-history-summary {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.3rem;
+                padding: 0 0.6rem 0.5rem;
+                background-color: #f8f9fa;
+            }
+
+            .policy-preview-history-content {
+                padding: 0.55rem 0.6rem 0.65rem;
+                border-top: 1px solid #dee2e6;
+            }
+
+            .policy-preview-history-filters {
+                display: grid;
+                grid-template-columns: minmax(10rem, 0.8fr) minmax(10rem, 0.8fr) minmax(14rem, 1.4fr);
+                gap: 0.4rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .policy-preview-history-table-wrapper {
+                max-height: 280px;
+                overflow: auto;
+                position: relative;
+            }
+
+            .policy-preview-history-table {
+                min-width: 1050px;
+                font-size: 0.7rem;
+            }
+
+            .policy-preview-history-table th,
+            .policy-preview-history-table td {
+                padding: 0.25rem 0.35rem;
+                vertical-align: top;
+            }
+
+            .policy-preview-history-table thead th {
+                position: sticky;
+                top: 0;
+                z-index: 3;
+                background-color: #f8f9fa;
+                box-shadow: 0 1px 0 #dee2e6;
+                white-space: nowrap;
+            }
+
+            .policy-preview-history-notes {
+                max-width: 18rem;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+
+            .policy-preview-history-details-items {
+                max-height: 22rem;
+                overflow: auto;
+            }
+
+            @media (max-width: 991.98px) {
+                .policy-preview-history-filters {
+                    grid-template-columns: 1fr;
+                }
             }
 
             .review-card-body.review-filters-active .results-table-wrapper {
@@ -2079,7 +2173,10 @@ async function fetchPolicyPreviewApprovals(baseParams) {
         );
     }
 
-    return Array.isArray(payload.records) ? payload.records : [];
+    return {
+        records: Array.isArray(payload.records) ? payload.records : [],
+        total: Number(payload.total) || 0
+    };
 }
 
 function buildPolicyPreviewApprovalsMap(records = []) {
@@ -2093,11 +2190,13 @@ function buildPolicyPreviewApprovalsMap(records = []) {
 
         const existing = approvalsByGroupId.get(groupId) || {
             latest: null,
-            decisionTypes: new Set()
+            decisionTypes: new Set(),
+            count: 0
         };
         const decisionType = String(record?.decision_type || '').trim();
 
         if (decisionType) existing.decisionTypes.add(decisionType);
+        existing.count += 1;
 
         const existingTime = new Date(existing.latest?.created_at || 0).getTime() || 0;
         const recordTime = new Date(record.created_at || 0).getTime() || 0;
@@ -2110,8 +2209,10 @@ function buildPolicyPreviewApprovalsMap(records = []) {
 }
 
 async function refreshPolicyPreviewApprovals(baseParams) {
-    const records = await fetchPolicyPreviewApprovals(baseParams);
-    currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(records);
+    const result = await fetchPolicyPreviewApprovals(baseParams);
+    currentPolicyPreviewApprovalRecords = result.records;
+    currentPolicyPreviewApprovalTotal = result.total;
+    currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(result.records);
     currentPolicyPreviewApprovalsError = '';
 }
 
@@ -2142,6 +2243,475 @@ function getPolicyPreviewDecisionButtons(group = {}) {
     return buttons;
 }
 
+function getPolicyPreviewDecisionStatusLabel(status) {
+    const key = String(status || '').trim();
+    if (key === 'RECORDED') return 'Καταγεγραμμένη';
+    if (key === 'CANCELLED') return 'Ακυρωμένη';
+    return '-';
+}
+
+function getPolicyPreviewHistoryUsers() {
+    return [
+        ...new Set(
+            currentPolicyPreviewApprovalRecords
+                .map((record) => String(record?.created_by_user_name || '').trim())
+                .filter(Boolean)
+        )
+    ].sort((left, right) => left.localeCompare(right, 'el', { sensitivity: 'base' }));
+}
+
+function getFilteredPolicyPreviewApprovalRecords() {
+    const decisionType = currentApprovalHistoryFilters.decisionType;
+    const userName = currentApprovalHistoryFilters.userName;
+    const searchText = currentApprovalHistoryFilters.searchText.trim().toLocaleLowerCase('el');
+
+    return currentPolicyPreviewApprovalRecords.filter((record) => {
+        if (decisionType && record.decision_type !== decisionType) return false;
+        if (userName && record.created_by_user_name !== userName) return false;
+        if (!searchText) return true;
+
+        const searchableText = [
+            record.notes,
+            record.policy_code,
+            getPolicyPreviewPolicyLabel(record.policy_code),
+            record.scenario_code,
+            getPolicyPreviewScenarioLabel(record.scenario_code),
+            record.action_type,
+            getPolicyPreviewActionLabel(record.action_type),
+            record.reason_code,
+            getPolicyPreviewReasonLabel(record.reason_code),
+            record.group_id,
+            record.created_by_user_name
+        ]
+            .map((value) => String(value || '').toLocaleLowerCase('el'))
+            .join(' ');
+
+        return searchableText.includes(searchText);
+    });
+}
+
+function getPolicyPreviewApprovalRecordCounts(record = {}) {
+    const items = Array.isArray(record.items) ? record.items : [];
+    const employeeCount = new Set(
+        items.map((item) => String(item?.employee_kodikos || '').trim()).filter(Boolean)
+    ).size;
+
+    return {
+        items: Number(record.snapshot_summary?.items_count) || items.length,
+        employees: Number(record.snapshot_summary?.employees_count) || employeeCount
+    };
+}
+
+function truncatePolicyPreviewHistoryText(value, maxLength = 90) {
+    const text = String(value || '').trim();
+    if (text.length <= maxLength) return text || '-';
+    return `${text.slice(0, maxLength - 1)}…`;
+}
+
+function renderPolicyPreviewApprovalHistorySummary() {
+    const records = currentPolicyPreviewApprovalRecords;
+
+    if (records.length === 0) {
+        return '<span class="small text-muted">Δεν υπάρχουν καταγεγραμμένες αποφάσεις για την τρέχουσα περίοδο.</span>';
+    }
+
+    const recordedCount = records.filter((record) => record.decision_status === 'RECORDED').length;
+    const countsByDecision = records.reduce((counts, record) => {
+        const key = String(record?.decision_type || '').trim();
+        if (key) counts[key] = (counts[key] || 0) + 1;
+        return counts;
+    }, {});
+    const countsByUser = records.reduce((counts, record) => {
+        const key = String(record?.created_by_user_name || '').trim();
+        if (key) counts[key] = (counts[key] || 0) + 1;
+        return counts;
+    }, {});
+    const latestRecord = [...records].sort(
+        (left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0)
+    )[0];
+
+    return `
+        <span class="badge text-bg-light border">Σύνολο αποφάσεων: ${escapeHtml(
+            currentPolicyPreviewApprovalTotal
+        )}</span>
+        <span class="badge text-bg-light border">Καταγεγραμμένες: ${escapeHtml(
+            recordedCount
+        )}</span>
+        ${Object.entries(countsByDecision)
+            .map(
+                ([type, count]) => `
+                    <span class="badge text-bg-light border">
+                        ${escapeHtml(getPolicyPreviewDecisionLabel(type))}: ${escapeHtml(count)}
+                    </span>
+                `
+            )
+            .join('')}
+        ${Object.entries(countsByUser)
+            .map(
+                ([userName, count]) => `
+                    <span class="badge text-bg-light border">
+                        ${escapeHtml(userName)}: ${escapeHtml(count)}
+                    </span>
+                `
+            )
+            .join('')}
+        <span class="badge text-bg-light border">
+            Τελευταία καταγραφή: ${escapeHtml(formatPolicyPreviewDateTime(latestRecord?.created_at))}
+        </span>
+    `;
+}
+
+function renderPolicyPreviewApprovalHistoryResults() {
+    const records = getFilteredPolicyPreviewApprovalRecords();
+
+    if (records.length === 0) {
+        return '<div class="small text-muted border rounded p-2">Δεν βρέθηκαν αποφάσεις για τα επιλεγμένα φίλτρα.</div>';
+    }
+
+    return `
+        <div class="small text-muted mb-1">Εμφανίζονται ${escapeHtml(records.length)} εγγραφές.</div>
+        <div class="policy-preview-history-table-wrapper">
+            <table class="table table-sm table-bordered align-middle mb-0 policy-preview-history-table">
+                <thead>
+                    <tr>
+                        <th>Ημερομηνία / ώρα</th>
+                        <th>Απόφαση</th>
+                        <th>Χρήστης</th>
+                        <th>Ομάδα / κατάσταση</th>
+                        <th>Πολιτική</th>
+                        <th>Σενάριο</th>
+                        <th>Εγγραφές</th>
+                        <th>Εργαζόμενοι</th>
+                        <th>Σημειώσεις</th>
+                        <th>Ενέργειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${records
+                        .map((record) => {
+                            const counts = getPolicyPreviewApprovalRecordCounts(record);
+                            return `
+                                <tr>
+                                    <td>${escapeHtml(formatPolicyPreviewDateTime(record.created_at))}</td>
+                                    <td>${escapeHtml(getPolicyPreviewDecisionLabel(record.decision_type))}</td>
+                                    <td>${escapeHtml(record.created_by_user_name || '-')}</td>
+                                    <td title="${escapeHtml(record.group_id || '')}">${escapeHtml(
+                                        getPolicyPreviewStatusLabel(record.status).label
+                                    )}</td>
+                                    <td title="${escapeHtml(record.policy_code || '')}">${escapeHtml(
+                                        getPolicyPreviewPolicyLabel(record.policy_code)
+                                    )}</td>
+                                    <td title="${escapeHtml(record.scenario_code || '')}">${escapeHtml(
+                                        getPolicyPreviewScenarioLabel(record.scenario_code)
+                                    )}</td>
+                                    <td>${escapeHtml(counts.items)}</td>
+                                    <td>${escapeHtml(counts.employees)}</td>
+                                    <td class="policy-preview-history-notes" title="${escapeHtml(
+                                        record.notes || ''
+                                    )}">${escapeHtml(truncatePolicyPreviewHistoryText(record.notes))}</td>
+                                    <td class="text-nowrap">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm policy-preview-details-btn policy-preview-history-details-btn"
+                                            data-approval-id="${escapeHtml(record._id || '')}">
+                                            Λεπτομέρειες
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-secondary policy-preview-history-group-btn"
+                                            data-group-id="${escapeHtml(record.group_id || '')}">
+                                            Άνοιγμα ομάδας
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        })
+                        .join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderPolicyPreviewApprovalHistoryContent() {
+    const users = getPolicyPreviewHistoryUsers();
+    const limitNote =
+        currentPolicyPreviewApprovalTotal > currentPolicyPreviewApprovalRecords.length
+            ? '<div class="small text-muted mb-2">Εμφανίζονται έως 200 καταγεγραμμένες αποφάσεις για την τρέχουσα περίοδο.</div>'
+            : '';
+
+    return `
+        ${limitNote}
+        <div class="policy-preview-history-filters">
+            <div>
+                <label class="form-label small mb-1" for="policyPreviewHistoryDecisionFilter">Απόφαση</label>
+                <select class="form-select form-select-sm" id="policyPreviewHistoryDecisionFilter">
+                    <option value="">Όλες οι αποφάσεις</option>
+                    ${Object.entries(policyPreviewDecisionLabels)
+                        .map(
+                            ([type, label]) => `
+                                <option value="${escapeHtml(type)}" ${
+                                    currentApprovalHistoryFilters.decisionType === type ? 'selected' : ''
+                                }>${escapeHtml(label)}</option>
+                            `
+                        )
+                        .join('')}
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="policyPreviewHistoryUserFilter">Χρήστης</label>
+                <select class="form-select form-select-sm" id="policyPreviewHistoryUserFilter">
+                    <option value="">Όλοι οι χρήστες</option>
+                    ${users
+                        .map(
+                            (userName) => `
+                                <option value="${escapeHtml(userName)}" ${
+                                    currentApprovalHistoryFilters.userName === userName ? 'selected' : ''
+                                }>${escapeHtml(userName)}</option>
+                            `
+                        )
+                        .join('')}
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="policyPreviewHistorySearch">Αναζήτηση</label>
+                <input
+                    type="search"
+                    class="form-control form-control-sm"
+                    id="policyPreviewHistorySearch"
+                    value="${escapeHtml(currentApprovalHistoryFilters.searchText)}"
+                    placeholder="Σημειώσεις, πολιτική ή σενάριο">
+            </div>
+        </div>
+        <div id="policyPreviewApprovalHistoryResults">
+            ${renderPolicyPreviewApprovalHistoryResults()}
+        </div>
+    `;
+}
+
+function renderPolicyPreviewApprovalHistorySection() {
+    return `
+        <section class="policy-preview-history-card" aria-labelledby="policyPreviewHistoryTitle">
+            <div class="policy-preview-history-header">
+                <div class="fw-semibold" id="policyPreviewHistoryTitle">Ιστορικό Αποφάσεων Ελέγχου</div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary policy-preview-history-toggle"
+                    aria-expanded="${String(currentApprovalHistoryExpanded)}">
+                    ${currentApprovalHistoryExpanded ? 'Απόκρυψη' : 'Εμφάνιση'}
+                </button>
+            </div>
+            <div class="policy-preview-history-summary">
+                ${renderPolicyPreviewApprovalHistorySummary()}
+            </div>
+            <div class="policy-preview-history-content ${
+                currentApprovalHistoryExpanded ? '' : 'd-none'
+            }">
+                ${renderPolicyPreviewApprovalHistoryContent()}
+            </div>
+        </section>
+    `;
+}
+
+function showPolicyPreviewApprovalHistoryDetails(record = {}) {
+    const items = Array.isArray(record.items) ? record.items : [];
+    const visibleItems = items.slice(0, 50);
+    const counts = getPolicyPreviewApprovalRecordCounts(record);
+    const html = `
+        <div class="text-start">
+            <table class="table table-sm table-bordered align-middle mb-3">
+                <tbody>
+                    <tr><th>Απόφαση</th><td>${escapeHtml(
+                        getPolicyPreviewDecisionLabel(record.decision_type)
+                    )}</td></tr>
+                    <tr><th>Κατάσταση</th><td>${escapeHtml(
+                        getPolicyPreviewDecisionStatusLabel(record.decision_status)
+                    )}</td></tr>
+                    <tr><th>ID ομάδας</th><td><span class="small text-muted">${escapeHtml(
+                        record.group_id || '-'
+                    )}</span></td></tr>
+                    <tr><th>Χρήστης</th><td>${escapeHtml(
+                        record.created_by_user_name || '-'
+                    )}</td></tr>
+                    <tr><th>Ημερομηνία</th><td>${escapeHtml(
+                        formatPolicyPreviewDateTime(record.created_at)
+                    )}</td></tr>
+                    <tr><th>Περίοδος</th><td>${escapeHtml(
+                        formatPolicyPreviewDate(record.apo_hmeromhnia)
+                    )} – ${escapeHtml(formatPolicyPreviewDate(record.eos_hmeromhnia))}</td></tr>
+                    <tr><th>Πολιτική</th><td title="${escapeHtml(
+                        record.policy_code || ''
+                    )}">${escapeHtml(getPolicyPreviewPolicyLabel(record.policy_code))}</td></tr>
+                    <tr><th>Σενάριο</th><td title="${escapeHtml(
+                        record.scenario_code || ''
+                    )}">${escapeHtml(getPolicyPreviewScenarioLabel(record.scenario_code))}</td></tr>
+                    <tr><th>Ενέργεια</th><td title="${escapeHtml(
+                        record.action_type || ''
+                    )}">${escapeHtml(getPolicyPreviewActionLabel(record.action_type))}</td></tr>
+                    <tr><th>Αιτιολογία</th><td title="${escapeHtml(
+                        record.reason_code || ''
+                    )}">${escapeHtml(getPolicyPreviewReasonLabel(record.reason_code))}</td></tr>
+                    <tr><th>Εγγραφές</th><td>${escapeHtml(counts.items)}</td></tr>
+                    <tr><th>Εργαζόμενοι</th><td>${escapeHtml(counts.employees)}</td></tr>
+                    <tr><th>Σημειώσεις</th><td>${escapeHtml(record.notes || '-')}</td></tr>
+                </tbody>
+            </table>
+            <div class="fw-semibold mb-1">Snapshot εγγραφών</div>
+            <div class="table-responsive policy-preview-history-details-items">
+                <table class="table table-sm table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Κωδικός</th>
+                            <th>Ημ/νία</th>
+                            <th>Προδηλωμένο</th>
+                            <th>Απολογιστικό</th>
+                            <th>Ώρες καρτών</th>
+                            <th>Προτεινόμενες τιμές</th>
+                            <th>Ενδείξεις</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${visibleItems
+                            .map(
+                                (item) => `
+                                    <tr>
+                                        <td>${escapeHtml(item.employee_kodikos || '-')}</td>
+                                        <td>${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}</td>
+                                        <td>${escapeHtml(item.kathgoria_ergasias || '-')}</td>
+                                        <td>${escapeHtml(
+                                            item.kathgoria_ergasias_apologistika || '-'
+                                        )}</td>
+                                        <td>${escapeHtml(
+                                            formatPolicyPreviewHours(item.cards_ores_ergasias)
+                                        )}</td>
+                                        <td>${renderPolicyPreviewCompactValues(
+                                            item.proposed_values
+                                        )}</td>
+                                        <td>${renderPolicyPreviewFlags(item.flags)}</td>
+                                    </tr>
+                                `
+                            )
+                            .join('')}
+                    </tbody>
+                </table>
+            </div>
+            ${
+                items.length > visibleItems.length
+                    ? `<div class="small text-muted mt-1">Εμφανίζονται τα πρώτα ${escapeHtml(
+                          visibleItems.length
+                      )} από ${escapeHtml(items.length)} items.</div>`
+                    : ''
+            }
+        </div>
+    `;
+
+    Swal.fire({
+        title: 'Λεπτομέρειες καταγεγραμμένης απόφασης',
+        html,
+        width: '72rem',
+        confirmButtonText: 'Κλείσιμο'
+    });
+}
+
+function openPolicyPreviewGroupFromHistory(root, groupId) {
+    const normalizedGroupId = String(groupId || '').trim();
+    const groupCard = [...root.querySelectorAll('.policy-preview-group-card')].find(
+        (card) => String(card.dataset.groupId || '').trim() === normalizedGroupId
+    );
+
+    if (!normalizedGroupId || !groupCard) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Η ομάδα δεν είναι διαθέσιμη',
+            text: 'Η ομάδα δεν υπάρχει στην τρέχουσα σελίδα αποτελεσμάτων.'
+        });
+        return;
+    }
+
+    const itemsContainer = groupCard.querySelector('.policy-preview-group-items');
+    const toggleButton = groupCard.querySelector('.policy-preview-group-toggle');
+
+    if (itemsContainer?.classList.contains('d-none')) {
+        itemsContainer.classList.remove('d-none');
+        toggleButton?.setAttribute('aria-expanded', 'true');
+        if (toggleButton) toggleButton.textContent = 'Κλείσιμο';
+    }
+
+    groupCard.classList.remove('policy-preview-group-highlight');
+    window.requestAnimationFrame(() => {
+        groupCard.classList.add('policy-preview-group-highlight');
+        groupCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    window.setTimeout(() => {
+        groupCard.classList.remove('policy-preview-group-highlight');
+    }, 3000);
+}
+
+function bindPolicyPreviewHistoryDetails(root) {
+    root.querySelectorAll('.policy-preview-history-details-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const approvalId = String(button.dataset.approvalId || '').trim();
+            const record = currentPolicyPreviewApprovalRecords.find(
+                (entry) => String(entry?._id || '').trim() === approvalId
+            );
+
+            if (record) showPolicyPreviewApprovalHistoryDetails(record);
+        });
+    });
+
+    root.querySelectorAll('.policy-preview-history-group-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const groupsRoot =
+                root.closest('#policyPreviewGroupsContainer') ||
+                document.getElementById('policyPreviewGroupsContainer');
+
+            if (groupsRoot) openPolicyPreviewGroupFromHistory(groupsRoot, button.dataset.groupId);
+        });
+    });
+}
+
+function updatePolicyPreviewApprovalHistoryResults(container) {
+    const results = container.querySelector('#policyPreviewApprovalHistoryResults');
+    if (!results) return;
+
+    results.innerHTML = renderPolicyPreviewApprovalHistoryResults();
+    bindPolicyPreviewHistoryDetails(results);
+}
+
+function bindPolicyPreviewApprovalHistoryEvents(container) {
+    const toggle = container.querySelector('.policy-preview-history-toggle');
+    const content = container.querySelector('.policy-preview-history-content');
+
+    toggle?.addEventListener('click', () => {
+        currentApprovalHistoryExpanded = !currentApprovalHistoryExpanded;
+        content?.classList.toggle('d-none', !currentApprovalHistoryExpanded);
+        toggle.setAttribute('aria-expanded', String(currentApprovalHistoryExpanded));
+        toggle.textContent = currentApprovalHistoryExpanded ? 'Απόκρυψη' : 'Εμφάνιση';
+    });
+
+    container
+        .querySelector('#policyPreviewHistoryDecisionFilter')
+        ?.addEventListener('change', (event) => {
+            currentApprovalHistoryFilters.decisionType = event.target.value;
+            updatePolicyPreviewApprovalHistoryResults(container);
+        });
+
+    container
+        .querySelector('#policyPreviewHistoryUserFilter')
+        ?.addEventListener('change', (event) => {
+            currentApprovalHistoryFilters.userName = event.target.value;
+            updatePolicyPreviewApprovalHistoryResults(container);
+        });
+
+    container.querySelector('#policyPreviewHistorySearch')?.addEventListener('input', (event) => {
+        currentApprovalHistoryFilters.searchText = event.target.value;
+        updatePolicyPreviewApprovalHistoryResults(container);
+    });
+
+    bindPolicyPreviewHistoryDetails(container);
+}
+
 function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
     const groupId = String(group.group_id || '').trim();
     const approvalState = currentPolicyPreviewApprovalsByGroupId.get(groupId);
@@ -2149,6 +2719,10 @@ function renderPolicyPreviewApprovalPanel(group = {}, groupIndex = 0) {
     const existingDecisionTypes = approvalState?.decisionTypes || new Set();
     const decisionDetails = latest
         ? `
+            <div class="small mb-1">
+                <span class="fw-semibold">Καταγεγραμμένες αποφάσεις:</span>
+                ${escapeHtml(approvalState?.count || 0)}
+            </div>
             <div class="policy-preview-approval-details">
                 <span><span class="fw-semibold">Απόφαση:</span> ${escapeHtml(
                     getPolicyPreviewDecisionLabel(latest.decision_type)
@@ -2664,7 +3238,9 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                       const isExpanded = options.expandedGroupId === group.group_id;
 
                       return `
-                          <div class="border rounded policy-preview-group-card">
+                          <div
+                              class="border rounded policy-preview-group-card"
+                              data-group-id="${escapeHtml(group.group_id || '')}">
                               <div class="policy-preview-group-header">
                                   <div>
                                       <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
@@ -2722,11 +3298,14 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                           )}</div>`
                         : ''
                 }
+                ${renderPolicyPreviewApprovalHistorySection()}
                 <hr class="my-2">
                 ${groupsHtml}
             </div>
         </div>
     `;
+
+    bindPolicyPreviewApprovalHistoryEvents(container);
 
     container.querySelectorAll('.policy-preview-group-toggle').forEach((button) => {
         button.addEventListener('click', () => {
@@ -2812,8 +3391,13 @@ async function loadResults() {
         ensureReviewTableStructure();
         ensureScenarioReviewFilterControl();
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
+        currentPolicyPreviewApprovalRecords = [];
+        currentPolicyPreviewApprovalTotal = 0;
         currentPolicyPreviewApprovalsByGroupId = new Map();
         currentPolicyPreviewApprovalsError = '';
+        currentApprovalHistoryFilters.decisionType = '';
+        currentApprovalHistoryFilters.userName = '';
+        currentApprovalHistoryFilters.searchText = '';
         renderPolicyPreviewGroups(null, { loading: true });
 
         const rows = payload.rows || [];
@@ -2836,6 +3420,8 @@ async function loadResults() {
                 await refreshPolicyPreviewApprovals(params);
             } catch (approvalError) {
                 console.warn('[loadResults] Policy preview approvals unavailable:', approvalError);
+                currentPolicyPreviewApprovalRecords = [];
+                currentPolicyPreviewApprovalTotal = 0;
                 currentPolicyPreviewApprovalsByGroupId = new Map();
                 currentPolicyPreviewApprovalsError =
                     approvalError.message ||
