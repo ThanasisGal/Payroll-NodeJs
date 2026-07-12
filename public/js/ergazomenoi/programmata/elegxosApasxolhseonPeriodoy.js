@@ -4,6 +4,10 @@ function userCanReviewEdit() {
     return document.getElementById('canReviewEdit')?.value === '1';
 }
 
+function canSeePolicyPriorityBadges() {
+    return userCanReviewEdit();
+}
+
 function num(value) {
     return Number(value || 0);
 }
@@ -293,7 +297,7 @@ function renderScenarioBadge(row) {
             ? 'review-scenario-badge review-scenario-badge-review'
             : 'review-scenario-badge review-scenario-badge-classified';
     const title = scenarioTitle(decision);
-    const confidenceHtml = confidence
+    const confidenceHtml = canSeePolicyPriorityBadges() && confidence
         ? `<span class="review-scenario-confidence">${escapeHtml(confidence)}</span>`
         : '';
 
