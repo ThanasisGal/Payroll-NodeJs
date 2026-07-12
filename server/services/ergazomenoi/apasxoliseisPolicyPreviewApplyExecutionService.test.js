@@ -3,6 +3,7 @@ const fs = require('fs');
 
 const {
     validateApplyExecutionInput,
+    buildApplyWriteOperationsFromPlan,
     runPolicyPreviewApplyExecutionLocked
 } = require('./apasxoliseisPolicyPreviewApplyExecutionService');
 
@@ -35,6 +36,129 @@ function applyPlan(
         plan_summary: { plan_status: planStatus, fields_applyable: fieldsApplyable },
         approvals: [{ approval_id: 'approval-a', plan_status: planStatus }]
     };
+}
+
+function planField(field, planAction, proposedValue) {
+    return {
+        field,
+        plan_action: planAction,
+        proposed_value: proposedValue
+    };
+}
+
+function planItem(overrides = {}) {
+    return {
+        prodhlomena_oraria_id: '507f1f77bcf86cd799439012',
+        employee_kodikos: '001',
+        hmeromhnia: '2026-06-15',
+        plan_status: 'APPLYABLE',
+        fields: [
+            planField('repo_apologistika', 'ALLOW_SET', true),
+            planField('kathgoria_ergasias_apologistika', 'ALLOW_SET', 'ΑΝ')
+        ],
+        ...overrides
+    };
+}
+
+function writeOperationsPlan({
+    approvalStatus = 'APPLYABLE',
+    items = [planItem()]
+} = {}) {
+    return {
+        approvals: [
+            {
+                approval_id: 'approval-a',
+                group_id: 'group-a',
+                plan_status: approvalStatus,
+                items
+            }
+        ]
+    };
+}
+
+function testApplyableItemBuildsOneOperationWithTwoFields() {
+    const result = buildApplyWriteOperationsFromPlan(writeOperationsPlan());
+    assert.strictEqual(result.summary.operations_total, 1);
+    assert.strictEqual(result.summary.fields_total, 2);
+    assert.deepStrictEqual(result.operations[0].set, {
+        repo_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΝ'
+    });
+}
+
+function testNoopAndBlockedFieldsAreSkipped() {
+    const result = buildApplyWriteOperationsFromPlan(
+        writeOperationsPlan({
+            items: [
+                planItem({
+                    fields: [
+                        planField('repo_apologistika', 'ALLOW_SET', true),
+                        planField('ores_ergasias_apologistika', 'NOOP', 8),
+                        planField('ores_apoysias_apologistika', 'BLOCKED', 4)
+                    ]
+                })
+            ]
+        })
+    );
+
+    assert.deepStrictEqual(result.operations[0].set, { repo_apologistika: true });
+    assert.strictEqual(result.summary.skipped_fields, 2);
+}
+
+function testPartiallyApplyableItemIncludesOnlyAllowedFields() {
+    const result = buildApplyWriteOperationsFromPlan(
+        writeOperationsPlan({
+            approvalStatus: 'PARTIALLY_APPLYABLE',
+            items: [
+                planItem({
+                    plan_status: 'PARTIALLY_APPLYABLE',
+                    fields: [
+                        planField('repo_apologistika', 'ALLOW_SET', true),
+                        planField('ores_apoysias_apologistika', 'BLOCKED', 4)
+                    ]
+                })
+            ]
+        })
+    );
+
+    assert.strictEqual(result.summary.operations_total, 1);
+    assert.deepStrictEqual(result.operations[0].set, { repo_apologistika: true });
+    assert.strictEqual(result.summary.skipped_fields, 1);
+}
+
+function testBlockedAndNoopApprovalsBuildNoOperations() {
+    ['BLOCKED', 'NOOP'].forEach((approvalStatus) => {
+        const result = buildApplyWriteOperationsFromPlan(
+            writeOperationsPlan({ approvalStatus })
+        );
+        assert.strictEqual(result.summary.operations_total, 0);
+        assert.strictEqual(result.summary.skipped_items, 1);
+    });
+}
+
+function testMissingRecordIdBuildsNoOperation() {
+    const result = buildApplyWriteOperationsFromPlan(
+        writeOperationsPlan({ items: [planItem({ prodhlomena_oraria_id: null })] })
+    );
+    assert.strictEqual(result.summary.operations_total, 0);
+    assert.strictEqual(result.summary.skipped_items, 1);
+}
+
+function testUndefinedProposedValueIsSkipped() {
+    const result = buildApplyWriteOperationsFromPlan(
+        writeOperationsPlan({
+            items: [
+                planItem({
+                    fields: [
+                        planField('repo_apologistika', 'ALLOW_SET', true),
+                        planField('ores_ergasias_apologistika', 'ALLOW_SET', undefined)
+                    ]
+                })
+            ]
+        })
+    );
+    assert.deepStrictEqual(result.operations[0].set, { repo_apologistika: true });
+    assert.strictEqual(result.summary.skipped_fields, 1);
 }
 
 async function runForRole(userRole, planStatus = 'APPLYABLE') {
@@ -105,6 +229,22 @@ async function testApplyPlanRunnerCalledOnce() {
     });
 }
 
+async function testLockedResponseIncludesWriteOperationsPreviewWithoutWrites() {
+    const result = await runPolicyPreviewApplyExecutionLocked({
+        session: { ...baseSession, userRole: 'A' },
+        filters: baseFilters,
+        applyPlanRunner: async () => ({
+            ...applyPlan(),
+            ...writeOperationsPlan()
+        })
+    });
+
+    assert.strictEqual(result.write_operations_preview.summary.operations_total, 1);
+    assert.strictEqual(result.write_operations_preview.summary.fields_total, 2);
+    assert.strictEqual(result.execution_summary.writes_performed, 0);
+    assert.strictEqual(result.execution_status, 'LOCKED');
+}
+
 function testExecutionServiceHasNoWriteDependency() {
     const source = fs.readFileSync(
         require.resolve('./apasxoliseisPolicyPreviewApplyExecutionService'),
@@ -118,12 +258,19 @@ function testExecutionServiceHasNoWriteDependency() {
 }
 
 async function run() {
+    testApplyableItemBuildsOneOperationWithTwoFields();
+    testNoopAndBlockedFieldsAreSkipped();
+    testPartiallyApplyableItemIncludesOnlyAllowedFields();
+    testBlockedAndNoopApprovalsBuildNoOperations();
+    testMissingRecordIdBuildsNoOperation();
+    testUndefinedProposedValueIsSkipped();
     await testAdminApplyablePlanRemainsLocked();
     await testSupervisorApplyablePlanRemainsLocked();
     await testNormalUserRejected();
     testMissingDateFiltersRejected();
     await testBlockedPlanRemainsLockedWithoutWrites();
     await testApplyPlanRunnerCalledOnce();
+    await testLockedResponseIncludesWriteOperationsPreviewWithoutWrites();
     testExecutionServiceHasNoWriteDependency();
     console.log('apasxoliseis policy preview locked apply execution service tests passed');
 }
