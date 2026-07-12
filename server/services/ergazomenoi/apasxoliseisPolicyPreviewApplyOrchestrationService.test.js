@@ -515,7 +515,11 @@ function testNoRuntimeCaller() {
 
     assert.deepStrictEqual(references.sort(), [
         'server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyOrchestrationService.js',
-        'server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyOrchestrationService.test.js'
+        'server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyOrchestrationService.test.js',
+        'server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOraria'
+            + 'OrchestrationService.js',
+        'server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOraria'
+            + 'OrchestrationService.test.js'
     ]);
 }
 
