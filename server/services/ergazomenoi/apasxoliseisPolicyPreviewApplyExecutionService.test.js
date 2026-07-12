@@ -2,9 +2,11 @@ const assert = require('assert');
 const fs = require('fs');
 
 const {
+    APPLY_EXECUTION_CONFIRMATION_TOKEN,
     validateApplyExecutionInput,
     buildApplyWriteOperationsFromPlan,
     buildMongoWriteModelsFromPreview,
+    executeMongoWriteModelsWithInjectedWriter,
     runPolicyPreviewApplyExecutionLocked
 } = require('./apasxoliseisPolicyPreviewApplyExecutionService');
 
@@ -247,6 +249,90 @@ function testMongoWriteModelsSupportMultipleOperations() {
     assert.strictEqual(result.summary.fields_total, 4);
 }
 
+function guardedExecutorInput(overrides = {}) {
+    return {
+        mongoWriteModelsPreview: mongoPreview([domainOperation()]),
+        ...overrides
+    };
+}
+
+async function testGuardedExecutorDefaultsToLockedWithoutCallingWriter() {
+    let calls = 0;
+    const result = await executeMongoWriteModelsWithInjectedWriter(
+        guardedExecutorInput({ writer: async () => { calls++; } })
+    );
+    assert.strictEqual(calls, 0);
+    assert.strictEqual(result.execution_status, 'LOCKED');
+    assert.strictEqual(result.execution_summary.writes_performed, 0);
+    assert.strictEqual(result.execution_guard.blocked_code, 'LOCKED');
+}
+
+async function testGuardedExecutorExplicitFalseDoesNotCallWriter() {
+    let calls = 0;
+    const result = await executeMongoWriteModelsWithInjectedWriter(
+        guardedExecutorInput({
+            options: { execution_enabled: false },
+            writer: async () => { calls++; }
+        })
+    );
+    assert.strictEqual(calls, 0);
+    assert.strictEqual(result.execution_guard.blocked_code, 'LOCKED');
+}
+
+async function testGuardedExecutorRequiresValidConfirmation() {
+    for (const confirmationToken of [undefined, 'WRONG_TOKEN']) {
+        let calls = 0;
+        const result = await executeMongoWriteModelsWithInjectedWriter(
+            guardedExecutorInput({
+                options: {
+                    execution_enabled: true,
+                    confirmation_token: confirmationToken
+                },
+                writer: async () => { calls++; }
+            })
+        );
+        assert.strictEqual(calls, 0);
+        assert.strictEqual(result.execution_guard.blocked_code, 'CONFIRMATION_REQUIRED');
+        assert.strictEqual(result.execution_summary.writes_performed, 0);
+    }
+}
+
+async function testGuardedExecutorRequiresConfiguredWriter() {
+    const result = await executeMongoWriteModelsWithInjectedWriter(
+        guardedExecutorInput({
+            options: {
+                execution_enabled: true,
+                confirmation_token: APPLY_EXECUTION_CONFIRMATION_TOKEN
+            }
+        })
+    );
+    assert.strictEqual(result.execution_guard.blocked_code, 'WRITER_NOT_CONFIGURED');
+    assert.strictEqual(result.execution_summary.writes_performed, 0);
+}
+
+async function testGuardedExecutorCallsFakeWriterOnceAndReportsCounts() {
+    let calls = 0;
+    const preview = mongoPreview([domainOperation()]);
+    const result = await executeMongoWriteModelsWithInjectedWriter({
+        mongoWriteModelsPreview: preview,
+        options: {
+            execution_enabled: true,
+            confirmation_token: APPLY_EXECUTION_CONFIRMATION_TOKEN
+        },
+        writer: async (writeModels) => {
+            calls++;
+            assert.deepStrictEqual(writeModels, preview.write_models);
+            return { matchedCount: 1, modifiedCount: 1 };
+        }
+    });
+
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(result.execution_status, 'EXECUTED');
+    assert.strictEqual(result.execution_summary.matched_count, 1);
+    assert.strictEqual(result.execution_summary.modified_count, 1);
+    assert.strictEqual(result.execution_summary.writes_performed, 1);
+}
+
 async function runForRole(userRole, planStatus = 'APPLYABLE') {
     return runPolicyPreviewApplyExecutionLocked({
         session: { ...baseSession, userRole },
@@ -316,21 +402,29 @@ async function testApplyPlanRunnerCalledOnce() {
 }
 
 async function testLockedResponseIncludesWriteOperationsPreviewWithoutWrites() {
+    let calls = 0;
     const result = await runPolicyPreviewApplyExecutionLocked({
         session: { ...baseSession, userRole: 'A' },
         filters: baseFilters,
         applyPlanRunner: async () => ({
             ...applyPlan(),
             ...writeOperationsPlan()
-        })
+        }),
+        options: {
+            execution_enabled: true,
+            confirmation_token: APPLY_EXECUTION_CONFIRMATION_TOKEN
+        },
+        writer: async () => { calls++; }
     });
 
+    assert.strictEqual(calls, 0);
     assert.strictEqual(result.write_operations_preview.summary.operations_total, 1);
     assert.strictEqual(result.write_operations_preview.summary.fields_total, 2);
     assert.strictEqual(result.mongo_write_models_preview.summary.write_models_total, 1);
     assert.strictEqual(result.mongo_write_models_preview.summary.fields_total, 2);
     assert.strictEqual(result.execution_summary.writes_performed, 0);
     assert.strictEqual(result.execution_status, 'LOCKED');
+    assert.strictEqual(result.execution_guard.blocked_code, 'LOCKED');
 }
 
 function testExecutionServiceHasNoWriteDependency() {
@@ -358,6 +452,11 @@ async function run() {
     testMongoWriteModelSkipsUndefinedAndNullFields();
     testMongoWriteModelSkipsOperationWhenNoSetFieldsRemain();
     testMongoWriteModelsSupportMultipleOperations();
+    await testGuardedExecutorDefaultsToLockedWithoutCallingWriter();
+    await testGuardedExecutorExplicitFalseDoesNotCallWriter();
+    await testGuardedExecutorRequiresValidConfirmation();
+    await testGuardedExecutorRequiresConfiguredWriter();
+    await testGuardedExecutorCallsFakeWriterOnceAndReportsCounts();
     await testAdminApplyablePlanRemainsLocked();
     await testSupervisorApplyablePlanRemainsLocked();
     await testNormalUserRejected();

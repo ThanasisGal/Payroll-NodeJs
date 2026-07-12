@@ -8,6 +8,7 @@ const {
 
 const APPLY_EXECUTION_STATUS = 'LOCKED';
 const APPLY_EXECUTION_ALLOWED_ROLES = Object.freeze(['A', 'S']);
+const APPLY_EXECUTION_CONFIRMATION_TOKEN = 'APPLY_POLICY_PREVIEW_CHANGES';
 const APPLY_EXECUTION_LOCKED_MESSAGE =
     'Η πραγματική εφαρμογή προτεινόμενων τιμών είναι απενεργοποιημένη σε αυτό το στάδιο.';
 
@@ -192,6 +193,105 @@ function buildMongoWriteModelsFromPreview(writeOperationsPreview = {}) {
     return { write_models: writeModels, summary };
 }
 
+function validateApplyExecutionUnlock(options = {}, writer) {
+    const executionRequested = options.execution_enabled === true;
+    const writerConfigured = typeof writer === 'function';
+
+    if (!executionRequested) {
+        return {
+            execution_requested: false,
+            confirmation_required: true,
+            writer_configured: writerConfigured,
+            blocked_code: 'LOCKED',
+            blocked_reason: 'Η εκτέλεση εφαρμογής παραμένει κλειδωμένη.'
+        };
+    }
+
+    if (options.confirmation_token !== APPLY_EXECUTION_CONFIRMATION_TOKEN) {
+        return {
+            execution_requested: true,
+            confirmation_required: true,
+            writer_configured: writerConfigured,
+            blocked_code: 'CONFIRMATION_REQUIRED',
+            blocked_reason: 'Απαιτείται έγκυρη επιβεβαίωση για την εκτέλεση εφαρμογής.'
+        };
+    }
+
+    if (!writerConfigured) {
+        return {
+            execution_requested: true,
+            confirmation_required: false,
+            writer_configured: false,
+            blocked_code: 'WRITER_NOT_CONFIGURED',
+            blocked_reason: 'Δεν έχει ρυθμιστεί writer για την εκτέλεση εφαρμογής.'
+        };
+    }
+
+    return {
+        execution_requested: true,
+        confirmation_required: false,
+        writer_configured: true,
+        blocked_code: null,
+        blocked_reason: null
+    };
+}
+
+async function executeMongoWriteModelsWithInjectedWriter({
+    mongoWriteModelsPreview = {},
+    options = {},
+    writer
+} = {}) {
+    const executionGuard = validateApplyExecutionUnlock(options, writer);
+    const writeModels = Array.isArray(mongoWriteModelsPreview.write_models)
+        ? mongoWriteModelsPreview.write_models
+        : [];
+
+    if (executionGuard.blocked_code) {
+        return {
+            execution_enabled: false,
+            execution_status: APPLY_EXECUTION_STATUS,
+            execution_guard: executionGuard,
+            execution_summary: {
+                writes_performed: 0,
+                matched_count: 0,
+                modified_count: 0
+            }
+        };
+    }
+
+    if (writeModels.length === 0) {
+        return {
+            execution_enabled: false,
+            execution_status: APPLY_EXECUTION_STATUS,
+            execution_guard: {
+                ...executionGuard,
+                blocked_code: 'NO_WRITE_MODELS',
+                blocked_reason: 'Δεν υπάρχουν write models για εκτέλεση.'
+            },
+            execution_summary: {
+                writes_performed: 0,
+                matched_count: 0,
+                modified_count: 0
+            }
+        };
+    }
+
+    const writerResult = (await writer(writeModels)) || {};
+    const matchedCount = Number(writerResult.matchedCount) || 0;
+    const modifiedCount = Number(writerResult.modifiedCount) || 0;
+
+    return {
+        execution_enabled: true,
+        execution_status: 'EXECUTED',
+        execution_guard: executionGuard,
+        execution_summary: {
+            writes_performed: modifiedCount,
+            matched_count: matchedCount,
+            modified_count: modifiedCount
+        }
+    };
+}
+
 function buildLockedApplyExecutionResult(applyPlan = {}) {
     const planSummary = applyPlan.plan_summary || {};
     const noApplyablePlan = ['EMPTY', 'BLOCKED'].includes(planSummary.plan_status);
@@ -217,6 +317,7 @@ function buildLockedApplyExecutionResult(applyPlan = {}) {
                 : 'Η εκτέλεση εφαρμογής δεν έχει ενεργοποιηθεί ακόμα.',
             writes_performed: 0
         },
+        execution_guard: validateApplyExecutionUnlock(),
         write_operations_preview: writeOperationsPreview,
         mongo_write_models_preview: buildMongoWriteModelsFromPreview(writeOperationsPreview),
         approvals: Array.isArray(applyPlan.approvals) ? applyPlan.approvals : []
@@ -238,6 +339,7 @@ async function runPolicyPreviewApplyExecutionLocked({
 module.exports = {
     APPLY_EXECUTION_STATUS,
     APPLY_EXECUTION_ALLOWED_ROLES,
+    APPLY_EXECUTION_CONFIRMATION_TOKEN,
     APPLY_EXECUTION_LOCKED_MESSAGE,
     validateApplyExecutionInput,
     assertApplyExecutionPermission,
@@ -246,6 +348,8 @@ module.exports = {
     buildApplyWriteOperationsFromPlan,
     buildMongoWriteModelFromOperation,
     buildMongoWriteModelsFromPreview,
+    validateApplyExecutionUnlock,
+    executeMongoWriteModelsWithInjectedWriter,
     buildLockedApplyExecutionResult,
     runPolicyPreviewApplyExecutionLocked
 };
