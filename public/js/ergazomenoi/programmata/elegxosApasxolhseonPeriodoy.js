@@ -1431,8 +1431,19 @@ function ensureReviewTableStructure() {
             }
 
             .policy-preview-history-details-items {
-                max-height: 22rem;
-                overflow: auto;
+                overflow-x: auto;
+                overflow-y: visible;
+            }
+
+            .policy-preview-approval-details-swal {
+                max-height: 82vh;
+                overflow: hidden;
+            }
+
+            .policy-preview-approval-details-swal-body {
+                max-height: 62vh;
+                overflow-y: auto;
+                overflow-x: hidden;
             }
 
             .policy-preview-dry-run-swal {
@@ -2682,7 +2693,11 @@ function showPolicyPreviewApprovalHistoryDetails(record = {}) {
         title: 'Λεπτομέρειες καταγεγραμμένης απόφασης',
         html,
         width: '72rem',
-        confirmButtonText: 'Κλείσιμο'
+        confirmButtonText: 'Κλείσιμο',
+        customClass: {
+            popup: 'policy-preview-approval-details-swal',
+            htmlContainer: 'policy-preview-approval-details-swal-body'
+        }
     });
 }
 
