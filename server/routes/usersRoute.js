@@ -1274,6 +1274,12 @@ router.get(
 );
 
 router.post(
+    '/api/prodhlomena-oraria/review/policies/apply-execution',
+    checkAuth,
+    erganhController.runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked
+);
+
+router.post(
     '/api/prodhlomena-oraria/review/policies/approvals',
     checkAuth,
     erganhController.createProdhlomenaOrariaPolicyPreviewApproval

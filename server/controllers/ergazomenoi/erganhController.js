@@ -138,6 +138,9 @@ const {
 const {
     runPolicyPreviewApplyPlan
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyPlanService');
+const {
+    runPolicyPreviewApplyExecutionLocked
+} = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -5278,6 +5281,28 @@ class erganhController {
                     error.statusCode && error.statusCode < 500
                         ? error.message
                         : 'Σφάλμα κατά την επικύρωση πλάνου εφαρμογής εγκεκριμένων προτάσεων.'
+            });
+        }
+    };
+
+    static runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked = async (req, res) => {
+        try {
+            const result = await runPolicyPreviewApplyExecutionLocked({
+                session: req.session,
+                filters: req.body
+            });
+
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            console.error('[runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked] ❌', error);
+
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                code: error.code || 'APPLY_EXECUTION_ERROR',
+                message:
+                    error.statusCode && error.statusCode < 500
+                        ? error.message
+                        : 'Σφάλμα κατά τον έλεγχο εκτέλεσης εφαρμογής εγκεκριμένων προτάσεων.'
             });
         }
     };
