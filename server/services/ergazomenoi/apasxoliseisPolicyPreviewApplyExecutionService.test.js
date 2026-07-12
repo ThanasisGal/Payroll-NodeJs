@@ -4,6 +4,7 @@ const fs = require('fs');
 const {
     validateApplyExecutionInput,
     buildApplyWriteOperationsFromPlan,
+    buildMongoWriteModelsFromPreview,
     runPolicyPreviewApplyExecutionLocked
 } = require('./apasxoliseisPolicyPreviewApplyExecutionService');
 
@@ -161,6 +162,91 @@ function testUndefinedProposedValueIsSkipped() {
     assert.strictEqual(result.summary.skipped_fields, 1);
 }
 
+function mongoPreview(operations) {
+    return buildMongoWriteModelsFromPreview({ operations });
+}
+
+function domainOperation(overrides = {}) {
+    return {
+        prodhlomena_oraria_id: '507f1f77bcf86cd799439012',
+        set: {
+            repo_apologistika: true,
+            kathgoria_ergasias_apologistika: 'ΑΝ'
+        },
+        fields: [
+            { field: 'repo_apologistika', proposed_value: true },
+            { field: 'kathgoria_ergasias_apologistika', proposed_value: 'ΑΝ' }
+        ],
+        ...overrides
+    };
+}
+
+function testMongoWriteModelContainsFilterAndTwoSetFields() {
+    const result = mongoPreview([domainOperation()]);
+    assert.strictEqual(result.summary.write_models_total, 1);
+    assert.strictEqual(result.summary.fields_total, 2);
+    assert.deepStrictEqual(result.write_models[0], {
+        updateOne: {
+            filter: { _id: '507f1f77bcf86cd799439012' },
+            update: {
+                $set: {
+                    repo_apologistika: true,
+                    kathgoria_ergasias_apologistika: 'ΑΝ'
+                }
+            }
+        }
+    });
+}
+
+function testMongoWriteModelSkipsMissingIdAndEmptySet() {
+    const result = mongoPreview([
+        domainOperation({ prodhlomena_oraria_id: '' }),
+        domainOperation({ set: {}, fields: [] })
+    ]);
+    assert.strictEqual(result.summary.write_models_total, 0);
+    assert.strictEqual(result.summary.skipped_operations, 2);
+    assert.strictEqual(result.summary.skipped_fields, 2);
+}
+
+function testMongoWriteModelSkipsUndefinedAndNullFields() {
+    const result = mongoPreview([
+        domainOperation({
+            set: {
+                repo_apologistika: true,
+                ores_ergasias_apologistika: undefined,
+                ores_apoysias_apologistika: null
+            }
+        })
+    ]);
+    assert.deepStrictEqual(result.write_models[0].updateOne.update.$set, {
+        repo_apologistika: true
+    });
+    assert.strictEqual(result.summary.skipped_fields, 2);
+}
+
+function testMongoWriteModelSkipsOperationWhenNoSetFieldsRemain() {
+    const result = mongoPreview([
+        domainOperation({
+            set: {
+                ores_ergasias_apologistika: undefined,
+                ores_apoysias_apologistika: null
+            }
+        })
+    ]);
+    assert.strictEqual(result.summary.write_models_total, 0);
+    assert.strictEqual(result.summary.skipped_operations, 1);
+    assert.strictEqual(result.summary.skipped_fields, 2);
+}
+
+function testMongoWriteModelsSupportMultipleOperations() {
+    const result = mongoPreview([
+        domainOperation(),
+        domainOperation({ prodhlomena_oraria_id: '507f1f77bcf86cd799439014' })
+    ]);
+    assert.strictEqual(result.summary.write_models_total, 2);
+    assert.strictEqual(result.summary.fields_total, 4);
+}
+
 async function runForRole(userRole, planStatus = 'APPLYABLE') {
     return runPolicyPreviewApplyExecutionLocked({
         session: { ...baseSession, userRole },
@@ -241,6 +327,8 @@ async function testLockedResponseIncludesWriteOperationsPreviewWithoutWrites() {
 
     assert.strictEqual(result.write_operations_preview.summary.operations_total, 1);
     assert.strictEqual(result.write_operations_preview.summary.fields_total, 2);
+    assert.strictEqual(result.mongo_write_models_preview.summary.write_models_total, 1);
+    assert.strictEqual(result.mongo_write_models_preview.summary.fields_total, 2);
     assert.strictEqual(result.execution_summary.writes_performed, 0);
     assert.strictEqual(result.execution_status, 'LOCKED');
 }
@@ -251,6 +339,7 @@ function testExecutionServiceHasNoWriteDependency() {
         'utf8'
     );
     assert.doesNotMatch(source, /ProdhlomenaOrariaModel/);
+    assert.doesNotMatch(source, /ApasxoliseisPolicyPreviewApprovalsModel/);
     assert.doesNotMatch(
         source,
         /\.(save|updateOne|updateMany|findOneAndUpdate|bulkWrite|create|insertMany|deleteOne|deleteMany|findByIdAndUpdate)\s*\(/
@@ -264,6 +353,11 @@ async function run() {
     testBlockedAndNoopApprovalsBuildNoOperations();
     testMissingRecordIdBuildsNoOperation();
     testUndefinedProposedValueIsSkipped();
+    testMongoWriteModelContainsFilterAndTwoSetFields();
+    testMongoWriteModelSkipsMissingIdAndEmptySet();
+    testMongoWriteModelSkipsUndefinedAndNullFields();
+    testMongoWriteModelSkipsOperationWhenNoSetFieldsRemain();
+    testMongoWriteModelsSupportMultipleOperations();
     await testAdminApplyablePlanRemainsLocked();
     await testSupervisorApplyablePlanRemainsLocked();
     await testNormalUserRejected();

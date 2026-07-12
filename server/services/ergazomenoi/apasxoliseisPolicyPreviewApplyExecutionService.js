@@ -129,6 +129,69 @@ function buildApplyWriteOperationsFromPlan(applyPlan = {}) {
     return { operations, summary };
 }
 
+function buildMongoWriteModelFromOperation(operation = {}) {
+    const prodhlomenaOrariaId = String(operation.prodhlomena_oraria_id || '').trim();
+    const sourceSet =
+        operation.set && typeof operation.set === 'object' && !Array.isArray(operation.set)
+            ? operation.set
+            : null;
+    if (!prodhlomenaOrariaId || !sourceSet) return null;
+
+    const set = {};
+    Object.entries(sourceSet).forEach(([field, value]) => {
+        const fieldName = String(field || '').trim();
+        if (!fieldName || value === undefined || value === null) return;
+        set[fieldName] = value;
+    });
+    if (Object.keys(set).length === 0) return null;
+
+    return {
+        updateOne: {
+            filter: { _id: prodhlomenaOrariaId },
+            update: { $set: set }
+        }
+    };
+}
+
+function countOperationCandidateFields(operation = {}) {
+    if (operation.set && typeof operation.set === 'object' && !Array.isArray(operation.set)) {
+        return Object.keys(operation.set).length;
+    }
+    return Array.isArray(operation.fields) ? operation.fields.length : 0;
+}
+
+function buildMongoWriteModelsFromPreview(writeOperationsPreview = {}) {
+    const writeModels = [];
+    const summary = {
+        write_models_total: 0,
+        fields_total: 0,
+        skipped_operations: 0,
+        skipped_fields: 0
+    };
+
+    const operations = Array.isArray(writeOperationsPreview.operations)
+        ? writeOperationsPreview.operations
+        : [];
+    operations.forEach((operation) => {
+        const candidateFields = countOperationCandidateFields(operation);
+        const writeModel = buildMongoWriteModelFromOperation(operation);
+
+        if (!writeModel) {
+            summary.skipped_operations++;
+            summary.skipped_fields += candidateFields;
+            return;
+        }
+
+        const includedFields = Object.keys(writeModel.updateOne.update.$set).length;
+        writeModels.push(writeModel);
+        summary.fields_total += includedFields;
+        summary.skipped_fields += candidateFields - includedFields;
+    });
+
+    summary.write_models_total = writeModels.length;
+    return { write_models: writeModels, summary };
+}
+
 function buildLockedApplyExecutionResult(applyPlan = {}) {
     const planSummary = applyPlan.plan_summary || {};
     const noApplyablePlan = ['EMPTY', 'BLOCKED'].includes(planSummary.plan_status);
@@ -136,6 +199,7 @@ function buildLockedApplyExecutionResult(applyPlan = {}) {
     const wouldApplyFields = Number.isFinite(fieldsApplyable) && fieldsApplyable > 0
         ? fieldsApplyable
         : 0;
+    const writeOperationsPreview = buildApplyWriteOperationsFromPlan(applyPlan);
 
     return {
         execution_enabled: false,
@@ -153,7 +217,8 @@ function buildLockedApplyExecutionResult(applyPlan = {}) {
                 : 'Η εκτέλεση εφαρμογής δεν έχει ενεργοποιηθεί ακόμα.',
             writes_performed: 0
         },
-        write_operations_preview: buildApplyWriteOperationsFromPlan(applyPlan),
+        write_operations_preview: writeOperationsPreview,
+        mongo_write_models_preview: buildMongoWriteModelsFromPreview(writeOperationsPreview),
         approvals: Array.isArray(applyPlan.approvals) ? applyPlan.approvals : []
     };
 }
@@ -179,6 +244,8 @@ module.exports = {
     normalizeApplyableFieldValue,
     buildApplyWriteOperationForItem,
     buildApplyWriteOperationsFromPlan,
+    buildMongoWriteModelFromOperation,
+    buildMongoWriteModelsFromPreview,
     buildLockedApplyExecutionResult,
     runPolicyPreviewApplyExecutionLocked
 };
