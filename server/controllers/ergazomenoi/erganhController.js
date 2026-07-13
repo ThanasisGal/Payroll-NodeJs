@@ -129,6 +129,15 @@ const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 const {
+    buildWeeklyRepoTransferAtomicInputs,
+    buildWeeklyRepoTransferAtomicPageProjection,
+    composePolicyPreviewResponse,
+    getAtomicPeriodRangeDiagnostic,
+    buildCompanyWideUniqueEmployeeByKodikos,
+    isEmployeeCompatibleWithBranch,
+    INPUT_REASON: ATOMIC_INPUT_REASON
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
     createPolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
@@ -1472,6 +1481,186 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
         previousProfileDate: getProfileDateForDeviation(firstProfile, week.weekStart)
     };
 }
+
+const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
+    '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
+    'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+    'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
+    'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
+    'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
+    'kathgoria_ergasias_apologistika apologistiko_biblio repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
+    'argia argia_apologistika kyriakes_apologistika is_locked ' +
+    'ores_ergasias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+    'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
+    'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
+    'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
+    'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
+
+const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
+    'kodikos ypokatasthma energos archived mhniaia_repo hmeres_ergasias_ebdomadas ' +
+    'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
+    'typos_apasxolhshs typos_ebdomadas typos_ergazomenon';
+
+const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
+    '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
+    'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
+    'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
+    'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
+    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt';
+
+async function buildAtomicRepoTransferPolicyPreviewProjection({
+    sessionTeam,
+    companyId,
+    fullPeriodFilter,
+    requestedPeriodStart,
+    requestedPeriodEnd,
+    holidayByDateKey,
+    holidayContextResolved
+}) {
+    const rangeDiagnostic = getAtomicPeriodRangeDiagnostic({
+        periodStart: requestedPeriodStart,
+        periodEnd: requestedPeriodEnd
+    });
+    if (rangeDiagnostic) {
+        return buildWeeklyRepoTransferAtomicPageProjection({
+            weeklyInputs: [],
+            inputReasonCodes: [rangeDiagnostic]
+        });
+    }
+    if (holidayContextResolved !== true) {
+        return buildWeeklyRepoTransferAtomicPageProjection({
+            weeklyInputs: [],
+            inputReasonCodes: [ATOMIC_INPUT_REASON.HOLIDAY_CONTEXT_NOT_RESOLVED]
+        });
+    }
+
+    const atomicRows = await ProdhlomenaOrariaModel.find(fullPeriodFilter)
+        .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
+        .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1, _id: 1 })
+        .lean();
+    const kodikoi = [
+        ...new Set(
+            atomicRows
+                .map((row) => String(row?.kodikos || '').trim())
+                .filter(Boolean)
+        )
+    ];
+    const rowIds = atomicRows.map((row) => row?._id).filter(Boolean);
+    const employeeFilter = {
+        team: sessionTeam,
+        company_kod: companyId,
+        kodikos: mongoose.trusted({ $in: kodikoi })
+    };
+
+    const [employeeRows, historyRows, auditRows] = await Promise.all([
+        kodikoi.length
+            ? ErgazomenoiModel.find(employeeFilter)
+                  .select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS)
+                  .lean()
+            : [],
+        kodikoi.length && IstorikoProslhpseonAllagonModel
+            ? IstorikoProslhpseonAllagonModel.find({
+                  team: sessionTeam,
+                  company_kod: companyId,
+                  kodikos: mongoose.trusted({ $in: kodikoi }),
+                  $or: mongoose.trusted([
+                      {
+                          hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
+                              $lte: requestedPeriodEnd
+                          })
+                      },
+                      {
+                          hmeromhnia_isxyos_oron_ergasias_apo: null,
+                          hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({
+                              $lte: requestedPeriodEnd
+                          })
+                      }
+                  ])
+              })
+                  .select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS)
+                  .sort({
+                      kodikos: 1,
+                      hmeromhnia_isxyos_oron_ergasias_apo: 1,
+                      hmeromhnia_allaghs_orarioy_apo: 1,
+                      createdAt: 1
+                  })
+                  .lean()
+            : [],
+        rowIds.length
+            ? ProdhlomenaOrariaAuditModel.find({
+                  team: sessionTeam,
+                  company_kod: companyId,
+                  prodhlomena_oraria_id: mongoose.trusted({ $in: rowIds })
+              })
+                  .select('prodhlomena_oraria_id')
+                  .lean()
+            : []
+    ]);
+
+    const employeeByKodikos = buildCompanyWideUniqueEmployeeByKodikos(employeeRows);
+    const historyByKodikos = new Map();
+    historyRows.forEach((history) => {
+        const kodikos = String(history?.kodikos || '').trim();
+        if (!kodikos) return;
+        if (!historyByKodikos.has(kodikos)) historyByKodikos.set(kodikos, []);
+        historyByKodikos.get(kodikos).push(history);
+    });
+    const existingAuditCountByRowKey = new Map();
+    auditRows.forEach((audit) => {
+        const rowId = String(audit?.prodhlomena_oraria_id || '').trim();
+        if (!rowId) return;
+        existingAuditCountByRowKey.set(
+            rowId,
+            (existingAuditCountByRowKey.get(rowId) || 0) + 1
+        );
+    });
+
+    const builtInputs = buildWeeklyRepoTransferAtomicInputs({
+        rows: atomicRows,
+        periodStart: requestedPeriodStart,
+        periodEnd: requestedPeriodEnd,
+        holidayByDateKey,
+        existingAuditCountByRowKey,
+        resolveEmploymentProfile: ({
+            ypokatasthma,
+            employee_kodikos,
+            week_start,
+            week_end
+        }) => {
+            const employee = employeeByKodikos.get(employee_kodikos);
+            if (!employee || !isEmployeeCompatibleWithBranch(employee, ypokatasthma)) return null;
+
+            const weekStart = new Date(`${week_start}T00:00:00.000Z`);
+            const weekEnd = new Date(`${week_end}T23:59:59.999Z`);
+            const weeklyProfileInfo = getWeeklyRepoProfileInfo({
+                week: {
+                    naturalWeekStart: weekStart,
+                    naturalWeekEnd: weekEnd,
+                    weekStart,
+                    weekEnd,
+                    isFullWeek: true
+                },
+                istorikoRows: historyByKodikos.get(employee_kodikos) || [],
+                ergazomenos: employee
+            });
+            const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
+
+            return {
+                typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
+                mhniaia_repo: weeklyProfileInfo.expectedWeeklyRepo,
+                source:
+                    effectiveProfile.employment_profile_source || effectiveProfile.source || '',
+                istorikoId: effectiveProfile.istorikoId || null,
+                effective_date: weeklyProfileInfo.effectiveProfileDate,
+                profile_changed_inside_week: weeklyProfileInfo.profileChangedInsideWeek === true
+            };
+        }
+    });
+
+    return buildWeeklyRepoTransferAtomicPageProjection(builtInputs);
+}
+
 function getWeekRangesInsidePeriod(apoDate, eosDate) {
     const periodStart = clampDateStartUtc(apoDate);
     const periodEnd = clampDateEndUtc(eosDate);
@@ -5194,18 +5383,36 @@ class erganhController {
             });
             const summary = summarizeApasxoliseisPolicyPreviewResults(previewRows);
             const grouping = buildApasxoliseisPolicyPreviewGrouping(previewRows);
-
-            return res.json({
-                success: true,
-                page: pageNum,
-                limit: limitNum,
-                total,
-                totalPages: Math.ceil(total / limitNum),
-                count: previewRows.length,
-                summary,
-                grouping,
-                rows: previewRows
+            const atomicGroupProjection = await buildAtomicRepoTransferPolicyPreviewProjection({
+                sessionTeam,
+                companyId,
+                fullPeriodFilter: filter,
+                requestedPeriodStart,
+                requestedPeriodEnd,
+                holidayByDateKey: scenarioContext.argiesByDateKey || new Map(),
+                holidayContextResolved:
+                    requestedPeriodStart?.getUTCFullYear() ===
+                        requestedPeriodEnd?.getUTCFullYear() &&
+                    String(requestedPeriodStart?.getUTCFullYear()) ===
+                        String(req.session.yearInUse || '').trim()
             });
+
+            return res.json(
+                composePolicyPreviewResponse({
+                    baseResponse: {
+                        success: true,
+                        page: pageNum,
+                        limit: limitNum,
+                        total,
+                        totalPages: Math.ceil(total / limitNum),
+                        count: previewRows.length,
+                        summary,
+                        grouping,
+                        rows: previewRows
+                    },
+                    atomicGroupProjection
+                })
+            );
         } catch (error) {
             console.error('[getProdhlomenaOrariaPolicyPreview] ❌', error);
 
