@@ -129,6 +129,9 @@ const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 const {
+    getOrarioTermsForDate: getCanonicalOrarioTermsForDate
+} = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const {
     buildWeeklyRepoTransferAtomicInputs,
     buildWeeklyRepoTransferAtomicPageProjection,
     composePolicyPreviewResponse,
@@ -1408,7 +1411,7 @@ function getEffectiveKathgoriaErgasias(row) {
 }
 
 function getEffectiveRepoProfileForDate(date, istorikoRows = [], ergazomenos = {}) {
-    return getOrarioTermsForDate(date, istorikoRows, ergazomenos);
+    return getCanonicalOrarioTermsForDate(date, istorikoRows, ergazomenos);
 }
 
 function getProfileSignature(profile = {}) {
@@ -1497,16 +1500,18 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
 
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
-    'kodikos ypokatasthma energos archived mhniaia_repo hmeres_ergasias_ebdomadas ' +
+    'kodikos ypokatasthma energos archived ' +
+    'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
+    'mhniaia_repo hmeres_ergasias_ebdomadas ' +
     'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'typos_apasxolhshs typos_ebdomadas typos_ergazomenon';
+    'typos_ergazomenon';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas ' +
     'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt';
 
 async function buildAtomicRepoTransferPolicyPreviewProjection({

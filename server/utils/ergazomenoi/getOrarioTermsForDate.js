@@ -33,6 +33,142 @@ function toNumberOrZero(value) {
     return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeEmploymentTypeValue(value) {
+    const raw = String(value ?? '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '_');
+
+    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
+        return '0';
+    }
+
+    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PART_TIME'].includes(raw)) {
+        return '1';
+    }
+
+    if (
+        [
+            '2',
+            '02',
+            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
+            'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
+            'EK_PERITROPHS',
+            'EK_PERITROPHIS',
+            'ROTATIONAL'
+        ].includes(raw)
+    ) {
+        return '2';
+    }
+
+    return '';
+}
+
+function resolveEmploymentTypeValue(record = {}) {
+    const canonicalRaw = String(record.kathestos_apasxolhshs ?? '').trim();
+
+    if (canonicalRaw !== '') {
+        return normalizeEmploymentTypeValue(canonicalRaw);
+    }
+
+    return normalizeEmploymentTypeValue(record.typos_apasxolhshs);
+}
+
+function resolveEmploymentTypeFromFormData(formData = {}) {
+    const canonicalCandidates = [
+        formData.kathestos_apasxolhshs_stathera,
+        formData.kathestos_apasxolhshs
+    ];
+
+    for (const candidate of canonicalCandidates) {
+        if (String(candidate ?? '').trim() !== '') {
+            return normalizeEmploymentTypeValue(candidate);
+        }
+    }
+
+    return normalizeEmploymentTypeValue(formData.typos_apasxolhshs);
+}
+
+function toNumberOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+
+    const n = Number(String(value).replace(',', '.').trim());
+    return Number.isFinite(n) ? n : null;
+}
+
+function getTyposEbdomadasFromHmeres(hmeres) {
+    const normalizedDays = toNumberOrNull(hmeres);
+    if (normalizedDays === 5) return '5HMERH';
+    if (normalizedDays === 6) return '6HMERH';
+    return '';
+}
+
+function normalizeWeeklyWorkdaysValue(value) {
+    if (value === 5 || value === 6) return value;
+    if (typeof value !== 'string') return null;
+
+    const raw = value.trim().toUpperCase();
+    if (['5', '5HMERH', '5ΗΜΕΡΗ', '5ΗΜΕΡΟ'].includes(raw)) return 5;
+    if (['6', '6HMERH', '6ΗΜΕΡΗ', '6ΗΜΕΡΟ'].includes(raw)) return 6;
+    return null;
+}
+
+function resolveEffectiveWeeklyWorkdays(record = {}) {
+    const candidates = [
+        record.hmeres_ergasias_ebdomadas,
+        record.typos_ebdomadas,
+        record.apasxolhsh_basei_symbashs,
+        record.apasxolhsh_basei_symbashs_stathera
+    ];
+
+    for (const candidate of candidates) {
+        const normalized = normalizeWeeklyWorkdaysValue(candidate);
+        if (normalized !== null) return normalized;
+    }
+
+    return null;
+}
+
+function normalizeExplicitWeeklyRepoValue(value) {
+    const normalized = toNumberOrNull(value);
+    return normalized === 1 || normalized === 2 ? normalized : null;
+}
+
+function repoFromWeeklyWorkdays(workdays) {
+    if (workdays === 5) return 2;
+    if (workdays === 6) return 1;
+    return 0;
+}
+
+function resolveExpectedWeeklyRepo(record = {}) {
+    const explicitRepo = normalizeExplicitWeeklyRepoValue(record.mhniaia_repo);
+    if (explicitRepo !== null) return explicitRepo;
+
+    return repoFromWeeklyWorkdays(resolveEffectiveWeeklyWorkdays(record));
+}
+
+function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomenos = {}) {
+    const canonicalEmploymentType = resolveEmploymentTypeFromFormData(formData);
+    const explicitFormRepo = normalizeExplicitWeeklyRepoValue(formData.mhniaia_repo);
+    const explicitFallbackRepo = normalizeExplicitWeeklyRepoValue(
+        fallbackErgazomenos.mhniaia_repo
+    );
+    const formWorkdays = resolveEffectiveWeeklyWorkdays(formData);
+    const fallbackWorkdays = resolveEffectiveWeeklyWorkdays(fallbackErgazomenos);
+    const effectiveWorkdays = formWorkdays ?? fallbackWorkdays;
+    const mhniaiaRepo =
+        explicitFormRepo ?? explicitFallbackRepo ?? repoFromWeeklyWorkdays(effectiveWorkdays);
+
+    return {
+        kathestos_apasxolhshs: canonicalEmploymentType,
+        typos_apasxolhshs: canonicalEmploymentType,
+        typos_ebdomadas:
+            formData.typos_ebdomadas ||
+            getTyposEbdomadasFromHmeres(effectiveWorkdays),
+        mhniaia_repo: mhniaiaRepo
+    };
+}
+
 function getEffectiveTermsApo(record = {}) {
     return (
         normalizeDateOnly(record.hmeromhnia_isxyos_oron_ergasias_apo) ||
@@ -53,17 +189,23 @@ function buildFallbackTerms(ergazomenos = {}) {
     const mo =
         toNumberOrZero(ergazomenos.mo_oron_hmerhsias_ergasias) ||
         (hmeres > 0 ? +(ores / hmeres).toFixed(4) : 0);
+    const employmentType = resolveEmploymentTypeValue(ergazomenos);
 
     return {
         source: 'ERG_AKTUAL',
         istorikoId: null,
 
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
+        mhniaia_repo: resolveExpectedWeeklyRepo(ergazomenos),
+
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
         mo_oron_hmerhsias_ergasias: mo,
 
-        typos_apasxolhshs: ergazomenos.typos_apasxolhshs || '',
-        typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
+        typos_ebdomadas:
+            ergazomenos.typos_ebdomadas ||
+            getTyposEbdomadasFromHmeres(ergazomenos.apasxolhsh_basei_symbashs),
 
         hmeromhnia_isxyos_oron_ergasias_apo: null,
         hmeromhnia_isxyos_oron_ergasias_eos: null,
@@ -79,16 +221,20 @@ function buildTermsFromHistoryRecord(record) {
     const mo =
         toNumberOrZero(record.mo_oron_hmerhsias_ergasias) ||
         (hmeres > 0 ? +(ores / hmeres).toFixed(4) : 0);
+    const employmentType = resolveEmploymentTypeValue(record);
 
     return {
         source: 'ISTORIKO',
         istorikoId: record._id || null,
 
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
+        mhniaia_repo: resolveExpectedWeeklyRepo(record),
+
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
         mo_oron_hmerhsias_ergasias: mo,
 
-        typos_apasxolhshs: record.typos_apasxolhshs || '',
         typos_ebdomadas: record.typos_ebdomadas || '',
 
         // Νέα πεδία ισχύος όρων εργασίας.
@@ -148,6 +294,12 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
 
 module.exports = {
     getOrarioTermsForDate,
+    resolveEmploymentTypeValue,
+    resolveEmploymentTypeFromFormData,
+    normalizeWeeklyWorkdaysValue,
+    resolveEffectiveWeeklyWorkdays,
+    resolveExpectedWeeklyRepo,
+    buildCanonicalWorkTermsSnapshotFields,
     normalizeDateOnly,
     getEffectiveTermsApo,
     getEffectiveTermsEos
