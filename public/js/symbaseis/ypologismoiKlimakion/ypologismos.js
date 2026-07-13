@@ -52,6 +52,20 @@ function collectRow({ uniqueCode, item, result, isxyeiApo, isxyeiEos, praxhKatat
     stoixeioNode.periods[periodKey].klimakia.push({ klimakio, poso: result, katastash });
 }
 
+function getDeterministicallySortedItems(data) {
+    return (Array.isArray(data) ? data : [])
+        .map((item, originalIndex) => ({ item, originalIndex }))
+        .sort((a, b) => {
+            const codeA = String(a.item?.kodikos ?? '');
+            const codeB = String(b.item?.kodikos ?? '');
+
+            if (codeA < codeB) return -1;
+            if (codeA > codeB) return 1;
+            return a.originalIndex - b.originalIndex;
+        })
+        .map(({ item }) => item);
+}
+
 // ------------------------------
 // ΒΟΗΘΗΤΙΚΟ: Ενημέρωση Swal Progress
 // ------------------------------
@@ -441,7 +455,9 @@ document.addEventListener('DOMContentLoaded', function () {
             for (const { data } of allFetched) {
                 if (!data?.length) continue;
 
-                for (const item of data) {
+                const sortedData = getDeterministicallySortedItems(data);
+
+                for (const item of sortedData) {
                     if (!item) continue;
 
                     const arithmosKlimakion = Number(item.arithmos_klimakion) || 0;
@@ -457,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 : 1;
 
                         const result = dynamicCalculation(
-                            data,
+                            sortedData,
                             item,
                             item.typos_ypologismoy ?? '',
                             multiplier,
@@ -541,20 +557,25 @@ function dynamicCalculation(data, item, expression, multiplier, klimakio) {
 
     let expr = String(expression || '');
 
-    expr = expr.replace(/poso\((\d{4})\)/gi, (_, code) => {
-        const row = (window.dataForUpdate || []).find(
-            (r) => r.kodikos_stoixeioy === code && Number(r.klimakio) === Number(klimakio)
-        );
-        if (row?.poso != null && !isNaN(row.poso)) return String(row.poso);
-        const ci = data.find(({ kodikos }) => kodikos === code);
-        if (!ci) return '0';
-        return String(
-            Number(String(ci.poso ?? '0').replace(',', '.')) ||
-                Number(String(ci.pososto ?? '0').replace(',', '.'))
-        );
-    });
+    expr = expr.replace(/poso\((\d{4})\)|\b(\d{4})\b/gi, (_, posoCode, plainCode) => {
+        if (posoCode) {
+            const row = (window.dataForUpdate || []).find(
+                (r) =>
+                    r.afora_thn_symbash_kathgoria_eidikothta ===
+                        item.afora_thn_symbash_kathgoria_eidikothta &&
+                    r.kodikos_stoixeioy === posoCode &&
+                    Number(r.klimakio) === Number(klimakio)
+            );
+            if (row?.poso != null && !isNaN(row.poso)) return String(row.poso);
+            const ci = data.find(({ kodikos }) => kodikos === posoCode);
+            if (!ci) return '0';
+            return String(
+                Number(String(ci.poso ?? '0').replace(',', '.')) ||
+                    Number(String(ci.pososto ?? '0').replace(',', '.'))
+            );
+        }
 
-    expr = expr.replace(/\b(\d{4})\b/g, (_, code) => {
+        const code = plainCode;
         const ci = data.find(({ kodikos }) => kodikos === code);
         if (!ci) return '0';
         const poso = Number(String(ci.poso ?? '0').replace(',', '.')) || 0;
