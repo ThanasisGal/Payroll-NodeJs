@@ -219,6 +219,7 @@ const scenarioProposedUpdateFillableFields = new Set([
 let currentReviewRows = [];
 let currentReviewDeviations = [];
 let currentPolicyPreviewGrouping = null;
+let currentAtomicRepoTransferProjection = null;
 let currentPolicyPreviewApprovalRecords = [];
 let currentPolicyPreviewApprovalTotal = 0;
 let currentPolicyPreviewApprovalsByGroupId = new Map();
@@ -2192,7 +2193,10 @@ async function fetchPolicyPreviewGrouping(baseParams) {
         throw new Error(payload.message || 'Αποτυχία ανάκτησης ομαδοποίησης πολιτικών.');
     }
 
-    return payload.grouping || null;
+    return {
+        grouping: payload.grouping || null,
+        atomicGroupProjection: payload.atomic_group_projection || null
+    };
 }
 
 function buildPolicyPreviewApprovalsParams(baseParams) {
@@ -3655,10 +3659,375 @@ function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
     `;
 }
 
+function getAtomicRepoTransferCount(source, key) {
+    const value = Number(source?.[key]);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function renderAtomicRepoTransferSummary(projection = {}) {
+    const summary = projection.summary || {};
+    const entries = [
+        ['Εβδομάδες εργαζομένων που αξιολογήθηκαν', 'weeks_evaluated'],
+        ['Ομάδες προτάσεων', 'groups_count'],
+        ['Ενιαίες αποφάσεις', 'decision_units_count'],
+        ['Έτοιμες προτάσεις', 'ready_count'],
+        ['Εργαζόμενοι', 'employees_count'],
+        ['Χωρίς ασφαλή πρόταση', 'not_available_count'],
+        ['Μη έγκυρες προβολές', 'invalid_projection_count']
+    ];
+
+    return `
+        <div class="atomic-repo-transfer-summary" aria-label="Σύνοψη προτάσεων μεταφοράς ρεπό">
+            ${entries
+                .map(
+                    ([label, key]) => `
+                        <div class="atomic-repo-transfer-summary-item">
+                            <span>${escapeHtml(label)}</span>
+                            <strong>${escapeHtml(getAtomicRepoTransferCount(summary, key))}</strong>
+                        </div>
+                    `
+                )
+                .join('')}
+        </div>
+    `;
+}
+
+function formatAtomicRepoTransferBoolean(value) {
+    if (value === true) return 'ΝΑΙ';
+    if (value === false) return 'ΟΧΙ';
+    return '-';
+}
+
+function formatAtomicRepoTransferHours(value) {
+    return formatPolicyPreviewHours(value).replace('.', ',');
+}
+
+function renderAtomicRepoTransferIntervals(proposedValues = {}) {
+    return `
+        <div class="atomic-repo-transfer-intervals">
+            ${[1, 2, 3]
+                .map((number) => {
+                    const pair = pairNo(number);
+                    const start = String(
+                        proposedValues[`apo_ora_${pair}_apologistika`] || ''
+                    ).trim();
+                    const end = String(
+                        proposedValues[`eos_ora_${pair}_apologistika`] || ''
+                    ).trim();
+                    const interval = start && end ? `${start}–${end}` : '—';
+
+                    return `
+                        <div class="atomic-repo-transfer-interval">
+                            <span class="fw-semibold">Ωράριο ${escapeHtml(pair)}:</span>
+                            <span>${escapeHtml(interval)}</span>
+                        </div>
+                    `;
+                })
+                .join('')}
+        </div>
+    `;
+}
+
+function renderAtomicRepoTransferItem(item = {}, role) {
+    const isSource = role === 'SOURCE_BECOMES_WORK';
+    const proposedValues = item.proposed_values || {};
+    const title = isSource ? 'Ημέρα που γίνεται εργασία' : 'Ημέρα που γίνεται ρεπό';
+    const panelClass = isSource
+        ? 'atomic-repo-transfer-source'
+        : 'atomic-repo-transfer-target';
+    const currentCategory = item.kathgoria_ergasias || '-';
+    const proposedCategory =
+        proposedValues.kathgoria_ergasias_apologistika ||
+        item.kathgoria_ergasias_apologistika ||
+        '-';
+    const proposedHours = formatAtomicRepoTransferHours(
+        proposedValues.ores_ergasias_apologistika
+    );
+
+    return `
+        <section class="atomic-repo-transfer-day ${escapeHtml(panelClass)}">
+            <div class="atomic-repo-transfer-day-title">${escapeHtml(title)}</div>
+            <div class="atomic-repo-transfer-date">
+                ${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}
+            </div>
+            <div class="small text-muted mb-2">
+                Εργαζόμενος: ${escapeHtml(item.employee_kodikos || '-')}
+            </div>
+            <dl class="atomic-repo-transfer-values">
+                <div>
+                    <dt>Τρέχον</dt>
+                    <dd>${escapeHtml(currentCategory)}</dd>
+                </div>
+                <div>
+                    <dt>Πρόταση</dt>
+                    <dd>${escapeHtml(proposedCategory)}</dd>
+                </div>
+                <div>
+                    <dt>Ρεπό απολογιστικά</dt>
+                    <dd>${escapeHtml(
+                        formatAtomicRepoTransferBoolean(proposedValues.repo_apologistika)
+                    )}</dd>
+                </div>
+                <div>
+                    <dt>Ώρες</dt>
+                    <dd>${escapeHtml(proposedHours)}</dd>
+                </div>
+            </dl>
+            ${renderAtomicRepoTransferIntervals(proposedValues)}
+        </section>
+    `;
+}
+
+function getAtomicRepoTransferDiagnosticMessages(reasonCounts = {}) {
+    const messages = [];
+    const hasReason = (code) => getAtomicRepoTransferCount(reasonCounts, code) > 0;
+
+    if (hasReason('ATOMIC_DATE_RANGE_EXCEEDS_LIMIT')) {
+        messages.push(
+            'Η ανάλυση μεταφοράς ρεπό υποστηρίζει διάστημα έως 62 ημερολογιακές ημέρες. Περιορίστε το επιλεγμένο διάστημα για να εμφανιστούν προτάσεις.'
+        );
+    }
+    if (
+        hasReason('PARTIAL_WEEK_OUTSIDE_FILTER_RANGE') ||
+        hasReason('INCOMPLETE_EMPLOYEE_WEEK')
+    ) {
+        messages.push(
+            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή δεν περιέχονταν πλήρως στο επιλεγμένο διάστημα.'
+        );
+    }
+    if (hasReason('EMPLOYMENT_PROFILE_NOT_RESOLVED')) {
+        messages.push(
+            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή δεν επιλύθηκε με ασφάλεια το εργασιακό προφίλ.'
+        );
+    }
+    if (hasReason('ATOMIC_HOLIDAY_CONTEXT_NOT_RESOLVED')) {
+        messages.push(
+            'Η ανάλυση δεν εκτελέστηκε επειδή δεν ήταν διαθέσιμο πλήρες πλαίσιο αργιών για το επιλεγμένο διάστημα.'
+        );
+    }
+    if (hasReason('INVALID_MHNIAIA_REPO')) {
+        messages.push(
+            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή τα αναμενόμενα εβδομαδιαία ρεπό δεν ήταν διαθέσιμα ως 1 ή 2.'
+        );
+    }
+
+    return messages;
+}
+
+function renderAtomicRepoTransferCodeCounts(counts = {}, label) {
+    const entries = Object.entries(counts || {}).filter(
+        ([code, count]) => String(code || '').trim() && Number(count) > 0
+    );
+
+    if (entries.length === 0) return '';
+
+    return `
+        <div class="atomic-repo-transfer-technical small text-muted">
+            <span class="fw-semibold">${escapeHtml(label)}:</span>
+            ${entries
+                .map(
+                    ([code, count]) =>
+                        `<span title="${escapeHtml(code)}">${escapeHtml(code)} (${escapeHtml(
+                            count
+                        )})</span>`
+                )
+                .join(' · ')}
+        </div>
+    `;
+}
+
+function renderAtomicRepoTransferDiagnostics(projection = {}) {
+    const reasonCounts = projection.reason_counts || {};
+    const warningCounts = projection.warning_counts || {};
+    const messages = getAtomicRepoTransferDiagnosticMessages(reasonCounts);
+    const warningMessages = [];
+
+    if (getAtomicRepoTransferCount(warningCounts, 'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS') > 0) {
+        warningMessages.push(
+            'Η ημέρα-στόχος έχει μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών. Η πρόταση παραμένει μόνο για ανθρώπινο έλεγχο.'
+        );
+    }
+
+    if (messages.length === 0 && warningMessages.length === 0 &&
+        Object.keys(reasonCounts).length === 0 && Object.keys(warningCounts).length === 0) {
+        return '';
+    }
+
+    return `
+        <div class="atomic-repo-transfer-diagnostics">
+            ${messages
+                .map(
+                    (message) =>
+                        `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(
+                            message
+                        )}</div>`
+                )
+                .join('')}
+            ${warningMessages
+                .map(
+                    (message) =>
+                        `<div class="atomic-repo-transfer-warning">${escapeHtml(message)}</div>`
+                )
+                .join('')}
+            ${renderAtomicRepoTransferCodeCounts(reasonCounts, 'Διαγνωστικοί κωδικοί')}
+            ${renderAtomicRepoTransferCodeCounts(warningCounts, 'Κωδικοί προειδοποιήσεων')}
+        </div>
+    `;
+}
+
+function getAtomicRepoTransferWarningMessage(code) {
+    if (code === 'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS') {
+        return 'Η ημέρα-στόχος έχει μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών. Η πρόταση παραμένει μόνο για ανθρώπινο έλεγχο.';
+    }
+    return 'Η πρόταση περιέχει προειδοποίηση και παραμένει μόνο για ανθρώπινο έλεγχο.';
+}
+
+function renderAtomicRepoTransferGroup(group = {}, index = 0) {
+    const items = Array.isArray(group.items) ? group.items : [];
+    const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
+    const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
+    const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
+    const warnings = Array.isArray(group.warnings) ? group.warnings : [];
+    const isExpanded = index === 0;
+    const detailsId = `atomicRepoTransferPair-${index}`;
+    const status = String(group.status || '').trim() || 'NEEDS_REVIEW';
+    const statusLabel = getPolicyPreviewStatusLabel(status);
+
+    return `
+        <article class="atomic-repo-transfer-group" data-atomic-group-id="${escapeHtml(
+            group.group_id || ''
+        )}">
+            <div class="atomic-repo-transfer-group-header">
+                <div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="badge ${escapeHtml(statusLabel.badgeClass)}" title="${escapeHtml(
+                            status
+                        )}">${escapeHtml(statusLabel.label)}</span>
+                        <span class="fw-semibold">${escapeHtml(
+                            group.title || 'Μεταφορά ρεπό εντός εβδομάδας'
+                        )}</span>
+                    </div>
+                    <div class="small text-muted">
+                        Εργαζόμενος: ${escapeHtml(employeeCode)} · Ημερομηνίες πρότασης:
+                        ${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(
+                            formatPolicyPreviewDate(group.last_date)
+                        )}
+                    </div>
+                    <div class="small mt-1">${escapeHtml(group.description || '-')}</div>
+                    <div class="atomic-repo-transfer-safety-flags">
+                        <span>1 ενιαία πρόταση / 2 εγγραφές</span>
+                        <span>Απαιτείται ανθρώπινος έλεγχος</span>
+                        <span>Η εφαρμογή είναι μπλοκαρισμένη</span>
+                    </div>
+                    <div class="small text-muted" title="${escapeHtml(group.group_id || '')}">
+                        ID: ${escapeHtml(group.group_id || '-')}
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary atomic-repo-transfer-toggle"
+                    data-atomic-target-id="${escapeHtml(detailsId)}"
+                    aria-expanded="${String(isExpanded)}">
+                    ${isExpanded ? 'Απόκρυψη ζεύγους' : 'Προβολή ζεύγους'}
+                </button>
+            </div>
+            ${
+                warnings.length > 0
+                    ? `<div class="atomic-repo-transfer-group-warnings">${warnings
+                          .map(
+                              (warning) => `
+                                  <div class="atomic-repo-transfer-warning" title="${escapeHtml(
+                                      warning
+                                  )}">
+                                      ${escapeHtml(getAtomicRepoTransferWarningMessage(warning))}
+                                      <span class="small">(${escapeHtml(warning)})</span>
+                                  </div>
+                              `
+                          )
+                          .join('')}</div>`
+                    : ''
+            }
+            <div
+                class="atomic-repo-transfer-pair ${isExpanded ? '' : 'd-none'}"
+                id="${escapeHtml(detailsId)}">
+                <div class="atomic-repo-transfer-pair-notice">
+                    Οι δύο αλλαγές είναι atomic: και οι δύο αλλαγές μαζί ή καμία.
+                </div>
+                <div class="atomic-repo-transfer-pair-grid">
+                    ${renderAtomicRepoTransferItem(source, 'SOURCE_BECOMES_WORK')}
+                    ${renderAtomicRepoTransferItem(target, 'TARGET_BECOMES_REPO')}
+                </div>
+            </div>
+        </article>
+    `;
+}
+
+function bindAtomicRepoTransferEvents(container) {
+    container.querySelectorAll('.atomic-repo-transfer-toggle').forEach((button) => {
+        button.addEventListener('click', () => {
+            const targetId = button.dataset.atomicTargetId;
+            const target = targetId ? document.getElementById(targetId) : null;
+            if (!target) return;
+
+            const isOpen = !target.classList.contains('d-none');
+            target.classList.toggle('d-none', isOpen);
+            button.setAttribute('aria-expanded', String(!isOpen));
+            button.textContent = isOpen ? 'Προβολή ζεύγους' : 'Απόκρυψη ζεύγους';
+        });
+    });
+}
+
+function renderAtomicRepoTransferProjection(projection) {
+    if (!projection) return '';
+
+    const groups = Array.isArray(projection.groups) ? projection.groups : [];
+    const groupsHtml = groups.length
+        ? groups.map((group, index) => renderAtomicRepoTransferGroup(group, index)).join('')
+        : `
+            <div class="atomic-repo-transfer-empty">
+                Δεν βρέθηκαν ασφαλείς προτάσεις μεταφοράς ρεπό για τις πλήρεις εβδομάδες του επιλεγμένου διαστήματος.
+            </div>
+        `;
+
+    return `
+        <section class="atomic-repo-transfer-section" aria-labelledby="atomicRepoTransferTitle">
+            <div class="card border rounded atomic-repo-transfer-card">
+                <div class="card-body">
+                    <div class="atomic-repo-transfer-header">
+                        <div class="fw-semibold" id="atomicRepoTransferTitle">
+                            Προτάσεις Μεταφοράς Ρεπό
+                        </div>
+                        <span class="atomic-repo-transfer-readonly-badge">ΜΟΝΟ ΠΡΟΒΟΛΗ</span>
+                    </div>
+                    <div class="atomic-repo-transfer-main-warning">
+                        <div>Οι προτάσεις δεν έχουν εφαρμοστεί.</div>
+                        <div>Κάθε πρόταση αποτελεί μία ενιαία αλλαγή δύο ημερών:</div>
+                        <div>και οι δύο αλλαγές μαζί ή καμία.</div>
+                    </div>
+                    <div class="atomic-repo-transfer-unavailable">
+                        Η έγκριση και η εφαρμογή δεν είναι ακόμη διαθέσιμες.
+                    </div>
+                    ${renderAtomicRepoTransferSummary(projection)}
+                    ${renderAtomicRepoTransferDiagnostics(projection)}
+                    <div class="atomic-repo-transfer-groups">${groupsHtml}</div>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
 function renderPolicyPreviewGroups(grouping, options = {}) {
     const container = document.getElementById('policyPreviewGroupsContainer');
 
     if (!container) return;
+
+    if (Object.prototype.hasOwnProperty.call(options, 'atomicGroupProjection')) {
+        currentAtomicRepoTransferProjection = options.atomicGroupProjection || null;
+    }
+
+    if (options.loading || options.error) {
+        currentAtomicRepoTransferProjection = null;
+    }
 
     currentPolicyPreviewGrouping = grouping || null;
 
@@ -3690,6 +4059,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
     if (!grouping) {
         container.innerHTML = `
+            ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
             <div class="card border rounded">
                 <div class="card-body py-3">
                     <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
@@ -3699,6 +4069,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
                 </div>
             </div>
         `;
+        bindAtomicRepoTransferEvents(container);
         return;
     }
 
@@ -3757,6 +4128,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
             `;
 
     container.innerHTML = `
+        ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
         <div class="card border rounded policy-preview-card">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
@@ -3781,6 +4153,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
         </div>
     `;
 
+    bindAtomicRepoTransferEvents(container);
     bindPolicyPreviewApprovalHistoryEvents(container);
     bindPolicyPreviewApplyDryRunEvents(container);
 
@@ -3834,6 +4207,9 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 async function loadResults() {
     try {
+        currentAtomicRepoTransferProjection = null;
+        renderPolicyPreviewGroups(null, { loading: true });
+
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
@@ -3857,6 +4233,9 @@ async function loadResults() {
         const payload = await response.json();
 
         if (!payload.success) {
+            renderPolicyPreviewGroups(null, {
+                error: payload.message || 'Αποτυχία ανάκτησης δεδομένων.'
+            });
             Swal.fire({
                 icon: 'warning',
                 title: 'Σφάλμα',
@@ -3877,7 +4256,6 @@ async function loadResults() {
         currentApprovalHistoryFilters.decisionType = '';
         currentApprovalHistoryFilters.userName = '';
         currentApprovalHistoryFilters.searchText = '';
-        renderPolicyPreviewGroups(null, { loading: true });
 
         const rows = payload.rows || [];
         try {
@@ -3925,7 +4303,9 @@ async function loadResults() {
         }
 
         if (groupingResult.status === 'fulfilled') {
-            renderPolicyPreviewGroups(groupingResult.value);
+            renderPolicyPreviewGroups(groupingResult.value.grouping, {
+                atomicGroupProjection: groupingResult.value.atomicGroupProjection
+            });
         } else {
             const policyPreviewError = groupingResult.reason;
             console.warn('[loadResults] Policy preview grouping unavailable:', policyPreviewError);
@@ -3937,6 +4317,9 @@ async function loadResults() {
         }
     } catch (error) {
         console.error(error);
+        renderPolicyPreviewGroups(null, {
+            error: error.message || 'Αποτυχία ανάκτησης δεδομένων.'
+        });
 
         Swal.fire({
             icon: 'error',

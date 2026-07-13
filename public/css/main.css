@@ -11354,6 +11354,260 @@ body.loader-active > *:not(.app-loader) {
     padding-top: 0.75rem;
 }
 
+.atomic-repo-transfer-section {
+    margin-bottom: 0.75rem;
+}
+
+.atomic-repo-transfer-card {
+    border-left: 4px solid #7a5c00 !important;
+    background-color: #fffdf5;
+}
+
+.atomic-repo-transfer-header,
+.atomic-repo-transfer-group-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.atomic-repo-transfer-readonly-badge {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #7a5c00;
+    border-radius: 999px;
+    background-color: #fff3cd;
+    color: #664d03;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.atomic-repo-transfer-main-warning,
+.atomic-repo-transfer-unavailable,
+.atomic-repo-transfer-pair-notice {
+    margin-top: 0.65rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.4rem;
+    font-size: 0.82rem;
+}
+
+.atomic-repo-transfer-main-warning {
+    border: 1px solid #ffe69c;
+    background-color: #fff3cd;
+    color: #664d03;
+    font-weight: 650;
+}
+
+.atomic-repo-transfer-unavailable {
+    border: 1px solid #b6d4fe;
+    background-color: #e7f1ff;
+    color: #084298;
+}
+
+.atomic-repo-transfer-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+}
+
+.atomic-repo-transfer-summary-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.35rem;
+    background-color: #ffffff;
+    font-size: 0.76rem;
+}
+
+.atomic-repo-transfer-summary-item strong {
+    font-size: 0.9rem;
+}
+
+.atomic-repo-transfer-diagnostics {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+}
+
+.atomic-repo-transfer-diagnostic-message,
+.atomic-repo-transfer-warning,
+.atomic-repo-transfer-empty {
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.35rem;
+    font-size: 0.78rem;
+}
+
+.atomic-repo-transfer-diagnostic-message,
+.atomic-repo-transfer-empty {
+    border: 1px solid #ced4da;
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+.atomic-repo-transfer-warning {
+    border: 1px solid #ffe69c;
+    background-color: #fff8e1;
+    color: #664d03;
+}
+
+.atomic-repo-transfer-technical {
+    overflow-wrap: anywhere;
+}
+
+.atomic-repo-transfer-groups {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.75rem;
+}
+
+.atomic-repo-transfer-group {
+    padding: 0.65rem;
+    border: 1px solid #d9c98d;
+    border-radius: 0.45rem;
+    background-color: #ffffff;
+}
+
+.atomic-repo-transfer-safety-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+}
+
+.atomic-repo-transfer-safety-flags span {
+    padding: 0.18rem 0.45rem;
+    border: 1px solid #d9c98d;
+    border-radius: 999px;
+    background-color: #fffdf5;
+    color: #5c4700;
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.atomic-repo-transfer-toggle {
+    flex: 0 0 auto;
+    min-width: 9rem;
+    white-space: nowrap;
+}
+
+.atomic-repo-transfer-group-warnings {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.55rem;
+}
+
+.atomic-repo-transfer-pair {
+    margin-top: 0.65rem;
+}
+
+.atomic-repo-transfer-pair-notice {
+    margin-top: 0;
+    border: 1px solid #f1aeb5;
+    background-color: #f8d7da;
+    color: #842029;
+    font-weight: 700;
+}
+
+.atomic-repo-transfer-pair-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-top: 0.65rem;
+}
+
+.atomic-repo-transfer-day {
+    min-width: 0;
+    padding: 0.65rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.4rem;
+}
+
+.atomic-repo-transfer-source {
+    border-left: 4px solid #198754;
+    background-color: #f3fbf7;
+}
+
+.atomic-repo-transfer-target {
+    border-left: 4px solid #0d6efd;
+    background-color: #f4f8ff;
+}
+
+.atomic-repo-transfer-day-title,
+.atomic-repo-transfer-date {
+    font-weight: 750;
+}
+
+.atomic-repo-transfer-date {
+    margin-top: 0.25rem;
+    font-size: 1rem;
+}
+
+.atomic-repo-transfer-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin-bottom: 0.55rem;
+}
+
+.atomic-repo-transfer-values div {
+    min-width: 0;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.3rem;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.atomic-repo-transfer-values dt {
+    color: #6c757d;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.atomic-repo-transfer-values dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.atomic-repo-transfer-intervals {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.atomic-repo-transfer-interval {
+    display: flex;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+    border-radius: 0.3rem;
+    background-color: rgba(255, 255, 255, 0.75);
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+    .atomic-repo-transfer-group-header {
+        flex-direction: column;
+    }
+
+    .atomic-repo-transfer-toggle {
+        width: 100%;
+    }
+
+    .atomic-repo-transfer-pair-grid,
+    .atomic-repo-transfer-values {
+        grid-template-columns: 1fr;
+    }
+}
+
 .review-filters-sticky {
     position: sticky;
     top: 0;

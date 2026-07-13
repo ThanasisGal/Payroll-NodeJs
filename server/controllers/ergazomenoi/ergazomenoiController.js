@@ -49,6 +49,10 @@ const { savePdfFromBase64, deletePdf } = require('../../utils/pdfHandler');
 const { addPdfUrlsToErgazomenos } = require('../../utils/s3UrlHelper');
 const { getUserContext } = require('../../utils/userContext');
 const {
+    resolveEmploymentTypeFromFormData,
+    buildCanonicalWorkTermsSnapshotFields
+} = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const {
     generatePresignedUrl,
     downloadS3UriToTempFile,
     isS3Url,
@@ -399,14 +403,7 @@ function getTyposEbdomadasFromHmeres(hmeres) {
 }
 
 function getTyposApasxolhshsFromFormData(formData = {}) {
-    return (
-        formData.typos_apasxolhshs ||
-        formData.apasxolhsh_basei_symbashs_stathera ||
-        formData.apasxolhsh_basei_symbashs ||
-        formData.kathestos_apasxolhshs_stathera ||
-        formData.kathestos_apasxolhshs ||
-        ''
-    );
+    return resolveEmploymentTypeFromFormData(formData);
 }
 
 function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {}) {
@@ -420,10 +417,10 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
     // ως αναμενόμενα ρεπό ανά εβδομάδα. Το κρατάμε σαν snapshot στο ιστορικό,
     // ώστε οι έλεγχοι παλιών περιόδων να μη βασίζονται στην τρέχουσα εικόνα
     // του ErgazomenoiModel μετά από μεταβολές σύμβασης/ωραρίου.
-    const mhniaiaRepo =
-        toNumberOrNull(formData.mhniaia_repo) ??
-        toNumberOrNull(fallbackErgazomenos.mhniaia_repo) ??
-        0;
+    const canonicalSnapshotFields = buildCanonicalWorkTermsSnapshotFields(
+        formData,
+        fallbackErgazomenos
+    );
 
     const orarioApo = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_apo);
     const orarioEos = toDateOrNull(formData.hmeromhnia_allaghs_orarioy_eos);
@@ -449,9 +446,7 @@ function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {})
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
-        typos_apasxolhshs: getTyposApasxolhshsFromFormData(formData),
-        typos_ebdomadas: formData.typos_ebdomadas || getTyposEbdomadasFromHmeres(hmeres),
-        mhniaia_repo: mhniaiaRepo,
+        ...canonicalSnapshotFields,
         employment_profile_source: formData.employment_profile_source || 'ERGOMENOI_CONTROLLER',
 
         // Flag ότι η εγγραφή μπορεί να χρησιμοποιηθεί από τον απολογιστικό υπολογισμό.
@@ -897,7 +892,8 @@ class ergazomenoiController {
                 hmeres_ergasias_ebdomadas: toNumberOrNull(data.hmeres_ergasias_ebdomadas),
                 ores_ergasias_ebdomadas: toNumberOrNull(data.ores_ergasias_ebdomadas),
                 mo_oron_hmerhsias_ergasias: toNumberOrNull(data.mo_oron_hmerhsias_ergasias),
-                typos_apasxolhshs: data.typos_apasxolhshs || '',
+                kathestos_apasxolhshs: getTyposApasxolhshsFromFormData(data),
+                typos_apasxolhshs: getTyposApasxolhshsFromFormData(data),
                 typos_ebdomadas:
                     data.typos_ebdomadas ||
                     getTyposEbdomadasFromHmeres(data.hmeres_ergasias_ebdomadas),
@@ -1907,7 +1903,6 @@ class ergazomenoiController {
             // υπολογισμός μόνο την τρέχουσα εικόνα του εργαζόμενου.
             ...buildIstorikoWorkTermsSnapshot(formData),
 
-            kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
             misthologiko_klimakio: formData.misthologiko_klimakio,
 
             symbash: formData.symbash_stathera,
@@ -3871,7 +3866,6 @@ class ergazomenoiController {
                 // Snapshot όρων εργασίας για τη συγκεκριμένη μεταβολή.
                 ...buildIstorikoWorkTermsSnapshot(formData),
 
-                kathestos_apasxolhshs: formData.kathestos_apasxolhshs,
                 misthologiko_klimakio: formData.misthologiko_klimakio,
                 symbash: formData.symbash,
                 kathgoria_symbashs: formData.kathgoria_symbashs,
