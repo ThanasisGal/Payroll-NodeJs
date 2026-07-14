@@ -69,6 +69,51 @@ function partTimeWeek() {
     return rows;
 }
 
+function autoLeavePriorityWeek() {
+    const start = new Date('2026-05-31T00:00:00.000Z');
+    const rows = Array.from({ length: 7 }, (_, offset) => {
+        const hmeromhnia = new Date(start);
+        hmeromhnia.setUTCDate(hmeromhnia.getUTCDate() + offset);
+        return {
+            ...workRow(offset),
+            _id: `priority-row-${offset}`,
+            hmeromhnia: hmeromhnia.toISOString().slice(0, 10),
+            cards_apo_ora_01: '08:00',
+            cards_eos_ora_01: '16:00'
+        };
+    });
+
+    Object.assign(rows[1], {
+        kathgoria_ergasias: 'ΑΝ',
+        cards_apo_ora_01: '08:12',
+        cards_eos_ora_01: '16:16',
+        cards_ores_ergasias: 8.07
+    });
+    Object.assign(rows[2], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        apo_ora_01: '08:00',
+        eos_ora_01: '16:00',
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0,
+        apologistiko_biblio: false,
+        adeia_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        ores_ergasias_apologistika: 8,
+        ores_apoysias_apologistika: 0
+    });
+    Object.assign(rows[3], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0
+    });
+
+    return rows;
+}
+
 function analyze(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
     return analyzeWeeklyRepoTransferSinglePair({
         weekRows: rows,
@@ -344,6 +389,379 @@ function testExactRepoCount() {
     assert.strictEqual(excess.counts.predicted_final_repo, 2);
 }
 
+function testAutoCalculatedLeavePriorityRegression() {
+    const rows = autoLeavePriorityWeek();
+    const before = JSON.stringify(rows);
+    const result = analyze(rows);
+
+    assertEligible(result, '2026-06-01', '2026-06-02', 'ΑΝ');
+    assert.deepStrictEqual(result.counts, {
+        source_candidates: 1,
+        target_candidates: 1,
+        existing_actual_repo: 1,
+        predicted_final_repo: 2
+    });
+    assert.strictEqual(JSON.stringify(rows), before);
+}
+
+function optionalHolidayContext(date, companyOperatesOnHoliday, description = 'Αργία') {
+    return {
+        holidayByDateKey: new Map([
+            [
+                date,
+                {
+                    isHoliday: true,
+                    isMandatoryHoliday: false,
+                    isOptionalHoliday: true,
+                    companyOperatesOnHoliday,
+                    blocksRepoTransfer: !companyOperatesOnHoliday,
+                    description
+                }
+            ]
+        ])
+    };
+}
+
+function testOptionalHolidayRepoTransferPolicy() {
+    const rows = fullTimeWeek();
+    rows[1].apologistiko_biblio = true;
+    rows[1].argia = true;
+    rows[1].argia_apologistika = true;
+    rows[1].ores_argion_prosayxhsh_apologistika = 8;
+    rows[1].ores_argion_ergasia_apologistika = 8;
+    const before = JSON.stringify(rows);
+    const operatesContext = optionalHolidayContext(dateKey(1), true, 'Περιγραφή Α');
+    const operates = analyze(rows, undefined, operatesContext);
+
+    assertEligible(operates, dateKey(1), dateKey(4), 'ΑΝ');
+    assert.ok(!operates.reasons.includes('SOURCE_HOLIDAY'));
+    assert.strictEqual(JSON.stringify(rows), before);
+
+    const differentDescription = analyze(
+        rows,
+        undefined,
+        optionalHolidayContext(dateKey(1), true, '<script>διαφορετική</script>')
+    );
+    assert.deepStrictEqual(differentDescription, operates);
+
+    const closed = analyze(rows, undefined, optionalHolidayContext(dateKey(1), false));
+    assertReason(closed, 'SOURCE_HOLIDAY');
+}
+
+function testMandatoryAndRawHolidayRemainBlocking() {
+    const mandatoryRows = fullTimeWeek();
+    const mandatory = analyze(mandatoryRows, undefined, {
+        holidayByDateKey: new Map([
+            [
+                dateKey(1),
+                {
+                    isHoliday: true,
+                    isMandatoryHoliday: true,
+                    isOptionalHoliday: false,
+                    companyOperatesOnHoliday: true,
+                    blocksRepoTransfer: false,
+                    description: 'Υποχρεωτική'
+                }
+            ]
+        ])
+    });
+    assertReason(mandatory, 'SOURCE_HOLIDAY');
+
+    const rawRows = fullTimeWeek();
+    rawRows[1].argia = true;
+    assertReason(analyze(rawRows), 'SOURCE_HOLIDAY');
+}
+
+function materializeAutoSource(rows, index, overrides = {}) {
+    Object.assign(rows[index], {
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: rows[index].cards_apo_ora_01,
+        eos_ora_01_apologistika: rows[index].cards_eos_ora_01,
+        ores_ergasias_apologistika: rows[index].cards_ores_ergasias,
+        ...overrides
+    });
+    return rows;
+}
+
+function testRealShapeOptionalHolidayAndAutoSourceFixture() {
+    const rows = materializeAutoSource(autoLeavePriorityWeek(), 1, {
+        apo_ora_01_apologistika: '08:12',
+        eos_ora_01_apologistika: '16:12',
+        apo_ora_01_break: '12:00',
+        eos_ora_01_break: '12:30',
+        ores_ergasias_apologistika: 7.57,
+        apologistiko_biblio: true,
+        argia: true,
+        argia_apologistika: true,
+        ores_argion_prosayxhsh_apologistika: 8.07,
+        ores_argion_ergasia_apologistika: 8.07,
+        ores_nominhs_yperorias_argion_apologistika: 0.07
+    });
+    const before = JSON.stringify(rows);
+    const result = analyze(
+        rows,
+        {
+            typos_apasxolhshs: 'PLHRHS',
+            mhniaia_repo: 2,
+            mo_oron_hmerhsias_ergasias: 8,
+            external_break_minutes: 30
+        },
+        optionalHolidayContext('2026-06-01', true, 'Αγίου Πνεύματος')
+    );
+
+    assertEligible(result, '2026-06-01', '2026-06-02', 'ΑΝ');
+    assert.deepStrictEqual(result.counts, {
+        source_candidates: 1,
+        target_candidates: 1,
+        existing_actual_repo: 1,
+        predicted_final_repo: 2
+    });
+    assert.strictEqual(JSON.stringify(rows), before);
+}
+
+function testNonHolidayAutoSourceFixture() {
+    const rows = materializeAutoSource(
+        fullTimeWeek({ sourceDay: 1, targetDay: 5, existingRepoDay: 3 }),
+        1
+    );
+    const start = new Date('2026-06-14T00:00:00.000Z');
+    rows.forEach((row, index) => {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + index);
+        row.hmeromhnia = date.toISOString().slice(0, 10);
+    });
+    Object.assign(rows[1], {
+        ores_ergasias: 0,
+        cards_apo_ora_01: '08:01',
+        cards_eos_ora_01: '15:59',
+        cards_ores_ergasias: 7.966666666666667,
+        apo_ora_01_apologistika: '08:01',
+        eos_ora_01_apologistika: '16:01',
+        apo_ora_01_break: '12:00',
+        eos_ora_01_break: '12:30',
+        ores_ergasias_apologistika: 7.47,
+        apologistiko_biblio: true
+    });
+    const profile = {
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        mo_oron_hmerhsias_ergasias: 8,
+        external_break_minutes: 30
+    };
+    assertEligible(analyze(rows, profile), '2026-06-15', '2026-06-19', 'ΑΝ');
+    assert.deepStrictEqual(analyze(rows, profile).counts, {
+        source_candidates: 1,
+        target_candidates: 1,
+        existing_actual_repo: 1,
+        predicted_final_repo: 2
+    });
+}
+
+function testProvisionalAutoSourceBlockingStates() {
+    const cases = [
+        ['lock', { is_locked: true }, {}, 'SOURCE_LOCKED'],
+        [
+            'audit',
+            {},
+            { existingAuditCountByRowKey: new Map([['row-1', 1]]) },
+            'SOURCE_MANUAL_OVERRIDE'
+        ],
+        ['unknown hours', { ores_asxeto_apologistika: 1 }, {}, 'SOURCE_ALREADY_PROCESSED'],
+        [
+            'interval mismatch',
+            { eos_ora_01_apologistika: '16:30' },
+            {},
+            'SOURCE_ALREADY_PROCESSED'
+        ],
+        ['hours mismatch', { ores_ergasias_apologistika: 7 }, {}, 'SOURCE_ALREADY_PROCESSED'],
+        [
+            'category mismatch',
+            { kathgoria_ergasias_apologistika: 'ΑΝ' },
+            {},
+            'SOURCE_CONFLICTING_APOLOGISTIKA_CATEGORY'
+        ],
+        [
+            'unrelated leave category',
+            { kathgoria_adeias_apologistika: 'ΑΔΑΛ' },
+            {},
+            'SOURCE_ALREADY_PROCESSED'
+        ],
+        ['declared leave', { adeia: true }, {}, 'SOURCE_LEAVE_OR_SICKNESS'],
+        ['sickness', { astheneia: true }, {}, 'SOURCE_LEAVE_OR_SICKNESS'],
+        [
+            'incomplete cards',
+            { cards_apo_ora_02: '18:00', cards_eos_ora_02: '' },
+            {},
+            'SOURCE_INVALID_CARD_EVIDENCE'
+        ]
+    ];
+
+    cases.forEach(([label, overrides, contexts, reason]) => {
+        const rows = materializeAutoSource(fullTimeWeek(), 1);
+        Object.assign(rows[1], overrides);
+        const result = analyze(rows, undefined, contexts);
+        assertReason(result, reason);
+        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', label);
+    });
+
+    const holidayRows = materializeAutoSource(fullTimeWeek(), 1);
+    assertReason(
+        analyze(holidayRows, undefined, optionalHolidayContext(dateKey(1), false)),
+        'SOURCE_HOLIDAY'
+    );
+}
+
+function testApologistikoBiblioIsNotEligibilityProvenance() {
+    [true, false].forEach((apologistikoBiblio) => {
+        const sourceRows = materializeAutoSource(fullTimeWeek(), 1, {
+            apologistiko_biblio: apologistikoBiblio,
+            ...(apologistikoBiblio
+                ? {
+                      ores_nyxtas_apologistika: 0.5,
+                      ores_yperergasias_apologistika: 0.25
+                  }
+                : {})
+        });
+        assertEligible(analyze(sourceRows), dateKey(1), dateKey(4), 'ΑΝ');
+
+        const targetRows = autoLeavePriorityWeek();
+        targetRows[2].apologistiko_biblio = apologistikoBiblio;
+        assertEligible(analyze(targetRows), '2026-06-01', '2026-06-02', 'ΑΝ');
+    });
+
+    const lockedSource = materializeAutoSource(fullTimeWeek(), 1, {
+        apologistiko_biblio: true,
+        is_locked: true
+    });
+    assertReason(analyze(lockedSource), 'SOURCE_LOCKED');
+
+    const auditedTarget = autoLeavePriorityWeek();
+    auditedTarget[2].apologistiko_biblio = true;
+    assertReason(
+        analyze(auditedTarget, undefined, {
+            existingAuditCountByRowKey: new Map([['priority-row-2', 1]])
+        }),
+        'TARGET_MANUAL_OVERRIDE'
+    );
+}
+
+function testKnownAutoDerivedPayrollFieldsAreNotManualMarkers() {
+    const knownFields = [
+        'ores_nyxtas_apologistika',
+        'ores_argion_prosayxhsh_apologistika',
+        'ores_argion_ergasia_apologistika',
+        'ores_prostheths_ergasias_apologistika',
+        'ores_yperergasias_apologistika',
+        'ores_yperergasias_nyxtas_apologistika',
+        'ores_yperergasias_argion_apologistika',
+        'ores_yperergasias_argion_nyxtas_apologistika',
+        'ores_nominhs_yperorias_apologistika',
+        'ores_nominhs_yperorias_nyxtas_apologistika',
+        'ores_nominhs_yperorias_argion_apologistika',
+        'ores_nominhs_yperorias_argion_nyxtas_apologistika',
+        'ores_paranomhs_yperorias_apologistika',
+        'ores_paranomhs_yperorias_nyxtas_apologistika',
+        'ores_paranomhs_yperorias_argion_apologistika',
+        'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+    ];
+
+    knownFields.forEach((field) => {
+        const rows = materializeAutoSource(fullTimeWeek(), 1, {
+            apologistiko_biblio: true,
+            [field]: 0.25
+        });
+        const isHolidayField = field.includes('_argion_') || field.startsWith('ores_argion_');
+        const contexts = isHolidayField
+            ? optionalHolidayContext(dateKey(1), true)
+            : {};
+        assertEligible(analyze(rows, undefined, contexts), dateKey(1), dateKey(4), 'ΑΝ');
+    });
+}
+
+function testArbitraryIntervalOffsetsRemainBlocked() {
+    [
+        ['16:50', '10 minutes'],
+        ['16:45', '15 minutes']
+    ].forEach(([calculatedEnd, label]) => {
+        const rows = materializeAutoSource(fullTimeWeek(), 1, {
+            eos_ora_01_apologistika: calculatedEnd,
+            apologistiko_biblio: true
+        });
+        const result = analyze(rows);
+        assertReason(result, 'SOURCE_ALREADY_PROCESSED');
+        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', label);
+    });
+}
+
+function testAutoCalculatedLeavePriorityBlockingStates() {
+    const cases = [
+        ['declared leave', { adeia: true }, {}, 'TARGET_LEAVE_OR_SICKNESS'],
+        ['declared leave category', { kathgoria_adeias: 'ΚΑΝ' }, {}, 'TARGET_LEAVE_OR_SICKNESS'],
+        ['locked', { is_locked: true }, {}, 'TARGET_LOCKED'],
+        [
+            'audit',
+            {},
+            { existingAuditCountByRowKey: new Map([['priority-row-2', 1]]) },
+            'TARGET_MANUAL_OVERRIDE'
+        ],
+        ['sickness', { astheneia: true }, {}, 'TARGET_LEAVE_OR_SICKNESS'],
+        ['holiday', { argia: true }, {}, 'TARGET_HOLIDAY'],
+        [
+            'unrelated apologistika hours',
+            { ores_nyxtas_apologistika: 1 },
+            {},
+            'TARGET_ALREADY_PROCESSED'
+        ]
+    ];
+
+    cases.forEach(([label, overrides, contexts, reason]) => {
+        const rows = autoLeavePriorityWeek();
+        Object.assign(rows[2], overrides);
+        const result = analyze(rows, undefined, contexts);
+        assertReason(result, reason);
+        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', label);
+    });
+}
+
+function testAutoCalculatedLeaveWithTwoTargetsNeedsReview() {
+    const rows = autoLeavePriorityWeek();
+    Object.assign(rows[4], {
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0
+    });
+    assertReason(analyze(rows), 'MULTIPLE_TARGET_CANDIDATES');
+}
+
+function testSixDayRepoLimitWithExistingRepoIsExceeded() {
+    const result = analyze(autoLeavePriorityWeek(), {
+        typos_apasxolhshs: 'PLHRHS',
+        hmeres_ergasias_ebdomadas: 6,
+        mhniaia_repo: 1
+    });
+    assertReason(result, 'REPO_LIMIT_EXCEEDED');
+    assert.strictEqual(result.counts.existing_actual_repo, 1);
+    assert.strictEqual(result.counts.predicted_final_repo, 2);
+}
+
+function testSplitShiftPrioritySourceRemainsSupported() {
+    const rows = autoLeavePriorityWeek();
+    Object.assign(rows[1], {
+        cards_apo_ora_01: '08:12',
+        cards_eos_ora_01: '12:12',
+        cards_apo_ora_02: '12:30',
+        cards_eos_ora_02: '16:34',
+        cards_ores_ergasias: 8.07,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '08:12',
+        eos_ora_01_apologistika: '12:12',
+        apo_ora_02_apologistika: '12:30',
+        eos_ora_02_apologistika: '16:34',
+        ores_ergasias_apologistika: 8.07
+    });
+    assertEligible(analyze(rows), '2026-06-01', '2026-06-02', 'ΑΝ');
+}
+
 function testInvalidRepoLimits() {
     [0, 3, 1.5, '2', 'invalid', undefined].forEach((mhniaiaRepo) => {
         const result = analyze(fullTimeWeek(), {
@@ -571,6 +989,19 @@ function run() {
     testMultipleTargets();
     testNoTarget();
     testExactRepoCount();
+    testAutoCalculatedLeavePriorityRegression();
+    testOptionalHolidayRepoTransferPolicy();
+    testMandatoryAndRawHolidayRemainBlocking();
+    testRealShapeOptionalHolidayAndAutoSourceFixture();
+    testNonHolidayAutoSourceFixture();
+    testProvisionalAutoSourceBlockingStates();
+    testApologistikoBiblioIsNotEligibilityProvenance();
+    testKnownAutoDerivedPayrollFieldsAreNotManualMarkers();
+    testArbitraryIntervalOffsetsRemainBlocked();
+    testAutoCalculatedLeavePriorityBlockingStates();
+    testAutoCalculatedLeaveWithTwoTargetsNeedsReview();
+    testSixDayRepoLimitWithExistingRepoIsExceeded();
+    testSplitShiftPrioritySourceRemainsSupported();
     testInvalidRepoLimits();
     testInvalidWeekInputs();
     testInputImmutability();

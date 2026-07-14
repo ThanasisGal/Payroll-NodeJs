@@ -280,6 +280,9 @@ function testSplitShiftIntervalsArePreservedInProjection() {
     const twoIntervalValues = {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
         repo_apologistika: false,
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: '',
+        ores_apoysias_apologistika: 0,
         apo_ora_01_apologistika: '08:00',
         eos_ora_01_apologistika: '12:00',
         apo_ora_02_apologistika: '12:30',

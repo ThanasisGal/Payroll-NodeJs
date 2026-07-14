@@ -11497,6 +11497,94 @@ body.loader-active > *:not(.app-loader) {
     white-space: nowrap;
 }
 
+#policyPreviewGroupsContainer .btn.btn-primary,
+#policyPreviewGroupsContainer .btn.btn-outline-primary,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-primary,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-info,
+#policyPreviewGroupsContainer .btn.policy-preview-details-btn {
+    --policy-preview-button-bg: #cfe2ff;
+    --policy-preview-button-border: #9ec5fe;
+    --policy-preview-button-hover-bg: #9ec5fe;
+}
+
+#policyPreviewGroupsContainer .btn.btn-success,
+#policyPreviewGroupsContainer .btn.btn-outline-success,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-success {
+    --policy-preview-button-bg: #d1e7dd;
+    --policy-preview-button-border: #a3cfbb;
+    --policy-preview-button-hover-bg: #a3cfbb;
+}
+
+#policyPreviewGroupsContainer .btn.btn-warning,
+#policyPreviewGroupsContainer .btn.btn-outline-warning,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-warning {
+    --policy-preview-button-bg: #fff3cd;
+    --policy-preview-button-border: #ffe69c;
+    --policy-preview-button-hover-bg: #ffe69c;
+}
+
+#policyPreviewGroupsContainer .btn.btn-danger,
+#policyPreviewGroupsContainer .btn.btn-outline-danger,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-danger {
+    --policy-preview-button-bg: #f8d7da;
+    --policy-preview-button-border: #f1aeb5;
+    --policy-preview-button-hover-bg: #f1aeb5;
+}
+
+#policyPreviewGroupsContainer .btn.btn-secondary,
+#policyPreviewGroupsContainer .btn.btn-outline-secondary,
+#policyPreviewGroupsContainer .btn.policy-preview-decision-secondary {
+    --policy-preview-button-bg: #e2e3e5;
+    --policy-preview-button-border: #c4c8cb;
+    --policy-preview-button-hover-bg: #c4c8cb;
+}
+
+#policyPreviewGroupsContainer .btn[class*='btn-'],
+#policyPreviewGroupsContainer .btn.policy-preview-details-btn,
+#policyPreviewGroupsContainer .btn[class*='policy-preview-decision-'] {
+    color: #000000 !important;
+    background-color: var(--policy-preview-button-bg) !important;
+    border-color: var(--policy-preview-button-border) !important;
+}
+
+#policyPreviewGroupsContainer .btn[class*='btn-']:hover:not(:disabled),
+#policyPreviewGroupsContainer .btn[class*='btn-']:focus:not(:disabled),
+#policyPreviewGroupsContainer .btn[class*='btn-']:active:not(:disabled),
+#policyPreviewGroupsContainer .btn.policy-preview-details-btn:hover:not(:disabled),
+#policyPreviewGroupsContainer .btn.policy-preview-details-btn:focus:not(:disabled),
+#policyPreviewGroupsContainer .btn.policy-preview-details-btn:active:not(:disabled),
+#policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:hover:not(:disabled),
+#policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:focus:not(:disabled),
+#policyPreviewGroupsContainer .btn[class*='policy-preview-decision-']:active:not(:disabled) {
+    color: #000000 !important;
+    background-color: var(--policy-preview-button-hover-bg) !important;
+    border-color: var(--policy-preview-button-border) !important;
+}
+
+#policyPreviewGroupsContainer .btn:focus-visible {
+    color: #000000 !important;
+    outline: 3px solid #212529;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3);
+}
+
+#policyPreviewGroupsContainer .btn:disabled,
+#policyPreviewGroupsContainer .btn.disabled,
+#policyPreviewGroupsContainer .btn[aria-disabled='true'] {
+    color: #000000 !important;
+    background-color: var(--policy-preview-button-bg) !important;
+    border-color: var(--policy-preview-button-border) !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#policyPreviewGroupsContainer .btn:disabled:hover,
+#policyPreviewGroupsContainer .btn.disabled:hover,
+#policyPreviewGroupsContainer .btn[aria-disabled='true']:hover {
+    color: #000000 !important;
+    background-color: var(--policy-preview-button-bg) !important;
+}
+
 .atomic-repo-transfer-group-warnings {
     display: grid;
     gap: 0.35rem;
@@ -11734,6 +11822,22 @@ body.loader-active > *:not(.app-loader) {
     background: #eef2f0;
     color: #2f513a;
     margin-right: 6px;
+}
+
+#resultsTable .review-holiday-description-badge {
+    display: inline-flex;
+    max-width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    border: 1px solid #d9a85f;
+    border-radius: 999px;
+    background: #fff3df;
+    color: #704b16;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .review-total-box {

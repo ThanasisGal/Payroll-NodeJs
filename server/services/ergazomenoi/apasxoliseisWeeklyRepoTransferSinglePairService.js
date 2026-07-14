@@ -144,14 +144,49 @@ function getContextValue(source, key) {
     return null;
 }
 
-function hasExternalHoliday(holidayByDateKey, key) {
-    const value = getContextValue(holidayByDateKey, key);
-    if (!value) return false;
-    if (value === true) return true;
-    if (typeof value === 'object') {
-        return value.isHoliday !== false;
+function resolveRepoTransferHolidayState(row, holidayByDateKey, key) {
+    const external = getContextValue(holidayByDateKey, key);
+    const hasExternalContext = Boolean(external);
+    const externalObject = external && typeof external === 'object' ? external : null;
+    const externalIsHoliday = externalObject
+        ? externalObject.isHoliday !== false
+        : toBoolean(external);
+    const isMandatoryHoliday = externalIsHoliday && Boolean(
+        externalObject &&
+        (externalObject.isMandatoryHoliday === true ||
+            externalObject.ypoxreotikh_argia === true)
+    );
+    const isOptionalHoliday = externalIsHoliday && Boolean(
+        externalObject &&
+        (externalObject.isOptionalHoliday === true ||
+            (externalObject.ypoxreotikh_argia === false && !isMandatoryHoliday))
+    );
+    const companyOperatesOnHoliday = Boolean(
+        externalObject && externalObject.companyOperatesOnHoliday === true
+    );
+    const rawHoliday =
+        toBoolean(row.argia) ||
+        toBoolean(row.argia_apologistika);
+    let blocksRepoTransfer = false;
+
+    if (isMandatoryHoliday) {
+        blocksRepoTransfer = true;
+    } else if (isOptionalHoliday) {
+        blocksRepoTransfer = !companyOperatesOnHoliday;
+    } else if (externalIsHoliday) {
+        blocksRepoTransfer = externalObject?.blocksRepoTransfer !== false;
+    } else if (!hasExternalContext && rawHoliday) {
+        blocksRepoTransfer = true;
     }
-    return toBoolean(value);
+
+    return {
+        isHoliday: externalIsHoliday || rawHoliday,
+        isMandatoryHoliday,
+        isOptionalHoliday,
+        companyOperatesOnHoliday,
+        blocksRepoTransfer,
+        description: toTrimmedString(externalObject?.description).slice(0, 200)
+    };
 }
 
 function hasCompleteNonZeroApologistikaInterval(row) {
@@ -164,13 +199,14 @@ function inspectApologistikaState(row, facts) {
     const category = toTrimmedString(row.kathgoria_ergasias_apologistika);
     const numericStates = Object.entries(row)
         .filter(([field]) => /^ores_.*_apologistika$/.test(field))
-        .map(([, value]) => classifyApologistikaNumber(value));
+        .map(([field, value]) => ({ field, ...classifyApologistikaNumber(value) }));
     const invalidNumericValue = numericStates.some((state) => state.kind === 'INVALID');
     const positiveNumericValue = numericStates.some((state) => state.kind === 'POSITIVE');
 
     const flags = facts.apologistika.existingFlags;
     return {
         category,
+        numericStates,
         invalidNumericValue,
         substantiveState:
             positiveNumericValue ||
@@ -183,12 +219,225 @@ function inspectApologistikaState(row, facts) {
     };
 }
 
-function hasLeaveOrSickness(row, facts) {
-    return (
-        facts.leave.hasDeclaredLeave ||
+function isProvisionalAutoCalculatedLeave({
+    row,
+    facts,
+    cardHours,
+    holidayState,
+    manualOverride
+}) {
+    const apologistikaState = inspectApologistikaState(row, facts);
+    const workHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const absenceHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_apoysias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const unrelatedPositiveHours = apologistikaState.numericStates.some(
+        (state) =>
+            state.kind === 'POSITIVE' &&
+            !['ores_ergasias_apologistika', 'ores_apoysias_apologistika'].includes(
+                state.field
+            )
+    );
+    const declaredHours = toFiniteNumber(row.ores_ergasias);
+    const workHoursMatchFallback =
+        workHoursState.kind === 'ZERO' ||
+        (workHoursState.kind === 'POSITIVE' &&
+            declaredHours !== null &&
+            workHoursState.value === declaredHours);
+    const autoLeaveMarker =
         facts.leave.adeia_apologistika ||
-        toBoolean(row.astheneia) ||
-        facts.apologistika.existingFlags.astheneia_apologistika
+        apologistikaState.category === 'ΑΔΕΙΑ' ||
+        facts.leave.kathgoria_adeias_apologistika === 'ΑΔΑΛ';
+    const compatibleCalculatedCategory = ['', 'ΑΔΕΙΑ'].includes(
+        apologistikaState.category
+    );
+    const compatibleLeaveCategory = ['', 'ΑΔΑΛ'].includes(
+        facts.leave.kathgoria_adeias_apologistika
+    );
+    const blockingSickness =
+        toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
+
+    return (
+        facts.declared.isDeclaredWork &&
+        cardHours === 0 &&
+        facts.leave.hasDeclaredLeave === false &&
+        blockingSickness === false &&
+        holidayState.blocksRepoTransfer === false &&
+        manualOverride === false &&
+        autoLeaveMarker &&
+        compatibleCalculatedCategory &&
+        compatibleLeaveCategory &&
+        apologistikaState.invalidNumericValue === false &&
+        workHoursMatchFallback &&
+        absenceHoursState.kind === 'ZERO' &&
+        unrelatedPositiveHours === false &&
+        hasCompleteNonZeroApologistikaInterval(row) === false &&
+        facts.apologistika.existingFlags.repo_apologistika === false
+    );
+}
+
+const AUTO_SOURCE_DERIVED_HOUR_FIELDS = new Set([
+    'ores_nyxtas_apologistika',
+    'ores_argion_prosayxhsh_apologistika',
+    'ores_argion_ergasia_apologistika',
+    'ores_prostheths_ergasias_apologistika',
+    'ores_yperergasias_apologistika',
+    'ores_yperergasias_nyxtas_apologistika',
+    'ores_yperergasias_argion_apologistika',
+    'ores_yperergasias_argion_nyxtas_apologistika',
+    'ores_nominhs_yperorias_apologistika',
+    'ores_nominhs_yperorias_nyxtas_apologistika',
+    'ores_nominhs_yperorias_argion_apologistika',
+    'ores_nominhs_yperorias_argion_nyxtas_apologistika',
+    'ores_paranomhs_yperorias_apologistika',
+    'ores_paranomhs_yperorias_nyxtas_apologistika',
+    'ores_paranomhs_yperorias_argion_apologistika',
+    'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+]);
+const AUTO_SOURCE_HOLIDAY_DERIVED_HOUR_FIELDS = new Set([
+    'ores_argion_prosayxhsh_apologistika',
+    'ores_argion_ergasia_apologistika',
+    'ores_yperergasias_argion_apologistika',
+    'ores_yperergasias_argion_nyxtas_apologistika',
+    'ores_nominhs_yperorias_argion_apologistika',
+    'ores_nominhs_yperorias_argion_nyxtas_apologistika',
+    'ores_paranomhs_yperorias_argion_apologistika',
+    'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+]);
+const AUTO_SOURCE_HOURS_TOLERANCE = 0.02;
+
+function numbersMatch(left, right) {
+    return Number.isFinite(left) &&
+        Number.isFinite(right) &&
+        Math.abs(left - right) <= AUTO_SOURCE_HOURS_TOLERANCE;
+}
+
+function sourceIntervalsMatchAutoResult(row, facts, employmentProfile) {
+    const cardIntervals = facts.cards.cardIntervalsRaw;
+    const apologistikaIntervals = facts.apologistika.currentApologistikaIntervals;
+    const declaredIntervals = facts.declared.declaredIntervals;
+    const hasSingleCardInterval = facts.cards.cardIntervalsNormalized.length === 1;
+    const declaredHours = toFiniteNumber(row.ores_ergasias);
+    const contractualDailyHours = toFiniteNumber(
+        employmentProfile.mo_oron_hmerhsias_ergasias
+    );
+    const hasAnyApologistikaInterval = apologistikaIntervals.some(
+        (interval) => interval.start || interval.end
+    );
+
+    if (!hasAnyApologistikaInterval) return true;
+
+    return apologistikaIntervals.every((apologistikaInterval, index) => {
+        const cardInterval = cardIntervals[index];
+        const declaredInterval = declaredIntervals[index];
+        if (!apologistikaInterval.start && !apologistikaInterval.end) {
+            return !cardInterval?.isComplete || cardInterval.isZeroLength;
+        }
+        if (
+            !apologistikaInterval.isComplete ||
+            apologistikaInterval.isZeroLength ||
+            !cardInterval?.isComplete ||
+            cardInterval.isZeroLength ||
+            apologistikaInterval.start !== cardInterval.start
+        ) {
+            return false;
+        }
+
+        return (
+            apologistikaInterval.end === cardInterval.end ||
+            (declaredInterval?.isComplete &&
+                !declaredInterval.isZeroLength &&
+                apologistikaInterval.durationMinutes === declaredInterval.durationMinutes) ||
+            (hasSingleCardInterval &&
+                [declaredHours, contractualDailyHours].some((expectedHours) =>
+                    numbersMatch(apologistikaInterval.durationMinutes / 60, expectedHours)
+                ))
+        );
+    });
+}
+
+function isProvisionalAutoCalculatedSourceWork({
+    row,
+    facts,
+    cardHours,
+    holidayState,
+    manualOverride,
+    apologistikaState,
+    employmentProfile
+}) {
+    const declaredRestOrNonWork =
+        facts.declared.isDeclaredRepo ||
+        facts.declared.isDeclaredNonWork ||
+        toBoolean(row.repo);
+    const categoryCompatible = ['', 'ΕΡΓ'].includes(apologistikaState.category);
+    const workHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const apologistikaIntervalHours = facts.apologistika.currentApologistikaIntervals
+        .filter((interval) => interval.isComplete && !interval.isZeroLength)
+        .reduce((sum, interval) => sum + interval.durationMinutes / 60, 0);
+    const declaredHours = toFiniteNumber(row.ores_ergasias);
+    const declaredBreakHours = facts.declared.breaks
+        .filter((interval) => interval.isComplete && !interval.isZeroLength)
+        .reduce((sum, interval) => sum + interval.durationMinutes / 60, 0);
+    const profileBreakMinutes = toFiniteNumber(employmentProfile.external_break_minutes);
+    const knownBreakHours = profileBreakMinutes > 0
+        ? profileBreakMinutes / 60
+        : declaredBreakHours;
+    const cardHoursAfterKnownBreak = Math.max(cardHours - knownBreakHours, 0);
+    const workHoursCompatible =
+        workHoursState.kind === 'ZERO' ||
+        (workHoursState.kind === 'POSITIVE' &&
+            [
+                cardHours,
+                cardHoursAfterKnownBreak,
+                apologistikaIntervalHours,
+                declaredHours
+            ].some((expected) =>
+                numbersMatch(workHoursState.value, expected)
+            ));
+    const unrelatedPositiveHours = apologistikaState.numericStates.some((state) => {
+        if (state.kind !== 'POSITIVE') return false;
+        if (state.field === 'ores_ergasias_apologistika') return false;
+        return !AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field);
+    });
+    const positiveDerivedHours = apologistikaState.numericStates.filter(
+        (state) =>
+            state.kind === 'POSITIVE' && AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field)
+    );
+    const isSunday = new Date(row.hmeromhnia).getUTCDay() === 0;
+    const derivedHoursCompatibleWithProvenance =
+        positiveDerivedHours.length === 0 ||
+        (toBoolean(row.apologistiko_biblio) &&
+            positiveDerivedHours.every(
+                (state) =>
+                    !AUTO_SOURCE_HOLIDAY_DERIVED_HOUR_FIELDS.has(state.field) ||
+                    holidayState.isHoliday ||
+                    isSunday
+            ));
+
+    return (
+        declaredRestOrNonWork &&
+        cardHours !== null &&
+        cardHours > 0 &&
+        facts.cards.cardIntervalsNormalized.length > 0 &&
+        facts.cards.incompleteCardPairs.length === 0 &&
+        facts.leave.hasDeclaredLeave === false &&
+        toBoolean(row.astheneia) === false &&
+        facts.apologistika.existingFlags.astheneia_apologistika === false &&
+        holidayState.blocksRepoTransfer === false &&
+        manualOverride === false &&
+        facts.apologistika.existingFlags.repo_apologistika === false &&
+        facts.apologistika.existingFlags.adeia_apologistika === false &&
+        facts.leave.kathgoria_adeias_apologistika === '' &&
+        categoryCompatible &&
+        apologistikaState.invalidNumericValue === false &&
+        workHoursCompatible &&
+        unrelatedPositiveHours === false &&
+        derivedHoursCompatibleWithProvenance &&
+        sourceIntervalsMatchAutoResult(row, facts, employmentProfile)
     );
 }
 
@@ -204,26 +453,52 @@ function buildRowInfo(row, contexts) {
     );
     const facts = buildApasxoliseisScenarioFacts(row, { existingAuditCount });
     const cardHours = toFiniteNumber(row.cards_ores_ergasias);
-    const isHoliday =
-        toBoolean(row.argia) ||
-        facts.apologistika.existingFlags.argia ||
-        hasExternalHoliday(contexts.holidayByDateKey, dateKey);
+    const holidayState = resolveRepoTransferHolidayState(
+        row,
+        contexts.holidayByDateKey,
+        dateKey
+    );
     const manualOverride = row.is_locked === true || existingAuditCount > 0;
     const criticalWarnings = [
         ...(facts.warnings.missingCriticalFacts || []),
         ...(facts.warnings.conflictingFacts || [])
     ];
+    const provisionalAutoCalculatedLeave = isProvisionalAutoCalculatedLeave({
+        row,
+        facts,
+        cardHours,
+        holidayState,
+        manualOverride
+    });
+    const blockingDeclaredLeave = facts.leave.hasDeclaredLeave;
+    const blockingSickness =
+        toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
+    const blockingManualOrAuditedState = manualOverride;
+    const apologistikaState = inspectApologistikaState(row, facts);
+    const provisionalAutoCalculatedSourceWork = isProvisionalAutoCalculatedSourceWork({
+        row,
+        facts,
+        cardHours,
+        holidayState,
+        manualOverride,
+        apologistikaState,
+        employmentProfile: contexts.employmentProfile
+    });
 
     return {
         row,
         dateKey,
         facts,
         cardHours,
-        isHoliday,
+        holidayState,
         manualOverride,
         criticalWarnings,
-        hasLeaveOrSickness: hasLeaveOrSickness(row, facts),
-        apologistikaState: inspectApologistikaState(row, facts)
+        blockingDeclaredLeave,
+        provisionalAutoCalculatedLeave,
+        provisionalAutoCalculatedSourceWork,
+        blockingSickness,
+        blockingManualOrAuditedState,
+        apologistikaState
     };
 }
 
@@ -231,8 +506,13 @@ function sourceExclusions(info) {
     const reasons = [];
     if (info.row.is_locked === true) reasons.push('SOURCE_LOCKED');
     if (info.manualOverride && info.row.is_locked !== true) reasons.push('SOURCE_MANUAL_OVERRIDE');
-    if (info.hasLeaveOrSickness) reasons.push('SOURCE_LEAVE_OR_SICKNESS');
-    if (info.isHoliday) reasons.push('SOURCE_HOLIDAY');
+    if (
+        info.blockingDeclaredLeave ||
+        info.blockingSickness
+    ) {
+        reasons.push('SOURCE_LEAVE_OR_SICKNESS');
+    }
+    if (info.holidayState.blocksRepoTransfer) reasons.push('SOURCE_HOLIDAY');
     if (info.criticalWarnings.length > 0) reasons.push('SOURCE_CONFLICTING_FACTS');
     if (
         !info.facts.cards.cardIntervalsNormalized.length ||
@@ -241,6 +521,7 @@ function sourceExclusions(info) {
         reasons.push('SOURCE_INVALID_CARD_EVIDENCE');
     }
     if (
+        !info.provisionalAutoCalculatedSourceWork &&
         info.apologistikaState.category &&
         info.apologistikaState.category !== 'ΕΡΓ'
     ) {
@@ -249,7 +530,12 @@ function sourceExclusions(info) {
     if (info.apologistikaState.invalidNumericValue) {
         reasons.push('SOURCE_INVALID_APOLOGISTIKA_NUMERIC_VALUE');
     }
-    if (info.apologistikaState.substantiveState) reasons.push('SOURCE_ALREADY_PROCESSED');
+    if (
+        !info.provisionalAutoCalculatedSourceWork &&
+        (info.apologistikaState.substantiveState || info.blockingManualOrAuditedState)
+    ) {
+        reasons.push('SOURCE_ALREADY_PROCESSED');
+    }
     return reasons;
 }
 
@@ -257,8 +543,10 @@ function targetExclusions(info) {
     const reasons = [];
     if (info.row.is_locked === true) reasons.push('TARGET_LOCKED');
     if (info.manualOverride && info.row.is_locked !== true) reasons.push('TARGET_MANUAL_OVERRIDE');
-    if (info.hasLeaveOrSickness) reasons.push('TARGET_LEAVE_OR_SICKNESS');
-    if (info.isHoliday) reasons.push('TARGET_HOLIDAY');
+    if (info.blockingDeclaredLeave || info.blockingSickness) {
+        reasons.push('TARGET_LEAVE_OR_SICKNESS');
+    }
+    if (info.holidayState.blocksRepoTransfer) reasons.push('TARGET_HOLIDAY');
     if (toBoolean(info.row.repo)) reasons.push('TARGET_CONFLICTING_REPO_STATE');
     const blockingCriticalWarnings = info.criticalWarnings.filter(
         (warning) =>
@@ -269,6 +557,7 @@ function targetExclusions(info) {
     );
     if (blockingCriticalWarnings.length > 0) reasons.push('TARGET_CONFLICTING_FACTS');
     if (
+        !info.provisionalAutoCalculatedLeave &&
         info.apologistikaState.category &&
         info.apologistikaState.category !== 'ΕΡΓ'
     ) {
@@ -277,7 +566,12 @@ function targetExclusions(info) {
     if (info.apologistikaState.invalidNumericValue) {
         reasons.push('TARGET_INVALID_APOLOGISTIKA_NUMERIC_VALUE');
     }
-    if (info.apologistikaState.substantiveState) reasons.push('TARGET_ALREADY_PROCESSED');
+    if (
+        !info.provisionalAutoCalculatedLeave &&
+        (info.apologistikaState.substantiveState || info.blockingManualOrAuditedState)
+    ) {
+        reasons.push('TARGET_ALREADY_PROCESSED');
+    }
     return reasons;
 }
 
@@ -441,7 +735,11 @@ function analyzeWeeklyRepoTransferSinglePair({
     base.employee.mhniaia_repo = repoLimit;
 
     const rowInfos = rows.map((row) =>
-        buildRowInfo(row, { holidayByDateKey, existingAuditCountByRowKey })
+        buildRowInfo(row, {
+            holidayByDateKey,
+            existingAuditCountByRowKey,
+            employmentProfile: profile
+        })
     );
     const sourceCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
     const targetCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';

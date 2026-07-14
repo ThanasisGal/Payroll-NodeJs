@@ -907,6 +907,25 @@ function formatDate(value) {
     return `${dayName}   ${day}/${month}/${year}`;
 }
 
+function renderReviewDateCell(row = {}) {
+    const formattedDate = escapeHtml(formatDate(row.hmeromhnia));
+    const description = String(row.holiday_description || '').trim();
+
+    if (!description) return `<div>${formattedDate}</div>`;
+
+    let tooltip = '';
+    if (row.holiday_is_mandatory === true) {
+        tooltip = 'Υποχρεωτική αργία';
+    } else if (row.holiday_is_optional === true) {
+        tooltip = row.holiday_company_operates === true
+            ? 'Μη υποχρεωτική αργία — η εταιρεία λειτουργεί'
+            : 'Μη υποχρεωτική αργία — η εταιρεία είναι κλειστή';
+    }
+    const titleAttribute = tooltip ? ` title="${escapeHtml(tooltip)}"` : '';
+
+    return `<div>${formattedDate}</div><span class="review-holiday-description-badge"${titleAttribute}>${escapeHtml(description)}</span>`;
+}
+
 function employeeGroupKey(row) {
     // return [row.ypokatasthma || '', row.kodikos || ''].join('|');
     return String(row.kodikos || '').trim();
@@ -1986,7 +2005,7 @@ function renderReviewRows(rows = [], deviations = []) {
         const yperoriaTotal = sumNomimiYperoria(row) + sumParanomiYperoria(row);
 
         tr.innerHTML = `
-            <td>${formatDate(row.hmeromhnia)}</td>
+            <td>${renderReviewDateCell(row)}</td>
             <td>${row.ypokatasthma || ''}</td>
             <td>${row.kodikos || ''}</td>
             <td${tdClass(declaredClass)}>${declaredText}</td>
@@ -3668,12 +3687,12 @@ function renderAtomicRepoTransferSummary(projection = {}) {
     const summary = projection.summary || {};
     const entries = [
         ['Εβδομάδες εργαζομένων που αξιολογήθηκαν', 'weeks_evaluated'],
-        ['Ομάδες προτάσεων', 'groups_count'],
-        ['Ενιαίες αποφάσεις', 'decision_units_count'],
-        ['Έτοιμες προτάσεις', 'ready_count'],
+        ['Προτάσεις', 'groups_count'],
+        ['Συνδεδεμένες προτάσεις', 'decision_units_count'],
+        ['Προτάσεις προς έλεγχο από HR', 'ready_count'],
         ['Εργαζόμενοι', 'employees_count'],
         ['Χωρίς ασφαλή πρόταση', 'not_available_count'],
-        ['Μη έγκυρες προβολές', 'invalid_projection_count']
+        ['Περιπτώσεις με μη έγκυρα στοιχεία', 'invalid_projection_count']
     ];
 
     return `
@@ -3778,60 +3797,60 @@ function renderAtomicRepoTransferItem(item = {}, role) {
     `;
 }
 
-function getAtomicRepoTransferDiagnosticMessages(reasonCounts = {}) {
-    const messages = [];
-    const hasReason = (code) => getAtomicRepoTransferCount(reasonCounts, code) > 0;
+const atomicRepoTransferDiagnosticLabels = Object.freeze({
+    PARTIAL_WEEK_OUTSIDE_FILTER_RANGE:
+        'Το επιλεγμένο διάστημα δεν περιλαμβάνει ολόκληρη εβδομάδα.',
+    NO_SOURCE_CANDIDATE:
+        'Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
+    REPO_DEFICIT_REMAINS:
+        'Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
+    INCOMPLETE_EMPLOYEE_WEEK: 'Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
+    ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED:
+        'Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
+    NO_TARGET_CANDIDATE: 'Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
+    INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
+    MULTIPLE_SOURCE_CANDIDATES:
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.'
+});
 
-    if (hasReason('ATOMIC_DATE_RANGE_EXCEEDS_LIMIT')) {
-        messages.push(
-            'Η ανάλυση μεταφοράς ρεπό υποστηρίζει διάστημα έως 62 ημερολογιακές ημέρες. Περιορίστε το επιλεγμένο διάστημα για να εμφανιστούν προτάσεις.'
-        );
-    }
-    if (
-        hasReason('PARTIAL_WEEK_OUTSIDE_FILTER_RANGE') ||
-        hasReason('INCOMPLETE_EMPLOYEE_WEEK')
-    ) {
-        messages.push(
-            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή δεν περιέχονταν πλήρως στο επιλεγμένο διάστημα.'
-        );
-    }
-    if (hasReason('EMPLOYMENT_PROFILE_NOT_RESOLVED')) {
-        messages.push(
-            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή δεν επιλύθηκε με ασφάλεια το εργασιακό προφίλ.'
-        );
-    }
-    if (hasReason('ATOMIC_HOLIDAY_CONTEXT_NOT_RESOLVED')) {
-        messages.push(
-            'Η ανάλυση δεν εκτελέστηκε επειδή δεν ήταν διαθέσιμο πλήρες πλαίσιο αργιών για το επιλεγμένο διάστημα.'
-        );
-    }
-    if (hasReason('INVALID_MHNIAIA_REPO')) {
-        messages.push(
-            'Ορισμένες εβδομάδες δεν αξιολογήθηκαν επειδή τα αναμενόμενα εβδομαδιαία ρεπό δεν ήταν διαθέσιμα ως 1 ή 2.'
-        );
-    }
+const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
 
-    return messages;
+function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
+    return Object.entries(reasonCounts || {})
+        .map(([code, rawCount]) => ({
+            count: Number(rawCount),
+            label:
+                atomicRepoTransferDiagnosticLabels[String(code || '').trim()] ||
+                atomicRepoTransferUnknownDiagnosticLabel
+        }))
+        .filter(({ count }) => Number.isFinite(count) && count > 0)
+        .sort((left, right) => {
+            if (right.count !== left.count) return right.count - left.count;
+            return left.label.localeCompare(right.label, 'el');
+        });
 }
 
-function renderAtomicRepoTransferCodeCounts(counts = {}, label) {
-    const entries = Object.entries(counts || {}).filter(
-        ([code, count]) => String(code || '').trim() && Number(count) > 0
-    );
+function renderAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
+    const entries = getAtomicRepoTransferDiagnosticEntries(reasonCounts);
 
     if (entries.length === 0) return '';
 
     return `
-        <div class="atomic-repo-transfer-technical small text-muted">
-            <span class="fw-semibold">${escapeHtml(label)}:</span>
-            ${entries
-                .map(
-                    ([code, count]) =>
-                        `<span title="${escapeHtml(code)}">${escapeHtml(code)} (${escapeHtml(
+        <div class="atomic-repo-transfer-diagnostic-summary">
+            <div class="fw-semibold">Περιπτώσεις χωρίς αυτόματη πρόταση</div>
+            <div class="small text-muted">
+                Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:
+            </div>
+            <div class="atomic-repo-transfer-diagnostic-list">
+                ${entries
+                    .map(({ count, label }) => {
+                        const countLabel = count === 1 ? 'περίπτωση' : 'περιπτώσεις';
+                        return `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(
                             count
-                        )})</span>`
-                )
-                .join(' · ')}
+                        )} ${countLabel}: ${escapeHtml(label)}</div>`;
+                    })
+                    .join('')}
+            </div>
         </div>
     `;
 }
@@ -3839,7 +3858,6 @@ function renderAtomicRepoTransferCodeCounts(counts = {}, label) {
 function renderAtomicRepoTransferDiagnostics(projection = {}) {
     const reasonCounts = projection.reason_counts || {};
     const warningCounts = projection.warning_counts || {};
-    const messages = getAtomicRepoTransferDiagnosticMessages(reasonCounts);
     const warningMessages = [];
 
     if (getAtomicRepoTransferCount(warningCounts, 'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS') > 0) {
@@ -3848,29 +3866,22 @@ function renderAtomicRepoTransferDiagnostics(projection = {}) {
         );
     }
 
-    if (messages.length === 0 && warningMessages.length === 0 &&
-        Object.keys(reasonCounts).length === 0 && Object.keys(warningCounts).length === 0) {
+    if (
+        getAtomicRepoTransferDiagnosticEntries(reasonCounts).length === 0 &&
+        warningMessages.length === 0
+    ) {
         return '';
     }
 
     return `
         <div class="atomic-repo-transfer-diagnostics">
-            ${messages
-                .map(
-                    (message) =>
-                        `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(
-                            message
-                        )}</div>`
-                )
-                .join('')}
+            ${renderAtomicRepoTransferDiagnosticEntries(reasonCounts)}
             ${warningMessages
                 .map(
                     (message) =>
                         `<div class="atomic-repo-transfer-warning">${escapeHtml(message)}</div>`
                 )
                 .join('')}
-            ${renderAtomicRepoTransferCodeCounts(reasonCounts, 'Διαγνωστικοί κωδικοί')}
-            ${renderAtomicRepoTransferCodeCounts(warningCounts, 'Κωδικοί προειδοποιήσεων')}
         </div>
     `;
 }
@@ -3890,9 +3901,6 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     const warnings = Array.isArray(group.warnings) ? group.warnings : [];
     const isExpanded = index === 0;
     const detailsId = `atomicRepoTransferPair-${index}`;
-    const status = String(group.status || '').trim() || 'NEEDS_REVIEW';
-    const statusLabel = getPolicyPreviewStatusLabel(status);
-
     return `
         <article class="atomic-repo-transfer-group" data-atomic-group-id="${escapeHtml(
             group.group_id || ''
@@ -3900,12 +3908,8 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
             <div class="atomic-repo-transfer-group-header">
                 <div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                        <span class="badge ${escapeHtml(statusLabel.badgeClass)}" title="${escapeHtml(
-                            status
-                        )}">${escapeHtml(statusLabel.label)}</span>
-                        <span class="fw-semibold">${escapeHtml(
-                            group.title || 'Μεταφορά ρεπό εντός εβδομάδας'
-                        )}</span>
+                        <span class="badge text-bg-warning">Πρόταση προς έλεγχο από HR</span>
+                        <span class="fw-semibold">Συνδεδεμένη πρόταση μεταφοράς ρεπό</span>
                     </div>
                     <div class="small text-muted">
                         Εργαζόμενος: ${escapeHtml(employeeCode)} · Ημερομηνίες πρότασης:
@@ -3913,14 +3917,10 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                             formatPolicyPreviewDate(group.last_date)
                         )}
                     </div>
-                    <div class="small mt-1">${escapeHtml(group.description || '-')}</div>
                     <div class="atomic-repo-transfer-safety-flags">
-                        <span>1 ενιαία πρόταση / 2 εγγραφές</span>
-                        <span>Απαιτείται ανθρώπινος έλεγχος</span>
-                        <span>Η εφαρμογή είναι μπλοκαρισμένη</span>
-                    </div>
-                    <div class="small text-muted" title="${escapeHtml(group.group_id || '')}">
-                        ID: ${escapeHtml(group.group_id || '-')}
+                        <span>Μία πρόταση / δύο συνδεδεμένες αλλαγές</span>
+                        <span>Μόνο για έλεγχο</span>
+                        <span>Δεν μπορεί να εφαρμοστεί</span>
                     </div>
                 </div>
                 <button
@@ -3936,11 +3936,8 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                     ? `<div class="atomic-repo-transfer-group-warnings">${warnings
                           .map(
                               (warning) => `
-                                  <div class="atomic-repo-transfer-warning" title="${escapeHtml(
-                                      warning
-                                  )}">
+                                  <div class="atomic-repo-transfer-warning">
                                       ${escapeHtml(getAtomicRepoTransferWarningMessage(warning))}
-                                      <span class="small">(${escapeHtml(warning)})</span>
                                   </div>
                               `
                           )
@@ -3950,9 +3947,6 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
             <div
                 class="atomic-repo-transfer-pair ${isExpanded ? '' : 'd-none'}"
                 id="${escapeHtml(detailsId)}">
-                <div class="atomic-repo-transfer-pair-notice">
-                    Οι δύο αλλαγές είναι atomic: και οι δύο αλλαγές μαζί ή καμία.
-                </div>
                 <div class="atomic-repo-transfer-pair-grid">
                     ${renderAtomicRepoTransferItem(source, 'SOURCE_BECOMES_WORK')}
                     ${renderAtomicRepoTransferItem(target, 'TARGET_BECOMES_REPO')}
@@ -3985,7 +3979,7 @@ function renderAtomicRepoTransferProjection(projection) {
         ? groups.map((group, index) => renderAtomicRepoTransferGroup(group, index)).join('')
         : `
             <div class="atomic-repo-transfer-empty">
-                Δεν βρέθηκαν ασφαλείς προτάσεις μεταφοράς ρεπό για τις πλήρεις εβδομάδες του επιλεγμένου διαστήματος.
+                Δεν δημιουργήθηκε αυτόματη πρόταση.
             </div>
         `;
 
@@ -3997,15 +3991,14 @@ function renderAtomicRepoTransferProjection(projection) {
                         <div class="fw-semibold" id="atomicRepoTransferTitle">
                             Προτάσεις Μεταφοράς Ρεπό
                         </div>
-                        <span class="atomic-repo-transfer-readonly-badge">ΜΟΝΟ ΠΡΟΒΟΛΗ</span>
+                        <span class="atomic-repo-transfer-readonly-badge">Μόνο για έλεγχο</span>
                     </div>
                     <div class="atomic-repo-transfer-main-warning">
-                        <div>Οι προτάσεις δεν έχουν εφαρμοστεί.</div>
-                        <div>Κάθε πρόταση αποτελεί μία ενιαία αλλαγή δύο ημερών:</div>
-                        <div>και οι δύο αλλαγές μαζί ή καμία.</div>
+                        <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
+                        <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
                     </div>
                     <div class="atomic-repo-transfer-unavailable">
-                        Η έγκριση και η εφαρμογή δεν είναι ακόμη διαθέσιμες.
+                        Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
                     </div>
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
