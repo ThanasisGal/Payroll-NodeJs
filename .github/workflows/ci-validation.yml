@@ -54,8 +54,8 @@ jobs:
                 ;;
             esac
 
-            if rg -q \
-              '^[[:space:]]*(import|export)([[:space:]\{*]|$)' \
+            if grep -Eq \
+              '^[[:space:]]*(import|export)([[:space:]{*]|$)' \
               "$file"
             then
               echo "CHECK ESM $file"
@@ -74,7 +74,7 @@ jobs:
           node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.holidayBadge.test.js
           node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js
 
-          if rg -n "on(click|change|submit)=" \
+          if grep -En 'on(click|change|submit)=' \
             public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js
           then
             echo "ERROR: inline event handler found in protected frontend source"
@@ -148,13 +148,16 @@ jobs:
             fi
           done
 
-          if rg -n "apasxoliseisPolicyPreviewApply" "${decision_sources[@]}"; then
+          if grep -En \
+            'apasxoliseisPolicyPreviewApply' \
+            "${decision_sources[@]}"
+          then
             echo "ERROR: apply dependency found in decision services"
             exit 1
           fi
 
-          if rg -n \
-            "\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save)[[:space:]]*\(" \
+          if grep -En \
+            '\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save)[[:space:]]*\(' \
             "${decision_sources[@]}"
           then
             echo "ERROR: write method found in decision read/reconstruction services"
