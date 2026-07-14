@@ -13,12 +13,14 @@ async function applyWeeklyRepoTransfer({ session, payload, decisionModel = Decis
     if (result.idempotent) return { execution: presentation(result.execution), idempotent: true };
     try { return { execution: presentation(await writer({ plan: result.plan })), idempotent: false }; }
     catch (error) {
-        if (!duplicate(error)) throw error;
         const byRequest = await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: command.request_id }));
         const byDecision = await lean(executionModel.findOne({ decision_id: command.decision_id, team: scope.team, company_kod: scope.company_kod }));
-        const raced = byRequest || byDecision;
-        if (raced && raced.command_identity === identity && String(raced.decision_id) === command.decision_id) return { execution: presentation(raced), idempotent: true };
-        throw applyError(byRequest ? 'REQUEST_ID_CONFLICT' : 'DECISION_ALREADY_APPLIED', 409);
+        if (byRequest) {
+            if (byRequest.command_identity === identity && String(byRequest.decision_id) === command.decision_id) return { execution: presentation(byRequest), idempotent: true };
+            throw applyError('REQUEST_ID_CONFLICT', 409);
+        }
+        if (byDecision) throw applyError('DECISION_ALREADY_APPLIED', 409);
+        throw error;
     }
 }
 

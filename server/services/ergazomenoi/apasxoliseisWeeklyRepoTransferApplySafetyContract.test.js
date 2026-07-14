@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const root = path.resolve(__dirname, '../../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const runtimeFiles = ['app.js','server/routes/usersRoute.js','server/controllers/ergazomenoi/erganhController.js','public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'];
@@ -13,4 +14,10 @@ assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)
 assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
 assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/process\.env/.test(productionFiles.map(read).join('\n'))); assert.ok(!/fallback/i.test(writer));
 assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
+const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
+assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
+const valuesSchema = ExecutionModel.schema.path('before_snapshot').schema.path('source').schema;
+for (const field of ['repo_apologistika','adeia_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'Boolean');
+for (const field of ['ores_apoysias_apologistika','ores_ergasias_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'Number');
+for (const field of ['kathgoria_ergasias_apologistika','kathgoria_adeias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'String');
 console.log('weekly repo-transfer apply safety contract passed');

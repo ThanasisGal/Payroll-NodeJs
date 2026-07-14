@@ -14,7 +14,14 @@ async function invoke({ preflight, writer, records = [] }) { return applyWeeklyR
     const duplicate = Object.assign(new Error('duplicate'), { code: 11000 });
     const raced = await invoke({ preflight: async () => ({ plan: {} }), writer: async () => { writes++; throw duplicate; }, records: [record] }); assert.strictEqual(raced.idempotent, true);
     await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { throw duplicate; }, records: [{ ...record, command_identity: 'other' }] }), (e) => e.code === 'REQUEST_ID_CONFLICT');
+    let raceWrites = 0; const sourceStale = Object.assign(new Error('source stale'), { code: 'SOURCE_STALE', statusCode: 409 });
+    const staleReplay = await invoke({ preflight: async () => ({ plan: {} }), writer: async () => { raceWrites++; throw sourceStale; }, records: [record] }); assert.strictEqual(staleReplay.idempotent, true); assert.deepStrictEqual(staleReplay.execution, presentation(record)); assert.strictEqual(raceWrites, 1);
+    const targetStale = Object.assign(new Error('target stale'), { code: 'TARGET_STALE', statusCode: 409 });
+    await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { raceWrites++; throw targetStale; }, records: [{ ...record, request_id: 'request-other' }] }), (e) => e.code === 'DECISION_ALREADY_APPLIED');
+    await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { raceWrites++; throw new Error('writer'); }, records: [{ ...record, command_identity: 'other' }] }), (e) => e.code === 'REQUEST_ID_CONFLICT');
+    const transactionError = Object.assign(new Error('audit transaction failure'), { code: 'AUDIT_FAILURE' });
+    await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { raceWrites++; throw transactionError; } }), (e) => e === transactionError);
+    assert.strictEqual(raceWrites, 4);
     const unsafe = Object.assign(new Error('failure'), { statusCode: 503, secret: 'not-presented' }); await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { throw unsafe; } }), (e) => e === unsafe);
-    let failureWrites = 0; await assert.rejects(() => invoke({ preflight: async () => ({ plan: {} }), writer: async () => { failureWrites++; throw new Error('writer'); } })); assert.strictEqual(failureWrites, 1);
     console.log('weekly repo-transfer apply service tests passed');
 })().catch((error) => { console.error(error); process.exit(1); });

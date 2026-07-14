@@ -2,14 +2,31 @@ const { fingerprintSnapshot, reconstructWeeklyRepoTransferDecision } = require('
 const { applyError, validateApplyCommand, commandIdentity, validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 
 const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika']);
+const APPLY_FIELD_TYPES = Object.freeze({
+    kathgoria_ergasias_apologistika: 'string', repo_apologistika: 'boolean',
+    adeia_apologistika: 'boolean', kathgoria_adeias_apologistika: 'string',
+    ores_apoysias_apologistika: 'number', apo_ora_01_apologistika: 'string',
+    eos_ora_01_apologistika: 'string', apo_ora_02_apologistika: 'string',
+    eos_ora_02_apologistika: 'string', apo_ora_03_apologistika: 'string',
+    eos_ora_03_apologistika: 'string', ores_ergasias_apologistika: 'number'
+});
 const APPLY_FIELD_SET = new Set(APPLY_FIELDS);
+function isPlainObject(value) { if (!value || typeof value !== 'object' || Array.isArray(value)) return false; const prototype = Object.getPrototypeOf(value); return prototype === Object.prototype || prototype === null; }
 function lean(query) { return query && typeof query.lean === 'function' ? query.lean() : query; }
 function dateKey(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }
 function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 function pick(values) { return Object.fromEntries(APPLY_FIELDS.map((field) => [field, values?.[field] === undefined ? null : values[field]])); }
 function validateProposed(values) {
-    if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).some((field) => !APPLY_FIELD_SET.has(field))) throw applyError('UNSUPPORTED_PROPOSED_FIELD', 409);
-    return Object.freeze({ ...values });
+    if (!isPlainObject(values)) throw applyError('UNSUPPORTED_PROPOSED_FIELD', 409);
+    const keys = Object.keys(values);
+    if (keys.length !== APPLY_FIELDS.length || keys.some((field) => !APPLY_FIELD_SET.has(field)) || APPLY_FIELDS.some((field) => !Object.hasOwn(values, field))) throw applyError('UNSUPPORTED_PROPOSED_FIELD', 409);
+    const result = {};
+    for (const field of APPLY_FIELDS) {
+        const value = values[field]; const expectedType = APPLY_FIELD_TYPES[field];
+        if (typeof value !== expectedType || expectedType === 'number' && !Number.isFinite(value)) throw applyError('INVALID_PROPOSED_VALUE', 409);
+        result[field] = value;
+    }
+    return Object.freeze(result);
 }
 async function preflightWeeklyRepoTransferApply({ session, payload, executionModel, decisionModel, reconstruct = reconstructWeeklyRepoTransferDecision, fingerprint = fingerprintSnapshot }) {
     const command = validateApplyCommand(payload); const scope = validateApplySession(session); const identity = commandIdentity(command);
@@ -39,4 +56,4 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.source.current_values)), after: sourceAfter }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.target.current_values)), after: targetAfter }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
 }
 
-module.exports = { APPLY_FIELDS, pick, validateProposed, preflightWeeklyRepoTransferApply };
+module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, pick, validateProposed, preflightWeeklyRepoTransferApply };
