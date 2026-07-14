@@ -48,14 +48,22 @@ jobs:
 
           while IFS= read -r -d '' file; do
             case "$file" in
-              public/min.js|*.min.js)
+              public/min.js|public/min.js/*|*.min.js)
                 echo "SKIP generated/minified JavaScript: $file"
                 continue
                 ;;
             esac
 
-            echo "CHECK $file"
-            node --check "$file"
+            if rg -q \
+              '^[[:space:]]*(import|export)([[:space:]\{*]|$)' \
+              "$file"
+            then
+              echo "CHECK ESM $file"
+              node --check --input-type=module < "$file"
+            else
+              echo "CHECK CommonJS/script $file"
+              node --check "$file"
+            fi
           done < <(git ls-files -z '*.js')
 
       - name: Validate CSP and frontend safety contracts
