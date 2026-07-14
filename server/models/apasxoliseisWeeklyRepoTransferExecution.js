@@ -2,12 +2,12 @@ const { Schema, model } = require('mongoose');
 
 const immutable = (type, extra = {}) => ({ type, required: true, immutable: true, ...extra });
 const fixedValuesDefinition = {
-    kathgoria_ergasias_apologistika: String, repo_apologistika: Boolean,
-    adeia_apologistika: Boolean, kathgoria_adeias_apologistika: String,
-    ores_apoysias_apologistika: Number, apo_ora_01_apologistika: String,
-    eos_ora_01_apologistika: String, apo_ora_02_apologistika: String,
-    eos_ora_02_apologistika: String, apo_ora_03_apologistika: String,
-    eos_ora_03_apologistika: String, ores_ergasias_apologistika: Number
+    kathgoria_ergasias_apologistika: immutable(String), repo_apologistika: immutable(Boolean),
+    adeia_apologistika: immutable(Boolean), kathgoria_adeias_apologistika: immutable(String),
+    ores_apoysias_apologistika: immutable(Number), apo_ora_01_apologistika: immutable(String),
+    eos_ora_01_apologistika: immutable(String), apo_ora_02_apologistika: immutable(String),
+    eos_ora_02_apologistika: immutable(String), apo_ora_03_apologistika: immutable(String),
+    eos_ora_03_apologistika: immutable(String), ores_ergasias_apologistika: immutable(Number)
 };
 const fixedValuesSchema = new Schema(fixedValuesDefinition, { _id: false, strict: 'throw' });
 const snapshotSchema = new Schema({ source: { type: fixedValuesSchema, required: true }, target: { type: fixedValuesSchema, required: true }, source_locked: { type: Boolean, required: true }, target_locked: { type: Boolean, required: true } }, { _id: false, strict: 'throw' });

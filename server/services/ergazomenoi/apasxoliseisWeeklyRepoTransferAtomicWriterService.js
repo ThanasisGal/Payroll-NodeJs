@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { ProdhlomenaOrariaModel, ProdhlomenaOrariaAuditModel } = require('../../models/ergazomenoi');
 const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
-const { APPLY_FIELDS, pick } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
+const { APPLY_FIELDS, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
 const { applyError } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 
 const AUDIT_REASON = 'APPROVED_LINKED_REPO_TRANSFER_APPLY';
@@ -13,7 +13,7 @@ function queryWithSession(query, session) { if (typeof query.session === 'functi
 function exact(value) { return value === undefined ? null : value; }
 function rowFilter(plan, row) {
     const filter = { _id: row.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, kodikos: plan.decision.employee_kodikos, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`), is_locked: false };
-    APPLY_FIELDS.forEach((field) => { filter[field] = exact(row.before[field]); });
+    CURRENT_GUARD_FIELDS.forEach((field) => { filter[field] = exact(row.expected_current[field]); });
     if (Number.isInteger(row.version)) filter.__v = row.version;
     return filter;
 }
@@ -21,10 +21,12 @@ function updateDocument(row) { const update = { $set: Object.fromEntries(APPLY_F
 function auditRecord(plan, row, timestamp) { return { team: plan.scope.team, company_kod: plan.scope.company_kod, prodhlomena_oraria_id: row.id, kodikos: plan.decision.employee_kodikos, ypokatasthma: plan.decision.ypokatasthma, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`), changedBy: `${plan.actor.name} (${plan.actor.id})`, changedAt: timestamp, reason: AUDIT_REASON, oldValues: pick(row.before), newValues: pick(row.after) }; }
 function executionRecord(plan, timestamp) { return { decision_id: plan.decision._id, decision_fingerprint: plan.decision.snapshot_fingerprint, proposal_id: plan.decision.proposal_id, source_prodhlomena_oraria_id: plan.source.id, target_prodhlomena_oraria_id: plan.target.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, employee_id: plan.decision.employee_id, employee_kodikos: plan.decision.employee_kodikos, week_start: plan.decision.week_start, week_end: plan.decision.week_end, request_id: plan.request_id, command_identity: plan.command_identity, created_by_user_id: plan.actor.id, created_by_user_name: plan.actor.name, created_by_user_role: plan.actor.role, execution_status: 'APPLIED', before_snapshot: { source: pick(plan.source.before), target: pick(plan.target.before), source_locked: false, target_locked: false }, after_snapshot: { source: pick(plan.source.after), target: pick(plan.target.after), source_locked: false, target_locked: false }, applied_at: timestamp, created_at: timestamp }; }
 async function freshRow(model, plan, row, session) { return queryWithSession(model.findOne({ _id: row.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, kodikos: plan.decision.employee_kodikos, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`) }), session); }
-function verifyFresh(fresh, row, prefix) { if (!fresh) throw applyError(`${prefix}_STALE`, 409); if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409); if (JSON.stringify(pick(fresh)) !== JSON.stringify(pick(row.before))) throw applyError(`${prefix}_STALE`, 409); return Object.freeze({ ...row, version: Number.isInteger(fresh.__v) ? fresh.__v : undefined }); }
+function verifyFresh(fresh, row, prefix) { if (!fresh) throw applyError(`${prefix}_STALE`, 409); if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409); if (JSON.stringify(pickCurrentGuardValues(fresh)) !== JSON.stringify(row.expected_current)) throw applyError(`${prefix}_STALE`, 409); return Object.freeze({ ...row, version: Number.isInteger(fresh.__v) ? fresh.__v : undefined }); }
 
 async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.connection, prodhlomenaModel = ProdhlomenaOrariaModel, auditModel = ProdhlomenaOrariaAuditModel, executionModel = ExecutionModel, capabilityProbe = defaultCapabilityProbe, now = () => new Date() }) {
-    if (!await capabilityProbe(connection)) throw applyError('TRANSACTIONS_UNAVAILABLE', 503);
+    let transactionCapable = false;
+    try { transactionCapable = await capabilityProbe(connection); } catch { transactionCapable = false; }
+    if (!transactionCapable) throw applyError('TRANSACTIONS_UNAVAILABLE', 503);
     const session = await connection.startSession(); let execution;
     try {
         await session.withTransaction(async () => {

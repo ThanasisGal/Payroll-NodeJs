@@ -12,12 +12,15 @@ assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/routes/usersRoute.js')));
 productionFiles.forEach((file) => assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|bulkWrite|ordered\s*:\s*false|updateMany/.test(read(file)), `${file} has forbidden dependency/operation`));
 assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)); assert.ok(/sourceResult\.matchedCount !== 1/.test(writer)); assert.ok(/targetResult\.matchedCount !== 1/.test(writer));
 assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
+assert.ok(/const CURRENT_GUARD_FIELDS = Object\.freeze\(ROW_FIELDS\.filter/.test(preflight));
+for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) assert.ok(require('./apasxoliseisWeeklyRepoTransferApplyPreflightService').CURRENT_GUARD_FIELDS.includes(field));
+assert.ok(/row\.expected_current/.test(writer)); assert.ok(/CURRENT_GUARD_FIELDS\.forEach/.test(writer)); assert.ok(/APPLY_FIELDS\.map/.test(writer));
 assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/process\.env/.test(productionFiles.map(read).join('\n'))); assert.ok(!/fallback/i.test(writer));
 assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
 const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
 assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
 const valuesSchema = ExecutionModel.schema.path('before_snapshot').schema.path('source').schema;
-for (const field of ['repo_apologistika','adeia_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'Boolean');
-for (const field of ['ores_apoysias_apologistika','ores_ergasias_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'Number');
-for (const field of ['kathgoria_ergasias_apologistika','kathgoria_adeias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika']) assert.strictEqual(valuesSchema.path(field).instance, 'String');
+const typedFields = { repo_apologistika: 'Boolean', adeia_apologistika: 'Boolean', ores_apoysias_apologistika: 'Number', ores_ergasias_apologistika: 'Number', kathgoria_ergasias_apologistika: 'String', kathgoria_adeias_apologistika: 'String', apo_ora_01_apologistika: 'String', eos_ora_01_apologistika: 'String', apo_ora_02_apologistika: 'String', eos_ora_02_apologistika: 'String', apo_ora_03_apologistika: 'String', eos_ora_03_apologistika: 'String' };
+for (const [field, type] of Object.entries(typedFields)) { const schemaPath = valuesSchema.path(field); assert.strictEqual(schemaPath.instance, type); assert.strictEqual(schemaPath.isRequired, true); assert.strictEqual(schemaPath.options.immutable, true); }
+assert.ok(/catch \{ transactionCapable = false; \}/.test(writer)); assert.ok(!/fallback/i.test(writer));
 console.log('weekly repo-transfer apply safety contract passed');

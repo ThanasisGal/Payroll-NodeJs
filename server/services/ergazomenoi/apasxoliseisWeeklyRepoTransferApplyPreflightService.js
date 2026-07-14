@@ -1,4 +1,4 @@
-const { fingerprintSnapshot, reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
+const { ROW_FIELDS, fingerprintSnapshot, reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { applyError, validateApplyCommand, commandIdentity, validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 
 const APPLY_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika']);
@@ -11,11 +11,14 @@ const APPLY_FIELD_TYPES = Object.freeze({
     eos_ora_03_apologistika: 'string', ores_ergasias_apologistika: 'number'
 });
 const APPLY_FIELD_SET = new Set(APPLY_FIELDS);
+const CURRENT_GUARD_EXCLUDED_FIELDS = new Set(['_id','team','company_kod','ypokatasthma','kodikos','hmeromhnia','is_locked']);
+const CURRENT_GUARD_FIELDS = Object.freeze(ROW_FIELDS.filter((field) => !CURRENT_GUARD_EXCLUDED_FIELDS.has(field)));
 function isPlainObject(value) { if (!value || typeof value !== 'object' || Array.isArray(value)) return false; const prototype = Object.getPrototypeOf(value); return prototype === Object.prototype || prototype === null; }
 function lean(query) { return query && typeof query.lean === 'function' ? query.lean() : query; }
 function dateKey(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10); }
 function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 function pick(values) { return Object.fromEntries(APPLY_FIELDS.map((field) => [field, values?.[field] === undefined ? null : values[field]])); }
+function pickCurrentGuardValues(values) { return Object.fromEntries(CURRENT_GUARD_FIELDS.map((field) => [field, values?.[field] === undefined ? null : values[field]])); }
 function validateProposed(values) {
     if (!isPlainObject(values)) throw applyError('UNSUPPORTED_PROPOSED_FIELD', 409);
     const keys = Object.keys(values);
@@ -38,7 +41,7 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     const decision = await lean(decisionModel.findOne({ _id: command.decision_id, team: scope.team, company_kod: scope.company_kod }));
     if (!decision) throw applyError('DECISION_NOT_FOUND', 404);
     if (decision.decision_code !== 'APPROVE_PROPOSAL' || decision.decision_status !== 'RECORDED') throw applyError('DECISION_NOT_APPROVED', 409);
-    if (await lean(executionModel.findOne({ decision_id: command.decision_id }))) throw applyError('DECISION_ALREADY_APPLIED', 409);
+    if (await lean(executionModel.findOne({ team: scope.team, company_kod: scope.company_kod, decision_id: command.decision_id }))) throw applyError('DECISION_ALREADY_APPLIED', 409);
     const immutableSnapshot = decision.canonical_snapshot;
     const reconstructionCommand = { proposal_id: immutableSnapshot.proposal_id, expected_source_id: immutableSnapshot.source.prodhlomena_oraria_id, expected_target_id: immutableSnapshot.target.prodhlomena_oraria_id, expected_proposal_version: immutableSnapshot.proposal_version, expected_choice_code: immutableSnapshot.choice_code };
     const rebuilt = await reconstruct({ scope, command: reconstructionCommand });
@@ -53,7 +56,7 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     if (current.source.lock_state || immutableSnapshot.source.lock_state) throw applyError('SOURCE_LOCKED', 409);
     if (current.target.lock_state || immutableSnapshot.target.lock_state) throw applyError('TARGET_LOCKED', 409);
     const sourceAfter = validateProposed(immutableSnapshot.source.proposed_values); const targetAfter = validateProposed(immutableSnapshot.target.proposed_values);
-    return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.source.current_values)), after: sourceAfter }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.target.current_values)), after: targetAfter }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
+    return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.source.current_values)), after: sourceAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.source.current_values)) }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.target.current_values)), after: targetAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.target.current_values)) }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
 }
 
-module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, pick, validateProposed, preflightWeeklyRepoTransferApply };
+module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues, validateProposed, preflightWeeklyRepoTransferApply };
