@@ -1,0 +1,205 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Syntax-check tracked JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              public/min.js|*.min.js)
+                echo "SKIP generated/minified JavaScript: $file"
+                continue
+                ;;
+            esac
+
+            echo "CHECK $file"
+            node --check "$file"
+          done < <(git ls-files -z '*.js')
+
+      - name: Validate CSP and frontend safety contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.holidayBadge.test.js
+          node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js
+
+          if rg -n "on(click|change|submit)=" \
+            public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js
+          then
+            echo "ERROR: inline event handler found in protected frontend source"
+            exit 1
+          fi
+
+      - name: Validate no-apply and no-write safety contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyDryRunService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyModelWriterService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyOrchestrationService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyPlanService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaModelService.test.js
+          node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaOrchestrationService.test.js
+
+      - name: Validate linked repo-transfer decision feature when present
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          feature_tests=(
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionSafetyContract.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionLoader.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionReconstructionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService.test.js"
+          )
+
+          present=()
+          missing=()
+
+          for test_file in "${feature_tests[@]}"; do
+            if [[ -f "$test_file" ]]; then
+              present+=("$test_file")
+            else
+              missing+=("$test_file")
+            fi
+          done
+
+          if (( ${#present[@]} == 0 )); then
+            echo "SKIP linked repo-transfer decision suite: feature is not present on this branch."
+            exit 0
+          fi
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "ERROR: linked repo-transfer decision suite is only partially present."
+            printf 'Missing: %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+          for test_file in "${feature_tests[@]}"; do
+            echo "RUN $test_file"
+            node "$test_file"
+          done
+
+          decision_sources=(
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionReconstructionService.js"
+          )
+
+          for source_file in "${decision_sources[@]}"; do
+            if [[ ! -f "$source_file" ]]; then
+              echo "ERROR: decision tests exist but production source was not found: $source_file"
+              exit 1
+            fi
+          done
+
+          if rg -n "apasxoliseisPolicyPreviewApply" "${decision_sources[@]}"; then
+            echo "ERROR: apply dependency found in decision services"
+            exit 1
+          fi
+
+          if rg -n \
+            "\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save)[[:space:]]*\(" \
+            "${decision_sources[@]}"
+          then
+            echo "ERROR: write method found in decision read/reconstruction services"
+            exit 1
+          fi
+
+      - name: Run safe focused tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tests=(
+            "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js"
+            "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.holidayBadge.test.js"
+            "public/js/symbaseis/ypologismoiKlimakion/ypologismos.test.js"
+            "server/controllers/ergazomenoi/ergazomenoiController.workTermsSnapshot.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyDryRunService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyModelWriterService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyOrchestrationService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyPlanService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaModelService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaOrchestrationService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService.test.js"
+            "server/services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicPageProjectionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairProposalService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairService.test.js"
+            "server/utils/ergazomenoi/getOrarioTermsForDate.test.js"
+          )
+
+          for test_file in "${tests[@]}"; do
+            echo "RUN $test_file"
+            node "$test_file"
+          done
+
+          echo "SKIP isolated localhost POST test:"
+          echo "server/middlewares/repoTransferDecisionBodyParser.test.js"
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Verify repository cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          if test -n "$(git status --porcelain)"; then
+            echo "ERROR: workflow or tests modified the repository"
+            git status --short
+            exit 1
+          fi
