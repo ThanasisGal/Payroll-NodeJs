@@ -1,7 +1,9 @@
 const assert = require('assert');
+const mongoose = require('mongoose');
+const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const { fingerprintSnapshot } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const { commandIdentity } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
-const { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, validateProposed, preflightWeeklyRepoTransferApply } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
+const { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApply } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
 const SOURCE = '507f1f77bcf86cd799439012', TARGET = '507f1f77bcf86cd799439013', DECISION = '507f1f77bcf86cd799439011';
 const session = { userTeam: 'team', companyInUse: 'company', userId: '507f191e810c19729de860ea', userName: 'Actor', userStatus: 'A', userRole: 'A' };
 const payload = { decision_id: DECISION, request_id: 'request-0001' };
@@ -11,6 +13,8 @@ function snapshot() { return { proposal_id: 'proposal', proposal_version: 'v1', 
 function setup(change = () => {}) { const snap = snapshot(); const decision = { _id: DECISION, decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', canonical_snapshot: snap, proposal_id: 'proposal', team: 'team', company_kod: 'company', ypokatasthma: 'branch', employee_id: snap.employee_id, employee_kodikos: '001', week_start: new Date('2026-07-12'), week_end: new Date('2026-07-18'), source_prodhlomena_oraria_id: SOURCE, target_prodhlomena_oraria_id: TARGET }; decision.snapshot_fingerprint = fingerprintSnapshot(snap); const rebuilt = JSON.parse(JSON.stringify(snap)); change({ snap, decision, rebuilt }); return { decision, rebuilt }; }
 function model(decision, executions = []) { return { decisionModel: { findOne: () => ({ lean: async () => decision }) }, executionModel: { findOne(filter) { return { lean: async () => executions.find((row) => Object.entries(filter).every(([key,value]) => String(row[key]) === String(value))) || null }; } } }; }
 async function run(change, code, executions = []) { const { decision, rebuilt } = setup(change); const models = model(decision, executions); const action = () => preflightWeeklyRepoTransferApply({ session, payload, ...models, reconstruct: async () => ({ snapshot: rebuilt, fingerprint: decision.snapshot_fingerprint }) }); if (code) return assert.rejects(action, (error) => error.code === code); return action(); }
+function executionFixture() { const id = () => new mongoose.Types.ObjectId(); const before = { ...values, kathgoria_adeias_apologistika: null, repo_apologistika: null, ores_apoysias_apologistika: null, apo_ora_02_apologistika: null, eos_ora_02_apologistika: null }; const snapshot = (item) => ({ source: { ...item }, target: { ...item }, source_locked: false, target_locked: false }); return { decision_id: id(), decision_fingerprint: 'f'.repeat(64), proposal_id: 'proposal', source_prodhlomena_oraria_id: id(), target_prodhlomena_oraria_id: id(), team: 'team', company_kod: 'company', ypokatasthma: 'branch', employee_id: id(), employee_kodikos: '001', week_start: new Date('2026-07-12'), week_end: new Date('2026-07-18'), request_id: 'request-0001', command_identity: 'c'.repeat(64), created_by_user_id: id(), created_by_user_name: 'Synthetic User', created_by_user_role: 'A', execution_status: 'APPLIED', before_snapshot: snapshot(before), after_snapshot: snapshot(values), applied_at: new Date('2026-07-14'), created_at: new Date('2026-07-14') }; }
+function modelValidation(record) { try { return new ExecutionModel(record).validateSync(); } catch (error) { return error; } }
 (async () => {
     assert.strictEqual(Object.keys(APPLY_FIELD_TYPES).length, 12);
     const proposed = { ...values };
@@ -26,6 +30,13 @@ async function run(change, code, executions = []) { const { decision, rebuilt } 
     for (const [field, value] of [['kathgoria_ergasias_apologistika', {}],['repo_apologistika', 'false'],['ores_ergasias_apologistika', '0'],['ores_ergasias_apologistika', NaN],['ores_ergasias_apologistika', Infinity]]) {
         assert.throws(() => validateProposed({ ...proposed, [field]: value }), (error) => error.code === 'INVALID_PROPOSED_VALUE');
     }
+    assert.strictEqual(modelValidation(executionFixture()), undefined);
+    for (const field of ['kathgoria_ergasias_apologistika','repo_apologistika','ores_ergasias_apologistika']) { const record = executionFixture(); delete record.after_snapshot.source[field]; assert.ok(modelValidation(record)); }
+    { const record = executionFixture(); record.after_snapshot.source.repo_apologistika = null; assert.ok(modelValidation(record)); }
+    { const record = executionFixture(); record.after_snapshot.source.extra = 'x'; assert.ok(modelValidation(record)); }
+    { const record = executionFixture(); delete record.before_snapshot.source.apo_ora_02_apologistika; assert.ok(modelValidation(record)); }
+    assert.deepStrictEqual(Object.keys(validateCurrentApplyValues({ ...values, apo_ora_02_apologistika: undefined })), APPLY_FIELDS); assert.strictEqual(validateCurrentApplyValues({ ...values, apo_ora_02_apologistika: undefined }).apo_ora_02_apologistika, null);
+    for (const [field, value] of [['apo_ora_02_apologistika', {}],['repo_apologistika', 'false'],['ores_ergasias_apologistika', '8'],['ores_ergasias_apologistika', NaN],['ores_ergasias_apologistika', Infinity]]) assert.throws(() => validateCurrentApplyValues({ ...values, [field]: value }), (error) => error.code === 'INVALID_CURRENT_VALUE');
     const accepted = await run(); assert.strictEqual(accepted.plan.source.id, SOURCE);
     assert.strictEqual(CURRENT_GUARD_FIELDS.length, 52); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
     for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) { assert.strictEqual(accepted.plan.source.expected_current[field], currentValues[field]); assert.strictEqual(accepted.plan.target.expected_current[field], currentValues[field]); }

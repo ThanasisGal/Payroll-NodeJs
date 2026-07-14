@@ -19,6 +19,15 @@ function dateKey(value) { const date = new Date(value); return Number.isNaN(date
 function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 function pick(values) { return Object.fromEntries(APPLY_FIELDS.map((field) => [field, values?.[field] === undefined ? null : values[field]])); }
 function pickCurrentGuardValues(values) { return Object.fromEntries(CURRENT_GUARD_FIELDS.map((field) => [field, values?.[field] === undefined ? null : values[field]])); }
+function validateCurrentApplyValues(values) {
+    const result = {};
+    for (const field of APPLY_FIELDS) {
+        const value = values?.[field] === undefined ? null : values[field]; const expectedType = APPLY_FIELD_TYPES[field];
+        if (value !== null && (typeof value !== expectedType || expectedType === 'number' && !Number.isFinite(value))) throw applyError('INVALID_CURRENT_VALUE', 409);
+        result[field] = value;
+    }
+    return Object.freeze(result);
+}
 function validateProposed(values) {
     if (!isPlainObject(values)) throw applyError('UNSUPPORTED_PROPOSED_FIELD', 409);
     const keys = Object.keys(values);
@@ -56,7 +65,7 @@ async function preflightWeeklyRepoTransferApply({ session, payload, executionMod
     if (current.source.lock_state || immutableSnapshot.source.lock_state) throw applyError('SOURCE_LOCKED', 409);
     if (current.target.lock_state || immutableSnapshot.target.lock_state) throw applyError('TARGET_LOCKED', 409);
     const sourceAfter = validateProposed(immutableSnapshot.source.proposed_values); const targetAfter = validateProposed(immutableSnapshot.target.proposed_values);
-    return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.source.current_values)), after: sourceAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.source.current_values)) }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: Object.freeze(pick(immutableSnapshot.target.current_values)), after: targetAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.target.current_values)) }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
+    return { idempotent: false, plan: Object.freeze({ decision, scope, source: Object.freeze({ id: String(immutableSnapshot.source.prodhlomena_oraria_id), date: immutableSnapshot.source.hmeromhnia, before: validateCurrentApplyValues(immutableSnapshot.source.current_values), after: sourceAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.source.current_values)) }), target: Object.freeze({ id: String(immutableSnapshot.target.prodhlomena_oraria_id), date: immutableSnapshot.target.hmeromhnia, before: validateCurrentApplyValues(immutableSnapshot.target.current_values), after: targetAfter, expected_current: Object.freeze(pickCurrentGuardValues(immutableSnapshot.target.current_values)) }), actor: Object.freeze({ id: scope.created_by_user_id, name: scope.created_by_user_name, role: scope.created_by_user_role }), request_id: command.request_id, command_identity: identity }) };
 }
 
-module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues, validateProposed, preflightWeeklyRepoTransferApply };
+module.exports = { APPLY_FIELDS, APPLY_FIELD_TYPES, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues, validateCurrentApplyValues, validateProposed, preflightWeeklyRepoTransferApply };

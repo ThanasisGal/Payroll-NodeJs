@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const root = path.resolve(__dirname, '../../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -19,8 +20,11 @@ assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/pro
 assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
 const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
 assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
-const valuesSchema = ExecutionModel.schema.path('before_snapshot').schema.path('source').schema;
+assert.ok(/const beforeValuesSchema/.test(modelSource)); assert.ok(/const afterValuesSchema/.test(modelSource)); assert.ok(/exactSnapshotValues/.test(modelSource)); assert.ok(!/checkRequired/.test(modelSource));
+const beforeSnapshotSchema = ExecutionModel.schema.path('before_snapshot').schema; const afterSnapshotSchema = ExecutionModel.schema.path('after_snapshot').schema;
+const valuesSchema = beforeSnapshotSchema.path('source').schema; const afterValuesSchema = afterSnapshotSchema.path('source').schema;
 const typedFields = { repo_apologistika: 'Boolean', adeia_apologistika: 'Boolean', ores_apoysias_apologistika: 'Number', ores_ergasias_apologistika: 'Number', kathgoria_ergasias_apologistika: 'String', kathgoria_adeias_apologistika: 'String', apo_ora_01_apologistika: 'String', eos_ora_01_apologistika: 'String', apo_ora_02_apologistika: 'String', eos_ora_02_apologistika: 'String', apo_ora_03_apologistika: 'String', eos_ora_03_apologistika: 'String' };
-for (const [field, type] of Object.entries(typedFields)) { const schemaPath = valuesSchema.path(field); assert.strictEqual(schemaPath.instance, type); assert.strictEqual(schemaPath.isRequired, true); assert.strictEqual(schemaPath.options.immutable, true); }
+for (const [field, type] of Object.entries(typedFields)) { for (const schema of [valuesSchema, afterValuesSchema]) { const schemaPath = schema.path(field); assert.strictEqual(schemaPath.instance, type); assert.strictEqual(Boolean(schemaPath.isRequired), false); assert.strictEqual(schemaPath.options.immutable, true); } }
+assert.strictEqual(valuesSchema.options.strict, 'throw'); assert.strictEqual(afterValuesSchema.options.strict, 'throw'); assert.ok(beforeSnapshotSchema.path('source').validators.length > 0); assert.ok(afterSnapshotSchema.path('source').validators.length > 0); assert.strictEqual(Boolean(mongoose.Schema.Types.String.checkRequired()('')), false);
 assert.ok(/catch \{ transactionCapable = false; \}/.test(writer)); assert.ok(!/fallback/i.test(writer));
 console.log('weekly repo-transfer apply safety contract passed');
