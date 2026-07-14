@@ -8,6 +8,7 @@ const source = fs.readFileSync(sourcePath, 'utf8');
 const cssPath = path.join(__dirname, '..', '..', '..', 'css', 'main.css');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
 const elementsById = new Map();
+let fetchCalls = 0;
 const documentStub = {
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -29,6 +30,10 @@ const sandbox = {
     document: documentStub,
     window: {},
     URLSearchParams,
+    fetch: async () => {
+        fetchCalls++;
+        throw new Error('Unexpected fetch');
+    },
     setTimeout: () => {},
     clearTimeout: () => {}
 };
@@ -223,11 +228,96 @@ function testReadOnlySafety() {
     const html = render(readyProjection());
     [
         'APPROVE_PREFILL',
-        'policy-preview-decision-btn',
-        'policy-preview-approval-panel',
         'Αποθήκευση',
         'Εφαρμογή'
     ].forEach((value) => assert.ok(!html.includes(value), `Forbidden atomic HTML: ${value}`));
+    assert.strictEqual((html.match(/atomic-repo-transfer-decision-btn/g) || []).length, 3);
+    assert.ok(html.includes('Έγκριση πρότασης'));
+    assert.ok(html.includes('Απόρριψη πρότασης'));
+    assert.ok(html.includes('Χρειάζεται περαιτέρω έλεγχο'));
+    assert.ok(html.includes('Απόφαση για ολόκληρη τη συνδεδεμένη πρόταση'));
+    assert.ok(!html.includes('onclick='));
+}
+
+function testBranchRequiredForDecisionButtons() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=ALL')", sandbox);
+    const withoutBranch = render(readyProjection());
+    assert.ok(withoutBranch.includes('Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.'));
+    assert.strictEqual((withoutBranch.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 3);
+    const visible = getVisibleText(withoutBranch).toLowerCase();
+    ['fingerprint', 'stale', 'canonical', 'runtime apply'].forEach((term) => assert.ok(!visible.includes(term)));
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    const withBranch = render(readyProjection());
+    assert.strictEqual((withBranch.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 0);
+    vm.runInContext('currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+async function testAllBranchSkipsDecisionRequests() {
+    fetchCalls = 0;
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=ALL')", sandbox);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['old', {}]])", sandbox);
+    await sandbox.refreshRepoTransferDecisions();
+    assert.strictEqual(fetchCalls, 0);
+    assert.strictEqual(vm.runInContext('currentRepoTransferDecisionsByProposalId.size', sandbox), 0);
+    vm.runInContext('currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function testOnlyCurrentDecisionDisablesButtons() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'APPROVE_PROPOSAL', created_at: '2026-06-20', created_by_user_name: 'HR', is_current: true }, history: [] }]])", sandbox);
+    const currentHtml = render(readyProjection());
+    assert.strictEqual((currentHtml.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 3);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: null, history: [{ decision_code: 'REJECT_PROPOSAL', created_at: '2026-06-19', created_by_user_name: 'HR', is_current: false }] }]])", sandbox);
+    const staleOnlyHtml = render(readyProjection());
+    assert.strictEqual((staleOnlyHtml.match(/atomic-repo-transfer-decision-btn[^>]+disabled/g) || []).length, 0);
+    assert.ok(staleOnlyHtml.includes('Προηγούμενες καταγεγραμμένες αποφάσεις'));
+    vm.runInContext('currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+async function testBatchHistoryUsesOneFetchForManyGroups() {
+    fetchCalls = 0;
+    const projection = readyProjection();
+    projection.groups = Array.from({ length: 20 }, (_, index) => ({
+        ...projection.groups[0],
+        group_id: `atomic-group-${index + 1}`
+    }));
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000&apo_hmeromhnia=2026-06-14&eos_hmeromhnia=2026-06-20')", sandbox);
+    vm.runInContext(`currentAtomicRepoTransferProjection = ${JSON.stringify(projection)}`, sandbox);
+    sandbox.fetch = async (url, options) => {
+        fetchCalls++;
+        assert.ok(String(url).startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
+        assert.strictEqual(options.method, undefined);
+        return {
+            ok: true,
+            json: async () => ({
+                success: true,
+                records: projection.groups.map((group) => ({
+                    proposal_id: group.group_id,
+                    current_decision: null,
+                    history: [],
+                    history_count: 0
+                }))
+            })
+        };
+    };
+    await sandbox.refreshRepoTransferDecisions();
+    assert.strictEqual(fetchCalls, 1);
+    assert.strictEqual(vm.runInContext('currentRepoTransferDecisionsByProposalId.size', sandbox), 20);
+    assert.ok(!source.slice(source.indexOf('async function refreshRepoTransferDecisions'), source.indexOf('async function submitRepoTransferDecision')).includes('for (const group'));
+    vm.runInContext('currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function testCurrentAndPreviousHistoryAreEscaped() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<b>HR</b>', notes: '<img src=x>', is_current: true }, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: true }, { decision_code: 'REJECT_PROPOSAL', created_by_user_name: '<script>x</script>', notes: '<svg>', is_current: false }], history_count: 2 }]])", sandbox);
+    const html = render(readyProjection());
+    assert.ok(html.includes('Προηγούμενες καταγεγραμμένες αποφάσεις'));
+    assert.ok(html.includes('&lt;b&gt;HR&lt;/b&gt;'));
+    assert.ok(html.includes('&lt;script&gt;x&lt;/script&gt;'));
+    assert.ok(!html.includes('<script>'));
+    assert.ok(!html.includes('<img src=x>'));
+    assert.ok(!html.includes('<svg>'));
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
 
 function testEscaping() {
@@ -432,6 +522,11 @@ const tests = [
     testPartTimeTargetIsNotAnError,
     testEmptyFirstIntervalDoesNotCompactSecond,
     testReadOnlySafety,
+    testBranchRequiredForDecisionButtons,
+    testAllBranchSkipsDecisionRequests,
+    testOnlyCurrentDecisionDisablesButtons,
+    testBatchHistoryUsesOneFetchForManyGroups,
+    testCurrentAndPreviousHistoryAreEscaped,
     testEscaping,
     testDiagnostics,
     testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,
@@ -444,5 +539,8 @@ const tests = [
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState
 ];
 
-tests.forEach((test) => test());
-console.log(`PASS atomic repo-transfer read-only UI (${tests.length} tests)`);
+async function run() {
+    for (const test of tests) await test();
+    console.log(`PASS atomic repo-transfer read-only UI (${tests.length} tests)`);
+}
+run().catch((error) => { console.error(error); process.exitCode = 1; });

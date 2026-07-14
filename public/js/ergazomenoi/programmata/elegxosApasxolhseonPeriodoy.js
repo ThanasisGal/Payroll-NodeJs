@@ -220,6 +220,8 @@ let currentReviewRows = [];
 let currentReviewDeviations = [];
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
+let currentRepoTransferDecisionsByProposalId = new Map();
+let repoTransferDecisionSubmitting = false;
 let currentPolicyPreviewApprovalRecords = [];
 let currentPolicyPreviewApprovalTotal = 0;
 let currentPolicyPreviewApprovalsByGroupId = new Map();
@@ -3901,6 +3903,42 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
     const warnings = Array.isArray(group.warnings) ? group.warnings : [];
     const isExpanded = index === 0;
     const detailsId = `atomicRepoTransferPair-${index}`;
+    const decisionState = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || '')) || null;
+    const recordedDecision = decisionState?.current_decision || null;
+    const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
+    const hasSpecificBranch = selectedBranch !== '' && selectedBranch.toUpperCase() !== 'ALL' && !selectedBranch.includes(',');
+    const decisionLabels = {
+        APPROVE_PROPOSAL: 'Έγκριση πρότασης',
+        REJECT_PROPOSAL: 'Απόρριψη πρότασης',
+        NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο'
+    };
+    const recordedDecisionHtml = recordedDecision
+        ? `<div class="atomic-repo-transfer-decision-recorded">
+               <div class="fw-semibold">Η απόφαση έχει ήδη καταγραφεί.</div>
+               <div class="small">Απόφαση: ${escapeHtml(decisionLabels[recordedDecision.decision_code] || '-')}</div>
+               <div class="small">Χρήστης: ${escapeHtml(recordedDecision.created_by_user_name || '-')} · ${escapeHtml(formatPolicyPreviewDateTime(recordedDecision.created_at))}</div>
+               ${recordedDecision.notes ? `<div class="small">Σημειώσεις: ${escapeHtml(recordedDecision.notes)}</div>` : ''}
+           </div>`
+        : '<div class="small text-muted">Δεν έχει καταγραφεί απόφαση για αυτή την πρόταση.</div>';
+    const olderDecisions = Array.isArray(decisionState?.history)
+        ? decisionState.history.filter((decision) => decision?.is_current !== true)
+        : [];
+    const previousDecisionHistory = olderDecisions.length > 0
+        ? `<details class="atomic-repo-transfer-previous-decisions mt-2">
+               <summary class="small fw-semibold">Προηγούμενες καταγεγραμμένες αποφάσεις (${escapeHtml(olderDecisions.length)})</summary>
+               <div class="mt-2">
+                   ${olderDecisions.map((decision) => `<div class="border-top pt-2 mt-2">
+                       <div class="small">Απόφαση: ${escapeHtml(decisionLabels[decision.decision_code] || '-')}</div>
+                       <div class="small">Χρήστης: ${escapeHtml(decision.created_by_user_name || '-')} · ${escapeHtml(formatPolicyPreviewDateTime(decision.created_at))}</div>
+                       ${decision.notes ? `<div class="small">Σημειώσεις: ${escapeHtml(decision.notes)}</div>` : ''}
+                   </div>`).join('')}
+               </div>
+           </details>`
+        : '';
+    const decisionButtons = Object.entries(decisionLabels).map(([code, label]) => {
+        const style = code === 'APPROVE_PROPOSAL' ? 'policy-preview-decision-success' : code === 'REJECT_PROPOSAL' ? 'policy-preview-decision-danger' : 'policy-preview-decision-warning';
+        return `<button type="button" class="btn btn-sm ${style} atomic-repo-transfer-decision-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-code="${escapeHtml(code)}" ${recordedDecision || !hasSpecificBranch ? 'disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+    }).join('');
     return `
         <article class="atomic-repo-transfer-group" data-atomic-group-id="${escapeHtml(
             group.group_id || ''
@@ -3952,6 +3990,13 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                     ${renderAtomicRepoTransferItem(target, 'TARGET_BECOMES_REPO')}
                 </div>
             </div>
+            <div class="policy-preview-approval-panel mt-2">
+                <div class="small fw-semibold mb-1">Απόφαση για ολόκληρη τη συνδεδεμένη πρόταση</div>
+                ${hasSpecificBranch ? '' : '<div class="small text-warning-emphasis mb-2">Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.</div>'}
+                ${recordedDecisionHtml}
+                ${previousDecisionHistory}
+                <div class="policy-preview-decision-actions mt-2">${decisionButtons}</div>
+            </div>
         </article>
     `;
 }
@@ -3969,6 +4014,79 @@ function bindAtomicRepoTransferEvents(container) {
             button.textContent = isOpen ? 'Προβολή ζεύγους' : 'Απόκρυψη ζεύγους';
         });
     });
+    container.querySelectorAll('.atomic-repo-transfer-decision-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const group = currentAtomicRepoTransferProjection?.groups?.[Number(button.dataset.atomicGroupIndex)];
+            if (!group) return;
+            try { await submitRepoTransferDecision(group, String(button.dataset.decisionCode || '')); }
+            catch (error) { await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' }); }
+        });
+    });
+}
+
+function repoTransferDecisionRequestId() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return `repo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function refreshRepoTransferDecisions() {
+    if (!currentPolicyPreviewBaseParams) {
+        currentRepoTransferDecisionsByProposalId = new Map();
+        return;
+    }
+    const selectedBranch = String(
+        currentPolicyPreviewBaseParams.get('ypokatasthma') || ''
+    ).trim();
+    if (
+        !selectedBranch ||
+        selectedBranch.toUpperCase() === 'ALL' ||
+        selectedBranch.includes(',')
+    ) {
+        currentRepoTransferDecisionsByProposalId = new Map();
+        return;
+    }
+    const params = new URLSearchParams({
+        apo_hmeromhnia: currentPolicyPreviewBaseParams.get('apo_hmeromhnia') || '',
+        eos_hmeromhnia: currentPolicyPreviewBaseParams.get('eos_hmeromhnia') || '',
+        ypokatasthma: selectedBranch
+    });
+    currentRepoTransferDecisionsByProposalId = new Map();
+    const response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/current?${params}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'CSRF-Token': csrfToken }
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'Δεν ήταν δυνατή η ανάκτηση των αποφάσεων.');
+    }
+    currentRepoTransferDecisionsByProposalId = new Map(
+        (payload.records || []).map((record) => [String(record.proposal_id || ''), record])
+    );
+}
+
+async function submitRepoTransferDecision(group, decisionCode) {
+    if (repoTransferDecisionSubmitting) return;
+    const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
+    if (!selectedBranch || selectedBranch.toUpperCase() === 'ALL' || selectedBranch.includes(',')) {
+        throw new Error('Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.');
+    }
+    const source = group.items?.find((item) => item.role === 'SOURCE_BECOMES_WORK');
+    const target = group.items?.find((item) => item.role === 'TARGET_BECOMES_REPO');
+    if (!source || !target || !group.pair_contract) throw new Error('Η συνδεδεμένη πρόταση δεν είναι διαθέσιμη.');
+    const labels = { APPROVE_PROPOSAL: 'Έγκριση πρότασης', REJECT_PROPOSAL: 'Απόρριψη πρότασης', NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο' };
+    if (!labels[decisionCode]) throw new Error('Η απόφαση δεν υποστηρίζεται.');
+    const confirmation = await Swal.fire({ icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' });
+    if (!confirmation.isConfirmed) return;
+    repoTransferDecisionSubmitting = true;
+    try {
+        const token = await getPolicyPreviewCsrfToken();
+        const response = await fetch('/api/prodhlomena-oraria/review/repo-transfer-decisions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token }, body: JSON.stringify({ proposal_id: group.group_id, expected_source_id: source.prodhlomena_oraria_id, expected_target_id: target.prodhlomena_oraria_id, expected_proposal_version: group.pair_contract.proposal_version, expected_choice_code: group.pair_contract.choice_code, decision_code: decisionCode, notes: String(confirmation.value || '').trim(), request_id: repoTransferDecisionRequestId() }) });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(response.status === 409 ? 'Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.' : payload.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.');
+        await refreshRepoTransferDecisions();
+        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
+        await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
+    } finally { repoTransferDecisionSubmitting = false; }
 }
 
 function renderAtomicRepoTransferProjection(projection) {
@@ -4240,6 +4358,7 @@ async function loadResults() {
         ensureReviewTableStructure();
         ensureScenarioReviewFilterControl();
         currentPolicyPreviewBaseParams = new URLSearchParams(params);
+        currentRepoTransferDecisionsByProposalId = new Map();
         currentPolicyPreviewApprovalRecords = [];
         currentPolicyPreviewApprovalTotal = 0;
         currentPolicyPreviewApprovalsByGroupId = new Map();
@@ -4296,6 +4415,13 @@ async function loadResults() {
         }
 
         if (groupingResult.status === 'fulfilled') {
+            currentAtomicRepoTransferProjection = groupingResult.value.atomicGroupProjection || null;
+            try {
+                await refreshRepoTransferDecisions();
+            } catch (repoTransferDecisionsError) {
+                console.warn('[loadResults] Repo-transfer decisions unavailable:', repoTransferDecisionsError);
+                currentRepoTransferDecisionsByProposalId = new Map();
+            }
             renderPolicyPreviewGroups(groupingResult.value.grouping, {
                 atomicGroupProjection: groupingResult.value.atomicGroupProjection
             });
