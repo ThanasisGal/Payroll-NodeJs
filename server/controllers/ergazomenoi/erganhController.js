@@ -1302,14 +1302,30 @@ function getCompanyHolidayFlags(company = {}) {
     };
 }
 
-function buildArgiesByDateKey(argies = []) {
+function normalizeHolidayDescription(argia = {}) {
+    return String(argia.perigrafh || argia.perigrafh_argias || '')
+        .trim()
+        .slice(0, 200);
+}
+
+function buildArgiesByDateKey(argies = [], companyFlags = {}) {
     const map = new Map();
 
     for (const argia of argies) {
         if (!argia?.hmeromhnia) continue;
+        const isMandatoryHoliday = argia.ypoxreotikh_argia === true;
+        const isOptionalHoliday = !isMandatoryHoliday;
+        const companyOperatesOnHoliday = isMandatoryHoliday
+            ? companyFlags.apasxolhsh_kata_tis_argies === true
+            : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
         map.set(dateKeyUtc(argia.hmeromhnia), {
-            ypoxreotikh_argia: argia.ypoxreotikh_argia === true,
-            description: String(argia.perigrafh || argia.perigrafh_argias || '').trim()
+            ypoxreotikh_argia: isMandatoryHoliday,
+            isHoliday: true,
+            isMandatoryHoliday,
+            isOptionalHoliday,
+            description: normalizeHolidayDescription(argia),
+            companyOperatesOnHoliday,
+            blocksRepoTransfer: isMandatoryHoliday || !companyOperatesOnHoliday
         });
     }
 
@@ -1365,9 +1381,22 @@ async function buildNoCardsDisplayContext({
               .lean()
         : [];
 
+    const companyFlags = getCompanyHolidayFlags(company);
     return {
-        companyFlags: getCompanyHolidayFlags(company),
-        argiesByDateKey: buildArgiesByDateKey(argies)
+        companyFlags,
+        argiesByDateKey: buildArgiesByDateKey(argies, companyFlags)
+    };
+}
+
+function buildReviewHolidayResponseFields(row = {}, context = {}) {
+    const holiday = context.argiesByDateKey?.get(dateKeyUtc(row.hmeromhnia));
+
+    return {
+        holiday_description: holiday?.description || '',
+        holiday_is_mandatory: holiday?.isMandatoryHoliday === true,
+        holiday_is_optional: holiday?.isOptionalHoliday === true,
+        holiday_company_operates: holiday?.companyOperatesOnHoliday === true,
+        holiday_blocks_repo_transfer: holiday?.blocksRepoTransfer === true
     };
 }
 
@@ -1504,7 +1533,7 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'mhniaia_repo hmeres_ergasias_ebdomadas ' +
     'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'typos_ergazomenon';
+    'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
@@ -1654,6 +1683,12 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
             return {
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                 mhniaia_repo: weeklyProfileInfo.expectedWeeklyRepo,
+                mo_oron_hmerhsias_ergasias:
+                    Number(effectiveProfile.mo_oron_hmerhsias_ergasias || 0),
+                external_break_minutes:
+                    employee.dialleima_entos_ektos_orarioy === true
+                        ? 0
+                        : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),
                 source:
                     effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                 istorikoId: effectiveProfile.istorikoId || null,
@@ -5117,6 +5152,10 @@ class erganhController {
                     kathgoria_ergasias: effectiveKathgoria,
                     kathgoria_ergasias_effective: effectiveKathgoria,
                     noCardsDisplayStatus: resolveNoCardsDisplayStatus(
+                        normalizedRow,
+                        noCardsDisplayContext
+                    ),
+                    ...buildReviewHolidayResponseFields(
                         normalizedRow,
                         noCardsDisplayContext
                     ),

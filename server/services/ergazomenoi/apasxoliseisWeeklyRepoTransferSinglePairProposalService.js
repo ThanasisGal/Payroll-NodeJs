@@ -230,7 +230,12 @@ function findReferencedRow(weekRows, reference, role) {
 
 function materializeSourceValues(row) {
     const facts = buildApasxoliseisScenarioFacts(row);
-    const intervals = facts.cards.cardIntervalsRaw;
+    const hasCalculatedIntervals = facts.apologistika.currentApologistikaIntervals.some(
+        (interval) => interval.isComplete && !interval.isZeroLength
+    );
+    const intervals = hasCalculatedIntervals
+        ? facts.apologistika.currentApologistikaIntervals
+        : facts.cards.cardIntervalsRaw;
     if (
         intervals.length !== CARD_INTERVAL_FIELDS.length ||
         intervals.some((interval, index) => {
@@ -245,11 +250,20 @@ function materializeSourceValues(row) {
     }
 
     const cardHours = Number(String(row.cards_ores_ergasias ?? '').replace(',', '.').trim());
-    if (!Number.isFinite(cardHours) || cardHours <= 0) return { invalidHours: true };
+    const calculatedHours = Number(
+        String(row.ores_ergasias_apologistika ?? '').replace(',', '.').trim()
+    );
+    const sourceHours = Number.isFinite(calculatedHours) && calculatedHours > 0
+        ? calculatedHours
+        : cardHours;
+    if (!Number.isFinite(sourceHours) || sourceHours <= 0) return { invalidHours: true };
 
     const proposedValues = {
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
-        repo_apologistika: false
+        repo_apologistika: false,
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: '',
+        ores_apoysias_apologistika: 0
     };
 
     intervals.forEach((interval, index) => {
@@ -258,7 +272,7 @@ function materializeSourceValues(row) {
         proposedValues[startField] = materializable ? interval.start : '';
         proposedValues[endField] = materializable ? interval.end : '';
     });
-    proposedValues.ores_ergasias_apologistika = cardHours;
+    proposedValues.ores_ergasias_apologistika = sourceHours;
 
     return { proposedValues };
 }
@@ -267,7 +281,10 @@ function materializeTargetValues(targetCategory) {
     return {
         kathgoria_ergasias_apologistika: targetCategory,
         repo_apologistika: true,
+        adeia_apologistika: false,
+        kathgoria_adeias_apologistika: '',
         ores_ergasias_apologistika: 0,
+        ores_apoysias_apologistika: 0,
         apo_ora_01_apologistika: '',
         eos_ora_01_apologistika: '',
         apo_ora_02_apologistika: '',

@@ -5,6 +5,8 @@ const vm = require('vm');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
+const cssPath = path.join(__dirname, '..', '..', '..', 'css', 'main.css');
+const cssSource = fs.readFileSync(cssPath, 'utf8');
 const elementsById = new Map();
 const documentStub = {
     querySelector: () => null,
@@ -125,11 +127,21 @@ function assertContains(html, values) {
     values.forEach((value) => assert.ok(html.includes(value), `Missing: ${value}`));
 }
 
+function getVisibleText(html) {
+    return String(html || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function testReadyFullTimeAndSplitShift() {
     const html = render(readyProjection());
     assertContains(html, [
         'Προτάσεις Μεταφοράς Ρεπό',
-        'ΜΟΝΟ ΠΡΟΒΟΛΗ',
+        'Μόνο για έλεγχο',
+        'Πρόταση προς έλεγχο από HR',
+        'Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές',
+        'Η πρόταση εμφανίζεται μόνο για έλεγχο',
         'Ημέρα που γίνεται εργασία',
         'Ημέρα που γίνεται ρεπό',
         'ΑΝ',
@@ -142,6 +154,44 @@ function testReadyFullTimeAndSplitShift() {
         '7,50',
         '0,00'
     ]);
+    assert.ok(!/\batomic\b/i.test(getVisibleText(html)));
+}
+
+function testCompleteVisibleSectionContainsNoTechnicalTerms() {
+    const projection = readyProjection();
+    projection.projection_status = 'READY';
+    projection.groups[0].status = 'READY';
+    projection.groups[0].title = 'Atomic READY group projection';
+    projection.groups[0].description =
+        'Η atomic read-only πρόταση απαιτεί ενιαία αποδοχή. Runtime apply blocked.';
+    projection.groups[0].warnings = ['APPLY_SUPPORTED'];
+    const visibleText = getVisibleText(render(projection));
+
+    [
+        /\batomic\b/i,
+        /read[\s-]*only/i,
+        /\bprojection\b/i,
+        /\beligibility\b/i,
+        /runtime\s+apply/i,
+        /apply\s+supported/i,
+        /\bready\b/i,
+        /\bgroup\b/i,
+        /\bblocked\b/i
+    ].forEach((forbiddenPattern) => {
+        assert.ok(
+            !forbiddenPattern.test(visibleText),
+            `Technical term is visible: ${forbiddenPattern}`
+        );
+    });
+
+    assert.ok(
+        visibleText.includes(
+            'Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές'
+        )
+    );
+    assert.ok(visibleText.includes('Η πρόταση εμφανίζεται μόνο για έλεγχο'));
+    assert.ok(visibleText.includes('Συνδεδεμένη πρόταση μεταφοράς ρεπό'));
+    assert.ok(visibleText.includes('Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη'));
 }
 
 function testPartTimeTargetIsNotAnError() {
@@ -192,29 +242,78 @@ function testEscaping() {
     assert.ok(!html.includes('<img src=x'));
     assert.ok(!html.includes('<b>001</b>'));
     assert.ok(!html.includes('<svg>'));
-    assertContains(html, ['&lt;script&gt;', '&lt;img', '&lt;b&gt;001&lt;/b&gt;', '&lt;svg&gt;']);
+    assert.ok(!html.includes('&lt;script&gt;'));
+    assert.ok(!html.includes('&lt;img'));
+    assertContains(html, ['&lt;b&gt;001&lt;/b&gt;', '&lt;svg&gt;']);
 }
 
 function testDiagnostics() {
     const projection = readyProjection();
     projection.reason_counts = {
-        ATOMIC_DATE_RANGE_EXCEEDS_LIMIT: 1,
-        EMPLOYMENT_PROFILE_NOT_RESOLVED: 1,
-        INCOMPLETE_EMPLOYEE_WEEK: 1,
-        ATOMIC_HOLIDAY_CONTEXT_NOT_RESOLVED: 1,
-        INVALID_MHNIAIA_REPO: 1
+        PARTIAL_WEEK_OUTSIDE_FILTER_RANGE: 8,
+        NO_SOURCE_CANDIDATE: 7,
+        REPO_DEFICIT_REMAINS: 6,
+        INCOMPLETE_EMPLOYEE_WEEK: 5,
+        ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED: 4,
+        NO_TARGET_CANDIDATE: 3,
+        INVALID_MHNIAIA_REPO: 2,
+        MULTIPLE_SOURCE_CANDIDATES: 1
     };
     projection.warning_counts = { TARGET_ZERO_HOURS_WITH_CARD_INTERVALS: 1 };
     const html = render(projection);
+    const visibleText = getVisibleText(html);
 
     assertContains(html, [
-        'έως 62 ημερολογιακές ημέρες',
-        'δεν περιέχονταν πλήρως',
-        'δεν επιλύθηκε με ασφάλεια το εργασιακό προφίλ',
-        'πλήρες πλαίσιο αργιών',
-        'τα αναμενόμενα εβδομαδιαία ρεπό δεν ήταν διαθέσιμα ως 1 ή 2',
+        'Περιπτώσεις χωρίς αυτόματη πρόταση',
+        'Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:',
+        '8 περιπτώσεις: Το επιλεγμένο διάστημα δεν περιλαμβάνει ολόκληρη εβδομάδα.',
+        '7 περιπτώσεις: Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
+        '6 περιπτώσεις: Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
+        '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
+        '4 περιπτώσεις: Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
+        '3 περιπτώσεις: Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
+        '2 περιπτώσεις: Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
+        '1 περίπτωση: Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
         'μηδενικές συνολικές ώρες αλλά περιέχει στοιχεία καρτών'
     ]);
+
+    assert.ok(!visibleText.includes('Διαγνωστικοί κωδικοί'));
+    Object.keys(projection.reason_counts).forEach((code) => {
+        assert.ok(!visibleText.includes(code), `Raw diagnostic code is visible: ${code}`);
+    });
+    assert.ok(!visibleText.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
+
+    const orderedLabels = [
+        '8 περιπτώσεις:',
+        '7 περιπτώσεις:',
+        '6 περιπτώσεις:',
+        '5 περιπτώσεις:',
+        '4 περιπτώσεις:',
+        '3 περιπτώσεις:',
+        '2 περιπτώσεις:',
+        '1 περίπτωση:'
+    ];
+    orderedLabels.reduce((previousIndex, label) => {
+        const currentIndex = visibleText.indexOf(label);
+        assert.ok(currentIndex > previousIndex, `Unexpected diagnostic order for: ${label}`);
+        return currentIndex;
+    }, -1);
+}
+
+function testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering() {
+    const projection = readyProjection();
+    projection.reason_counts = {
+        FUTURE_PRIVATE_DIAGNOSTIC: 3,
+        NO_TARGET_CANDIDATE: 3
+    };
+    const visibleText = getVisibleText(render(projection));
+
+    assert.ok(!visibleText.includes('FUTURE_PRIVATE_DIAGNOSTIC'));
+    assert.ok(visibleText.includes('3 περιπτώσεις: Άλλη περίπτωση που χρειάζεται έλεγχο.'));
+    assert.ok(
+        visibleText.indexOf('Άλλη περίπτωση που χρειάζεται έλεγχο.') <
+            visibleText.indexOf('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.')
+    );
 }
 
 function testEmptyProjection() {
@@ -224,9 +323,43 @@ function testEmptyProjection() {
     projection.summary.decision_units_count = 0;
     const html = render(projection);
 
-    assertContains(html, [
-        'Δεν βρέθηκαν ασφαλείς προτάσεις μεταφοράς ρεπό για τις πλήρεις εβδομάδες'
-    ]);
+    assertContains(html, ['Δεν δημιουργήθηκε αυτόματη πρόταση.']);
+    assert.ok(!getVisibleText(html).includes('Χρειάζεται έλεγχο'));
+    assert.ok(!getVisibleText(html).includes('Πρόταση προς έλεγχο από HR'));
+}
+
+function testRepoTransferStatusAndSafeMarkup() {
+    const projection = readyProjection();
+    projection.groups[0].warnings = ['TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'];
+    const html = render(projection);
+    const visibleText = getVisibleText(html);
+
+    assert.ok(visibleText.includes('Πρόταση προς έλεγχο από HR'));
+    assert.ok(!visibleText.includes('Χρειάζεται έλεγχο'));
+    assert.ok(!visibleText.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
+    assert.ok(!/\sstyle\s*=/i.test(html));
+    assert.ok(!/\son[a-z]+\s*=/i.test(html));
+    assert.ok(html.includes('atomic-repo-transfer-toggle'));
+    assert.ok(html.includes('btn-outline-secondary'));
+}
+
+function testScopedSemanticButtonCss() {
+    assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn.btn-primary'));
+    assert.ok(cssSource.includes('--policy-preview-button-bg: #cfe2ff;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #9ec5fe;'));
+    assert.ok(cssSource.includes('--policy-preview-button-bg: #d1e7dd;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #a3cfbb;'));
+    assert.ok(cssSource.includes('--policy-preview-button-bg: #fff3cd;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #ffe69c;'));
+    assert.ok(cssSource.includes('--policy-preview-button-bg: #f8d7da;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #f1aeb5;'));
+    assert.ok(cssSource.includes('--policy-preview-button-bg: #e2e3e5;'));
+    assert.ok(cssSource.includes('--policy-preview-button-hover-bg: #c4c8cb;'));
+    assert.ok(cssSource.includes('color: #000000 !important;'));
+    assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn:focus-visible'));
+    assert.ok(cssSource.includes('#policyPreviewGroupsContainer .btn:disabled'));
+    assert.ok(cssSource.includes('cursor: not-allowed;'));
+    assert.ok(!cssSource.includes('style="'));
 }
 
 function testEmployeeWeekEvaluationLabel() {
@@ -295,12 +428,16 @@ function testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState() {
 
 const tests = [
     testReadyFullTimeAndSplitShift,
+    testCompleteVisibleSectionContainsNoTechnicalTerms,
     testPartTimeTargetIsNotAnError,
     testEmptyFirstIntervalDoesNotCompactSecond,
     testReadOnlySafety,
     testEscaping,
     testDiagnostics,
+    testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,
     testEmptyProjection,
+    testRepoTransferStatusAndSafeMarkup,
+    testScopedSemanticButtonCss,
     testEmployeeWeekEvaluationLabel,
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,

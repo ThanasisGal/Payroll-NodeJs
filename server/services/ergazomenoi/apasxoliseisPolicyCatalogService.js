@@ -248,7 +248,10 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         },
         proposed_update_fields: [
             'repo_apologistika',
-            'kathgoria_ergasias_apologistika'
+            'kathgoria_ergasias_apologistika',
+            'adeia_apologistika',
+            'kathgoria_adeias_apologistika',
+            'ores_apoysias_apologistika'
         ],
         result_statuses: [
             POLICY_RESULT_STATUS.OK,
