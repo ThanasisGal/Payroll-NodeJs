@@ -93,6 +93,7 @@ jobs:
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyPlanService.test.js
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaModelService.test.js
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaOrchestrationService.test.js
+          node server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplySafetyContract.test.js
 
       - name: Validate linked repo-transfer decision feature when present
         shell: bash
@@ -187,6 +188,11 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairProposalService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyPreflightService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplySafetyContract.test.js"
             "server/utils/ergazomenoi/getOrarioTermsForDate.test.js"
           )
 

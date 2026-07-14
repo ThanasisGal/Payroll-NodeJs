@@ -1,0 +1,16 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '../../..');
+const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
+const runtimeFiles = ['app.js','server/routes/usersRoute.js','server/controllers/ergazomenoi/erganhController.js','public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'];
+const productionFiles = ['server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyPreflightService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService.js'];
+const writer = read(productionFiles[2]); const preflight = read(productionFiles[1]);
+runtimeFiles.forEach((file) => { const source = read(file); assert.ok(!/WeeklyRepoTransferApply|linked-repo-transfer[^\n]*apply|repo-transfer-decisions\/[^\n]*\/apply/i.test(source), `${file} exposes apply foundation`); });
+assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/routes/usersRoute.js'))); assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/controllers/ergazomenoi/erganhController.js')));
+productionFiles.forEach((file) => assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|bulkWrite|ordered\s*:\s*false|updateMany/.test(read(file)), `${file} has forbidden dependency/operation`));
+assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)); assert.ok(/sourceResult\.matchedCount !== 1/.test(writer)); assert.ok(/targetResult\.matchedCount !== 1/.test(writer));
+assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
+assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/process\.env/.test(productionFiles.map(read).join('\n'))); assert.ok(!/fallback/i.test(writer));
+assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
+console.log('weekly repo-transfer apply safety contract passed');
