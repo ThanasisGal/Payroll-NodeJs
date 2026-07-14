@@ -1286,6 +1286,24 @@ router.post(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions/current',
+    checkAuth,
+    erganhController.getWeeklyRepoTransferDecisionBatch
+);
+
+router.get(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions',
+    checkAuth,
+    erganhController.getWeeklyRepoTransferDecisions
+);
+
+router.post(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions',
+    checkAuth,
+    erganhController.createWeeklyRepoTransferDecision
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/scenarios',
     erganhController.getProdhlomenaOrariaScenarioClassifications
 );

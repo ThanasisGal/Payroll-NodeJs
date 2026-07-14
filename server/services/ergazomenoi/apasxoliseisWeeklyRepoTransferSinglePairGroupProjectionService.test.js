@@ -119,6 +119,10 @@ function assertSafetyContract(group) {
     assert.deepStrictEqual(group.pair_contract, {
         choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
         proposal_version: 'repo-transfer-single-pair-proposal:v1',
+        policy_versions: {
+            weekly_repo: 'foundation:v1',
+            source_work: 'foundation:v1'
+        },
         atomic_pair_required: true,
         requires_hr_review: true,
         approval_supported: false,

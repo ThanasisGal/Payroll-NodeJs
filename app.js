@@ -35,6 +35,9 @@ const mongoose = require('mongoose');
 mongoose.set('sanitizeFilter', true);
 const geoGuard = require('./server/middlewares/geoGuard');
 const usersRoute = require('./server/routes/usersRoute');
+const {
+    createRepoTransferDecisionBodyMiddleware
+} = require('./server/middlewares/repoTransferDecisionBodyParser');
 const dropdownRoutes = require('./server/routes/dropdownRoutes');
 const apiRoutes = require('./server/routes/apiRoutes');
 const adminRoutes = require('./server/routes/adminRoutes');
@@ -158,6 +161,10 @@ connectDB();
 /*                         Σειρά βασικών middlewares                          */
 /* -------------------------------------------------------------------------- */
 
+app.use(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions',
+    ...createRepoTransferDecisionBodyMiddleware()
+);
 app.use(json({ limit: '50mb' }));
 app.use(urlencoded({ extended: true, limit: '50mb' }));
 app.use(methodOverride('_method'));

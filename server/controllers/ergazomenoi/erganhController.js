@@ -129,9 +129,6 @@ const {
     buildApasxoliseisPolicyPreviewGrouping
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService');
 const {
-    getOrarioTermsForDate: getCanonicalOrarioTermsForDate
-} = require('../../utils/ergazomenoi/getOrarioTermsForDate');
-const {
     buildWeeklyRepoTransferAtomicInputs,
     buildWeeklyRepoTransferAtomicPageProjection,
     composePolicyPreviewResponse,
@@ -140,6 +137,16 @@ const {
     isEmployeeCompatibleWithBranch,
     INPUT_REASON: ATOMIC_INPUT_REASON
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
+    ATOMIC_REPO_TRANSFER_ROW_FIELDS,
+    ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS,
+    ATOMIC_REPO_TRANSFER_HISTORY_FIELDS,
+    getCompanyHolidayFlags,
+    buildArgiesByDateKey,
+    buildNoCardsDisplayContext,
+    getEffectiveRepoProfileForDate,
+    getWeeklyRepoProfileInfo
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
     createPolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords
@@ -153,6 +160,13 @@ const {
 const {
     runPolicyPreviewApplyExecutionLocked
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApplyExecutionService');
+const {
+    createWeeklyRepoTransferDecision,
+    listWeeklyRepoTransferDecisions
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService');
+const {
+    loadWeeklyRepoTransferDecisionBatch
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -1294,44 +1308,6 @@ function isNoCardDeclaredWorkRow(row = {}) {
     );
 }
 
-function getCompanyHolidayFlags(company = {}) {
-    return {
-        apasxolhsh_kata_tis_argies: company?.apasxolhsh_kata_tis_argies === true,
-        leitoyrgia_stis_mh_ypoxreotikes_argies:
-            company?.leitoyrgia_stis_mh_ypoxreotikes_argies === true
-    };
-}
-
-function normalizeHolidayDescription(argia = {}) {
-    return String(argia.perigrafh || argia.perigrafh_argias || '')
-        .trim()
-        .slice(0, 200);
-}
-
-function buildArgiesByDateKey(argies = [], companyFlags = {}) {
-    const map = new Map();
-
-    for (const argia of argies) {
-        if (!argia?.hmeromhnia) continue;
-        const isMandatoryHoliday = argia.ypoxreotikh_argia === true;
-        const isOptionalHoliday = !isMandatoryHoliday;
-        const companyOperatesOnHoliday = isMandatoryHoliday
-            ? companyFlags.apasxolhsh_kata_tis_argies === true
-            : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
-        map.set(dateKeyUtc(argia.hmeromhnia), {
-            ypoxreotikh_argia: isMandatoryHoliday,
-            isHoliday: true,
-            isMandatoryHoliday,
-            isOptionalHoliday,
-            description: normalizeHolidayDescription(argia),
-            companyOperatesOnHoliday,
-            blocksRepoTransfer: isMandatoryHoliday || !companyOperatesOnHoliday
-        });
-    }
-
-    return map;
-}
-
 function isMisthotosEmployee(row = {}) {
     return String(row.typos_ergazomenon || '').trim() === 'Μ';
 }
@@ -1347,45 +1323,6 @@ function resolveNoCardsDisplayStatus(row = {}, { argiesByDateKey = new Map(), co
     }
 
     return companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
-}
-
-async function buildNoCardsDisplayContext({
-    team,
-    companyId,
-    companyKodikos,
-    etos,
-    periodStart,
-    periodEnd
-}) {
-    const trimmedCompanyId = String(companyId || '').trim();
-    const companyQuery = mongoose.Types.ObjectId.isValid(trimmedCompanyId)
-        ? { _id: trimmedCompanyId }
-        : { kod: trimmedCompanyId };
-    const company = trimmedCompanyId
-        ? await CompaniesModel.findOne(companyQuery)
-              .select('kod apasxolhsh_kata_tis_argies leitoyrgia_stis_mh_ypoxreotikes_argies')
-              .lean()
-        : null;
-    const resolvedCompanyKodikos = String(companyKodikos || company?.kod || '').trim();
-    const argies = resolvedCompanyKodikos
-        ? await ArgiesModel.find({
-              team,
-              company_kod: resolvedCompanyKodikos,
-              etos: String(etos || ''),
-              hmeromhnia: mongoose.trusted({
-                  $gte: periodStart,
-                  $lte: periodEnd
-              })
-          })
-              .select('hmeromhnia ypoxreotikh_argia perigrafh perigrafh_argias')
-              .lean()
-        : [];
-
-    const companyFlags = getCompanyHolidayFlags(company);
-    return {
-        companyFlags,
-        argiesByDateKey: buildArgiesByDateKey(argies, companyFlags)
-    };
 }
 
 function buildReviewHolidayResponseFields(row = {}, context = {}) {
@@ -1438,110 +1375,6 @@ function getEffectiveKathgoriaErgasias(row) {
     if (apologistika !== '') return apologistika;
     return String(row?.kathgoria_ergasias || '').trim();
 }
-
-function getEffectiveRepoProfileForDate(date, istorikoRows = [], ergazomenos = {}) {
-    return getCanonicalOrarioTermsForDate(date, istorikoRows, ergazomenos);
-}
-
-function getProfileSignature(profile = {}) {
-    return [
-        profile.source || '',
-        profile.istorikoId ? String(profile.istorikoId) : '',
-        String(profile.mhniaia_repo ?? ''),
-        String(profile.typos_apasxolhshs ?? ''),
-        String(profile.hmeres_ergasias_ebdomadas ?? ''),
-        String(profile.ores_ergasias_ebdomadas ?? '')
-    ].join('|');
-}
-
-function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
-    return (
-        normalizeDateOnlyForCalc(profile.hmeromhnia_isxyos_oron_ergasias_apo) ||
-        normalizeDateOnlyForCalc(profile.hmeromhnia_allaghs_orarioy_apo) ||
-        normalizeDateOnlyForCalc(profile.hmeromhnia_allaghs_symbashs) ||
-        normalizeDateOnlyForCalc(fallbackDate)
-    );
-}
-
-function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} }) {
-    const signatures = new Set();
-    const profiles = [];
-
-    // Κανόνας σπασμένης εβδομάδας:
-    // Για εβδομάδα Κυριακή-Σάββατο που έχει αλλαγή όρων εργασίας μέσα της,
-    // ΔΕΝ κάνουμε αναλογικό υπολογισμό. Υπερισχύει το profile που ισχύει
-    // στο τέλος της φυσικής εβδομάδας, δηλαδή το Σάββατο.
-    const saturdayOfWeek = week.naturalWeekEnd || endOfWeekSaturdayUtc(week.weekStart);
-
-    for (
-        let day = clampDateStartUtc(week.weekStart);
-        day.getTime() <= week.weekEnd.getTime();
-        day = addDaysUtc(day, 1)
-    ) {
-        const profile = getEffectiveRepoProfileForDate(day, istorikoRows, ergazomenos);
-        const signature = getProfileSignature(profile);
-        signatures.add(signature);
-        profiles.push({ day: new Date(day), profile, signature });
-    }
-
-    const firstProfile =
-        profiles.length > 0
-            ? profiles[0].profile
-            : getEffectiveRepoProfileForDate(week.weekStart, istorikoRows, ergazomenos);
-
-    const profileOfSaturday = getEffectiveRepoProfileForDate(
-        saturdayOfWeek,
-        istorikoRows,
-        ergazomenos
-    );
-
-    const lastProfileInsidePeriod =
-        profiles.length > 0
-            ? profiles[profiles.length - 1].profile
-            : getEffectiveRepoProfileForDate(week.weekEnd, istorikoRows, ergazomenos);
-
-    const effectiveProfile = week.isFullWeek ? profileOfSaturday : lastProfileInsidePeriod;
-    const firstSignature = getProfileSignature(firstProfile);
-    const saturdaySignature = getProfileSignature(profileOfSaturday);
-
-    return {
-        expectedWeeklyRepo: getExpectedWeeklyRepo(effectiveProfile),
-        profileChangedInsideWeek: signatures.size > 1 || firstSignature !== saturdaySignature,
-        effectiveProfile,
-        effectiveProfileDate: getProfileDateForDeviation(effectiveProfile, saturdayOfWeek),
-        previousProfile: firstProfile,
-        previousProfileDate: getProfileDateForDeviation(firstProfile, week.weekStart)
-    };
-}
-
-const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
-    '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
-    'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
-    'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
-    'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
-    'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-    'kathgoria_ergasias_apologistika apologistiko_biblio repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
-    'argia argia_apologistika kyriakes_apologistika is_locked ' +
-    'ores_ergasias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
-    'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
-    'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
-    'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
-    'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
-
-const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
-    'kodikos ypokatasthma energos archived ' +
-    'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
-    'mhniaia_repo hmeres_ergasias_ebdomadas ' +
-    'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';
-
-const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
-    '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
-    'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
-    'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
-    'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas ' +
-    'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt';
 
 async function buildAtomicRepoTransferPolicyPreviewProjection({
     sessionTeam,
@@ -5579,6 +5412,79 @@ class erganhController {
                     error.statusCode && error.statusCode < 500
                         ? error.message
                         : 'Σφάλμα κατά την καταγραφή της απόφασης πολιτικής απασχολήσεων.'
+            });
+        }
+    };
+
+    static createWeeklyRepoTransferDecision = async (req, res) => {
+        try {
+            const result = await createWeeklyRepoTransferDecision({
+                session: req.session,
+                payload: req.body
+            });
+            return res.status(result.idempotent ? 200 : 201).json({
+                success: true,
+                idempotent: result.idempotent,
+                decision: result.decision,
+                message: result.idempotent
+                    ? 'Η απόφαση είχε ήδη καταγραφεί.'
+                    : 'Η απόφαση για τη συνδεδεμένη πρόταση καταγράφηκε.'
+            });
+        } catch (error) {
+            console.error(
+                '[createWeeklyRepoTransferDecision]',
+                error?.statusCode || 500,
+                error?.message
+            );
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message
+                    : 'Δεν ήταν δυνατή η καταγραφή της απόφασης.'
+            });
+        }
+    };
+
+    static getWeeklyRepoTransferDecisions = async (req, res) => {
+        try {
+            const records = await listWeeklyRepoTransferDecisions({
+                session: req.session,
+                filters: req.query
+            });
+            return res.json({ success: true, records });
+        } catch (error) {
+            console.error(
+                '[getWeeklyRepoTransferDecisions]',
+                error?.statusCode || 500,
+                error?.message
+            );
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message
+                    : 'Δεν ήταν δυνατή η ανάκτηση των αποφάσεων.'
+            });
+        }
+    };
+
+    static getWeeklyRepoTransferDecisionBatch = async (req, res) => {
+        try {
+            const result = await loadWeeklyRepoTransferDecisionBatch({
+                session: req.session,
+                filters: req.query
+            });
+            return res.json({ success: true, ...result });
+        } catch (error) {
+            console.error(
+                '[getWeeklyRepoTransferDecisionBatch]',
+                error?.statusCode || 500,
+                error?.message
+            );
+            return res.status(error.statusCode || 500).json({
+                success: false,
+                message: error.statusCode && error.statusCode < 500
+                    ? error.message
+                    : 'Δεν ήταν δυνατή η ανάκτηση των αποφάσεων.'
             });
         }
     };

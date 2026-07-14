@@ -288,6 +288,10 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         pair_contract: {
             choice_code: CHOICE_CODE,
             proposal_version: PROPOSAL_VERSION,
+            policy_versions: {
+                weekly_repo: proposal.policy_context.weekly_repo_policy_version,
+                source_work: proposal.policy_context.source_work_policy_version
+            },
             atomic_pair_required: true,
             requires_hr_review: true,
             approval_supported: false,
