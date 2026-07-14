@@ -81,7 +81,12 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
 function profileSignature(profile = {}) { return [profile.source || '', String(profile.istorikoId || ''), String(profile.mhniaia_repo ?? ''), String(profile.typos_apasxolhshs ?? ''), String(profile.hmeres_ergasias_ebdomadas ?? ''), String(profile.ores_ergasias_ebdomadas ?? '')].join('|'); }
-function profileDate(profile, fallback) { return normalizeDateOnly(profile.hmeromhnia_isxyos_oron_ergasias_apo) || normalizeDateOnly(profile.hmeromhnia_allaghs_orarioy_apo) || normalizeDateOnly(profile.hmeromhnia_allaghs_symbashs) || normalizeDateOnly(fallback); }
+function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
+    return normalizeDateOnly(profile.hmeromhnia_isxyos_oron_ergasias_apo) ||
+        normalizeDateOnly(profile.hmeromhnia_allaghs_orarioy_apo) ||
+        normalizeDateOnly(profile.hmeromhnia_allaghs_symbashs) ||
+        normalizeDateOnly(fallbackDate);
+}
 function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} }) {
     const saturday = week.naturalWeekEnd || endOfWeekSaturdayUtc(week.weekStart);
     const profiles = [];
@@ -93,13 +98,16 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
     return {
         expectedWeeklyRepo: Number(effective.mhniaia_repo ?? 0) || 0,
         profileChangedInsideWeek: new Set(profiles.map(profileSignature)).size > 1 || profileSignature(first) !== profileSignature(saturdayProfile),
-        effectiveProfile: effective, effectiveProfileDate: profileDate(effective, saturday),
-        previousProfile: first, previousProfileDate: profileDate(first, week.weekStart)
+        effectiveProfile: effective,
+        effectiveProfileDate: getProfileDateForDeviation(effective, saturday),
+        previousProfile: first,
+        previousProfileDate: getProfileDateForDeviation(first, week.weekStart)
     };
 }
 
 module.exports = {
     ATOMIC_REPO_TRANSFER_ROW_FIELDS, ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS,
     ATOMIC_REPO_TRANSFER_HISTORY_FIELDS, getCompanyHolidayFlags, buildArgiesByDateKey,
-    buildNoCardsDisplayContext, getEffectiveRepoProfileForDate, getWeeklyRepoProfileInfo
+    buildNoCardsDisplayContext, getEffectiveRepoProfileForDate,
+    getProfileDateForDeviation, getWeeklyRepoProfileInfo
 };

@@ -1,8 +1,11 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const {
     ATOMIC_REPO_TRANSFER_ROW_FIELDS,
     getCompanyHolidayFlags,
     buildArgiesByDateKey,
+    getProfileDateForDeviation,
     getWeeklyRepoProfileInfo,
     buildNoCardsDisplayContext
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
@@ -70,6 +73,57 @@ function testCanonicalWeeklyProfile() {
     assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h2');
     assert.strictEqual(changed.expectedWeeklyRepo, 1);
     assert.strictEqual(changed.profileChangedInsideWeek, true);
+    assert.strictEqual(
+        changed.effectiveProfileDate,
+        getProfileDateForDeviation(changed.effectiveProfile, week.naturalWeekEnd)
+    );
+    assert.strictEqual(
+        changed.previousProfileDate,
+        getProfileDateForDeviation(changed.previousProfile, week.weekStart)
+    );
+}
+
+function testProfileDateForDeviationPrecedenceAndFallbacks() {
+    assert.strictEqual(getProfileDateForDeviation({
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-18T08:30:00.000Z',
+        hmeromhnia_allaghs_orarioy_apo: '2026-06-17',
+        hmeromhnia_allaghs_symbashs: '2026-06-16'
+    }, '2026-06-15'), '2026-06-18');
+    assert.strictEqual(getProfileDateForDeviation({
+        hmeromhnia_allaghs_orarioy_apo: new Date('2026-06-17T22:00:00.000Z'),
+        hmeromhnia_allaghs_symbashs: '2026-06-16'
+    }, '2026-06-15'), '2026-06-17');
+    assert.strictEqual(getProfileDateForDeviation({
+        hmeromhnia_allaghs_symbashs: '2026-06-16T12:00:00.000Z'
+    }, '2026-06-15'), '2026-06-16');
+    assert.strictEqual(getProfileDateForDeviation({}, '2026-06-15T23:59:59.999Z'), '2026-06-15');
+    assert.strictEqual(getProfileDateForDeviation({
+        hmeromhnia_isxyos_oron_ergasias_apo: 'invalid',
+        hmeromhnia_allaghs_orarioy_apo: '',
+        hmeromhnia_allaghs_symbashs: null
+    }, 'also-invalid'), null);
+    assert.strictEqual(getProfileDateForDeviation(), null);
+}
+
+function testControllerImportsSharedProfileDateHelper() {
+    const controllerSource = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'controllers', 'ergazomenoi', 'erganhController.js'),
+        'utf8'
+    );
+    const importStart = controllerSource.indexOf('const {\n    ATOMIC_REPO_TRANSFER_ROW_FIELDS');
+    const importEnd = controllerSource.indexOf(
+        "} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');",
+        importStart
+    );
+    const sharedImport = controllerSource.slice(importStart, importEnd);
+
+    assert.ok(importStart >= 0 && importEnd > importStart);
+    assert.ok(sharedImport.includes('getProfileDateForDeviation'));
+    assert.strictEqual(
+        (controllerSource.match(/getProfileDateForDeviation\s*\(/g) || []).length,
+        2
+    );
+    assert.doesNotMatch(controllerSource, /function\s+getProfileDateForDeviation\s*\(/);
 }
 
 function queryResult(value) {
@@ -130,7 +184,9 @@ async function testTeamScopedCompanyResolution() {
 async function run() {
     testRowFieldEquivalence();
     testHolidayContexts();
+    testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
+    testControllerImportsSharedProfileDateHelper();
     await testTeamScopedCompanyResolution();
     console.log('weekly repo transfer authoritative context tests passed');
 }

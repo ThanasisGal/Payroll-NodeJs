@@ -145,6 +145,7 @@ const {
     buildArgiesByDateKey,
     buildNoCardsDisplayContext,
     getEffectiveRepoProfileForDate,
+    getProfileDateForDeviation,
     getWeeklyRepoProfileInfo
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
