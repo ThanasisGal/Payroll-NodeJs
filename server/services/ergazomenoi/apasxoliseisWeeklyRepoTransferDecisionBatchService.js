@@ -60,8 +60,17 @@ function presentation(record, currentFingerprint) {
         notes: record.notes || '',
         created_by_user_name: record.created_by_user_name || '',
         created_at: record.created_at || null,
-        is_current: record.snapshot_fingerprint === currentFingerprint
+        is_current: Boolean(currentFingerprint && record.snapshot_fingerprint === currentFingerprint)
     };
+}
+function executionPresentation(execution) {
+    return execution ? {
+        id: String(execution._id || ''),
+        decision_id: String(execution.decision_id || ''),
+        execution_status: execution.execution_status,
+        applied_at: execution.applied_at || null,
+        created_by_user_name: execution.created_by_user_name || ''
+    } : null;
 }
 
 async function loadWeeklyRepoTransferDecisionBatch({
@@ -187,28 +196,30 @@ async function loadWeeklyRepoTransferDecisionBatch({
         const snapshot = canonicalSnapshotBuilder({ scope, context, group });
         return { group, fingerprint: snapshotFingerprintBuilder(snapshot) };
     });
-    const proposalIds = current.map((entry) => entry.group.group_id);
-    const decisions = proposalIds.length
-        ? await decisionModel.find({
-              team: scope.team,
-              company_kod: scope.company_kod,
-              ypokatasthma: normalized.ypokatasthma,
-              proposal_id: mongoose.trusted({ $in: proposalIds }),
-              decision_status: 'RECORDED'
-          }).select('-canonical_snapshot -canonical_group_key -command_identity -request_id').sort({ created_at: -1 }).lean()
-        : [];
-    const currentDecisionRecords = current.map(({ group, fingerprint }) =>
-        decisions.find((decision) => decision.proposal_id === group.group_id && decision.snapshot_fingerprint === fingerprint)
-    ).filter(Boolean);
-    const currentDecisionIds = currentDecisionRecords.map((decision) => decision._id);
-    const executions = currentDecisionIds.length
+    const decisions = await decisionModel.find({
+        team: scope.team,
+        company_kod: scope.company_kod,
+        ypokatasthma: normalized.ypokatasthma,
+        decision_status: 'RECORDED',
+        week_start: mongoose.trusted({ $lte: normalized.end.date }),
+        week_end: mongoose.trusted({ $gte: normalized.start.date })
+    }).select('-canonical_snapshot -canonical_group_key -command_identity -request_id').sort({ created_at: -1 }).lean();
+    const periodDecisionIds = decisions.map((decision) => decision._id).filter(Boolean);
+    const executions = periodDecisionIds.length
         ? await executionModel.find({
               team: scope.team,
               company_kod: scope.company_kod,
-              decision_id: mongoose.trusted({ $in: currentDecisionIds })
-          }).select('_id decision_id execution_status applied_at created_by_user_name').lean()
+              decision_id: mongoose.trusted({ $in: periodDecisionIds })
+          }).select('_id decision_id proposal_id execution_status applied_at created_by_user_name').lean()
         : [];
     const executionByDecisionId = new Map(executions.map((execution) => [String(execution.decision_id), execution]));
+    const executedDecisionIds = new Set(executionByDecisionId.keys());
+    const decisionsByProposalId = new Map();
+    decisions.forEach((decision) => {
+        const proposalId = String(decision.proposal_id || '');
+        if (!decisionsByProposalId.has(proposalId)) decisionsByProposalId.set(proposalId, []);
+        decisionsByProposalId.get(proposalId).push(decision);
+    });
     let authorized = true;
     try { validateApplySession(session); } catch { authorized = false; }
     let runtimeState = { enabled: false };
@@ -217,17 +228,17 @@ async function loadWeeklyRepoTransferDecisionBatch({
     if (runtimeState.enabled) {
         try { indexState = await indexStateLoader(); } catch { indexState = { ready: false }; }
     }
-    return {
-        records: current.map(({ group, fingerprint }) => {
-            const history = decisions
-                .filter((decision) => decision.proposal_id === group.group_id)
-                .map((decision) => presentation(decision, fingerprint));
-            const rawCurrent = decisions.find((decision) => decision.proposal_id === group.group_id && decision.snapshot_fingerprint === fingerprint) || null;
-            const execution = rawCurrent ? executionByDecisionId.get(String(rawCurrent._id)) || null : null;
+    const currentProposalIds = new Set(current.map(({ group }) => String(group.group_id || '')));
+    const currentRecords = current.map(({ group, fingerprint }) => {
+            const proposalDecisions = decisionsByProposalId.get(String(group.group_id || '')) || [];
+            const history = proposalDecisions.map((decision) => presentation(decision, fingerprint));
+            const rawCurrent = proposalDecisions.find((decision) => decision.snapshot_fingerprint === fingerprint) || null;
+            const executedDecision = proposalDecisions.find((decision) => executedDecisionIds.has(String(decision._id))) || null;
+            const execution = executedDecision ? executionByDecisionId.get(String(executedDecision._id)) || null : null;
             let apply_state = 'NOT_APPROVED';
-            if (rawCurrent?.decision_code === 'APPROVE_PROPOSAL' && rawCurrent?.decision_status === 'RECORDED') {
+            if (execution) apply_state = 'ALREADY_APPLIED';
+            else if (rawCurrent?.decision_code === 'APPROVE_PROPOSAL' && rawCurrent?.decision_status === 'RECORDED') {
                 if (!authorized) apply_state = 'NOT_AUTHORIZED';
-                else if (execution) apply_state = 'ALREADY_APPLIED';
                 else if (!runtimeState.enabled) apply_state = 'RUNTIME_DISABLED';
                 else if (!indexState.ready) apply_state = 'INDEXES_NOT_READY';
                 else apply_state = 'READY_TO_APPLY';
@@ -235,18 +246,34 @@ async function loadWeeklyRepoTransferDecisionBatch({
             return {
                 proposal_id: group.group_id,
                 current_decision: history.find((decision) => decision.is_current) || null,
-                current_execution: execution ? {
-                    id: String(execution._id || ''), decision_id: String(execution.decision_id || ''),
-                    execution_status: execution.execution_status, applied_at: execution.applied_at || null,
-                    created_by_user_name: execution.created_by_user_name || ''
-                } : null,
+                current_execution: executionPresentation(execution),
                 apply_state,
                 apply_allowed: apply_state === 'READY_TO_APPLY',
                 history,
                 history_count: history.length
             };
-        }),
+        });
+    const appliedOnlyRecords = [...decisionsByProposalId.entries()]
+        .filter(([proposalId, proposalDecisions]) => !currentProposalIds.has(proposalId) && proposalDecisions.some((decision) => executedDecisionIds.has(String(decision._id))))
+        .map(([proposalId, proposalDecisions]) => {
+            const executedDecision = proposalDecisions.find((decision) => executedDecisionIds.has(String(decision._id)));
+            const execution = executionByDecisionId.get(String(executedDecision._id));
+            const history = proposalDecisions.map((decision) => presentation(decision, null));
+            return {
+                proposal_id: proposalId,
+                current_decision: null,
+                current_execution: executionPresentation(execution),
+                apply_state: 'ALREADY_APPLIED',
+                apply_allowed: false,
+                history,
+                history_count: history.length
+            };
+        })
+        .sort((left, right) => new Date(right.current_execution.applied_at || 0) - new Date(left.current_execution.applied_at || 0));
+    return {
+        records: [...currentRecords, ...appliedOnlyRecords],
         current_groups_count: current.length,
+        applied_only_count: appliedOnlyRecords.length,
         projection_status: projection.projection_status,
         reason_counts: projection.reason_counts,
         warning_counts: projection.warning_counts

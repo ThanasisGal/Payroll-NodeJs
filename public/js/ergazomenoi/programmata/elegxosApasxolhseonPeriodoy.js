@@ -3928,9 +3928,9 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
         INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.',
         NOT_AUTHORIZED: 'Δεν έχετε δικαίωμα εφαρμογής εγκεκριμένης πρότασης.'
     };
-    const applyHtml = !isCurrentApproval ? '' : applyState === 'ALREADY_APPLIED'
-        ? `<div class="mt-2"><span class="badge text-bg-success">Η πρόταση εφαρμόστηκε</span><span class="small ms-2">${escapeHtml(formatPolicyPreviewDateTime(decisionState?.current_execution?.applied_at))}</span></div>`
-        : `<div class="mt-2">
+    const applyHtml = applyState === 'ALREADY_APPLIED' && decisionState?.current_execution
+        ? `<div class="mt-2"><span class="badge text-bg-success">Η πρόταση εφαρμόστηκε</span><span class="small ms-2">${escapeHtml(formatPolicyPreviewDateTime(decisionState.current_execution.applied_at))}</span></div>`
+        : !isCurrentApproval ? '' : `<div class="mt-2">
                <button type="button" class="btn btn-sm policy-preview-decision-success atomic-repo-transfer-apply-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-id="${escapeHtml(recordedDecision?.id || '')}" ${applyState === 'READY_TO_APPLY' ? '' : 'disabled aria-disabled="true"'}>Εφαρμογή εγκεκριμένης μεταφοράς</button>
                ${applyMessages[applyState] ? `<div class="small text-muted mt-1">${escapeHtml(applyMessages[applyState])}</div>` : ''}
            </div>`;

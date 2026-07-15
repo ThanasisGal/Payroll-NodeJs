@@ -47,4 +47,17 @@ assert.ok(frontendApply.includes("title: 'Η πρόταση εφαρμόστηκ
 const committedSuccessPath = frontendApply.slice(frontendApply.indexOf('Swal.close();\n    try {'));
 assert.ok(!committedSuccessPath.includes('button.disabled = false'));
 assert.ok(/generallyEnabled[\s\S]*=== 'true'/.test(read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js')));
+const batchSource = read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService.js');
+assert.ok(batchSource.includes('week_start: mongoose.trusted({ $lte: normalized.end.date })'));
+assert.ok(batchSource.includes('week_end: mongoose.trusted({ $gte: normalized.start.date })'));
+assert.ok(!batchSource.includes('proposal_id: mongoose.trusted({ $in: proposalIds })'));
+assert.strictEqual((batchSource.match(/executionModel\.find\(/g) || []).length, 1);
+assert.ok(batchSource.includes('executedDecisionIds'));
+assert.ok(batchSource.indexOf("if (execution) apply_state = 'ALREADY_APPLIED'") < batchSource.indexOf("if (!authorized) apply_state = 'NOT_AUTHORIZED'"));
+assert.ok(batchSource.includes('appliedOnlyRecords'));
+assert.ok(batchSource.includes("current_decision: null"));
+assert.ok(!/\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save|createIndex|createIndexes|syncIndexes)\s*\(/.test(batchSource));
+const renderGroupSource = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferGroup'), read(runtimeFiles[3]).indexOf('function bindAtomicRepoTransferEvents'));
+assert.ok(renderGroupSource.includes("applyState === 'ALREADY_APPLIED' && decisionState?.current_execution"));
+assert.ok(renderGroupSource.indexOf("applyState === 'ALREADY_APPLIED'") < renderGroupSource.indexOf("!isCurrentApproval ? ''"));
 console.log('weekly repo-transfer apply safety contract passed');

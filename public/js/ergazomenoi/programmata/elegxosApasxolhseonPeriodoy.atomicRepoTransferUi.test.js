@@ -337,6 +337,13 @@ function testApplyPresentationStatesAndSafetyContract() {
     const applied = render(readyProjection());
     assert.ok(applied.includes('Η πρόταση εφαρμόστηκε'));
     assert.ok(!applied.includes('atomic-repo-transfer-apply-btn'));
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-16T11:00:00.000Z', created_by_user_name: '<Executor>' }, current_decision: null, history: [{ decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<HR>', is_current: false }] }]])", sandbox);
+    const appliedWithoutCurrent = render(readyProjection());
+    assert.ok(appliedWithoutCurrent.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(appliedWithoutCurrent.includes('16/07/2026'));
+    assert.ok(!appliedWithoutCurrent.includes('atomic-repo-transfer-apply-btn'));
+    assert.ok(appliedWithoutCurrent.includes('&lt;HR&gt;'));
+    assert.ok(!appliedWithoutCurrent.includes('<HR>'));
     for (const code of ['REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
         vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'NOT_APPROVED', current_decision: { decision_code: '${code}', is_current: true }, history: [] }]])`, sandbox);
         assert.ok(!render(readyProjection()).includes('atomic-repo-transfer-apply-btn'));
@@ -352,6 +359,16 @@ function testApplyPresentationStatesAndSafetyContract() {
     assert.ok(applySource.includes('await refreshRepoTransferDecisions()'));
     assert.ok(!applySource.includes('retry'));
     assert.ok(!/\son[a-z]+\s*=/.test(applied));
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function testImmediatePostApplyRefreshKeepsBadgeForTemporaryOldGroup() {
+    // The pre-apply projection intentionally remains in memory until a full page reload.
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { proposal_id: 'atomic-group-1', current_decision: null, current_execution: { applied_at: '2026-07-15T10:00:00.000Z', execution_status: 'APPLIED' }, apply_state: 'ALREADY_APPLIED', apply_allowed: false, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: false }] }]])", sandbox);
+    const html = render(readyProjection());
+    assert.ok(html.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
     vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
 
@@ -646,6 +663,7 @@ const tests = [
     testBatchHistoryUsesOneFetchForManyGroups,
     testCurrentAndPreviousHistoryAreEscaped,
     testApplyPresentationStatesAndSafetyContract,
+    testImmediatePostApplyRefreshKeepsBadgeForTemporaryOldGroup,
     testEscaping,
     testDiagnostics,
     testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,
