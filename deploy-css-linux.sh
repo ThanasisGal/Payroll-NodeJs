@@ -27,6 +27,9 @@ FINAL_S3_SHA=""
 CDN_SHA=""
 INVALIDATION_ID=""
 VERIFY_STATE=""
+S3_OBJECT_PRESENT="false"
+S3_COMPLIANT="false"
+CDN_COMPLIANT="false"
 
 log() { printf '%s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -176,11 +179,12 @@ read_current_production_css() {
         --region "$AWS_REGION")"
     case "$exact_key_count" in
         0)
-            VERIFY_STATE="CSS_REMOTE_OBJECT_MISSING"
+            S3_OBJECT_PRESENT="false"
+            S3_COMPLIANT="false"
             REMOTE_CSS_SHA=""
             return
             ;;
-        1) ;;
+        1) S3_OBJECT_PRESENT="true" ;;
         *) fail "Malformed exact-key S3 lookup response" ;;
     esac
 
@@ -191,28 +195,77 @@ read_current_production_css() {
         "$remote_css" >/dev/null
     [[ -s "$remote_css" ]] || fail "Production S3 CSS object is empty"
     REMOTE_CSS_SHA="$(sha256sum "$remote_css" | awk '{ print $1 }')"
-    if [[ "$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA" ]]; then
-        VERIFY_STATE="CSS_ALREADY_DEPLOYED"
+
+    local remote_content_type remote_cache_control remote_git_sha remote_app_version remote_metadata_css_sha
+    read -r remote_content_type remote_cache_control remote_git_sha remote_app_version remote_metadata_css_sha < <(
+        aws s3api head-object \
+            --bucket "$S3_BUCKET" \
+            --key "$S3_FINAL_KEY" \
+            --region "$AWS_REGION" \
+            --query '[ContentType,CacheControl,Metadata."git-sha",Metadata."app-version",Metadata."css-sha256"]' \
+            --output text
+    )
+    [[ -n "$remote_content_type" && -n "$remote_cache_control" ]] \
+        || fail "Malformed production S3 CSS metadata response"
+
+    if [[ "$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA" \
+        && "$remote_content_type" == "text/css; charset=utf-8" \
+        && "$remote_cache_control" == "$CSS_CACHE_CONTROL" \
+        && "$remote_git_sha" == "$INITIAL_HEAD" \
+        && "$remote_app_version" == "$INITIAL_VERSION" \
+        && "$remote_metadata_css_sha" == "$LOCAL_CSS_SHA" ]]; then
+        S3_COMPLIANT="true"
     else
-        VERIFY_STATE="CSS_DEPLOYMENT_REQUIRED"
+        S3_COMPLIANT="false"
     fi
 }
 
-optional_cdn_read_verification() {
-    if ! command -v curl >/dev/null 2>&1; then
-        log "CDN read verification skipped: curl is not installed"
-        return
-    fi
+read_current_cdn_css() {
+    require_command curl
     local cdn_probe="$TEMP_DIR/current-cdn.min.css"
-    if curl --fail --silent --show-error --location \
-        "$CDN_CSS_URL?verify=$LOCAL_CSS_SHA" \
-        --output "$cdn_probe"; then
-        local probe_sha
-        probe_sha="$(sha256sum "$cdn_probe" | awk '{ print $1 }')"
-        log "Read-only CDN probe completed: sha256=$probe_sha"
+    local cdn_headers="$TEMP_DIR/current-cdn.headers"
+    local cdn_content_type cdn_cache_control
+
+    curl --fail --silent --show-error --location \
+        "$CDN_CSS_URL?verify=${LOCAL_CSS_SHA}-${INITIAL_HEAD}" \
+        --dump-header "$cdn_headers" \
+        --output "$cdn_probe"
+    [[ -s "$cdn_probe" ]] || fail "Production CDN CSS response is empty"
+    [[ -s "$cdn_headers" ]] || fail "Production CDN response headers are empty"
+
+    cdn_content_type="$(awk 'BEGIN { IGNORECASE=1 } /^Content-Type:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
+    cdn_cache_control="$(awk 'BEGIN { IGNORECASE=1 } /^Cache-Control:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
+    [[ -n "$cdn_content_type" && -n "$cdn_cache_control" ]] \
+        || fail "Malformed production CDN response headers"
+
+    CDN_SHA="$(sha256sum "$cdn_probe" | awk '{ print $1 }')"
+    if [[ "$CDN_SHA" == "$LOCAL_CSS_SHA" \
+        && "${cdn_content_type,,}" == text/css* \
+        && "${cdn_cache_control,,}" == *max-age=0* \
+        && "${cdn_cache_control,,}" == *must-revalidate* ]]; then
+        CDN_COMPLIANT="true"
     else
-        log "Read-only CDN probe was unavailable"
+        CDN_COMPLIANT="false"
     fi
+}
+
+calculate_verify_state() {
+    if [[ "$S3_OBJECT_PRESENT" != "true" ]]; then
+        VERIFY_STATE="CSS_REMOTE_OBJECT_MISSING"
+    elif [[ "$S3_COMPLIANT" != "true" ]]; then
+        VERIFY_STATE="CSS_DEPLOYMENT_REQUIRED"
+    elif [[ "$CDN_COMPLIANT" != "true" ]]; then
+        VERIFY_STATE="CSS_DEPLOYMENT_REQUIRED"
+    else
+        VERIFY_STATE="CSS_ALREADY_DEPLOYED"
+    fi
+
+    log "local_css_hash=$LOCAL_CSS_SHA"
+    log "s3_css_hash=${REMOTE_CSS_SHA:-unavailable}"
+    log "cdn_css_hash=${CDN_SHA:-unavailable}"
+    log "s3_compliant=$S3_COMPLIANT"
+    log "cdn_compliant=$CDN_COMPLIANT"
+    log "verify_state=$VERIFY_STATE"
 }
 
 immutable_git_postflight() {
@@ -251,6 +304,26 @@ immutable_git_pre_mutation_guard() {
     log "Immutable Git pre-mutation guard passed"
 }
 
+immutable_git_pre_final_promotion_guard() {
+    git fetch --prune origin main
+
+    local current_head current_version origin_head divergence
+    current_head="$(git rev-parse HEAD)"
+    current_version="$(node -p "require('./package.json').version")"
+    origin_head="$(git rev-parse origin/main)"
+    divergence="$(git rev-list --left-right --count main...origin/main)"
+
+    if [[ "$(git branch --show-current)" != "main" \
+        || -n "$(git status --porcelain)" \
+        || "$current_head" != "$INITIAL_HEAD" \
+        || "$origin_head" != "$INITIAL_HEAD" \
+        || "$divergence" != $'0\t0' \
+        || "$current_version" != "$INITIAL_VERSION" ]]; then
+        fail "CSS DEPLOYMENT ABORTED — MAIN CHANGED BEFORE FINAL CSS PROMOTION"
+    fi
+    log "Immutable Git pre-final-promotion guard passed"
+}
+
 run_verify_workflow() {
     immutable_git_preflight
     exact_head_main_ci_guard
@@ -258,7 +331,8 @@ run_verify_workflow() {
     deterministic_css_build
     aws_readiness_guard
     read_current_production_css
-    optional_cdn_read_verification
+    read_current_cdn_css
+    calculate_verify_state
     immutable_git_postflight
     log "$VERIFY_STATE"
 }
@@ -295,6 +369,8 @@ promote_css_through_staging() {
         "$staging_download" >/dev/null
     staging_sha="$(sha256sum "$staging_download" | awk '{ print $1 }')"
     [[ "$staging_sha" == "$LOCAL_CSS_SHA" ]] || fail "Staging S3 CSS hash verification failed"
+
+    immutable_git_pre_final_promotion_guard
 
     aws s3api copy-object \
         --bucket "$S3_BUCKET" \
