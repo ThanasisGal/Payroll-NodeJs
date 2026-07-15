@@ -4113,6 +4113,8 @@ async function submitRepoTransferDecision(group, decisionCode) {
 
 async function submitRepoTransferApply(group, decisionId, button) {
     if (!decisionId || repoTransferApplySubmitting.has(decisionId)) return;
+    repoTransferApplySubmitting.add(decisionId);
+    button.disabled = true;
     const source = group.items?.find((item) => item.role === 'SOURCE_BECOMES_WORK') || {};
     const target = group.items?.find((item) => item.role === 'TARGET_BECOMES_REPO') || {};
     const employee = source.employee_name || target.employee_name || source.employee_kodikos || target.employee_kodikos || '-';
@@ -4122,28 +4124,50 @@ async function submitRepoTransferApply(group, decisionId, button) {
         showCancelButton: true, confirmButtonText: 'Εφαρμογή και των δύο αλλαγών', cancelButtonText: 'Ακύρωση',
         confirmButtonColor: '#d1e7dd', cancelButtonColor: '#6c757d', customClass: { confirmButton: 'text-black' }
     });
-    if (!confirmation.isConfirmed) return;
-    repoTransferApplySubmitting.add(decisionId); button.disabled = true;
+    if (!confirmation.isConfirmed) {
+        repoTransferApplySubmitting.delete(decisionId);
+        button.disabled = false;
+        return;
+    }
+    let payload;
     try {
         Swal.fire({ title: 'Εφαρμογή εγκεκριμένης μεταφοράς…', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
         const token = await getPolicyPreviewCsrfToken();
-        const response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/${encodeURIComponent(decisionId)}/apply`, {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token },
-            body: JSON.stringify({ request_id: repoTransferDecisionRequestId() })
-        });
-        const payload = await response.json().catch(() => ({}));
+        let response;
+        try {
+            response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/${encodeURIComponent(decisionId)}/apply`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token },
+                body: JSON.stringify({ request_id: repoTransferDecisionRequestId() })
+            });
+        } catch {
+            throw new Error('Η εφαρμογή δεν ολοκληρώθηκε.');
+        }
+        payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.success) throw new Error(payload.message || 'Η εφαρμογή δεν ολοκληρώθηκε.');
-        Swal.close();
-        await Swal.fire({ icon: 'success', title: 'Η πρόταση εφαρμόστηκε', text: payload.message });
-        await refreshRepoTransferDecisions();
-        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
     } catch (error) {
         Swal.close();
         await Swal.fire({ icon: 'error', title: 'Δεν εφαρμόστηκε η πρόταση', text: String(error.message || 'Η εφαρμογή δεν ολοκληρώθηκε.') });
         const state = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || ''));
         if (state?.apply_state === 'READY_TO_APPLY') button.disabled = false;
-    } finally { repoTransferApplySubmitting.delete(decisionId); }
+        repoTransferApplySubmitting.delete(decisionId);
+        return;
+    }
+
+    Swal.close();
+    try {
+        await refreshRepoTransferDecisions();
+        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
+        await Swal.fire({ icon: 'success', title: 'Η πρόταση εφαρμόστηκε', text: payload.message });
+    } catch {
+        await Swal.fire({
+            icon: 'warning',
+            title: 'Η πρόταση εφαρμόστηκε',
+            text: 'Οι αλλαγές αποθηκεύτηκαν επιτυχώς, αλλά η προβολή δεν ανανεώθηκε. Ανανεώστε τη σελίδα για να δείτε την τρέχουσα κατάσταση.'
+        });
+    } finally {
+        repoTransferApplySubmitting.delete(decisionId);
+    }
 }
 
 function renderAtomicRepoTransferProjection(projection) {

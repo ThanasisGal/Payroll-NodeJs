@@ -355,6 +355,89 @@ function testApplyPresentationStatesAndSafetyContract() {
     vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
 
+function applyGroup() {
+    const projection = readyProjection();
+    return projection.groups[0];
+}
+
+function setupApplyBehavior({ response, networkError, refreshError } = {}) {
+    const calls = { post: 0, refresh: 0, render: 0, swal: [] };
+    sandbox.Swal = {
+        fire: async (options) => {
+            calls.swal.push(options);
+            if (options?.showCancelButton) return { isConfirmed: true };
+            return {};
+        },
+        close: () => {},
+        showLoading: () => {}
+    };
+    sandbox.fetch = async (_url, options) => {
+        calls.post++;
+        assert.strictEqual(options.method, 'POST');
+        if (networkError) throw new Error('private network detail');
+        return response || { ok: true, json: async () => ({ success: true, message: 'Ασφαλές μήνυμα επιτυχίας.' }) };
+    };
+    sandbox.getPolicyPreviewCsrfToken = async () => 'csrf-test';
+    sandbox.refreshRepoTransferDecisions = async () => {
+        calls.refresh++;
+        if (refreshError) throw new Error('private refresh detail');
+    };
+    sandbox.renderPolicyPreviewGroups = () => { calls.render++; };
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'READY_TO_APPLY' }]])", sandbox);
+    return calls;
+}
+
+async function testApplyPostSuccessAndRefreshSuccess() {
+    const calls = setupApplyBehavior();
+    const button = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ea', button);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.strictEqual(calls.render, 1);
+    assert.ok(calls.swal.some((call) => call.title === 'Η πρόταση εφαρμόστηκε' && call.icon === 'success'));
+    assert.strictEqual(button.disabled, true);
+}
+
+async function testApplyPostSuccessAndRefreshFailure() {
+    const calls = setupApplyBehavior({ refreshError: true });
+    const button = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860eb', button);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.ok(calls.swal.some((call) => call.title === 'Η πρόταση εφαρμόστηκε' && call.icon === 'warning' && call.text.includes('η προβολή δεν ανανεώθηκε')));
+    assert.ok(!calls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση'));
+    assert.strictEqual(button.disabled, true);
+}
+
+async function testApplyServerAndNetworkFailures() {
+    const serverCalls = setupApplyBehavior({ response: { ok: false, json: async () => ({ success: false, message: 'Ασφαλές μήνυμα server.' }) } });
+    const serverButton = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ec', serverButton);
+    assert.strictEqual(serverCalls.post, 1);
+    assert.strictEqual(serverCalls.refresh, 0);
+    assert.ok(serverCalls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση' && call.text === 'Ασφαλές μήνυμα server.'));
+    assert.strictEqual(serverButton.disabled, false);
+
+    const networkCalls = setupApplyBehavior({ networkError: true });
+    const networkButton = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ed', networkButton);
+    assert.strictEqual(networkCalls.post, 1);
+    assert.strictEqual(networkCalls.refresh, 0);
+    assert.ok(networkCalls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση' && call.text === 'Η εφαρμογή δεν ολοκληρώθηκε.'));
+    assert.ok(!networkCalls.swal.some((call) => String(call.text || '').includes('private network detail')));
+}
+
+async function testApplyDoubleClickUsesOnePost() {
+    const calls = setupApplyBehavior();
+    const button = { disabled: false };
+    const first = sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ee', button);
+    const second = sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ee', button);
+    await Promise.all([first, second]);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.strictEqual(button.disabled, true);
+}
+
 function testEscaping() {
     const projection = readyProjection();
     projection.groups[0].title = '<script>alert(1)</script>';
@@ -572,7 +655,11 @@ const tests = [
     testEmployeeWeekEvaluationLabel,
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,
-    testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState
+    testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
+    testApplyPostSuccessAndRefreshSuccess,
+    testApplyPostSuccessAndRefreshFailure,
+    testApplyServerAndNetworkFailures,
+    testApplyDoubleClickUsesOnePost
 ];
 
 async function run() {

@@ -34,7 +34,12 @@ const WeeklyRepoTransferExecutionSchema = new Schema({
     execution_status: immutable(String, { enum: ['APPLIED'] }),
     before_snapshot: immutable(beforeSnapshotSchema), after_snapshot: immutable(afterSnapshotSchema),
     applied_at: immutable(Date), created_at: immutable(Date, { default: Date.now })
-}, { collection: 'Apasxoliseis_Weekly_Repo_Transfer_Executions', versionKey: false });
+}, {
+    collection: 'Apasxoliseis_Weekly_Repo_Transfer_Executions',
+    versionKey: false,
+    autoIndex: false,
+    autoCreate: false
+});
 
 WeeklyRepoTransferExecutionSchema.index({ decision_id: 1 }, { unique: true, name: 'unique_applied_repo_transfer_decision' });
 WeeklyRepoTransferExecutionSchema.index({ team: 1, company_kod: 1, request_id: 1 }, { unique: true, name: 'unique_repo_transfer_apply_request' });

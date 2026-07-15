@@ -12,6 +12,9 @@ const routeSource = read('server/routes/usersRoute.js'); const controllerSource 
 assert.strictEqual((routeSource.match(/repo-transfer-decisions\/:decisionId\/apply/g) || []).length, 1);
 assert.ok(/checkAuth,[\s\S]{0,80}applyWeeklyRepoTransferDecision/.test(routeSource));
 assert.ok(/getWeeklyRepoTransferApplyRuntimeState/.test(controllerSource)); assert.ok(/assertWeeklyRepoTransferApplyIndexesReady/.test(controllerSource));
+const controllerAction = controllerSource.slice(controllerSource.indexOf('static applyWeeklyRepoTransferDecision'), controllerSource.indexOf('static getWeeklyRepoTransferDecisionBatch'));
+assert.ok(controllerAction.indexOf('validateApplySession(req.session)') < controllerAction.indexOf('getWeeklyRepoTransferApplyRuntimeState()'));
+assert.ok(controllerAction.indexOf('getWeeklyRepoTransferApplyRuntimeState()') < controllerAction.indexOf('assertWeeklyRepoTransferApplyIndexesReady()'));
 productionFiles.forEach((file) => assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|bulkWrite|ordered\s*:\s*false|updateMany/.test(read(file)), `${file} has forbidden dependency/operation`));
 assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)); assert.ok(/sourceResult\.matchedCount !== 1/.test(writer)); assert.ok(/targetResult\.matchedCount !== 1/.test(writer));
 assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
@@ -26,6 +29,9 @@ assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|syncIndexes|createIndex
     'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService.js'
 ].map(read).join('\n')));
 const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
+assert.strictEqual(ExecutionModel.schema.options.autoIndex, false);
+assert.strictEqual(ExecutionModel.schema.options.autoCreate, false);
+assert.ok(!/syncIndexes|createIndexes|createIndex|ensureIndexes|\.init\s*\(/.test(modelSource));
 assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
 assert.ok(/const beforeValuesSchema/.test(modelSource)); assert.ok(/const afterValuesSchema/.test(modelSource)); assert.ok(/exactSnapshotValues/.test(modelSource)); assert.ok(!/checkRequired/.test(modelSource));
 const beforeSnapshotSchema = ExecutionModel.schema.path('before_snapshot').schema; const afterSnapshotSchema = ExecutionModel.schema.path('after_snapshot').schema;
@@ -34,4 +40,11 @@ const typedFields = { repo_apologistika: 'Boolean', adeia_apologistika: 'Boolean
 for (const [field, type] of Object.entries(typedFields)) { for (const schema of [valuesSchema, afterValuesSchema]) { const schemaPath = schema.path(field); assert.strictEqual(schemaPath.instance, type); assert.strictEqual(Boolean(schemaPath.isRequired), false); assert.strictEqual(schemaPath.options.immutable, true); } }
 assert.strictEqual(valuesSchema.options.strict, 'throw'); assert.strictEqual(afterValuesSchema.options.strict, 'throw'); assert.ok(beforeSnapshotSchema.path('source').validators.length > 0); assert.ok(afterSnapshotSchema.path('source').validators.length > 0); assert.strictEqual(Boolean(mongoose.Schema.Types.String.checkRequired()('')), false);
 assert.ok(/catch \{ transactionCapable = false; \}/.test(writer)); assert.ok(!/fallback/i.test(writer));
+const frontendApply = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('async function submitRepoTransferApply'), read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferProjection'));
+assert.ok(frontendApply.indexOf("title: 'Δεν εφαρμόστηκε η πρόταση'") < frontendApply.indexOf('await refreshRepoTransferDecisions()'));
+assert.ok(frontendApply.includes("icon: 'warning'"));
+assert.ok(frontendApply.includes("title: 'Η πρόταση εφαρμόστηκε'"));
+const committedSuccessPath = frontendApply.slice(frontendApply.indexOf('Swal.close();\n    try {'));
+assert.ok(!committedSuccessPath.includes('button.disabled = false'));
+assert.ok(/generallyEnabled[\s\S]*=== 'true'/.test(read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js')));
 console.log('weekly repo-transfer apply safety contract passed');

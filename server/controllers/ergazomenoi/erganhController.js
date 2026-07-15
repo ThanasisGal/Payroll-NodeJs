@@ -169,6 +169,7 @@ const {
     loadWeeklyRepoTransferDecisionBatch
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService');
 const { applyWeeklyRepoTransfer } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService');
+const { validateApplySession } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { assertWeeklyRepoTransferApplyIndexesReady } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
 
@@ -5491,6 +5492,7 @@ class erganhController {
 
     static applyWeeklyRepoTransferDecision = async (req, res) => {
         try {
+            validateApplySession(req.session);
             const runtime = getWeeklyRepoTransferApplyRuntimeState();
             if (!runtime.enabled) {
                 const error = new Error(runtime.code); error.code = runtime.code; throw error;

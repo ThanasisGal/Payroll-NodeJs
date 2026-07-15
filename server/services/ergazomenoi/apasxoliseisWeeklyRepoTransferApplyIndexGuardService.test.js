@@ -1,5 +1,9 @@
 const assert = require('assert');
 const { getWeeklyRepoTransferApplyIndexState, assertWeeklyRepoTransferApplyIndexesReady } = require('./apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
+const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
+
+assert.strictEqual(ExecutionModel.schema.options.autoIndex, false);
+assert.strictEqual(ExecutionModel.schema.options.autoCreate, false);
 
 const correct = () => Promise.resolve([
     { name: 'unique_applied_repo_transfer_decision', key: { decision_id: 1 }, unique: true },
@@ -16,5 +20,5 @@ const correct = () => Promise.resolve([
     assert.strictEqual((await getWeeklyRepoTransferApplyIndexState({ indexLoader: async () => { const error = new Error('ns not found'); error.code = 26; throw error; } })).ready, false);
     assert.strictEqual((await getWeeklyRepoTransferApplyIndexState({ indexLoader: async () => { throw new Error('permission details'); } })).code, 'APPLY_INDEXES_NOT_READY');
     await assert.rejects(() => assertWeeklyRepoTransferApplyIndexesReady({ indexLoader: async () => [] }), (error) => error.code === 'APPLY_INDEXES_NOT_READY' && error.statusCode === 503);
-    console.log('PASS repo-transfer apply read-only index guard (8 tests)');
+    console.log('PASS repo-transfer apply read-only index guard (10 tests)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
