@@ -39,6 +39,47 @@ jobs:
           script="deploy-ubuntu.sh"
           bash -n "$script"
 
+          if [[ ! -x "$script" ]]; then
+            echo "ERROR: $script is not executable in the CI checkout"
+            exit 1
+          fi
+
+          index_mode=$(git ls-files --stage -- "$script" | awk 'NR == 1 { print $1 }')
+          tree_mode=$(git ls-tree HEAD -- "$script" | awk 'NR == 1 { print $1 }')
+
+          if [[ "$index_mode" != "100755" ]]; then
+            echo "ERROR: $script index mode is $index_mode, expected 100755"
+            exit 1
+          fi
+
+          if [[ "$tree_mode" != "100755" ]]; then
+            echo "ERROR: $script HEAD tree mode is $tree_mode, expected 100755"
+            exit 1
+          fi
+
+          echo "Executable mode contract passed: $script tree=$tree_mode index=$index_mode filesystem=executable"
+
+          workflow_file=".github/workflows/ci-validation.yml"
+          executable_mode_contract=$(awk '
+            /script="deploy-ubuntu\.sh"/ { capture=1 }
+            /^[[:space:]]+require\(\) \{/ { if (capture) exit }
+            capture
+          ' "$workflow_file")
+
+          for contract_pattern in \
+            'if [[ ! -x "$script" ]]' \
+            'git ls-files --stage -- "$script"' \
+            'git ls-tree HEAD -- "$script"' \
+            '"$index_mode" != "100755"' \
+            '"$tree_mode" != "100755"' \
+            'Executable mode contract passed'
+          do
+            if ! grep -Fq -- "$contract_pattern" <<< "$executable_mode_contract"; then
+              echo "ERROR: missing executable-mode CI contract: $contract_pattern"
+              exit 1
+            fi
+          done
+
           require() {
             local pattern="$1"
             if ! grep -Eq -- "$pattern" "$script"; then
