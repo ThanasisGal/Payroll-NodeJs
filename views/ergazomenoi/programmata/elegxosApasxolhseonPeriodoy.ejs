@@ -5,6 +5,9 @@
         if (isNaN(d.getTime())) return '';
         return d.toISOString().slice(0, 10);
     };
+    const normalizedUserRole = String(userRole || '').trim().toUpperCase();
+    const canRecordRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
+    const canApplyRepoTransferDecision = ['A', 'S'].includes(normalizedUserRole);
 %>
 
 <div class="container-fluid mt-3">
@@ -228,6 +231,16 @@
         type="hidden"
         id="canReviewEdit"
         value="<%= userRole === 'A' || userRole === 'S' ? '1' : '0' %>"
+    />
+    <input
+        type="hidden"
+        id="canRecordRepoTransferDecision"
+        value="<%= canRecordRepoTransferDecision ? '1' : '0' %>"
+    />
+    <input
+        type="hidden"
+        id="canApplyRepoTransferDecision"
+        value="<%= canApplyRepoTransferDecision ? '1' : '0' %>"
     />
 
     <script src="<%= script('ergazomenoi/programmata/elegxosApasxolhseonPeriodoy') %>"></script>
