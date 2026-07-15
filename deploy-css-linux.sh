@@ -12,6 +12,7 @@ readonly AWS_REGION="eu-central-1"
 readonly CLOUDFRONT_REGION="us-east-1"
 readonly CLOUDFRONT_DISTRIBUTION_ID="E2FVQEZRP01HIX"
 readonly CDN_CSS_URL="https://cdn.webpayrollsolutions.com/assets/own/css/main.min.css"
+readonly CSS_CACHE_CONTROL="public, max-age=0, s-maxage=31536000, must-revalidate"
 
 ACTION=""
 INTERACTIVE="false"
@@ -165,14 +166,23 @@ aws_readiness_guard() {
 
 read_current_production_css() {
     local remote_css="$TEMP_DIR/current-s3.min.css"
-    if ! aws s3api head-object \
+    local exact_key_count
+    exact_key_count="$(aws s3api list-objects-v2 \
         --bucket "$S3_BUCKET" \
-        --key "$S3_FINAL_KEY" \
-        --region "$AWS_REGION" >/dev/null 2>&1; then
-        VERIFY_STATE="CSS_REMOTE_OBJECT_MISSING"
-        REMOTE_CSS_SHA=""
-        return
-    fi
+        --prefix "$S3_FINAL_KEY" \
+        --max-keys 1000 \
+        --query "length(Contents[?Key == '$S3_FINAL_KEY'])" \
+        --output text \
+        --region "$AWS_REGION")"
+    case "$exact_key_count" in
+        0)
+            VERIFY_STATE="CSS_REMOTE_OBJECT_MISSING"
+            REMOTE_CSS_SHA=""
+            return
+            ;;
+        1) ;;
+        *) fail "Malformed exact-key S3 lookup response" ;;
+    esac
 
     aws s3api get-object \
         --bucket "$S3_BUCKET" \
@@ -221,6 +231,26 @@ immutable_git_postflight() {
     log "Immutable Git postflight passed"
 }
 
+immutable_git_pre_mutation_guard() {
+    git fetch --prune origin main
+
+    local current_head current_version origin_head divergence
+    current_head="$(git rev-parse HEAD)"
+    current_version="$(node -p "require('./package.json').version")"
+    origin_head="$(git rev-parse origin/main)"
+    divergence="$(git rev-list --left-right --count main...origin/main)"
+
+    if [[ "$(git branch --show-current)" != "main" \
+        || -n "$(git status --porcelain)" \
+        || "$current_head" != "$INITIAL_HEAD" \
+        || "$origin_head" != "$INITIAL_HEAD" \
+        || "$divergence" != $'0\t0' \
+        || "$current_version" != "$INITIAL_VERSION" ]]; then
+        fail "CSS DEPLOYMENT ABORTED — MAIN CHANGED AFTER VERIFICATION"
+    fi
+    log "Immutable Git pre-mutation guard passed"
+}
+
 run_verify_workflow() {
     immutable_git_preflight
     exact_head_main_ci_guard
@@ -254,7 +284,7 @@ promote_css_through_staging() {
         --key "$staging_key" \
         --body "$GENERATED_CSS" \
         --content-type "text/css; charset=utf-8" \
-        --cache-control "public, max-age=31536000, immutable" \
+        --cache-control "$CSS_CACHE_CONTROL" \
         --metadata "git-sha=$INITIAL_HEAD,app-version=$INITIAL_VERSION,css-sha256=$LOCAL_CSS_SHA" \
         --region "$AWS_REGION" >/dev/null
 
@@ -272,7 +302,7 @@ promote_css_through_staging() {
         --copy-source "$S3_BUCKET/$staging_key" \
         --metadata-directive REPLACE \
         --content-type "text/css; charset=utf-8" \
-        --cache-control "public, max-age=31536000, immutable" \
+        --cache-control "$CSS_CACHE_CONTROL" \
         --metadata "git-sha=$INITIAL_HEAD,app-version=$INITIAL_VERSION,css-sha256=$LOCAL_CSS_SHA" \
         --region "$AWS_REGION" >/dev/null
 
@@ -283,6 +313,21 @@ promote_css_through_staging() {
         "$final_download" >/dev/null
     FINAL_S3_SHA="$(sha256sum "$final_download" | awk '{ print $1 }')"
     [[ "$FINAL_S3_SHA" == "$LOCAL_CSS_SHA" ]] || fail "Final S3 CSS hash verification failed"
+
+    local final_content_type final_cache_control final_git_sha final_app_version final_css_sha
+    read -r final_content_type final_cache_control final_git_sha final_app_version final_css_sha < <(
+        aws s3api head-object \
+            --bucket "$S3_BUCKET" \
+            --key "$S3_FINAL_KEY" \
+            --region "$AWS_REGION" \
+            --query '[ContentType,CacheControl,Metadata."git-sha",Metadata."app-version",Metadata."css-sha256"]' \
+            --output text
+    )
+    [[ "$final_content_type" == "text/css; charset=utf-8" ]] || fail "Final S3 ContentType verification failed"
+    [[ "$final_cache_control" == "$CSS_CACHE_CONTROL" ]] || fail "Final S3 CacheControl verification failed"
+    [[ "$final_git_sha" == "$INITIAL_HEAD" ]] || fail "Final S3 git-sha metadata verification failed"
+    [[ "$final_app_version" == "$INITIAL_VERSION" ]] || fail "Final S3 app-version metadata verification failed"
+    [[ "$final_css_sha" == "$LOCAL_CSS_SHA" ]] || fail "Final S3 css-sha256 metadata verification failed"
 
     aws s3api delete-object \
         --bucket "$S3_BUCKET" \
@@ -309,9 +354,17 @@ invalidate_cloudfront_and_wait() {
 verify_cdn_after_deploy() {
     require_command curl
     local cdn_download="$TEMP_DIR/deployed-cdn.min.css"
+    local cdn_headers="$TEMP_DIR/deployed-cdn.headers"
     curl --fail --silent --show-error --location \
         "$CDN_CSS_URL?css_sha=$LOCAL_CSS_SHA" \
+        --dump-header "$cdn_headers" \
         --output "$cdn_download"
+    local cdn_content_type cdn_cache_control
+    cdn_content_type="$(awk 'BEGIN { IGNORECASE=1 } /^Content-Type:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
+    cdn_cache_control="$(awk 'BEGIN { IGNORECASE=1 } /^Cache-Control:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
+    [[ "${cdn_content_type,,}" == text/css* ]] || fail "CDN Content-Type verification failed"
+    [[ "${cdn_cache_control,,}" == *max-age=0* ]] || fail "CDN Cache-Control max-age verification failed"
+    [[ "${cdn_cache_control,,}" == *must-revalidate* ]] || fail "CDN Cache-Control revalidation verification failed"
     CDN_SHA="$(sha256sum "$cdn_download" | awk '{ print $1 }')"
     if [[ "$CDN_SHA" != "$LOCAL_CSS_SHA" ]]; then
         log "local_hash=$LOCAL_CSS_SHA"
@@ -326,10 +379,13 @@ verify_cdn_after_deploy() {
 
 run_deploy_workflow() {
     run_verify_workflow
-    if [[ "$VERIFY_STATE" == "CSS_ALREADY_DEPLOYED" ]]; then
-        exit 0
-    fi
+    case "$VERIFY_STATE" in
+        CSS_ALREADY_DEPLOYED) exit 0 ;;
+        CSS_DEPLOYMENT_REQUIRED|CSS_REMOTE_OBJECT_MISSING) ;;
+        *) fail "Unexpected or empty CSS verify state" ;;
+    esac
     confirm_production_deploy
+    immutable_git_pre_mutation_guard
     promote_css_through_staging
     invalidate_cloudfront_and_wait
     verify_cdn_after_deploy

@@ -275,17 +275,80 @@ jobs:
           require_css_contract 'CSS_ALREADY_DEPLOYED'
           require_css_contract 'CSS_DEPLOYMENT_REQUIRED'
           require_css_contract 'CSS_REMOTE_OBJECT_MISSING'
+          require_css_contract 'CSS_CACHE_CONTROL'
+          require_css_contract 'public, max-age=0, s-maxage=31536000, must-revalidate'
+          require_css_contract 'list-objects-v2'
+          require_css_contract "Contents[?Key == '\$S3_FINAL_KEY']"
+          require_css_contract 'exact_key_count="$(aws s3api list-objects-v2'
+          require_css_contract 'Malformed exact-key S3 lookup response'
           require_css_contract 'CONFIRM_PRODUCTION_CSS_DEPLOY'
           require_css_contract 'Type DEPLOY CSS PRODUCTION to continue:'
           require_css_contract 'assets/own/css/.staging/main.min.${INITIAL_HEAD}.${LOCAL_CSS_SHA}.css'
           require_css_contract 'Staging S3 CSS hash verification failed'
           require_css_contract 'Final S3 CSS hash verification failed'
+          require_css_contract 'Final S3 ContentType verification failed'
+          require_css_contract 'Final S3 CacheControl verification failed'
+          require_css_contract 'Final S3 git-sha metadata verification failed'
+          require_css_contract 'Final S3 app-version metadata verification failed'
+          require_css_contract 'Final S3 css-sha256 metadata verification failed'
+          require_css_contract 'Metadata."git-sha"'
+          require_css_contract 'Metadata."app-version"'
+          require_css_contract 'Metadata."css-sha256"'
           require_css_contract 'metadata-directive REPLACE'
           require_css_contract 'git-sha=$INITIAL_HEAD,app-version=$INITIAL_VERSION,css-sha256=$LOCAL_CSS_SHA'
           require_css_contract 'cloudfront wait invalidation-completed'
           require_css_contract '/$S3_FINAL_KEY*'
           require_css_contract 'CSS DEPLOYMENT VERIFICATION FAILED'
+          require_css_contract 'CDN Content-Type verification failed'
+          require_css_contract 'CDN Cache-Control max-age verification failed'
+          require_css_contract 'CDN Cache-Control revalidation verification failed'
+          require_css_contract '--dump-header "$cdn_headers"'
+          require_css_contract 'immutable_git_pre_mutation_guard'
+          require_css_contract 'CSS DEPLOYMENT ABORTED — MAIN CHANGED AFTER VERIFICATION'
           require_css_contract 'immutable_git_postflight'
+
+          if grep -Fq -- 'public, max-age=31536000, immutable' "$script"; then
+            echo "ERROR: immutable browser cache found for mutable production CSS key"
+            exit 1
+          fi
+
+          if [[ "$(grep -Fc -- '--cache-control "$CSS_CACHE_CONTROL"' "$script")" -ne 2 ]]; then
+            echo "ERROR: staging and final CSS objects must use the central cache policy"
+            exit 1
+          fi
+
+          lookup_body=$(awk '/^read_current_production_css\(\)/ { capture=1 } /^optional_cdn_read_verification\(\)/ { if (capture) exit } capture' "$script")
+          if grep -Eq 'if ! aws|2>/dev/null|2>&1' <<< "$lookup_body"; then
+            echo "ERROR: exact-key S3 lookup suppresses or treats AWS failure as absence"
+            exit 1
+          fi
+
+          pre_mutation_guard_line=$(grep -n '^    immutable_git_pre_mutation_guard$' "$script" | cut -d: -f1)
+          promote_call_line=$(grep -n '^    promote_css_through_staging$' "$script" | cut -d: -f1)
+          if [[ -z "$pre_mutation_guard_line" || -z "$promote_call_line" ]] \
+            || (( pre_mutation_guard_line >= promote_call_line )); then
+            echo "ERROR: immutable main guard must run before the first production S3 mutation"
+            exit 1
+          fi
+
+          promotion_body=$(awk '/^promote_css_through_staging\(\)/ { capture=1 } /^invalidate_cloudfront_and_wait\(\)/ { if (capture) exit } capture' "$script")
+          first_promotion_aws=$(grep -m1 -E '^[[:space:]]+aws ' <<< "$promotion_body")
+          if [[ "$first_promotion_aws" != *'aws s3api put-object'* ]]; then
+            echo "ERROR: the first promotion AWS operation is not the staging put-object"
+            exit 1
+          fi
+
+          deploy_body=$(awk '/^run_deploy_workflow\(\)/ { capture=1 } /^parse_action / { if (capture) exit } capture' "$script")
+          for state_pattern in \
+            'CSS_ALREADY_DEPLOYED) exit 0' \
+            'CSS_DEPLOYMENT_REQUIRED|CSS_REMOTE_OBJECT_MISSING)' \
+            '*) fail "Unexpected or empty CSS verify state"'
+          do
+            if ! grep -Fq -- "$state_pattern" <<< "$deploy_body"; then
+              echo "ERROR: missing explicit CSS verify-state allowlist branch: $state_pattern"
+              exit 1
+            fi
+          done
 
           reject_css_contract 'git[[:space:]]+(add|commit|push|pull|merge)'
           reject_css_contract 'npm[[:space:]]+version'
