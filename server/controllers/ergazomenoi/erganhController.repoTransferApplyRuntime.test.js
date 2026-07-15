@@ -1,0 +1,22 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const controller = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
+const routes = fs.readFileSync(path.join(__dirname, '..', '..', 'routes', 'usersRoute.js'), 'utf8');
+const app = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'app.js'), 'utf8');
+const action = controller.slice(controller.indexOf('static applyWeeklyRepoTransferDecision'), controller.indexOf('static getWeeklyRepoTransferDecisionBatch'));
+
+assert.ok(routes.includes("'/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply'"));
+assert.ok(routes.includes('checkAuth,\n    erganhController.applyWeeklyRepoTransferDecision'));
+assert.ok(app.indexOf('createRepoTransferApplyBodyMiddleware') < app.indexOf('createRepoTransferDecisionBodyMiddleware()'));
+assert.ok(action.includes('decision_id: req.params.decisionId'));
+assert.ok(action.includes('request_id: req.body.request_id'));
+assert.ok(!action.includes('req.body.decision_id'));
+assert.ok(!action.includes('proposed_values') && !action.includes('$set'));
+assert.ok(action.includes('result.idempotent ? 200 : 201'));
+assert.ok(action.includes('REPO_TRANSFER_APPLY_ERRORS'));
+assert.ok(action.includes('Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'));
+assert.ok(!action.includes('error.message'));
+assert.ok(!controller.includes('erganhApi') && !controller.includes('syncIndexes') && !controller.includes('createIndexes'));
+console.log('PASS repo-transfer apply controller/runtime safety contract (12 tests)');

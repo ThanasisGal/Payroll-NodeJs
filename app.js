@@ -38,6 +38,9 @@ const usersRoute = require('./server/routes/usersRoute');
 const {
     createRepoTransferDecisionBodyMiddleware
 } = require('./server/middlewares/repoTransferDecisionBodyParser');
+const {
+    createRepoTransferApplyBodyMiddleware
+} = require('./server/middlewares/repoTransferApplyBodyParser');
 const dropdownRoutes = require('./server/routes/dropdownRoutes');
 const apiRoutes = require('./server/routes/apiRoutes');
 const adminRoutes = require('./server/routes/adminRoutes');
@@ -161,6 +164,10 @@ connectDB();
 /*                         Σειρά βασικών middlewares                          */
 /* -------------------------------------------------------------------------- */
 
+app.use(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply',
+    ...createRepoTransferApplyBodyMiddleware()
+);
 app.use(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions',
     ...createRepoTransferDecisionBodyMiddleware()

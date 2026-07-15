@@ -8,8 +8,10 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const runtimeFiles = ['app.js','server/routes/usersRoute.js','server/controllers/ergazomenoi/erganhController.js','public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'];
 const productionFiles = ['server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyPreflightService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService.js'];
 const writer = read(productionFiles[2]); const preflight = read(productionFiles[1]);
-runtimeFiles.forEach((file) => { const source = read(file); assert.ok(!/WeeklyRepoTransferApply|linked-repo-transfer[^\n]*apply|repo-transfer-decisions\/[^\n]*\/apply/i.test(source), `${file} exposes apply foundation`); });
-assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/routes/usersRoute.js'))); assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/controllers/ergazomenoi/erganhController.js')));
+const routeSource = read('server/routes/usersRoute.js'); const controllerSource = read('server/controllers/ergazomenoi/erganhController.js');
+assert.strictEqual((routeSource.match(/repo-transfer-decisions\/:decisionId\/apply/g) || []).length, 1);
+assert.ok(/checkAuth,[\s\S]{0,80}applyWeeklyRepoTransferDecision/.test(routeSource));
+assert.ok(/getWeeklyRepoTransferApplyRuntimeState/.test(controllerSource)); assert.ok(/assertWeeklyRepoTransferApplyIndexesReady/.test(controllerSource));
 productionFiles.forEach((file) => assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|bulkWrite|ordered\s*:\s*false|updateMany/.test(read(file)), `${file} has forbidden dependency/operation`));
 assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)); assert.ok(/sourceResult\.matchedCount !== 1/.test(writer)); assert.ok(/targetResult\.matchedCount !== 1/.test(writer));
 assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
@@ -17,7 +19,12 @@ assert.ok(/const CURRENT_GUARD_FIELDS = Object\.freeze\(ROW_FIELDS\.filter/.test
 for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) assert.ok(require('./apasxoliseisWeeklyRepoTransferApplyPreflightService').CURRENT_GUARD_FIELDS.includes(field));
 assert.ok(/row\.expected_current/.test(writer)); assert.ok(/CURRENT_GUARD_FIELDS\.forEach/.test(writer)); assert.ok(/APPLY_FIELDS\.map/.test(writer));
 assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/process\.env/.test(productionFiles.map(read).join('\n'))); assert.ok(!/fallback/i.test(writer));
-assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
+assert.ok(!/router\.(put|patch)[^\n]*repo-transfer[^\n]*apply/i.test(routeSource));
+assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|syncIndexes|createIndexes/.test([
+    ...productionFiles,
+    'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js',
+    'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService.js'
+].map(read).join('\n')));
 const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
 assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
 assert.ok(/const beforeValuesSchema/.test(modelSource)); assert.ok(/const afterValuesSchema/.test(modelSource)); assert.ok(/exactSnapshotValues/.test(modelSource)); assert.ok(!/checkRequired/.test(modelSource));

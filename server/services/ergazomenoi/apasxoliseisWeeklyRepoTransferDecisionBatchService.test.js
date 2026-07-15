@@ -53,7 +53,7 @@ const session = {
     userStatus: 'A'
 };
 
-function dependencies(rows, decisions = []) {
+function dependencies(rows, decisions = [], executions = []) {
     const counter = { filters: {} };
     const employeeCodes = [...new Set(rows.map((row) => row.kodikos))];
     const employees = employeeCodes.map((kodikos) => ({
@@ -76,7 +76,8 @@ function dependencies(rows, decisions = []) {
             employeeModel: { find: (filter) => { counter.filters.employees = filter; return query(employees, counter, 'employees'); } },
             historyModel: { find: (filter) => { counter.filters.histories = filter; return query([], counter, 'histories'); } },
             auditModel: { find: (filter) => { counter.filters.audits = filter; return query([], counter, 'audits'); } },
-            decisionModel: { find: (filter) => { counter.filters.decisions = filter; return query(decisions, counter, 'decisions'); } }
+            decisionModel: { find: (filter) => { counter.filters.decisions = filter; return query(decisions, counter, 'decisions'); } },
+            executionModel: { find: (filter) => { counter.filters.executions = filter; return query(executions, counter, 'executions'); } }
         },
         holidayContextBuilder: async () => {
             counter.holidays = (counter.holidays || 0) + 1;
@@ -144,8 +145,8 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     const initial = await load(rows);
     const proposalId = initial.result.records[0].proposal_id;
     const decisions = [
-        { proposal_id: proposalId, snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL', created_by_user_name: 'Current HR', created_at: new Date('2026-07-02') },
-        { proposal_id: proposalId, snapshot_fingerprint: 'old', decision_code: 'REJECT_PROPOSAL', created_by_user_name: 'Old HR', created_at: new Date('2026-07-01') }
+        { _id: new mongoose.Types.ObjectId(), proposal_id: proposalId, snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', created_by_user_name: 'Current HR', created_at: new Date('2026-07-02') },
+        { _id: new mongoose.Types.ObjectId(), proposal_id: proposalId, snapshot_fingerprint: 'old', decision_code: 'REJECT_PROPOSAL', decision_status: 'RECORDED', created_by_user_name: 'Old HR', created_at: new Date('2026-07-01') }
     ];
     const deps = dependencies(rows, decisions);
     const result = await loadWeeklyRepoTransferDecisionBatch({
@@ -157,6 +158,9 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     });
     assert.strictEqual(result.records[0].current_decision.decision_code, 'APPROVE_PROPOSAL');
     assert.strictEqual(result.records[0].history_count, 2);
+    assert.strictEqual(deps.counter.executions, 1);
+    assert.strictEqual(result.records[0].apply_state, 'NOT_AUTHORIZED');
+    assert.strictEqual(result.records[0].apply_allowed, false);
     assert.deepStrictEqual(result.records[0].history.map((entry) => entry.is_current), [true, false]);
     assert.ok(!JSON.stringify(result).includes('snapshot_fingerprint'));
     assert.ok(!JSON.stringify(result).includes('canonical_snapshot'));

@@ -320,6 +320,41 @@ function testCurrentAndPreviousHistoryAreEscaped() {
     vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
 
+function testApplyPresentationStatesAndSafetyContract() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    const states = {
+        READY_TO_APPLY: 'Εφαρμογή εγκεκριμένης μεταφοράς',
+        RUNTIME_DISABLED: 'Η εφαρμογή δεν είναι ακόμη ενεργοποιημένη.',
+        INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.'
+    };
+    Object.entries(states).forEach(([applyState, text]) => {
+        vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: '${applyState}', apply_allowed: ${applyState === 'READY_TO_APPLY'}, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', is_current: true }, history: [] }]])`, sandbox);
+        const html = render(readyProjection());
+        assert.ok(html.includes(text));
+        assert.strictEqual(/atomic-repo-transfer-apply-btn[^>]+disabled/.test(html), applyState !== 'READY_TO_APPLY');
+    });
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-15T10:00:00.000Z' }, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', is_current: true }, history: [] }]])", sandbox);
+    const applied = render(readyProjection());
+    assert.ok(applied.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!applied.includes('atomic-repo-transfer-apply-btn'));
+    for (const code of ['REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
+        vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'NOT_APPROVED', current_decision: { decision_code: '${code}', is_current: true }, history: [] }]])`, sandbox);
+        assert.ok(!render(readyProjection()).includes('atomic-repo-transfer-apply-btn'));
+    }
+    const applySource = source.slice(source.indexOf('async function submitRepoTransferApply'), source.indexOf('function renderAtomicRepoTransferProjection'));
+    assert.ok(applySource.includes('Εφαρμογή εγκεκριμένης μεταφοράς ρεπό'));
+    assert.ok(applySource.includes('Ημέρα προέλευσης:') && applySource.includes('Ημέρα στόχος:'));
+    assert.strictEqual((applySource.match(/method: 'POST'/g) || []).length, 1);
+    assert.ok(applySource.includes('body: JSON.stringify({ request_id:'));
+    assert.ok(!applySource.includes('body: JSON.stringify({ decision_id'));
+    assert.ok(applySource.includes("'x-csrf-token': token"));
+    assert.ok(applySource.includes('repoTransferApplySubmitting.has(decisionId)'));
+    assert.ok(applySource.includes('await refreshRepoTransferDecisions()'));
+    assert.ok(!applySource.includes('retry'));
+    assert.ok(!/\son[a-z]+\s*=/.test(applied));
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
+}
+
 function testEscaping() {
     const projection = readyProjection();
     projection.groups[0].title = '<script>alert(1)</script>';
@@ -527,6 +562,7 @@ const tests = [
     testOnlyCurrentDecisionDisablesButtons,
     testBatchHistoryUsesOneFetchForManyGroups,
     testCurrentAndPreviousHistoryAreEscaped,
+    testApplyPresentationStatesAndSafetyContract,
     testEscaping,
     testDiagnostics,
     testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,

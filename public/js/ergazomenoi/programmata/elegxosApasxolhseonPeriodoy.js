@@ -222,6 +222,7 @@ let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentRepoTransferDecisionsByProposalId = new Map();
 let repoTransferDecisionSubmitting = false;
+const repoTransferApplySubmitting = new Set();
 let currentPolicyPreviewApprovalRecords = [];
 let currentPolicyPreviewApprovalTotal = 0;
 let currentPolicyPreviewApprovalsByGroupId = new Map();
@@ -3920,6 +3921,19 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                ${recordedDecision.notes ? `<div class="small">Σημειώσεις: ${escapeHtml(recordedDecision.notes)}</div>` : ''}
            </div>`
         : '<div class="small text-muted">Δεν έχει καταγραφεί απόφαση για αυτή την πρόταση.</div>';
+    const isCurrentApproval = recordedDecision?.decision_code === 'APPROVE_PROPOSAL';
+    const applyState = String(decisionState?.apply_state || 'NOT_APPROVED');
+    const applyMessages = {
+        RUNTIME_DISABLED: 'Η εφαρμογή δεν είναι ακόμη ενεργοποιημένη.',
+        INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.',
+        NOT_AUTHORIZED: 'Δεν έχετε δικαίωμα εφαρμογής εγκεκριμένης πρότασης.'
+    };
+    const applyHtml = !isCurrentApproval ? '' : applyState === 'ALREADY_APPLIED'
+        ? `<div class="mt-2"><span class="badge text-bg-success">Η πρόταση εφαρμόστηκε</span><span class="small ms-2">${escapeHtml(formatPolicyPreviewDateTime(decisionState?.current_execution?.applied_at))}</span></div>`
+        : `<div class="mt-2">
+               <button type="button" class="btn btn-sm policy-preview-decision-success atomic-repo-transfer-apply-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-id="${escapeHtml(recordedDecision?.id || '')}" ${applyState === 'READY_TO_APPLY' ? '' : 'disabled aria-disabled="true"'}>Εφαρμογή εγκεκριμένης μεταφοράς</button>
+               ${applyMessages[applyState] ? `<div class="small text-muted mt-1">${escapeHtml(applyMessages[applyState])}</div>` : ''}
+           </div>`;
     const olderDecisions = Array.isArray(decisionState?.history)
         ? decisionState.history.filter((decision) => decision?.is_current !== true)
         : [];
@@ -3996,6 +4010,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                 ${recordedDecisionHtml}
                 ${previousDecisionHistory}
                 <div class="policy-preview-decision-actions mt-2">${decisionButtons}</div>
+                ${applyHtml}
             </div>
         </article>
     `;
@@ -4020,6 +4035,13 @@ function bindAtomicRepoTransferEvents(container) {
             if (!group) return;
             try { await submitRepoTransferDecision(group, String(button.dataset.decisionCode || '')); }
             catch (error) { await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' }); }
+        });
+    });
+    container.querySelectorAll('.atomic-repo-transfer-apply-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const group = currentAtomicRepoTransferProjection?.groups?.[Number(button.dataset.atomicGroupIndex)];
+            if (!group || button.disabled) return;
+            await submitRepoTransferApply(group, String(button.dataset.decisionId || ''), button);
         });
     });
 }
@@ -4087,6 +4109,41 @@ async function submitRepoTransferDecision(group, decisionCode) {
         renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
         await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
     } finally { repoTransferDecisionSubmitting = false; }
+}
+
+async function submitRepoTransferApply(group, decisionId, button) {
+    if (!decisionId || repoTransferApplySubmitting.has(decisionId)) return;
+    const source = group.items?.find((item) => item.role === 'SOURCE_BECOMES_WORK') || {};
+    const target = group.items?.find((item) => item.role === 'TARGET_BECOMES_REPO') || {};
+    const employee = source.employee_name || target.employee_name || source.employee_kodikos || target.employee_kodikos || '-';
+    const confirmation = await Swal.fire({
+        icon: 'warning', title: 'Εφαρμογή εγκεκριμένης μεταφοράς ρεπό',
+        html: `<div class="text-start"><div><strong>Εργαζόμενος:</strong> ${escapeHtml(employee)}</div><div><strong>Ημέρα προέλευσης:</strong> ${escapeHtml(formatPolicyPreviewDate(source.hmeromhnia))}</div><div><strong>Ημέρα στόχος:</strong> ${escapeHtml(formatPolicyPreviewDate(target.hmeromhnia))}</div><div class="mt-2">Θα αλλάξουν και οι δύο ημέρες ως ενιαίο ζεύγος.</div><div class="mt-2 fw-semibold">Η ενέργεια εφαρμόζει αλλαγές και δεν είναι απλή καταγραφή απόφασης.</div></div>`,
+        showCancelButton: true, confirmButtonText: 'Εφαρμογή και των δύο αλλαγών', cancelButtonText: 'Ακύρωση',
+        confirmButtonColor: '#d1e7dd', cancelButtonColor: '#6c757d', customClass: { confirmButton: 'text-black' }
+    });
+    if (!confirmation.isConfirmed) return;
+    repoTransferApplySubmitting.add(decisionId); button.disabled = true;
+    try {
+        Swal.fire({ title: 'Εφαρμογή εγκεκριμένης μεταφοράς…', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
+        const token = await getPolicyPreviewCsrfToken();
+        const response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/${encodeURIComponent(decisionId)}/apply`, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token },
+            body: JSON.stringify({ request_id: repoTransferDecisionRequestId() })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(payload.message || 'Η εφαρμογή δεν ολοκληρώθηκε.');
+        Swal.close();
+        await Swal.fire({ icon: 'success', title: 'Η πρόταση εφαρμόστηκε', text: payload.message });
+        await refreshRepoTransferDecisions();
+        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
+    } catch (error) {
+        Swal.close();
+        await Swal.fire({ icon: 'error', title: 'Δεν εφαρμόστηκε η πρόταση', text: String(error.message || 'Η εφαρμογή δεν ολοκληρώθηκε.') });
+        const state = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || ''));
+        if (state?.apply_state === 'READY_TO_APPLY') button.disabled = false;
+    } finally { repoTransferApplySubmitting.delete(decisionId); }
 }
 
 function renderAtomicRepoTransferProjection(projection) {

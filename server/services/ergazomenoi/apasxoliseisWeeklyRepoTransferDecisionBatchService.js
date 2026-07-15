@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
+const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const {
     ProdhlomenaOrariaModel,
     ErgazomenoiModel,
@@ -25,6 +26,9 @@ const {
     buildCanonicalSnapshot,
     fingerprintSnapshot
 } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
+const { validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
+const { getWeeklyRepoTransferApplyRuntimeState } = require('./apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
+const { getWeeklyRepoTransferApplyIndexState } = require('./apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
 
 function requestError(message, statusCode = 400) {
     const error = new Error(message);
@@ -50,7 +54,9 @@ function validateBatchFilters(filters = {}) {
 }
 function presentation(record, currentFingerprint) {
     return {
+        id: String(record._id || ''),
         decision_code: record.decision_code,
+        decision_status: record.decision_status,
         notes: record.notes || '',
         created_by_user_name: record.created_by_user_name || '',
         created_at: record.created_at || null,
@@ -64,7 +70,9 @@ async function loadWeeklyRepoTransferDecisionBatch({
     models = {},
     holidayContextBuilder = buildNoCardsDisplayContext,
     canonicalSnapshotBuilder = buildCanonicalSnapshot,
-    snapshotFingerprintBuilder = fingerprintSnapshot
+    snapshotFingerprintBuilder = fingerprintSnapshot,
+    runtimeStateLoader = getWeeklyRepoTransferApplyRuntimeState,
+    indexStateLoader = getWeeklyRepoTransferApplyIndexState
 }) {
     const scope = validateSessionScope(session);
     const normalized = validateBatchFilters(filters);
@@ -73,6 +81,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
     const historyModel = models.historyModel === undefined ? IstorikoProslhpseonAllagonModel : models.historyModel;
     const auditModel = models.auditModel || ProdhlomenaOrariaAuditModel;
     const decisionModel = models.decisionModel || DecisionModel;
+    const executionModel = models.executionModel || ExecutionModel;
     const rowFilter = {
         team: scope.team,
         company_kod: scope.company_kod,
@@ -188,14 +197,51 @@ async function loadWeeklyRepoTransferDecisionBatch({
               decision_status: 'RECORDED'
           }).select('-canonical_snapshot -canonical_group_key -command_identity -request_id').sort({ created_at: -1 }).lean()
         : [];
+    const currentDecisionRecords = current.map(({ group, fingerprint }) =>
+        decisions.find((decision) => decision.proposal_id === group.group_id && decision.snapshot_fingerprint === fingerprint)
+    ).filter(Boolean);
+    const currentDecisionIds = currentDecisionRecords.map((decision) => decision._id);
+    const executions = currentDecisionIds.length
+        ? await executionModel.find({
+              team: scope.team,
+              company_kod: scope.company_kod,
+              decision_id: mongoose.trusted({ $in: currentDecisionIds })
+          }).select('_id decision_id execution_status applied_at created_by_user_name').lean()
+        : [];
+    const executionByDecisionId = new Map(executions.map((execution) => [String(execution.decision_id), execution]));
+    let authorized = true;
+    try { validateApplySession(session); } catch { authorized = false; }
+    let runtimeState = { enabled: false };
+    let indexState = { ready: false };
+    try { runtimeState = await runtimeStateLoader(); } catch { runtimeState = { enabled: false }; }
+    if (runtimeState.enabled) {
+        try { indexState = await indexStateLoader(); } catch { indexState = { ready: false }; }
+    }
     return {
         records: current.map(({ group, fingerprint }) => {
             const history = decisions
                 .filter((decision) => decision.proposal_id === group.group_id)
                 .map((decision) => presentation(decision, fingerprint));
+            const rawCurrent = decisions.find((decision) => decision.proposal_id === group.group_id && decision.snapshot_fingerprint === fingerprint) || null;
+            const execution = rawCurrent ? executionByDecisionId.get(String(rawCurrent._id)) || null : null;
+            let apply_state = 'NOT_APPROVED';
+            if (rawCurrent?.decision_code === 'APPROVE_PROPOSAL' && rawCurrent?.decision_status === 'RECORDED') {
+                if (!authorized) apply_state = 'NOT_AUTHORIZED';
+                else if (execution) apply_state = 'ALREADY_APPLIED';
+                else if (!runtimeState.enabled) apply_state = 'RUNTIME_DISABLED';
+                else if (!indexState.ready) apply_state = 'INDEXES_NOT_READY';
+                else apply_state = 'READY_TO_APPLY';
+            }
             return {
                 proposal_id: group.group_id,
                 current_decision: history.find((decision) => decision.is_current) || null,
+                current_execution: execution ? {
+                    id: String(execution._id || ''), decision_id: String(execution.decision_id || ''),
+                    execution_status: execution.execution_status, applied_at: execution.applied_at || null,
+                    created_by_user_name: execution.created_by_user_name || ''
+                } : null,
+                apply_state,
+                apply_allowed: apply_state === 'READY_TO_APPLY',
                 history,
                 history_count: history.length
             };
