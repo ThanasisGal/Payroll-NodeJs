@@ -120,6 +120,16 @@ check_command() {
     fi
 }
 
+exclude_file_has_exact_line() {
+    local expected="$1"
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line=${line%$'\r'}
+        [[ "$line" == "$expected" ]] && return 0
+    done < "$EXCLUDES_FILE"
+    return 1
+}
+
 cleanup_deploy_build() {
     if [[ "$DEPLOY_ACTION" != "deploy" || "$BUILD_STARTED" != "true" || "$CLEANUP_DONE" == "true" ]]; then
         return 0
@@ -890,7 +900,7 @@ else
     log_info "DEPLOY MERGED RELEASE: Git mutation disabled"
     log_info "Deploying already merged version: ${DEPLOY_VERSION}"
 
-    if ! grep -Fxq '.env' "$EXCLUDES_FILE" || ! grep -Fxq '.env.production' "$EXCLUDES_FILE"; then
+    if ! exclude_file_has_exact_line '.env' || ! exclude_file_has_exact_line '.env.production'; then
         log_error "rsync-excludes.txt must contain exact .env and .env.production exclusions."
         exit 1
     fi

@@ -76,8 +76,8 @@ jobs:
           require 'APPLY_RUNTIME_DISABLED'
           require 'ALLOW_REPO_TRANSFER_APPLY'
           require 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'
-          require "grep -Fxq '\.env'"
-          require "grep -Fxq '\.env\.production'"
+          require "exclude_file_has_exact_line '\.env'"
+          require "exclude_file_has_exact_line '\.env\.production'"
           require 'pm2 reload payroll --update-env'
           require 'CONFIRM_PRODUCTION_DEPLOY.*!=.*yes'
           require 'Active users should complete/save their work before deployment\.'
@@ -109,7 +109,8 @@ jobs:
             echo "ERROR: expected exactly two runtime guard invocations"
             exit 1
           fi
-          if ! grep -Fxq '.env' rsync-excludes.txt || ! grep -Fxq '.env.production' rsync-excludes.txt; then
+          if ! awk 'sub(/\r$/, ""); $0 == ".env" { found=1 } END { exit !found }' rsync-excludes.txt \
+            || ! awk 'sub(/\r$/, ""); $0 == ".env.production" { found=1 } END { exit !found }' rsync-excludes.txt; then
             echo "ERROR: production env files are not both excluded from rsync"
             exit 1
           fi
