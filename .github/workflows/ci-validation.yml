@@ -31,6 +31,97 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate two-phase deployment safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          script="deploy-ubuntu.sh"
+          bash -n "$script"
+
+          require() {
+            local pattern="$1"
+            if ! grep -Eq "$pattern" "$script"; then
+              echo "ERROR: missing deployment safety contract: $pattern"
+              exit 1
+            fi
+          }
+
+          reject() {
+            local pattern="$1"
+            if grep -Eq "$pattern" "$script"; then
+              echo "ERROR: forbidden deployment workflow command found: $pattern"
+              exit 1
+            fi
+          }
+
+          require '1\) Prepare release'
+          require '2\) Deploy merged release'
+          require '3\) Exit'
+          require 'Invalid DEPLOY_ACTION'
+          require 'immutable_git_preflight'
+          require 'current_branch.*!=.*main'
+          require 'git fetch origin main'
+          require 'git status --porcelain'
+          require 'main\.\.\.origin/main'
+          require 'release/prod-\$\{NEW_VERSION\}'
+          require 'git switch -c "\$RELEASE_BRANCH"'
+          require 'git add -- package.json public/min\.js'
+          require 'gh pr create .*--draft'
+          require 'RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED'
+          require 'DEPLOY MERGED RELEASE: Git mutation disabled'
+          require 'git diff --exit-code -- public/min\.js'
+          require 'DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE'
+          require 'remote_runtime_apply_disabled_guard'
+          require 'APPLY_RUNTIME_DISABLED'
+          require 'ALLOW_REPO_TRANSFER_APPLY'
+          require 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'
+          require "grep -Fxq '\.env'"
+          require "grep -Fxq '\.env\.production'"
+          require 'pm2 reload payroll --update-env'
+          require 'CONFIRM_PRODUCTION_DEPLOY.*!=.*yes'
+          require 'Active users should complete/save their work before deployment\.'
+          require 'git restore --source .* --worktree -- public/min\.js'
+          require 'git ls-files --others --exclude-standard -z -- public/min\.js'
+          require 'git ls-files --others --ignored --exclude-standard -z -- public/min\.js'
+          require 'rm -rf "\$BUILD_DIR"'
+
+          reject 'git add -A'
+          reject 'git push( +[^ ]+)* +origin +main'
+          reject 'git pull'
+          reject 'git rebase'
+          reject 'git merge'
+          reject 'git reset --hard'
+          reject 'git clean'
+
+          if DEPLOY_ACTION=invalid bash "$script" > /tmp/deploy-invalid-action.log 2>&1; then
+            echo "ERROR: invalid DEPLOY_ACTION unexpectedly succeeded"
+            exit 1
+          fi
+          grep -q 'Invalid DEPLOY_ACTION' /tmp/deploy-invalid-action.log
+          grep -q 'DEPLOYMENT ABORTED BEFORE PRODUCTION CHANGES' /tmp/deploy-invalid-action.log
+          if grep -Eq 'git fetch|Cleaning build directories|aws |ssh |rsync |pm2 ' /tmp/deploy-invalid-action.log; then
+            echo "ERROR: invalid DEPLOY_ACTION reached Git/build/network operations"
+            exit 1
+          fi
+
+          test "$(grep -c 'remote_runtime_apply_disabled_guard$' "$script")" -eq 2
+          grep -Fxq '.env' rsync-excludes.txt
+          grep -Fxq '.env.production' rsync-excludes.txt
+
+          mapfile -t runtime_guard_lines < <(grep -n 'remote_runtime_apply_disabled_guard$' "$script" | cut -d: -f1)
+          build_cleanup_line=$(grep -n 'BUILD_STARTED="true"' "$script" | cut -d: -f1)
+          prepare_exit_line=$(grep -n 'RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED' "$script" | cut -d: -f1)
+          first_s3_line=$(grep -n 'aws s3 sync' "$script" | head -1 | cut -d: -f1)
+          first_rsync_line=$(grep -n '^rsync -az' "$script" | cut -d: -f1)
+          first_pm2_reload_line=$(grep -n 'pm2 reload payroll --update-env' "$script" | cut -d: -f1)
+          test "${runtime_guard_lines[0]}" -lt "$build_cleanup_line"
+          test "${runtime_guard_lines[1]}" -gt "$first_rsync_line"
+          test "${runtime_guard_lines[1]}" -lt "$first_pm2_reload_line"
+          test "$prepare_exit_line" -lt "$first_s3_line"
+          test "$prepare_exit_line" -lt "$first_rsync_line"
+          test "$prepare_exit_line" -lt "$first_pm2_reload_line"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

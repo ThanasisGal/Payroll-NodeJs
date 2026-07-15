@@ -41,6 +41,15 @@ SKIP_OBFUSCATION="${SKIP_OBFUSCATION:-false}"
 UPLOAD_TO_CDN="${UPLOAD_TO_CDN:-true}"
 APP_VERSION=$(date '+%Y%m%d%H%M%S')
 DEPLOYMENT_PHASE="Phase 1"
+DEPLOY_ACTION="${DEPLOY_ACTION:-}"
+DEPLOY_ACTION_WAS_PROVIDED="false"
+[[ -n "$DEPLOY_ACTION" ]] && DEPLOY_ACTION_WAS_PROVIDED="true"
+CONFIRM_PRODUCTION_DEPLOY="${CONFIRM_PRODUCTION_DEPLOY:-}"
+INITIAL_HEAD=""
+INITIAL_VERSION=""
+BUILD_STARTED="false"
+PRODUCTION_OPERATION_STARTED="false"
+CLEANUP_DONE="false"
 
 # Disk & Swap
 DISK_THRESHOLD=500
@@ -111,9 +120,135 @@ check_command() {
     fi
 }
 
+cleanup_deploy_build() {
+    if [[ "$DEPLOY_ACTION" != "deploy" || "$BUILD_STARTED" != "true" || "$CLEANUP_DONE" == "true" ]]; then
+        return 0
+    fi
+
+    CLEANUP_DONE="true"
+    log_info "Restoring deploy-mode generated artifacts to $INITIAL_HEAD..."
+    git restore --source "$INITIAL_HEAD" --worktree -- public/min.js
+
+    while IFS= read -r -d '' generated_file; do
+        rm -f -- "$generated_file"
+    done < <(
+        git ls-files --others --exclude-standard -z -- public/min.js
+        git ls-files --others --ignored --exclude-standard -z -- public/min.js
+    )
+
+    rm -rf "$BUILD_DIR"
+    find "$OUTPUT_DIR" -depth -type d -empty -delete 2>/dev/null || true
+}
+
+handle_exit() {
+    local exit_code=$?
+    trap - EXIT
+    cleanup_deploy_build || true
+    if [[ $exit_code -ne 0 ]]; then
+        if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
+            log_error "RELEASE PREPARATION FAILED"
+        elif [[ "$PRODUCTION_OPERATION_STARTED" == "true" ]]; then
+            log_error "DEPLOYMENT FAILED — REVIEW S3/EC2/PM2 STATE"
+        else
+            log_error "DEPLOYMENT ABORTED BEFORE PRODUCTION CHANGES"
+        fi
+    fi
+    exit "$exit_code"
+}
+
+trap handle_exit EXIT
+
+select_deploy_action() {
+    if [[ -z "$DEPLOY_ACTION" ]]; then
+        echo "Choose deployment workflow:"
+        echo "  1) Prepare release"
+        echo "  2) Deploy merged release"
+        echo "  3) Exit"
+        echo ""
+        read -r -p "Choice [3]: " action_choice
+        action_choice=${action_choice:-3}
+        case "$action_choice" in
+            1) DEPLOY_ACTION="prepare" ;;
+            2) DEPLOY_ACTION="deploy" ;;
+            3) log_info "No action selected."; exit 0 ;;
+            *) log_error "Invalid menu choice."; exit 1 ;;
+        esac
+    fi
+
+    case "$DEPLOY_ACTION" in
+        prepare|deploy) ;;
+        *) log_error "Invalid DEPLOY_ACTION. Supported values: prepare, deploy, or empty for the menu."; exit 1 ;;
+    esac
+}
+
+immutable_git_preflight() {
+    local current_branch local_head remote_head divergence
+
+    current_branch=$(git branch --show-current)
+    if [[ "$current_branch" != "main" ]]; then
+        log_error "Both workflows must start from main; current branch is $current_branch."
+        return 1
+    fi
+
+    git fetch origin main
+
+    if [[ -n "$(git status --porcelain)" ]]; then
+        log_error "Working tree/index must be clean and contain no untracked files."
+        git status --short
+        return 1
+    fi
+
+    local_head=$(git rev-parse HEAD)
+    remote_head=$(git rev-parse origin/main)
+    divergence=$(git rev-list --left-right --count main...origin/main)
+    if [[ "$local_head" != "$remote_head" || "$divergence" != $'0\t0' ]]; then
+        log_error "main must be fully synchronized with origin/main (divergence: $divergence)."
+        return 1
+    fi
+
+    INITIAL_HEAD="$local_head"
+    INITIAL_VERSION=$(node -p "require('./package.json').version")
+    log_success "Immutable Git preflight passed at $INITIAL_HEAD"
+}
+
+remote_runtime_apply_disabled_guard() {
+    log_info "Verifying linked repo-transfer apply remains disabled on EC2..."
+    ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'RUNTIME_GUARD'
+        set -euo pipefail
+        cd ~/Payroll-NodeJs
+
+        node <<'NODE'
+require('dotenv').config({ override: false });
+const { getWeeklyRepoTransferApplyRuntimeState } = require('./server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
+const state = getWeeklyRepoTransferApplyRuntimeState(process.env);
+if (state.enabled !== false || state.code !== 'APPLY_RUNTIME_DISABLED') {
+    console.error('APPLY RUNTIME GUARD FAILED');
+    process.exit(1);
+}
+console.log('APPLY RUNTIME DISABLED');
+NODE
+
+        if pm2 describe payroll >/dev/null 2>&1; then
+            PM2_JSON="$(pm2 jlist)" node <<'NODE'
+const processInfo = JSON.parse(process.env.PM2_JSON).find(item => item.name === 'payroll');
+    const env = processInfo?.pm2_env || {};
+    const unsafe = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY']
+        .some(key => String(env[key] || '').trim().toLowerCase() === 'true');
+    if (unsafe) {
+        console.error('PM2 APPLY RUNTIME GUARD FAILED');
+        process.exit(1);
+    }
+    console.log('PM2 APPLY FLAGS DISABLED');
+NODE
+        fi
+RUNTIME_GUARD
+}
+
 get_file_size() {
     stat -c%s "$1" 2>/dev/null || echo "0"
 }
+
+select_deploy_action
 
 # =============================================================================
 # SYSTEM INFO
@@ -145,81 +280,12 @@ fi
 
 cd "$PROJECT_DIR" || exit 1
 
-# =============================================================================
-# GIT BRANCH SAFETY CHECK
-# =============================================================================
-# Το deploy πρέπει να καταλήγει πάντα στο main.
-# Αν είσαι σε άλλο branch, σου δίνει επιλογή να σταματήσεις ή να κάνεις:
-# push current branch -> checkout main -> pull main -> merge current branch -> continue.
-
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ -z "$CURRENT_BRANCH" ]]; then
-    log_error "Could not detect current Git branch."
-    exit 1
-fi
-
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    log_warning "You are currently on branch: $CURRENT_BRANCH"
-    log_warning "Deployment expects branch: main"
-    echo ""
-    echo "Choose what to do:"
-    echo "  1) Stop deployment"
-    echo "  2) Push current branch, switch to main, merge it, then continue"
-    echo ""
-
-    read -p "Choice [1]: " BRANCH_CHOICE
-    BRANCH_CHOICE=${BRANCH_CHOICE:-1}
-
-    case "$BRANCH_CHOICE" in
-        2)
-            log_info "Pushing current branch: $CURRENT_BRANCH"
-            git push -u origin "$CURRENT_BRANCH"
-
-            log_info "Switching to main..."
-            git checkout main
-
-            log_info "Pulling latest main..."
-            git pull origin main
-
-            log_info "Merging branch $CURRENT_BRANCH into main..."
-            if git merge "$CURRENT_BRANCH"; then
-                log_success "Branch $CURRENT_BRANCH merged into main"
-            else
-                log_error "Merge failed. Resolve conflicts manually, then run deploy again."
-                exit 1
-            fi
-            ;;
-        *)
-            log_error "Deployment stopped. Please switch to main first:"
-            echo "cd $PROJECT_DIR"
-            echo "git checkout main"
-            echo "git pull origin main"
-            exit 1
-            ;;
-    esac
-fi
-
-
 check_command "node"
 check_command "npm"
 check_command "git"
-check_command "rsync"
-check_command "ssh"
-check_command "aws"
+check_command "gh"
 
-# Check EC2 key
-if [[ ! -f "$EC2_KEY" ]]; then
-    log_error "EC2 key not found:  $EC2_KEY"
-    exit 1
-fi
-
-KEY_PERMS=$(stat -c "%a" "$EC2_KEY" 2>/dev/null)
-if [[ "$KEY_PERMS" != "600" ]] && [[ "$KEY_PERMS" != "400" ]]; then
-    log_warning "Fixing EC2 key permissions..."
-    chmod 600 "$EC2_KEY"
-    log_success "Key permissions set to 600"
-fi
+immutable_git_preflight
 
 # Check npm packages
 if !  npm list -g terser &>/dev/null; then
@@ -247,56 +313,11 @@ fi
 log_success "Disk space OK ($(( AVAILABLE_DISK / 1024 )) MB available)"
 
 # =============================================================================
-# AWS PRE-FLIGHT CHECKS
-# =============================================================================
-
-log_info "Running AWS pre-flight checks..."
-
-if aws sts get-caller-identity &>/dev/null; then
-    CALLER_INFO=$(aws sts get-caller-identity --output json 2>/dev/null)
-    USER_ARN=$(echo "$CALLER_INFO" | grep -o '"Arn": *"[^"]*"' | cut -d'"' -f4)
-    log_success "AWS Credentials OK:  $USER_ARN"
-else
-    log_warning "AWS credentials not configured. CDN operations will be skipped."
-    log_info "Run 'aws configure' to enable CDN deployment."
-    UPLOAD_TO_CDN="false"
-fi
-
-if [[ "$UPLOAD_TO_CDN" == "true" ]]; then
-    if aws s3 ls "s3://$S3_BUCKET/" --region "$AWS_REGION" &>/dev/null; then
-        log_success "S3 bucket accessible:  $S3_BUCKET"
-    else
-        log_warning "Cannot access S3 bucket: $S3_BUCKET - CDN upload will be skipped"
-        UPLOAD_TO_CDN="false"
-    fi
-    
-    log_info "Checking CloudFront distribution:  $CLOUDFRONT_DIST_ID"
-    if aws cloudfront get-distribution --id "$CLOUDFRONT_DIST_ID" --region us-east-1 &>/dev/null 2>&1; then
-        log_success "CloudFront distribution accessible"
-    else
-        log_warning "CloudFront distribution not accessible (invalidation will be skipped)"
-    fi
-fi
-
-# =============================================================================
 # GIT STATUS
 # =============================================================================
 
 log_info "Current Git status:"
 git status --short
-
-# =============================================================================
-# CLEANUP
-# =============================================================================
-
-log_info "Cleaning build directories..."
-
-rm -rf "$BUILD_DIR"
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$BUILD_DIR"
-mkdir -p "$OUTPUT_DIR"
-
-log_success "Cleanup complete."
 
 # =============================================================================
 # BUILD FUNCTIONS
@@ -811,64 +832,112 @@ echo -e "${YELLOW}📦 Current version:   ${GREEN}$CURRENT_VERSION${NC}"
 echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-PATCH_VERSION=$(increment_patch "$CURRENT_VERSION")
-MINOR_VERSION=$(increment_minor "$CURRENT_VERSION")
-MAJOR_VERSION=$(increment_major "$CURRENT_VERSION")
+if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
+    PATCH_VERSION=$(increment_patch "$CURRENT_VERSION")
+    MINOR_VERSION=$(increment_minor "$CURRENT_VERSION")
+    MAJOR_VERSION=$(increment_major "$CURRENT_VERSION")
 
-echo "Select version bump type:"
-echo ""
-echo -e "  ${GREEN}1)${NC} Patch (bug fix / optimization)	$CURRENT_VERSION → ${GREEN}$PATCH_VERSION${NC}"
-echo -e "  ${BLUE}2)${NC} Minor (new feature)				$CURRENT_VERSION → ${BLUE}$MINOR_VERSION${NC}"
-echo -e "  ${RED}3)${NC} Major (breaking change)			$CURRENT_VERSION → ${RED}$MAJOR_VERSION${NC}"
-echo -e "  ${YELLOW}4)${NC} Skip (keep current version)		$CURRENT_VERSION → ${YELLOW}$CURRENT_VERSION${NC}"
-echo ""
+    echo "Select version bump type:"
+    echo ""
+    echo -e "  ${GREEN}1)${NC} Patch (bug fix / optimization)	$CURRENT_VERSION → ${GREEN}$PATCH_VERSION${NC}"
+    echo -e "  ${BLUE}2)${NC} Minor (new feature)				$CURRENT_VERSION → ${BLUE}$MINOR_VERSION${NC}"
+    echo -e "  ${RED}3)${NC} Major (breaking change)			$CURRENT_VERSION → ${RED}$MAJOR_VERSION${NC}"
+    echo -e "  ${YELLOW}4)${NC} Skip (keep current version)		$CURRENT_VERSION → ${YELLOW}$CURRENT_VERSION${NC}"
+    echo ""
 
-read -p "Choice [1]:   " BUMP_CHOICE
-BUMP_CHOICE=${BUMP_CHOICE:-1}
+    read -r -p "Choice [1]:   " BUMP_CHOICE
+    BUMP_CHOICE=${BUMP_CHOICE:-1}
 
-case $BUMP_CHOICE in
-    1)
-        NEW_VERSION="$PATCH_VERSION"
-        BUMP_TYPE="Patch"
-        ;;
-    2)
-        NEW_VERSION="$MINOR_VERSION"
-        BUMP_TYPE="Minor"
-        ;;
-    3)
-        NEW_VERSION="$MAJOR_VERSION"
-        BUMP_TYPE="Major"
-        ;;
-    4)
-        NEW_VERSION="$CURRENT_VERSION"
-        BUMP_TYPE="Skip"
-        log_warning "Keeping current version:   $CURRENT_VERSION"
-        ;;
-    *)
-        log_warning "Invalid choice, defaulting to Patch"
-        NEW_VERSION="$PATCH_VERSION"
-        BUMP_TYPE="Patch"
-        ;;
-esac
+    case "$BUMP_CHOICE" in
+        1) NEW_VERSION="$PATCH_VERSION"; BUMP_TYPE="Patch" ;;
+        2) NEW_VERSION="$MINOR_VERSION"; BUMP_TYPE="Minor" ;;
+        3) NEW_VERSION="$MAJOR_VERSION"; BUMP_TYPE="Major" ;;
+        4)
+            read -r -p "Skip version bump and keep cache-busting version $CURRENT_VERSION? Type yes to confirm: " SKIP_CONFIRMATION
+            if [[ "$SKIP_CONFIRMATION" != "yes" ]]; then
+                log_error "Skip version bump was not confirmed."
+                exit 1
+            fi
+            NEW_VERSION="$CURRENT_VERSION"
+            BUMP_TYPE="Skip"
+            log_warning "Keeping current version: $CURRENT_VERSION"
+            ;;
+        *) log_error "Invalid version choice."; exit 1 ;;
+    esac
 
-if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
-    sed -i "s/\"version\": *\"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$PACKAGE_JSON"
-    
-    if [[ $? -eq 0 ]]; then
-        echo ""
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${GREEN}✅ Version updated:   $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)${NC}"
-        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        APP_VERSION="$NEW_VERSION"
-    else
-        log_error "Failed to update version!"
+    OLD_VERSION="$CURRENT_VERSION"
+    RELEASE_BRANCH="release/prod-${NEW_VERSION}-$(date '+%Y%m%d%H%M%S')"
+    if git show-ref --verify --quiet "refs/heads/$RELEASE_BRANCH" || git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" &>/dev/null; then
+        log_error "Release branch already exists: $RELEASE_BRANCH"
         exit 1
     fi
+    git switch -c "$RELEASE_BRANCH"
+
+    if [[ "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
+        sed -i "s/\"version\": *\"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" "$PACKAGE_JSON"
+        echo ""
+        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}✅ Version updated: $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)${NC}"
+        echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    fi
+    APP_VERSION="$NEW_VERSION"
+    log_info "OLD_VERSION=$OLD_VERSION"
+    log_info "NEW_VERSION=$NEW_VERSION"
+    log_info "RELEASE_BRANCH=$RELEASE_BRANCH"
 else
-    APP_VERSION="$CURRENT_VERSION"
+    DEPLOY_VERSION="$CURRENT_VERSION"
+    APP_VERSION="$DEPLOY_VERSION"
+    log_info "DEPLOY MERGED RELEASE: Git mutation disabled"
+    log_info "Deploying already merged version: ${DEPLOY_VERSION}"
+
+    if ! grep -Fxq '.env' "$EXCLUDES_FILE" || ! grep -Fxq '.env.production' "$EXCLUDES_FILE"; then
+        log_error "rsync-excludes.txt must contain exact .env and .env.production exclusions."
+        exit 1
+    fi
+
+    log_warning "Active users should complete/save their work before deployment."
+    if [[ "$DEPLOY_ACTION_WAS_PROVIDED" == "true" ]]; then
+        if [[ "$CONFIRM_PRODUCTION_DEPLOY" != "yes" ]]; then
+            log_error "Non-interactive deploy requires CONFIRM_PRODUCTION_DEPLOY=yes."
+            exit 1
+        fi
+    else
+        read -r -p "Proceed with production deployment? [yes/NO] " PRODUCTION_CONFIRMATION
+        if [[ "$PRODUCTION_CONFIRMATION" != "yes" ]]; then
+            log_error "Production deployment was not confirmed."
+            exit 1
+        fi
+    fi
+
+    check_command "ssh"
+    if [[ ! -f "$EC2_KEY" ]]; then
+        log_error "EC2 key not found: $EC2_KEY"
+        exit 1
+    fi
+    KEY_PERMS=$(stat -c "%a" "$EC2_KEY" 2>/dev/null)
+    if [[ "$KEY_PERMS" != "600" ]] && [[ "$KEY_PERMS" != "400" ]]; then
+        log_warning "Fixing EC2 key permissions..."
+        chmod 600 "$EC2_KEY"
+        log_success "Key permissions set to 600"
+    fi
+
+    # Read-only guard before the local production rebuild and any production operation.
+    remote_runtime_apply_disabled_guard
 fi
 
 echo ""
+
+# =============================================================================
+# CLEANUP
+# =============================================================================
+
+BUILD_STARTED="true"
+log_info "Cleaning build directories..."
+rm -rf "$BUILD_DIR"
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$BUILD_DIR"
+mkdir -p "$OUTPUT_DIR"
+log_success "Cleanup complete."
 
 # =============================================================================
 # BUILD PROCESS
@@ -1138,6 +1207,105 @@ log_success "Build process complete!"
 echo ""
 
 # =============================================================================
+# MODE BOUNDARY: PREPARE RELEASE OR DEPLOY MERGED RELEASE
+# =============================================================================
+
+if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
+    git diff --check
+
+    unexpected_changes=()
+    while IFS= read -r changed_path; do
+        case "$changed_path" in
+            package.json|public/min.js|public/min.js/*) ;;
+            *) unexpected_changes+=("$changed_path") ;;
+        esac
+    done < <(git status --porcelain=v1 | sed -E 's/^.. //; s/.* -> //')
+
+    if (( ${#unexpected_changes[@]} > 0 )); then
+        log_error "Prepare release changed files outside package.json and public/min.js:"
+        printf '  %s\n' "${unexpected_changes[@]}"
+        exit 1
+    fi
+
+    git status --short
+    git add -- package.json public/min.js
+    git diff --cached --check
+    if git diff --cached --quiet; then
+        log_error "Release preparation produced no scoped changes to commit."
+        exit 1
+    fi
+
+    RELEASE_TITLE="🚀 Deploy prod build - ${NEW_VERSION} (Phase 1)"
+    git commit -m "$RELEASE_TITLE"
+    git push -u origin "$RELEASE_BRANCH"
+
+    RELEASE_PR_BODY=$(mktemp)
+    cat > "$RELEASE_PR_BODY" <<EOF
+## Release preparation
+
+- Previous version: \`$OLD_VERSION\`
+- New version: \`$NEW_VERSION\`
+- Exact base SHA: \`$INITIAL_HEAD\`
+- Release branch: \`$RELEASE_BRANCH\`
+- Production build artifacts generated: \`public/min.js\`
+
+No production deployment was performed. No S3/CDN, EC2, PM2, or DNS operation was executed.
+
+Actual deployment must occur only after CI and merge through **Deploy merged release**.
+EOF
+    gh pr create --repo ThanasisGal/Payroll-NodeJs --base main --head "$RELEASE_BRANCH" --draft --title "$RELEASE_TITLE" --body-file "$RELEASE_PR_BODY"
+    rm -f "$RELEASE_PR_BODY"
+
+    trap - EXIT
+    log_success "RELEASE PREPARED — REVIEW AND MERGE THE DRAFT PR BEFORE DEPLOYMENT"
+    log_success "RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED"
+    exit 0
+fi
+
+if ! git diff --exit-code -- public/min.js; then
+    log_error "DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE"
+    exit 1
+fi
+
+if [[ -n "$(git ls-files --others --exclude-standard -- public/min.js)" || -n "$(git ls-files --others --ignored --exclude-standard -- public/min.js)" ]]; then
+    log_error "DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE"
+    exit 1
+fi
+
+if [[ "$(git rev-parse HEAD)" != "$INITIAL_HEAD" || "$(node -p "require('./package.json').version")" != "$INITIAL_VERSION" ]]; then
+    log_error "Deploy mode changed HEAD or package version."
+    exit 1
+fi
+
+check_command "rsync"
+check_command "aws"
+
+log_info "Running AWS pre-flight checks..."
+if aws sts get-caller-identity &>/dev/null; then
+    CALLER_INFO=$(aws sts get-caller-identity --output json 2>/dev/null)
+    USER_ARN=$(echo "$CALLER_INFO" | grep -o '"Arn": *"[^"]*"' | cut -d'"' -f4)
+    log_success "AWS Credentials OK: $USER_ARN"
+else
+    log_warning "AWS credentials not configured. CDN operations will be skipped."
+    UPLOAD_TO_CDN="false"
+fi
+
+if [[ "$UPLOAD_TO_CDN" == "true" ]]; then
+    if aws s3 ls "s3://$S3_BUCKET/" --region "$AWS_REGION" &>/dev/null; then
+        log_success "S3 bucket accessible: $S3_BUCKET"
+    else
+        log_warning "Cannot access S3 bucket: $S3_BUCKET - CDN upload will be skipped"
+        UPLOAD_TO_CDN="false"
+    fi
+    log_info "Checking CloudFront distribution: $CLOUDFRONT_DIST_ID"
+    aws cloudfront get-distribution --id "$CLOUDFRONT_DIST_ID" --region us-east-1 &>/dev/null 2>&1 \
+        && log_success "CloudFront distribution accessible" \
+        || log_warning "CloudFront distribution not accessible (invalidation will be skipped)"
+fi
+
+PRODUCTION_OPERATION_STARTED="true"
+
+# =============================================================================
 # UPLOAD TO S3/CLOUDFRONT
 # =============================================================================
 
@@ -1278,82 +1446,6 @@ ssh -i "$EC2_KEY" "$EC2_USER_HOST" "
 " || echo "ℹ️  Skip swap setup (no SSH or already configured)."
 
 # =============================================================================
-# GIT COMMIT & PUSH
-# =============================================================================
-
-echo ""
-echo "=========================================="
-echo "📦 GIT COMMIT & PUSH"
-echo "=========================================="
-
-log_info "Fetching remote changes..."
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    log_error "Current branch is $CURRENT_BRANCH, not main. Aborting before Git push."
-    exit 1
-fi
-
-git fetch origin main
-
-LOCAL=$(git rev-parse @ 2>/dev/null || echo "local")
-REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "remote")
-BASE=$(git merge-base @ @{u} 2>/dev/null || echo "base")
-
-if [ "$LOCAL" != "$REMOTE" ]; then
-    if [ "$LOCAL" = "$BASE" ]; then
-        log_info "Remote has new commits. Pulling changes..."
-        if git pull origin main --rebase --autostash; then
-            log_success "Successfully pulled and rebased changes"
-        else
-            log_warning "Rebase failed, trying regular merge..."
-            git rebase --abort 2>/dev/null
-            if git pull origin main --no-rebase; then
-                log_success "Successfully merged remote changes"
-            else
-                log_error "Failed to sync with remote!"
-                log_info "Please resolve conflicts manually and run script again"
-                exit 1
-            fi
-        fi
-    elif [ "$REMOTE" = "$BASE" ]; then
-        log_info "Local has new commits (remote is behind)"
-    else
-        log_warning "Branches have diverged. Pulling with merge strategy..."
-        if git pull origin main --no-rebase; then
-            log_success "Successfully merged diverged branches"
-        else
-            log_error "Failed to merge diverged branches!"
-            log_info "Please resolve conflicts manually"
-            exit 1
-        fi
-    fi
-else
-    log_success "Local is up-to-date with remote"
-fi
-
-log_info "Staging changes..."
-git add -A
-
-if [[ -n $(git status --porcelain) ]]; then
-    log_info "Committing changes..."
-    git commit -m "🚀 Deploy $OBF_ENV build - $APP_VERSION ($DEPLOYMENT_PHASE)"
-    
-    log_info "Pushing to GitHub..."
-    if git push origin main; then
-        log_success "Successfully pushed to GitHub"
-    else
-        log_error "Git push failed!"
-        log_info "💡 Try running manually: git pull origin main && git push origin main"
-        exit 1
-    fi
-else
-    log_info "No changes to commit"
-fi
-
-echo ""
-
-# =============================================================================
 # PRE-RSYNC:  FIX EC2 PERMISSIONS
 # =============================================================================
 
@@ -1457,6 +1549,9 @@ ENDSSH
 
 log_success "Permissions fixed"
 echo ""
+
+# Re-check the effective remote runtime after rsync and before any PM2 reload.
+remote_runtime_apply_disabled_guard
 
 # =============================================================================
 # REMOTE DEPLOYMENT
@@ -1736,5 +1831,16 @@ if [[ $TOTAL_FILES_FAILED -gt 0 ]]; then
     echo ""
 fi
 
+cleanup_deploy_build
+
+FINAL_HEAD=$(git rev-parse HEAD)
+FINAL_VERSION=$(node -p "require('./package.json').version")
+FINAL_DIVERGENCE=$(git rev-list --left-right --count main...origin/main)
+if [[ "$FINAL_HEAD" != "$INITIAL_HEAD" || "$FINAL_VERSION" != "$INITIAL_VERSION" || "$FINAL_DIVERGENCE" != $'0\t0' || -n "$(git status --porcelain)" ]]; then
+    log_error "Final local Git invariants failed after deploy cleanup."
+    exit 1
+fi
+
 echo "=========================================="
+log_success "MERGED RELEASE DEPLOYED AND VERIFIED"
 echo ""
