@@ -105,9 +105,14 @@ jobs:
             exit 1
           fi
 
-          test "$(grep -c 'remote_runtime_apply_disabled_guard$' "$script")" -eq 2
-          grep -Fxq '.env' rsync-excludes.txt
-          grep -Fxq '.env.production' rsync-excludes.txt
+          if [[ "$(grep -c 'remote_runtime_apply_disabled_guard$' "$script")" -ne 2 ]]; then
+            echo "ERROR: expected exactly two runtime guard invocations"
+            exit 1
+          fi
+          if ! grep -Fxq '.env' rsync-excludes.txt || ! grep -Fxq '.env.production' rsync-excludes.txt; then
+            echo "ERROR: production env files are not both excluded from rsync"
+            exit 1
+          fi
 
           mapfile -t runtime_guard_lines < <(grep -n 'remote_runtime_apply_disabled_guard$' "$script" | cut -d: -f1)
           build_cleanup_line=$(grep -n 'BUILD_STARTED="true"' "$script" | cut -d: -f1)
@@ -115,12 +120,18 @@ jobs:
           first_s3_line=$(grep -m1 -n 'aws s3 sync' "$script" | cut -d: -f1)
           first_rsync_line=$(grep -n '^rsync -az' "$script" | cut -d: -f1)
           first_pm2_reload_line=$(grep -n 'pm2 reload payroll --update-env' "$script" | cut -d: -f1)
-          test "${runtime_guard_lines[0]}" -lt "$build_cleanup_line"
-          test "${runtime_guard_lines[1]}" -gt "$first_rsync_line"
-          test "${runtime_guard_lines[1]}" -lt "$first_pm2_reload_line"
-          test "$prepare_exit_line" -lt "$first_s3_line"
-          test "$prepare_exit_line" -lt "$first_rsync_line"
-          test "$prepare_exit_line" -lt "$first_pm2_reload_line"
+          if (( runtime_guard_lines[0] >= build_cleanup_line )); then
+            echo "ERROR: first runtime guard must run before local build cleanup"
+            exit 1
+          fi
+          if (( runtime_guard_lines[1] <= first_rsync_line || runtime_guard_lines[1] >= first_pm2_reload_line )); then
+            echo "ERROR: second runtime guard must run after rsync and before PM2 reload"
+            exit 1
+          fi
+          if (( prepare_exit_line >= first_s3_line || prepare_exit_line >= first_rsync_line || prepare_exit_line >= first_pm2_reload_line )); then
+            echo "ERROR: prepare mode must terminate before production operations"
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
