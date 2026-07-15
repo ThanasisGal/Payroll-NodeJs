@@ -112,7 +112,7 @@ jobs:
           mapfile -t runtime_guard_lines < <(grep -n 'remote_runtime_apply_disabled_guard$' "$script" | cut -d: -f1)
           build_cleanup_line=$(grep -n 'BUILD_STARTED="true"' "$script" | cut -d: -f1)
           prepare_exit_line=$(grep -n 'RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED' "$script" | cut -d: -f1)
-          first_s3_line=$(grep -n 'aws s3 sync' "$script" | head -1 | cut -d: -f1)
+          first_s3_line=$(grep -m1 -n 'aws s3 sync' "$script" | cut -d: -f1)
           first_rsync_line=$(grep -n '^rsync -az' "$script" | cut -d: -f1)
           first_pm2_reload_line=$(grep -n 'pm2 reload payroll --update-env' "$script" | cut -d: -f1)
           test "${runtime_guard_lines[0]}" -lt "$build_cleanup_line"
