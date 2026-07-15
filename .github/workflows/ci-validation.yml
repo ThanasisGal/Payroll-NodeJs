@@ -222,6 +222,250 @@ jobs:
             exit 1
           fi
 
+      - name: Validate hardened CSS deployment safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          script="deploy-css-linux.sh"
+          test -f "$script"
+          bash -n "$script"
+          test -x "$script"
+
+          index_mode=$(git ls-files --stage -- "$script" | awk 'NR == 1 { print $1 }')
+          tree_mode=$(git ls-tree HEAD -- "$script" | awk 'NR == 1 { print $1 }')
+          test "$index_mode" = "100755"
+          test "$tree_mode" = "100755"
+
+          require_css_contract() {
+            local pattern="$1"
+            if ! grep -Fq -- "$pattern" "$script"; then
+              echo "ERROR: missing CSS deployment safety contract: $pattern"
+              exit 1
+            fi
+          }
+
+          reject_css_contract() {
+            local pattern="$1"
+            if grep -Eq -- "$pattern" "$script"; then
+              echo "ERROR: forbidden CSS deployment operation found: $pattern"
+              exit 1
+            fi
+          }
+
+          require_css_contract '1) Verify merged CSS'
+          require_css_contract '2) Deploy merged CSS'
+          require_css_contract 'immutable_git_preflight'
+          require_css_contract 'git status --porcelain'
+          require_css_contract 'git fetch --prune origin main'
+          require_css_contract 'main...origin/main'
+          require_css_contract 'exact_head_main_ci_guard'
+          require_css_contract '--event push'
+          require_css_contract 'headSha =='
+          require_css_contract '$INITIAL_HEAD'
+          require_css_contract 'conclusion =='
+          require_css_contract 'status =='
+          require_css_contract '.name == "validate"'
+          require_css_contract 'mktemp -d'
+          require_css_contract 'first.min.css'
+          require_css_contract 'second.min.css'
+          require_css_contract 'cmp -s "$first_css" "$second_css"'
+          require_css_contract './node_modules/.bin/cleancss'
+          require_css_contract 'CSS BUILD IS NOT DETERMINISTIC'
+          require_css_contract 'CSS_ALREADY_DEPLOYED'
+          require_css_contract 'CSS_DEPLOYMENT_REQUIRED'
+          require_css_contract 'CSS_REMOTE_OBJECT_MISSING'
+          require_css_contract 'CSS_CACHE_CONTROL'
+          require_css_contract 'public, max-age=0, s-maxage=31536000, must-revalidate'
+          require_css_contract 'list-objects-v2'
+          require_css_contract "Contents[?Key == '\$S3_FINAL_KEY']"
+          require_css_contract 'exact_key_count="$(aws s3api list-objects-v2'
+          require_css_contract 'Malformed exact-key S3 lookup response'
+          require_css_contract 'S3_OBJECT_PRESENT'
+          require_css_contract 'S3_COMPLIANT'
+          require_css_contract 'CDN_COMPLIANT'
+          require_css_contract 'read_current_cdn_css'
+          require_css_contract 'require_command curl'
+          require_css_contract '?verify=${LOCAL_CSS_SHA}-${INITIAL_HEAD}'
+          require_css_contract 'Production CDN CSS response is empty'
+          require_css_contract 'Malformed production CDN response headers'
+          require_css_contract 'calculate_verify_state'
+          require_css_contract 's3_compliant=$S3_COMPLIANT'
+          require_css_contract 'cdn_compliant=$CDN_COMPLIANT'
+          require_css_contract 'CONFIRM_PRODUCTION_CSS_DEPLOY'
+          require_css_contract 'Type DEPLOY CSS PRODUCTION to continue:'
+          require_css_contract 'assets/own/css/.staging/main.min.${INITIAL_HEAD}.${LOCAL_CSS_SHA}.css'
+          require_css_contract 'Staging S3 CSS hash verification failed'
+          require_css_contract 'Final S3 CSS hash verification failed'
+          require_css_contract 'Final S3 ContentType verification failed'
+          require_css_contract 'Final S3 CacheControl verification failed'
+          require_css_contract 'Final S3 git-sha metadata verification failed'
+          require_css_contract 'Final S3 app-version metadata verification failed'
+          require_css_contract 'Final S3 css-sha256 metadata verification failed'
+          require_css_contract 'Metadata."git-sha"'
+          require_css_contract 'Metadata."app-version"'
+          require_css_contract 'Metadata."css-sha256"'
+          require_css_contract 'metadata-directive REPLACE'
+          require_css_contract 'git-sha=$INITIAL_HEAD,app-version=$INITIAL_VERSION,css-sha256=$LOCAL_CSS_SHA'
+          require_css_contract 'cloudfront wait invalidation-completed'
+          require_css_contract '/$S3_FINAL_KEY*'
+          require_css_contract 'CSS DEPLOYMENT VERIFICATION FAILED'
+          require_css_contract 'CDN Content-Type verification failed'
+          require_css_contract 'CDN Cache-Control max-age verification failed'
+          require_css_contract 'CDN Cache-Control revalidation verification failed'
+          require_css_contract '--dump-header "$cdn_headers"'
+          require_css_contract 'immutable_git_pre_mutation_guard'
+          require_css_contract 'CSS DEPLOYMENT ABORTED — MAIN CHANGED AFTER VERIFICATION'
+          require_css_contract 'immutable_git_pre_final_promotion_guard'
+          require_css_contract 'CSS DEPLOYMENT ABORTED — MAIN CHANGED BEFORE FINAL CSS PROMOTION'
+          require_css_contract 'immutable_git_postflight'
+
+          if grep -Fq -- 'optional_cdn_read_verification' "$script"; then
+            echo "ERROR: CDN verification must be mandatory"
+            exit 1
+          fi
+
+          if grep -Fq -- 'public, max-age=31536000, immutable' "$script"; then
+            echo "ERROR: immutable browser cache found for mutable production CSS key"
+            exit 1
+          fi
+
+          if [[ "$(grep -Fc -- '--cache-control "$CSS_CACHE_CONTROL"' "$script")" -ne 2 ]]; then
+            echo "ERROR: staging and final CSS objects must use the central cache policy"
+            exit 1
+          fi
+
+          lookup_body=$(awk '/^read_current_production_css\(\)/ { capture=1 } /^read_current_cdn_css\(\)/ { if (capture) exit } capture' "$script")
+          if grep -Eq 'if ! aws|2>/dev/null|2>&1' <<< "$lookup_body"; then
+            echo "ERROR: exact-key S3 lookup suppresses or treats AWS failure as absence"
+            exit 1
+          fi
+          for s3_contract in \
+            'REMOTE_CSS_SHA=' \
+            'head-object' \
+            '"$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA"' \
+            '"$remote_content_type" == "text/css; charset=utf-8"' \
+            '"$remote_cache_control" == "$CSS_CACHE_CONTROL"' \
+            '"$remote_git_sha" == "$INITIAL_HEAD"' \
+            '"$remote_app_version" == "$INITIAL_VERSION"' \
+            '"$remote_metadata_css_sha" == "$LOCAL_CSS_SHA"'
+          do
+            if ! grep -Fq -- "$s3_contract" <<< "$lookup_body"; then
+              echo "ERROR: incomplete production S3 compliance contract: $s3_contract"
+              exit 1
+            fi
+          done
+
+          verify_body=$(awk '/^run_verify_workflow\(\)/ { capture=1 } /^confirm_production_deploy\(\)/ { if (capture) exit } capture' "$script")
+          for verify_call in read_current_production_css read_current_cdn_css calculate_verify_state; do
+            if ! grep -Fq -- "    $verify_call" <<< "$verify_body"; then
+              echo "ERROR: verify workflow is missing mandatory call: $verify_call"
+              exit 1
+            fi
+          done
+          s3_verify_line=$(grep -n '^    read_current_production_css$' <<< "$verify_body" | cut -d: -f1)
+          cdn_verify_line=$(grep -n '^    read_current_cdn_css$' <<< "$verify_body" | cut -d: -f1)
+          state_calculation_line=$(grep -n '^    calculate_verify_state$' <<< "$verify_body" | cut -d: -f1)
+          if (( s3_verify_line >= cdn_verify_line || cdn_verify_line >= state_calculation_line )); then
+            echo "ERROR: VERIFY_STATE must be calculated after S3 and CDN compliance checks"
+            exit 1
+          fi
+
+          state_body=$(awk '/^calculate_verify_state\(\)/ { capture=1 } /^immutable_git_postflight\(\)/ { if (capture) exit } capture' "$script")
+          for state_contract in \
+            '[[ "$S3_OBJECT_PRESENT" != "true" ]]' \
+            '[[ "$S3_COMPLIANT" != "true" ]]' \
+            '[[ "$CDN_COMPLIANT" != "true" ]]' \
+            'VERIFY_STATE="CSS_ALREADY_DEPLOYED"'
+          do
+            if ! grep -Fq -- "$state_contract" <<< "$state_body"; then
+              echo "ERROR: incomplete S3/CDN verify-state contract: $state_contract"
+              exit 1
+            fi
+          done
+
+          cdn_read_body=$(awk '/^read_current_cdn_css\(\)/ { capture=1 } /^calculate_verify_state\(\)/ { if (capture) exit } capture' "$script")
+          for cdn_contract in \
+            'require_command curl' \
+            '--dump-header "$cdn_headers"' \
+            'CDN_SHA=' \
+            '"$CDN_SHA" == "$LOCAL_CSS_SHA"' \
+            'text/css*' \
+            'max-age=0' \
+            'must-revalidate'
+          do
+            if ! grep -Fq -- "$cdn_contract" <<< "$cdn_read_body"; then
+              echo "ERROR: incomplete mandatory CDN compliance contract: $cdn_contract"
+              exit 1
+            fi
+          done
+
+          pre_mutation_guard_line=$(grep -n '^    immutable_git_pre_mutation_guard$' "$script" | cut -d: -f1)
+          promote_call_line=$(grep -n '^    promote_css_through_staging$' "$script" | cut -d: -f1)
+          if [[ -z "$pre_mutation_guard_line" || -z "$promote_call_line" ]] \
+            || (( pre_mutation_guard_line >= promote_call_line )); then
+            echo "ERROR: immutable main guard must run before the first production S3 mutation"
+            exit 1
+          fi
+
+          promotion_body=$(awk '/^promote_css_through_staging\(\)/ { capture=1 } /^invalidate_cloudfront_and_wait\(\)/ { if (capture) exit } capture' "$script")
+          first_promotion_aws=$(grep -m1 -E '^[[:space:]]+aws ' <<< "$promotion_body")
+          if [[ "$first_promotion_aws" != *'aws s3api put-object'* ]]; then
+            echo "ERROR: the first promotion AWS operation is not the staging put-object"
+            exit 1
+          fi
+
+          staging_hash_line=$(grep -n 'Staging S3 CSS hash verification failed' <<< "$promotion_body" | cut -d: -f1)
+          final_guard_line=$(grep -n '^    immutable_git_pre_final_promotion_guard$' <<< "$promotion_body" | cut -d: -f1)
+          final_copy_line=$(grep -n 'aws s3api copy-object' <<< "$promotion_body" | cut -d: -f1)
+          if [[ -z "$staging_hash_line" || -z "$final_guard_line" || -z "$final_copy_line" ]] \
+            || (( staging_hash_line >= final_guard_line || final_guard_line >= final_copy_line )); then
+            echo "ERROR: immutable main guard must run after staging verification and before final promotion"
+            exit 1
+          fi
+
+          deploy_body=$(awk '/^run_deploy_workflow\(\)/ { capture=1 } /^parse_action / { if (capture) exit } capture' "$script")
+          for state_pattern in \
+            'CSS_ALREADY_DEPLOYED) exit 0' \
+            'CSS_DEPLOYMENT_REQUIRED|CSS_REMOTE_OBJECT_MISSING)' \
+            '*) fail "Unexpected or empty CSS verify state"'
+          do
+            if ! grep -Fq -- "$state_pattern" <<< "$deploy_body"; then
+              echo "ERROR: missing explicit CSS verify-state allowlist branch: $state_pattern"
+              exit 1
+            fi
+          done
+
+          reject_css_contract 'git[[:space:]]+(add|commit|push|pull|merge)'
+          reject_css_contract 'npm[[:space:]]+version'
+          reject_css_contract 'sed[[:space:]]+-i.*package\.json'
+          reject_css_contract '(^|[[:space:]])ssh([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])rsync([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])pm2([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])systemctl([[:space:]]|$)'
+          reject_css_contract 'StrictHostKeyChecking=no'
+          reject_css_contract '18\.199\.'
+
+          node - <<'NODE'
+          const scripts = require('./package.json').scripts || {};
+          if (scripts['css:minify'] !== 'cleancss --inline none -o public/css/main.min.css public/css/main.css') {
+            throw new Error('css:minify changed unexpectedly');
+          }
+          if (scripts['css:verify'] !== './deploy-css-linux.sh verify') {
+            throw new Error('css:verify does not use the hardened script');
+          }
+          if (scripts['css:deploy'] !== './deploy-css-linux.sh deploy') {
+            throw new Error('css:deploy does not use the hardened script');
+          }
+          for (const [name, command] of Object.entries(scripts)) {
+            if (/aws\s+s3|cloudfront\s+create-invalidation/.test(command)) {
+              throw new Error(`direct AWS deployment npm script found: ${name}`);
+            }
+          }
+          NODE
+
+          echo "Hardened CSS deployment safety contract passed: tree=$tree_mode index=$index_mode filesystem=executable"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
