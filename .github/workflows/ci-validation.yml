@@ -31,6 +31,145 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate two-phase deployment safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          script="deploy-ubuntu.sh"
+          bash -n "$script"
+
+          require() {
+            local pattern="$1"
+            if ! grep -Eq -- "$pattern" "$script"; then
+              echo "ERROR: missing deployment safety contract: $pattern"
+              exit 1
+            fi
+          }
+
+          reject() {
+            local pattern="$1"
+            if grep -Eq -- "$pattern" "$script"; then
+              echo "ERROR: forbidden deployment workflow command found: $pattern"
+              exit 1
+            fi
+          }
+
+          require '1\) Prepare release'
+          require '2\) Deploy merged release'
+          require '3\) Exit'
+          require 'Invalid DEPLOY_ACTION'
+          require 'immutable_git_preflight'
+          require 'current_branch.*!=.*main'
+          require 'git fetch origin main'
+          require 'git status --porcelain'
+          require 'main\.\.\.origin/main'
+          require 'release/prod-\$\{NEW_VERSION\}'
+          require 'git switch -c "\$RELEASE_BRANCH"'
+          require 'git add -- package.json'
+          require 'git add -f -- public/min\.js'
+          require 'git diff --cached --name-only'
+          require 'gh pr create .*--draft'
+          require 'RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED'
+          require 'DEPLOY MERGED RELEASE: Git mutation disabled'
+          require 'git diff --exit-code -- public/min\.js'
+          require 'DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE'
+          require 'remote_apply_flags_disabled_guard'
+          require 'remote_runtime_apply_disabled_guard'
+          require 'APPLY_RUNTIME_DISABLED'
+          require 'ALLOW_REPO_TRANSFER_APPLY'
+          require 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'
+          require "exclude_file_has_exact_line '\.env'"
+          require "exclude_file_has_exact_line '\.env\.production'"
+          require 'pm2 reload payroll --update-env'
+          require 'CONFIRM_PRODUCTION_DEPLOY.*!=.*yes'
+          require 'Active users should complete/save their work before deployment\.'
+          require 'git restore --source .* --worktree -- public/min\.js'
+          require 'git ls-files --others --exclude-standard -z -- public/min\.js'
+          require 'git ls-files --others --ignored --exclude-standard -z -- public/min\.js'
+          require 'rm -rf "\$BUILD_DIR"'
+          require '--seed "\$APP_VERSION"'
+          require 'DEPLOYMENT ABORTED — PRODUCTION CDN UPLOAD IS REQUIRED'
+          require 'OBF_ENV.*==.*prod.*UPLOAD_TO_CDN.*!=.*true'
+          require 'DEPLOY_ACTION.*==.*prepare'
+          require 'check_command "gh"'
+
+          reject 'git add -A'
+          reject 'git add -f --? \.'
+          reject 'git push( +[^ ]+)* +origin +main'
+          reject 'git pull'
+          reject 'git rebase'
+          reject 'git merge'
+          reject 'git reset --hard'
+          reject 'git clean'
+          reject '--seed.*(RANDOM|date|%Y|%s|PID|\$\$)'
+          reject 'APP_VERSION=.*date'
+          reject 'UPLOAD_TO_CDN="false"'
+          reject 'AWS credentials not configured\. CDN operations will be skipped\.'
+          reject 'Cannot access S3 bucket:.*CDN upload will be skipped'
+
+          if DEPLOY_ACTION=invalid bash "$script" > /tmp/deploy-invalid-action.log 2>&1; then
+            echo "ERROR: invalid DEPLOY_ACTION unexpectedly succeeded"
+            exit 1
+          fi
+          grep -q 'Invalid DEPLOY_ACTION' /tmp/deploy-invalid-action.log
+          grep -q 'DEPLOYMENT ABORTED BEFORE PRODUCTION CHANGES' /tmp/deploy-invalid-action.log
+          if grep -Eq 'git fetch|Cleaning build directories|aws |ssh |rsync |pm2 ' /tmp/deploy-invalid-action.log; then
+            echo "ERROR: invalid DEPLOY_ACTION reached Git/build/network operations"
+            exit 1
+          fi
+
+          if [[ "$(grep -c 'remote_apply_flags_disabled_guard$' "$script")" -ne 1 ]]; then
+            echo "ERROR: expected exactly one pre-build flag-only guard invocation"
+            exit 1
+          fi
+          if [[ "$(grep -c 'remote_runtime_apply_disabled_guard$' "$script")" -ne 1 ]]; then
+            echo "ERROR: expected exactly one post-rsync runtime-service guard invocation"
+            exit 1
+          fi
+          if ! awk '{ sub(/\r$/, ""); if ($0 == ".env") found=1 } END { exit !found }' rsync-excludes.txt \
+            || ! awk '{ sub(/\r$/, ""); if ($0 == ".env.production") found=1 } END { exit !found }' rsync-excludes.txt; then
+            echo "ERROR: production env files are not both excluded from rsync"
+            exit 1
+          fi
+
+          flag_guard_body=$(awk '/^remote_apply_flags_disabled_guard\(\)/ { capture=1 } /^remote_runtime_apply_disabled_guard\(\)/ { if (capture) exit } capture' "$script")
+          runtime_guard_body=$(awk '/^remote_runtime_apply_disabled_guard\(\)/ { capture=1 } /^get_file_size\(\)/ { if (capture) exit } capture' "$script")
+          if grep -q 'apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService' <<< "$flag_guard_body"; then
+            echo "ERROR: pre-build flag-only guard imports the new runtime service"
+            exit 1
+          fi
+          if ! grep -q 'apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService' <<< "$runtime_guard_body"; then
+            echo "ERROR: post-rsync guard does not import the runtime service"
+            exit 1
+          fi
+
+          flag_guard_line=$(grep -n 'remote_apply_flags_disabled_guard$' "$script" | cut -d: -f1)
+          runtime_guard_line=$(grep -n 'remote_runtime_apply_disabled_guard$' "$script" | cut -d: -f1)
+          gh_check_line=$(grep -n 'check_command "gh"' "$script" | cut -d: -f1)
+          gh_guard_line=$(sed -n "$((gh_check_line - 1))p" "$script")
+          if [[ "$gh_guard_line" != *'DEPLOY_ACTION" == "prepare"'* ]]; then
+            echo "ERROR: gh prerequisite is not prepare-only"
+            exit 1
+          fi
+          build_cleanup_line=$(grep -n 'BUILD_STARTED="true"' "$script" | cut -d: -f1)
+          prepare_exit_line=$(grep -n 'RELEASE PREPARED — NO PRODUCTION DEPLOYMENT PERFORMED' "$script" | cut -d: -f1)
+          first_s3_line=$(grep -m1 -n 'aws s3 sync' "$script" | cut -d: -f1)
+          first_rsync_line=$(grep -n '^rsync -az' "$script" | cut -d: -f1)
+          first_pm2_reload_line=$(grep -n 'pm2 reload payroll --update-env' "$script" | cut -d: -f1)
+          if (( flag_guard_line >= build_cleanup_line )); then
+            echo "ERROR: first runtime guard must run before local build cleanup"
+            exit 1
+          fi
+          if (( runtime_guard_line <= first_rsync_line || runtime_guard_line >= first_pm2_reload_line )); then
+            echo "ERROR: second runtime guard must run after rsync and before PM2 reload"
+            exit 1
+          fi
+          if (( prepare_exit_line >= first_s3_line || prepare_exit_line >= first_rsync_line || prepare_exit_line >= first_pm2_reload_line )); then
+            echo "ERROR: prepare mode must terminate before production operations"
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
