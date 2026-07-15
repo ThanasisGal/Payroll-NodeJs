@@ -39,7 +39,7 @@ EXCLUDES_FILE="$PROJECT_DIR/rsync-excludes.txt"
 OBF_ENV="${OBF_ENV:-prod}"
 SKIP_OBFUSCATION="${SKIP_OBFUSCATION:-false}"
 UPLOAD_TO_CDN="${UPLOAD_TO_CDN:-true}"
-APP_VERSION=$(date '+%Y%m%d%H%M%S')
+APP_VERSION=""
 DEPLOYMENT_PHASE="Phase 1"
 DEPLOY_ACTION="${DEPLOY_ACTION:-}"
 DEPLOY_ACTION_WAS_PROVIDED="false"
@@ -221,11 +221,49 @@ immutable_git_preflight() {
     log_success "Immutable Git preflight passed at $INITIAL_HEAD"
 }
 
+remote_apply_flags_disabled_guard() {
+    log_info "Verifying remote linked repo-transfer apply flags are disabled..."
+    ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'FLAGS_GUARD'
+        set -euo pipefail
+        cd ~/Payroll-NodeJs
+
+        node <<'NODE'
+require('dotenv').config({ override: false });
+const flagNames = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'];
+const enabled = flagNames.some(name => String(process.env[name] || '').trim().toLowerCase() === 'true');
+if (enabled) {
+    console.error('REMOTE APPLY FLAGS GUARD FAILED');
+    process.exit(1);
+}
+NODE
+
+        if pm2 describe payroll >/dev/null 2>&1; then
+            PM2_JSON="$(pm2 jlist)" node <<'NODE'
+const processInfo = JSON.parse(process.env.PM2_JSON).find(item => item.name === 'payroll');
+const env = processInfo?.pm2_env || {};
+const unsafe = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY']
+    .some(key => String(env[key] || '').trim().toLowerCase() === 'true');
+if (unsafe) {
+    console.error('REMOTE APPLY FLAGS GUARD FAILED');
+    process.exit(1);
+}
+NODE
+        fi
+        echo 'REMOTE APPLY FLAGS DISABLED'
+FLAGS_GUARD
+}
+
 remote_runtime_apply_disabled_guard() {
-    log_info "Verifying linked repo-transfer apply remains disabled on EC2..."
+    log_info "Verifying linked repo-transfer runtime service after rsync..."
     ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'RUNTIME_GUARD'
         set -euo pipefail
         cd ~/Payroll-NodeJs
+
+        SERVICE_FILE='server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js'
+        if [[ ! -f "$SERVICE_FILE" ]]; then
+            echo 'APPLY RUNTIME GUARD FAILED'
+            exit 1
+        fi
 
         node <<'NODE'
 require('dotenv').config({ override: false });
@@ -235,22 +273,21 @@ if (state.enabled !== false || state.code !== 'APPLY_RUNTIME_DISABLED') {
     console.error('APPLY RUNTIME GUARD FAILED');
     process.exit(1);
 }
-console.log('APPLY RUNTIME DISABLED');
 NODE
 
         if pm2 describe payroll >/dev/null 2>&1; then
             PM2_JSON="$(pm2 jlist)" node <<'NODE'
 const processInfo = JSON.parse(process.env.PM2_JSON).find(item => item.name === 'payroll');
-    const env = processInfo?.pm2_env || {};
-    const unsafe = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY']
-        .some(key => String(env[key] || '').trim().toLowerCase() === 'true');
-    if (unsafe) {
-        console.error('PM2 APPLY RUNTIME GUARD FAILED');
-        process.exit(1);
-    }
-    console.log('PM2 APPLY FLAGS DISABLED');
+const env = processInfo?.pm2_env || {};
+const unsafe = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY']
+    .some(key => String(env[key] || '').trim().toLowerCase() === 'true');
+if (unsafe) {
+    console.error('APPLY RUNTIME GUARD FAILED');
+    process.exit(1);
+}
 NODE
         fi
+        echo 'APPLY RUNTIME DISABLED'
 RUNTIME_GUARD
 }
 
@@ -293,7 +330,9 @@ cd "$PROJECT_DIR" || exit 1
 check_command "node"
 check_command "npm"
 check_command "git"
-check_command "gh"
+if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
+    check_command "gh"
+fi
 
 immutable_git_preflight
 
@@ -416,6 +455,7 @@ obfuscate_file() {
         --compact true
         --simplify false
         --identifier-names-generator mangled-shuffled
+        --seed "$APP_VERSION"
         --identifiers-prefix "$id_prefix"
         --rename-globals false
         --string-array false
@@ -932,7 +972,7 @@ else
     fi
 
     # Read-only guard before the local production rebuild and any production operation.
-    remote_runtime_apply_disabled_guard
+    remote_apply_flags_disabled_guard
 fi
 
 echo ""
@@ -1238,7 +1278,19 @@ if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
     fi
 
     git status --short
-    git add -- package.json public/min.js
+    git add -- package.json
+    git add -f -- public/min.js
+    staged_scope_invalid="false"
+    while IFS= read -r staged_path; do
+        case "$staged_path" in
+            package.json|public/min.js/*) ;;
+            *) staged_scope_invalid="true"; log_error "Unexpected staged path: $staged_path" ;;
+        esac
+    done < <(git diff --cached --name-only)
+    if [[ "$staged_scope_invalid" == "true" ]]; then
+        log_error "Release staged scope must contain only package.json and public/min.js artifacts."
+        exit 1
+    fi
     git diff --cached --check
     if git diff --cached --quiet; then
         log_error "Release preparation produced no scoped changes to commit."
@@ -1290,22 +1342,27 @@ fi
 check_command "rsync"
 check_command "aws"
 
+if [[ "$OBF_ENV" == "prod" && "$UPLOAD_TO_CDN" != "true" ]]; then
+    log_error "DEPLOYMENT ABORTED — PRODUCTION CDN UPLOAD IS REQUIRED"
+    exit 1
+fi
+
 log_info "Running AWS pre-flight checks..."
 if aws sts get-caller-identity &>/dev/null; then
     CALLER_INFO=$(aws sts get-caller-identity --output json 2>/dev/null)
     USER_ARN=$(echo "$CALLER_INFO" | grep -o '"Arn": *"[^"]*"' | cut -d'"' -f4)
     log_success "AWS Credentials OK: $USER_ARN"
 else
-    log_warning "AWS credentials not configured. CDN operations will be skipped."
-    UPLOAD_TO_CDN="false"
+    log_error "DEPLOYMENT ABORTED — PRODUCTION CDN UPLOAD IS REQUIRED"
+    exit 1
 fi
 
 if [[ "$UPLOAD_TO_CDN" == "true" ]]; then
     if aws s3 ls "s3://$S3_BUCKET/" --region "$AWS_REGION" &>/dev/null; then
         log_success "S3 bucket accessible: $S3_BUCKET"
     else
-        log_warning "Cannot access S3 bucket: $S3_BUCKET - CDN upload will be skipped"
-        UPLOAD_TO_CDN="false"
+        log_error "DEPLOYMENT ABORTED — PRODUCTION CDN UPLOAD IS REQUIRED"
+        exit 1
     fi
     log_info "Checking CloudFront distribution: $CLOUDFRONT_DIST_ID"
     aws cloudfront get-distribution --id "$CLOUDFRONT_DIST_ID" --region us-east-1 &>/dev/null 2>&1 \
