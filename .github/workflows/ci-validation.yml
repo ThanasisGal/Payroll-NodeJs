@@ -288,7 +288,7 @@ jobs:
           require_css_contract 'require_command curl'
           require_css_contract '?verify=${LOCAL_CSS_SHA}-${INITIAL_HEAD}'
           require_css_contract 'Production CDN CSS response is empty'
-          require_css_contract 'Malformed production CDN response headers'
+          require_css_contract 'Malformed production CDN response headers: no valid final HTTP response block'
           require_css_contract 'calculate_verify_state'
           require_css_contract 's3_compliant=$S3_COMPLIANT'
           require_css_contract 'cdn_compliant=$CDN_COMPLIANT'
@@ -399,6 +399,70 @@ jobs:
               exit 1
             fi
           done
+
+          fixture_dir=$(mktemp -d)
+          trap 'rm -rf -- "$fixture_dir"' EXIT
+          printf 'fixture-css' > "$fixture_dir/body.css"
+          fixture_sha=$(sha256sum "$fixture_dir/body.css" | awk '{ print $1 }')
+
+          run_cdn_fixture() (
+            source "$script"
+            TEMP_DIR="$fixture_dir/run"
+            mkdir -p "$TEMP_DIR"
+            LOCAL_CSS_SHA="$fixture_sha"
+            INITIAL_HEAD="fixture-head"
+            FIXTURE_HEADERS="$1"
+            curl() {
+              local headers_output body_output
+              while (( $# )); do
+                case "$1" in
+                  --dump-header) headers_output="$2"; shift 2 ;;
+                  --output) body_output="$2"; shift 2 ;;
+                  *) shift ;;
+                esac
+              done
+              cp "$FIXTURE_HEADERS" "$headers_output"
+              cp "$fixture_dir/body.css" "$body_output"
+            }
+            read_current_cdn_css
+            printf '%s\n' "$CDN_COMPLIANT"
+          )
+
+          printf 'HTTP/1.1 200 OK\r\nContent-Type: text/css; charset=utf-8\r\n\r\n' \
+            > "$fixture_dir/no-cache-control.headers"
+          test "$(run_cdn_fixture "$fixture_dir/no-cache-control.headers")" = "false"
+
+          printf 'HTTP/1.1 301 Moved Permanently\r\nContent-Type: text/html\r\nCache-Control: no-cache\r\n\r\nHTTP/2 200\r\nContent-Type: text/css\r\nCache-Control: public, max-age=3600\r\n\r\n' \
+            > "$fixture_dir/wrong-cache-control.headers"
+          test "$(run_cdn_fixture "$fixture_dir/wrong-cache-control.headers")" = "false"
+
+          printf 'HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 200\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: public, max-age=0, must-revalidate\r\n\r\n' \
+            > "$fixture_dir/compliant.headers"
+          test "$(run_cdn_fixture "$fixture_dir/compliant.headers")" = "true"
+
+          printf 'Content-Type: text/css\r\nCache-Control: public, max-age=0, must-revalidate\r\n' \
+            > "$fixture_dir/malformed.headers"
+          if run_cdn_fixture "$fixture_dir/malformed.headers" > "$fixture_dir/malformed.log" 2>&1; then
+            echo "ERROR: malformed HTTP header fixture unexpectedly succeeded"
+            exit 1
+          fi
+          grep -Fq 'Malformed production CDN response headers: no valid final HTTP response block' \
+            "$fixture_dir/malformed.log"
+
+          if (
+            source "$script"
+            TEMP_DIR="$fixture_dir/network-failure"
+            mkdir -p "$TEMP_DIR"
+            LOCAL_CSS_SHA="$fixture_sha"
+            INITIAL_HEAD="fixture-head"
+            curl() { return 22; }
+            read_current_cdn_css
+          ); then
+            echo "ERROR: CDN network/HTTP failure unexpectedly succeeded"
+            exit 1
+          fi
+
+          echo "CDN stale-header classification regression contract passed"
 
           pre_mutation_guard_line=$(grep -n '^    immutable_git_pre_mutation_guard$' "$script" | cut -d: -f1)
           promote_call_line=$(grep -n '^    promote_css_through_staging$' "$script" | cut -d: -f1)

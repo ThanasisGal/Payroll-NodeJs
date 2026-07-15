@@ -197,16 +197,34 @@ read_current_production_css() {
     REMOTE_CSS_SHA="$(sha256sum "$remote_css" | awk '{ print $1 }')"
 
     local remote_content_type remote_cache_control remote_git_sha remote_app_version remote_metadata_css_sha
-    read -r remote_content_type remote_cache_control remote_git_sha remote_app_version remote_metadata_css_sha < <(
-        aws s3api head-object \
+    local head_response
+    head_response="$(aws s3api head-object \
             --bucket "$S3_BUCKET" \
             --key "$S3_FINAL_KEY" \
             --region "$AWS_REGION" \
             --query '[ContentType,CacheControl,Metadata."git-sha",Metadata."app-version",Metadata."css-sha256"]' \
-            --output text
-    )
-    [[ -n "$remote_content_type" && -n "$remote_cache_control" ]] \
+            --output json)"
+    mapfile -t remote_metadata_values < <(node -e '
+        let input = "";
+        process.stdin.setEncoding("utf8");
+        process.stdin.on("data", chunk => { input += chunk; });
+        process.stdin.on("end", () => {
+            let values;
+            try { values = JSON.parse(input); } catch { process.exit(1); }
+            if (!Array.isArray(values) || values.length !== 5) process.exit(1);
+            for (const value of values) {
+                if (value !== null && typeof value !== "string") process.exit(1);
+                process.stdout.write(`${value ?? ""}\n`);
+            }
+        });
+    ' <<< "$head_response")
+    [[ "${#remote_metadata_values[@]}" -eq 5 ]] \
         || fail "Malformed production S3 CSS metadata response"
+    remote_content_type="${remote_metadata_values[0]}"
+    remote_cache_control="${remote_metadata_values[1]}"
+    remote_git_sha="${remote_metadata_values[2]}"
+    remote_app_version="${remote_metadata_values[3]}"
+    remote_metadata_css_sha="${remote_metadata_values[4]}"
 
     if [[ "$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA" \
         && "$remote_content_type" == "text/css; charset=utf-8" \
@@ -218,6 +236,36 @@ read_current_production_css() {
     else
         S3_COMPLIANT="false"
     fi
+}
+
+parse_final_http_response_headers() {
+    local headers_file="$1"
+    awk '
+        BEGIN { IGNORECASE=1; block=0; valid=0 }
+        /^HTTP\/[0-9]+(\.[0-9]+)?[[:space:]]+[0-9][0-9][0-9]([[:space:]]|$)/ {
+            block++
+            valid=1
+            content_type=""
+            cache_control=""
+            next
+        }
+        block && /^Content-Type:/ {
+            sub(/^[^:]*:[[:space:]]*/, "")
+            sub(/\r$/, "")
+            content_type=$0
+            next
+        }
+        block && /^Cache-Control:/ {
+            sub(/^[^:]*:[[:space:]]*/, "")
+            sub(/\r$/, "")
+            cache_control=$0
+        }
+        END {
+            if (!valid) exit 1
+            print content_type
+            print cache_control
+        }
+    ' "$headers_file"
 }
 
 read_current_cdn_css() {
@@ -233,10 +281,16 @@ read_current_cdn_css() {
     [[ -s "$cdn_probe" ]] || fail "Production CDN CSS response is empty"
     [[ -s "$cdn_headers" ]] || fail "Production CDN response headers are empty"
 
-    cdn_content_type="$(awk 'BEGIN { IGNORECASE=1 } /^Content-Type:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
-    cdn_cache_control="$(awk 'BEGIN { IGNORECASE=1 } /^Cache-Control:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
-    [[ -n "$cdn_content_type" && -n "$cdn_cache_control" ]] \
-        || fail "Malformed production CDN response headers"
+    local parsed_headers
+    if ! parsed_headers="$(parse_final_http_response_headers "$cdn_headers")"; then
+        fail "Malformed production CDN response headers: no valid final HTTP response block"
+    fi
+    cdn_content_type="${parsed_headers%%$'\n'*}"
+    if [[ "$parsed_headers" == *$'\n'* ]]; then
+        cdn_cache_control="${parsed_headers#*$'\n'}"
+    else
+        cdn_cache_control=""
+    fi
 
     CDN_SHA="$(sha256sum "$cdn_probe" | awk '{ print $1 }')"
     if [[ "$CDN_SHA" == "$LOCAL_CSS_SHA" \
@@ -470,8 +524,10 @@ run_deploy_workflow() {
     log "git_sha=$INITIAL_HEAD css_sha256=$LOCAL_CSS_SHA invalidation_id=$INVALIDATION_ID"
 }
 
-parse_action "$@"
-case "$ACTION" in
-    verify) run_verify_workflow ;;
-    deploy) run_deploy_workflow ;;
-esac
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    parse_action "$@"
+    case "$ACTION" in
+        verify) run_verify_workflow ;;
+        deploy) run_deploy_workflow ;;
+    esac
+fi
