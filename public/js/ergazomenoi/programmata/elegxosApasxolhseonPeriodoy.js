@@ -4,8 +4,12 @@ function userCanReviewEdit() {
     return document.getElementById('canReviewEdit')?.value === '1';
 }
 
-function canSeePolicyPriorityBadges() {
-    return userCanReviewEdit();
+function userCanRecordRepoTransferDecision() {
+    return document.getElementById('canRecordRepoTransferDecision')?.value === '1';
+}
+
+function userCanApplyRepoTransferDecision() {
+    return document.getElementById('canApplyRepoTransferDecision')?.value === '1';
 }
 
 function num(value) {
@@ -295,22 +299,16 @@ function renderScenarioBadge(row) {
     if (!decision || !decision.scenario_code) return '';
 
     const label = scenarioLabel(decision);
-    const confidence = scenarioConfidenceLabel(decision.confidence);
     const badgeClass =
         decision.requires_review === true
             ? 'review-scenario-badge review-scenario-badge-review'
             : 'review-scenario-badge review-scenario-badge-classified';
     const title = scenarioTitle(decision);
-    const confidenceHtml = canSeePolicyPriorityBadges() && confidence
-        ? `<span class="review-scenario-confidence">${escapeHtml(confidence)}</span>`
-        : '';
-
     return `
         <div class="review-scenario-badge-row">
             <span class="${badgeClass}" title="${escapeHtml(title)}">
                 ${escapeHtml(label)}
             </span>
-            ${confidenceHtml}
         </div>
     `;
 }
@@ -679,7 +677,7 @@ function renderScenarioDetailsSection(row) {
             <div class="review-scenario-summary">
                 <span class="review-badge">${escapeHtml(label)}</span>
                 ${code ? `<span class="review-badge">${escapeHtml(code)}</span>` : ''}
-                ${confidence ? `<span class="review-badge">Βεβαιότητα: ${escapeHtml(confidence)}</span>` : ''}
+                ${confidence ? `<span class="review-badge">Βεβαιότητα αντιστοίχισης: ${escapeHtml(confidence)}</span>` : ''}
                 ${status ? `<span class="review-badge">Κατάσταση: ${escapeHtml(status)}</span>` : ''}
                 <span class="review-badge">${escapeHtml(reviewText)}</span>
             </div>
@@ -3928,9 +3926,12 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
         INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.',
         NOT_AUTHORIZED: 'Δεν έχετε δικαίωμα εφαρμογής εγκεκριμένης πρότασης.'
     };
+    const canApply = userCanApplyRepoTransferDecision();
     const applyHtml = applyState === 'ALREADY_APPLIED' && decisionState?.current_execution
         ? `<div class="mt-2"><span class="badge text-bg-success">Η πρόταση εφαρμόστηκε</span><span class="small ms-2">${escapeHtml(formatPolicyPreviewDateTime(decisionState.current_execution.applied_at))}</span></div>`
-        : !isCurrentApproval ? '' : `<div class="mt-2">
+        : !isCurrentApproval ? '' : !canApply
+        ? '<div class="small text-muted mt-2">Δεν έχετε δικαίωμα εφαρμογής.</div>'
+        : `<div class="mt-2">
                <button type="button" class="btn btn-sm policy-preview-decision-success atomic-repo-transfer-apply-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-id="${escapeHtml(recordedDecision?.id || '')}" ${applyState === 'READY_TO_APPLY' ? '' : 'disabled aria-disabled="true"'}>Εφαρμογή εγκεκριμένης μεταφοράς</button>
                ${applyMessages[applyState] ? `<div class="small text-muted mt-1">${escapeHtml(applyMessages[applyState])}</div>` : ''}
            </div>`;
@@ -3949,10 +3950,10 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                </div>
            </details>`
         : '';
-    const decisionButtons = Object.entries(decisionLabels).map(([code, label]) => {
+    const decisionButtons = userCanRecordRepoTransferDecision() ? Object.entries(decisionLabels).map(([code, label]) => {
         const style = code === 'APPROVE_PROPOSAL' ? 'policy-preview-decision-success' : code === 'REJECT_PROPOSAL' ? 'policy-preview-decision-danger' : 'policy-preview-decision-warning';
         return `<button type="button" class="btn btn-sm ${style} atomic-repo-transfer-decision-btn" data-atomic-group-index="${escapeHtml(index)}" data-decision-code="${escapeHtml(code)}" ${recordedDecision || !hasSpecificBranch ? 'disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
-    }).join('');
+    }).join('') : '';
     return `
         <article class="atomic-repo-transfer-group" data-atomic-group-id="${escapeHtml(
             group.group_id || ''
@@ -3972,7 +3973,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                     <div class="atomic-repo-transfer-safety-flags">
                         <span>Μία πρόταση / δύο συνδεδεμένες αλλαγές</span>
                         <span>Μόνο για έλεγχο</span>
-                        <span>Δεν μπορεί να εφαρμοστεί</span>
+                        <span>Η πρόταση δεν είναι διαθέσιμη για εφαρμογή στην παρούσα κατάσταση.</span>
                     </div>
                 </div>
                 <button
@@ -4087,6 +4088,7 @@ async function refreshRepoTransferDecisions() {
 }
 
 async function submitRepoTransferDecision(group, decisionCode) {
+    if (!userCanRecordRepoTransferDecision()) return;
     if (repoTransferDecisionSubmitting) return;
     const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
     if (!selectedBranch || selectedBranch.toUpperCase() === 'ALL' || selectedBranch.includes(',')) {
@@ -4112,6 +4114,7 @@ async function submitRepoTransferDecision(group, decisionCode) {
 }
 
 async function submitRepoTransferApply(group, decisionId, button) {
+    if (!userCanApplyRepoTransferDecision()) return;
     if (!decisionId || repoTransferApplySubmitting.has(decisionId)) return;
     repoTransferApplySubmitting.add(decisionId);
     button.disabled = true;

@@ -1,6 +1,8 @@
 const assert = require('assert');
 const {
     validateCommand,
+    DECISION_ALLOWED_ROLES,
+    isWeeklyRepoTransferDecisionRoleAllowed,
     createWeeklyRepoTransferDecision,
     listWeeklyRepoTransferDecisions,
     MAX_COMMAND_BYTES
@@ -72,6 +74,52 @@ async function run() {
     assertStatus(() => validateCommand({ ...command, expected_target_id: SOURCE }), 400);
     assertStatus(() => validateCommand({ ...command, notes: 'x'.repeat(2001) }), 400);
     assertStatus(() => validateCommand({ ...command, blob: 'x'.repeat(MAX_COMMAND_BYTES) }), 413);
+
+    assert.deepStrictEqual(DECISION_ALLOWED_ROLES, ['A', 'S', 'HR']);
+    ['A', 'S', 'HR', ' hr '].forEach((role) => assert.strictEqual(isWeeklyRepoTransferDecisionRoleAllowed(role), true));
+    ['UNKNOWN', '', null, undefined].forEach((role) => assert.strictEqual(isWeeklyRepoTransferDecisionRoleAllowed(role), false));
+
+    for (const role of ['A', 'S', 'HR']) {
+        const allowedModel = fakeModel();
+        const result = await createWeeklyRepoTransferDecision({
+            session: { ...session, userRole: role },
+            payload: { ...command, request_id: `allowed-${role.toLowerCase()}-request` },
+            decisionModel: allowedModel,
+            reconstruct: async () => reconstruction()
+        });
+        assert.strictEqual(result.decision.decision_code, 'APPROVE_PROPOSAL');
+        assert.strictEqual(allowedModel.records.length, 1);
+        assert.strictEqual(allowedModel.records[0].created_by_user_role, role);
+    }
+
+    const deniedSessions = [
+        { ...session, userRole: 'UNKNOWN' },
+        { ...session, userRole: '' },
+        { ...session, userRole: null },
+        { ...session, userRole: undefined },
+        { ...session, userStatus: 'I' },
+        { ...session, userId: 'invalid-user-id' },
+        { ...session, userTeam: '' },
+        { ...session, companyInUse: '' }
+    ];
+    for (const deniedSession of deniedSessions) {
+        const deniedModel = fakeModel();
+        let reconstructionCalls = 0;
+        let createCalls = 0;
+        deniedModel.create = async () => { createCalls++; throw new Error('create must not run'); };
+        await assert.rejects(
+            () => createWeeklyRepoTransferDecision({
+                session: deniedSession,
+                payload: command,
+                decisionModel: deniedModel,
+                reconstruct: async () => { reconstructionCalls++; return reconstruction(); }
+            }),
+            (error) => error.statusCode === 403 && error.code === 'DECISION_NOT_AUTHORIZED'
+        );
+        assert.strictEqual(reconstructionCalls, 0);
+        assert.strictEqual(createCalls, 0);
+        assert.strictEqual(deniedModel.records.length, 0);
+    }
 
     for (const decision_code of ['APPROVE_PROPOSAL', 'REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
         const perDecisionModel = fakeModel();

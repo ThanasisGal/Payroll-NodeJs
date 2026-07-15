@@ -5,6 +5,8 @@ const vm = require('vm');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
+const viewPath = path.join(__dirname, '..', '..', '..', '..', 'views', 'ergazomenoi', 'programmata', 'elegxosApasxolhseonPeriodoy.ejs');
+const viewSource = fs.readFileSync(viewPath, 'utf8');
 const cssPath = path.join(__dirname, '..', '..', '..', 'css', 'main.css');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
 const elementsById = new Map();
@@ -40,6 +42,15 @@ const sandbox = {
 
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox, { filename: sourcePath });
+
+function setRepoTransferPermissions({ decision, apply } = {}) {
+    if (decision === undefined) elementsById.delete('canRecordRepoTransferDecision');
+    else elementsById.set('canRecordRepoTransferDecision', { value: decision ? '1' : '0' });
+    if (apply === undefined) elementsById.delete('canApplyRepoTransferDecision');
+    else elementsById.set('canApplyRepoTransferDecision', { value: apply ? '1' : '0' });
+}
+
+setRepoTransferPermissions({ decision: true, apply: true });
 
 function proposedValues({ category, repo, hours, intervals = [] }) {
     const values = {
@@ -237,6 +248,58 @@ function testReadOnlySafety() {
     assert.ok(html.includes('Χρειάζεται περαιτέρω έλεγχο'));
     assert.ok(html.includes('Απόφαση για ολόκληρη τη συνδεδεμένη πρόταση'));
     assert.ok(!html.includes('onclick='));
+}
+
+function testServerDerivedRepoTransferPermissionsAndRoleVisibility() {
+    assert.ok(viewSource.includes('id="canRecordRepoTransferDecision"'));
+    assert.ok(viewSource.includes('id="canApplyRepoTransferDecision"'));
+    assert.ok(viewSource.includes("['A', 'S', 'HR'].includes(normalizedUserRole)"));
+    assert.ok(viewSource.includes("['A', 'S'].includes(normalizedUserRole)"));
+    assert.ok(viewSource.includes('id="canReviewEdit"'));
+    assert.ok(!viewSource.includes('id="currentUserRole"'));
+    assert.ok(!viewSource.includes('id="userRole"'));
+    assert.ok(!source.includes('userCanRecordRepoTransferDecision() {\n    return userCanReviewEdit()'));
+    assert.ok(!source.includes('userCanApplyRepoTransferDecision() {\n    return userCanReviewEdit()'));
+
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    for (const permissions of [
+        { role: 'A', decision: true, apply: true },
+        { role: 'S', decision: true, apply: true },
+        { role: 'HR', decision: true, apply: false },
+        { role: 'UNKNOWN', decision: false, apply: false }
+    ]) {
+        setRepoTransferPermissions(permissions);
+        vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'READY_TO_APPLY', apply_allowed: true, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', is_current: true }, history: [] }]])", sandbox);
+        const html = render(readyProjection());
+        assert.strictEqual((html.match(/atomic-repo-transfer-decision-btn/g) || []).length, permissions.decision ? 3 : 0, permissions.role);
+        assert.strictEqual(html.includes('atomic-repo-transfer-apply-btn'), permissions.apply, permissions.role);
+    }
+
+    setRepoTransferPermissions();
+    const missing = render(readyProjection());
+    assert.strictEqual((missing.match(/atomic-repo-transfer-decision-btn/g) || []).length, 0);
+    assert.ok(!missing.includes('atomic-repo-transfer-apply-btn'));
+    elementsById.set('canReviewEdit', { value: '1' });
+    const noFallback = render(readyProjection());
+    assert.strictEqual((noFallback.match(/atomic-repo-transfer-decision-btn/g) || []).length, 0);
+    assert.ok(!noFallback.includes('atomic-repo-transfer-apply-btn'));
+    elementsById.delete('canReviewEdit');
+    setRepoTransferPermissions({ decision: true, apply: true });
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function testConfidenceAndDecisionTerminology() {
+    const primary = sandbox.renderScenarioBadge({ scenarioDecision: { scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW', confidence: 'HIGH', requires_review: true } });
+    assert.ok(primary.includes('ΠΡΟΣ ΕΛΕΓΧΟ'));
+    assert.ok(!getVisibleText(primary).includes('Υψηλή'));
+    assert.ok(!getVisibleText(primary).includes('Μεσαία'));
+    assert.ok(!getVisibleText(primary).includes('Χαμηλή'));
+    const details = sandbox.renderScenarioDetailsSection({ scenarioDecision: { scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW', confidence: 'HIGH', requires_review: true } });
+    assert.ok(details.includes('Βεβαιότητα αντιστοίχισης: Υψηλή'));
+    assert.ok(!details.includes('Προτεραιότητα'));
+    assert.ok(source.includes("NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο'"));
+    assert.ok(source.includes('Η πρόταση δεν είναι διαθέσιμη για εφαρμογή στην παρούσα κατάσταση.'));
+    assert.ok(!source.includes('<span>Δεν μπορεί να εφαρμοστεί</span>'));
 }
 
 function testBranchRequiredForDecisionButtons() {
@@ -657,6 +720,8 @@ const tests = [
     testPartTimeTargetIsNotAnError,
     testEmptyFirstIntervalDoesNotCompactSecond,
     testReadOnlySafety,
+    testServerDerivedRepoTransferPermissionsAndRoleVisibility,
+    testConfidenceAndDecisionTerminology,
     testBranchRequiredForDecisionButtons,
     testAllBranchSkipsDecisionRequests,
     testOnlyCurrentDecisionDisablesButtons,

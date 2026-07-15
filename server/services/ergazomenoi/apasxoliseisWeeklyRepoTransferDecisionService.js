@@ -6,11 +6,32 @@ const { reconstructWeeklyRepoTransferDecision } = require('./apasxoliseisWeeklyR
 const { getAtomicPeriodRangeDiagnostic } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
 
 const DECISION_CODES = Object.freeze(['APPROVE_PROPOSAL', 'REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']);
+const DECISION_ALLOWED_ROLES = Object.freeze(['A', 'S', 'HR']);
 const COMMAND_KEYS = Object.freeze(['proposal_id','expected_source_id','expected_target_id','expected_proposal_version','expected_choice_code','decision_code','notes','request_id']);
 const MAX_COMMAND_BYTES = 16 * 1024;
 
 function errorWithStatus(message, statusCode) { const error = new Error(message); error.statusCode = statusCode; return error; }
+function decisionAuthorizationError() {
+    const error = errorWithStatus('Δεν έχετε δικαίωμα καταγραφής απόφασης.', 403);
+    error.code = 'DECISION_NOT_AUTHORIZED';
+    return error;
+}
 function text(value, max) { return String(value ?? '').trim().slice(0, max); }
+function isWeeklyRepoTransferDecisionRoleAllowed(role) {
+    return DECISION_ALLOWED_ROLES.includes(String(role ?? '').trim().toUpperCase());
+}
+function assertWeeklyRepoTransferDecisionAuthorization(session = {}) {
+    let scope;
+    try {
+        scope = validateSessionScope(session);
+    } catch {
+        throw decisionAuthorizationError();
+    }
+    if (!isWeeklyRepoTransferDecisionRoleAllowed(scope.created_by_user_role)) {
+        throw decisionAuthorizationError();
+    }
+    return scope;
+}
 function validateCommand(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw errorWithStatus('Μη έγκυρη εντολή απόφασης.', 400);
     let bytes; try { bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8'); } catch { throw errorWithStatus('Μη έγκυρη εντολή απόφασης.', 400); }
@@ -31,7 +52,7 @@ function validateCommand(payload) {
     return command;
 }
 function scopeFromSession(session) {
-    const base = validateSessionScope(session);
+    const base = assertWeeklyRepoTransferDecisionAuthorization(session);
     return {
         ...base,
         year: text(session.yearInUse, 10),
@@ -123,4 +144,4 @@ async function listWeeklyRepoTransferDecisions({ session, filters = {}, decision
     return records.map((record) => presentation(record, currentFingerprint));
 }
 
-module.exports = { DECISION_CODES, COMMAND_KEYS, MAX_COMMAND_BYTES, validateCommand, scopeFromSession, commandIdentity, createWeeklyRepoTransferDecision, listWeeklyRepoTransferDecisions, presentation };
+module.exports = { DECISION_CODES, DECISION_ALLOWED_ROLES, COMMAND_KEYS, MAX_COMMAND_BYTES, validateCommand, isWeeklyRepoTransferDecisionRoleAllowed, assertWeeklyRepoTransferDecisionAuthorization, scopeFromSession, commandIdentity, createWeeklyRepoTransferDecision, listWeeklyRepoTransferDecisions, presentation };
