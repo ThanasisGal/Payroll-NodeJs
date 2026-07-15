@@ -168,6 +168,28 @@ const {
 const {
     loadWeeklyRepoTransferDecisionBatch
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService');
+const { applyWeeklyRepoTransfer } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService');
+const { validateApplySession } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService');
+const { getWeeklyRepoTransferApplyRuntimeState } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
+const { assertWeeklyRepoTransferApplyIndexesReady } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
+
+const REPO_TRANSFER_APPLY_ERRORS = Object.freeze({
+    APPLY_RUNTIME_DISABLED: [503, 'Η εφαρμογή εγκεκριμένων μεταφορών ρεπό δεν είναι ενεργοποιημένη.'],
+    APPLY_INDEXES_NOT_READY: [503, 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη στο ενεργό περιβάλλον.'],
+    TRANSACTIONS_UNAVAILABLE: [503, 'Η ασφαλής ατομική εφαρμογή δεν υποστηρίζεται από την ενεργή βάση.'],
+    APPLY_NOT_AUTHORIZED: [403, 'Δεν έχετε δικαίωμα εφαρμογής εγκεκριμένης πρότασης.'],
+    DECISION_NOT_FOUND: [404, 'Η απόφαση δεν βρέθηκε στο ενεργό εταιρικό πλαίσιο.'],
+    DECISION_NOT_APPROVED: [409, 'Μόνο εγκεκριμένη απόφαση μπορεί να εφαρμοστεί.'],
+    DECISION_ALREADY_APPLIED: [409, 'Η απόφαση έχει ήδη εφαρμοστεί.'],
+    REQUEST_ID_CONFLICT: [409, 'Το αναγνωριστικό αιτήματος έχει χρησιμοποιηθεί για διαφορετική εντολή.'],
+    STALE_FINGERPRINT: [409, 'Τα δεδομένα της πρότασης έχουν αλλάξει. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    SOURCE_STALE: [409, 'Τα δεδομένα της πρότασης έχουν αλλάξει. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    TARGET_STALE: [409, 'Τα δεδομένα της πρότασης έχουν αλλάξει. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    PAIR_IDENTITY_MISMATCH: [409, 'Τα δεδομένα της πρότασης έχουν αλλάξει. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    SCOPE_MISMATCH: [409, 'Τα δεδομένα της πρότασης έχουν αλλάξει. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    SOURCE_LOCKED: [409, 'Μία από τις δύο ημέρες είναι κλειδωμένη. Δεν εφαρμόστηκε καμία μεταβολή.'],
+    TARGET_LOCKED: [409, 'Μία από τις δύο ημέρες είναι κλειδωμένη. Δεν εφαρμόστηκε καμία μεταβολή.']
+});
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -5464,6 +5486,32 @@ class erganhController {
                 message: error.statusCode && error.statusCode < 500
                     ? error.message
                     : 'Δεν ήταν δυνατή η ανάκτηση των αποφάσεων.'
+            });
+        }
+    };
+
+    static applyWeeklyRepoTransferDecision = async (req, res) => {
+        try {
+            validateApplySession(req.session);
+            const runtime = getWeeklyRepoTransferApplyRuntimeState();
+            if (!runtime.enabled) {
+                const error = new Error(runtime.code); error.code = runtime.code; throw error;
+            }
+            await assertWeeklyRepoTransferApplyIndexesReady();
+            const result = await applyWeeklyRepoTransfer({
+                session: req.session,
+                payload: { decision_id: req.params.decisionId, request_id: req.body.request_id }
+            });
+            return res.status(result.idempotent ? 200 : 201).json({
+                success: true, idempotent: result.idempotent, execution: result.execution,
+                message: 'Η εγκεκριμένη μεταφορά ρεπό εφαρμόστηκε και στις δύο ημέρες.'
+            });
+        } catch (error) {
+            console.error('[applyWeeklyRepoTransferDecision]', error?.code || 'INTERNAL_ERROR');
+            const mapped = REPO_TRANSFER_APPLY_ERRORS[error?.code];
+            return res.status(mapped?.[0] || 500).json({
+                success: false,
+                message: mapped?.[1] || 'Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'
             });
         }
     };

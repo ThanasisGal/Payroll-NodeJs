@@ -1303,6 +1303,12 @@ router.post(
     erganhController.createWeeklyRepoTransferDecision
 );
 
+router.post(
+    '/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply',
+    checkAuth,
+    erganhController.applyWeeklyRepoTransferDecision
+);
+
 router.get(
     '/api/prodhlomena-oraria/review/scenarios',
     erganhController.getProdhlomenaOrariaScenarioClassifications

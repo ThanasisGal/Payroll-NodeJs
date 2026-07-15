@@ -320,6 +320,141 @@ function testCurrentAndPreviousHistoryAreEscaped() {
     vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
 }
 
+function testApplyPresentationStatesAndSafetyContract() {
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    const states = {
+        READY_TO_APPLY: 'Εφαρμογή εγκεκριμένης μεταφοράς',
+        RUNTIME_DISABLED: 'Η εφαρμογή δεν είναι ακόμη ενεργοποιημένη.',
+        INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.'
+    };
+    Object.entries(states).forEach(([applyState, text]) => {
+        vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: '${applyState}', apply_allowed: ${applyState === 'READY_TO_APPLY'}, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', is_current: true }, history: [] }]])`, sandbox);
+        const html = render(readyProjection());
+        assert.ok(html.includes(text));
+        assert.strictEqual(/atomic-repo-transfer-apply-btn[^>]+disabled/.test(html), applyState !== 'READY_TO_APPLY');
+    });
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-15T10:00:00.000Z' }, current_decision: { id: '507f191e810c19729de860ea', decision_code: 'APPROVE_PROPOSAL', is_current: true }, history: [] }]])", sandbox);
+    const applied = render(readyProjection());
+    assert.ok(applied.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!applied.includes('atomic-repo-transfer-apply-btn'));
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'ALREADY_APPLIED', current_execution: { applied_at: '2026-07-16T11:00:00.000Z', created_by_user_name: '<Executor>' }, current_decision: null, history: [{ decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<HR>', is_current: false }] }]])", sandbox);
+    const appliedWithoutCurrent = render(readyProjection());
+    assert.ok(appliedWithoutCurrent.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(appliedWithoutCurrent.includes('16/07/2026'));
+    assert.ok(!appliedWithoutCurrent.includes('atomic-repo-transfer-apply-btn'));
+    assert.ok(appliedWithoutCurrent.includes('&lt;HR&gt;'));
+    assert.ok(!appliedWithoutCurrent.includes('<HR>'));
+    for (const code of ['REJECT_PROPOSAL', 'NEEDS_MORE_REVIEW']) {
+        vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'NOT_APPROVED', current_decision: { decision_code: '${code}', is_current: true }, history: [] }]])`, sandbox);
+        assert.ok(!render(readyProjection()).includes('atomic-repo-transfer-apply-btn'));
+    }
+    const applySource = source.slice(source.indexOf('async function submitRepoTransferApply'), source.indexOf('function renderAtomicRepoTransferProjection'));
+    assert.ok(applySource.includes('Εφαρμογή εγκεκριμένης μεταφοράς ρεπό'));
+    assert.ok(applySource.includes('Ημέρα προέλευσης:') && applySource.includes('Ημέρα στόχος:'));
+    assert.strictEqual((applySource.match(/method: 'POST'/g) || []).length, 1);
+    assert.ok(applySource.includes('body: JSON.stringify({ request_id:'));
+    assert.ok(!applySource.includes('body: JSON.stringify({ decision_id'));
+    assert.ok(applySource.includes("'x-csrf-token': token"));
+    assert.ok(applySource.includes('repoTransferApplySubmitting.has(decisionId)'));
+    assert.ok(applySource.includes('await refreshRepoTransferDecisions()'));
+    assert.ok(!applySource.includes('retry'));
+    assert.ok(!/\son[a-z]+\s*=/.test(applied));
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function testImmediatePostApplyRefreshKeepsBadgeForTemporaryOldGroup() {
+    // The pre-apply projection intentionally remains in memory until a full page reload.
+    vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=0000')", sandbox);
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { proposal_id: 'atomic-group-1', current_decision: null, current_execution: { applied_at: '2026-07-15T10:00:00.000Z', execution_status: 'APPLIED' }, apply_state: 'ALREADY_APPLIED', apply_allowed: false, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: false }] }]])", sandbox);
+    const html = render(readyProjection());
+    assert.ok(html.includes('Η πρόταση εφαρμόστηκε'));
+    assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
+    vm.runInContext('currentRepoTransferDecisionsByProposalId = new Map(); currentPolicyPreviewBaseParams = null', sandbox);
+}
+
+function applyGroup() {
+    const projection = readyProjection();
+    return projection.groups[0];
+}
+
+function setupApplyBehavior({ response, networkError, refreshError } = {}) {
+    const calls = { post: 0, refresh: 0, render: 0, swal: [] };
+    sandbox.Swal = {
+        fire: async (options) => {
+            calls.swal.push(options);
+            if (options?.showCancelButton) return { isConfirmed: true };
+            return {};
+        },
+        close: () => {},
+        showLoading: () => {}
+    };
+    sandbox.fetch = async (_url, options) => {
+        calls.post++;
+        assert.strictEqual(options.method, 'POST');
+        if (networkError) throw new Error('private network detail');
+        return response || { ok: true, json: async () => ({ success: true, message: 'Ασφαλές μήνυμα επιτυχίας.' }) };
+    };
+    sandbox.getPolicyPreviewCsrfToken = async () => 'csrf-test';
+    sandbox.refreshRepoTransferDecisions = async () => {
+        calls.refresh++;
+        if (refreshError) throw new Error('private refresh detail');
+    };
+    sandbox.renderPolicyPreviewGroups = () => { calls.render++; };
+    vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { apply_state: 'READY_TO_APPLY' }]])", sandbox);
+    return calls;
+}
+
+async function testApplyPostSuccessAndRefreshSuccess() {
+    const calls = setupApplyBehavior();
+    const button = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ea', button);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.strictEqual(calls.render, 1);
+    assert.ok(calls.swal.some((call) => call.title === 'Η πρόταση εφαρμόστηκε' && call.icon === 'success'));
+    assert.strictEqual(button.disabled, true);
+}
+
+async function testApplyPostSuccessAndRefreshFailure() {
+    const calls = setupApplyBehavior({ refreshError: true });
+    const button = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860eb', button);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.ok(calls.swal.some((call) => call.title === 'Η πρόταση εφαρμόστηκε' && call.icon === 'warning' && call.text.includes('η προβολή δεν ανανεώθηκε')));
+    assert.ok(!calls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση'));
+    assert.strictEqual(button.disabled, true);
+}
+
+async function testApplyServerAndNetworkFailures() {
+    const serverCalls = setupApplyBehavior({ response: { ok: false, json: async () => ({ success: false, message: 'Ασφαλές μήνυμα server.' }) } });
+    const serverButton = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ec', serverButton);
+    assert.strictEqual(serverCalls.post, 1);
+    assert.strictEqual(serverCalls.refresh, 0);
+    assert.ok(serverCalls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση' && call.text === 'Ασφαλές μήνυμα server.'));
+    assert.strictEqual(serverButton.disabled, false);
+
+    const networkCalls = setupApplyBehavior({ networkError: true });
+    const networkButton = { disabled: false };
+    await sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ed', networkButton);
+    assert.strictEqual(networkCalls.post, 1);
+    assert.strictEqual(networkCalls.refresh, 0);
+    assert.ok(networkCalls.swal.some((call) => call.title === 'Δεν εφαρμόστηκε η πρόταση' && call.text === 'Η εφαρμογή δεν ολοκληρώθηκε.'));
+    assert.ok(!networkCalls.swal.some((call) => String(call.text || '').includes('private network detail')));
+}
+
+async function testApplyDoubleClickUsesOnePost() {
+    const calls = setupApplyBehavior();
+    const button = { disabled: false };
+    const first = sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ee', button);
+    const second = sandbox.submitRepoTransferApply(applyGroup(), '507f191e810c19729de860ee', button);
+    await Promise.all([first, second]);
+    assert.strictEqual(calls.post, 1);
+    assert.strictEqual(calls.refresh, 1);
+    assert.strictEqual(button.disabled, true);
+}
+
 function testEscaping() {
     const projection = readyProjection();
     projection.groups[0].title = '<script>alert(1)</script>';
@@ -527,6 +662,8 @@ const tests = [
     testOnlyCurrentDecisionDisablesButtons,
     testBatchHistoryUsesOneFetchForManyGroups,
     testCurrentAndPreviousHistoryAreEscaped,
+    testApplyPresentationStatesAndSafetyContract,
+    testImmediatePostApplyRefreshKeepsBadgeForTemporaryOldGroup,
     testEscaping,
     testDiagnostics,
     testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,
@@ -536,7 +673,11 @@ const tests = [
     testEmployeeWeekEvaluationLabel,
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,
-    testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState
+    testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
+    testApplyPostSuccessAndRefreshSuccess,
+    testApplyPostSuccessAndRefreshFailure,
+    testApplyServerAndNetworkFailures,
+    testApplyDoubleClickUsesOnePost
 ];
 
 async function run() {

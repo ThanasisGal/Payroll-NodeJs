@@ -8,8 +8,13 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const runtimeFiles = ['app.js','server/routes/usersRoute.js','server/controllers/ergazomenoi/erganhController.js','public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'];
 const productionFiles = ['server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyPreflightService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.js','server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService.js'];
 const writer = read(productionFiles[2]); const preflight = read(productionFiles[1]);
-runtimeFiles.forEach((file) => { const source = read(file); assert.ok(!/WeeklyRepoTransferApply|linked-repo-transfer[^\n]*apply|repo-transfer-decisions\/[^\n]*\/apply/i.test(source), `${file} exposes apply foundation`); });
-assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/routes/usersRoute.js'))); assert.ok(!/applyWeeklyRepoTransfer/.test(read('server/controllers/ergazomenoi/erganhController.js')));
+const routeSource = read('server/routes/usersRoute.js'); const controllerSource = read('server/controllers/ergazomenoi/erganhController.js');
+assert.strictEqual((routeSource.match(/repo-transfer-decisions\/:decisionId\/apply/g) || []).length, 1);
+assert.ok(/checkAuth,[\s\S]{0,80}applyWeeklyRepoTransferDecision/.test(routeSource));
+assert.ok(/getWeeklyRepoTransferApplyRuntimeState/.test(controllerSource)); assert.ok(/assertWeeklyRepoTransferApplyIndexesReady/.test(controllerSource));
+const controllerAction = controllerSource.slice(controllerSource.indexOf('static applyWeeklyRepoTransferDecision'), controllerSource.indexOf('static getWeeklyRepoTransferDecisionBatch'));
+assert.ok(controllerAction.indexOf('validateApplySession(req.session)') < controllerAction.indexOf('getWeeklyRepoTransferApplyRuntimeState()'));
+assert.ok(controllerAction.indexOf('getWeeklyRepoTransferApplyRuntimeState()') < controllerAction.indexOf('assertWeeklyRepoTransferApplyIndexesReady()'));
 productionFiles.forEach((file) => assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|bulkWrite|ordered\s*:\s*false|updateMany/.test(read(file)), `${file} has forbidden dependency/operation`));
 assert.ok(/startSession/.test(writer)); assert.ok(/withTransaction/.test(writer)); assert.ok(/sourceResult\.matchedCount !== 1/.test(writer)); assert.ok(/targetResult\.matchedCount !== 1/.test(writer));
 assert.ok(/auditModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/executionModel\.create\([^\n]+\{ session \}/.test(writer)); assert.ok(/const APPLY_FIELDS = Object\.freeze\(\[/.test(preflight));
@@ -17,8 +22,16 @@ assert.ok(/const CURRENT_GUARD_FIELDS = Object\.freeze\(ROW_FIELDS\.filter/.test
 for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) assert.ok(require('./apasxoliseisWeeklyRepoTransferApplyPreflightService').CURRENT_GUARD_FIELDS.includes(field));
 assert.ok(/row\.expected_current/.test(writer)); assert.ok(/CURRENT_GUARD_FIELDS\.forEach/.test(writer)); assert.ok(/APPLY_FIELDS\.map/.test(writer));
 assert.ok(!/payload[^\n]*\$set|client[^\n]*\$set/.test(writer)); assert.ok(!/process\.env/.test(productionFiles.map(read).join('\n'))); assert.ok(!/fallback/i.test(writer));
-assert.ok(!/router\.(post|put|patch)[^\n]*apply/i.test(read('server/routes/usersRoute.js'))); assert.ok(!/fetch\([^\n]*repo-transfer[^\n]*apply/i.test(read(runtimeFiles[3]))); assert.ok(!/repo-transfer[^\n]{0,200}<button[^>]*apply/i.test(read(runtimeFiles[3])));
+assert.ok(!/router\.(put|patch)[^\n]*repo-transfer[^\n]*apply/i.test(routeSource));
+assert.ok(!/apasxoliseisPolicyPreviewApply|ERGANI|Ergani|syncIndexes|createIndexes/.test([
+    ...productionFiles,
+    'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js',
+    'server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService.js'
+].map(read).join('\n')));
 const modelSource = read('server/models/apasxoliseisWeeklyRepoTransferExecution.js');
+assert.strictEqual(ExecutionModel.schema.options.autoIndex, false);
+assert.strictEqual(ExecutionModel.schema.options.autoCreate, false);
+assert.ok(!/syncIndexes|createIndexes|createIndex|ensureIndexes|\.init\s*\(/.test(modelSource));
 assert.ok(!/Schema\.Types\.Mixed/.test(modelSource));
 assert.ok(/const beforeValuesSchema/.test(modelSource)); assert.ok(/const afterValuesSchema/.test(modelSource)); assert.ok(/exactSnapshotValues/.test(modelSource)); assert.ok(!/checkRequired/.test(modelSource));
 const beforeSnapshotSchema = ExecutionModel.schema.path('before_snapshot').schema; const afterSnapshotSchema = ExecutionModel.schema.path('after_snapshot').schema;
@@ -27,4 +40,24 @@ const typedFields = { repo_apologistika: 'Boolean', adeia_apologistika: 'Boolean
 for (const [field, type] of Object.entries(typedFields)) { for (const schema of [valuesSchema, afterValuesSchema]) { const schemaPath = schema.path(field); assert.strictEqual(schemaPath.instance, type); assert.strictEqual(Boolean(schemaPath.isRequired), false); assert.strictEqual(schemaPath.options.immutable, true); } }
 assert.strictEqual(valuesSchema.options.strict, 'throw'); assert.strictEqual(afterValuesSchema.options.strict, 'throw'); assert.ok(beforeSnapshotSchema.path('source').validators.length > 0); assert.ok(afterSnapshotSchema.path('source').validators.length > 0); assert.strictEqual(Boolean(mongoose.Schema.Types.String.checkRequired()('')), false);
 assert.ok(/catch \{ transactionCapable = false; \}/.test(writer)); assert.ok(!/fallback/i.test(writer));
+const frontendApply = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('async function submitRepoTransferApply'), read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferProjection'));
+assert.ok(frontendApply.indexOf("title: 'Δεν εφαρμόστηκε η πρόταση'") < frontendApply.indexOf('await refreshRepoTransferDecisions()'));
+assert.ok(frontendApply.includes("icon: 'warning'"));
+assert.ok(frontendApply.includes("title: 'Η πρόταση εφαρμόστηκε'"));
+const committedSuccessPath = frontendApply.slice(frontendApply.indexOf('Swal.close();\n    try {'));
+assert.ok(!committedSuccessPath.includes('button.disabled = false'));
+assert.ok(/generallyEnabled[\s\S]*=== 'true'/.test(read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js')));
+const batchSource = read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionBatchService.js');
+assert.ok(batchSource.includes('week_start: mongoose.trusted({ $lte: normalized.end.date })'));
+assert.ok(batchSource.includes('week_end: mongoose.trusted({ $gte: normalized.start.date })'));
+assert.ok(!batchSource.includes('proposal_id: mongoose.trusted({ $in: proposalIds })'));
+assert.strictEqual((batchSource.match(/executionModel\.find\(/g) || []).length, 1);
+assert.ok(batchSource.includes('executedDecisionIds'));
+assert.ok(batchSource.indexOf("if (execution) apply_state = 'ALREADY_APPLIED'") < batchSource.indexOf("if (!authorized) apply_state = 'NOT_AUTHORIZED'"));
+assert.ok(batchSource.includes('appliedOnlyRecords'));
+assert.ok(batchSource.includes("current_decision: null"));
+assert.ok(!/\.(updateOne|updateMany|findOneAndUpdate|bulkWrite|save|createIndex|createIndexes|syncIndexes)\s*\(/.test(batchSource));
+const renderGroupSource = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferGroup'), read(runtimeFiles[3]).indexOf('function bindAtomicRepoTransferEvents'));
+assert.ok(renderGroupSource.includes("applyState === 'ALREADY_APPLIED' && decisionState?.current_execution"));
+assert.ok(renderGroupSource.indexOf("applyState === 'ALREADY_APPLIED'") < renderGroupSource.indexOf("!isCurrentApproval ? ''"));
 console.log('weekly repo-transfer apply safety contract passed');

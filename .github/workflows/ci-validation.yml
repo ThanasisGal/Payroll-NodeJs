@@ -107,6 +107,10 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionLoader.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionReconstructionService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService.test.js"
+            "server/middlewares/repoTransferApplyBodyParser.test.js"
+            "server/controllers/ergazomenoi/erganhController.repoTransferApplyRuntime.test.js"
           )
 
           present=()
@@ -193,6 +197,10 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplySafetyContract.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyIndexGuardService.test.js"
+            "server/middlewares/repoTransferApplyBodyParser.test.js"
+            "server/controllers/ergazomenoi/erganhController.repoTransferApplyRuntime.test.js"
             "server/utils/ergazomenoi/getOrarioTermsForDate.test.js"
           )
 
