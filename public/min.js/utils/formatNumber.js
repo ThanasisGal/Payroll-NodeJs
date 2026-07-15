@@ -1,0 +1,1 @@
+export default function formatNumber(t,r){return t.toString().padStart(r,"0")}
