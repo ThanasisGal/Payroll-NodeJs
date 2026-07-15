@@ -241,7 +241,7 @@ read_current_production_css() {
 parse_final_http_response_headers() {
     local headers_file="$1"
     awk '
-        BEGIN { IGNORECASE=1; block=0; valid=0 }
+        BEGIN { block=0; valid=0 }
         /^HTTP\/[0-9]+(\.[0-9]+)?[[:space:]]+[0-9][0-9][0-9]([[:space:]]|$)/ {
             block++
             valid=1
@@ -249,13 +249,13 @@ parse_final_http_response_headers() {
             cache_control=""
             next
         }
-        block && /^Content-Type:/ {
+        block && tolower($0) ~ /^content-type:/ {
             sub(/^[^:]*:[[:space:]]*/, "")
             sub(/\r$/, "")
             content_type=$0
             next
         }
-        block && /^Cache-Control:/ {
+        block && tolower($0) ~ /^cache-control:/ {
             sub(/^[^:]*:[[:space:]]*/, "")
             sub(/\r$/, "")
             cache_control=$0
@@ -489,9 +489,16 @@ verify_cdn_after_deploy() {
         "$CDN_CSS_URL?css_sha=$LOCAL_CSS_SHA" \
         --dump-header "$cdn_headers" \
         --output "$cdn_download"
-    local cdn_content_type cdn_cache_control
-    cdn_content_type="$(awk 'BEGIN { IGNORECASE=1 } /^Content-Type:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
-    cdn_cache_control="$(awk 'BEGIN { IGNORECASE=1 } /^Cache-Control:/ { sub(/^[^:]*:[[:space:]]*/, ""); value=$0 } END { print value }' "$cdn_headers" | tr -d '\r')"
+    local cdn_content_type cdn_cache_control parsed_headers
+    if ! parsed_headers="$(parse_final_http_response_headers "$cdn_headers")"; then
+        fail "Malformed deployed CDN response headers: no valid final HTTP response block"
+    fi
+    cdn_content_type="${parsed_headers%%$'\n'*}"
+    if [[ "$parsed_headers" == *$'\n'* ]]; then
+        cdn_cache_control="${parsed_headers#*$'\n'}"
+    else
+        cdn_cache_control=""
+    fi
     [[ "${cdn_content_type,,}" == text/css* ]] || fail "CDN Content-Type verification failed"
     [[ "${cdn_cache_control,,}" == *max-age=0* ]] || fail "CDN Cache-Control max-age verification failed"
     [[ "${cdn_cache_control,,}" == *must-revalidate* ]] || fail "CDN Cache-Control revalidation verification failed"

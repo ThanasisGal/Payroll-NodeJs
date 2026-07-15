@@ -289,6 +289,9 @@ jobs:
           require_css_contract '?verify=${LOCAL_CSS_SHA}-${INITIAL_HEAD}'
           require_css_contract 'Production CDN CSS response is empty'
           require_css_contract 'Malformed production CDN response headers: no valid final HTTP response block'
+          require_css_contract 'Malformed deployed CDN response headers: no valid final HTTP response block'
+          require_css_contract 'tolower($0) ~ /^content-type:/'
+          require_css_contract 'tolower($0) ~ /^cache-control:/'
           require_css_contract 'calculate_verify_state'
           require_css_contract 's3_compliant=$S3_COMPLIANT'
           require_css_contract 'cdn_compliant=$CDN_COMPLIANT'
@@ -428,17 +431,25 @@ jobs:
             printf '%s\n' "$CDN_COMPLIANT"
           )
 
-          printf 'HTTP/1.1 200 OK\r\nContent-Type: text/css; charset=utf-8\r\n\r\n' \
-            > "$fixture_dir/no-cache-control.headers"
-          test "$(run_cdn_fixture "$fixture_dir/no-cache-control.headers")" = "false"
+          printf 'HTTP/2 200\r\ncontent-type: text/css; charset=utf-8\r\ncache-control: public, max-age=0, s-maxage=31536000, must-revalidate\r\nx-cache: Hit from cloudfront\r\nage: 10\r\n\r\n' \
+            > "$fixture_dir/lowercase-compliant.headers"
+          test "$(run_cdn_fixture "$fixture_dir/lowercase-compliant.headers")" = "true"
 
-          printf 'HTTP/1.1 301 Moved Permanently\r\nContent-Type: text/html\r\nCache-Control: no-cache\r\n\r\nHTTP/2 200\r\nContent-Type: text/css\r\nCache-Control: public, max-age=3600\r\n\r\n' \
-            > "$fixture_dir/wrong-cache-control.headers"
-          test "$(run_cdn_fixture "$fixture_dir/wrong-cache-control.headers")" = "false"
+          printf 'HTTP/2 200\r\nContent-Type: text/css; charset=utf-8\r\nCaChE-CoNtRoL: public, max-age=0, s-maxage=31536000, must-revalidate\r\n\r\n' \
+            > "$fixture_dir/mixed-case-compliant.headers"
+          test "$(run_cdn_fixture "$fixture_dir/mixed-case-compliant.headers")" = "true"
 
-          printf 'HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 200\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: public, max-age=0, must-revalidate\r\n\r\n' \
-            > "$fixture_dir/compliant.headers"
-          test "$(run_cdn_fixture "$fixture_dir/compliant.headers")" = "true"
+          printf 'HTTP/2 200\r\ncache-control: public, max-age=0, s-maxage=31536000, must-revalidate\r\n\r\n' \
+            > "$fixture_dir/lowercase-missing-content-type.headers"
+          test "$(run_cdn_fixture "$fixture_dir/lowercase-missing-content-type.headers")" = "false"
+
+          printf 'HTTP/2 200\r\ncontent-type: text/css; charset=utf-8\r\n\r\n' \
+            > "$fixture_dir/lowercase-missing-cache-control.headers"
+          test "$(run_cdn_fixture "$fixture_dir/lowercase-missing-cache-control.headers")" = "false"
+
+          printf 'HTTP/1.1 200 Connection established\r\nContent-Type: text/html\r\nCache-Control: no-cache\r\n\r\nHTTP/1.1 301 Moved Permanently\r\nContent-Type: text/html\r\nCache-Control: public, max-age=3600\r\n\r\nHTTP/2 200\r\ncontent-type: text/css; charset=utf-8\r\ncache-control: public, max-age=0, s-maxage=31536000, must-revalidate\r\n\r\n' \
+            > "$fixture_dir/final-lowercase-block.headers"
+          test "$(run_cdn_fixture "$fixture_dir/final-lowercase-block.headers")" = "true"
 
           printf 'Content-Type: text/css\r\nCache-Control: public, max-age=0, must-revalidate\r\n' \
             > "$fixture_dir/malformed.headers"
@@ -462,7 +473,17 @@ jobs:
             exit 1
           fi
 
-          echo "CDN stale-header classification regression contract passed"
+          post_deploy_body=$(awk '/^verify_cdn_after_deploy\(\)/ { capture=1 } /^run_deploy_workflow\(\)/ { if (capture) exit } capture' "$script")
+          if ! grep -Fq 'parse_final_http_response_headers "$cdn_headers"' <<< "$post_deploy_body"; then
+            echo "ERROR: post-deploy CDN verification does not use the shared header parser"
+            exit 1
+          fi
+          if grep -Fq 'IGNORECASE' <<< "$post_deploy_body"; then
+            echo "ERROR: post-deploy CDN verification retains an independent header parser"
+            exit 1
+          fi
+
+          echo "Portable lowercase CDN header regression contract passed"
 
           pre_mutation_guard_line=$(grep -n '^    immutable_git_pre_mutation_guard$' "$script" | cut -d: -f1)
           promote_call_line=$(grep -n '^    promote_css_through_staging$' "$script" | cut -d: -f1)
