@@ -50,6 +50,8 @@ INITIAL_VERSION=""
 BUILD_STARTED="false"
 PRODUCTION_OPERATION_STARTED="false"
 CLEANUP_DONE="false"
+RELEASE_BRANCH=""
+PREPARE_COMMIT_CREATED="false"
 
 # Disk & Swap
 DISK_THRESHOLD=500
@@ -137,23 +139,43 @@ cleanup_deploy_build() {
 
     CLEANUP_DONE="true"
     log_info "Restoring deploy-mode generated artifacts to $INITIAL_HEAD..."
-    git restore --source "$INITIAL_HEAD" --worktree -- public/min.js
+    git restore --source "$INITIAL_HEAD" --worktree -- build public/min.js
 
     while IFS= read -r -d '' generated_file; do
         rm -f -- "$generated_file"
     done < <(
-        git ls-files --others --exclude-standard -z -- public/min.js
-        git ls-files --others --ignored --exclude-standard -z -- public/min.js
+        git ls-files --others --exclude-standard -z -- build public/min.js
+        git ls-files --others --ignored --exclude-standard -z -- build public/min.js
     )
 
-    rm -rf "$BUILD_DIR"
+    find "$BUILD_DIR" -depth -type d -empty -delete 2>/dev/null || true
     find "$OUTPUT_DIR" -depth -type d -empty -delete 2>/dev/null || true
+}
+
+rollback_failed_prepare() {
+    if [[ "$DEPLOY_ACTION" != "prepare" || -z "$INITIAL_HEAD" || -z "$RELEASE_BRANCH" || "$PREPARE_COMMIT_CREATED" == "true" ]]; then
+        return 0
+    fi
+
+    log_info "Rolling back failed pre-commit release preparation..."
+    git restore --source "$INITIAL_HEAD" --staged --worktree -- package.json build public/min.js
+    while IFS= read -r -d '' generated_file; do
+        rm -f -- "$generated_file"
+    done < <(
+        git ls-files --others --exclude-standard -z -- build public/min.js
+        git ls-files --others --ignored --exclude-standard -z -- build public/min.js
+    )
+    find "$BUILD_DIR" "$OUTPUT_DIR" -depth -type d -empty -delete 2>/dev/null || true
+    git switch main
+    git branch -d "$RELEASE_BRANCH"
+    RELEASE_BRANCH=""
 }
 
 handle_exit() {
     local exit_code=$?
     trap - EXIT
     cleanup_deploy_build || true
+    rollback_failed_prepare || true
     if [[ $exit_code -ne 0 ]]; then
         if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
             log_error "RELEASE PREPARATION FAILED"
@@ -219,6 +241,17 @@ immutable_git_preflight() {
     INITIAL_HEAD="$local_head"
     INITIAL_VERSION=$(node -p "require('./package.json').version")
     log_success "Immutable Git preflight passed at $INITIAL_HEAD"
+}
+
+verify_prepare_git_identity() {
+    local git_user_name git_user_email
+    git_user_name=$(git config user.name || true)
+    git_user_email=$(git config user.email || true)
+    if [[ -z "$git_user_name" || -z "$git_user_email" ]]; then
+        log_error "Prepare release requires configured Git user.name and user.email."
+        return 1
+    fi
+    log_success "Git commit identity is configured."
 }
 
 remote_apply_flags_disabled_guard() {
@@ -883,6 +916,7 @@ echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
+    verify_prepare_git_identity
     PATCH_VERSION=$(increment_patch "$CURRENT_VERSION")
     MINOR_VERSION=$(increment_minor "$CURRENT_VERSION")
     MAJOR_VERSION=$(increment_major "$CURRENT_VERSION")
@@ -1261,37 +1295,38 @@ echo ""
 # =============================================================================
 
 if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
-    git diff --check
+    git diff --check -- . ':(exclude)build/**' ':(exclude)public/min.js/**'
 
     unexpected_changes=()
     while IFS= read -r changed_path; do
         case "$changed_path" in
-            package.json|public/min.js|public/min.js/*) ;;
+            package.json|build|build/*|public/min.js|public/min.js/*) ;;
             *) unexpected_changes+=("$changed_path") ;;
         esac
     done < <(git status --porcelain=v1 | sed -E 's/^.. //; s/.* -> //')
 
     if (( ${#unexpected_changes[@]} > 0 )); then
-        log_error "Prepare release changed files outside package.json and public/min.js:"
+        log_error "Prepare release changed files outside package.json, build, and public/min.js:"
         printf '  %s\n' "${unexpected_changes[@]}"
         exit 1
     fi
 
     git status --short
     git add -- package.json
+    git add -f -- build
     git add -f -- public/min.js
     staged_scope_invalid="false"
     while IFS= read -r staged_path; do
         case "$staged_path" in
-            package.json|public/min.js/*) ;;
+            package.json|build/*|public/min.js/*) ;;
             *) staged_scope_invalid="true"; log_error "Unexpected staged path: $staged_path" ;;
         esac
     done < <(git diff --cached --name-only)
     if [[ "$staged_scope_invalid" == "true" ]]; then
-        log_error "Release staged scope must contain only package.json and public/min.js artifacts."
+        log_error "Release staged scope must contain only package.json, build, and public/min.js artifacts."
         exit 1
     fi
-    git diff --cached --check
+    git diff --cached --check -- . ':(exclude)build/**' ':(exclude)public/min.js/**'
     if git diff --cached --quiet; then
         log_error "Release preparation produced no scoped changes to commit."
         exit 1
@@ -1299,6 +1334,7 @@ if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
 
     RELEASE_TITLE="🚀 Deploy prod build - ${NEW_VERSION} (Phase 1)"
     git commit -m "$RELEASE_TITLE"
+    PREPARE_COMMIT_CREATED="true"
     git push -u origin "$RELEASE_BRANCH"
 
     RELEASE_PR_BODY=$(mktemp)
@@ -1309,7 +1345,7 @@ if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
 - New version: \`$NEW_VERSION\`
 - Exact base SHA: \`$INITIAL_HEAD\`
 - Release branch: \`$RELEASE_BRANCH\`
-- Production build artifacts generated: \`public/min.js\`
+- Production build artifacts generated: \`build\` and \`public/min.js\`
 
 No production deployment was performed. No S3/CDN, EC2, PM2, or DNS operation was executed.
 
@@ -1324,12 +1360,12 @@ EOF
     exit 0
 fi
 
-if ! git diff --exit-code -- public/min.js; then
+if ! git diff --exit-code -- build public/min.js; then
     log_error "DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE"
     exit 1
 fi
 
-if [[ -n "$(git ls-files --others --exclude-standard -- public/min.js)" || -n "$(git ls-files --others --ignored --exclude-standard -- public/min.js)" ]]; then
+if [[ -n "$(git ls-files --others --exclude-standard -- build public/min.js)" || -n "$(git ls-files --others --ignored --exclude-standard -- build public/min.js)" ]]; then
     log_error "DEPLOY ABORTED — REBUILT ARTIFACTS DIFFER FROM MERGED RELEASE"
     exit 1
 fi
