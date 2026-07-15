@@ -109,8 +109,8 @@ jobs:
             echo "ERROR: expected exactly two runtime guard invocations"
             exit 1
           fi
-          if ! awk 'sub(/\r$/, ""); $0 == ".env" { found=1 } END { exit !found }' rsync-excludes.txt \
-            || ! awk 'sub(/\r$/, ""); $0 == ".env.production" { found=1 } END { exit !found }' rsync-excludes.txt; then
+          if ! awk '{ sub(/\r$/, ""); if ($0 == ".env") found=1 } END { exit !found }' rsync-excludes.txt \
+            || ! awk '{ sub(/\r$/, ""); if ($0 == ".env.production") found=1 } END { exit !found }' rsync-excludes.txt; then
             echo "ERROR: production env files are not both excluded from rsync"
             exit 1
           fi
