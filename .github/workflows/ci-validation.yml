@@ -222,6 +222,101 @@ jobs:
             exit 1
           fi
 
+      - name: Validate hardened CSS deployment safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          script="deploy-css-linux.sh"
+          test -f "$script"
+          bash -n "$script"
+          test -x "$script"
+
+          index_mode=$(git ls-files --stage -- "$script" | awk 'NR == 1 { print $1 }')
+          tree_mode=$(git ls-tree HEAD -- "$script" | awk 'NR == 1 { print $1 }')
+          test "$index_mode" = "100755"
+          test "$tree_mode" = "100755"
+
+          require_css_contract() {
+            local pattern="$1"
+            if ! grep -Fq -- "$pattern" "$script"; then
+              echo "ERROR: missing CSS deployment safety contract: $pattern"
+              exit 1
+            fi
+          }
+
+          reject_css_contract() {
+            local pattern="$1"
+            if grep -Eq -- "$pattern" "$script"; then
+              echo "ERROR: forbidden CSS deployment operation found: $pattern"
+              exit 1
+            fi
+          }
+
+          require_css_contract '1) Verify merged CSS'
+          require_css_contract '2) Deploy merged CSS'
+          require_css_contract 'immutable_git_preflight'
+          require_css_contract 'git status --porcelain'
+          require_css_contract 'git fetch --prune origin main'
+          require_css_contract 'main...origin/main'
+          require_css_contract 'exact_head_main_ci_guard'
+          require_css_contract '--event push'
+          require_css_contract 'headSha =='
+          require_css_contract '$INITIAL_HEAD'
+          require_css_contract 'conclusion =='
+          require_css_contract 'status =='
+          require_css_contract '.name == "validate"'
+          require_css_contract 'mktemp -d'
+          require_css_contract 'first.min.css'
+          require_css_contract 'second.min.css'
+          require_css_contract 'cmp -s "$first_css" "$second_css"'
+          require_css_contract './node_modules/.bin/cleancss'
+          require_css_contract 'CSS BUILD IS NOT DETERMINISTIC'
+          require_css_contract 'CSS_ALREADY_DEPLOYED'
+          require_css_contract 'CSS_DEPLOYMENT_REQUIRED'
+          require_css_contract 'CSS_REMOTE_OBJECT_MISSING'
+          require_css_contract 'CONFIRM_PRODUCTION_CSS_DEPLOY'
+          require_css_contract 'Type DEPLOY CSS PRODUCTION to continue:'
+          require_css_contract 'assets/own/css/.staging/main.min.${INITIAL_HEAD}.${LOCAL_CSS_SHA}.css'
+          require_css_contract 'Staging S3 CSS hash verification failed'
+          require_css_contract 'Final S3 CSS hash verification failed'
+          require_css_contract 'metadata-directive REPLACE'
+          require_css_contract 'git-sha=$INITIAL_HEAD,app-version=$INITIAL_VERSION,css-sha256=$LOCAL_CSS_SHA'
+          require_css_contract 'cloudfront wait invalidation-completed'
+          require_css_contract '/$S3_FINAL_KEY*'
+          require_css_contract 'CSS DEPLOYMENT VERIFICATION FAILED'
+          require_css_contract 'immutable_git_postflight'
+
+          reject_css_contract 'git[[:space:]]+(add|commit|push|pull|merge)'
+          reject_css_contract 'npm[[:space:]]+version'
+          reject_css_contract 'sed[[:space:]]+-i.*package\.json'
+          reject_css_contract '(^|[[:space:]])ssh([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])rsync([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])pm2([[:space:]]|$)'
+          reject_css_contract '(^|[[:space:]])systemctl([[:space:]]|$)'
+          reject_css_contract 'StrictHostKeyChecking=no'
+          reject_css_contract '18\.199\.'
+
+          node - <<'NODE'
+          const scripts = require('./package.json').scripts || {};
+          if (scripts['css:minify'] !== 'cleancss --inline none -o public/css/main.min.css public/css/main.css') {
+            throw new Error('css:minify changed unexpectedly');
+          }
+          if (scripts['css:verify'] !== './deploy-css-linux.sh verify') {
+            throw new Error('css:verify does not use the hardened script');
+          }
+          if (scripts['css:deploy'] !== './deploy-css-linux.sh deploy') {
+            throw new Error('css:deploy does not use the hardened script');
+          }
+          for (const [name, command] of Object.entries(scripts)) {
+            if (/aws\s+s3|cloudfront\s+create-invalidation/.test(command)) {
+              throw new Error(`direct AWS deployment npm script found: ${name}`);
+            }
+          }
+          NODE
+
+          echo "Hardened CSS deployment safety contract passed: tree=$tree_mode index=$index_mode filesystem=executable"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

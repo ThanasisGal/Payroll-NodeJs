@@ -8,8 +8,8 @@
         "start": "NODE_ENV=production node app.js",
         "postinstall": "npx playwright install --with-deps",
         "css:minify": "cleancss --inline none -o public/css/main.min.css public/css/main.css",
-        "css:upload": "aws s3 cp public/css/main.min.css s3://employee-certificates-webpayrollsolutions-central/assets/own/css/main.min.css --content-type text/css --cache-control max-age=31536000 --region eu-central-1",
-        "css:deploy": "npm run css:minify && npm run css:upload",
+        "css:verify": "./deploy-css-linux.sh verify",
+        "css:deploy": "./deploy-css-linux.sh deploy",
         "import:prosop": "PHASE=2 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js",
         "import:prosop:phase1": "PHASE=1 EXCEL_PATH=./tblProsop.xlsx node importTblProsop.js"
     },
