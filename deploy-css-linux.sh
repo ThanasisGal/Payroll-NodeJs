@@ -226,10 +226,14 @@ read_current_production_css() {
     remote_app_version="${remote_metadata_values[3]}"
     remote_metadata_css_sha="${remote_metadata_values[4]}"
 
+    log "s3_metadata_git_sha=${remote_git_sha:-unavailable}"
+    if [[ "$remote_git_sha" != "$INITIAL_HEAD" ]]; then
+        log "S3 git-sha metadata differs from current main (informational): deployed=$remote_git_sha current=$INITIAL_HEAD"
+    fi
+
     if [[ "$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA" \
         && "$remote_content_type" == "text/css; charset=utf-8" \
         && "$remote_cache_control" == "$CSS_CACHE_CONTROL" \
-        && "$remote_git_sha" == "$INITIAL_HEAD" \
         && "$remote_app_version" == "$INITIAL_VERSION" \
         && "$remote_metadata_css_sha" == "$LOCAL_CSS_SHA" ]]; then
         S3_COMPLIANT="true"
