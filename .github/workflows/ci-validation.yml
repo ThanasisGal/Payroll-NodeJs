@@ -349,9 +349,10 @@ jobs:
             '"$REMOTE_CSS_SHA" == "$LOCAL_CSS_SHA"' \
             '"$remote_content_type" == "text/css; charset=utf-8"' \
             '"$remote_cache_control" == "$CSS_CACHE_CONTROL"' \
-            '"$remote_git_sha" == "$INITIAL_HEAD"' \
             '"$remote_app_version" == "$INITIAL_VERSION"' \
-            '"$remote_metadata_css_sha" == "$LOCAL_CSS_SHA"'
+            '"$remote_metadata_css_sha" == "$LOCAL_CSS_SHA"' \
+            's3_metadata_git_sha=${remote_git_sha:-unavailable}' \
+            'S3 git-sha metadata differs from current main (informational)'
           do
             if ! grep -Fq -- "$s3_contract" <<< "$lookup_body"; then
               echo "ERROR: incomplete production S3 compliance contract: $s3_contract"
@@ -407,6 +408,34 @@ jobs:
           trap 'rm -rf -- "$fixture_dir"' EXIT
           printf 'fixture-css' > "$fixture_dir/body.css"
           fixture_sha=$(sha256sum "$fixture_dir/body.css" | awk '{ print $1 }')
+
+          run_s3_git_sha_mismatch_fixture() (
+            source "$script"
+            TEMP_DIR="$fixture_dir/s3-git-sha-mismatch"
+            mkdir -p "$TEMP_DIR"
+            LOCAL_CSS_SHA="$fixture_sha"
+            INITIAL_HEAD="current-main-head"
+            INITIAL_VERSION="1.2.1"
+            aws() {
+              case "$1 $2" in
+                's3api list-objects-v2') printf '1\n' ;;
+                's3api get-object') cp "$fixture_dir/body.css" "${@: -1}" ;;
+                's3api head-object')
+                  printf '["text/css; charset=utf-8","%s","css-deployment-head","1.2.1","%s"]\n' \
+                    "$CSS_CACHE_CONTROL" "$fixture_sha"
+                  ;;
+                *) return 1 ;;
+              esac
+            }
+            read_current_production_css
+            printf 'fixture_s3_compliant=%s\n' "$S3_COMPLIANT"
+          )
+
+          run_s3_git_sha_mismatch_fixture > "$fixture_dir/s3-git-sha-mismatch.log"
+          grep -Fq 's3_metadata_git_sha=css-deployment-head' "$fixture_dir/s3-git-sha-mismatch.log"
+          grep -Fq 'S3 git-sha metadata differs from current main (informational)' \
+            "$fixture_dir/s3-git-sha-mismatch.log"
+          grep -Fq 'fixture_s3_compliant=true' "$fixture_dir/s3-git-sha-mismatch.log"
 
           run_cdn_fixture() (
             source "$script"
