@@ -21,6 +21,7 @@
                             <th scope="col">@Email</th>
                             <th scope="col">Τηλέφωνο</th>
                             <th scope="col">Ομάδα Εργασίας</th>
+                            <th scope="col">Ρόλος</th>
                             <th scope="col">Ενεργός</th>
                             <th scope="col" class="text-end">Ενέργειες</th>
                         </tr>
@@ -34,6 +35,7 @@
                                 <td><%= element.email %></td>
                                 <td><%= element.tel %></td>
                                 <td><%= element.team %></td>
+                                <td><%= getUserRoleLabel(element.privileges) %></td>
                                 <td>
                                     <% if (element.situation == 'A') { %>
                                         <input
@@ -67,7 +69,7 @@
                                             method="POST"
                                             class="position-relative">
 
-                                            <%- include('../partials/_csrfField') %>
+                                            <%- include('./partials/_csrfField') %>
 
                                             <button
                                                 type="submit"
@@ -129,7 +131,7 @@
 
                         <% } %> 
                         
-                        <% for( i <= (Number(current) + 2) && i <= pages; i++) { %>
+                        <% for (; i <= (Number(current) + 2) && i <= pages; i++) { %>
                             <% if (i == current) { %>
 
                                 <li class="page-item">

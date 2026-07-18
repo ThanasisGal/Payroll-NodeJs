@@ -33,6 +33,7 @@
                         <th scope="col">@Email</th>
                         <th scope="col">Τηλέφωνο</th>
                         <th scope="col">Ομάδα Εργασίας</th>
+                        <th scope="col">Ρόλος</th>
                         <th scope="col">Ενεργός</th>
                         <th scope="col" class="text-end">Ενέργειες</th>
                     </tr>
@@ -47,6 +48,7 @@
                             <td><%= element.email %></td>
                             <td><%= element.tel %></td>
                             <td><%= element.team %></td>
+                            <td><%= getUserRoleLabel(element.privileges) %></td>
                             <td>
                                 <input
                                     class="form-check-input custom-checkbox checkbox-class"

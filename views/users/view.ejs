@@ -133,58 +133,15 @@
         <label for="group" class="col-form-label field-required">Role</label>
       </div>
 
-      <% if (users.privileges == 'A') { %>
       <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" checked />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" disabled />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" disabled />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
+        <input
+          type="text"
+          id="userRoleLabel"
+          class="form-control"
+          value="<%= getUserRoleLabel(users.privileges) %>"
+          readonly
+        />
       </div>
-      <% } %> <% if (users.privileges == 'C') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" disabled />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" checked />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" disabled />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
-      </div>
-      <% } %> <% if (users.privileges == 'V') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" disabled />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" disabled />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" checked />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
-      </div>
-      <% } %>
 
       <div class="col-1-5 right-align">
         <label for="group1" class="col-form-label field-required">Status</label>
@@ -226,11 +183,7 @@
           id="details"
           rows="5"
           readonly
-        ></textarea>
-
-        <script nonce="<%= nonce %>">
-          document.getElementById("details").value = "<%= users.details %>";
-        </script>
+        ><%= users.details || '' %></textarea>
       </div>
     </div>
 

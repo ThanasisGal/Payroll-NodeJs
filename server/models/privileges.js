@@ -26,6 +26,8 @@ const Schema = _Schema;
 	userId: { type: String, required: true },
 	li_Id: { type: String, required: true },
 	situation_A: { type: Boolean, default: false },
+	situation_S: { type: Boolean, default: false },
+	situation_HR: { type: Boolean, default: false },
 	situation_C: { type: Boolean, default: false },
 	situation_U: { type: Boolean, default: false },
 	situation_V: { type: Boolean, default: false }

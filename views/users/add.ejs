@@ -31,6 +31,7 @@
   <div class="card z-depth-5">
     <div class="card-body">
       <form action="/admin/add" method="POST">
+        <%- include('../partials/_csrfField') %>
         <div class="row form-group g-3 align-items-center mb-2">
           <div class="col-1-5 right-align">
             <label for="firstName" class="col-form-label field-required"
@@ -134,18 +135,18 @@
             <label for="group" class="col-form-label field-required">Role</label>
           </div>
           <div class="col-4" style="padding-top: 8px">
-            <div class="form-check form-check-inline">
-              <input type="radio" name="radioRoles" id="roleAdmin" value="A" />
-              <label class="form-check-label" for="roleAdmin">Admin</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input type="radio" name="radioRoles" id="roleCustomer" value="C" />
-              <label class="form-check-label" for="roleCustomer">Customer</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input type="radio" name="radioRoles" id="roleVisitor" value="V" />
-              <label class="form-check-label" for="roleVisitor">Visitor</label>
-            </div>
+            <% userRoleOptions.forEach((option) => { %>
+              <div class="form-check form-check-inline">
+                <input
+                  type="radio"
+                  name="radioRoles"
+                  id="role-<%= option.value %>"
+                  value="<%= option.value %>"
+                  required
+                />
+                <label class="form-check-label" for="role-<%= option.value %>"><%= option.label %></label>
+              </div>
+            <% }) %>
           </div>
 
           <div class="col-1-5 right-align">
