@@ -138,10 +138,11 @@
           <label for="group" class="col-form-label field-required">Role</label>
         </div>
 
-        <div class="col-4" style="padding-top: 8px">
+        <div class="col-4 user-radio-group">
           <% userRoleOptions.forEach((option) => { %>
-            <div class="form-check form-check-inline">
+            <div class="form-check form-check-inline user-radio-option">
               <input
+                class="form-check-input"
                 type="radio"
                 name="radioRoles"
                 id="role-<%= option.value %>"
@@ -161,9 +162,10 @@
         </div>
 
         <% if (users.situation == 'A') { %>
-        <div class="col-4" style="padding-top: 8px">
-          <div class="form-check form-check-inline">
+        <div class="col-4 user-radio-group">
+          <div class="form-check form-check-inline user-radio-option">
             <input
+              class="form-check-input"
               type="radio"
               name="radioStatus"
               id="radioActive"
@@ -172,8 +174,9 @@
             />
             <label class="form-check-label" for="radioActive">Ενεργός</label>
           </div>
-          <div class="form-check form-check-inline">
+          <div class="form-check form-check-inline user-radio-option">
             <input
+              class="form-check-input"
               type="radio"
               name="radioStatus"
               id="radioInactive"
@@ -186,13 +189,14 @@
         </div>
 
         <% } %> <% if (users.situation == 'I') { %>
-        <div class="col-4" style="padding-top: 8px">
-          <div class="form-check form-check-inline">
-            <input type="radio" name="radioStatus" id="radioActive" value="A" />
+        <div class="col-4 user-radio-group">
+          <div class="form-check form-check-inline user-radio-option">
+            <input class="form-check-input" type="radio" name="radioStatus" id="radioActive" value="A" />
             <label class="form-check-label" for="radioActive">Ενεργός</label>
           </div>
-          <div class="form-check form-check-inline">
+          <div class="form-check form-check-inline user-radio-option">
             <input
+              class="form-check-input"
               type="radio"
               name="radioStatus"
               id="radioInactive"
@@ -224,24 +228,21 @@
 
     </form>
   </div>
-  <div class="card-footer">
-    <div
-      class="d-inline-block d-flex"
-      style="justify-content: space-around"
-    >
-      <button type="submit" form="editUserForm" class="btn btn-outline-secondary mb-1 mt-2">
+  <div class="card-footer user-admin-card-footer">
+    <div class="user-admin-actions">
+      <button type="submit" form="editUserForm" class="btn user-admin-action-btn user-admin-action-secondary mb-1 mt-2">
         <i class="bi bi-person-gear"></i> Ενημέρωση
       </button>
       <button
         type="button"
-        class="btn btn-outline-danger mb-1 mt-2"
+        class="btn user-admin-action-btn user-admin-action-danger mb-1 mt-2"
         data-bs-toggle="modal"
         id="deleteButton"
         data-bs-target="#deleteModal"
       >
         <i class="bi bi-person-x"></i> Διαγραφή
       </button>
-      <a class="btn btn-outline-secondary mb-1 mt-2" href="/admin"
+      <a class="btn user-admin-action-btn user-admin-action-secondary mb-1 mt-2" href="/admin"
         ><i class="bi bi-table"></i> Επιστροφή</a
       >
     </div>

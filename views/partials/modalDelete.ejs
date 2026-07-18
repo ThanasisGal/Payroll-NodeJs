@@ -23,21 +23,22 @@
           Είστε σίγουρος(η);
         </p>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer user-admin-actions">
         <button
           type="button"
-          class="btn btn-outline-secondary"
+          class="btn user-admin-action-btn user-admin-action-secondary"
           data-bs-dismiss="modal"
         >
           Κλείσιμο
         </button>
 
         <form
-          action="/edit/<%= users._id %>?_method=DELETE"
+          action="/admin/edit/<%= users._id %>?_method=DELETE"
           method="POST"
           class="position-relative"
         >
-          <button type="submit" class="btn btn-outline-danger">
+          <%- include('./_csrfField') %>
+          <button type="submit" class="btn user-admin-action-btn user-admin-action-danger">
             Διαγραφή Χρήστη
           </button>
         </form>

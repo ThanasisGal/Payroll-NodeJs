@@ -389,6 +389,137 @@ test('role EJS contains no inline role event handlers or repeated role branches'
     assert.ok(!/users\.privileges\s*==\s*['"](?:A|C|V)['"]/.test(combined));
 });
 
+test('add and edit EJS align role and status radios with namespaced classes', () => {
+    const addHtml = renderView('users/add.ejs', {
+        userRoleOptions: getSelectableAdminUserRoles(),
+        csrfToken: 'csrf-test'
+    });
+    assert.ok(addHtml.includes('user-radio-group'));
+    assert.ok(addHtml.includes('user-radio-option'));
+    assert.ok(/class="form-check-input"\s+type="radio"\s+name="radioRoles"/.test(addHtml));
+    assert.ok(/class="form-check-input"\s+type="radio"\s+name="radioStatus"/.test(addHtml));
+
+    for (const role of ['A', 'S', 'HR', 'U']) {
+        const users = { id: 'id', _id: 'id', firstName: 'Test', lastName: 'User', email: 'test@example.invalid', password: 'x', tel: '', team: 'T', privileges: role, situation: 'A', details: '', updatedAt: new Date(0) };
+        const editHtml = renderView('users/edit.ejs', {
+            users,
+            normalizedUserRole: role,
+            userRoleOptions: getUserRoleOptionsForCurrentValue(role),
+            csrfToken: 'csrf-test'
+        });
+        assert.ok(editHtml.includes('user-radio-group'));
+        assert.ok(editHtml.includes('user-radio-option'));
+        assert.ok(/class="form-check-input"\s+type="radio"\s+name="radioRoles"/.test(editHtml));
+        assert.ok(/class="form-check-input"\s+type="radio"\s+name="radioStatus"/.test(editHtml));
+        assert.ok(!/class="col-4"\s+style="padding-top:\s*8px"/.test(editHtml));
+    }
+    assert.ok(!/class="col-4"\s+style="padding-top:\s*8px"/.test(addHtml));
+});
+
+test('view EJS renders readonly role and status labels without status radios', () => {
+    for (const [situation, label] of [['A', 'Ενεργός'], ['I', 'Ανενεργός'], ['?', 'Άγνωστη κατάσταση']]) {
+        const users = { _id: 'id', firstName: 'Test', lastName: 'User', email: 'test@example.invalid', password: 'x', tel: '', team: 'T', privileges: 'HR', situation, details: '<note>' };
+        const html = renderView('users/view.ejs', { users, getUserRoleLabel });
+        assert.ok(/id="userRoleLabel"[\s\S]*?readonly/.test(html));
+        assert.ok(new RegExp(`id="userStatusLabel"[\\s\\S]*?value="${label}"[\\s\\S]*?readonly`).test(html));
+        assert.ok(!html.includes('name="radioStatus"'));
+    }
+});
+
+test('user-management actions use confirmation links and protected delete forms', () => {
+    const user = { id: 'id', _id: 'id', kod: '1', firstName: 'Test', lastName: 'User', email: 'test@example.invalid', password: 'x', tel: '', team: 'T', privileges: 'S', situation: 'A', details: '', updatedAt: new Date(0) };
+    const second = { ...user, id: 'id-hr', _id: 'id-hr', kod: '2', privileges: 'HR' };
+    const common = { getUserRoleLabel, current: 1, pages: 1, csrfToken: 'csrf-test' };
+    const indexHtml = renderView('index.ejs', { ...common, users: [user, second] });
+    const searchHtml = renderView('search.ejs', { ...common, user: [user, second], users: user });
+    const deleteHtml = renderView('users/delete.ejs', { users: user, csrfToken: 'csrf-test' });
+    const modalHtml = renderView('partials/modalDelete.ejs', { users: user, csrfToken: 'csrf-test' });
+    const addHtml = renderView('users/add.ejs', { userRoleOptions: getSelectableAdminUserRoles(), csrfToken: 'csrf-test' });
+    const editHtml = renderView('users/edit.ejs', { users: user, normalizedUserRole: 'S', userRoleOptions: getUserRoleOptionsForCurrentValue('S'), csrfToken: 'csrf-test' });
+    const viewHtml = renderView('users/view.ejs', { users: user, getUserRoleLabel });
+
+    for (const html of [addHtml, editHtml, viewHtml, deleteHtml, indexHtml, searchHtml, modalHtml]) {
+        assert.ok(html.includes('user-admin-action-btn'));
+    }
+    assert.ok(indexHtml.includes('href="/admin/delete/id"'));
+    assert.ok(searchHtml.includes('href="/admin/delete/id"'));
+    assert.ok(!indexHtml.includes('_method=DELETE'));
+    assert.ok(!searchHtml.includes('_method=DELETE'));
+    assert.ok(!indexHtml.includes('id="deleteModal"'));
+    assert.ok(!searchHtml.includes('action="/edit/'));
+    for (const html of [deleteHtml, modalHtml]) {
+        assert.ok(html.includes('action="/admin/edit/id?_method=DELETE"'));
+        assert.ok(html.includes('method="POST"'));
+        assert.ok(html.includes('name="_csrf"'));
+        assert.ok(html.includes('user-admin-action-danger'));
+    }
+    assert.ok(deleteHtml.includes('href="/admin"'));
+    assert.ok(modalHtml.includes('id="deleteModal"'));
+    assert.ok(editHtml.includes('data-bs-target="#deleteModal"'));
+    assert.ok(editHtml.includes('form="editUserForm"'));
+});
+
+test('user-management CSS is namespaced and action markup avoids outline classes', () => {
+    const css = fs.readFileSync(path.join(repositoryRoot, 'public', 'css', 'main.css'), 'utf8');
+    for (const selector of [
+        '.user-admin-action-btn', '.user-admin-action-secondary', '.user-admin-action-danger',
+        '.user-admin-actions', '.user-admin-row-actions', '.user-radio-group', '.user-radio-option'
+    ]) assert.ok(css.includes(selector));
+    assert.ok(css.includes('.user-admin-action-btn:disabled'));
+    const actionFiles = ['users/add.ejs', 'users/edit.ejs', 'users/view.ejs', 'users/delete.ejs', 'index.ejs', 'search.ejs', 'partials/modalDelete.ejs'];
+    for (const file of actionFiles) {
+        const source = fs.readFileSync(path.join(repositoryRoot, 'views', file), 'utf8');
+        const activeMarkup = source.replace(/<!--[\s\S]*?-->/g, '');
+        assert.ok(!/class="[^"]*btn-outline-(?:secondary|danger)[^"]*"/.test(activeMarkup), file);
+    }
+    assert.deepStrictEqual([...USER_ROLE_CODES], ['A', 'S', 'HR', 'C', 'U', 'V']);
+    assert.strictEqual(getUserRoleLabel('S'), 'Supervisor');
+    assert.strictEqual(getUserRoleLabel('HR'), 'HR');
+});
+
+test('user-management card footers own vertical sizing and center actions', () => {
+    const css = fs.readFileSync(path.join(repositoryRoot, 'public', 'css', 'main.css'), 'utf8');
+    const actionsRule = css.match(/\.user-admin-actions\s*\{([^}]*)\}/)?.[1] || '';
+    const buttonRule = css.match(/\.user-admin-actions\s+\.user-admin-action-btn\s*\{([^}]*)\}/)?.[1] || '';
+    const footerRule = css.match(/\.user-admin-card-footer\s*\{([^}]*)\}/)?.[1] || '';
+    const footerActionsRule = css.match(/\.user-admin-card-footer\s*>\s*\.user-admin-actions\s*\{([^}]*)\}/)?.[1] || '';
+    const paginationRule = css.match(/\.user-admin-card-footer\s+nav,\s*\.user-admin-card-footer\s+\.pagination\s*\{([^}]*)\}/)?.[1] || '';
+    assert.match(actionsRule, /align-items:\s*center/);
+    assert.match(actionsRule, /flex-wrap:\s*wrap/);
+    assert.doesNotMatch(actionsRule, /min-height/);
+    assert.doesNotMatch(actionsRule, /padding-block/);
+    assert.match(buttonRule, /margin-top:\s*0\s*!important/);
+    assert.match(buttonRule, /margin-bottom:\s*0\s*!important/);
+    assert.match(footerRule, /display:\s*flex/);
+    assert.match(footerRule, /align-items:\s*center/);
+    assert.match(footerRule, /min-height:\s*[^;]+/);
+    assert.match(footerRule, /padding:\s*[^;]+/);
+    assert.match(footerRule, /box-sizing:\s*border-box/);
+    assert.match(footerActionsRule, /min-height:\s*0/);
+    assert.match(footerActionsRule, /padding:\s*0/);
+    assert.match(footerActionsRule, /align-items:\s*center/);
+    assert.match(paginationRule, /margin-top:\s*0\s*!important/);
+    assert.match(paginationRule, /margin-bottom:\s*0\s*!important/);
+
+    const footerViews = ['users/add.ejs', 'users/edit.ejs', 'users/view.ejs', 'users/delete.ejs', 'index.ejs', 'search.ejs'];
+    for (const file of footerViews) {
+        const source = fs.readFileSync(path.join(repositoryRoot, 'views', file), 'utf8');
+        assert.ok(source.includes('class="card-footer user-admin-card-footer"'), file);
+    }
+
+    const addHtml = renderView('users/add.ejs', {
+        userRoleOptions: getSelectableAdminUserRoles(),
+        csrfToken: 'csrf-test'
+    });
+    const formStart = addHtml.indexOf('<form action="/admin/add" method="POST">');
+    const bodyStart = addHtml.indexOf('<div class="card-body">', formStart);
+    const footerStart = addHtml.indexOf('<div class="card-footer user-admin-card-footer">', bodyStart);
+    const formEnd = addHtml.indexOf('</form>', footerStart);
+    assert.ok(formStart >= 0 && bodyStart > formStart && footerStart > bodyStart && formEnd > footerStart);
+    assert.ok(addHtml.slice(formStart, bodyStart).includes('name="_csrf"'));
+    assert.match(addHtml.slice(bodyStart, footerStart), /<\/div>\s*$/);
+});
+
 (async () => {
     try {
         for (const { name, fn } of tests) {

@@ -4,7 +4,7 @@
   <h1 class="h3">Εισαγωγή Νέου Χρήστη</h1>
   <div class="btn-toolbar mb-2 mb-md 0">
     <div class="btn-group me-2">
-      <a class="btn btn-sm btn-outline-secondary" href="/admin"
+      <a class="btn btn-sm user-admin-action-btn user-admin-action-secondary" href="/admin"
         ><i class="bi bi-table"></i> Επιστροφή</a
       >
       <!-- <button class="btn btn-sm btn-outline-secondary">?</button> -->
@@ -29,9 +29,9 @@
 
 <div class="container">
   <div class="card z-depth-5">
-    <div class="card-body">
-      <form action="/admin/add" method="POST">
-        <%- include('../partials/_csrfField') %>
+    <form action="/admin/add" method="POST">
+      <%- include('../partials/_csrfField') %>
+      <div class="card-body">
         <div class="row form-group g-3 align-items-center mb-2">
           <div class="col-1-5 right-align">
             <label for="firstName" class="col-form-label field-required"
@@ -134,10 +134,11 @@
           <div class="col-1-5 right-align">
             <label for="group" class="col-form-label field-required">Role</label>
           </div>
-          <div class="col-4" style="padding-top: 8px">
+          <div class="col-4 user-radio-group">
             <% userRoleOptions.forEach((option) => { %>
-              <div class="form-check form-check-inline">
+              <div class="form-check form-check-inline user-radio-option">
                 <input
+                  class="form-check-input"
                   type="radio"
                   name="radioRoles"
                   id="role-<%= option.value %>"
@@ -154,13 +155,14 @@
               >Status</label
             >
           </div>
-          <div class="col-4" style="padding-top: 8px">
-            <div class="form-check form-check-inline">
-              <input type="radio" name="radioStatus" id="radioActive" value="A" />
+          <div class="col-4 user-radio-group">
+            <div class="form-check form-check-inline user-radio-option">
+              <input class="form-check-input" type="radio" name="radioStatus" id="radioActive" value="A" />
               <label class="form-check-label" for="radioActive">Ενεργός</label>
             </div>
-            <div class="form-check form-check-inline">
+            <div class="form-check form-check-inline user-radio-option">
               <input
+                class="form-check-input"
                 type="radio"
                 name="radioStatus"
                 id="radioInactive"
@@ -186,24 +188,20 @@
             ></textarea>
           </div>
         </div>
-        <div class="card-footer">
-          <div
-            class="d-inline-block d-flex"
-            style="justify-content: space-around"
+      </div>
+      <div class="card-footer user-admin-card-footer">
+        <div class="user-admin-actions">
+          <button type="submit" class="btn user-admin-action-btn user-admin-action-secondary mt-2 w-15">
+            <i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
+          </button>
+          <a
+            class="btn btn-sm user-admin-action-btn user-admin-action-secondary mt-2 w-15"
+            href="/admin"
           >
-            <button type="submit" class="btn btn-outline-secondary mt-2 w-15">
-              <i class="bi bi-person-plus"></i> Προσθήκη Χρήστη
-            </button>
-            <a
-              class="btn btn-sm btn-outline-secondary mt-2 w-15"
-              style="vertical-align: middle"
-              href="/admin"
-            >
-              <i class="bi bi-table"></i> Επιστροφή</a
-            >
-          </div>
+            <i class="bi bi-table"></i> Επιστροφή</a
+          >
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   </div>
 </div>

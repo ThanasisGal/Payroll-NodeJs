@@ -3,7 +3,7 @@
     <h1 class="h3">Αποτελέσματα Αναζήτησης</h1>
     <div class="btn-toolbar mb-2 mb-md 0">
         <div class="btn-group me-2">
-            <a href="/admin" class="btn btn-sm btn-outline-secondary"><i class="bi bi-table"></i> Εμφάνιση όλων</a>
+            <a href="/admin" class="btn btn-sm user-admin-action-btn user-admin-action-secondary"><i class="bi bi-table"></i> Εμφάνιση όλων</a>
         </div>
     </div>
 </div>
@@ -57,27 +57,16 @@
                                     <% } %>
                                 </td>
                                 <td class="text-end">
-                                    <div class="d-flex flex-row justify-content-end gap-2">
-                                        <a href="/admin/view/<%= element._id %>" role="button" class="btn btn-secondary btn-small" data-bs-title="Προβολή"><i class="bi bi-eye"></i>
+                                    <div class="user-admin-row-actions">
+                                        <a href="/admin/view/<%= element._id %>" role="button" class="btn btn-small user-admin-action-btn user-admin-action-secondary" data-bs-title="Προβολή"><i class="bi bi-eye"></i>
                                         </a>
 
-                                        <a href="/admin/edit/<%= element._id %>" type="button" class="btn btn-secondary btn-small" data-bs-title="Διόρθωση"><i class="bi bi-pencil"></i>
+                                        <a href="/admin/edit/<%= element._id %>" type="button" class="btn btn-small user-admin-action-btn user-admin-action-secondary" data-bs-title="Διόρθωση"><i class="bi bi-pencil"></i>
                                         </a>
 
-                                        <form
-                                            action="/edit/<%= element._id %>?_method=DELETE"
-                                            method="POST"
-                                            class="position-relative">
-
-                                            <%- include('./partials/_csrfField') %>
-
-                                            <button
-                                                type="submit"
-                                                class="btn btn-secondary btn-small"
-                                                data-bs-title="Διαγραφή">
-                                                <i class="bi bi-person-x"></i>
-                                            </button>
-                                        </form>
+                                        <a href="/admin/delete/<%= element._id %>" class="btn btn-small user-admin-action-btn user-admin-action-danger" data-bs-title="Διαγραφή">
+                                            <i class="bi bi-person-x"></i>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>
@@ -91,10 +80,10 @@
         </div>
     </div>
 
-    <div class="card-footer">
-        <div class="d-inline-block d-flex js-sb">
-            <a href="/admin/add" class="btn btn-outline-secondary mb-1 mt-2 w-15"><i class="bi bi-person-plus"></i> Νέος Χρήστης</a>
-            <a class="btn btn-outline-secondary mb-1 mt-2 w-15" href="/admin"><i class="bi bi-table"></i> Επιστροφή</a>
+    <div class="card-footer user-admin-card-footer">
+        <div class="user-admin-actions justify-content-between">
+            <a href="/admin/add" class="btn user-admin-action-btn user-admin-action-secondary mb-1 mt-2 w-15"><i class="bi bi-person-plus"></i> Νέος Χρήστης</a>
+            <a class="btn user-admin-action-btn user-admin-action-secondary mb-1 mt-2 w-15" href="/admin"><i class="bi bi-table"></i> Επιστροφή</a>
 
             <% if (user.length > 0) { %>
                 <nav aria-label="Search Pagination">

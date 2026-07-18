@@ -1,46 +1,25 @@
-<div
-  class="modal fade"
-  id="delModal"
-  data-bs-backdrop="static"
-  data-bs-keyboard="false"
-  tabindex="-1"
-  aria-labelledby="staticBackdropLabel"
-  aria-hidden="true"
->
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header bg-danger">
-        <div class="modal-title fw-bold" style="font-size: 18px"><i class="bi bi-trash3"></i>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+  <h1 class="h3">Διαγραφή Χρήστη</h1>
+</div>
+
+<div class="card z-depth-5">
+  <div class="card-body text-center py-4">
+    <p class="mb-2">
+      Ο χρήστης <strong><%= users.lastName %> <%= users.firstName %></strong> θα διαγραφεί οριστικά.
+    </p>
+    <p class="mb-0">Είστε σίγουρος(η);</p>
+  </div>
+  <div class="card-footer user-admin-card-footer">
+    <div class="user-admin-actions">
+      <a href="/admin" class="btn user-admin-action-btn user-admin-action-secondary">
+        Ακύρωση
+      </a>
+      <form action="/admin/edit/<%= users._id %>?_method=DELETE" method="POST" class="m-0">
+        <%- include('../partials/_csrfField') %>
+        <button type="submit" class="btn user-admin-action-btn user-admin-action-danger">
           Διαγραφή Χρήστη
-        </div>
-      </div>
-
-      <div class="modal-body">
-        <p>
-          Ο χρήστης
-          <b class="fw-bold"><%= users.lastName %> <%= users.firstName %></b> και με ID <b class="fw-bold"><%= users._id %></b> θα διαγραφεί οριστικά.<br /><br />
-          Είστε σίγουρος(η);
-        </p>
-      </div>
-      <div class="modal-footer">
-        <form action="/admin" method="GET">
-          <button
-            type="submit"
-            class="btn btn-outline-secondary"
-            data-bs-dismiss="modal">Κλείσιμο
-          </button>
-        </form>
-
-        <form
-          action="/admin/edit/<%= users._id %>?_method=DELETE"
-          method="POST"
-          class="position-relative"
-        >
-          <button type="submit" class="btn btn-outline-danger">
-            Διαγραφή Χρήστη
-          </button>
-        </form>
-      </div>
+        </button>
+      </form>
     </div>
   </div>
 </div>

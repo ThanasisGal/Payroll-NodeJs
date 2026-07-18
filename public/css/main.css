@@ -13930,3 +13930,119 @@ body.loader-active > *:not(.app-loader) {
 .apasxolhseis-snapshot-confirm-actions {
     gap: 0.75rem;
 }
+
+.user-admin-action-btn {
+    color: #212529;
+    border-width: 1px;
+    border-style: solid;
+    opacity: 1;
+}
+
+.user-admin-action-secondary {
+    background-color: var(--bs-secondary-bg-subtle, #e9ecef);
+    border-color: var(--bs-secondary-border-subtle, #adb5bd);
+    color: #212529;
+}
+
+.user-admin-action-secondary:hover,
+.user-admin-action-secondary:focus {
+    background-color: #dee2e6;
+    border-color: var(--bs-secondary-border-subtle, #adb5bd);
+    color: #212529;
+}
+
+.user-admin-action-danger {
+    background-color: var(--bs-danger-bg-subtle, #f8d7da);
+    border-color: var(--bs-danger-border-subtle, #ea868f);
+    color: #212529;
+}
+
+.user-admin-action-danger:hover,
+.user-admin-action-danger:focus {
+    background-color: #f1bfc4;
+    border-color: var(--bs-danger-border-subtle, #ea868f);
+    color: #212529;
+}
+
+.user-admin-action-btn:disabled,
+.user-admin-action-btn.disabled {
+    color: #343a40;
+    background-color: var(--bs-secondary-bg-subtle, #e9ecef);
+    border-color: var(--bs-secondary-border-subtle, #adb5bd);
+    opacity: 0.6;
+}
+
+.user-admin-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.user-admin-actions .user-admin-action-btn {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.user-admin-card-footer {
+    display: flex;
+    align-items: center;
+    min-height: 3.75rem;
+    padding: 0.5rem 1rem;
+    box-sizing: border-box;
+}
+
+.user-admin-card-footer > .user-admin-actions {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+    align-items: center;
+}
+
+.user-admin-card-footer .user-admin-action-btn {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.user-admin-card-footer nav,
+.user-admin-card-footer .pagination {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    align-self: center;
+}
+
+.user-admin-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.user-radio-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    column-gap: 1.25rem;
+    row-gap: 0.5rem;
+}
+
+.user-radio-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+}
+
+.user-radio-option .form-check-input {
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.user-radio-option .form-check-label {
+    margin: 0;
+    line-height: 1.25;
+}
