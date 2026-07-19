@@ -2,6 +2,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const ejs = require('ejs');
+const { execFileSync } = require('child_process');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
@@ -9,6 +11,8 @@ const viewPath = path.join(__dirname, '..', '..', '..', '..', 'views', 'ergazome
 const viewSource = fs.readFileSync(viewPath, 'utf8');
 const cssPath = path.join(__dirname, '..', '..', '..', 'css', 'main.css');
 const cssSource = fs.readFileSync(cssPath, 'utf8');
+const dropdownHelperPath = path.join(__dirname, '..', '..', '..', 'js', 'dropdown-item.js');
+const dropdownHelperSource = fs.readFileSync(dropdownHelperPath, 'utf8');
 const elementsById = new Map();
 let fetchCalls = 0;
 const documentStub = {
@@ -714,6 +718,704 @@ function testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState() {
     elementsById.delete('policyPreviewGroupsContainer');
 }
 
+function minimalElement(overrides = {}) {
+    const classes = new Set(String(overrides.className || '').split(/\s+/).filter(Boolean));
+    return {
+        value: '',
+        innerHTML: '',
+        textContent: '',
+        disabled: false,
+        dataset: {},
+        className: overrides.className || '',
+        classList: {
+            add: (...values) => values.forEach((value) => classes.add(value)),
+            remove: (...values) => values.forEach((value) => classes.delete(value)),
+            toggle: (value, force) => {
+                if (force === true) classes.add(value);
+                else if (force === false) classes.delete(value);
+                else if (classes.has(value)) classes.delete(value);
+                else classes.add(value);
+            },
+            contains: (value) => classes.has(value)
+        },
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+        ...overrides
+    };
+}
+
+function setMinimalRenderElements() {
+    const ids = [
+        'hrReviewStatus',
+        'hrReviewProgress',
+        'hrReviewPendingContainer',
+        'hrReviewCompletedContainer'
+    ];
+    ids.forEach((id) => elementsById.set(id, minimalElement()));
+}
+
+function clearMinimalRenderElements() {
+    [
+        'hrReviewStatus',
+        'hrReviewProgress',
+        'hrReviewPendingContainer',
+        'hrReviewCompletedContainer'
+    ].forEach((id) => elementsById.delete(id));
+}
+
+function renderViewForRole(userRole) {
+    return ejs.render(viewSource, {
+        userRole,
+        csrfToken: 'csrf-test',
+        companyId: 'company-test',
+        periodRec: { apo: '2026-07-01', eos: '2026-07-31' },
+        dateInputValue: (value) => value,
+        script: (value) => `/scripts/${value}`
+    }, { filename: viewPath });
+}
+
+function duplicateIds(html) {
+    const ids = [...String(html).matchAll(/\sid=["']([^"']+)["']/g)].map((match) => match[1]);
+    return ids.filter((id, index) => ids.indexOf(id) !== index);
+}
+
+function decisionReadyProjection() {
+    const projection = readyProjection();
+    const group = projection.groups[0];
+    group.pair_contract = {
+        proposal_version: 'repo-transfer-single-pair-proposal:v1',
+        choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR'
+    };
+    group.items[0].prodhlomena_oraria_id = '507f191e810c19729de860ea';
+    group.items[1].prodhlomena_oraria_id = '507f191e810c19729de860eb';
+    return projection;
+}
+
+function setHrDecisionState(projection = decisionReadyProjection()) {
+    vm.runInContext(`
+        currentHrReviewProjection = ${JSON.stringify(projection)};
+        currentAtomicRepoTransferProjection = currentHrReviewProjection;
+        currentHrReviewLoaded = true;
+        currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-07-06&eos_hmeromhnia=2026-07-12&ypokatasthma=0000');
+        currentRepoTransferDecisionsByProposalId = new Map();
+        repoTransferDecisionSubmitting = false;
+    `, sandbox);
+    sandbox.classifyHrReviewGroups();
+    return projection.groups[0];
+}
+
+function snapshotSandboxFunctions(names) {
+    return new Map(names.map((name) => [name, sandbox[name]]));
+}
+
+function restoreSandboxFunctions(snapshot) {
+    snapshot.forEach((value, name) => {
+        sandbox[name] = value;
+    });
+}
+
+function testMinimalWorkspaceEjsContract() {
+    assert.ok(viewSource.includes("const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole)"));
+    assert.ok(viewSource.includes('id="canUseAdvancedEmploymentReview"'));
+    assert.ok(viewSource.includes('id="hrReviewWorkspace"'));
+    assert.ok(viewSource.includes('<% if (canUseAdvancedEmploymentReview) { %>'));
+    assert.ok(viewSource.includes('id="advancedReviewWorkspace" class="d-none"'));
+    assert.ok(!viewSource.includes('id="userRole"'));
+    assert.ok(!viewSource.includes('id="normalizedUserRole"'));
+    assertContains(viewSource, [
+        'id="ypokatasthmata"',
+        'id="ypokatasthmata_stathera"',
+        '/api/dropdown/erganh/ypokatasthmata?company=',
+        'initYpokatasthmataDropdowns.js',
+        'id="hrReviewStartBtn"'
+    ]);
+}
+
+function testEmploymentReviewScrollContainerContract() {
+    assert.ok(viewSource.includes('employment-review-scroll-container'));
+    assert.ok(viewSource.includes('id="hrReviewWorkspace"'));
+    assert.ok(viewSource.includes('id="advancedReviewWorkspace"'));
+    assert.ok(!/style=["'][^"']*overflow-y\s*:\s*auto/i.test(viewSource));
+
+    const selectorStart = cssSource.indexOf('.employment-review-scroll-container {');
+    assert.ok(selectorStart >= 0);
+    const selectorEnd = cssSource.indexOf('}', selectorStart);
+    const scrollCss = cssSource.slice(selectorStart, selectorEnd);
+    assert.ok(/overflow-y\s*:\s*auto\s*;/.test(scrollCss));
+    assert.ok(/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
+    assert.ok(/max-height\s*:[^;]*(?:100vh|100dvh)/.test(scrollCss));
+
+    const cssDiff = execFileSync('git', ['diff', '--unified=0', '--', cssPath], {
+        encoding: 'utf8'
+    });
+    const addedCss = cssDiff
+        .split('\n')
+        .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+        .map((line) => line.slice(1))
+        .join('\n');
+    assert.ok(!/(?:^|\n)\s*(?:body|html)\b[^{}]*\{[^}]*overflow\s*:/im.test(addedCss));
+}
+
+function testEmploymentReviewFinalUiContract() {
+    assert.ok(viewSource.includes('data-dropdown-direction="down"'));
+    const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
+    const repositionEnd = dropdownHelperSource.indexOf('requestAnimationFrame(reposition)', repositionStart);
+    const repositionSource = dropdownHelperSource.slice(repositionStart, repositionEnd);
+    assert.ok(repositionSource.includes("el.dataset.dropdownDirection || 'auto'"));
+    assert.ok(repositionSource.includes("['auto', 'up', 'down'].includes("));
+    assert.ok(repositionSource.includes("forcedDirection === 'down'"));
+    assert.ok(repositionSource.includes("ddEl.classList.add('place-below', 'maxh-ideal')"));
+    assert.ok(repositionSource.includes("ddEl.classList.add('place-below', 'maxh-limited')"));
+    const forcedDownSource = repositionSource.slice(
+        repositionSource.indexOf("if (forcedDirection === 'down')"),
+        repositionSource.indexOf("} else if (forcedDirection === 'up')")
+    );
+    assert.ok(!forcedDownSource.includes('place-above'));
+    assert.ok(repositionSource.includes('else if (idealHeight <= spaceBelow)'));
+    assert.ok(repositionSource.includes("ddEl.classList.add('place-above', 'maxh-ideal')"));
+    assert.ok(!/new TomSelect\([\s\S]*?dropdownDirection\s*[:,]/.test(dropdownHelperSource));
+
+    const outerCards = viewSource.match(/class="card[^"]*employment-review-card[^"]*z-depth-5[^"]*"/g) || [];
+    assert.strictEqual(outerCards.length, 2);
+    assert.ok(viewSource.includes('container-fluid mt-3 employment-review-page-shell'));
+    assert.ok(!/id="hrReviewWorkspace"[^>]*employment-review-page-shell/.test(viewSource));
+    assert.ok(!/employment-review-page-shell[^"']*\bw-70\b|\bw-70\b[^"']*employment-review-page-shell/.test(viewSource));
+    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
+    assert.ok(cssSource.includes('margin-left: 15%'));
+    assert.ok(!/\.employment-review-card\s*\{[^}]*?(?:width|margin-(?:left|right)|--employment-review-(?:width|right))/s.test(cssSource));
+    assert.ok(/@media \(max-width: 991\.98px\)[\s\S]*?\.employment-review-page-shell[\s\S]*?width:\s*100%[\s\S]*?margin-left:\s*0[\s\S]*?margin-right:\s*0/.test(cssSource));
+    const shellCssStart = cssSource.indexOf('.employment-review-page-shell {');
+    const shellCss = cssSource.slice(shellCssStart, cssSource.indexOf('}', shellCssStart));
+    assert.ok(!/(?:transform|translate)\s*[:(]/.test(shellCss));
+    assert.ok(!/#hrReviewStartBtn\s*\{[^}]*(?:transform|translate|position|margin)/s.test(cssSource));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 17rem'));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 25.5rem'));
+    assert.ok(cssSource.includes('overflow-y: auto'));
+
+    ['hrReviewStartBtn', 'showAdvancedReviewBtn', 'showMinimalReviewBtn'].forEach((id) => {
+        assert.ok(new RegExp(`class="[^"]*employment-review-action-btn[^"]*" id="${id}"`).test(viewSource));
+    });
+    assert.ok(!/id="(?:showAdvancedReviewBtn|showMinimalReviewBtn)"[^>]*btn-outline-|class="[^"]*btn-outline-[^"]*" id="(?:showAdvancedReviewBtn|showMinimalReviewBtn)"/.test(viewSource));
+    assert.ok(source.includes('hr-review-decision-btn employment-review-action-btn employment-review-action-success'));
+    assert.ok(source.includes('hr-review-decision-btn employment-review-action-btn employment-review-action-danger'));
+    assert.ok(source.includes('hr-review-decision-btn employment-review-action-btn employment-review-action-warning'));
+
+    ['secondary', 'success', 'danger', 'warning'].forEach((variant) => {
+        const start = cssSource.indexOf(`.employment-review-action-${variant} {`);
+        assert.ok(start >= 0);
+        const block = cssSource.slice(start, cssSource.indexOf('}', start));
+        assert.ok(/background\s*:\s*(?!transparent)/.test(block));
+    });
+
+    const cssDiff = execFileSync('git', ['diff', '--unified=0', '--', cssPath], { encoding: 'utf8' });
+    const addedSelectors = cssDiff
+        .split('\n')
+        .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+        .map((line) => line.slice(1))
+        .filter((line) => line.includes('{'));
+    assert.ok(!addedSelectors.some((line) => /^\s*\.btn(?:\b|[-.:#])/.test(line)));
+    assert.ok(!addedSelectors.some((line) => /^\s*\.btn-outline-/.test(line)));
+
+    assert.ok(viewSource.includes('id="hrReviewWorkspace"'));
+    assert.ok(viewSource.includes('id="advancedReviewWorkspace"'));
+    assert.ok(viewSource.includes('id="canUseAdvancedEmploymentReview"'));
+    assert.ok(viewSource.includes('meta name="csrf-token"'));
+    assert.ok(source.includes('body: JSON.stringify({ proposal_id: group.group_id'));
+    assert.ok(!viewSource.includes('id="currentUserRole"'));
+}
+
+function testCorrectiveDropdownAndPageShellContract() {
+    const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
+    const repositionEnd = dropdownHelperSource.indexOf('requestAnimationFrame(reposition)', repositionStart);
+    const repositionSource = dropdownHelperSource.slice(repositionStart, repositionEnd);
+    const forcedDownStart = repositionSource.indexOf("if (forcedDirection === 'down')");
+    const forcedUpStart = repositionSource.indexOf("} else if (forcedDirection === 'up')");
+    const forcedDownSource = repositionSource.slice(forcedDownStart, forcedUpStart);
+
+    assert.ok(forcedDownStart >= 0 && forcedUpStart > forcedDownStart);
+    assert.ok(forcedDownSource.includes('spaceBelow - 8'));
+    assert.ok(forcedDownSource.includes("'place-below', 'maxh-limited'"));
+    assert.ok(!forcedDownSource.includes('place-above'));
+    assert.ok(cssSource.includes('var(--ts-available-space, 260px)'));
+
+    const shellMarkup = viewSource.match(/<div class="[^"]*employment-review-page-shell[^"]*">/)?.[0] || '';
+    assert.ok(shellMarkup.includes('employment-review-page-shell'));
+    assert.ok(!shellMarkup.includes('w-70'));
+    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
+    assert.ok(!/\.hr-review-card\s*\{[^}]*max-width/s.test(cssSource));
+    assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
+}
+
+function testEmploymentReviewBranchActionLayoutContract() {
+    assert.ok(!viewSource.includes('col-md-6 employment-review-branch-action-group'));
+    assert.ok(viewSource.includes('hr-review-filters employment-review-filter-grid'));
+    assert.ok(viewSource.includes('class="employment-review-branch-control"'));
+    assert.ok(viewSource.includes('class="employment-review-start-action d-grid"'));
+
+    const gridStart = cssSource.indexOf('.employment-review-filter-grid {');
+    const gridCss = cssSource.slice(gridStart, cssSource.indexOf('}', gridStart));
+    assert.ok(/display:\s*grid/.test(gridCss));
+    assert.ok(/grid-template-columns:[\s\S]*2\.5rem[\s\S]*max-content/.test(gridCss));
+    assert.ok(/column-gap:\s*0\.75rem/.test(gridCss));
+
+    const branchStart = cssSource.indexOf('.employment-review-branch-control {');
+    const branchCss = cssSource.slice(branchStart, cssSource.indexOf('}', branchStart));
+    assert.ok(/grid-column:\s*3/.test(branchCss));
+    assert.ok(/min-width:\s*0/.test(branchCss));
+    assert.ok(cssSource.includes('.employment-review-branch-control .ts-wrapper {'));
+    assert.ok(cssSource.includes('width: calc(100% - 2rem)'));
+
+    const actionStart = cssSource.indexOf('.employment-review-start-action {');
+    const actionCss = cssSource.slice(actionStart, cssSource.indexOf('}', actionStart));
+    assert.ok(/grid-column:\s*5/.test(actionCss));
+    assert.ok(!/(?:position\s*:\s*absolute|transform\s*:|translate\s*:)/.test(actionCss));
+    assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
+
+    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
+    assert.ok(cssSource.includes('.hr-review-card {\n    width: 100%;'));
+    assert.ok(dropdownHelperSource.includes("ddEl.classList.add('place-below', 'maxh-limited')"));
+    assert.ok(viewSource.includes('id="hrReviewStartBtn"'));
+    assert.ok(source.includes("getElementById('hrReviewStartBtn')?.addEventListener('click', loadHrReviewQueue)"));
+}
+
+function testRoleScopedRenderedEjs() {
+    const hr = renderViewForRole('HR');
+    assert.ok(hr.includes('id="hrReviewWorkspace"'));
+    assert.ok(!hr.includes('id="advancedReviewWorkspace"'));
+    assert.ok(!hr.includes('id="resultsTable"'));
+    assert.ok(!hr.includes('id="policyPreviewGroupsContainer"'));
+    assert.ok(hr.includes('id="ypokatasthmata"'));
+    assert.ok(hr.includes('initYpokatasthmataDropdowns.js'));
+
+    ['A', 'S'].forEach((role) => {
+        const html = renderViewForRole(role);
+        assert.ok(html.includes('id="hrReviewWorkspace"'));
+        assert.ok(html.includes('id="advancedReviewWorkspace"'));
+        assert.ok(html.includes('id="resultsTable"'));
+        assert.ok(html.includes('id="policyPreviewGroupsContainer"'));
+        assert.ok(html.includes('id="ypokatasthmata"'));
+        assert.ok(html.includes('initYpokatasthmataDropdowns.js'));
+        assert.deepStrictEqual(duplicateIds(html), [], `${role} rendered duplicate IDs`);
+    });
+
+    const unknown = renderViewForRole('UNKNOWN');
+    assert.ok(!unknown.includes('id="hrReviewWorkspace"'));
+    assert.ok(!unknown.includes('id="advancedReviewWorkspace"'));
+    assert.ok(!unknown.includes('id="ypokatasthmata"'));
+    assert.ok(!unknown.includes('initYpokatasthmataDropdowns.js'));
+    assert.ok(unknown.includes('Δεν έχετε δικαίωμα χρήσης του ελέγχου απασχολήσεων.'));
+    assert.ok(!unknown.includes('hr-review-decision-btn'));
+    assert.deepStrictEqual(duplicateIds(hr), [], 'HR rendered duplicate IDs');
+    assert.deepStrictEqual(duplicateIds(unknown), [], 'UNKNOWN rendered duplicate IDs');
+}
+
+function testHrQueueClassification() {
+    const projection = readyProjection();
+    projection.groups = [
+        { ...projection.groups[0], group_id: 'pending' },
+        { ...projection.groups[0], group_id: 'decided' },
+        { ...projection.groups[0], group_id: 'applied-state' },
+        { ...projection.groups[0], group_id: 'applied-execution' },
+        { ...projection.groups[0], group_id: 'stale-only' }
+    ];
+    vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(projection)}`, sandbox);
+    vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([
+        ['decided', { current_decision: { decision_code: 'REJECT_PROPOSAL' } }],
+        ['applied-state', { apply_state: 'ALREADY_APPLIED' }],
+        ['applied-execution', { current_execution: { execution_status: 'APPLIED' } }],
+        ['stale-only', { current_decision: null, history: [{ decision_code: 'APPROVE_PROPOSAL', is_current: false }] }]
+    ])`, sandbox);
+    sandbox.classifyHrReviewGroups();
+    assert.deepStrictEqual(
+        Array.from(vm.runInContext('currentHrPendingGroups.map((group) => group.group_id)', sandbox)),
+        ['pending', 'stale-only']
+    );
+    assert.deepStrictEqual(
+        Array.from(vm.runInContext('currentHrCompletedGroups.map((group) => group.group_id)', sandbox)),
+        ['decided', 'applied-state', 'applied-execution']
+    );
+}
+
+function testMinimalRenderingAndTerminology() {
+    setMinimalRenderElements();
+    const projection = readyProjection({
+        sourceIntervals: [
+            ['', ''],
+            ['12:00', '16:00'],
+            ['', '']
+        ]
+    });
+    projection.groups[0].items[0].employee_name = '<img src=x onerror=alert(1)>';
+    vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(projection)}; currentHrReviewLoaded = true; currentRepoTransferDecisionsByProposalId = new Map()`, sandbox);
+    sandbox.classifyHrReviewGroups();
+    sandbox.renderHrReviewWorkspace();
+    const html = elementsById.get('hrReviewPendingContainer').innerHTML;
+    const visible = getVisibleText(html);
+    assert.ok(!html.includes('<img'));
+    assert.ok(html.includes('&lt;img'));
+    assertContains(html, [
+        'Ημέρα που θα καταχωριστεί ως εργασία',
+        'Ημέρα που θα καταχωριστεί ως ρεπό',
+        'Ωράριο 01',
+        'Ωράριο 02',
+        'Ωράριο 03',
+        '12:00–16:00',
+        'Αποδοχή πρότασης',
+        'Δεν ισχύει',
+        'Χρειάζομαι οδηγία'
+    ]);
+    assert.ok(html.indexOf('Ωράριο 01') < html.indexOf('Ωράριο 02'));
+    assert.ok(html.indexOf('Ωράριο 02') < html.indexOf('12:00–16:00'));
+    [
+        /\batomic\b/i,
+        /\bprojection\b/i,
+        /\bgroup(?:_id)?\b/i,
+        /policy_code/i,
+        /scenario_code/i,
+        /reason_code/i,
+        /action_type/i,
+        /confidence/i,
+        /runtime/i,
+        /fingerprint/i,
+        /\bstale\b/i,
+        /dry-run/i,
+        /eligibility/i,
+        /\bREADY\b/,
+        /\bblocked\b/i
+    ].forEach((pattern) => assert.ok(!pattern.test(visible), `Visible minimal term: ${pattern}`));
+    assert.ok(
+        getVisibleText(elementsById.get('hrReviewProgress').innerHTML).includes(
+            '1 περιπτώσεις χρειάζονται απόφαση'
+        )
+    );
+    setRepoTransferPermissions({ decision: false, apply: false });
+    sandbox.renderHrPendingCase();
+    assert.ok(!elementsById.get('hrReviewPendingContainer').innerHTML.includes('hr-review-decision-btn'));
+    setRepoTransferPermissions({ decision: true, apply: true });
+    clearMinimalRenderElements();
+}
+
+function testMinimalCompletionAndClosedCompletedSection() {
+    setMinimalRenderElements();
+    const projection = readyProjection();
+    vm.runInContext(`currentHrReviewProjection = ${JSON.stringify(projection)}; currentHrReviewLoaded = true; currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'APPROVE_PROPOSAL', created_by_user_name: '<Admin>', notes: '<note>' } }]])`, sandbox);
+    sandbox.classifyHrReviewGroups();
+    sandbox.renderHrReviewWorkspace();
+    const status = elementsById.get('hrReviewStatus').innerHTML;
+    const completed = elementsById.get('hrReviewCompletedContainer').innerHTML;
+    assert.ok(status.includes('Ο έλεγχος ολοκληρώθηκε'));
+    assert.ok(completed.includes('<details'));
+    assert.ok(!completed.includes('<details open'));
+    assert.ok(completed.includes('&lt;Admin&gt;'));
+    assert.ok(completed.includes('&lt;note&gt;'));
+    clearMinimalRenderElements();
+}
+
+function testMinimalSafetySourceContracts() {
+    const minimalStart = source.indexOf('function userCanUseAdvancedEmploymentReview');
+    const minimalEnd = source.indexOf('function renderAtomicRepoTransferProjection');
+    const minimalSource = source.slice(minimalStart, minimalEnd);
+    assert.ok(minimalSource.includes('fetchPolicyPreviewGrouping(params)'));
+    assert.ok(minimalSource.includes('await refreshRepoTransferDecisions()'));
+    assert.ok(!minimalSource.includes('loadResults()'));
+    assert.ok(!minimalSource.includes('renderReviewRows('));
+    assert.ok(!minimalSource.includes('fetchScenarioClassifications('));
+    assert.ok(!minimalSource.includes('refreshPolicyPreviewApprovals('));
+    assert.ok(!minimalSource.includes('fetchPolicyPreviewApplyDryRun('));
+    assert.ok(!/\son[a-z]+\s*=/i.test(minimalSource));
+    assert.ok(source.includes("data-decision-code=\"APPROVE_PROPOSAL\">Αποδοχή πρότασης"));
+    assert.ok(source.includes("data-decision-code=\"REJECT_PROPOSAL\">Δεν ισχύει"));
+    assert.ok(source.includes("data-decision-code=\"NEEDS_MORE_REVIEW\">Χρειάζομαι οδηγία"));
+    assert.ok(source.includes("options.mode === 'hr'"));
+    assert.ok(source.includes("String(value || '').trim()"));
+}
+
+async function testLightweightHrLoadingRequests() {
+    setMinimalRenderElements();
+    elementsById.set('hrReviewStartBtn', minimalElement());
+    elementsById.set('hr_apo_hmeromhnia', minimalElement({ value: '2026-07-06' }));
+    elementsById.set('hr_eos_hmeromhnia', minimalElement({ value: '2026-07-12' }));
+    elementsById.set('ypokatasthmata_stathera', minimalElement({ value: '0000' }));
+    const urls = [];
+    const projection = readyProjection();
+    sandbox.fetch = async (url, options = {}) => {
+        urls.push({ url: String(url), method: options.method || 'GET' });
+        if (String(url).startsWith('/api/prodhlomena-oraria/review/policies/preview?')) {
+            return {
+                ok: true,
+                json: async () => ({
+                    success: true,
+                    grouping: { version: 1, groups: [], summary: {} },
+                    atomic_group_projection: projection
+                })
+            };
+        }
+        if (String(url).startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?')) {
+            return { ok: true, json: async () => ({ success: true, records: [] }) };
+        }
+        throw new Error(`Unexpected HR loading request: ${url}`);
+    };
+    vm.runInContext('currentHrReviewLoading = false; currentHrReviewLoaded = false', sandbox);
+    await sandbox.loadHrReviewQueue();
+    assert.strictEqual(urls.length, 2);
+    assert.ok(urls[0].url.startsWith('/api/prodhlomena-oraria/review/policies/preview?'));
+    assert.ok(urls[1].url.startsWith('/api/prodhlomena-oraria/review/repo-transfer-decisions/current?'));
+    assert.ok(urls.every((call) => call.method === 'GET'));
+    const allUrls = urls.map((call) => call.url).join('\n');
+    assert.ok(!allUrls.includes('/api/prodhlomena-oraria/review?'));
+    assert.ok(!allUrls.includes('/review/scenarios'));
+    assert.ok(!allUrls.includes('/review/policies/approvals'));
+    assert.ok(!allUrls.includes('/review/policies/apply-dry-run'));
+    ['hrReviewStartBtn', 'hr_apo_hmeromhnia', 'hr_eos_hmeromhnia', 'ypokatasthmata_stathera'].forEach((id) => elementsById.delete(id));
+    clearMinimalRenderElements();
+}
+
+async function testHrDecisionPresentationAndLocalRerender() {
+    setMinimalRenderElements();
+    setRepoTransferPermissions({ decision: true, apply: false });
+    const group = setHrDecisionState();
+    const calls = { swal: [], posts: 0, heavyLoads: 0 };
+    const saved = snapshotSandboxFunctions([
+        'loadResults', 'getPolicyPreviewCsrfToken', 'refreshRepoTransferDecisions', 'fetch', 'Swal'
+    ]);
+    try {
+        sandbox.loadResults = async () => { calls.heavyLoads++; };
+        sandbox.getPolicyPreviewCsrfToken = async () => 'csrf-test';
+        sandbox.refreshRepoTransferDecisions = async () => {
+            vm.runInContext("currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: 'NEEDS_MORE_REVIEW', notes: 'Διευκρίνιση' } }]])", sandbox);
+        };
+        sandbox.fetch = async (url, options) => {
+            calls.posts++;
+            assert.strictEqual(url, '/api/prodhlomena-oraria/review/repo-transfer-decisions');
+            assert.strictEqual(options.method, 'POST');
+            assert.strictEqual(options.credentials, 'same-origin');
+            assert.strictEqual(options.headers['CSRF-Token'], 'csrf-test');
+            assert.strictEqual(options.headers['x-csrf-token'], 'csrf-test');
+            const body = JSON.parse(options.body);
+            assert.deepStrictEqual(Object.keys(body).sort(), [
+                'decision_code', 'expected_choice_code', 'expected_proposal_version',
+                'expected_source_id', 'expected_target_id', 'notes', 'proposal_id', 'request_id'
+            ]);
+            return { ok: true, json: async () => ({ success: true }) };
+        };
+        sandbox.Swal = {
+            fire: async (options) => {
+                calls.swal.push(options);
+                if (options.title === 'Χρειάζομαι οδηγία') {
+                    assert.strictEqual(options.inputValidator('   '), 'Συμπληρώστε τι χρειάζεται διευκρίνιση.');
+                    assert.strictEqual(options.inputValidator(' κείμενο '), undefined);
+                    return { isConfirmed: true, value: ' Διευκρίνιση ' };
+                }
+                return {};
+            }
+        };
+        await sandbox.submitRepoTransferDecision(group, 'NEEDS_MORE_REVIEW', { mode: 'hr' });
+        assert.strictEqual(calls.posts, 1);
+        assert.strictEqual(calls.heavyLoads, 0);
+        assert.ok(calls.swal.some((call) => call.title === 'Η απόφαση καταγράφηκε'));
+        assert.strictEqual(vm.runInContext('currentHrPendingGroups.length', sandbox), 0);
+        assert.strictEqual(vm.runInContext('currentHrCompletedGroups.length', sandbox), 1);
+    } finally {
+        restoreSandboxFunctions(saved);
+        setRepoTransferPermissions({ decision: true, apply: true });
+        clearMinimalRenderElements();
+    }
+}
+
+async function testHrDecisionCancelAndEmptyNoteDoNotPost() {
+    setMinimalRenderElements();
+    setRepoTransferPermissions({ decision: true, apply: false });
+    const saved = snapshotSandboxFunctions(['fetch', 'Swal', 'refreshRepoTransferDecisions']);
+    let posts = 0;
+    let refreshes = 0;
+    try {
+        sandbox.fetch = async () => { posts++; throw new Error('POST must not run'); };
+        sandbox.refreshRepoTransferDecisions = async () => { refreshes++; };
+
+        let group = setHrDecisionState();
+        sandbox.Swal = { fire: async () => ({ isConfirmed: false }) };
+        await sandbox.submitRepoTransferDecision(group, 'APPROVE_PROPOSAL', { mode: 'hr' });
+        assert.strictEqual(posts, 0);
+        assert.strictEqual(refreshes, 0);
+        assert.strictEqual(vm.runInContext('currentHrCompletedGroups.length', sandbox), 0);
+
+        group = setHrDecisionState();
+        sandbox.Swal = {
+            fire: async (options) => {
+                assert.strictEqual(options.inputValidator('   '), 'Συμπληρώστε τι χρειάζεται διευκρίνιση.');
+                return { isConfirmed: false };
+            }
+        };
+        await sandbox.submitRepoTransferDecision(group, 'NEEDS_MORE_REVIEW', { mode: 'hr' });
+        assert.strictEqual(posts, 0);
+        assert.strictEqual(refreshes, 0);
+        assert.strictEqual(vm.runInContext('currentHrCompletedGroups.length', sandbox), 0);
+    } finally {
+        restoreSandboxFunctions(saved);
+        setRepoTransferPermissions({ decision: true, apply: true });
+        clearMinimalRenderElements();
+    }
+}
+
+async function testHrApproveAndRejectPostPaths() {
+    setMinimalRenderElements();
+    setRepoTransferPermissions({ decision: true, apply: false });
+    const saved = snapshotSandboxFunctions([
+        'fetch', 'Swal', 'refreshRepoTransferDecisions', 'getPolicyPreviewCsrfToken'
+    ]);
+    try {
+        for (const decisionCode of ['APPROVE_PROPOSAL', 'REJECT_PROPOSAL']) {
+            const group = setHrDecisionState();
+            let posts = 0;
+            let refreshes = 0;
+            sandbox.getPolicyPreviewCsrfToken = async () => 'csrf-test';
+            sandbox.Swal = { fire: async (options) =>
+                options.title === 'Η απόφαση καταγράφηκε'
+                    ? {}
+                    : { isConfirmed: true }
+            };
+            sandbox.fetch = async (url, options) => {
+                posts++;
+                const body = JSON.parse(options.body);
+                assert.strictEqual(url, '/api/prodhlomena-oraria/review/repo-transfer-decisions');
+                assert.strictEqual(body.decision_code, decisionCode);
+                assert.strictEqual(body.notes, '');
+                assert.deepStrictEqual(Object.keys(body).sort(), [
+                    'decision_code', 'expected_choice_code', 'expected_proposal_version',
+                    'expected_source_id', 'expected_target_id', 'notes', 'proposal_id', 'request_id'
+                ]);
+                return { ok: true, json: async () => ({ success: true }) };
+            };
+            sandbox.refreshRepoTransferDecisions = async () => {
+                refreshes++;
+                vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([['atomic-group-1', { current_decision: { decision_code: '${decisionCode}' } }]])`, sandbox);
+            };
+            await sandbox.submitRepoTransferDecision(group, decisionCode, { mode: 'hr' });
+            assert.strictEqual(posts, 1);
+            assert.strictEqual(refreshes, 1);
+            assert.strictEqual(vm.runInContext('currentHrPendingGroups.length', sandbox), 0);
+            assert.strictEqual(vm.runInContext('currentHrCompletedGroups.length', sandbox), 1);
+        }
+    } finally {
+        restoreSandboxFunctions(saved);
+        setRepoTransferPermissions({ decision: true, apply: true });
+        clearMinimalRenderElements();
+    }
+}
+
+async function testHrPostSuccessRefreshFailureWarning() {
+    setMinimalRenderElements();
+    setRepoTransferPermissions({ decision: true, apply: false });
+    const group = setHrDecisionState();
+    const decisionButton = minimalElement();
+    const originalQuerySelectorAll = documentStub.querySelectorAll;
+    const saved = snapshotSandboxFunctions([
+        'fetch', 'Swal', 'refreshRepoTransferDecisions', 'getPolicyPreviewCsrfToken',
+        'loadResults', 'renderPolicyPreviewGroups'
+    ]);
+    const dialogs = [];
+    let posts = 0;
+    let heavyLoads = 0;
+    let advancedRenders = 0;
+    try {
+        documentStub.querySelectorAll = (selector) =>
+            selector === '#hrReviewPendingContainer .hr-review-decision-btn' ? [decisionButton] : [];
+        sandbox.getPolicyPreviewCsrfToken = async () => 'csrf-test';
+        sandbox.fetch = async () => {
+            posts++;
+            return { ok: true, json: async () => ({ success: true }) };
+        };
+        sandbox.refreshRepoTransferDecisions = async () => { throw new Error('refresh failed'); };
+        sandbox.loadResults = async () => { heavyLoads++; };
+        sandbox.renderPolicyPreviewGroups = () => { advancedRenders++; };
+        sandbox.Swal = {
+            fire: async (options) => {
+                dialogs.push(options);
+                return dialogs.length === 1 ? { isConfirmed: true } : {};
+            }
+        };
+        await sandbox.submitRepoTransferDecision(group, 'APPROVE_PROPOSAL', { mode: 'hr' });
+        assert.strictEqual(posts, 1);
+        assert.strictEqual(heavyLoads, 0);
+        assert.strictEqual(advancedRenders, 0);
+        assert.strictEqual(decisionButton.disabled, true);
+        assert.ok(dialogs.some((dialog) => dialog.title === 'Η απόφαση καταγράφηκε'));
+        assert.ok(dialogs.some((dialog) => String(dialog.text || '').includes('Η προβολή δεν ανανεώθηκε')));
+        assert.ok(!dialogs.some((dialog) => dialog.title === 'Δεν καταγράφηκε η απόφαση'));
+        assert.strictEqual(vm.runInContext('repoTransferDecisionSubmitting', sandbox), false);
+    } finally {
+        documentStub.querySelectorAll = originalQuerySelectorAll;
+        restoreSandboxFunctions(saved);
+        setRepoTransferPermissions({ decision: true, apply: true });
+        clearMinimalRenderElements();
+    }
+}
+
+async function testHrLoadingLocksAndRestoresFilters() {
+    setMinimalRenderElements();
+    const start = minimalElement();
+    const from = minimalElement({ value: '2026-07-06' });
+    const to = minimalElement({ value: '2026-07-12' });
+    const hidden = minimalElement({ value: '0000' });
+    const tomCalls = { disable: 0, enable: 0 };
+    const select = minimalElement({
+        value: '0000',
+        tomselect: {
+            getValue: () => '0000',
+            disable: () => { tomCalls.disable++; },
+            enable: () => { tomCalls.enable++; }
+        }
+    });
+    elementsById.set('hrReviewStartBtn', start);
+    elementsById.set('hr_apo_hmeromhnia', from);
+    elementsById.set('hr_eos_hmeromhnia', to);
+    elementsById.set('ypokatasthmata_stathera', hidden);
+    elementsById.set('ypokatasthmata', select);
+    const saved = snapshotSandboxFunctions(['fetch']);
+    try {
+        let releasePreview;
+        const previewWait = new Promise((resolve) => { releasePreview = resolve; });
+        let requestNumber = 0;
+        sandbox.fetch = async () => {
+            requestNumber++;
+            if (requestNumber === 1) {
+                await previewWait;
+                return { ok: true, json: async () => ({ success: true, grouping: {}, atomic_group_projection: readyProjection() }) };
+            }
+            return { ok: true, json: async () => ({ success: true, records: [] }) };
+        };
+        vm.runInContext('currentHrReviewLoading = false', sandbox);
+        const loading = sandbox.loadHrReviewQueue();
+        assert.strictEqual(from.disabled, true);
+        assert.strictEqual(to.disabled, true);
+        assert.strictEqual(select.disabled, true);
+        assert.strictEqual(start.disabled, true);
+        assert.strictEqual(tomCalls.disable, 1);
+        releasePreview();
+        await loading;
+        assert.strictEqual(from.disabled, false);
+        assert.strictEqual(to.disabled, false);
+        assert.strictEqual(select.disabled, false);
+        assert.strictEqual(start.disabled, false);
+        assert.strictEqual(tomCalls.enable, 1);
+
+        sandbox.fetch = async () => { throw new Error('preview failed'); };
+        vm.runInContext('currentHrReviewLoading = false', sandbox);
+        await sandbox.loadHrReviewQueue();
+        assert.strictEqual(from.disabled, false);
+        assert.strictEqual(to.disabled, false);
+        assert.strictEqual(select.disabled, false);
+        assert.strictEqual(start.disabled, false);
+        assert.strictEqual(tomCalls.disable, 2);
+        assert.strictEqual(tomCalls.enable, 2);
+    } finally {
+        restoreSandboxFunctions(saved);
+        ['hrReviewStartBtn', 'hr_apo_hmeromhnia', 'hr_eos_hmeromhnia', 'ypokatasthmata_stathera', 'ypokatasthmata']
+            .forEach((id) => elementsById.delete(id));
+        clearMinimalRenderElements();
+    }
+}
+
 const tests = [
     testReadyFullTimeAndSplitShift,
     testCompleteVisibleSectionContainsNoTechnicalTerms,
@@ -739,6 +1441,22 @@ const tests = [
     testProposalDateRangeWording,
     testGenericIsolationSourceContract,
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
+    testMinimalWorkspaceEjsContract,
+    testEmploymentReviewScrollContainerContract,
+    testEmploymentReviewFinalUiContract,
+    testCorrectiveDropdownAndPageShellContract,
+    testEmploymentReviewBranchActionLayoutContract,
+    testRoleScopedRenderedEjs,
+    testHrQueueClassification,
+    testMinimalRenderingAndTerminology,
+    testMinimalCompletionAndClosedCompletedSection,
+    testMinimalSafetySourceContracts,
+    testLightweightHrLoadingRequests,
+    testHrDecisionPresentationAndLocalRerender,
+    testHrDecisionCancelAndEmptyNoteDoNotPost,
+    testHrApproveAndRejectPostPaths,
+    testHrPostSuccessRefreshFailureWarning,
+    testHrLoadingLocksAndRestoresFilters,
     testApplyPostSuccessAndRefreshSuccess,
     testApplyPostSuccessAndRefreshFailure,
     testApplyServerAndNetworkFailures,

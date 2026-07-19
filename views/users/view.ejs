@@ -133,86 +133,29 @@
         <label for="group" class="col-form-label field-required">Role</label>
       </div>
 
-      <% if (users.privileges == 'A') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" checked />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" disabled />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" disabled />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
+      <div class="col-4">
+        <input
+          type="text"
+          id="userRoleLabel"
+          class="form-control"
+          value="<%= getUserRoleLabel(users.privileges) %>"
+          readonly
+        />
       </div>
-      <% } %> <% if (users.privileges == 'C') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" disabled />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" checked />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" disabled />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
-      </div>
-      <% } %> <% if (users.privileges == 'V') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleAdmin" disabled />
-          <label class="form-check-label" for="roleAdmin">Admin</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleCustomer" disabled />
-          <label class="form-check-label" for="roleCustomer">Customer</label>
-        </div>
-
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioRoles" id="roleVisitor" checked />
-          <label class="form-check-label" for="roleVisitor">Visitor</label>
-        </div>
-      </div>
-      <% } %>
 
       <div class="col-1-5 right-align">
         <label for="group1" class="col-form-label field-required">Status</label>
       </div>
 
-      <% if (users.situation == 'A') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioStatus" id="radioActive" checked />
-          <label class="form-check-label" for="radioActive">Ενεργός</label>
-        </div>
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioStatus" id="radioInactive" disabled />
-          <label class="form-check-label" for="radioInactive">Ανενεργός</label>
-        </div>
+      <div class="col-4">
+        <input
+          type="text"
+          id="userStatusLabel"
+          class="form-control"
+          value="<%= users.situation === 'A' ? 'Ενεργός' : users.situation === 'I' ? 'Ανενεργός' : 'Άγνωστη κατάσταση' %>"
+          readonly
+        />
       </div>
-      <% } %> <% if (users.situation == 'I') { %>
-      <div class="col-4" style="padding-top: 8px">
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioStatus" id="radioActive" disabled />
-          <label class="form-check-label" for="radioActive">Ενεργός</label>
-        </div>
-        <div class="form-check form-check-inline">
-          <input type="radio" name="radioStatus" id="radioInactive" checked />
-          <label class="form-check-label" for="radioInactive">Ανενεργός</label>
-        </div>
-      </div>
-      <% } %>
     </div>
 
     <div class="row form-group g-3 align-items-center mb-4">
@@ -226,18 +169,14 @@
           id="details"
           rows="5"
           readonly
-        ></textarea>
-
-        <script nonce="<%= nonce %>">
-          document.getElementById("details").value = "<%= users.details %>";
-        </script>
+        ><%= users.details || '' %></textarea>
       </div>
     </div>
 
   </div>
-  <div class="card-footer">
-    <div class="d-inline-block d-flex" style="justify-content:space-around">
-      <a class="btn btn-sm btn-outline-secondary mb-1 mt-2" href="/admin"
+  <div class="card-footer user-admin-card-footer">
+    <div class="user-admin-actions">
+      <a class="btn btn-sm user-admin-action-btn user-admin-action-secondary mb-1 mt-2" href="/admin"
       ><i class="bi bi-table"></i> Επιστροφή</a
       >
     </div>
