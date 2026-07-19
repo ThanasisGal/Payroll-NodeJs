@@ -161,7 +161,6 @@ export const initTomDropdown = ({
         labelField: 'label',
         searchField: ['label'],
         sort: false,
-        dropdownDirection: 'auto',
 
         score(search) {
             if (!search || !Array.isArray(search.tokens) || !search.tokens.length) {
@@ -551,6 +550,16 @@ export const initTomDropdown = ({
                 const reposition = () => {
                     const controlRect = this.control.getBoundingClientRect();
                     const ddEl = this.dropdown;
+                    const requestedDropdownDirection = String(
+                        el.dataset.dropdownDirection || 'auto'
+                    )
+                        .trim()
+                        .toLowerCase();
+                    const forcedDirection = ['auto', 'up', 'down'].includes(
+                        requestedDropdownDirection
+                    )
+                        ? requestedDropdownDirection
+                        : 'auto';
 
                     const searchH = 36;
                     const optionH = 34;
@@ -570,12 +579,37 @@ export const initTomDropdown = ({
                         'maxh-ideal',
                         'maxh-limited'
                     );
+                    ddEl.style.removeProperty('--ts-available-space');
 
-                    if (idealHeight <= spaceBelow) {
+                    if (forcedDirection === 'down') {
+                        if (idealHeight <= spaceBelow) {
+                            ddEl.classList.add('place-below', 'maxh-ideal');
+                        } else {
+                            ddEl.style.setProperty(
+                                '--ts-available-space',
+                                `${Math.max(0, spaceBelow - 8)}px`
+                            );
+                            ddEl.classList.add('place-below', 'maxh-limited');
+                        }
+                    } else if (forcedDirection === 'up') {
+                        if (idealHeight <= spaceAbove) {
+                            ddEl.classList.add('place-above', 'maxh-ideal');
+                        } else {
+                            ddEl.style.setProperty(
+                                '--ts-available-space',
+                                `${Math.max(0, spaceAbove - 8)}px`
+                            );
+                            ddEl.classList.add('place-above', 'maxh-limited');
+                        }
+                    } else if (idealHeight <= spaceBelow) {
                         ddEl.classList.add('place-below', 'maxh-ideal');
                     } else if (idealHeight <= spaceAbove) {
                         ddEl.classList.add('place-above', 'maxh-ideal');
                     } else {
+                        ddEl.style.setProperty(
+                            '--ts-available-space',
+                            `${Math.max(0, spaceAbove - 8)}px`
+                        );
                         ddEl.classList.add('place-above', 'maxh-limited');
                     }
                 };

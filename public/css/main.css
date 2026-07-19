@@ -4805,7 +4805,7 @@ select.tom-dropdown {
     overflow-y: auto;
 }
 .ts-dropdown.maxh-limited {
-    max-height: clamp(150px, 35vh, 260px);
+    max-height: min(clamp(150px, 35vh, 260px), var(--ts-available-space, 260px));
     overflow-y: auto;
 }
 
@@ -13929,4 +13929,313 @@ body.loader-active > *:not(.app-loader) {
 .swal2-actions.apasxolhseis-snapshot-confirm-actions,
 .apasxolhseis-snapshot-confirm-actions {
     gap: 0.75rem;
+}
+
+.hr-review-card {
+    width: 100%;
+}
+
+.employment-review-page-shell {
+    width: calc(70% + 1.5rem) !important;
+    max-width: none;
+    margin-left: 15%;
+    margin-right: 0;
+}
+
+.hr-review-filters {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.employment-review-filter-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(0, 1fr)
+        minmax(18rem, 1.35fr)
+        2.5rem
+        max-content;
+    column-gap: 0.75rem;
+    align-items: end;
+}
+
+.employment-review-branch-control {
+    grid-column: 3;
+    min-width: 0;
+}
+
+.employment-review-branch-control .ts-wrapper {
+    width: calc(100% - 2rem);
+}
+
+.employment-review-start-action {
+    grid-column: 5;
+    align-self: end;
+    white-space: nowrap;
+}
+
+.employment-review-start-action .employment-review-action-btn {
+    white-space: nowrap;
+}
+
+.hr-review-status {
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    background: #f8f9fa;
+    text-align: center;
+}
+
+.hr-review-loading-state {
+    color: #495057;
+}
+
+.hr-review-error-state {
+    color: #842029;
+    background: #f8d7da;
+    border-color: #f5c2c7;
+}
+
+.hr-review-empty-state,
+.hr-review-completion-state {
+    color: #0f5132;
+    background: #d1e7dd;
+    border-color: #badbcc;
+}
+
+.hr-review-completion-state span {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.hr-review-progress {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    background: #eef2f5;
+}
+
+.hr-review-proposal-card {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+}
+
+.hr-review-employee {
+    margin-bottom: 1rem;
+}
+
+.hr-review-employee h4 {
+    margin-bottom: 0.35rem;
+}
+
+.hr-review-days-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.hr-review-day {
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+}
+
+.hr-review-day-work {
+    background: #eef6ff;
+}
+
+.hr-review-day-rest {
+    background: #f3f0ff;
+}
+
+.hr-review-day h5 {
+    margin-bottom: 0.35rem;
+}
+
+.hr-review-day-date {
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+}
+
+.hr-review-day-values > div,
+.hr-review-intervals > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.25rem 0;
+}
+
+.hr-review-intervals {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #ced4da;
+}
+
+.hr-review-question {
+    margin: 1.25rem 0 0.75rem;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.hr-review-decision-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.employment-review-action-btn {
+    color: #212529;
+    opacity: 1;
+}
+
+.employment-review-action-secondary {
+    background: var(--bs-secondary-bg-subtle, #e9ecef);
+    border-color: #ced4da;
+}
+
+.employment-review-action-success {
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+    border-color: #a3cfbb;
+}
+
+.employment-review-action-danger {
+    background: var(--bs-danger-bg-subtle, #f8d7da);
+    border-color: #f1aeb5;
+}
+
+.employment-review-action-warning {
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+    border-color: #ffe69c;
+}
+
+.employment-review-action-secondary:hover,
+.employment-review-action-secondary:focus {
+    color: #212529;
+    background: #dee2e6;
+    border-color: #adb5bd;
+}
+
+.employment-review-action-success:hover,
+.employment-review-action-success:focus {
+    color: #212529;
+    background: #badbcc;
+    border-color: #75b798;
+}
+
+.employment-review-action-danger:hover,
+.employment-review-action-danger:focus {
+    color: #212529;
+    background: #f1aeb5;
+    border-color: #ea868f;
+}
+
+.employment-review-action-warning:hover,
+.employment-review-action-warning:focus {
+    color: #212529;
+    background: #ffe69c;
+    border-color: #ffda6a;
+}
+
+.employment-review-action-btn:disabled {
+    color: #212529;
+    opacity: 0.65;
+}
+
+.employment-review-action-secondary:disabled {
+    background: var(--bs-secondary-bg-subtle, #e9ecef);
+}
+
+.employment-review-action-success:disabled {
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+}
+
+.employment-review-action-danger:disabled {
+    background: var(--bs-danger-bg-subtle, #f8d7da);
+}
+
+.employment-review-action-warning:disabled {
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+.hr-review-completed-details {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    background: #f8f9fa;
+}
+
+.hr-review-completed-details summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.hr-review-completed-details ul {
+    margin: 0.75rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.hr-review-completed-details li + li {
+    margin-top: 0.75rem;
+}
+
+.hr-review-workspace-switch {
+    text-align: right;
+}
+
+.employment-review-scroll-container {
+    --employment-review-viewport-offset: 17rem;
+    max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
+    max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+}
+
+.employment-review-scroll-container--advanced {
+    --employment-review-viewport-offset: 25.5rem;
+}
+
+.employment-review-scroll-container .results-table-wrapper {
+    max-height: none;
+    overflow-y: visible;
+}
+
+@media (max-width: 991.98px) {
+    .employment-review-page-shell {
+        width: 100% !important;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .employment-review-filter-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .employment-review-filter-grid > * {
+        grid-column: 1;
+        width: 100%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .hr-review-progress,
+    .hr-review-days-grid {
+        display: block;
+    }
+
+    .hr-review-progress > div + div,
+    .hr-review-day + .hr-review-day {
+        margin-top: 0.75rem;
+    }
 }
