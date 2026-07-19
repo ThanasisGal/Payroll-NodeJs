@@ -8,12 +8,102 @@
     const normalizedUserRole = String(userRole || '').trim().toUpperCase();
     const canRecordRepoTransferDecision = ['A', 'S', 'HR'].includes(normalizedUserRole);
     const canApplyRepoTransferDecision = ['A', 'S'].includes(normalizedUserRole);
+    const canUseAdvancedEmploymentReview = ['A', 'S'].includes(normalizedUserRole);
+    const companyInUse = companyId || '';
 %>
 
-<div class="container-fluid mt-3">
+<div class="container-fluid mt-3 employment-review-page-shell">
     <meta name="csrf-token" content="<%= csrfToken %>" />
 
-    <div class="card shadow-sm rounded-4">
+    <% if (canRecordRepoTransferDecision) { %>
+    <section id="hrReviewWorkspace" class="hr-review-workspace">
+        <div class="card shadow-sm rounded-4 hr-review-card employment-review-card z-depth-5">
+            <div class="card-header text-center">
+                <h3 class="mb-0">Έλεγχος Απασχολήσεων</h3>
+            </div>
+            <div class="card-body">
+                <div class="hr-review-filters employment-review-filter-grid">
+                    <div class="employment-review-date-filter">
+                        <label for="hr_apo_hmeromhnia" class="form-label">Από ημερομηνία</label>
+                        <input
+                            type="date"
+                            id="hr_apo_hmeromhnia"
+                            class="form-control"
+                            value="<%= dateInputValue(periodRec?.apo) %>"
+                        />
+                    </div>
+                    <div class="employment-review-date-filter">
+                        <label for="hr_eos_hmeromhnia" class="form-label">Έως ημερομηνία</label>
+                        <input
+                            type="date"
+                            id="hr_eos_hmeromhnia"
+                            class="form-control"
+                            value="<%= dateInputValue(periodRec?.eos) %>"
+                        />
+                    </div>
+                    <div class="employment-review-branch-control">
+                        <label for="ypokatasthmata" class="form-label">Παράρτημα</label>
+                        <input
+                            type="hidden"
+                            name="ypokatasthmata_stathera"
+                            id="ypokatasthmata_stathera"
+                            value=""
+                            readonly
+                        />
+                        <select
+                            id="ypokatasthmata"
+                            name="ypokatasthmata"
+                            class="tom-dropdown selectpicker-dropdown-normal left-align"
+                            aria-label="Παράρτημα"
+                            data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
+                            single
+                            data-target-input="ypokatasthmata_stathera"
+                            data-preselect="ypokatasthmata_stathera"
+                            data-dropdown-direction="down"
+                            data-preload-all="true"
+                            data-pad-length="4"
+                            data-xrhsh-related="false"
+                            data-team-related="false"
+                            data-company-related="false"
+                            data-mhnas-related="false"
+                            placeholder="Επιλέξτε παράρτημα">
+                        </select>
+                    </div>
+                    <div class="employment-review-start-action d-grid">
+                        <button type="button" class="btn rounded-4 employment-review-action-btn employment-review-action-secondary" id="hrReviewStartBtn">
+                            Έναρξη ελέγχου
+                        </button>
+                    </div>
+                </div>
+
+                <div class="employment-review-scroll-container employment-review-scroll-container--minimal">
+                    <div id="hrReviewStatus" class="hr-review-status mt-3" aria-live="polite">
+                        Επιλέξτε παράρτημα και πατήστε «Έναρξη ελέγχου».
+                    </div>
+                    <div id="hrReviewProgress" class="hr-review-progress d-none" aria-live="polite"></div>
+                    <div id="hrReviewPendingContainer" class="hr-review-pending-container"></div>
+                    <div id="hrReviewCompletedContainer" class="hr-review-completed-container"></div>
+
+                    <% if (canUseAdvancedEmploymentReview) { %>
+                        <div class="hr-review-workspace-switch mt-4">
+                            <button type="button" class="btn employment-review-action-btn employment-review-action-secondary" id="showAdvancedReviewBtn">
+                                Αναλυτική προβολή
+                            </button>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </section>
+    <% } else { %>
+        <div class="alert alert-warning text-center" role="alert">
+            Δεν έχετε δικαίωμα χρήσης του ελέγχου απασχολήσεων.
+        </div>
+    <% } %>
+
+    <% if (canUseAdvancedEmploymentReview) { %>
+    <section id="advancedReviewWorkspace" class="d-none">
+    <div class="card shadow-sm rounded-4 employment-review-card z-depth-5">
         <div class="card-header text-center">
             <h3 class="mb-0">Έλεγχος Απασχολήσεων Από Κάρτες Εργασίας ΕΡΓΑΝΗ ΙΙ</h3>
         </div>
@@ -116,6 +206,9 @@
                 </div>
 
                 <div class="mb-4">
+                    <button type="button" class="btn rounded-4 me-2 employment-review-action-btn employment-review-action-secondary" id="showMinimalReviewBtn">
+                        Επιστροφή στον απλό έλεγχο
+                    </button>
                     <button type="button" class="btn btn-brown rounded-4" id="searchBtn">
                         <i class="bi bi-search"></i>
                         Αναζήτηση
@@ -133,10 +226,11 @@
                 </div>
             </div>
 
-            <div id="policyPreviewGroupsContainer" class="mb-3"></div>
+            <div class="employment-review-scroll-container employment-review-scroll-container--advanced">
+                <div id="policyPreviewGroupsContainer" class="mb-3"></div>
 
-            <div class="table-responsive results-table-wrapper">
-                <table class="table table-bordered table-hover align-middle" id="resultsTable">
+                <div class="table-responsive results-table-wrapper">
+                    <table class="table table-bordered table-hover align-middle" id="resultsTable">
                     <thead class="table-dark">
                         <tr>
                             <th>Ημ/νία</th>
@@ -156,7 +250,8 @@
                     </thead>
 
                     <tbody></tbody>
-                </table>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -227,6 +322,8 @@
             </div>
         </div>
     </div>
+    </section>
+    <% } %>
     <input
         type="hidden"
         id="canReviewEdit"
@@ -242,6 +339,14 @@
         id="canApplyRepoTransferDecision"
         value="<%= canApplyRepoTransferDecision ? '1' : '0' %>"
     />
+    <input
+        type="hidden"
+        id="canUseAdvancedEmploymentReview"
+        value="<%= canUseAdvancedEmploymentReview ? '1' : '0' %>"
+    />
 
+    <% if (canRecordRepoTransferDecision) { %>
+        <script type="module" src="<%= script('ergazomenoi/programmata/initYpokatasthmataDropdowns.js') %>"></script>
+    <% } %>
     <script src="<%= script('ergazomenoi/programmata/elegxosApasxolhseonPeriodoy') %>"></script>
 </div>

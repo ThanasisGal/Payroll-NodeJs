@@ -237,6 +237,12 @@ let currentApprovalHistoryExpanded = false;
 let currentPolicyPreviewApplyDryRun = null;
 let currentPolicyPreviewApplyDryRunError = '';
 let currentPolicyPreviewApplyDryRunExpanded = false;
+let currentHrReviewProjection = null;
+let currentHrPendingGroups = [];
+let currentHrCompletedGroups = [];
+let currentHrActiveIndex = 0;
+let currentHrReviewLoaded = false;
+let currentHrReviewLoading = false;
 const currentApprovalHistoryFilters = {
     decisionType: '',
     userName: '',
@@ -4087,7 +4093,7 @@ async function refreshRepoTransferDecisions() {
     );
 }
 
-async function submitRepoTransferDecision(group, decisionCode) {
+async function submitRepoTransferDecision(group, decisionCode, options = {}) {
     if (!userCanRecordRepoTransferDecision()) return;
     if (repoTransferDecisionSubmitting) return;
     const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
@@ -4099,7 +4105,43 @@ async function submitRepoTransferDecision(group, decisionCode) {
     if (!source || !target || !group.pair_contract) throw new Error('Η συνδεδεμένη πρόταση δεν είναι διαθέσιμη.');
     const labels = { APPROVE_PROPOSAL: 'Έγκριση πρότασης', REJECT_PROPOSAL: 'Απόρριψη πρότασης', NEEDS_MORE_REVIEW: 'Χρειάζεται περαιτέρω έλεγχο' };
     if (!labels[decisionCode]) throw new Error('Η απόφαση δεν υποστηρίζεται.');
-    const confirmation = await Swal.fire({ icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' });
+    const isHrMode = options.mode === 'hr';
+    const hrConfirmations = {
+        APPROVE_PROPOSAL: {
+            title: 'Αποδοχή πρότασης',
+            text: 'Θέλετε να αποδεχθείτε την προτεινόμενη αλλαγή;'
+        },
+        REJECT_PROPOSAL: {
+            title: 'Δεν ισχύει',
+            text: 'Θέλετε να καταγράψετε ότι η πρόταση δεν ισχύει;'
+        },
+        NEEDS_MORE_REVIEW: {
+            title: 'Χρειάζομαι οδηγία',
+            text: ''
+        }
+    };
+    const confirmationOptions = isHrMode
+        ? {
+              icon: 'warning',
+              title: hrConfirmations[decisionCode].title,
+              text: hrConfirmations[decisionCode].text,
+              ...(decisionCode === 'NEEDS_MORE_REVIEW'
+                  ? {
+                        input: 'textarea',
+                        inputLabel: 'Τι χρειάζεται διευκρίνιση;',
+                        inputAttributes: { maxlength: '2000' },
+                        inputValidator: (value) =>
+                            String(value || '').trim()
+                                ? undefined
+                                : 'Συμπληρώστε τι χρειάζεται διευκρίνιση.'
+                    }
+                  : {}),
+              showCancelButton: true,
+              confirmButtonText: 'Καταγραφή απόφασης',
+              cancelButtonText: 'Άκυρο'
+          }
+        : { icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' };
+    const confirmation = await Swal.fire(confirmationOptions);
     if (!confirmation.isConfirmed) return;
     repoTransferDecisionSubmitting = true;
     try {
@@ -4107,9 +4149,37 @@ async function submitRepoTransferDecision(group, decisionCode) {
         const response = await fetch('/api/prodhlomena-oraria/review/repo-transfer-decisions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token }, body: JSON.stringify({ proposal_id: group.group_id, expected_source_id: source.prodhlomena_oraria_id, expected_target_id: target.prodhlomena_oraria_id, expected_proposal_version: group.pair_contract.proposal_version, expected_choice_code: group.pair_contract.choice_code, decision_code: decisionCode, notes: String(confirmation.value || '').trim(), request_id: repoTransferDecisionRequestId() }) });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload.success) throw new Error(response.status === 409 ? 'Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο πριν καταγράψετε απόφαση.' : payload.message || 'Δεν ήταν δυνατή η καταγραφή της απόφασης.');
-        await refreshRepoTransferDecisions();
-        renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
-        await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
+        if (isHrMode) {
+            try {
+                await refreshRepoTransferDecisions();
+            } catch (refreshError) {
+                console.warn('[submitRepoTransferDecision] HR refresh unavailable:', refreshError);
+                document
+                    .querySelectorAll('#hrReviewPendingContainer .hr-review-decision-btn')
+                    .forEach((button) => {
+                        button.disabled = true;
+                    });
+                const status = document.getElementById('hrReviewStatus');
+                if (status) {
+                    status.className = 'hr-review-status hr-review-error-state';
+                    status.textContent =
+                        'Η απόφαση καταγράφηκε, αλλά η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Έναρξη ελέγχου».';
+                }
+                await Swal.fire({
+                    icon: 'warning',
+                    title: 'Η απόφαση καταγράφηκε',
+                    text: 'Η προβολή δεν ανανεώθηκε. Πατήστε ξανά «Έναρξη ελέγχου» για να δείτε την τρέχουσα κατάσταση.'
+                });
+                return;
+            }
+            classifyHrReviewGroups();
+            renderHrReviewWorkspace();
+            await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε' });
+        } else {
+            await refreshRepoTransferDecisions();
+            renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
+            await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
+        }
     } finally { repoTransferDecisionSubmitting = false; }
 }
 
@@ -4171,6 +4241,311 @@ async function submitRepoTransferApply(group, decisionId, button) {
     } finally {
         repoTransferApplySubmitting.delete(decisionId);
     }
+}
+
+function userCanUseAdvancedEmploymentReview() {
+    return document.getElementById('canUseAdvancedEmploymentReview')?.value === '1';
+}
+
+function getHrSelectedBranch() {
+    const hiddenValue = String(
+        document.getElementById('ypokatasthmata_stathera')?.value || ''
+    ).trim();
+    if (hiddenValue) return hiddenValue;
+
+    const select = document.getElementById('ypokatasthmata');
+    const tomValue = select?.tomselect?.getValue?.();
+    return String(tomValue || select?.value || '').trim();
+}
+
+function isHrReviewGroupCompleted(group = {}) {
+    const decisionState = currentRepoTransferDecisionsByProposalId.get(
+        String(group.group_id || '')
+    );
+
+    return Boolean(
+        decisionState?.current_decision ||
+            decisionState?.apply_state === 'ALREADY_APPLIED' ||
+            decisionState?.current_execution?.execution_status === 'APPLIED'
+    );
+}
+
+function classifyHrReviewGroups() {
+    const groups = Array.isArray(currentHrReviewProjection?.groups)
+        ? currentHrReviewProjection.groups
+        : [];
+
+    currentHrPendingGroups = groups.filter((group) => !isHrReviewGroupCompleted(group));
+    currentHrCompletedGroups = groups.filter((group) => isHrReviewGroupCompleted(group));
+    currentHrActiveIndex = 0;
+}
+
+function renderHrReviewProgress() {
+    const progress = document.getElementById('hrReviewProgress');
+    if (!progress) return;
+
+    const total = currentHrPendingGroups.length + currentHrCompletedGroups.length;
+    progress.classList.toggle('d-none', !currentHrReviewLoaded || total === 0);
+    progress.innerHTML = total > 0
+        ? `<div><strong>${escapeHtml(total)}</strong> περιπτώσεις χρειάζονται απόφαση</div>
+           <div>Ολοκληρώθηκαν <strong>${escapeHtml(currentHrCompletedGroups.length)}</strong> από <strong>${escapeHtml(total)}</strong></div>`
+        : '';
+}
+
+function renderHrReviewIntervals(proposedValues = {}) {
+    return [1, 2, 3]
+        .map((number) => {
+            const pair = pairNo(number);
+            const start = String(proposedValues[`apo_ora_${pair}_apologistika`] || '').trim();
+            const end = String(proposedValues[`eos_ora_${pair}_apologistika`] || '').trim();
+            const interval = start && end ? `${start}–${end}` : '—';
+            return `<div><span>Ωράριο ${escapeHtml(pair)}</span><strong>${escapeHtml(interval)}</strong></div>`;
+        })
+        .join('');
+}
+
+function renderHrReviewDay(item = {}, kind) {
+    const proposedValues = item.proposed_values || {};
+    const isWorkDay = kind === 'work';
+    const proposedCategory =
+        proposedValues.kathgoria_ergasias_apologistika ||
+        item.kathgoria_ergasias_apologistika ||
+        '-';
+    const hoursHtml = isWorkDay
+        ? `<div><span>Προτεινόμενες ώρες</span><strong>${escapeHtml(
+              formatAtomicRepoTransferHours(proposedValues.ores_ergasias_apologistika)
+          )}</strong></div>`
+        : '';
+
+    return `
+        <section class="hr-review-day hr-review-day-${isWorkDay ? 'work' : 'rest'}">
+            <h5>${isWorkDay ? 'Ημέρα που θα καταχωριστεί ως εργασία' : 'Ημέρα που θα καταχωριστεί ως ρεπό'}</h5>
+            <div class="hr-review-day-date">${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}</div>
+            <div class="hr-review-day-values">
+                <div><span>Τρέχουσα κατηγορία</span><strong>${escapeHtml(item.kathgoria_ergasias || '-')}</strong></div>
+                <div><span>Προτεινόμενη κατηγορία</span><strong>${escapeHtml(proposedCategory)}</strong></div>
+                ${hoursHtml}
+            </div>
+            ${isWorkDay ? `<div class="hr-review-intervals">${renderHrReviewIntervals(proposedValues)}</div>` : ''}
+        </section>
+    `;
+}
+
+function renderHrPendingCase() {
+    const container = document.getElementById('hrReviewPendingContainer');
+    if (!container) return;
+
+    const group = currentHrPendingGroups[currentHrActiveIndex];
+    if (!group) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const items = Array.isArray(group.items) ? group.items : [];
+    const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
+    const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
+    const employeeName = source.employee_name || target.employee_name || '';
+    const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
+    const decisionActions = userCanRecordRepoTransferDecision()
+        ? `<div class="hr-review-decision-actions">
+               <button type="button" class="btn policy-preview-decision-success hr-review-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
+               <button type="button" class="btn policy-preview-decision-danger hr-review-decision-btn employment-review-action-btn employment-review-action-danger" data-decision-code="REJECT_PROPOSAL">Δεν ισχύει</button>
+               <button type="button" class="btn policy-preview-decision-warning hr-review-decision-btn employment-review-action-btn employment-review-action-warning" data-decision-code="NEEDS_MORE_REVIEW">Χρειάζομαι οδηγία</button>
+           </div>`
+        : '';
+
+    container.innerHTML = `
+        <article class="hr-review-proposal-card">
+            <div class="hr-review-employee">
+                ${employeeName ? `<h4>${escapeHtml(employeeName)}</h4>` : ''}
+                <div>Κωδικός εργαζομένου: <strong>${escapeHtml(employeeCode)}</strong></div>
+                <div>Ημερομηνίες: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(
+                    formatPolicyPreviewDate(group.last_date)
+                )}</div>
+            </div>
+            <div class="hr-review-days-grid">
+                ${renderHrReviewDay(source, 'work')}
+                ${renderHrReviewDay(target, 'rest')}
+            </div>
+            <div class="hr-review-question">Είναι σωστή αυτή η πρόταση;</div>
+            ${decisionActions}
+        </article>
+    `;
+
+    container.querySelectorAll('.hr-review-decision-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+            if (button.disabled) return;
+            try {
+                await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), {
+                    mode: 'hr'
+                });
+            } catch (error) {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Δεν καταγράφηκε η απόφαση',
+                    text: error.message || 'Παρουσιάστηκε σφάλμα.'
+                });
+            }
+        });
+    });
+}
+
+function renderHrCompletedCases() {
+    const container = document.getElementById('hrReviewCompletedContainer');
+    if (!container) return;
+
+    if (currentHrCompletedGroups.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const itemsHtml = currentHrCompletedGroups
+        .map((group) => {
+            const items = Array.isArray(group.items) ? group.items : [];
+            const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
+            const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
+            const state = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || '')) || {};
+            const decision = state.current_decision || {};
+            const name = source.employee_name || target.employee_name || '';
+            const code = source.employee_kodikos || target.employee_kodikos || '-';
+            return `
+                <li>
+                    <div><strong>${escapeHtml(name || `Εργαζόμενος ${code}`)}</strong></div>
+                    <div>${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
+                    ${decision.created_by_user_name ? `<div>Καταχώριση: ${escapeHtml(decision.created_by_user_name)}</div>` : ''}
+                    ${decision.notes ? `<div>Σημείωση: ${escapeHtml(decision.notes)}</div>` : ''}
+                </li>
+            `;
+        })
+        .join('');
+
+    container.innerHTML = `
+        <details class="hr-review-completed-details">
+            <summary>Ολοκληρωμένες περιπτώσεις (${escapeHtml(currentHrCompletedGroups.length)})</summary>
+            <ul>${itemsHtml}</ul>
+        </details>
+    `;
+}
+
+function renderHrCompletionState() {
+    const status = document.getElementById('hrReviewStatus');
+    if (!status || !currentHrReviewLoaded) return;
+
+    const total = currentHrPendingGroups.length + currentHrCompletedGroups.length;
+    if (total === 0) {
+        status.className = 'hr-review-status hr-review-empty-state';
+        status.textContent =
+            'Δεν υπάρχουν περιπτώσεις που χρειάζονται απόφαση για το επιλεγμένο διάστημα.';
+    } else if (currentHrPendingGroups.length === 0) {
+        status.className = 'hr-review-status hr-review-completion-state';
+        status.innerHTML =
+            '<strong>Ο έλεγχος ολοκληρώθηκε.</strong><span>Δεν υπάρχουν άλλες περιπτώσεις που χρειάζονται απόφαση.</span>';
+    } else {
+        status.className = 'hr-review-status d-none';
+        status.textContent = '';
+    }
+}
+
+function renderHrReviewWorkspace() {
+    renderHrReviewProgress();
+    renderHrPendingCase();
+    renderHrCompletedCases();
+    renderHrCompletionState();
+}
+
+function setHrReviewControlsDisabled(disabled) {
+    const startDate = document.getElementById('hr_apo_hmeromhnia');
+    const endDate = document.getElementById('hr_eos_hmeromhnia');
+    const branchSelect = document.getElementById('ypokatasthmata');
+    const startButton = document.getElementById('hrReviewStartBtn');
+
+    if (startDate) startDate.disabled = disabled;
+    if (endDate) endDate.disabled = disabled;
+    if (branchSelect) {
+        branchSelect.disabled = disabled;
+        if (disabled) branchSelect.tomselect?.disable?.();
+        else branchSelect.tomselect?.enable?.();
+    }
+    if (startButton) startButton.disabled = disabled;
+}
+
+async function loadHrReviewQueue() {
+    if (currentHrReviewLoading) return;
+
+    const branch = getHrSelectedBranch();
+    const status = document.getElementById('hrReviewStatus');
+    if (!branch || branch.toUpperCase() === 'ALL' || branch.includes(',')) {
+        if (status) {
+            status.className = 'hr-review-status hr-review-error-state';
+            status.textContent = 'Επιλέξτε συγκεκριμένο παράρτημα';
+        }
+        return;
+    }
+
+    const filterSnapshot = {
+        apo_hmeromhnia: document.getElementById('hr_apo_hmeromhnia')?.value || '',
+        eos_hmeromhnia: document.getElementById('hr_eos_hmeromhnia')?.value || '',
+        ypokatasthma: branch
+    };
+
+    const params = new URLSearchParams({
+        apo_hmeromhnia: filterSnapshot.apo_hmeromhnia,
+        eos_hmeromhnia: filterSnapshot.eos_hmeromhnia,
+        ypokatasthma: filterSnapshot.ypokatasthma,
+        kodikos: '',
+        page: '1',
+        limit: '200'
+    });
+
+    currentHrReviewLoading = true;
+    setHrReviewControlsDisabled(true);
+    if (status) {
+        status.className = 'hr-review-status hr-review-loading-state';
+        status.textContent = 'Φόρτωση περιπτώσεων…';
+    }
+
+    try {
+        currentPolicyPreviewBaseParams = new URLSearchParams(params);
+        currentRepoTransferDecisionsByProposalId = new Map();
+        const result = await fetchPolicyPreviewGrouping(params);
+        currentHrReviewProjection = result.atomicGroupProjection || null;
+        currentAtomicRepoTransferProjection = currentHrReviewProjection;
+        await refreshRepoTransferDecisions();
+        currentHrReviewLoaded = true;
+        classifyHrReviewGroups();
+        renderHrReviewWorkspace();
+    } catch (error) {
+        currentHrReviewLoaded = false;
+        currentHrReviewProjection = null;
+        currentHrPendingGroups = [];
+        currentHrCompletedGroups = [];
+        document.getElementById('hrReviewProgress')?.classList.add('d-none');
+        const pending = document.getElementById('hrReviewPendingContainer');
+        const completed = document.getElementById('hrReviewCompletedContainer');
+        if (pending) pending.innerHTML = '';
+        if (completed) completed.innerHTML = '';
+        if (status) {
+            status.className = 'hr-review-status hr-review-error-state';
+            status.textContent = error.message || 'Δεν ήταν δυνατή η φόρτωση του ελέγχου.';
+        }
+    } finally {
+        currentHrReviewLoading = false;
+        setHrReviewControlsDisabled(false);
+    }
+}
+
+function bindHrReviewEvents() {
+    document.getElementById('hrReviewStartBtn')?.addEventListener('click', loadHrReviewQueue);
+    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', () => {
+        if (!userCanUseAdvancedEmploymentReview()) return;
+        document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
+        document.getElementById('advancedReviewWorkspace')?.classList.remove('d-none');
+    });
+    document.getElementById('showMinimalReviewBtn')?.addEventListener('click', async () => {
+        document.getElementById('advancedReviewWorkspace')?.classList.add('d-none');
+        document.getElementById('hrReviewWorkspace')?.classList.remove('d-none');
+        if (currentHrReviewLoaded) await loadHrReviewQueue();
+    });
 }
 
 function renderAtomicRepoTransferProjection(projection) {
@@ -5467,6 +5842,7 @@ document.getElementById('reviewPdfDownloadBtn')?.addEventListener('click', (even
 document.addEventListener('DOMContentLoaded', initReviewMoveByEnter);
 document.addEventListener('DOMContentLoaded', ensureScenarioReviewFilterControl);
 document.addEventListener('DOMContentLoaded', ensureReviewCardElevation);
+document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);
