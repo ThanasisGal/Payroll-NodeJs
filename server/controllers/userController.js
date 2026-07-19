@@ -17,6 +17,15 @@ const jwt = require('jsonwebtoken');
 const jwtDecode = require('jwt-decode').jwtDecode;
 const transporter = require('../../config/emailConfig');
 const { getDetailedGreeting } = require('../utils/emailHelpers');
+const {
+    normalizeUserRole,
+    isAllowedUserRole,
+    isAdminUserRole,
+    getUserRoleLabel,
+    getSelectableAdminUserRoles,
+    getUserRoleOptionsForCurrentValue,
+    getUserRoleBadgeClass
+} = require('../constants/userRoles');
 
 const { PeriodsModel } = Models;
 const { ParamModel } = Models_A;
@@ -149,6 +158,7 @@ class userController {
                 title: 'Admin Διαχείριση Χρηστών', // ✅ Απευθείας
                 description: 'Web Payroll Solutions by Admin', // ✅ Απευθείας
                 users,
+                getUserRoleLabel,
                 current: page,
                 pages: totalPages
             });
@@ -160,11 +170,18 @@ class userController {
     static addUser = (req, res) => {
         res.render('users/add', {
             title: 'Προσθήκη Νέου Χρήστη',
-            description: 'Web Payroll Solutions by Admin'
+            description: 'Web Payroll Solutions by Admin',
+            userRoleOptions: getSelectableAdminUserRoles()
         });
     };
 
     static postUser = async (req, res) => {
+        const normalizedRole = normalizeUserRole(req.body.radioRoles);
+        if (!isAllowedUserRole(normalizedRole)) {
+            await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
+            return res.status(400).redirect('/admin/add');
+        }
+
         let aa_kod = 1;
         try {
             const lastRecord = await UserModel.findOne({}, { kod: 1 }).sort({ kod: -1 }).lean();
@@ -176,8 +193,6 @@ class userController {
             aa_kod = 1;
         }
 
-        const isAdmin = req.body.radioRoles === 'A' ? true : false;
-
         const newUser = UserModel({
             kod: aa_kod,
             firstName: req.body.firstName,
@@ -186,11 +201,11 @@ class userController {
             password: req.body.password,
             tel: req.body.tel,
             team: req.body.team,
-            privileges: req.body.radioRoles,
+            privileges: normalizedRole,
             situation: req.body.radioStatus,
             details: req.body.details,
             isVerified: false,
-            isAdmin: isAdmin,
+            isAdmin: isAdminUserRole(normalizedRole),
             createdAt: Date.now(),
             updatedAt: Date.now()
         });
@@ -198,9 +213,7 @@ class userController {
         try {
             await UserModel.create(newUser);
             await res.flash('success', 'Έχει προστεθεί νέος χρήστης');
-            redir = 'index';
-
-            await res.render(redir);
+            return res.redirect('/admin');
         } catch (error) {
             throw error;
         }
@@ -213,7 +226,8 @@ class userController {
             res.render('users/view', {
                 title: 'Προβολή Στοιχείων Χρήστη',
                 description: 'Web Payroll Solutions by Admin',
-                users
+                users,
+                getUserRoleLabel
             });
         } catch (error) {
             logger.error(error);
@@ -227,7 +241,9 @@ class userController {
             res.render('users/edit', {
                 title: 'Διόρθωση Στοιχείων Χρήστη',
                 description: 'Web Payroll Solutions by Admin',
-                users
+                users,
+                normalizedUserRole: normalizeUserRole(users?.privileges),
+                userRoleOptions: getUserRoleOptionsForCurrentValue(users?.privileges)
             });
         } catch (error) {
             logger.error(error);
@@ -235,23 +251,38 @@ class userController {
     };
 
     static editPostUser = async (req, res) => {
+        const normalizedRole = normalizeUserRole(req.body.radioRoles);
+        if (!isAllowedUserRole(normalizedRole)) {
+            await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
+            return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+        }
+
         try {
-            await UserModel.findByIdAndUpdate(req.params.id, {
+            const updatedUser = await UserModel.findByIdAndUpdate(req.params.id, {
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
                 email: req.body.email,
                 password: req.body.password,
                 tel: req.body.tel,
                 team: req.body.team,
-                privileges: req.body.radioRoles,
+                privileges: normalizedRole,
+                isAdmin: isAdminUserRole(normalizedRole),
                 situation: req.body.radioStatus,
                 details: req.body.details,
                 updatedAt: Date.now()
-            });
+            }, { runValidators: true });
+
+            if (!updatedUser) {
+                await res.flash('warning', 'Δεν βρέθηκε ο χρήστης προς ενημέρωση');
+                return res.redirect('/admin');
+            }
+
             await res.flash('info', 'Επιτυχής Ενημέρωση');
-            await res.redirect(`/admin`);
+            return res.redirect('/admin');
         } catch (error) {
             logger.error(error);
+            await res.flash('warning', 'Δεν ήταν δυνατή η ενημέρωση του χρήστη');
+            return res.redirect('/admin');
         }
     };
 
@@ -320,6 +351,7 @@ class userController {
                 title: 'Αναζήτηση',
                 description: 'Web Payroll Solutions',
                 user,
+                getUserRoleLabel,
                 current: page,
                 pages: totalPages
             });
@@ -365,6 +397,7 @@ class userController {
                 title: 'Αναζήτηση',
                 description: 'Web Payroll Solutions',
                 user,
+                getUserRoleLabel,
                 current: page,
                 pages: totalPages
             });
@@ -399,7 +432,9 @@ class userController {
                         email: user?.email || '',
                         tel: user?.tel || '',
                         team: user?.team || data.userTeam || '',
-                        privileges: user?.privileges || '',
+                        privileges: normalizeUserRole(user?.privileges),
+                        roleLabel: getUserRoleLabel(user?.privileges),
+                        roleBadgeClass: getUserRoleBadgeClass(user?.privileges),
                         companyInUse: data.companyInUse || '',
                         companyDescription: data.companyDescription || '',
                         periodInUseDescr: data.periodInUseDescr || '',
@@ -1082,14 +1117,23 @@ class userController {
 
     static async fetchPermissions(user_Id, userPermission) {
         try {
-            const lis = await SidebarStatusModel.find(
+            let lis = await SidebarStatusModel.find(
                 { userId: user_Id },
-                { li_Id: 1, situation_A: 1, situation_C: 1, situation_U: 1, situation_V: 1 }
+                {
+                    li_Id: 1,
+                    situation_A: 1,
+                    situation_S: 1,
+                    situation_HR: 1,
+                    situation_C: 1,
+                    situation_U: 1,
+                    situation_V: 1
+                }
             )
                 .sort({ li_Id: 1 })
                 .lean();
 
-            const isValidRole = ['A', 'C', 'U', 'V'].includes(userPermission);
+            const normalizedRole = normalizeUserRole(userPermission);
+            const isValidRole = isAllowedUserRole(normalizedRole);
             if (!Array.isArray(lis)) lis = [];
 
             if (!isValidRole) {
@@ -1097,7 +1141,7 @@ class userController {
             }
 
             const permissions = Object.fromEntries(
-                lis.map((li) => [li.li_Id, Boolean(li[`situation_${userPermission}`])])
+                lis.map((li) => [li.li_Id, Boolean(li[`situation_${normalizedRole}`])])
             );
 
             return permissions;

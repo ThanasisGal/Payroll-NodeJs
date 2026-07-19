@@ -67,13 +67,7 @@
                             </div>
 
                             <div class="flex-shrink-0">
-                                <% if (u.privileges === 'A') { %>
-                                    <span class="badge bg-danger">Admin</span>
-                                <% } else if (u.privileges === 'C') { %>
-                                    <span class="badge bg-primary">Customer</span>
-                                <% } else { %>
-                                    <span class="badge bg-secondary">Visitor</span>
-                                <% } %>
+                                <span class="badge <%= u.roleBadgeClass %>"><%= u.roleLabel %></span>
                             </div>
                         </div>
 

@@ -1,4 +1,5 @@
 const { Schema: _Schema, model } = require("mongoose");
+const { USER_ROLE_CODES } = require('../constants/userRoles');
 
 const Schema = _Schema;
 const UserSchema = new Schema({
@@ -9,7 +10,7 @@ const UserSchema = new Schema({
   password: {type: String, required: true, trim: true},
   tel: {type: String, trim: true},
   team: {type: String, required: true, trim: true},
-  privileges: {type: String, required: true},
+  privileges: {type: String, required: true, trim: true, uppercase: true, enum: USER_ROLE_CODES},
   situation: {type: String, required: true},
   details: {type: String},
   isVerified: {type: Boolean, default: false},

@@ -37,6 +37,7 @@ const E3NJsonSubmitController = require('../controllers/ergazomenoi/e3nJsonSubmi
 const checkUserAuth = require('../middlewares/auth-middleware.js');
 const getSessionVars = require('../middlewares/session-variables.js');
 const checkAuth = require('../middlewares/checkValidUser.js');
+const requireAdminRole = require('../middlewares/requireAdminRole.js');
 const sanitizeNumberFields = require('../middlewares/sanitizeNumbers');
 
 // ============================================================================
@@ -105,25 +106,25 @@ router.get('/logout/end_Session', userController.logout);
 // ============================================================================
 // ADMIN ROUTES
 // ============================================================================
-router.get('/admin', userController.adminHomepage);
+router.get('/admin', requireAdminRole, userController.adminHomepage);
 
-router.get('/admin/add', userController.addUser);
+router.get('/admin/add', requireAdminRole, userController.addUser);
 
-router.post('/admin/add', userController.postUser);
+router.post('/admin/add', requireAdminRole, userController.postUser);
 
-router.get('/admin/view/:id', userController.viewUser);
+router.get('/admin/view/:id', requireAdminRole, userController.viewUser);
 
-router.get('/admin/edit/:id', userController.editUser);
+router.get('/admin/edit/:id', requireAdminRole, userController.editUser);
 
-router.put('/admin/edit/:id', userController.editPostUser);
+router.put('/admin/edit/:id', requireAdminRole, userController.editPostUser);
 
-router.delete('/admin/edit/:id', userController.deletePostUser);
+router.delete('/admin/edit/:id', requireAdminRole, userController.deletePostUser);
 
-router.get('/admin/delete/:id', userController.checkAndDeletePostUser);
+router.get('/admin/delete/:id', requireAdminRole, userController.checkAndDeletePostUser);
 
-router.post('/admin/search', userController.searchPostUser);
+router.post('/admin/search', requireAdminRole, userController.searchPostUser);
 
-router.get('/admin/search', userController.searchGetUser);
+router.get('/admin/search', requireAdminRole, userController.searchGetUser);
 
 router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', checkAuth, adminController.anoigmaNeasXrhshs);
 
