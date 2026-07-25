@@ -26,10 +26,16 @@ const {
     getUserRoleOptionsForCurrentValue,
     getUserRoleBadgeClass
 } = require('../constants/userRoles');
+const {
+    normalizeRequiredUserTeam,
+    canManageAllUserTeams,
+    buildManagedUserFilter,
+    buildManagedUserIdentityFilter
+} = require('../services/userTeamScopeService');
 
 const { PeriodsModel } = Models;
 const { ParamModel } = Models_A;
-const { UserPrivilegesModel, SidebarStatusModel } = Models_B;
+const { UserPrivilegesModel } = Models_B;
 const { CompaniesModel } = Models_C;
 
 const APP_ORIGIN =
@@ -91,7 +97,6 @@ const validatePasswordStrength = (password) => {
     return { valid: true, error: null };
 };
 
-let sTerm = '';
 var redir, tmpEmail;
 
 // Helper: συγχρονίζει συλλογή με βάση πρότυπο
@@ -99,7 +104,7 @@ async function syncFromTemplate({
     Model,
     userIdStr, // π.χ.String(user._id)
     templateId, // π.χ.process.env.PROTYPO_ID
-    uniqueKey, // π.χ.'form' για UserPrivileges, 'li_Id' για SidebarStatus
+    uniqueKey, // π.χ. 'form' για UserPrivileges
     projection = { _id: 0, userId: 0 } // να μη φέρνουμε _id/userId από το πρότυπο
 }) {
     if (!templateId) return;
@@ -140,16 +145,21 @@ class userController {
 
     static adminHomepage = async (req, res) => {
         const perPage = Number(process.env.EGGRAFES);
-        let page = req.query.page || 1;
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
 
         try {
-            const totalRecords = await UserModel.countDocuments({});
+            const managedUserFilter = buildManagedUserFilter(req.session?.userTeam);
+            const totalRecords = await UserModel.countDocuments(managedUserFilter);
             let totalPages = perPage > totalRecords ? 1 : Math.ceil(totalRecords / perPage);
             let limPerPage = perPage > totalRecords ? totalRecords : perPage;
             let limitPerPage = limPerPage <= 0 ? 1 : limPerPage;
             let skipRecords = totalPages == 1 ? 0 : perPage * page - perPage;
 
-            const users = await UserModel.aggregate([{ $sort: { createdAt: -1 } }])
+            const users = await UserModel.aggregate([
+                { $match: managedUserFilter },
+                { $project: { password: 0, details: 0, isVerified: 0, isAdmin: 0 } },
+                { $sort: { createdAt: -1 } }
+            ])
                 .skip(skipRecords)
                 .limit(limitPerPage)
                 .exec();
@@ -164,21 +174,44 @@ class userController {
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403
+                    ? 'Δεν έχετε έγκυρο team scope'
+                    : 'Σφάλμα φόρτωσης χρηστών'
+            );
         }
     };
 
     static addUser = (req, res) => {
-        res.render('users/add', {
-            title: 'Προσθήκη Νέου Χρήστη',
-            description: 'Web Payroll Solutions by Admin',
-            userRoleOptions: getSelectableAdminUserRoles()
-        });
+        try {
+            const managedTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            res.render('users/add', {
+                title: 'Προσθήκη Νέου Χρήστη',
+                description: 'Web Payroll Solutions by Admin',
+                userRoleOptions: getSelectableAdminUserRoles(),
+                managedTeam,
+                canManageAllTeams: canManageAllUserTeams(managedTeam)
+            });
+        } catch (error) {
+            return res.status(Number(error?.status) || 500).send('Δεν έχετε έγκυρο team scope');
+        }
     };
 
     static postUser = async (req, res) => {
         const normalizedRole = normalizeUserRole(req.body.radioRoles);
         if (!isAllowedUserRole(normalizedRole)) {
             await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
+            return res.status(400).redirect('/admin/add');
+        }
+
+        let team;
+        try {
+            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            team = canManageAllUserTeams(sessionTeam)
+                ? normalizeRequiredUserTeam(req.body.team)
+                : sessionTeam;
+        } catch (error) {
+            await res.flash('warning', 'Μη έγκυρη ομάδα εργασίας');
             return res.status(400).redirect('/admin/add');
         }
 
@@ -200,7 +233,7 @@ class userController {
             email: req.body.email,
             password: req.body.password,
             tel: req.body.tel,
-            team: req.body.team,
+            team,
             privileges: normalizedRole,
             situation: req.body.radioStatus,
             details: req.body.details,
@@ -221,7 +254,13 @@ class userController {
 
     static viewUser = async (req, res) => {
         try {
-            const users = await UserModel.findOne({ _id: req.params.id });
+            if (!mongoose.isValidObjectId(req.params.id)) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
+            const users = await UserModel.findOne(
+                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+            );
+            if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
             res.render('users/view', {
                 title: 'Προβολή Στοιχείων Χρήστη',
@@ -231,22 +270,37 @@ class userController {
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα φόρτωσης χρήστη'
+            );
         }
     };
 
     static editUser = async (req, res) => {
         try {
-            const users = await UserModel.findOne({ _id: req.params.id });
+            if (!mongoose.isValidObjectId(req.params.id)) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
+            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            const users = await UserModel.findOne(
+                buildManagedUserIdentityFilter(sessionTeam, req.params.id)
+            );
+            if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
             res.render('users/edit', {
                 title: 'Διόρθωση Στοιχείων Χρήστη',
                 description: 'Web Payroll Solutions by Admin',
                 users,
                 normalizedUserRole: normalizeUserRole(users?.privileges),
-                userRoleOptions: getUserRoleOptionsForCurrentValue(users?.privileges)
+                userRoleOptions: getUserRoleOptionsForCurrentValue(users?.privileges),
+                managedTeam: sessionTeam,
+                canManageAllTeams: canManageAllUserTeams(sessionTeam)
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα φόρτωσης χρήστη'
+            );
         }
     };
 
@@ -258,29 +312,47 @@ class userController {
         }
 
         try {
-            const updatedUser = await UserModel.findByIdAndUpdate(req.params.id, {
+            if (!mongoose.isValidObjectId(req.params.id)) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
+            const sessionTeam = normalizeRequiredUserTeam(req.session?.userTeam);
+            const managedUserFilter = buildManagedUserIdentityFilter(sessionTeam, req.params.id);
+            const targetUser = await UserModel.findOne(managedUserFilter).select('_id team').lean();
+            if (!targetUser) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+
+            const team = canManageAllUserTeams(sessionTeam)
+                ? normalizeRequiredUserTeam(req.body.team)
+                : sessionTeam;
+            const update = {
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
                 email: req.body.email,
                 password: req.body.password,
                 tel: req.body.tel,
-                team: req.body.team,
+                team,
                 privileges: normalizedRole,
                 isAdmin: isAdminUserRole(normalizedRole),
                 situation: req.body.radioStatus,
                 details: req.body.details,
                 updatedAt: Date.now()
-            }, { runValidators: true });
+            };
+            const updatedUser = await UserModel.findOneAndUpdate(
+                managedUserFilter,
+                update,
+                { runValidators: true }
+            );
 
             if (!updatedUser) {
-                await res.flash('warning', 'Δεν βρέθηκε ο χρήστης προς ενημέρωση');
-                return res.redirect('/admin');
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
 
             await res.flash('info', 'Επιτυχής Ενημέρωση');
             return res.redirect('/admin');
         } catch (error) {
             logger.error(error);
+            if (Number(error?.status) === 403) {
+                return res.status(403).send('Δεν έχετε έγκυρο team scope');
+            }
             await res.flash('warning', 'Δεν ήταν δυνατή η ενημέρωση του χρήστη');
             return res.redirect('/admin');
         }
@@ -288,17 +360,32 @@ class userController {
 
     static deletePostUser = async (req, res) => {
         try {
+            if (!mongoose.isValidObjectId(req.params.id)) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
+            const result = await UserModel.deleteOne(
+                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+            );
+            if (result.deletedCount !== 1) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             await res.flash('info', 'Επιτυχής Διαγραφή');
-            await UserModel.deleteOne({ _id: req.params.id });
-            res.redirect('/admin');
+            return res.redirect('/admin');
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα διαγραφής χρήστη'
+            );
         }
     };
 
     static checkAndDeletePostUser = async (req, res) => {
         try {
-            const users = await UserModel.findOne({ _id: req.params.id });
+            if (!mongoose.isValidObjectId(req.params.id)) {
+                return res.status(404).send('Ο χρήστης δεν βρέθηκε');
+            }
+            const users = await UserModel.findOne(
+                buildManagedUserIdentityFilter(req.session?.userTeam, req.params.id)
+            );
+            if (!users) return res.status(404).send('Ο χρήστης δεν βρέθηκε');
 
             res.render('users/delete', {
                 title: 'Διαγραφή Χρήστη',
@@ -307,18 +394,21 @@ class userController {
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα φόρτωσης χρήστη'
+            );
         }
     };
 
     static searchPostUser = async (req, res) => {
         try {
-            let searchTerm = req.body.searchTerm;
+            const searchTerm = typeof req.body.searchTerm === 'string' ? req.body.searchTerm : '';
             const searchNoSpecialChar = searchTerm.replace(/[^a-zα-ωA-ZΑ-Ω0-9]/g, '');
-            sTerm = searchNoSpecialChar;
+            req.session.adminUserSearchTerm = searchNoSpecialChar;
             const perPage = Number(process.env.EGGRAFES);
-            const page = req.query.page || 1;
-
-            const users = await UserModel.find({
+            const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+            const searchFilter = {
+                ...buildManagedUserFilter(req.session?.userTeam),
                 $or: [
                     { kod: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
                     { firstName: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
@@ -327,23 +417,14 @@ class userController {
                     { tel: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
                     { team: { $regex: new RegExp(searchNoSpecialChar, 'i') } }
                 ]
-            });
-
-            const totalRecords = users.length;
+            };
+            const totalRecords = await UserModel.countDocuments(searchFilter);
             let totalPages = perPage > totalRecords ? 1 : Math.ceil(totalRecords / perPage);
             let limitPerPage = perPage > totalRecords ? totalRecords : perPage;
             let skipRecords = totalPages == 1 ? 0 : perPage * page - perPage;
 
-            const user = await UserModel.find({
-                $or: [
-                    { kod: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { firstName: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { lastName: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { email: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { tel: { $regex: new RegExp(searchNoSpecialChar, 'i') } },
-                    { team: { $regex: new RegExp(searchNoSpecialChar, 'i') } }
-                ]
-            })
+            const user = await UserModel.find(searchFilter)
+                .select('_id kod firstName lastName email tel team privileges situation createdAt')
                 .skip(skipRecords)
                 .limit(limitPerPage);
 
@@ -357,16 +438,21 @@ class userController {
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα αναζήτησης'
+            );
         }
     };
 
     static searchGetUser = async (req, res) => {
         try {
-            let searchTerm = sTerm;
+            const searchTerm = typeof req.session?.adminUserSearchTerm === 'string'
+                ? req.session.adminUserSearchTerm
+                : '';
             const perPage = Number(process.env.EGGRAFES);
-            const page = req.query.page || 1;
-
-            const users = await UserModel.find({
+            const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+            const searchFilter = {
+                ...buildManagedUserFilter(req.session?.userTeam),
                 $or: [
                     { firstName: { $regex: new RegExp(searchTerm, 'i') } },
                     { lastName: { $regex: new RegExp(searchTerm, 'i') } },
@@ -374,22 +460,14 @@ class userController {
                     { tel: { $regex: new RegExp(searchTerm, 'i') } },
                     { team: { $regex: new RegExp(searchTerm, 'i') } }
                 ]
-            });
-
-            const totalRecords = users.length;
+            };
+            const totalRecords = await UserModel.countDocuments(searchFilter);
             let totalPages = perPage > totalRecords ? 1 : Math.ceil(totalRecords / perPage);
             let limitPerPage = perPage > totalRecords ? totalRecords : perPage;
             let skipRecords = totalPages == 1 ? 0 : perPage * page - perPage;
 
-            const user = await UserModel.find({
-                $or: [
-                    { firstName: { $regex: new RegExp(searchTerm, 'i') } },
-                    { lastName: { $regex: new RegExp(searchTerm, 'i') } },
-                    { email: { $regex: new RegExp(searchTerm, 'i') } },
-                    { tel: { $regex: new RegExp(searchTerm, 'i') } },
-                    { team: { $regex: new RegExp(searchTerm, 'i') } }
-                ]
-            })
+            const user = await UserModel.find(searchFilter)
+                .select('_id kod firstName lastName email tel team privileges situation createdAt')
                 .skip(skipRecords)
                 .limit(limitPerPage);
 
@@ -403,15 +481,14 @@ class userController {
             });
         } catch (error) {
             logger.error(error);
+            return res.status(Number(error?.status) || 500).send(
+                Number(error?.status) === 403 ? 'Δεν έχετε έγκυρο team scope' : 'Σφάλμα αναζήτησης'
+            );
         }
     };
 
     static activeSessionsPage = async (req, res) => {
         try {
-            const currentUser = await UserModel.findById(req.session.userId).lean();
-            if (!currentUser || !currentUser.isAdmin) {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
-            }
             const sessions = await mongoose.connection.db.collection('sessions').find({}).toArray();
 
             const activeUsers = [];
@@ -461,9 +538,6 @@ class userController {
     static sendMessageToUser = async (req, res) => {
         try {
             const currentUser = await UserModel.findById(req.session.userId).lean();
-            if (!currentUser || !currentUser.isAdmin) {
-                return res.status(403).json({ success: false, message: 'Unauthorized' });
-            }
 
             const { toUserId, message } = req.body;
 
@@ -530,11 +604,6 @@ class userController {
 
     static usageReportPage = async (req, res) => {
         try {
-            const currentUser = await UserModel.findById(req.session.userId).lean();
-            if (!currentUser || !currentUser.isAdmin) {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
-            }
-
             const greekMonths = [
                 'ΙΑΝΟΥΑΡΙΟΣ',
                 'ΦΕΒΡΟΥΑΡΙΟΣ',
@@ -818,11 +887,6 @@ class userController {
 
     static exportUsageReport = async (req, res) => {
         try {
-            const currentUser = await UserModel.findById(req.session.userId).lean();
-            if (!currentUser || !currentUser.isAdmin) {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
-            }
-
             const month = req.query.month || new Date().toISOString().slice(0, 7);
             const logs = await UsageLogModel.find({ date: month }).sort({ loginAt: 1 }).lean();
 
@@ -1108,43 +1172,29 @@ class userController {
             return res.status(401).json({ permissions: {} });
         }
 
-        const user_Id = req.session.userId;
-        const userPermission = req.session.userRole;
-        const permissions = await userController.fetchPermissions(user_Id, userPermission);
+        const permissions = await userController.fetchPermissions(String(req.session.userId));
 
         res.json({ permissions }); // Επιστροφή δεδομένων στο frontend
     };
 
-    static async fetchPermissions(user_Id, userPermission) {
+    static async fetchPermissions(authenticatedUserId) {
         try {
-            let lis = await SidebarStatusModel.find(
-                { userId: user_Id },
-                {
-                    li_Id: 1,
-                    situation_A: 1,
-                    situation_S: 1,
-                    situation_HR: 1,
-                    situation_C: 1,
-                    situation_U: 1,
-                    situation_V: 1
-                }
-            )
-                .sort({ li_Id: 1 })
-                .lean();
+            const rows = await UserPrivilegesModel.find(
+                { userId: String(authenticatedUserId) },
+                { _id: 0, form: 1, 'privileges.admin': 1, 'privileges.read': 1 }
+            ).lean();
 
-            const normalizedRole = normalizeUserRole(userPermission);
-            const isValidRole = isAllowedUserRole(normalizedRole);
-            if (!Array.isArray(lis)) lis = [];
-
-            if (!isValidRole) {
-                return {}; // ή return null, ανάλογα με το πώς το περιμένει ο caller
-            }
-
-            const permissions = Object.fromEntries(
-                lis.map((li) => [li.li_Id, Boolean(li[`situation_${normalizedRole}`])])
+            return Object.fromEntries(
+                (Array.isArray(rows) ? rows : [])
+                    .filter((row) => typeof row?.form === 'string' && row.form.length > 0)
+                    .map((row) => [
+                        row.form,
+                        {
+                            admin: row.privileges?.admin === true,
+                            read: row.privileges?.read === true
+                        }
+                    ])
             );
-
-            return permissions;
         } catch (err) {
             logger.error(err);
             return {};
@@ -1234,14 +1284,6 @@ class userController {
                 templateId: templateUserId,
                 uniqueKey: 'form',
                 projection: { _id: 0, userId: 0, createdAt: 0, updatedAt: 0 }
-            });
-
-            await syncFromTemplate({
-                Model: SidebarStatusModel,
-                userIdStr,
-                templateId: templateUserId,
-                uniqueKey: 'li_Id',
-                projection: { _id: 0, userId: 0 }
             });
 
             // Υπολόγισε το sessionExpires από το maxAge του session
@@ -1439,27 +1481,6 @@ class userController {
                             updatedAt: new Date()
                         }));
                         await UserPrivilegesModel.insertMany(clones);
-                    }
-                }
-            }
-
-            // Clone sidebar from template
-            if (templateUserId) {
-                const existingSidebar = await SidebarStatusModel.countDocuments({
-                    userId: String(saved._id)
-                });
-                if (existingSidebar === 0) {
-                    const templateSidebar = await SidebarStatusModel.find(
-                        { userId: templateUserId },
-                        { _id: 0, userId: 0 }
-                    ).lean();
-
-                    if (templateSidebar?.length) {
-                        const sidebarClones = templateSidebar.map((doc) => ({
-                            ...doc,
-                            userId: String(saved._id)
-                        }));
-                        await SidebarStatusModel.insertMany(sidebarClones);
                     }
                 }
             }

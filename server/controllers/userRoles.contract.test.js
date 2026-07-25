@@ -1,6 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
 const ejs = require('ejs');
@@ -15,7 +16,7 @@ const {
     getUserRoleBadgeClass
 } = require('../constants/userRoles');
 const UserModel = require('../models/userModel');
-const { SidebarStatusModel } = require('../models/privileges');
+const { UserPrivilegesModel, SidebarStatusModel } = require('../models/privileges');
 
 const sideEffectModuleStubs = [
     ['../../config/emailConfig', { sendMail: async () => ({}) }],
@@ -48,6 +49,7 @@ function responseStub() {
         redirect(url) { this.redirects.push(url); return this; },
         render(view, locals) { this.renders.push({ view, locals }); return this; },
         send(message) { this.sent.push(message); return this; },
+        json(value) { this.payload = value; return this; },
         async flash(type, message) { this.flashes.push({ type, message }); }
     };
 }
@@ -120,12 +122,15 @@ test('UserModel validates and normalizes privileges without a database', async (
     await assert.rejects(invalid.validate(), /privileges/);
 });
 
-test('SidebarStatusModel has independent false-default role fields', () => {
+test('SidebarStatusModel remains a legacy compatibility schema only', () => {
     for (const field of ['situation_S', 'situation_HR']) {
         const schemaPath = SidebarStatusModel.schema.path(field);
         assert.ok(schemaPath);
         assert.strictEqual(schemaPath.options.default, false);
     }
+    const source = fs.readFileSync(path.join(repositoryRoot, 'server/models/privileges.js'), 'utf8');
+    assert.ok(source.includes('Legacy schema retained only for backward compatibility'));
+    assert.ok(source.includes('longer an authorization source'));
 });
 
 test('controller create synchronizes privileges and isAdmin', async () => {
@@ -140,7 +145,10 @@ test('controller create synchronizes privileges and isAdmin', async () => {
         ]) {
             const res = responseStub();
             const writesBefore = writes.length;
-            await userController.postUser({ body: userBody(` ${role.toLowerCase()} `) }, res);
+            await userController.postUser({
+                session: { userTeam: 'THA' },
+                body: userBody(` ${role.toLowerCase()} `)
+            }, res);
             const write = writes.at(-1);
             assert.strictEqual(writes.length, writesBefore + 1);
             assert.strictEqual(write.privileges, role);
@@ -185,67 +193,120 @@ test('controller create and edit reject invalid shapes before model access', asy
 });
 
 test('controller edit synchronizes role/admin and enables validators', async () => {
-    const originalUpdate = UserModel.findByIdAndUpdate;
+    const originalFindOne = UserModel.findOne;
+    const originalUpdate = UserModel.findOneAndUpdate;
     const updates = [];
     try {
-        UserModel.findByIdAndUpdate = async (id, update, options) => {
-            updates.push({ id, update, options });
-            return { _id: id };
+        UserModel.findOne = () => ({ select: () => ({ lean: async () => ({ _id: 'target', team: 'TEAM1' }) }) });
+        UserModel.findOneAndUpdate = async (filter, update, options) => {
+            updates.push({ filter, update, options });
+            return { _id: filter._id };
         };
+        let sequence = 1;
         for (const [from, to, expectedAdmin] of [
             ['A', 'HR', false], ['HR', 'A', true], ['A', 'S', false], ['C', 'U', false], ['V', 'C', false]
         ]) {
             const res = responseStub();
-            await userController.editPostUser({ params: { id: `user-${from}-${to}` }, body: userBody(to) }, res);
+            const targetId = new mongoose.Types.ObjectId(`0000000000000000000000${String(sequence++).padStart(2, '0')}`);
+            await userController.editPostUser({
+                session: { userTeam: 'TEAM1' },
+                params: { id: String(targetId) },
+                body: { ...userBody(to), team: 'TEAM2' }
+            }, res);
             const write = updates.at(-1);
             assert.strictEqual(write.update.privileges, to);
             assert.strictEqual(write.update.isAdmin, expectedAdmin);
+            assert.strictEqual(write.update.team, 'TEAM1');
             assert.strictEqual(write.options.runValidators, true);
             assert.deepStrictEqual(res.redirects, ['/admin']);
             assert.ok(res.flashes.some((flash) => flash.type === 'info'));
         }
     } finally {
-        UserModel.findByIdAndUpdate = originalUpdate;
+        UserModel.findOne = originalFindOne;
+        UserModel.findOneAndUpdate = originalUpdate;
     }
 });
 
 test('controller edit handles null update and thrown errors safely', async () => {
-    const originalUpdate = UserModel.findByIdAndUpdate;
+    const originalFindOne = UserModel.findOne;
+    const originalUpdate = UserModel.findOneAndUpdate;
+    const targetId = String(new mongoose.Types.ObjectId('000000000000000000000099'));
     try {
-        UserModel.findByIdAndUpdate = async () => null;
+        UserModel.findOne = () => ({ select: () => ({ lean: async () => ({ _id: targetId, team: 'TEAM1' }) }) });
+        UserModel.findOneAndUpdate = async () => null;
         const missingRes = responseStub();
-        await userController.editPostUser({ params: { id: 'missing' }, body: userBody('HR') }, missingRes);
-        assert.deepStrictEqual(missingRes.redirects, ['/admin']);
-        assert.ok(missingRes.flashes.some((flash) => flash.message === 'Δεν βρέθηκε ο χρήστης προς ενημέρωση'));
+        await userController.editPostUser({ session: { userTeam: 'TEAM1' }, params: { id: targetId }, body: userBody('HR') }, missingRes);
+        assert.strictEqual(missingRes.statusCode, 404);
         assert.ok(!missingRes.flashes.some((flash) => flash.message === 'Επιτυχής Ενημέρωση'));
 
-        UserModel.findByIdAndUpdate = async () => { throw new Error('raw database detail'); };
+        UserModel.findOneAndUpdate = async () => { throw new Error('raw database detail'); };
         const errorRes = responseStub();
-        await userController.editPostUser({ params: { id: 'error' }, body: userBody('S') }, errorRes);
+        await userController.editPostUser({ session: { userTeam: 'TEAM1' }, params: { id: targetId }, body: userBody('S') }, errorRes);
         assert.deepStrictEqual(errorRes.redirects, ['/admin']);
         assert.ok(errorRes.flashes.some((flash) => flash.message === 'Δεν ήταν δυνατή η ενημέρωση του χρήστη'));
         assert.ok(!errorRes.flashes.some((flash) => flash.message.includes('raw database detail')));
     } finally {
-        UserModel.findByIdAndUpdate = originalUpdate;
+        UserModel.findOne = originalFindOne;
+        UserModel.findOneAndUpdate = originalUpdate;
     }
 });
 
-test('fetchPermissions selects S and HR independently with safe false defaults', async () => {
-    const originalFind = SidebarStatusModel.find;
+test('fetchPermissions uses canonical UserPrivileges read-or-admin without internal fields', async () => {
+    const originalFind = UserPrivilegesModel.find;
+    const originalSidebarFind = SidebarStatusModel.find;
     let projection;
+    let query;
+    let sidebarReads = 0;
     try {
-        SidebarStatusModel.find = (query, selected) => {
+        SidebarStatusModel.find = () => { sidebarReads += 1; throw new Error('legacy read'); };
+        UserPrivilegesModel.find = (receivedQuery, selected) => {
+            query = receivedQuery;
             projection = selected;
-            return { sort: () => ({ lean: async () => [{ li_Id: 'li1', situation_S: true }, { li_Id: 'li2' }] }) };
+            return { lean: async () => [
+                { form: 'ReadForm', privileges: { read: true, admin: false } },
+                { form: 'AdminForm', privileges: { read: false, admin: true } },
+                { form: 'ClosedForm', privileges: { read: false, admin: false } }
+            ] };
         };
-        assert.deepStrictEqual(await userController.fetchPermissions('user-id', ' s '), { li1: true, li2: false });
-        SidebarStatusModel.find = () => ({ sort: () => ({ lean: async () => [{ li_Id: 'li1', situation_HR: true, situation_C: false }] }) });
-        assert.deepStrictEqual(await userController.fetchPermissions('user-id', 'HR'), { li1: true });
-        assert.strictEqual(projection.situation_S, 1);
-        assert.strictEqual(projection.situation_HR, 1);
+        assert.deepStrictEqual(await userController.fetchPermissions('session-user'), {
+            ReadForm: { admin: false, read: true },
+            AdminForm: { admin: true, read: false },
+            ClosedForm: { admin: false, read: false }
+        });
+        assert.deepStrictEqual(query, { userId: 'session-user' });
+        assert.deepStrictEqual(projection, { _id: 0, form: 1, 'privileges.admin': 1, 'privileges.read': 1 });
+        assert.strictEqual(sidebarReads, 0);
     } finally {
-        SidebarStatusModel.find = originalFind;
+        UserPrivilegesModel.find = originalFind;
+        SidebarStatusModel.find = originalSidebarFind;
     }
+});
+
+test('getRoles rejects unauthenticated requests and trusts only session userId', async () => {
+    const unauthorized = responseStub();
+    await userController.getUserRoles({ session: {} }, unauthorized);
+    assert.strictEqual(unauthorized.statusCode, 401);
+    assert.deepStrictEqual(unauthorized.payload, { permissions: {} });
+
+    const original = userController.fetchPermissions;
+    try {
+        let received;
+        userController.fetchPermissions = async (userId) => { received = userId; return {}; };
+        const res = responseStub();
+        await userController.getUserRoles({ session: { userId: 123 }, query: { userId: 'attacker' } }, res);
+        assert.strictEqual(received, '123');
+        assert.deepStrictEqual(res.payload, { permissions: {} });
+    } finally {
+        userController.fetchPermissions = original;
+    }
+});
+
+test('login and registration sync UserPrivileges but never SidebarStatus', () => {
+    const source = fs.readFileSync(path.join(repositoryRoot, 'server/controllers/userController.js'), 'utf8');
+    assert.ok(source.includes('Model: UserPrivilegesModel'));
+    assert.ok(!source.includes('Model: SidebarStatusModel'));
+    assert.ok(!source.includes('SidebarStatusModel.countDocuments'));
+    assert.ok(!source.includes('SidebarStatusModel.insertMany'));
 });
 
 test('requireAdminRole authorizes only active database-backed A users', async () => {
@@ -312,7 +373,11 @@ test('user-management routes require the admin middleware', () => {
         ["router.delete('/admin/edit/:id'", 'deletePostUser'],
         ["router.get('/admin/delete/:id'", 'checkAndDeletePostUser'],
         ["router.post('/admin/search'", 'searchPostUser'],
-        ["router.get('/admin/search'", 'searchGetUser']
+        ["router.get('/admin/search'", 'searchGetUser'],
+        ["router.get('/admin/active-sessions'", 'activeSessionsPage'],
+        ["router.post('/admin/send-message'", 'sendMessageToUser'],
+        ["router.get('/admin/usage-report'", 'usageReportPage'],
+        ["router.get('/admin/usage-report/export'", 'exportUsageReport']
     ];
     for (const [prefix, handler] of contracts) {
         assert.ok(
@@ -320,7 +385,28 @@ test('user-management routes require the admin middleware', () => {
             `${prefix} must use requireAdminRole`
         );
     }
-    assert.ok(routeSource.includes("router.get('/admin/active-sessions', checkAuth, userController.activeSessionsPage);"));
+});
+
+test('admin monitoring controllers do not use the legacy isAdmin boolean', () => {
+    const controllerSource = fs.readFileSync(
+        path.join(repositoryRoot, 'server', 'controllers', 'userController.js'),
+        'utf8'
+    );
+    for (const method of [
+        'activeSessionsPage',
+        'sendMessageToUser',
+        'usageReportPage',
+        'exportUsageReport'
+    ]) {
+        const methodStart = controllerSource.indexOf(`static ${method} =`);
+        assert.notStrictEqual(methodStart, -1, `${method} must exist`);
+        const nextMethod = controllerSource.indexOf('\n    static ', methodStart + 1);
+        const methodSource = controllerSource.slice(
+            methodStart,
+            nextMethod === -1 ? controllerSource.length : nextMethod
+        );
+        assert.ok(!methodSource.includes('.isAdmin'), `${method} must not use legacy isAdmin`);
+    }
 });
 
 test('add EJS renders selectable roles, unique IDs, and CSRF', () => {

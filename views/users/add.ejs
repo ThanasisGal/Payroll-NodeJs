@@ -123,7 +123,8 @@
               name="team"
               id="team"
               class="form-control"
-              value=""
+              value="<%= typeof canManageAllTeams !== 'undefined' && !canManageAllTeams ? managedTeam : '' %>"
+              <%= typeof canManageAllTeams !== 'undefined' && !canManageAllTeams ? 'readonly' : '' %>
               style="outline: 4 !important"
               required
             />

@@ -22,6 +22,8 @@ const Schema = _Schema;
 	userPrivilegesSchema.index({ userId: 1, form: 1 }, { unique: true });
 	const UserPrivilegesModel = model("userPrivileges", userPrivilegesSchema);
 
+	// Legacy schema retained only for backward compatibility. Sidebar_Status is no
+	// longer an authorization source and is not synchronized during login/registration.
 	const sidebarStatusSchema = new Schema({
 	userId: { type: String, required: true },
 	li_Id: { type: String, required: true },

@@ -51,6 +51,7 @@ require('./server/config/aws');
 
 const getSessionVars = require('./server/middlewares/session-variables');
 const logger = require('./server/utils/logger');
+const { isAdminUserRole, isUserPrivilegesManagerRole } = require('./server/constants/userRoles');
 
 // ============================================================================
 // ✅ TEXT CACHE SYSTEM IMPORTS
@@ -63,6 +64,8 @@ const {
 
 const app = express();
 app.disable('x-powered-by');
+app.locals.isUserPrivilegesManagerRole = isUserPrivilegesManagerRole;
+app.locals.isAdminUserRole = isAdminUserRole;
 
 const cdnProxy = require('./server/middlewares/cdnProxy');
 app.use(cdnProxy);
@@ -187,7 +190,11 @@ app.use(
             res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
             res.set('Access-Control-Allow-Headers', 'Content-Type');
 
-            if (filepath.endsWith('.html')) {
+            if (!isProd) {
+                res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+                res.set('Pragma', 'no-cache');
+                res.set('Expires', '0');
+            } else if (filepath.endsWith('.html')) {
                 res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
                 res.set('Pragma', 'no-cache');
                 res.set('Expires', '0');
@@ -230,7 +237,15 @@ try {
 app.locals.script = (scriptPath) => {
     const cleanPath = scriptPath.replace(/\.js$/i, '').trim().replace(/\s+/g, '');
     const baseURL = STATIC_BASE.trim().replace(/\s+/g, '');
-    const version = app.locals.appVersion || '1.0.0';
+    let version = app.locals.appVersion || '1.0.0';
+
+    if (!isProd) {
+        try {
+            version = fs.statSync(path.join(__dirname, 'public', 'js', `${cleanPath}.js`)).mtimeMs;
+        } catch {
+            // Keep the application version fallback so a missing asset still resolves to a debuggable URL.
+        }
+    }
 
     return `${baseURL}/${cleanPath}.js?v=${version}`.replace(/\s+/g, '');
 };

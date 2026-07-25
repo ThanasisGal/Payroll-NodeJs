@@ -28,6 +28,7 @@ const forosController = require('../controllers/Kinhseis/forosContoller.js');
 const ektyposhSymbaseonController = require('../controllers/ektyposeis/symbaseis/ektyposhSymbaseonController.js');
 const ektyposhApasxolhseonController = require('../controllers/ektyposeis/apasxolhseis/ektyposhApasxolhseonController.js');
 const E3NJsonSubmitController = require('../controllers/ergazomenoi/e3nJsonSubmitController');
+const userPrivilegesController = require('../controllers/userPrivilegesController');
 
 // const { savePdfFromBase64, deletePdf } = require('../utils/pdfHandler');
 
@@ -37,7 +38,10 @@ const E3NJsonSubmitController = require('../controllers/ergazomenoi/e3nJsonSubmi
 const checkUserAuth = require('../middlewares/auth-middleware.js');
 const getSessionVars = require('../middlewares/session-variables.js');
 const checkAuth = require('../middlewares/checkValidUser.js');
+const requireUserPrivilegeForm = require('../middlewares/requireUserPrivilegeForm');
+const requireEmploymentReviewAccess = requireUserPrivilegeForm('ElegxosApasxolhseonPeriodoy');
 const requireAdminRole = require('../middlewares/requireAdminRole.js');
+const { requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole.js');
 const sanitizeNumberFields = require('../middlewares/sanitizeNumbers');
 
 // ============================================================================
@@ -126,11 +130,19 @@ router.post('/admin/search', requireAdminRole, userController.searchPostUser);
 
 router.get('/admin/search', requireAdminRole, userController.searchGetUser);
 
+router.get('/admin/user-privileges', requireUserPrivilegesManagerRole, userPrivilegesController.renderPage);
+
+router.get('/admin/user-privileges/users', requireUserPrivilegesManagerRole, userPrivilegesController.listUsers);
+
+router.get('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole, userPrivilegesController.getPrivileges);
+
+router.put('/admin/user-privileges/:userId', requireUserPrivilegesManagerRole, userPrivilegesController.updatePrivileges);
+
 router.post('/admin/dhmioyrgia-arxeion-neas-xrhshs', checkAuth, adminController.anoigmaNeasXrhshs);
 
-router.get('/admin/active-sessions', checkAuth, userController.activeSessionsPage);
+router.get('/admin/active-sessions', requireAdminRole, userController.activeSessionsPage);
 
-router.post('/admin/send-message', checkAuth, userController.sendMessageToUser);
+router.post('/admin/send-message', requireAdminRole, userController.sendMessageToUser);
 
 // ============================================================================
 // MAIN APP ROUTES
@@ -1239,89 +1251,108 @@ router.post(
 
 router.get(
     '/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy',
+    checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.mainElegxosApasxolhseonPeriodoyForm
 );
 
-router.get('/api/prodhlomena-oraria/review', erganhController.getProdhlomenaOrariaForReview);
+router.get('/api/prodhlomena-oraria/review', checkAuth, requireEmploymentReviewAccess, erganhController.getProdhlomenaOrariaForReview);
 
 router.get(
     '/api/prodhlomena-oraria/policies/catalog',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getApasxoliseisPolicyCatalog
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/policies/preview',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaPolicyPreview
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/policies/approvals',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaPolicyPreviewApprovals
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/policies/apply-dry-run',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaPolicyPreviewApplyDryRun
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/policies/apply-plan',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaPolicyPreviewApplyPlan
 );
 
 router.post(
     '/api/prodhlomena-oraria/review/policies/apply-execution',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.runProdhlomenaOrariaPolicyPreviewApplyExecutionLocked
 );
 
 router.post(
     '/api/prodhlomena-oraria/review/policies/approvals',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.createProdhlomenaOrariaPolicyPreviewApproval
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions/current',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getWeeklyRepoTransferDecisionBatch
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getWeeklyRepoTransferDecisions
 );
 
 router.post(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.createWeeklyRepoTransferDecision
 );
 
 router.post(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply',
     checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.applyWeeklyRepoTransferDecision
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/scenarios',
+    checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.getProdhlomenaOrariaScenarioClassifications
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/export-excel',
+    checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.exportProdhlomenaOrariaReviewExcel
 );
 
 router.get(
     '/api/prodhlomena-oraria/review/export-pdf',
+    checkAuth,
+    requireEmploymentReviewAccess,
     erganhController.exportProdhlomenaOrariaReviewPdf
 );
 
@@ -1390,9 +1421,9 @@ router.post('/api/update_session_periodos', kinhseisController.update_session_pe
 
 router.post('/api/usage/heartbeat', checkAuth, userController.heartbeat);
 
-router.get('/admin/usage-report', checkAuth, userController.usageReportPage);
+router.get('/admin/usage-report', requireAdminRole, userController.usageReportPage);
 
-router.get('/admin/usage-report/export', checkAuth, userController.exportUsageReport);
+router.get('/admin/usage-report/export', requireAdminRole, userController.exportUsageReport);
 // ============================================================================
 // ✅ ERROR HANDLING - Multer & PDF Errors
 // ============================================================================

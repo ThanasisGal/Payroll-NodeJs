@@ -798,7 +798,7 @@ function setHrDecisionState(projection = decisionReadyProjection()) {
         currentHrReviewLoaded = true;
         currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-07-06&eos_hmeromhnia=2026-07-12&ypokatasthma=0000');
         currentRepoTransferDecisionsByProposalId = new Map();
-        repoTransferDecisionSubmitting = false;
+        repoTransferDecisionSubmitting.clear();
     `, sandbox);
     sandbox.classifyHrReviewGroups();
     return projection.groups[0];
@@ -880,8 +880,9 @@ function testEmploymentReviewFinalUiContract() {
     assert.ok(viewSource.includes('container-fluid mt-3 employment-review-page-shell'));
     assert.ok(!/id="hrReviewWorkspace"[^>]*employment-review-page-shell/.test(viewSource));
     assert.ok(!/employment-review-page-shell[^"']*\bw-70\b|\bw-70\b[^"']*employment-review-page-shell/.test(viewSource));
-    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
-    assert.ok(cssSource.includes('margin-left: 15%'));
+    assert.ok(cssSource.includes('width: 94% !important'));
+    assert.ok(cssSource.includes('margin-left: 3%'));
+    assert.ok(cssSource.includes('margin-right: 3%'));
     assert.ok(!/\.employment-review-card\s*\{[^}]*?(?:width|margin-(?:left|right)|--employment-review-(?:width|right))/s.test(cssSource));
     assert.ok(/@media \(max-width: 991\.98px\)[\s\S]*?\.employment-review-page-shell[\s\S]*?width:\s*100%[\s\S]*?margin-left:\s*0[\s\S]*?margin-right:\s*0/.test(cssSource));
     const shellCssStart = cssSource.indexOf('.employment-review-page-shell {');
@@ -941,7 +942,7 @@ function testCorrectiveDropdownAndPageShellContract() {
     const shellMarkup = viewSource.match(/<div class="[^"]*employment-review-page-shell[^"]*">/)?.[0] || '';
     assert.ok(shellMarkup.includes('employment-review-page-shell'));
     assert.ok(!shellMarkup.includes('w-70'));
-    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
+    assert.ok(cssSource.includes('width: 94% !important'));
     assert.ok(!/\.hr-review-card\s*\{[^}]*max-width/s.test(cssSource));
     assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
 }
@@ -971,7 +972,7 @@ function testEmploymentReviewBranchActionLayoutContract() {
     assert.ok(!/(?:position\s*:\s*absolute|transform\s*:|translate\s*:)/.test(actionCss));
     assert.ok(!/#hrReviewStartBtn\s*\{/s.test(cssSource));
 
-    assert.ok(cssSource.includes('width: calc(70% + 1.5rem) !important'));
+    assert.ok(cssSource.includes('width: 94% !important'));
     assert.ok(cssSource.includes('.hr-review-card {\n    width: 100%;'));
     assert.ok(dropdownHelperSource.includes("ddEl.classList.add('place-below', 'maxh-limited')"));
     assert.ok(viewSource.includes('id="hrReviewStartBtn"'));
@@ -1342,7 +1343,7 @@ async function testHrPostSuccessRefreshFailureWarning() {
         assert.ok(dialogs.some((dialog) => dialog.title === 'Η απόφαση καταγράφηκε'));
         assert.ok(dialogs.some((dialog) => String(dialog.text || '').includes('Η προβολή δεν ανανεώθηκε')));
         assert.ok(!dialogs.some((dialog) => dialog.title === 'Δεν καταγράφηκε η απόφαση'));
-        assert.strictEqual(vm.runInContext('repoTransferDecisionSubmitting', sandbox), false);
+        assert.strictEqual(vm.runInContext('repoTransferDecisionSubmitting.size', sandbox), 0);
     } finally {
         documentStub.querySelectorAll = originalQuerySelectorAll;
         restoreSandboxFunctions(saved);
