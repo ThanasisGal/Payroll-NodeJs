@@ -746,6 +746,10 @@ declare -a common_files=(
     "public/js/common/ergazomenoiAnenerghToggle.js"
 )
 
+declare -a admin_files=(
+    "public/js/admin/userPrivilegesManagement.js"
+)
+
 declare -a companies=(
     "public/js/companies/genikastoixeia/dropdownsValue.js"
     "public/js/companies/genikastoixeia/getFieldValues.js"
@@ -844,6 +848,13 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/programmata/sendApologistikoButton.js"
     "public/js/ergazomenoi/programmata/sendApologistikoYperorionButton.js"
     "public/js/ergazomenoi/genika/istorikoTable.js"
+    "public/js/ergazomenoi/genika/alles_parathrhseis.js"
+)
+
+declare -a krathseis_files=(
+    "public/js/Krathseis/nestingTables.js"
+    "public/js/Krathseis/selectRowInTable.js"
+    "public/js/Krathseis/selectRowsInNestedTable.js"
 )
 
 declare -a kinhseis=(
@@ -865,6 +876,7 @@ declare -a kinhseis=(
     "public/js/kinhseis/apasxolhseis/ypologismoiForoy.js"
     "public/js/kinhseis/apasxolhseis/adeies.js"
     "public/js/kinhseis/apasxolhseis/putFieldValues.js"
+    "public/js/kinhseis/apasxolhseis/payrollPhasesPanel.js"
 )
 
 declare -a no_obfuscate=(
@@ -1039,11 +1051,11 @@ echo "Obfuscation:    $([ "$SKIP_OBFUSCATION" == "true" ] && echo "DISABLED" || 
 echo "CDN Upload:     $([ "$UPLOAD_TO_CDN" == "true" ] && echo "ENABLED" || echo "DISABLED")"
 echo "Version:        $APP_VERSION"
 echo "Phase:          $DEPLOYMENT_PHASE (Core files only)"
-echo "Files:           ~$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#kinhseis[@]} + ${#no_obfuscate[@]})) files"
+echo "Files:           ~$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#admin_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#krathseis_files[@]} + ${#kinhseis[@]} + ${#no_obfuscate[@]})) files"
 echo "=========================================="
 echo ""
 
-TOTAL_FILES_EXPECTED=$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#kinhseis[@]}))
+TOTAL_FILES_EXPECTED=$((${#modules[@]} + ${#utils[@]} + ${#dates[@]} + ${#common_files[@]} + ${#admin_files[@]} + ${#companies[@]} + ${#symbaseis[@]} + ${#ergazomenoi[@]} + ${#krathseis_files[@]} + ${#kinhseis[@]}))
 PROCESSED=0
 
 PHASE1_START=$(date +%s)
@@ -1107,6 +1119,27 @@ done
 PHASE3_END=$(date +%s)
 PHASE3_DURATION=$((PHASE3_END - PHASE3_START))
 log_success "Phase 1.3 complete in $(format_duration $PHASE3_DURATION)"
+echo ""
+
+ADMIN_PHASE_START=$(date +%s)
+log_phase "PHASE 1.ADMIN: Building admin files (${#admin_files[@]} files)..."
+echo ""
+
+for file in "${admin_files[@]}"; do
+    if [[ -f "$file" ]]; then
+        PROCESSED=$((PROCESSED + 1))
+        echo "[$PROCESSED/$TOTAL_FILES_EXPECTED]"
+        process_file "$file" false
+    else
+        log_warning "File not found: $file"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED + 1))
+        FAILED_FILES+=("$file (source not found)")
+    fi
+done
+
+ADMIN_PHASE_END=$(date +%s)
+ADMIN_PHASE_DURATION=$((ADMIN_PHASE_END - ADMIN_PHASE_START))
+log_success "Phase 1.ADMIN complete in $(format_duration $ADMIN_PHASE_DURATION)"
 echo ""
 
 PHASE4_START=$(date +%s)
@@ -1191,6 +1224,27 @@ done
 PHASE7_END=$(date +%s)
 PHASE7_DURATION=$((PHASE7_END - PHASE7_START))
 log_success "Phase 1.7 complete in $(format_duration $PHASE7_DURATION)"
+echo ""
+
+KRATHSEIS_PHASE_START=$(date +%s)
+log_phase "PHASE 1.KRATHSEIS: Building krathseis files (${#krathseis_files[@]} files)..."
+echo ""
+
+for file in "${krathseis_files[@]}"; do
+    if [[ -f "$file" ]]; then
+        PROCESSED=$((PROCESSED + 1))
+        echo "[$PROCESSED/$TOTAL_FILES_EXPECTED]"
+        process_file "$file" false
+    else
+        log_warning "File not found: $file"
+        TOTAL_FILES_FAILED=$((TOTAL_FILES_FAILED + 1))
+        FAILED_FILES+=("$file (source not found)")
+    fi
+done
+
+KRATHSEIS_PHASE_END=$(date +%s)
+KRATHSEIS_PHASE_DURATION=$((KRATHSEIS_PHASE_END - KRATHSEIS_PHASE_START))
+log_success "Phase 1.KRATHSEIS complete in $(format_duration $KRATHSEIS_PHASE_DURATION)"
 echo ""
 
 PHASE8_START=$(date +%s)
