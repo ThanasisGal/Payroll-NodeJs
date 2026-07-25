@@ -13931,6 +13931,210 @@ body.loader-active > *:not(.app-loader) {
     gap: 0.75rem;
 }
 
+.user-privileges-page {
+    overflow-x: hidden;
+}
+
+.user-privileges-shell {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 0;
+    max-width: 100%;
+}
+
+.user-privileges-card {
+    display: flex;
+    flex-direction: column;
+    width: min(96rem, 100%);
+    max-height: calc(100vh - 8rem);
+    min-height: 28rem;
+    overflow: hidden;
+}
+
+.user-privileges-header {
+    flex: 0 0 auto;
+    color: #fff;
+}
+
+.user-privileges-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.user-privileges-controls {
+    display: grid;
+    grid-template-columns: minmax(18rem, 2fr) minmax(12rem, 1fr) auto;
+    gap: 1rem;
+    align-items: end;
+    flex: 0 0 auto;
+    padding: 1rem;
+    background: #fff;
+}
+
+.user-privileges-user-field,
+.user-privileges-role-field,
+.user-privileges-toggle-field {
+    min-width: 0;
+}
+
+.user-privileges-user-field {
+    box-sizing: border-box;
+    padding-inline-end: 2.5rem;
+}
+
+.user-privileges-user-field .ts-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.user-privileges-user-field .ts-control {
+    max-width: 100%;
+    padding-right: 2.5rem !important;
+}
+
+.user-privileges-user-field .ts-control .item {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-privileges-controls label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+}
+
+.user-privileges-status {
+    flex: 0 0 auto;
+    min-height: 2rem;
+    padding: 0.35rem 1rem;
+    color: #495057;
+}
+
+.user-privileges-status[data-kind='success'] {
+    color: #146c43;
+}
+
+.user-privileges-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1rem 0.5rem;
+}
+
+.user-privileges-table {
+    min-width: 52rem;
+    margin-bottom: 0;
+    text-align: center;
+}
+
+.user-privileges-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #e8f5e9;
+    white-space: nowrap;
+}
+
+.user-privileges-table th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.user-privileges-table thead th:first-child {
+    z-index: 3;
+    background: #e8f5e9;
+}
+
+.user-privileges-table tbody th.user-privileges-form-cell,
+.user-privileges-table .user-privileges-form-name {
+    max-width: 28rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 400;
+}
+
+.user-privileges-column-toggle {
+    appearance: none;
+    border: 0;
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.4rem;
+    width: 100%;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.user-privileges-column-toggle:hover,
+.user-privileges-column-toggle:focus-visible,
+.user-privileges-column-toggle.is-partial {
+    background: #d4e8d5;
+}
+
+.user-privileges-column-toggle.is-active {
+    background: #b8d8ba;
+    box-shadow: inset 0 0 0 1px #6d9b70;
+}
+
+.user-privileges-column-toggle:disabled {
+    cursor: default;
+    opacity: 0.65;
+}
+
+.user-privileges-not-applicable {
+    background: #e9ecef !important;
+}
+
+.user-privileges-empty {
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+}
+
+.user-privileges-footer {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.user-privileges-footer-actions {
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .user-privileges-card {
+        max-height: calc(100vh - 5rem);
+    }
+
+    .user-privileges-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .user-privileges-footer {
+        flex-wrap: wrap;
+    }
+
+    .user-privileges-footer .w-20 {
+        width: min(12rem, 42%) !important;
+    }
+}
+
 .user-admin-action-btn {
     color: #212529;
     border-width: 1px;
@@ -14052,10 +14256,10 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
-    width: calc(70% + 1.5rem) !important;
+    width: 94% !important;
     max-width: none;
-    margin-left: 15%;
-    margin-right: 0;
+    margin-left: 3%;
+    margin-right: 3%;
 }
 
 .hr-review-filters {
@@ -14280,6 +14484,16 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-action-warning:disabled {
     background: var(--bs-warning-bg-subtle, #fff3cd);
+}
+
+.employment-review-return-btn,
+.employment-review-return-btn:hover,
+.employment-review-return-btn:focus,
+.employment-review-return-btn:active {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+    opacity: 1;
 }
 
 .hr-review-completed-details {

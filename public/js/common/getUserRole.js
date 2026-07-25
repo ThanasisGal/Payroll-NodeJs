@@ -1,89 +1,85 @@
-document.addEventListener("DOMContentLoaded", function () {
-	// ✅ Only run on authenticated/protected pages
-	// Skip on public pages and login flow
-	const publicPages = ['/login', '/reset_password', '/register', '/login/logout', '/logout', '/dates/appDate', '/dates/yearInUse', '/dates/periods'];
-	const currentPath = window.location.pathname;
-	
-	// If on home page or login pages, skip permission check
-	if (publicPages.some(page => currentPath === page)) {
-		return;
-	}
+(function sidebarPrivileges() {
+    'use strict';
 
-	// ✅ Πρώτα ελέγξε αν ο χρήστης είναι συνδεδεμένος
-	const userId = window.WPS_USER_ID;
-	if (! userId || userId === '""' || userId === 'null') {
-		return;
-	}
+    function canOpenForm(permission) {
+        return permission?.admin === true || permission?.read === true;
+    }
 
-	// ✅ Αν έχει userId, πρέπει να φορτώσουμε τα δικαιώματα ΑΚΟΜΑ κι αν είναι στο home page
-	// (γιατί μπορεί να έχει ενεργό session από προηγούμενη σύνδεση)
-	
-	async function fetchUserDataAndPermissions() {
-		try {
-			const response = await fetch("/api/login/getRoles", {
-				credentials: 'include',
-				headers: {
-				'Content-Type': 'application/json'
-				}
-			});
+    function setLinkEnabled(link, enabled) {
+        if (!link) return;
+        link.classList.toggle('enabled', enabled);
+        link.classList.toggle('disabled', !enabled);
+        if (enabled) {
+            link.removeAttribute('disabled');
+            link.removeAttribute('aria-disabled');
+        } else {
+            link.setAttribute('disabled', 'true');
+            link.setAttribute('aria-disabled', 'true');
+        }
+    }
 
-			if (response.status === 401) {
-				hideProtectedElements();
-				return;
-			}
+    function updateParentLinks(root) {
+        const parents = Array.from(root.querySelectorAll('li')).reverse();
+        parents.forEach((item) => {
+            const ownLink = item.querySelector(':scope > a');
+            const descendantLeaves = item.querySelectorAll('li > a[data-privilege-form], li > a[data-sidebar-special]');
+            if (!ownLink || descendantLeaves.length === 0) return;
+            setLinkEnabled(ownLink, Array.from(descendantLeaves).some((link) => link.classList.contains('enabled')));
+        });
+    }
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-			}
+    function applySidebarPermissions(root, permissions) {
+        root.querySelectorAll('a[data-privilege-form]').forEach((link) => {
+            const form = link.dataset.privilegeForm;
+            setLinkEnabled(link, canOpenForm(permissions?.[form]));
+        });
+        root.querySelectorAll('a[data-sidebar-special]').forEach((link) => {
+            setLinkEnabled(link, link.dataset.sidebarAuthorized === 'true');
+        });
+        updateParentLinks(root);
+    }
 
-			const data = await response.json();
-			
-			if (! data || !data.permissions) {
-				console.warn("[DOMContentLoaded] Δεν υπάρχουν δικαιώματα");
-				return;
-			}
+    function disableProtectedLinks(root) {
+        root.querySelectorAll('a[data-privilege-form]').forEach((link) => setLinkEnabled(link, false));
+        updateParentLinks(root);
+    }
 
-			const { permissions } = data;
-			updateDOM(permissions);
-			
-		} catch (error) {
-			console.error("[DOMContentLoaded] Σφάλμα:", error);
-			hideProtectedElements();
-		}
-	}
+    document.addEventListener('click', (event) => {
+        const disabledLink = event.target.closest?.('#sidebarMenu a.disabled, #sidebarMenu a[aria-disabled="true"]');
+        if (disabledLink) event.preventDefault();
+    });
 
-	function updateDOM(permissions) {
-		for (const key in permissions) {
-			const listItem = document.querySelector(`#${key}`);
-			if (!listItem) continue;
-		
-			const links = listItem.querySelectorAll('a');
-		
-			links.forEach(link => {
-				if (permissions[key]) {
-					link.classList.remove("disabled");
-					link.classList.add("enabled");
-					link.removeAttribute('disabled');
-				} else {
-					link.classList.remove("enabled");
-					link.classList.add("disabled");
-					link.setAttribute('disabled', 'true');
-				}
-			});
-		}
-	}
+    document.addEventListener('DOMContentLoaded', async () => {
+        const root = document.getElementById('sidebarMenu');
+        if (!root) return;
+        const publicPages = ['/login', '/reset_password', '/register', '/login/logout', '/logout', '/dates/appDate', '/dates/yearInUse', '/dates/periods'];
+        if (publicPages.includes(window.location.pathname)) return;
+        const userId = window.WPS_USER_ID;
+        if (!userId || userId === '""' || userId === 'null') return;
 
-	function hideProtectedElements() {
-		const protectedElements = document.querySelectorAll('[id^="perm_"], [data-permission]');
-		protectedElements.forEach(el => {
-			const links = el.querySelectorAll('a');
-			links.forEach(link => {
-				link.classList.add("disabled");
-				link.classList.remove("enabled");
-			});
-		});
-	}
+        try {
+            const response = await fetch('/api/login/getRoles', {
+                credentials: 'include',
+                headers: { Accept: 'application/json' }
+            });
+            if (response.status === 401) {
+                disableProtectedLinks(root);
+                return;
+            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            applySidebarPermissions(root, data?.permissions || {});
+        } catch (error) {
+            console.error('[sidebarPrivileges] Αποτυχία φόρτωσης δικαιωμάτων:', error);
+            disableProtectedLinks(root);
+        }
+    });
 
-	fetchUserDataAndPermissions();
-
-});
+    window.SidebarPrivileges = {
+        canOpenForm,
+        setLinkEnabled,
+        updateParentLinks,
+        applySidebarPermissions,
+        disableProtectedLinks
+    };
+})();

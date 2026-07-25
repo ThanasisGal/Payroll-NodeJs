@@ -22,6 +22,10 @@ function isAdminUserRole(value) {
     return normalizeUserRole(value) === 'A';
 }
 
+function isUserPrivilegesManagerRole(value) {
+    return ['A', 'S'].includes(normalizeUserRole(value));
+}
+
 function getUserRoleLabel(value) {
     return USER_ROLE_DEFINITIONS[normalizeUserRole(value)]?.label || 'Άγνωστος ρόλος';
 }
@@ -56,6 +60,7 @@ module.exports = {
     normalizeUserRole,
     isAllowedUserRole,
     isAdminUserRole,
+    isUserPrivilegesManagerRole,
     getUserRoleLabel,
     getSelectableAdminUserRoles,
     getUserRoleOptionsForCurrentValue,

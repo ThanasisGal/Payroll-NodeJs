@@ -1,0 +1,64 @@
+<section class="user-privileges-shell" aria-labelledby="userPrivilegesTitle">
+    <div class="card z-depth-5 user-privileges-card">
+        <header class="card-header bg-header text-center user-privileges-header">
+            <h1 id="userPrivilegesTitle" class="user-privileges-title">Δικαιώματα Χρηστών</h1>
+        </header>
+
+        <div class="user-privileges-controls">
+            <div class="user-privileges-user-field">
+                <label for="userPrivilegesUser">Χρήστης</label>
+                <select
+                    id="userPrivilegesUser"
+                    class="form-select tom-dropdown"
+                    data-api="/admin/user-privileges/users"
+                    data-preload-all="true"
+                    aria-describedby="userPrivilegesStatus"
+                ></select>
+            </div>
+            <div class="user-privileges-role-field">
+                <label for="userPrivilegesRole">Ρόλος</label>
+                <input id="userPrivilegesRole" class="form-control" type="text" readonly value="" />
+            </div>
+            <div class="user-privileges-toggle-field">
+                <button id="userPrivilegesToggleAll" type="button" class="btn btn-success" disabled>
+                    Επιλογή όλων
+                </button>
+            </div>
+        </div>
+
+        <div id="userPrivilegesStatus" class="user-privileges-status" role="status" aria-live="polite">
+            Επιλέξτε χρήστη για να εμφανιστούν τα δικαιώματα.
+        </div>
+
+        <div class="user-privileges-table-container">
+            <table class="table table-striped table-hover user-privileges-table">
+                <thead id="userPrivilegesTableHead"></thead>
+                <tbody id="userPrivilegesTableBody"></tbody>
+            </table>
+            <div id="userPrivilegesEmpty" class="user-privileges-empty" hidden>
+                Ο επιλεγμένος χρήστης δεν έχει εγγραφές δικαιωμάτων.
+            </div>
+        </div>
+
+        <footer class="card-footer user-privileges-footer">
+            <div class="d-flex cardFooter01 user-privileges-footer-actions">
+                <button
+                    id="userPrivilegesUpdate"
+                    type="button"
+                    class="btn btn-brown rounded-4 mt-1 w-20 buttons-content"
+                    disabled
+                >
+                    <i class="bi bi-floppy"></i> Ενημέρωση
+                </button>
+                <a
+                    href="/mainapp"
+                    class="btn btn-brown buttons-content rounded-4 mt-1 w-20"
+                >
+                    <i class="bi bi-chevron-double-left"></i> Επιστροφή
+                </a>
+            </div>
+        </footer>
+    </div>
+</section>
+
+<script src="<%= script('admin/userPrivilegesManagement') %>" defer></script>

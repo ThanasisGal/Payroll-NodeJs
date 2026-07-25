@@ -225,7 +225,7 @@ let currentReviewDeviations = [];
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentRepoTransferDecisionsByProposalId = new Map();
-let repoTransferDecisionSubmitting = false;
+const repoTransferDecisionSubmitting = new Set();
 const repoTransferApplySubmitting = new Set();
 let currentPolicyPreviewApprovalRecords = [];
 let currentPolicyPreviewApprovalTotal = 0;
@@ -240,7 +240,6 @@ let currentPolicyPreviewApplyDryRunExpanded = false;
 let currentHrReviewProjection = null;
 let currentHrPendingGroups = [];
 let currentHrCompletedGroups = [];
-let currentHrActiveIndex = 0;
 let currentHrReviewLoaded = false;
 let currentHrReviewLoading = false;
 const currentApprovalHistoryFilters = {
@@ -4095,7 +4094,8 @@ async function refreshRepoTransferDecisions() {
 
 async function submitRepoTransferDecision(group, decisionCode, options = {}) {
     if (!userCanRecordRepoTransferDecision()) return;
-    if (repoTransferDecisionSubmitting) return;
+    const proposalId = String(group?.group_id || '');
+    if (!proposalId || repoTransferDecisionSubmitting.has(proposalId)) return;
     const selectedBranch = String(currentPolicyPreviewBaseParams?.get('ypokatasthma') || '').trim();
     if (!selectedBranch || selectedBranch.toUpperCase() === 'ALL' || selectedBranch.includes(',')) {
         throw new Error('Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.');
@@ -4143,7 +4143,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
         : { icon: 'warning', title: labels[decisionCode], html: '<div class="text-start"><div>Η απόφαση αφορά και τις δύο συνδεδεμένες αλλαγές της πρότασης.</div><div class="mt-2">Δεν θα εφαρμοστεί καμία αλλαγή στα Προδηλωμένα.</div></div>', input: 'textarea', inputLabel: 'Προαιρετικές σημειώσεις', inputAttributes: { maxlength: '2000' }, showCancelButton: true, confirmButtonText: 'Καταγραφή απόφασης', cancelButtonText: 'Άκυρο' };
     const confirmation = await Swal.fire(confirmationOptions);
     if (!confirmation.isConfirmed) return;
-    repoTransferDecisionSubmitting = true;
+    repoTransferDecisionSubmitting.add(proposalId);
     try {
         const token = await getPolicyPreviewCsrfToken();
         const response = await fetch('/api/prodhlomena-oraria/review/repo-transfer-decisions', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': token, 'x-csrf-token': token }, body: JSON.stringify({ proposal_id: group.group_id, expected_source_id: source.prodhlomena_oraria_id, expected_target_id: target.prodhlomena_oraria_id, expected_proposal_version: group.pair_contract.proposal_version, expected_choice_code: group.pair_contract.choice_code, decision_code: decisionCode, notes: String(confirmation.value || '').trim(), request_id: repoTransferDecisionRequestId() }) });
@@ -4180,7 +4180,7 @@ async function submitRepoTransferDecision(group, decisionCode, options = {}) {
             renderPolicyPreviewGroups(currentPolicyPreviewGrouping, { atomicGroupProjection: currentAtomicRepoTransferProjection });
             await Swal.fire({ icon: 'success', title: 'Η απόφαση καταγράφηκε', text: 'Η απόφαση αφορά ολόκληρη τη συνδεδεμένη πρόταση. Δεν έγινε αλλαγή στα Προδηλωμένα.' });
         }
-    } finally { repoTransferDecisionSubmitting = false; }
+    } finally { repoTransferDecisionSubmitting.delete(proposalId); }
 }
 
 async function submitRepoTransferApply(group, decisionId, button) {
@@ -4277,7 +4277,6 @@ function classifyHrReviewGroups() {
 
     currentHrPendingGroups = groups.filter((group) => !isHrReviewGroupCompleted(group));
     currentHrCompletedGroups = groups.filter((group) => isHrReviewGroupCompleted(group));
-    currentHrActiveIndex = 0;
 }
 
 function renderHrReviewProgress() {
@@ -4335,59 +4334,35 @@ function renderHrPendingCase() {
     const container = document.getElementById('hrReviewPendingContainer');
     if (!container) return;
 
-    const group = currentHrPendingGroups[currentHrActiveIndex];
-    if (!group) {
+    if (currentHrPendingGroups.length === 0) {
         container.innerHTML = '';
         return;
     }
 
-    const items = Array.isArray(group.items) ? group.items : [];
-    const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
-    const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
-    const employeeName = source.employee_name || target.employee_name || '';
-    const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
-    const decisionActions = userCanRecordRepoTransferDecision()
-        ? `<div class="hr-review-decision-actions">
-               <button type="button" class="btn policy-preview-decision-success hr-review-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
-               <button type="button" class="btn policy-preview-decision-danger hr-review-decision-btn employment-review-action-btn employment-review-action-danger" data-decision-code="REJECT_PROPOSAL">Δεν ισχύει</button>
-               <button type="button" class="btn policy-preview-decision-warning hr-review-decision-btn employment-review-action-btn employment-review-action-warning" data-decision-code="NEEDS_MORE_REVIEW">Χρειάζομαι οδηγία</button>
-           </div>`
-        : '';
-
-    container.innerHTML = `
-        <article class="hr-review-proposal-card">
+    container.innerHTML = currentHrPendingGroups.map((group, groupIndex) => {
+        const items = Array.isArray(group.items) ? group.items : [];
+        const source = items.find((item) => item?.role === 'SOURCE_BECOMES_WORK') || {};
+        const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
+        const employeeName = source.employee_name || target.employee_name || '';
+        const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
+        const decisionActions = userCanRecordRepoTransferDecision()
+            ? `<div class="hr-review-decision-actions">
+                   <button type="button" class="btn policy-preview-decision-success hr-review-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
+                   <button type="button" class="btn policy-preview-decision-danger hr-review-decision-btn employment-review-action-btn employment-review-action-danger" data-decision-code="REJECT_PROPOSAL">Δεν ισχύει</button>
+                   <button type="button" class="btn policy-preview-decision-warning hr-review-decision-btn employment-review-action-btn employment-review-action-warning" data-decision-code="NEEDS_MORE_REVIEW">Χρειάζομαι οδηγία</button>
+               </div>`
+            : '';
+        return `<article class="hr-review-proposal-card" data-group-id="${escapeHtml(String(group.group_id || ''))}" data-group-index="${groupIndex}">
             <div class="hr-review-employee">
                 ${employeeName ? `<h4>${escapeHtml(employeeName)}</h4>` : ''}
                 <div>Κωδικός εργαζομένου: <strong>${escapeHtml(employeeCode)}</strong></div>
-                <div>Ημερομηνίες: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(
-                    formatPolicyPreviewDate(group.last_date)
-                )}</div>
+                <div>Ημερομηνίες: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
             </div>
-            <div class="hr-review-days-grid">
-                ${renderHrReviewDay(source, 'work')}
-                ${renderHrReviewDay(target, 'rest')}
-            </div>
+            <div class="hr-review-days-grid">${renderHrReviewDay(source, 'work')}${renderHrReviewDay(target, 'rest')}</div>
             <div class="hr-review-question">Είναι σωστή αυτή η πρόταση;</div>
             ${decisionActions}
-        </article>
-    `;
-
-    container.querySelectorAll('.hr-review-decision-btn').forEach((button) => {
-        button.addEventListener('click', async () => {
-            if (button.disabled) return;
-            try {
-                await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), {
-                    mode: 'hr'
-                });
-            } catch (error) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Δεν καταγράφηκε η απόφαση',
-                    text: error.message || 'Παρουσιάστηκε σφάλμα.'
-                });
-            }
-        });
-    });
+        </article>`;
+    }).join('');
 }
 
 function renderHrCompletedCases() {
@@ -4536,6 +4511,20 @@ async function loadHrReviewQueue() {
 
 function bindHrReviewEvents() {
     document.getElementById('hrReviewStartBtn')?.addEventListener('click', loadHrReviewQueue);
+    document.getElementById('hrReviewPendingContainer')?.addEventListener('click', async (event) => {
+        const button = event.target.closest?.('.hr-review-decision-btn');
+        if (!button || button.disabled) return;
+        const card = button.closest('.hr-review-proposal-card[data-group-id]');
+        const group = currentHrPendingGroups.find(
+            (candidate) => String(candidate.group_id || '') === String(card?.dataset.groupId || '')
+        );
+        if (!group) return;
+        try {
+            await submitRepoTransferDecision(group, String(button.dataset.decisionCode || ''), { mode: 'hr' });
+        } catch (error) {
+            await Swal.fire({ icon: 'error', title: 'Δεν καταγράφηκε η απόφαση', text: error.message || 'Παρουσιάστηκε σφάλμα.' });
+        }
+    });
     document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', () => {
         if (!userCanUseAdvancedEmploymentReview()) return;
         document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
@@ -5846,3 +5835,40 @@ document.addEventListener('DOMContentLoaded', bindHrReviewEvents);
 document.getElementById('exportExcelBtn')?.addEventListener('click', exportExcel);
 document.getElementById('exportPdfBtn')?.addEventListener('click', exportPdf);
 document.getElementById('searchBtn')?.addEventListener('click', loadResults);
+
+window.EmploymentReviewHrTest = {
+    setGroups(groups, completedGroupIds = []) {
+        currentHrReviewProjection = { groups: Array.isArray(groups) ? groups : [] };
+        currentRepoTransferDecisionsByProposalId = new Map(
+            completedGroupIds.map((groupId) => [String(groupId), { current_decision: { decision_code: 'MARK_REVIEWED' } }])
+        );
+        currentHrReviewLoaded = true;
+        classifyHrReviewGroups();
+    },
+    render: renderHrReviewWorkspace,
+    diagnostics() {
+        const groups = Array.isArray(currentHrReviewProjection?.groups) ? currentHrReviewProjection.groups : [];
+        const employeeCodes = [...new Set(groups.flatMap((group) =>
+            (Array.isArray(group.items) ? group.items : []).map((item) => String(item?.employee_kodikos || '').trim()).filter(Boolean)
+        ))].sort();
+        return {
+            totalGroups: groups.length,
+            pendingGroups: currentHrPendingGroups.length,
+            completedGroups: currentHrCompletedGroups.length,
+            uniqueEmployees: employeeCodes.length,
+            employeeCodes
+        };
+    },
+    groupForId(groupId) {
+        return currentHrPendingGroups.find((group) => String(group.group_id || '') === String(groupId || '')) || null;
+    },
+    beginSubmit(groupId) {
+        const key = String(groupId || '');
+        if (!key || repoTransferDecisionSubmitting.has(key)) return false;
+        repoTransferDecisionSubmitting.add(key);
+        return true;
+    },
+    endSubmit(groupId) {
+        repoTransferDecisionSubmitting.delete(String(groupId || ''));
+    }
+};

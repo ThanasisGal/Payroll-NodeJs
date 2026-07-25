@@ -40,7 +40,7 @@
         <div class="sidebar-scroll">
             <ul id="nav-tree" class="menu">
                 <li id="li0" data-value="li0">
-                    <a class="disabled menu-li menu-item mt-1 ajustedGap-menu" href="/">
+                    <a class="enabled menu-li menu-item mt-1 ajustedGap-menu" href="/" data-sidebar-special data-sidebar-authorized="true">
                         Αρχική Σελίδα</a
                     >
                 </li>
@@ -66,6 +66,7 @@
                                 <li id="li111" data-value="li111">
                                     <a
                                         id="admin_users"
+                                        data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                         class="disabled childmenu-li menu-item"
                                         href="/admin"
                                         data-ml-1913="1"
@@ -85,6 +86,22 @@
                                         Διαχείριση Χρηστών
                                     </a>
                                 </li>
+                                <% if (isUserPrivilegesManagerRole(userRole)) { %>
+                                    <li id="li112" data-value="li112">
+                                        <a
+                                            id="admin_user_privileges"
+                                            data-sidebar-special data-sidebar-authorized="true"
+                                            class="disabled childmenu-li menu-item"
+                                            href="/admin/user-privileges"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="right"
+                                            data-tooltip-max-width="15vw"
+                                            data-bs-title="Διαχείριση δικαιωμάτων χρηστών"
+                                        >
+                                            Δικαιώματα Χρηστών
+                                        </a>
+                                    </li>
+                                <% } %>
                             </ul>
                         </li>
 
@@ -106,6 +123,7 @@
                                 data-tooltip-max-width="15vw"
                                 data-bs-title="Αποστολή αρχείων txt στο Cloud"
                                 href="/api/admin/aws_s3"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                             >
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
@@ -118,6 +136,7 @@
                         <li id="li13" data-value="li13" class="margin-top--0_5rem">
                             <a
                                 id="btn-anoigma-neas-xrhshs"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 data-ml-1913="1"
                                 data-ml-1680="1"
@@ -144,6 +163,7 @@
                         <li id="li14" data-value="li14">
                             <a
                                 id="admin_active_sessions"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/active-sessions"
                                 data-ml-1913="1"
@@ -170,6 +190,7 @@
                         <li id="li15" data-value="li15">
                             <a
                                 id="admin_usage_report"
+                                data-sidebar-special data-sidebar-authorized="<%= isAdminUserRole(userRole) %>"
                                 class="disabled submenu-li menu-item ajustedGap-link"
                                 href="/admin/usage-report"
                                 data-ml-1913="1"
@@ -213,6 +234,7 @@
                                 <li id="li211" data-value="li211">
                                     <a
                                         id="companies_genikaStoixeia"
+                                        data-privilege-form="Companies"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/genikastoixeia"
                                         data-ml-1913="1"
@@ -235,6 +257,7 @@
                                 <li id="li212" data-value="li212">
                                     <a
                                         id="companies_ypokatasthmata"
+                                        data-privilege-form="Ypokatasthmata"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/ypokatasthmata"
                                         data-ml-1913="1"
@@ -257,6 +280,7 @@
                                 <li id="li213" data-value="li213">
                                     <a
                                         id="nomimoi_ekprosopoi"
+                                        data-privilege-form="NomimoiEkprosopoi"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/nomimoi_ekprosopoi"
                                         data-ml-1913="1"
@@ -279,6 +303,7 @@
                                 <li id="li214" data-value="li214">
                                     <a
                                         id="passwords"
+                                        data-privilege-form="Passwords"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/passwords"
                                         data-ml-1913="1"
@@ -301,6 +326,7 @@
                                 <li id="li215" data-value="li215">
                                     <a
                                         id="antistoixiseis"
+                                        data-privilege-form="Antistoixiseis"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/antistoixiseis"
                                         data-ml-1913="1"
@@ -323,6 +349,7 @@
                                 <li id="li216" data-value="li216">
                                     <a
                                         id="trapezes"
+                                        data-privilege-form="Trapezes"
                                         class="disabled childmenu-li menu-item"
                                         href="/companies/trapezes"
                                         data-ml-1913="1"
@@ -355,6 +382,7 @@
                                 <li id="li221" data-value="li221">
                                     <a
                                         id="ergazomenoi"
+                                        data-privilege-form="Ergazomenoi"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/ergazomenoi"
                                         data-ml-1913="1"
@@ -452,6 +480,7 @@
                                 <li id="li232" data-value="li232">
                                     <a
                                         id="antigrafhProgrammatos"
+                                        data-privilege-form="AntigrafhProgrammatonErgasias"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/antigrafhProgrammaton"
                                         data-ml-1913="2"
@@ -475,6 +504,7 @@
                                 <li id="li233" data-value="li233">
                                     <a
                                         id="eisagoghOrarionApoErganh"
+                                        data-privilege-form="LhpshOrarionApoErganh"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/lhpshOrarionApoErganh"
                                         data-ml-1913="2"
@@ -498,6 +528,7 @@
                                 <li id="li234" data-value="li234">
                                     <a
                                         id="eisagoghOrarionApoKartes"
+                                        data-privilege-form="LhpshOrarionApoKartes"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/lhpshOrarionApoKartes"
                                         data-ml-1913="2"
@@ -521,6 +552,7 @@
                                 <li id="li235" data-value="li235">
                                     <a
                                         id="exagoghOrarionSeErganh"
+                                        data-privilege-form="CalcApasxolhseisPeriodoy"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/calcApasxolhseisPeriodoy"
                                         data-ml-1913="2"
@@ -544,6 +576,7 @@
                                 <li id="li236" data-value="li236">
                                     <a
                                         id="elegxosApasxolhseonPeriodoy"
+                                        data-privilege-form="ElegxosApasxolhseonPeriodoy"
                                         class="disabled childmenu-li menu-item"
                                         href="/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy"
                                         data-ml-1913="1"
@@ -576,6 +609,7 @@
                                         <li id="li2371" data-value="li2371">
                                             <a
                                                 id="apologistikosPinakasOrarion"
+                                                data-privilege-form="ApologistikosPinakasOrarion"
                                                 class="disabled childmenu-li menu-item"
                                                 href="/ergazomenoi/programmata/apologistikosPinakasOrarion"
                                                 data-ml-1913="1"
@@ -599,6 +633,7 @@
                                         <li id="li2372" data-value="li2372">
                                             <a
                                                 id="apologistikosPinakasYperorion"
+                                                data-privilege-form="ApologistikosPinakasYperorion"
                                                 class="disabled childmenu-li menu-item"
                                                 href="/ergazomenoi/programmata/apologistikosPinakasYperorion"
                                                 data-ml-1913="2"
@@ -654,6 +689,7 @@
                                 data-tooltip-max-width="15rem"
                                 data-bs-title="Διαχείριση των σταθερών στοιχείων των κρατήσεων καθώς και διαχείριση των ποσοστών αυτών"
                                 href="/krathseis/krathseis"
+                                data-privilege-form="Krathseis"
                             >
                                 <i
                                     class="bi bi-chevron-down chevron-icon margin-right-0_5rem display-none"
@@ -672,6 +708,7 @@
                                 <li id="li251" data-value="li251">
                                     <a
                                         id="symbaseis_symbaseis"
+                                        data-privilege-form="Symbaseis"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/symbaseis"
                                         data-ml-1913="1"
@@ -694,6 +731,7 @@
                                 <li id="li252" data-value="li252">
                                     <a
                                         id="symbaseis_kathgories"
+                                        data-privilege-form="KathgoriesSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/kathgories"
                                         data-ml-1913="1"
@@ -716,6 +754,7 @@
                                 <li id="li253" data-value="li253">
                                     <a
                                         id="symbaseis_eidikothtes"
+                                        data-privilege-form="EidikothtesSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/eidikothtes"
                                         data-ml-1913="1"
@@ -738,6 +777,7 @@
                                 <li id="li254" data-value="li254">
                                     <a
                                         id="symbaseis_stoixeiaSymbaseon"
+                                        data-privilege-form="StoixeiaSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/stoixeiaSymbaseon"
                                         data-ml-1913="1"
@@ -760,6 +800,7 @@
                                 <li id="li255" data-value="li255">
                                     <a
                                         id="symbaseis_klimakia"
+                                        data-privilege-form="KlimakiaSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/klimakia"
                                         data-ml-1913="1"
@@ -782,6 +823,7 @@
                                 <li id="li256" data-value="li256">
                                     <a
                                         id="symbaseis_ypologismoiKlimakion"
+                                        data-privilege-form="YpologismoiKlimakionSymbaseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/symbaseis/ypologismoiKlimakion"
                                         data-ml-1913="2"
@@ -840,6 +882,7 @@
                         <li id="li32" data-value="li32">
                             <a
                                 id="apasxolhseis"
+                                data-privilege-form="Apasxolhseis"
                                 class="disabled childmenu-li menu-item"
                                 href="/kinhseis/apasxolhseis"
                                 data-ml-1913="11"
@@ -904,6 +947,7 @@
                                 <li id="li411" data-value="li411">
                                     <a
                                         id="ektyposhApodeixeonMisthodosias"
+                                        data-privilege-form="EktyposhAtomikonEkkathariseon"
                                         class="disabled childmenu-li menu-item"
                                         href="/ektyposeis/apasxolhseis/ektyposhApasxolhseon"
                                         data-bs-toggle="tooltip"
@@ -945,6 +989,7 @@
                                 <li id="li422" data-value="li422">
                                     <a
                                         id="ektyposhSymbaseonErgazomenon"
+                                        data-privilege-form="EktyposhSymbaseonErgazomenon"
                                         class="disabled childmenu-li menu-item"
                                         href="/ektyposeis/symbaseis/ektyposhSymbaseonErgazomenon"
                                         data-bs-toggle="tooltip"
@@ -1080,6 +1125,7 @@
                 id="li7"
                 type="button"
                 class="btn btn-small w-100 logout-btn button-height-vh-5"
+                data-sidebar-special data-sidebar-authorized="true"
                 href="../../../login/logout"
             >
                 <i class="bi bi-power font-size-px-20 cred"></i> Αποσύνδεση
