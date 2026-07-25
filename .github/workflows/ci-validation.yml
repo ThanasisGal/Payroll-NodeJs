@@ -762,7 +762,7 @@ jobs:
           echo "server/middlewares/repoTransferDecisionBodyParser.test.js"
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/ci/audit-production-dependencies.js
 
       - name: Verify repository cleanliness
         shell: bash

@@ -1,0 +1,12 @@
+{
+  "exceptions": [
+    {
+      "package": "brace-expansion",
+      "advisoryId": "GHSA-mh99-v99m-4gvg",
+      "severity": "high",
+      "reason": "No patched release exists in the parent-supported 1.x/2.x ranges; 5.x is an incompatible major transitive substitution.",
+      "trackingIssue": "https://github.com/ThanasisGal/Payroll-NodeJs/issues/34",
+      "expiresOn": "2026-10-23"
+    }
+  ]
+}
