@@ -102,7 +102,12 @@ function createServer() {
                 sidebarOrder: index,
                 exists: index !== 11,
                 applicableKeys: index === 4 ? columns.filter((key) => key !== 'read') : columns,
-                privileges: Object.fromEntries(columns.map((key) => [key, false]))
+                privileges: Object.fromEntries(columns.map((key) => [key, false])),
+                navigation: {
+                    itemLabel: index === 11 ? 'Έλεγχος Απασχολήσεων' : `Δοκιμαστική φόρμα ${index}`,
+                    itemOrder: index,
+                    ancestors: [{ key: 'fixture-root', label: 'Δοκιμαστική Ενότητα', order: 0 }]
+                }
             }));
             res.writeHead(200, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({
@@ -171,7 +176,16 @@ async function measure(page) {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const browser = await chromium.launch({ headless: true });
     try {
-        for (const viewport of [{ width: 1440, height: 900 }, { width: 600, height: 800 }]) {
+        for (const viewport of [
+            { width: 1024, height: 800 },
+            { width: 1152, height: 800 },
+            { width: 1280, height: 900 },
+            { width: 1366, height: 900 },
+            { width: 1440, height: 900 },
+            { width: 1600, height: 900 },
+            { width: 1913, height: 1000 },
+            { width: 600, height: 800 }
+        ]) {
             const page = await browser.newPage({ viewport });
             const consoleErrors = [];
             page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
@@ -204,7 +218,7 @@ async function measure(page) {
                 await window.UserPrivilegesManagement.loadUser('user-1');
             });
             const tableBehavior = await page.evaluate(() => {
-                const rows = [...document.querySelectorAll('#userPrivilegesTableBody tr')];
+                const rows = [...document.querySelectorAll('#userPrivilegesTableBody tr[data-privilege-form-row="true"]')];
                 const employmentIndex = rows.findIndex((row) => row.dataset.form === 'ElegxosApasxolhseonPeriodoy');
                 const employmentName = rows[employmentIndex]?.querySelector('.user-privileges-form-name');
                 const formNames = [...document.querySelectorAll('#userPrivilegesTableBody .user-privileges-form-name')];
@@ -232,6 +246,21 @@ async function measure(page) {
                 document.getElementById('userPrivilegesToggleAll').click();
                 const globalToggle = [...document.querySelectorAll('#userPrivilegesTableBody input:not(:disabled)')]
                     .every((box) => box.checked);
+                const hierarchyButton = document.querySelector('.user-privileges-hierarchy-toggle');
+                const firstCheckbox = document.querySelector(
+                    'tr[data-privilege-form-row="true"] input:not(:disabled)'
+                );
+                const checkedBeforeCollapse = firstCheckbox.checked;
+                hierarchyButton.click();
+                const collapsedRowsHidden = [...document.querySelectorAll(
+                    'tr[data-privilege-form-row="true"]'
+                )].every((row) => row.hidden);
+                const checkboxPreserved = firstCheckbox.checked === checkedBeforeCollapse;
+                const collapsedAria = hierarchyButton.getAttribute('aria-expanded');
+                hierarchyButton.click();
+                const expandedRowsVisible = [...document.querySelectorAll(
+                    'tr[data-privilege-form-row="true"]'
+                )].every((row) => !row.hidden);
                 return {
                     headerButtons: columnButtons.map((button) => ({
                         type: button.type,
@@ -249,6 +278,10 @@ async function measure(page) {
                     disabledAfterFirst,
                     adminAfterRead,
                     globalToggle,
+                    collapsedRowsHidden,
+                    checkboxPreserved,
+                    collapsedAria,
+                    expandedRowsVisible,
                     readAriaPressed: readButton.getAttribute('aria-pressed'),
                     partialState,
                     expectedColumns
@@ -280,6 +313,16 @@ async function measure(page) {
                 className: 'user-privileges-column-toggle is-partial'
             });
             assert.strictEqual(tableBehavior.globalToggle, true);
+            assert.strictEqual(tableBehavior.collapsedRowsHidden, true);
+            assert.strictEqual(tableBehavior.checkboxPreserved, true);
+            assert.strictEqual(tableBehavior.collapsedAria, 'false');
+            assert.strictEqual(tableBehavior.expandedRowsVisible, true);
+            const hierarchyToggle = page.locator('.user-privileges-hierarchy-toggle');
+            await hierarchyToggle.focus();
+            await hierarchyToggle.press('Enter');
+            assert.strictEqual(await hierarchyToggle.getAttribute('aria-expanded'), 'false');
+            await hierarchyToggle.press('Space');
+            assert.strictEqual(await hierarchyToggle.getAttribute('aria-expanded'), 'true');
             const readToggle = page.locator('[data-privilege-key="read"]');
             await readToggle.focus();
             await readToggle.press('Enter');

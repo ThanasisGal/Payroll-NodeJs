@@ -62,6 +62,14 @@ function catalogModelFor(entries) {
         }
     };
 }
+function hierarchyFor(catalog) {
+    return catalog.map((entry, index) => ({
+        form: entry.form,
+        itemLabel: entry.formLabel,
+        itemOrder: index,
+        ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
+    }));
+}
 
 test('A and S are the only user-privilege manager roles', () => {
     assert.strictEqual(isUserPrivilegesManagerRole('A'), true);
@@ -123,7 +131,7 @@ test('serialization produces stable safe columns and per-row applicability', () 
         { form: 'Alpha', formLabel: 'Άλφα', sidebarOrder: 0 },
         { form: 'Beta', formLabel: 'Βήτα', sidebarOrder: 1 }
     ];
-    const result = serializePrivilegeDocuments(catalog, docs);
+    const result = serializePrivilegeDocuments(catalog, docs, undefined, hierarchyFor(catalog));
     assert.deepStrictEqual(result.columns, ['admin', 'create', 'read', 'update', 'delete', 'print', 'export']);
     assert.deepStrictEqual(result.rows.map((row) => row.form), ['Alpha', 'Beta']);
     assert.ok(result.rows[1].applicableKeys.includes('export'));
@@ -131,6 +139,11 @@ test('serialization produces stable safe columns and per-row applicability', () 
     assert.strictEqual(result.rows[0].form, 'Alpha');
     assert.strictEqual(result.rows[0].formLabel, 'Άλφα');
     assert.deepStrictEqual(result.rows.map((row) => row.sidebarOrder), [0, 1]);
+    assert.deepStrictEqual(result.rows[0].navigation, {
+        itemLabel: 'Άλφα',
+        itemOrder: 0,
+        ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
+    });
 });
 
 test('seed catalog validates unique forms and visible orders', () => {
@@ -161,7 +174,7 @@ test('a catalog form without a user document is serialized with false privileges
         formLabel: 'Έλεγχος Απασχολήσεων',
         sidebarOrder: 12
     }];
-    const serialized = serializePrivilegeDocuments(catalog, []);
+    const serialized = serializePrivilegeDocuments(catalog, [], undefined, hierarchyFor(catalog));
     assert.strictEqual(serialized.rows.length, 1);
     assert.deepStrictEqual(serialized.rows[0], {
         id: null,
@@ -173,7 +186,12 @@ test('a catalog form without a user document is serialized with false privileges
         privileges: Object.assign(Object.create(null), {
             admin: false, create: false, delete: false, export: false,
             print: false, read: false, update: false
-        })
+        }),
+        navigation: {
+            itemLabel: 'Έλεγχος Απασχολήσεων',
+            itemOrder: 0,
+            ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
+        }
     });
     const payload = { rows: [{
         id: null,
@@ -197,11 +215,28 @@ test('mixed existing and missing documents are left-joined in catalog sidebar or
         privilegeDoc(2, 'user-1', 'LastForm'),
         privilegeDoc(1, 'user-1', 'FirstForm')
     ];
-    const result = serializePrivilegeDocuments(catalog, documents);
+    const result = serializePrivilegeDocuments(catalog, documents, undefined, hierarchyFor(catalog));
     assert.deepStrictEqual(result.rows.map((row) => row.form), ['FirstForm', 'MissingForm', 'LastForm']);
     assert.deepStrictEqual(result.rows.map((row) => row.exists), [true, false, true]);
     assert.strictEqual(result.rows[1].id, null);
     assert.ok(Object.values(result.rows[1].privileges).every((value) => value === false));
+});
+
+test('serialization fails closed when hierarchy is missing or malformed', () => {
+    const catalog = [{ form: 'Alpha', formLabel: 'Άλφα', sidebarOrder: 0 }];
+    assert.throws(
+        () => serializePrivilegeDocuments(catalog, [], undefined, []),
+        (error) => error.status === 500
+    );
+    assert.throws(
+        () => serializePrivilegeDocuments(catalog, [], undefined, [{
+            form: 'Alpha',
+            itemLabel: 'Άλφα',
+            itemOrder: -1,
+            ancestors: [{ key: 'root', label: 'Ρίζα', order: 0 }]
+        }]),
+        (error) => error.status === 500
+    );
 });
 
 test('runtime serialization reads labels only from the catalog', () => {
@@ -237,6 +272,7 @@ test('full update rejects tampered form, userId, unknown keys and non-booleans',
     );
     const owner = payloadFor(docs); owner.rows[0].userId = 'other'; assert.throws(() => validateFullUpdatePayload(owner, catalog, docs));
     const display = payloadFor(docs); display.rows[0].formLabel = 'Παραποιημένη ετικέτα'; assert.throws(() => validateFullUpdatePayload(display, catalog, docs));
+    const navigation = payloadFor(docs); navigation.rows[0].navigation = {}; assert.throws(() => validateFullUpdatePayload(navigation, catalog, docs));
     const unknown = payloadFor(docs); unknown.rows[0].privileges.execute = true; assert.throws(() => validateFullUpdatePayload(unknown, catalog, docs));
     const polluted = payloadFor(docs); polluted.rows[0].privileges = JSON.parse('{"admin":true,"create":false,"read":true,"update":true,"delete":false,"print":false,"export":true,"constructor":false}'); assert.throws(() => validateFullUpdatePayload(polluted, catalog, docs));
     for (const bad of ['true', 1, null, {}, []]) {

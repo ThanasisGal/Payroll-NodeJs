@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const UserModel = require('../models/userModel');
 const { UserPrivilegesModel } = require('../models/privileges');
 const UserPrivilegeFormCatalogModel = require('../models/userPrivilegeFormCatalog');
+const {
+    USER_PRIVILEGE_FORM_CATALOG_SEED
+} = require('../seeds/userPrivilegeFormCatalogSeedData');
 
 for (const [modulePath, exports] of [
     ['../../config/emailConfig', { sendMail: async () => ({}) }],
@@ -275,11 +278,9 @@ async function testPrivilegesDirectScope() {
         UserPrivilegeFormCatalogModel.find = () => ({
             select() { return this; },
             sort() { return this; },
-            lean: async () => [{
-                form: 'Companies',
-                formLabel: 'Γενικά Στοιχεία',
-                sidebarOrder: 0
-            }]
+            lean: async () => USER_PRIVILEGE_FORM_CATALOG_SEED
+                .filter((entry) => entry.active && entry.showInPrivileges)
+                .map(({ form, formLabel, sidebarOrder }) => ({ form, formLabel, sidebarOrder }))
         });
 
         const deniedGet = response();
