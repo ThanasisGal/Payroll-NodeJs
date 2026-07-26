@@ -64,6 +64,14 @@ const html = `<!doctype html>
             </a>
         </div>
     </div>
+    <input
+        id="employeeStyleCheckboxReference"
+        type="checkbox"
+        class="form-check-input custom-checkbox checkbox-class"
+        checked
+        aria-hidden="true"
+        style="position:fixed;left:-10000px;top:0"
+    >
 </main>
 </div></div>
 <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
@@ -131,6 +139,48 @@ function createServer() {
 
 function rounded(rect) {
     return Object.fromEntries(['left', 'right', 'top', 'bottom', 'width', 'height'].map((key) => [key, Number(rect[key].toFixed(2))]));
+}
+
+async function readCheckboxVisual(locator) {
+    return locator.evaluate((checkbox) => {
+        const style = getComputedStyle(checkbox);
+        const markStyle = getComputedStyle(checkbox, '::before');
+        return {
+            checked: checkbox.checked,
+            background: style.backgroundColor,
+            border: style.borderColor,
+            mark: markStyle.color,
+            transitionDuration: style.transitionDuration,
+            transitionDelay: style.transitionDelay
+        };
+    });
+}
+
+function maxTransitionMs(visual) {
+    const parseTimes = (value) => String(value)
+        .split(',')
+        .map((part) => part.trim())
+        .map((part) => {
+            if (part.endsWith('ms')) return Number.parseFloat(part);
+            if (part.endsWith('s')) return Number.parseFloat(part) * 1000;
+            return 0;
+        })
+        .map((value) => (Number.isFinite(value) ? value : 0));
+    const durations = parseTimes(visual.transitionDuration);
+    const delays = parseTimes(visual.transitionDelay);
+    const count = Math.max(durations.length, delays.length);
+    return Math.max(
+        0,
+        ...Array.from(
+            { length: count },
+            (_, index) =>
+                durations[index % durations.length] + delays[index % delays.length]
+        )
+    );
+}
+
+function settledTransitionWait(visual) {
+    return Math.min(1000, Math.max(100, maxTransitionMs(visual) + 100));
 }
 
 async function measure(page) {
@@ -325,21 +375,57 @@ async function measure(page) {
                 const visualCheckbox = page.locator(
                     'tr[data-privilege-form-row="true"] input:not(:disabled)'
                 ).first();
-                const checkedVisual = await visualCheckbox.evaluate((checkbox) => {
-                    checkbox.checked = true;
-                    return {
-                        background: getComputedStyle(checkbox).backgroundColor,
-                        border: getComputedStyle(checkbox).borderColor,
-                        mark: getComputedStyle(checkbox, '::before').color,
-                        checked: checkbox.checked
-                    };
+                const employeeStyleCheckboxReference = page.locator(
+                    '#employeeStyleCheckboxReference'
+                );
+                assert.strictEqual(await employeeStyleCheckboxReference.isChecked(), true);
+                const referenceTransition = await readCheckboxVisual(
+                    employeeStyleCheckboxReference
+                );
+                const referenceTransitionMs = maxTransitionMs(referenceTransition);
+                await page.waitForTimeout(settledTransitionWait(referenceTransition));
+                const employeeStyleVisual = await readCheckboxVisual(
+                    employeeStyleCheckboxReference
+                );
+
+                await visualCheckbox.uncheck();
+                assert.strictEqual(await visualCheckbox.isChecked(), false);
+                await visualCheckbox.check();
+                assert.strictEqual(await visualCheckbox.isChecked(), true);
+                await page.mouse.move(0, 0);
+                const permissionTransition = await readCheckboxVisual(visualCheckbox);
+                const permissionTransitionMs = maxTransitionMs(permissionTransition);
+                await page.waitForTimeout(settledTransitionWait(permissionTransition));
+                const checkedVisual = await readCheckboxVisual(visualCheckbox);
+                const diagnostic = JSON.stringify({
+                    viewport,
+                    reference: employeeStyleVisual,
+                    permission: checkedVisual,
+                    referenceTransitionMs,
+                    permissionTransitionMs
                 });
-                assert.deepStrictEqual(checkedVisual, {
+                assert.deepStrictEqual({
+                    checked: employeeStyleVisual.checked,
+                    background: employeeStyleVisual.background,
+                    border: employeeStyleVisual.border,
+                    mark: employeeStyleVisual.mark
+                }, {
                     background: 'rgb(0, 128, 0)',
                     border: 'rgb(0, 128, 0)',
                     mark: 'rgb(255, 255, 255)',
                     checked: true
-                });
+                }, `Employee checkbox visual mismatch: ${diagnostic}`);
+                assert.deepStrictEqual({
+                    checked: checkedVisual.checked,
+                    background: checkedVisual.background,
+                    border: checkedVisual.border,
+                    mark: checkedVisual.mark
+                }, {
+                    checked: employeeStyleVisual.checked,
+                    background: employeeStyleVisual.background,
+                    border: employeeStyleVisual.border,
+                    mark: employeeStyleVisual.mark
+                }, `Permission checkbox visual mismatch: ${diagnostic}`);
                 assert.strictEqual(
                     await page.locator('#userPrivilegesTableBody input:disabled').first()
                         .evaluate((checkbox) => getComputedStyle(checkbox).opacity),
