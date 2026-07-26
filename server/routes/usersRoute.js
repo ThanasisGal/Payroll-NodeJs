@@ -39,7 +39,22 @@ const checkUserAuth = require('../middlewares/auth-middleware.js');
 const getSessionVars = require('../middlewares/session-variables.js');
 const checkAuth = require('../middlewares/checkValidUser.js');
 const requireUserPrivilegeForm = require('../middlewares/requireUserPrivilegeForm');
-const { requireUserPrivilegeAction } = require('../middlewares/requireUserPrivilegeForm');
+const {
+    requireUserPrivilegeAction,
+    requireUserPrivilegeAnyAction
+} = require('../middlewares/requireUserPrivilegeForm');
+const {
+    authorizeList: authorizeProgrammataList,
+    authorizeEmployee: authorizeProgrammataEmployee,
+    authorizeUpdate: authorizeProgrammataUpdate,
+    authorizeDelete: authorizeProgrammataDelete,
+    authorizeCopy: authorizeProgrammataCopy,
+    authorizeGetOraria,
+    authorizeSessionCompany: authorizeProgrammataSessionCompany,
+    authorizeCalculation: authorizeProgrammataCalculation,
+    authorizeExternalAction: authorizeProgrammataExternalAction,
+    validatePdfDelete
+} = require('../middlewares/programmataAccessScope');
 const {
     authorizeCompanyCreate,
     authorizeCompanyUpdate,
@@ -580,25 +595,29 @@ router.post('/ergazomenoi/erganh/openErganh', checkAuth, erganhController.openEr
 // ============================================================================
 router.get(
     '/ergazomenoi/programmata/programmaErgasias',
-    checkAuth,
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read'),
+    authorizeProgrammataSessionCompany,
     programmataController.mainProgrammaErgasiasForm
 );
 
 router.delete(
     '/ergazomenoi/programmata/delete/:selectedTeam/:selectedCompany/:selectedKodikos/:startDate/:endDate',
-    checkAuth,
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'delete'),
+    authorizeProgrammataDelete,
     programmataController.deleteOrariaErgazomenoyApoEos
 );
 
 router.get(
     '/ergazomenoi/programmata/antigrafhProgrammaton',
-    checkAuth,
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read'),
+    authorizeProgrammataSessionCompany,
     programmataController.mainAntigrafhProgrammatonForm
 );
 
 router.post(
     '/ergazomenoi/programmata/copy',
-    checkAuth,
+    requireUserPrivilegeAnyAction('SynthrhshProgrammatosErgasias', ['create', 'update']),
+    authorizeProgrammataCopy,
     programmataController.antigrafhProgrammaton
 );
 
@@ -607,63 +626,79 @@ router.post(
 // ============================================================================
 router.get(
     '/ergazomenoi/programmata/lhpshOrarionApoErganh',
-    checkAuth,
+    requireUserPrivilegeAction('LhpshOrarionApoErganh', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainLhpshOrarionApoErganhForm
 );
 
 router.post(
     '/ergazomenoi/programmata/downloadSchedule',
-    checkAuth,
+    requireUserPrivilegeAction('LhpshOrarionApoErganh', 'update'),
+    authorizeProgrammataExternalAction,
     erganhController.lhpshOrarionApoErganh
 );
 
 router.get(
     '/ergazomenoi/programmata/lhpshOrarionApoKartes',
-    checkAuth,
+    requireUserPrivilegeAction('LhpshOrarionApoKartes', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainLhpshOrarionApoKartesForm
 );
 
 router.post(
     '/ergazomenoi/programmata/wtoApologistiko',
-    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'export'),
+    authorizeProgrammataExternalAction,
     erganhController.generateWTOApologistiko
 );
 
 router.post(
     '/ergazomenoi/programmata/wtoApologistikoYperorion',
-    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'export'),
+    authorizeProgrammataExternalAction,
     erganhController.generateWTOApologistikoYperorion
 );
 
 router.post(
     '/ergazomenoi/programmata/downloadCards',
-    checkAuth,
+    requireUserPrivilegeAction('LhpshOrarionApoKartes', 'update'),
+    authorizeProgrammataExternalAction,
     erganhController.lhpshOrarionApoKartes
 );
 
 router.get(
     '/ergazomenoi/programmata/calcApasxolhseisPeriodoy',
-    checkAuth,
+    requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainCalcApasxolhseisPeriodoyForm
 );
 
-router.post('/ergazomenoi/programmata/delete-pdf', checkAuth, erganhController.deletePdfFile);
+router.post(
+    '/ergazomenoi/programmata/delete-pdf',
+    requireUserPrivilegeAction('LhpshOrarionApoKartes', 'delete'),
+    authorizeProgrammataSessionCompany,
+    validatePdfDelete,
+    erganhController.deletePdfFile
+);
 
 router.get(
     '/ergazomenoi/programmata/exagoghOrarionSeErganh',
-    checkAuth,
+    requireUserPrivilegeAction('ExagoghOrarionSeErganh', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainExagoghOrarionSeErganhForm
 );
 
 router.get(
     '/ergazomenoi/programmata/apologistikosPinakasOrarion',
-    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasOrarion', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainApologistikosPinakasForm
 );
 
 router.get(
     '/ergazomenoi/programmata/apologistikosPinakasYperorion',
-    checkAuth,
+    requireUserPrivilegeAction('ApologistikosPinakasYperorion', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainApologistikosPinakasYperorionForm
 );
 
@@ -1141,22 +1176,33 @@ router.post('/api/forologikes-klimakes/lookup', ergazomenoiController.forologike
 // ============================================================================
 router.get(
     '/api/getAllErgazomenoi/:selectedTeam/:selectedCompany',
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read'),
+    authorizeProgrammataList,
     programmataController.getAllErgazomenoi
 );
 
 router.get(
     '/api/getErgazomeno/:selectedTeam/:selectedCompany/:selectedKodikos',
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'read'),
+    authorizeProgrammataEmployee,
     programmataController.getErgazomeno
 );
 
 router.post(
     '/api/ergazomenoi/programmata/update/:selectedTeam/:selectedCompany/:selectedKodikos',
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'update'),
+    authorizeProgrammataUpdate,
     programmataController.postOrariaUpdate
 );
 
 router.get('/api/erganh/periods', checkAuth, erganhController.getPeriods);
 
-router.post('/api/ergazomenoi/programmata/getOraria', programmataController.getOraria);
+router.post(
+    '/api/ergazomenoi/programmata/getOraria',
+    requireUserPrivilegeAction('SynthrhshProgrammatosErgasias', 'update'),
+    authorizeGetOraria,
+    programmataController.getOraria
+);
 
 // ============================================================================
 // API ENDPOINTS - Additional Employee Data
@@ -1279,13 +1325,15 @@ router.get(
 
 router.post(
     '/ergazomenoi/programmata/calcApasxolhseisPeriodoy',
+    requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'update'),
+    authorizeProgrammataCalculation,
     erganhController.calcApasxolhseisPeriodoy
 );
 
 router.get(
     '/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy',
-    checkAuth,
-    requireEmploymentReviewAccess,
+    requireUserPrivilegeAction('ElegxosApasxolhseonPeriodoy', 'read'),
+    authorizeProgrammataSessionCompany,
     erganhController.mainElegxosApasxolhseonPeriodoyForm
 );
 

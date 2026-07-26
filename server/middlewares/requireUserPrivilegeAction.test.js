@@ -3,6 +3,7 @@ const UserModel = require('../models/userModel');
 const { UserPrivilegesModel } = require('../models/privileges');
 const {
     requireUserPrivilegeAction,
+    requireUserPrivilegeAnyAction,
     ALLOWED_PRIVILEGE_ACTIONS
 } = require('./requireUserPrivilegeForm');
 
@@ -22,6 +23,8 @@ function response() {
     );
     assert.throws(() => requireUserPrivilegeAction('', 'create'), TypeError);
     assert.throws(() => requireUserPrivilegeAction('Companies', '__proto__'), TypeError);
+    assert.throws(() => requireUserPrivilegeAnyAction('Companies', []), TypeError);
+    assert.throws(() => requireUserPrivilegeAnyAction('Companies', ['constructor']), TypeError);
 
     const originalUserFindById = UserModel.findById;
     const originalPrivilegeFindOne = UserPrivilegesModel.findOne;
@@ -64,6 +67,50 @@ function response() {
         await middleware({ session: { userId: '42' } }, internal, () => assert.fail('next called'));
         assert.strictEqual(internal.statusCode, 500);
         assert.ok(!internal.body.includes('database detail'));
+
+        let userLookups = 0;
+        let privilegeLookups = 0;
+        UserModel.findById = () => {
+            userLookups++;
+            return {
+                select() { return this; },
+                lean: async () => ({ situation: 'A', team: 'TEAM1' })
+            };
+        };
+        UserPrivilegesModel.findOne = () => {
+            privilegeLookups++;
+            return {
+                select() { return this; },
+                lean: async () => ({ privileges: { update: true } })
+            };
+        };
+        const anyAction = requireUserPrivilegeAnyAction(
+            'SynthrhshProgrammatosErgasias',
+            ['create', 'update', 'update']
+        );
+        let anyNext = 0;
+        await anyAction({ session: { userId: 7 } }, response(), () => anyNext++);
+        assert.strictEqual(anyNext, 1);
+        assert.strictEqual(userLookups, 1);
+        assert.strictEqual(privilegeLookups, 1);
+
+        for (const privileges of [{ create: true }, { admin: true }]) {
+            UserPrivilegesModel.findOne = () => ({
+                select() { return this; },
+                lean: async () => ({ privileges })
+            });
+            let allowed = 0;
+            await anyAction({ session: { userId: 7 } }, response(), () => allowed++);
+            assert.strictEqual(allowed, 1);
+        }
+
+        UserPrivilegesModel.findOne = () => ({
+            select() { return this; },
+            lean: async () => ({ privileges: { read: true } })
+        });
+        const deniedCopy = response();
+        await anyAction({ session: { userId: 7 } }, deniedCopy, () => assert.fail('next called'));
+        assert.strictEqual(deniedCopy.statusCode, 403);
     } finally {
         UserModel.findById = originalUserFindById;
         UserPrivilegesModel.findOne = originalPrivilegeFindOne;
