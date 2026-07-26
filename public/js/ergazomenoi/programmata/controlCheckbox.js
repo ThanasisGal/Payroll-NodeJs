@@ -78,8 +78,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const ypokatasthma = document.getElementById("ypokatasthmata").value;
     const diadikasia = document.getElementById("diadikasia").value;
     const filetype = document.getElementById("fileType").value;
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
 
     // Μετατροπή της ημερομηνίας σε μορφή ISO (με το Z που σημαίνει UTC)
     fromDate = fdate.toISOString();
@@ -146,8 +144,6 @@ document.addEventListener("DOMContentLoaded", function () {
             eosHmeromhnia: toDate,
             diadikasia: diadikasia,
             filetype: filetype,
-            username: username,
-            password: password,
             ypokatasthma: ypokatasthma
           })
         });

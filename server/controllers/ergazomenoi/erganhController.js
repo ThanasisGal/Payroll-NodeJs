@@ -4072,9 +4072,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
@@ -4118,9 +4118,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
@@ -4159,8 +4159,7 @@ class erganhController {
     };
 
     static deletePdfFile = async (req, res) => {
-        const pdfUrl = req.body.pdfUrl;
-        const pdfFilePath = path.join(__dirname, '..', '..', '..', 'public', pdfUrl);
+        const pdfFilePath = req.programmataAccessScope.pdfFilePath;
         try {
             await fsPromises.unlink(pdfFilePath);
             res.json({ success: true, message: 'Το PDF διαγράφηκε επιτυχώς' });
@@ -4188,9 +4187,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
@@ -4205,18 +4204,11 @@ class erganhController {
                 energos: true
             });
 
-            const passwordsData = await PasswordsModel.find({
-                companykod_object: companyId,
-                kodikos: '0001'
-            });
-            const cleanedPasswordsData = passwordsData.map((data) => data._doc);
-
             res.render('ergazomenoi/programmata/exagoghOrarionSeErganh', {
                 userPrivileges: userPrivileges ? userPrivileges.privileges : {},
                 locals,
                 sessionTeam: sessionTeam,
                 companyId: companyId,
-                passwords: cleanedPasswordsData,
                 ergazomenoi: ergazomenoi
             });
         } catch (error) {
@@ -4230,9 +4222,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             const userPrivileges = await UserPrivilegesModel.findOne({
@@ -4269,10 +4261,18 @@ class erganhController {
 
     static lhpshOrarionApoErganh = async (req, res) => {
         try {
-            const { selectedTeam, selectedCompany, fromDate, toDate, selectedPararthma } = req.body;
+            const {
+                effectiveTeam: selectedTeam,
+                companyId: selectedCompany,
+                externalDateRange,
+                ypokatasthma: selectedPararthma
+            } = req.programmataAccessScope;
+            const fromDate = externalDateRange.startValue;
+            const toDate = externalDateRange.endValue;
 
             // 1. Credentials από PasswordsModel (kodikos = '0002')
             const passwordRecord = await PasswordsModel.findOne({
+                team: selectedTeam,
                 companykod_object: selectedCompany,
                 kodikos: '0002'
             });
@@ -4288,7 +4288,7 @@ class erganhController {
             const password = passwordRecord.password;
 
             // 2. Στοιχεία session για το path αποθήκευσης
-            const userTeam = req.session.userTeam;
+            const userTeam = req.programmataAccessScope.effectiveTeam;
             const companyKodikos = req.session.companyKodikos;
             const companyDescription = req.session.companyDescription;
             let periodInUseDescr = req.session.periodInUseDescr;
@@ -4394,9 +4394,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             const userPrivileges = await UserPrivilegesModel.findOne({
@@ -4433,11 +4433,17 @@ class erganhController {
 
     static lhpshOrarionApoKartes = async (req, res) => {
         try {
-            const { selectedPararthma, apoHmeromhnia, eosHmeromhnia } = req.body;
+            const {
+                ypokatasthma: selectedPararthma,
+                externalDateRange
+            } = req.programmataAccessScope;
+            const apoHmeromhnia = externalDateRange.startValue;
+            const eosHmeromhnia = externalDateRange.endValue;
 
             // 1. Credentials (kodikos = '0002')
-            const companyId = req.session.companyInUse;
+            const companyId = req.programmataAccessScope.companyId;
             const passwordRecord = await PasswordsModel.findOne({
+                team: req.programmataAccessScope.effectiveTeam,
                 companykod_object: companyId,
                 kodikos: '0002'
             });
@@ -4453,7 +4459,7 @@ class erganhController {
             const password = passwordRecord.password;
 
             // 2. Session στοιχεία
-            const userTeam = req.session.userTeam;
+            const userTeam = req.programmataAccessScope.effectiveTeam;
             const companyKodikos = req.session.companyKodikos;
             const companyDescription = req.session.companyDescription;
             let periodInUseDescr = req.session.periodInUseDescr;
@@ -4581,9 +4587,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             const userPrivileges = await UserPrivilegesModel.findOne({
@@ -4625,9 +4631,9 @@ class erganhController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             const userPrivileges = await UserPrivilegesModel.findOne({
@@ -7001,8 +7007,12 @@ class erganhController {
 
     static calcApasxolhseisPeriodoy = async (req, res) => {
         try {
-            const sessionTeam = req.session.userTeam;
-            const companyId = req.session.companyInUse;
+            const {
+                effectiveTeam: sessionTeam,
+                companyId,
+                dateRange,
+                ypokatasthma: scopedYpokatasthma
+            } = req.programmataAccessScope;
 
             const {
                 apo_hmeromhnia,
@@ -7019,14 +7029,12 @@ class erganhController {
                 });
             }
 
-            const apoDate = new Date(`${apo_hmeromhnia}T00:00:00.000Z`);
-            const eosDate = new Date(`${eos_hmeromhnia}T23:59:59.999Z`);
+            const apoDate = dateRange.startDate;
+            const eosDate = new Date(dateRange.endDate);
+            eosDate.setUTCHours(23, 59, 59, 999);
             const calculationStartDate = startOfWeekSundayUtc(apoDate);
 
-            const selectedYpokatasthma =
-                ypokatasthmata_stathera && String(ypokatasthmata_stathera).trim() !== ''
-                    ? String(ypokatasthmata_stathera).trim().padStart(4, '0')
-                    : '';
+            const selectedYpokatasthma = scopedYpokatasthma;
 
             const proorhProseleyshMinutes = parseInt(proorh_proseleysh || 0, 10) || 0;
             const proorhApoxorhshMinutes = parseInt(proorhApoxorhsh_stathera || 0, 10) || 0;
@@ -7369,7 +7377,13 @@ class erganhController {
 
                 bulkOps.push({
                     updateOne: {
-                        filter: { _id: rec._id },
+                        filter: {
+                            _id: rec._id,
+                            team: sessionTeam,
+                            company_kod: companyId,
+                            kodikos: rec.kodikos,
+                            hmeromhnia: rec.hmeromhnia
+                        },
                         update: { $set: update },
                         upsert: false
                     }
@@ -10979,10 +10993,12 @@ class erganhController {
 
     static generateWTOApologistiko = async (req, res) => {
         try {
-            const { ypokatasthmata, ypokatasthmata_stathera, apo_hmeromhnia, eos_hmeromhnia } =
-                req.body || {};
-
-            const selectedYpokatasthma = ypokatasthmata_stathera || ypokatasthmata || '';
+            const {
+                ypokatasthma: selectedYpokatasthma,
+                externalDateRange
+            } = req.programmataAccessScope;
+            const apo_hmeromhnia = externalDateRange.startValue;
+            const eos_hmeromhnia = externalDateRange.endValue;
 
             if (!selectedYpokatasthma || !apo_hmeromhnia || !eos_hmeromhnia) {
                 return res.status(400).json({
@@ -10991,15 +11007,19 @@ class erganhController {
                 });
             }
 
-            const companyKodikos = req.session?.companyInUse || req.session?.companyKodikos;
-            const team = req.session?.userTeam || req.session?.team;
+            const {
+                effectiveTeam: team,
+                companyId: companyKodikos
+            } = req.programmataAccessScope;
 
             const company = await CompaniesModel.findOne({
-                kod: companyKodikos
+                _id: companyKodikos,
+                team
             }).lean();
 
             const ypokatasthma = await YpokatasthmataModel.findOne({
-                company: companyKodikos,
+                companykod_object: companyKodikos,
+                team,
                 kodikos: selectedYpokatasthma
             }).lean();
 
@@ -11069,8 +11089,8 @@ class erganhController {
             fs.writeFileSync(xmlPath, result.xml, 'utf8');
 
             const erganhPasswordDoc = await PasswordsModel.findOne({
-                team: req.session.userTeam,
-                companykod_object: req.session.companyInUse,
+                team,
+                companykod_object: companyKodikos,
                 kodikos: '0002'
             }).lean();
 
@@ -11084,7 +11104,7 @@ class erganhController {
             };
 
             const uploadResult = await uploadE3ToErganh(
-                req.session.companyInUse,
+                companyKodikos,
                 xmlPath,
                 req.session.userId || req.session.user?._id || null,
                 creds,
@@ -11117,10 +11137,12 @@ class erganhController {
 
     static generateWTOApologistikoYperorion = async (req, res) => {
         try {
-            const { ypokatasthmata, ypokatasthmata_stathera, apo_hmeromhnia, eos_hmeromhnia } =
-                req.body || {};
-
-            const selectedYpokatasthma = ypokatasthmata_stathera || ypokatasthmata || '';
+            const {
+                ypokatasthma: selectedYpokatasthma,
+                externalDateRange
+            } = req.programmataAccessScope;
+            const apo_hmeromhnia = externalDateRange.startValue;
+            const eos_hmeromhnia = externalDateRange.endValue;
 
             if (!selectedYpokatasthma || !apo_hmeromhnia || !eos_hmeromhnia) {
                 return res.status(400).json({
@@ -11129,8 +11151,8 @@ class erganhController {
                 });
             }
 
-            const team = req.session?.userTeam || req.session?.team;
-            const companyInUse = req.session?.companyInUse;
+            const team = req.programmataAccessScope.effectiveTeam;
+            const companyInUse = req.programmataAccessScope.companyId;
             const companyKodikos =
                 req.session?.companyKodikos ||
                 req.session?.companykod ||
@@ -11141,7 +11163,8 @@ class erganhController {
             const userId = req.session?.user?._id?.toString() || req.session?.userId?.toString();
 
             const company = await CompaniesModel.findOne({
-                _id: companyInUse
+                _id: companyInUse,
+                team
             }).lean();
 
             if (!company) {
@@ -11156,6 +11179,7 @@ class erganhController {
 
             const ypokatasthma = await YpokatasthmataModel.findOne({
                 companykod_object: companyInUse,
+                team,
                 kodikos: selectedYpokatasthma
             }).lean();
 

@@ -6,24 +6,12 @@ const textCacheManager = require('../utils/textCacheManager');
 const { UserPrivilegesModel } = require('../models/privileges');
 const { CompaniesModel } = require('../models/companies');
 const uploadTextTemplateController = require('../controllers/uploadTextTemplateController');
-
-// ============================================================================
-// Middleware: Require Admin
-// ============================================================================
-function requireAdmin(req, res, next) {
-    if (!req.session?.userId) {
-        return res.status(401).json({
-            success: false,
-            error: 'Unauthorized - Please login'
-        });
-    }
-    next();
-}
+const requireAdminRole = require('../middlewares/requireAdminRole');
 
 // ============================================================================
 // GET /admin/aws_s3 - Render Upload Page
 // ============================================================================
-router.get('/aws_s3', requireAdmin, async (req, res) => {
+router.get('/aws_s3', requireAdminRole, async (req, res) => {
     const sessionUserTeam = req.session.userTeam;
     const companyId = req.session.companyInUse;
     const sessionUserId = req.session.userId;
@@ -73,7 +61,7 @@ router.get('/aws_s3', requireAdmin, async (req, res) => {
 // ============================================================================
 router.post(
     '/templates/upload',
-    requireAdmin,
+    requireAdminRole,
     uploadTextTemplate.array('files', 20),
     uploadTextTemplateController.uploadTemplates
 );

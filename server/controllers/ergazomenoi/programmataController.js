@@ -18,6 +18,9 @@ const { ArgiesModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
 
 const { ErgazomenoiModel, OrariaModel } = Models_D;
+const {
+    getErganiCredsFromPasswordsModel
+} = require('../../utils/erganh/erganiCredentials');
 
 // Έλεγχος αν είμαστε σε παραγωγή (production)
 const isProduction = process.env.NODE_ENV === 'production';
@@ -43,9 +46,9 @@ class programmataController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
@@ -66,12 +69,12 @@ class programmataController {
     };
 
     static getAllErgazomenoi = async (req, res) => {
-        const { selectedTeam, selectedCompany } = req.params;
+        const { effectiveTeam, companyId } = req.programmataAccessScope;
 
         try {
             const ergazomenoi = await ErgazomenoiModel.find({
-                team: selectedTeam,
-                company_kod: selectedCompany
+                team: effectiveTeam,
+                company_kod: companyId
             }).sort('eponymo onoma');
 
             res.json(ergazomenoi);
@@ -81,13 +84,13 @@ class programmataController {
     };
 
     static getErgazomeno = async (req, res) => {
-        const { selectedTeam, selectedCompany, selectedKodikos } = req.params;
+        const { effectiveTeam, companyId, employeeCode } = req.programmataAccessScope;
 
         try {
             const ergazomenoi = await ErgazomenoiModel.findOne({
-                team: selectedTeam,
-                company_kod: selectedCompany,
-                kodikos: selectedKodikos
+                team: effectiveTeam,
+                company_kod: companyId,
+                kodikos: employeeCode
             });
 
             res.json(ergazomenoi);
@@ -97,7 +100,12 @@ class programmataController {
     };
 
     static postOrariaUpdate = async (req, res) => {
-        const { selectedTeam, selectedCompany, selectedKodikos } = req.params;
+        const {
+            effectiveTeam: selectedTeam,
+            companyId: selectedCompany,
+            employeeCode: selectedKodikos,
+            dateRange
+        } = req.programmataAccessScope;
         const formData = req.body;
 
         // ============================ ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ =============================
@@ -167,8 +175,8 @@ class programmataController {
         }
 
         let promises = [];
-        const fromDate = new Date(formData.hmeromhnia_allaghs_orarioy_apo_hidden);
-        const toDate = new Date(formData.hmeromhnia_allaghs_orarioy_eos_hidden);
+        const fromDate = dateRange.startDate;
+        const toDate = dateRange.endDate;
 
         let currentDate = new Date(fromDate); // Ξεκινάμε από την αρχική ημερομηνία
         let i = 1;
@@ -252,25 +260,12 @@ class programmataController {
 
     static deleteOrariaErgazomenoyApoEos = async (req, res) => {
         try {
-            const { selectedTeam, selectedCompany, selectedKodikos, startDate, endDate } =
-                req.params;
-
-            // Δημιουργία των UTC ημερομηνιών χρησιμοποιώντας Date.UTC
-            const start = new Date(
-                Date.UTC(
-                    parseInt(startDate.slice(0, 4)), // Έτος
-                    parseInt(startDate.slice(5, 7)) - 1, // Μήνας (μηδενική βάση)
-                    parseInt(startDate.slice(8, 10)) // Ημέρα
-                )
-            );
-
-            const end = new Date(
-                Date.UTC(
-                    parseInt(endDate.slice(0, 4)),
-                    parseInt(endDate.slice(5, 7)) - 1,
-                    parseInt(endDate.slice(8, 10))
-                )
-            );
+            const {
+                effectiveTeam: selectedTeam,
+                companyId: selectedCompany,
+                employeeCode: selectedKodikos,
+                dateRange: { startDate: start, endDate: end }
+            } = req.programmataAccessScope;
 
             // Διαγραφή των εγγραφών από τη βάση δεδομένων με τις σωστές ημερομηνίες
             await OrariaModel.deleteMany({
@@ -295,15 +290,15 @@ class programmataController {
             description: 'Web Payroll Solutions'
         };
 
-        const companyId = req.session.companyInUse;
+        const companyId = req.programmataAccessScope.companyId;
         const sessionUserId = req.session.userId;
-        const sessionTeam = req.session.userTeam;
+        const sessionTeam = req.programmataAccessScope.effectiveTeam;
 
         try {
             // Έλεγχος CRUD των δικαιωμάτων του χρήστη
             const userPrivileges = await UserPrivilegesModel.findOne({
                 userId: sessionUserId,
-                form: 'AntigrafhProgrammatonErgasias'
+                form: 'SynthrhshProgrammatosErgasias'
             }).exec();
 
             res.render('ergazomenoi/programmata/antigrafhProgrammatonErgasias', {
@@ -323,15 +318,17 @@ class programmataController {
     static antigrafhProgrammaton = async (req, res) => {
         try {
             const {
-                selectedTeam,
-                selectedCompany,
-                fromStartDate,
-                fromEndDate,
-                toStartDate,
-                toEndDate,
-                fromSelectedKodikos,
-                toSelectedKodikos
-            } = req.body;
+                effectiveTeam: selectedTeam,
+                companyId: selectedCompany,
+                sourceEmployeeCode: fromSelectedKodikos,
+                destinationEmployeeCode: toSelectedKodikos,
+                sourceRange,
+                destinationRange
+            } = req.programmataAccessScope;
+            const fromStartDate = sourceRange.startIso;
+            const fromEndDate = sourceRange.endIso;
+            const toStartDate = destinationRange.startIso;
+            const toEndDate = destinationRange.endIso;
 
             // Λήψη δεδομένων από τη βάση για τον "ΑΠΟ" εργαζόμενο
             const schedules = await OrariaModel.find({
@@ -881,18 +878,21 @@ class programmataController {
 
     static getOraria = async (req, res) => {
         const {
-            team,
-            company,
-            kodikoi,
-            apoHmeromhnia,
-            eosHmeromhnia,
+            effectiveTeam: team,
+            companyId: company,
+            employeeCodes: kodikoi,
+            dateRange,
             diadikasia,
             filetype,
-            username,
-            password,
             ypokatasthma
-        } = req.body;
+        } = req.programmataAccessScope;
+        const apoHmeromhnia = dateRange.startIso;
+        const eosHmeromhnia = dateRange.endIso;
         try {
+            const { username, password } = await getErganiCredsFromPasswordsModel({
+                team,
+                companyId: company
+            });
             // 1. Ανάκτηση των ωραρίων για τους επιλεγμένους κωδικούς
             const oraria = await OrariaModel.find(
                 {

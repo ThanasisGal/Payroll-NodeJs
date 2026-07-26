@@ -45,9 +45,17 @@ function requireUserPrivilegeForm(canonicalForm) {
     };
 }
 
-function requireUserPrivilegeAction(canonicalForm, privilegeKey) {
+function requireUserPrivilegeAnyAction(canonicalForm, privilegeKeys) {
     validateCanonicalForm(canonicalForm);
-    if (typeof privilegeKey !== 'string' || !ALLOWED_PRIVILEGE_ACTIONS.has(privilegeKey)) {
+    if (!Array.isArray(privilegeKeys) || privilegeKeys.length === 0) {
+        throw new TypeError('privilegeKeys must be a non-empty array');
+    }
+    const actions = [...new Set(privilegeKeys)];
+    if (
+        actions.some(
+            (key) => typeof key !== 'string' || !ALLOWED_PRIVILEGE_ACTIONS.has(key)
+        )
+    ) {
         throw new TypeError('privilegeKey is not allowed');
     }
 
@@ -68,12 +76,16 @@ function requireUserPrivilegeAction(canonicalForm, privilegeKey) {
                 userId,
                 form: canonicalForm
             })
-                .select(`_id privileges.admin privileges.${privilegeKey}`)
+                .select(
+                    `_id privileges.admin ${actions
+                        .map((key) => `privileges.${key}`)
+                        .join(' ')}`
+                )
                 .lean();
 
             if (
                 record?.privileges?.admin !== true &&
-                record?.privileges?.[privilegeKey] !== true
+                !actions.some((key) => record?.privileges?.[key] === true)
             ) {
                 return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
             }
@@ -87,6 +99,14 @@ function requireUserPrivilegeAction(canonicalForm, privilegeKey) {
     };
 }
 
+function requireUserPrivilegeAction(canonicalForm, privilegeKey) {
+    if (typeof privilegeKey !== 'string' || !ALLOWED_PRIVILEGE_ACTIONS.has(privilegeKey)) {
+        throw new TypeError('privilegeKey is not allowed');
+    }
+    return requireUserPrivilegeAnyAction(canonicalForm, [privilegeKey]);
+}
+
 module.exports = requireUserPrivilegeForm;
 module.exports.requireUserPrivilegeAction = requireUserPrivilegeAction;
+module.exports.requireUserPrivilegeAnyAction = requireUserPrivilegeAnyAction;
 module.exports.ALLOWED_PRIVILEGE_ACTIONS = ALLOWED_PRIVILEGE_ACTIONS;
