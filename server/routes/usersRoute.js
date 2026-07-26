@@ -466,9 +466,19 @@ router.delete(
     ergazomenoiController.deleteSymbashDaneismoyPdf
 );
 
-router.get('/api/ergazomenoi/:id', ergazomenoiController.getErgazomenosById);
+router.get(
+    '/api/ergazomenoi/:id',
+    checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'read'),
+    ergazomenoiController.getErgazomenosById
+);
 
-router.get('/api/ergazomenoi', ergazomenoiController.getAllErgazomenoiWithUrls);
+router.get(
+    '/api/ergazomenoi',
+    checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'read'),
+    ergazomenoiController.getAllErgazomenoiWithUrls
+);
 
 router.get(
     '/ergazomenoi/ergazomenoi/istoriko/:kod',
@@ -1167,7 +1177,12 @@ router.get('/api/genikesParametroi', genikaAPIsController.getGenikesParametroi);
 
 router.post('/api/getOraria', ergazomenoiController.getOrariaAnaErgazomeno);
 
-router.post('/api/ergazomenoi/update/:ergazomenoiId', ergazomenoiController.postErgazomenoiUpdate);
+router.post(
+    '/api/ergazomenoi/update/:ergazomenoiId',
+    checkAuth,
+    requireUserPrivilegeAction('Ergazomenoi', 'update'),
+    ergazomenoiController.postErgazomenoiUpdate
+);
 
 router.post('/api/forologikes-klimakes/lookup', ergazomenoiController.forologikesKlimakes);
 
