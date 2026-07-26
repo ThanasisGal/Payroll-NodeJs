@@ -127,11 +127,12 @@ class passwordsController {
 
     static postPasswordsForm = async (req, res) => {
         const formData = req.body;
+        const scope = req.companyAccessScope;
 
         const newPassword = PasswordsModel({
-            team: formData.companyTeam,
-            companykod_object: formData.companyId,
-            companykod: formatNumber(formData.companyKodikos, 4),
+            team: scope.effectiveTeam,
+            companykod_object: scope.companyId,
+            companykod: formatNumber(scope.companyKod, 4),
             kodikos: formatNumber(formData.Kodikos, 4),
             perigrafh: formData.perigrafh,
             username: formData.username,

@@ -391,7 +391,9 @@ class antistoixiseisController {
     };
 
     static postAntistoixiseisUpdate = async (req, res) => {
-        const antistoixishId = req.params.antistoixishId;
+        const antistoixishId = req.companyAccessScope.resourceId;
+        const companyId = req.companyAccessScope.companyId;
+        const team = req.companyAccessScope.companyTeamFilter;
         const formData = req.body;
 
         const filteredDataAntistoixiseis = {
@@ -412,7 +414,7 @@ class antistoixiseisController {
 
         // Τώρα μπορώ να χρησιμοποιήσω το filteredDataAntistoixiseis στη $set: για ενημέρωση
         await AntistoixiseisModel.findOneAndUpdate(
-            { _id: antistoixishId },
+            { _id: antistoixishId, companyId, team },
             { $set: filteredDataAntistoixiseis },
             { new: true } // Μπορώ να δουλέψω με το ενημερωμένο έγγραφο αμέσως μετά την ενημέρωση
         );

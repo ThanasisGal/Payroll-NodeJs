@@ -144,11 +144,12 @@ class ypokatasthmataController {
     static postYpokatasthmataForm = async (req, res) => {
         let aa_kod = null;
         const formData = req.body;
+        const scope = req.companyAccessScope;
 
         try {
             const lastRecord = await YpokatasthmataModel.find({
-                team: formData.companyTeam,
-                companykod: formData.companyKodikos
+                team: scope.effectiveTeam,
+                companykod_object: scope.companyId
             })
                 .sort({ _id: -1 })
                 .limit(1);
@@ -166,9 +167,9 @@ class ypokatasthmataController {
         }
 
         const newYpokatasthma = YpokatasthmataModel({
-            team: formData.companyTeam,
-            companykod_object: formData.companyId,
-            companykod: formData.companyKodikos,
+            team: scope.effectiveTeam,
+            companykod_object: scope.companyId,
+            companykod: scope.companyKod,
             kodikos: formatNumber(aa_kod, 4),
             perigrafh: formData.perigrafh,
             odos: formData.odos,

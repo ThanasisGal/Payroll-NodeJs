@@ -349,8 +349,8 @@ class companiesController {
     };
 
     static postCompanyForm = async (req, res) => {
-        const sessionUserTeam = req.session.userTeam;
-        const sessionUserId = req.session.userId;
+        const sessionUserTeam = req.companyAccessScope.effectiveTeam;
+        const sessionUserId = req.companyAccessScope.userId;
 
         const formData = req.body;
         if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
@@ -750,8 +750,8 @@ class companiesController {
     };
 
     static postCompanyUpdate = async (req, res) => {
-        const sessionUserTeam = req.session.userTeam;
-        const companyId = req.params.companyId;
+        const sessionUserTeam = req.companyAccessScope.effectiveTeam;
+        const companyId = req.companyAccessScope.companyId;
 
         try {
             // ensure stamps dir exists
@@ -856,8 +856,8 @@ class companiesController {
         };
 
         try {
-            await CompaniesModel.findByIdAndUpdate(
-                companyId,
+            await CompaniesModel.findOneAndUpdate(
+                { _id: companyId, team: req.companyAccessScope.companyTeamFilter },
                 { $set: filteredDataCompany },
                 { new: true }
             ).exec();
