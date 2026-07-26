@@ -64,6 +64,14 @@ const html = `<!doctype html>
             </a>
         </div>
     </div>
+    <input
+        id="employeeStyleCheckboxReference"
+        type="checkbox"
+        class="form-check-input custom-checkbox checkbox-class"
+        checked
+        aria-hidden="true"
+        style="position:fixed;left:-10000px;top:0"
+    >
 </main>
 </div></div>
 <script src="https://cdn.webpayrollsolutions.com/assets/own/vendor/tom-select.complete.js"></script>
@@ -102,7 +110,12 @@ function createServer() {
                 sidebarOrder: index,
                 exists: index !== 11,
                 applicableKeys: index === 4 ? columns.filter((key) => key !== 'read') : columns,
-                privileges: Object.fromEntries(columns.map((key) => [key, false]))
+                privileges: Object.fromEntries(columns.map((key) => [key, false])),
+                navigation: {
+                    itemLabel: index === 11 ? 'Έλεγχος Απασχολήσεων' : `Δοκιμαστική φόρμα ${index}`,
+                    itemOrder: index,
+                    ancestors: [{ key: 'fixture-root', label: 'Δοκιμαστική Ενότητα', order: 0 }]
+                }
             }));
             res.writeHead(200, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({
@@ -126,6 +139,48 @@ function createServer() {
 
 function rounded(rect) {
     return Object.fromEntries(['left', 'right', 'top', 'bottom', 'width', 'height'].map((key) => [key, Number(rect[key].toFixed(2))]));
+}
+
+async function readCheckboxVisual(locator) {
+    return locator.evaluate((checkbox) => {
+        const style = getComputedStyle(checkbox);
+        const markStyle = getComputedStyle(checkbox, '::before');
+        return {
+            checked: checkbox.checked,
+            background: style.backgroundColor,
+            border: style.borderColor,
+            mark: markStyle.color,
+            transitionDuration: style.transitionDuration,
+            transitionDelay: style.transitionDelay
+        };
+    });
+}
+
+function maxTransitionMs(visual) {
+    const parseTimes = (value) => String(value)
+        .split(',')
+        .map((part) => part.trim())
+        .map((part) => {
+            if (part.endsWith('ms')) return Number.parseFloat(part);
+            if (part.endsWith('s')) return Number.parseFloat(part) * 1000;
+            return 0;
+        })
+        .map((value) => (Number.isFinite(value) ? value : 0));
+    const durations = parseTimes(visual.transitionDuration);
+    const delays = parseTimes(visual.transitionDelay);
+    const count = Math.max(durations.length, delays.length);
+    return Math.max(
+        0,
+        ...Array.from(
+            { length: count },
+            (_, index) =>
+                durations[index % durations.length] + delays[index % delays.length]
+        )
+    );
+}
+
+function settledTransitionWait(visual) {
+    return Math.min(1000, Math.max(100, maxTransitionMs(visual) + 100));
 }
 
 async function measure(page) {
@@ -171,7 +226,16 @@ async function measure(page) {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const browser = await chromium.launch({ headless: true });
     try {
-        for (const viewport of [{ width: 1440, height: 900 }, { width: 600, height: 800 }]) {
+        for (const viewport of [
+            { width: 1024, height: 800 },
+            { width: 1152, height: 800 },
+            { width: 1280, height: 900 },
+            { width: 1366, height: 900 },
+            { width: 1440, height: 900 },
+            { width: 1600, height: 900 },
+            { width: 1913, height: 1000 },
+            { width: 600, height: 800 }
+        ]) {
             const page = await browser.newPage({ viewport });
             const consoleErrors = [];
             page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
@@ -204,7 +268,7 @@ async function measure(page) {
                 await window.UserPrivilegesManagement.loadUser('user-1');
             });
             const tableBehavior = await page.evaluate(() => {
-                const rows = [...document.querySelectorAll('#userPrivilegesTableBody tr')];
+                const rows = [...document.querySelectorAll('#userPrivilegesTableBody tr[data-privilege-form-row="true"]')];
                 const employmentIndex = rows.findIndex((row) => row.dataset.form === 'ElegxosApasxolhseonPeriodoy');
                 const employmentName = rows[employmentIndex]?.querySelector('.user-privileges-form-name');
                 const formNames = [...document.querySelectorAll('#userPrivilegesTableBody .user-privileges-form-name')];
@@ -232,6 +296,22 @@ async function measure(page) {
                 document.getElementById('userPrivilegesToggleAll').click();
                 const globalToggle = [...document.querySelectorAll('#userPrivilegesTableBody input:not(:disabled)')]
                     .every((box) => box.checked);
+                const hierarchyButton = document.querySelector('.user-privileges-hierarchy-toggle');
+                const firstCheckbox = document.querySelector(
+                    'tr[data-privilege-form-row="true"] input:not(:disabled)'
+                );
+                firstCheckbox.checked = true;
+                const checkedBeforeCollapse = firstCheckbox.checked;
+                hierarchyButton.click();
+                const collapsedRowsHidden = [...document.querySelectorAll(
+                    'tr[data-privilege-form-row="true"]'
+                )].every((row) => row.hidden);
+                const checkboxPreserved = firstCheckbox.checked === checkedBeforeCollapse;
+                const collapsedAria = hierarchyButton.getAttribute('aria-expanded');
+                hierarchyButton.click();
+                const expandedRowsVisible = [...document.querySelectorAll(
+                    'tr[data-privilege-form-row="true"]'
+                )].every((row) => !row.hidden);
                 return {
                     headerButtons: columnButtons.map((button) => ({
                         type: button.type,
@@ -249,6 +329,11 @@ async function measure(page) {
                     disabledAfterFirst,
                     adminAfterRead,
                     globalToggle,
+                    checkboxClasses: [...firstCheckbox.classList],
+                    collapsedRowsHidden,
+                    checkboxPreserved,
+                    collapsedAria,
+                    expandedRowsVisible,
                     readAriaPressed: readButton.getAttribute('aria-pressed'),
                     partialState,
                     expectedColumns
@@ -280,6 +365,83 @@ async function measure(page) {
                 className: 'user-privileges-column-toggle is-partial'
             });
             assert.strictEqual(tableBehavior.globalToggle, true);
+            assert.deepStrictEqual(tableBehavior.checkboxClasses, [
+                'form-check-input',
+                'custom-checkbox',
+                'checkbox-class',
+                'user-privileges-checkbox'
+            ]);
+            if (viewport.width === 1024) {
+                const visualCheckbox = page.locator(
+                    'tr[data-privilege-form-row="true"] input:not(:disabled)'
+                ).first();
+                const employeeStyleCheckboxReference = page.locator(
+                    '#employeeStyleCheckboxReference'
+                );
+                assert.strictEqual(await employeeStyleCheckboxReference.isChecked(), true);
+                const referenceTransition = await readCheckboxVisual(
+                    employeeStyleCheckboxReference
+                );
+                const referenceTransitionMs = maxTransitionMs(referenceTransition);
+                await page.waitForTimeout(settledTransitionWait(referenceTransition));
+                const employeeStyleVisual = await readCheckboxVisual(
+                    employeeStyleCheckboxReference
+                );
+
+                await visualCheckbox.uncheck();
+                assert.strictEqual(await visualCheckbox.isChecked(), false);
+                await visualCheckbox.check();
+                assert.strictEqual(await visualCheckbox.isChecked(), true);
+                await page.mouse.move(0, 0);
+                const permissionTransition = await readCheckboxVisual(visualCheckbox);
+                const permissionTransitionMs = maxTransitionMs(permissionTransition);
+                await page.waitForTimeout(settledTransitionWait(permissionTransition));
+                const checkedVisual = await readCheckboxVisual(visualCheckbox);
+                const diagnostic = JSON.stringify({
+                    viewport,
+                    reference: employeeStyleVisual,
+                    permission: checkedVisual,
+                    referenceTransitionMs,
+                    permissionTransitionMs
+                });
+                assert.deepStrictEqual({
+                    checked: employeeStyleVisual.checked,
+                    background: employeeStyleVisual.background,
+                    border: employeeStyleVisual.border,
+                    mark: employeeStyleVisual.mark
+                }, {
+                    background: 'rgb(0, 128, 0)',
+                    border: 'rgb(0, 128, 0)',
+                    mark: 'rgb(255, 255, 255)',
+                    checked: true
+                }, `Employee checkbox visual mismatch: ${diagnostic}`);
+                assert.deepStrictEqual({
+                    checked: checkedVisual.checked,
+                    background: checkedVisual.background,
+                    border: checkedVisual.border,
+                    mark: checkedVisual.mark
+                }, {
+                    checked: employeeStyleVisual.checked,
+                    background: employeeStyleVisual.background,
+                    border: employeeStyleVisual.border,
+                    mark: employeeStyleVisual.mark
+                }, `Permission checkbox visual mismatch: ${diagnostic}`);
+                assert.strictEqual(
+                    await page.locator('#userPrivilegesTableBody input:disabled').first()
+                        .evaluate((checkbox) => getComputedStyle(checkbox).opacity),
+                    '0.55'
+                );
+            }
+            assert.strictEqual(tableBehavior.collapsedRowsHidden, true);
+            assert.strictEqual(tableBehavior.checkboxPreserved, true);
+            assert.strictEqual(tableBehavior.collapsedAria, 'false');
+            assert.strictEqual(tableBehavior.expandedRowsVisible, true);
+            const hierarchyToggle = page.locator('.user-privileges-hierarchy-toggle');
+            await hierarchyToggle.focus();
+            await hierarchyToggle.press('Enter');
+            assert.strictEqual(await hierarchyToggle.getAttribute('aria-expanded'), 'false');
+            await hierarchyToggle.press('Space');
+            assert.strictEqual(await hierarchyToggle.getAttribute('aria-expanded'), 'true');
             const readToggle = page.locator('[data-privilege-key="read"]');
             await readToggle.focus();
             await readToggle.press('Enter');

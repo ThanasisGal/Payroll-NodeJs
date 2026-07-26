@@ -14056,9 +14056,60 @@ body.loader-active > *:not(.app-loader) {
 .user-privileges-table tbody th.user-privileges-form-cell,
 .user-privileges-table .user-privileges-form-name {
     max-width: 28rem;
+    padding-inline-start: calc(0.75rem + (var(--user-privileges-depth, 0) * 1.15rem));
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: 400;
+}
+
+.user-privileges-table .user-privileges-hierarchy-row > th {
+    padding: 0;
+    background: #e7f4eb;
+}
+
+.user-privileges-table .user-privileges-hierarchy-row[data-hierarchy-depth='0'] > th {
+    color: #fff;
+    background: #287a4b;
+}
+
+.user-privileges-table .user-privileges-hierarchy-row[data-hierarchy-depth='1'] > th {
+    color: #173f2a;
+    background: #cce7d5;
+}
+
+.user-privileges-table .user-privileges-hierarchy-row[data-hierarchy-depth='2'] > th {
+    color: #234a33;
+    background: #e3f1e8;
+}
+
+.user-privileges-hierarchy-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    min-height: 2.15rem;
+    border: 0;
+    padding: 0.35rem 0.75rem;
+    padding-inline-start: calc(0.75rem + (var(--user-privileges-depth, 0) * 1.15rem));
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+}
+
+.user-privileges-hierarchy-toggle:hover,
+.user-privileges-hierarchy-toggle:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+}
+
+.user-privileges-hierarchy-chevron {
+    display: inline-block;
+    width: 1rem;
+    flex: 0 0 1rem;
+    text-align: center;
 }
 
 .user-privileges-column-toggle {
@@ -14093,6 +14144,22 @@ body.loader-active > *:not(.app-loader) {
 
 .user-privileges-not-applicable {
     background: #e9ecef !important;
+}
+
+.user-privileges-table .user-privileges-checkbox {
+    margin: 0;
+    vertical-align: middle;
+}
+
+.user-privileges-table .user-privileges-checkbox:focus-visible {
+    outline: 2px solid #146c43;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 0.2rem rgba(20, 108, 67, 0.2);
+}
+
+.user-privileges-table .user-privileges-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .user-privileges-empty {

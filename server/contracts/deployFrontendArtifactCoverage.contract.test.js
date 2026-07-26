@@ -15,6 +15,7 @@ const expectedCoverage = [
     'Krathseis/nestingTables',
     'Krathseis/selectRowInTable',
     'Krathseis/selectRowsInNestedTable',
+    'ergazomenoi/genika/erganiRestSubmissionUi',
     'ergazomenoi/genika/alles_parathrhseis'
 ];
 

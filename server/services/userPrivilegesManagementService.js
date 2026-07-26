@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const { UserPrivilegesModel } = require('../models/privileges');
 const UserPrivilegeFormCatalogModel = require('../models/userPrivilegeFormCatalog');
+const {
+    userPrivilegeSidebarHierarchy,
+    validateUserPrivilegeSidebarHierarchy,
+    compareHierarchyEntries
+} = require('../constants/userPrivilegeSidebarHierarchy');
 
 const BLOCKED_KEYS = new Set([
     '__proto__', 'prototype', 'constructor', '_id', '__v', 'userId', 'form',
@@ -65,15 +70,32 @@ function validateCatalogEntries(catalogEntries) {
     });
 }
 
-function serializePrivilegeDocuments(catalogEntries, documents, schemaKeys = getSchemaPrivilegeKeys()) {
+function serializePrivilegeDocuments(
+    catalogEntries,
+    documents,
+    schemaKeys = getSchemaPrivilegeKeys(),
+    hierarchyEntries = userPrivilegeSidebarHierarchy
+) {
     const columns = [...schemaKeys];
     const catalog = validateCatalogEntries(catalogEntries);
+    validateUserPrivilegeSidebarHierarchy(hierarchyEntries);
+    const hierarchyByForm = new Map(hierarchyEntries.map((item) => [item.form, item]));
+    if (hierarchyByForm.size !== catalog.length ||
+        catalog.some((entry) => !hierarchyByForm.has(entry.form)) ||
+        hierarchyEntries.some((item) => !catalog.some((entry) => entry.form === item.form))) {
+        throw contractError(
+            'PRIVILEGE_HIERARCHY_MISMATCH',
+            'Η ρύθμιση πλοήγησης δικαιωμάτων δεν συμφωνεί με τον κατάλογο',
+            500
+        );
+    }
     const documentsByForm = new Map(
         (Array.isArray(documents) ? documents : []).map((doc) => [String(doc.form), doc])
     );
     const rows = catalog
         .map((entry) => {
             const doc = documentsByForm.get(entry.form);
+            const navigation = hierarchyByForm.get(entry.form);
             const raw = doc?.privileges?.toObject
                 ? doc.privileges.toObject()
                 : (doc?.privileges || {});
@@ -86,10 +108,22 @@ function serializePrivilegeDocuments(catalogEntries, documents, schemaKeys = get
                 sidebarOrder: entry.sidebarOrder,
                 exists: Boolean(doc),
                 applicableKeys: [...columns],
-                privileges
+                privileges,
+                navigation: {
+                    itemLabel: navigation.itemLabel,
+                    itemOrder: navigation.itemOrder,
+                    ancestors: navigation.ancestors.map((ancestor) => ({
+                        key: ancestor.key,
+                        label: ancestor.label,
+                        order: ancestor.order
+                    }))
+                }
             };
         })
-        .sort((a, b) => a.sidebarOrder - b.sidebarOrder || a.form.localeCompare(b.form));
+        .sort((left, right) => compareHierarchyEntries(
+            hierarchyByForm.get(left.form),
+            hierarchyByForm.get(right.form)
+        ));
     return { columns, rows };
 }
 
