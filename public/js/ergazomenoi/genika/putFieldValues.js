@@ -912,28 +912,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectedE6NUploadMethod
                 });
 
+                let e6nResult;
                 try {
                     showGenericRestProgressSwal(progressTitle);
-
-                    const e6nResult = await submitE6NRestToErganh(
+                } catch (_) {
+                    console.warn('[E6N-SAFETY-NET] Δεν εμφανίστηκε το progress UI.');
+                }
+                try {
+                    e6nResult = await submitE6NRestToErganh(
                         ergazomenoiId,
                         selectedE6NProcessCode,
                         selectedE6NUploadMethod
                     );
-
-                    Swal.close();
-
-                    if (selectedE6NUploadMethod === 'rest') {
-                        await showE6NRestResultSwal(e6nResult);
-                    } else {
-                        await showE6NXmlResultSwal(e6nResult);
-                    }
-
-                    return { success: true, ...e6nResult };
                 } catch (error) {
-                    Swal.close();
-
-                    const failedResult = {
+                    e6nResult = {
                         success: false,
                         submissionCode: selectedE6NProcessCode === '221' ? 'WebE6NMP' : 'WebE6NXP',
                         uploadMethod: selectedE6NUploadMethod,
@@ -941,17 +933,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         error: error?.message || String(error),
                         userMessage: error?.message || String(error)
                     };
-
-                    console.error('[E6N-SAFETY-NET] E6N upload failed:', failedResult);
-
-                    if (selectedE6NUploadMethod === 'rest') {
-                        await showE6NRestResultSwal(failedResult);
-                    } else {
-                        await showE6NXmlResultSwal(failedResult);
-                    }
-
-                    return failedResult;
+                    console.error('[E6N-SAFETY-NET] E6N upload failed');
                 }
+
+                Swal.close();
+                if (selectedE6NUploadMethod === 'rest') {
+                    await presentErganiRestSubmissionResult(e6nResult);
+                } else {
+                    await showE6NXmlResultSwal(e6nResult);
+                }
+
+                return e6nResult;
             };
 
             console.group('[CONTRACT-DEBUG] BEFORE FETCH');
@@ -1415,6 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let e3Result = { success: true };
                     let maResult = { success: true };
                     let wtoResult = { success: true };
+                    const submissionResults = [];
 
                     if (userWantsE3 && data.data?._id) {
                         if (isE3NRestSubmit) {
@@ -1422,28 +1415,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                 console.log('[E3-REST-UPLOAD] Submitting E3N via REST JSON...');
 
                                 e3Result = await submitE3NRestToErganh(data.data._id);
-                                if (e3Result?.cancelled) {
-                                    return { e3Result, maResult, wtoResult };
-                                }
-
-                                Swal.close();
-
-                                console.log('[E3-REST-UPLOAD] Result:', e3Result);
-
-                                await showE3NSubmittedPdfIfAvailable(e3Result);
-                                await showE3NRestResultSwal(e3Result);
                             } catch (e) {
-                                Swal.close();
-
                                 console.error('[E3-REST-UPLOAD] ❌ Exception:', e?.message || e);
 
                                 e3Result = {
                                     success: false,
                                     error: e?.message || String(e)
                                 };
-
-                                await showE3NRestResultSwal(e3Result);
                             }
+
+                            if (e3Result?.cancelled) {
+                                return { e3Result, maResult, wtoResult, submissionResults };
+                            }
+                            console.log('[E3-REST-UPLOAD] Result:', e3Result);
+                            submissionResults.push(e3Result);
+                            await presentErganiRestSubmissionResult(e3Result);
                         } else if (
                             e3XmlData?.success &&
                             (e3XmlData?.s3Url ||
@@ -1551,7 +1537,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 } else {
                                     console.log('[MA-UPLOAD] Uploading MA XML...');
                                 }
-
+                            } catch (_) {
+                                console.warn('[MA-UPLOAD] Δεν εμφανίστηκε το progress UI.');
+                            }
+                            try {
                                 maResult = await uploadMaToErganh(
                                     data.data._id,
                                     maUrlToSend,
@@ -1569,27 +1558,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                     result.value?.erganiUploadMethod || 'xml'
                                 );
 
-                                if (isE7NRestSubmit) {
-                                    Swal.close();
-                                    console.log('[E7N-REST-UPLOAD] Result:', maResult);
-                                    await showE7NRestResultSwal(maResult);
-                                } else if (isE5NRestSubmit) {
-                                    Swal.close();
-                                    console.log('[E5N-REST-UPLOAD] Result:', maResult);
-                                    await showE5NRestResultSwal(maResult);
-                                } else if (isE6NRestSubmit) {
-                                    Swal.close();
-                                    console.log('[E6N-REST-UPLOAD] Result:', maResult);
-                                    await showE6NRestResultSwal(maResult);
-                                } else if (isE6NXmlSubmit) {
-                                    Swal.close();
-                                    console.log('[E6N-XML-UPLOAD] Result:', maResult);
-                                    await showE6NXmlResultSwal(maResult);
-                                } else if (isMARestSubmit) {
-                                    Swal.close();
-                                    console.log('[MA-REST-UPLOAD] Result:', maResult);
-                                    await showMARestResultSwal(maResult);
-                                } else {
+                                if (
+                                    !isE7NRestSubmit &&
+                                    !isE5NRestSubmit &&
+                                    !isE6NRestSubmit &&
+                                    !isE6NXmlSubmit &&
+                                    !isMARestSubmit
+                                ) {
                                     console.log('[MA-UPLOAD] Result:', maResult);
                                 }
                             } catch (e) {
@@ -1609,16 +1584,19 @@ document.addEventListener('DOMContentLoaded', () => {
                                     success: false,
                                     error: e?.message || String(e)
                                 };
+                            }
 
-                                if (isE7NRestSubmit) {
-                                    await showE7NRestResultSwal(maResult);
-                                } else if (isE6NRestSubmit) {
-                                    await showE6NRestResultSwal(maResult);
-                                } else if (isE6NXmlSubmit) {
-                                    await showE6NXmlResultSwal(maResult);
-                                } else if (isMARestSubmit) {
-                                    await showMARestResultSwal(maResult);
-                                }
+                            if (
+                                isE7NRestSubmit ||
+                                isE5NRestSubmit ||
+                                isE6NRestSubmit ||
+                                isMARestSubmit
+                            ) {
+                                submissionResults.push(maResult);
+                                await presentErganiRestSubmissionResult(maResult);
+                            } else if (isE6NXmlSubmit) {
+                                Swal.close();
+                                await showE6NXmlResultSwal(maResult);
                             }
                         }
                     }
@@ -1633,11 +1611,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                     data.data._id,
                                     'REST_WTOWEEK_NO_XML_REQUIRED'
                                 );
-                                console.log('[WTO-REST-UPLOAD] Result:', wtoResult);
                             } catch (e) {
                                 console.error('[WTO-REST-UPLOAD] ❌ Exception:', e?.message || e);
                                 wtoResult = { success: false, error: e?.message || String(e) };
                             }
+                            submissionResults.push(wtoResult);
+                            await presentErganiRestSubmissionResult(wtoResult);
+                            console.log('[WTO-REST-UPLOAD] Result:', wtoResult);
                         } else if (result.value?.isPermanent === true) {
                             if (
                                 wtoXmlData?.success &&
@@ -1688,7 +1668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
                     }
 
-                    return { e3Result, maResult, wtoResult };
+                    return { e3Result, maResult, wtoResult, submissionResults };
                 };
 
                 // =====================================================================
@@ -2022,6 +2002,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(updateProgress, 350);
             }
         });
+    }
+
+    async function presentErganiRestSubmissionResult(result) {
+        if (!window.ErganiRestSubmissionUi) {
+            throw new Error('Δεν φορτώθηκε η κοινή ροή αποτελεσμάτων ΕΡΓΑΝΗ.');
+        }
+        return window.ErganiRestSubmissionUi.presentSubmissionResultSafely(result);
     }
 
     async function showE3NRestResultSwal(e3Result) {
@@ -2409,11 +2396,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
-        }
-
         return data;
     }
 
@@ -2457,11 +2439,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     data?.error ||
                     `E5N REST JSON upload failed with HTTP ${response.status}`
             );
-        }
-
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
         }
 
         return data;
@@ -2517,11 +2494,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     data?.error ||
                     `E6N ${String(uploadMethod).toUpperCase()} upload failed with HTTP ${response.status}`
             );
-        }
-
-        if (data?.pdfUrl || data?.pdfS3Url || data?.pdf_url) {
-            Swal.close();
-            await showErganiSubmittedPdfModal(data);
         }
 
         return data;
@@ -3603,8 +3575,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             }
 
-            Swal.close();
-
             if (!response.ok || payload?.success !== true) {
                 const failedPayload = {
                     ...payload,
@@ -3616,29 +3586,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         `HTTP ${response.status}`
                 };
 
-                await showWTOWeekRestResultSwal(failedPayload);
                 return failedPayload;
             }
 
-            // Όπως στο E7N/E3N:
-            // πρώτα PDF iframe modal, μετά τελικό Swal με πρωτόκολλο.
-            if (payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url) {
-                await showErganiSubmittedPdfModal(payload);
-            }
-
-            await showWTOWeekRestResultSwal(payload);
-
             return payload;
         } catch (error) {
-            Swal.close();
-
             const failedPayload = {
                 success: false,
                 error: error?.message || String(error),
                 message: error?.message || String(error)
             };
-
-            await showWTOWeekRestResultSwal(failedPayload);
 
             return failedPayload;
         } finally {
@@ -4243,7 +4200,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                 }
 
-                await showErganiSubmittedPdfModal(payload);
                 return { success: true, ...payload };
             } catch (error) {
                 if (window.hideLoader) window.hideLoader();

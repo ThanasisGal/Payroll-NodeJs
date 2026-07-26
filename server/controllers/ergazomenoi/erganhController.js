@@ -13,6 +13,10 @@ const { chromium } = require('playwright');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3Client } = require('../../config/aws');
+const {
+    getScopedErganiLogFilter,
+    createOpenErganiPdfHandler
+} = require('./erganiPdfAccess');
 
 const { generateWTOXML } = require('../../utils/xmlGenerators/wto_v1Generator');
 const { generateWtoXML, generateWTOWeekJSON } = require('../../utils/xmlGenerators/wtoGenerator');
@@ -8227,6 +8231,8 @@ class erganhController {
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
+                submissionCode: 'WebE7N',
+                processDescription: 'Λύση Σύμβασης Ορισμένου Χρόνου (E7N)',
                 uploadMethod: 'rest',
                 temporary: false,
                 finalSubmission: true,
@@ -8239,12 +8245,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
@@ -8627,6 +8630,8 @@ class erganhController {
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
+                submissionCode: 'WebE3N',
+                processDescription: 'Πρόσληψη (E3N)',
                 uploadMethod: 'rest',
                 temporary: false,
                 finalSubmission: true,
@@ -8639,12 +8644,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
@@ -9113,6 +9115,7 @@ class erganhController {
                 temporary: false,
                 finalSubmission: true,
                 submissionCode: config.submissionCode,
+                processDescription: config.label,
                 processCode: config.xmlType,
                 message: restResult?.success
                     ? `Το ${config.submissionCode} υποβλήθηκε οριστικά μέσω REST API.`
@@ -9124,12 +9127,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
@@ -9442,6 +9442,8 @@ class erganhController {
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
+                submissionCode: 'WebE5N',
+                processDescription: 'Οικειοθελής Αποχώρηση (E5N)',
                 uploadMethod: 'rest',
                 temporary: false,
                 finalSubmission: true,
@@ -9454,12 +9456,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
@@ -9753,6 +9752,8 @@ class erganhController {
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
+                submissionCode: 'WebMA',
+                processDescription: 'Μεταβολή Στοιχείων Εργασιακής Σχέσης',
                 uploadMethod: 'rest',
                 temporary: false,
                 finalSubmission: true,
@@ -9765,12 +9766,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,
@@ -9984,13 +9982,16 @@ class erganhController {
                     submissionStatus: row.submission_status || '',
                     documentStatus: row.document_status || 'ACTIVE',
                     environment: row.environment || '',
-                    pdfUrl: row.pdf_s3_key
-                        ? `/ergazomenoi/ergazomenoi/ergani/pdf/${row._id}`
-                        : row.pdf_relative_path
-                          ? `/uploads/s3-mock/${row.pdf_relative_path}`
-                          : '',
+                    pdfUrl:
+                        row.pdf_s3_key || row.pdf_relative_path || row.pdf_s3_url
+                            ? getErganiPdfRoute(row._id)
+                            : '',
                     pdfFilename: row.pdf_filename || '',
-                    pdfSaved: !!row.pdf_s3_url,
+                    pdfSaved: !!(
+                        row.pdf_s3_key ||
+                        row.pdf_relative_path ||
+                        row.pdf_s3_url
+                    ),
                     isCancelled: row.is_cancelled === true,
                     cancelledAt: row.cancelled_at || null,
                     cancelledProtocol: row.cancelled_protocol || '',
@@ -10008,59 +10009,13 @@ class erganhController {
         }
     };
 
-    static openErganiPdf = async (req, res) => {
-        try {
-            const rec = await ErgazomenoiErganhModel.findById(req.params.id).lean();
-
-            if (!rec) {
-                return res.status(404).send('PDF not found');
-            }
-
-            const localMockUrl = rec.pdf_relative_path
-                ? `/uploads/s3-mock/${rec.pdf_relative_path}`
-                : '';
-
-            if (rec.pdf_s3_url?.startsWith('file://')) {
-                if (localMockUrl) return res.redirect(localMockUrl);
-                return res.status(404).send('PDF local path not found');
-            }
-
-            if (!rec.pdf_s3_key) {
-                if (localMockUrl) return res.redirect(localMockUrl);
-                return res.status(404).send('PDF S3 key not found');
-            }
-
-            const bucket = getErganiS3Bucket(rec);
-
-            if (!bucket) {
-                if (localMockUrl) return res.redirect(localMockUrl);
-                return res.status(500).send('PDF bucket not configured');
-            }
-
-            const s3Response = await s3Client.send(
-                new GetObjectCommand({
-                    Bucket: bucket,
-                    Key: rec.pdf_s3_key
-                })
-            );
-
-            res.removeHeader('X-Frame-Options');
-            res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-            res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-            res.setHeader('Content-Type', s3Response.ContentType || 'application/pdf');
-            res.setHeader('Content-Disposition', 'inline; filename="ergani.pdf"');
-            res.setHeader('Cache-Control', 'private, max-age=300');
-
-            if (s3Response.ContentLength) {
-                res.setHeader('Content-Length', String(s3Response.ContentLength));
-            }
-
-            return s3Response.Body.pipe(res);
-        } catch (err) {
-            console.error('openErganiPdf error:', err);
-            return res.status(500).send('PDF open error');
-        }
-    };
+    static openErganiPdf = createOpenErganiPdfHandler({
+        model: ErgazomenoiErganhModel,
+        objectId: mongoose.Types.ObjectId,
+        s3Client,
+        GetObjectCommand,
+        getBucket: getErganiS3Bucket
+    });
 
     static retrySubmittedErganiPdf = async (req, res) => {
         let accessToken = null;
@@ -10092,11 +10047,9 @@ class erganhController {
                 });
             }
 
-            const erganhLog = await ErgazomenoiErganhModel.findOne({
-                _id: id,
-                team: sessionTeam,
-                $or: [{ companykod_object: companyId }, { companykod: String(companyId) }]
-            });
+            const erganhLog = await ErgazomenoiErganhModel.findOne(
+                getScopedErganiLogFilter({ id, sessionTeam, companyId })
+            );
 
             if (!erganhLog) {
                 return res.status(404).json({
@@ -10115,11 +10068,10 @@ class erganhController {
                     (erganhLog.submit_date ? formatDateDdMmYyyy(erganhLog.submit_date) : '')
             };
 
-            const existingPdfUrl = erganhLog.pdf_s3_key
-                ? getErganiPdfRoute(erganhLog._id)
-                : erganhLog.pdf_relative_path
-                  ? `/uploads/s3-mock/${erganhLog.pdf_relative_path}`
-                  : erganhLog.pdf_s3_url || '';
+            const existingPdfUrl =
+                erganhLog.pdf_s3_key || erganhLog.pdf_relative_path || erganhLog.pdf_s3_url
+                    ? getErganiPdfRoute(erganhLog._id)
+                    : '';
 
             console.log('[ERGANI PDF RETRY] start', retryContext);
             console.log('[ERGANI PDF RETRY] existing-pdf', {
@@ -10513,11 +10465,10 @@ class erganhController {
                 uploadMethod: r.upload_method || '',
                 submissionStatus: r.submission_status || '',
                 documentStatus: r.document_status || 'ACTIVE',
-                pdfUrl: r.pdf_s3_key
-                    ? getErganiPdfRoute(r._id)
-                    : r.pdf_relative_path
-                      ? `/uploads/s3-mock/${r.pdf_relative_path}`
-                      : r.pdf_s3_url || '',
+                pdfUrl:
+                    r.pdf_s3_key || r.pdf_relative_path || r.pdf_s3_url
+                        ? getErganiPdfRoute(r._id)
+                        : '',
                 pdfSaved: !!(r.pdf_s3_key || r.pdf_relative_path || r.pdf_s3_url),
                 pdfDeferred:
                     r.upload_method === 'REST' &&
@@ -10954,6 +10905,8 @@ class erganhController {
 
             return res.status(restResult?.success ? 200 : 400).json({
                 success: !!restResult?.success,
+                submissionCode: 'WTOWeek',
+                processDescription: 'Οργάνωση Χρόνου Εργασίας - Σταθερό Εβδομαδιαίο',
                 uploadMethod: 'rest',
                 temporary: false,
                 finalSubmission: true,
@@ -10966,12 +10919,9 @@ class erganhController {
                 erganhLogId: erganhLog?._id || null,
                 pdfSaved: pdfStorage.pdfSaved,
                 pdfUrl:
-                    pdfStorage.pdfS3Key && erganhLog?._id
+                    pdfStorage.pdfSaved && erganhLog?._id
                         ? getErganiPdfRoute(erganhLog._id)
-                        : pdfStorage.pdfRelativePath
-                          ? `/uploads/s3-mock/${pdfStorage.pdfRelativePath}`
-                          : pdfStorage.pdfS3Url || '',
-                pdfS3Key: pdfStorage.pdfS3Key,
+                        : '',
                 pdfFilename: pdfStorage.pdfFilename,
                 pdfSizeBytes: pdfStorage.pdfSizeBytes,
                 pdfSaveError: pdfStorage.pdfSaveError,

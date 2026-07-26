@@ -665,17 +665,17 @@ app.use((req, res, next) => {
     }
 
     if (!validateSimpleCsrfToken(req)) {
-        logger.error('❌ CSRF validation FAILED:');
-        logger.error(`  Path: ${req.path}`);
-        logger.error(`  Method: ${req.method}`);
-        logger.error(`  Cookie token : ${req.cookies['psifl.x-csrf-token'] || 'MISSING'}`);
-        logger.error(`  Body _csrf   : ${req.body?._csrf || 'MISSING'}`);
-        logger.error(`  Header csrf  : ${req.headers['csrf-token'] || 'MISSING'}`);
-        logger.error(`  Header x-csrf: ${req.headers['x-csrf-token'] || 'MISSING'}`);
-        logger.error(`  Query _csrf  : ${req.query?._csrf || 'MISSING'}`);
-        logger.error(
-            `  Match?       : cookie===body → ${req.cookies['psifl.x-csrf-token'] === req.body?._csrf}`
-        );
+        logger.error('❌ CSRF validation FAILED', {
+            path: req.path,
+            method: req.method,
+            cookieTokenPresent: Boolean(req.cookies['psifl.x-csrf-token']),
+            requestTokenPresent: Boolean(
+                req.body?._csrf ||
+                    req.headers['csrf-token'] ||
+                    req.headers['x-csrf-token'] ||
+                    req.query?._csrf
+            )
+        });
         return res.status(403).json({
             error: 'CSRF validation failed',
             message: 'Invalid or missing CSRF token'
@@ -707,8 +707,10 @@ app.use(async (err, req, res, next) => {
             method: req.method,
             path: req.path,
             ip: req.ip,
-            body_csrf: req.body._csrf?.substring(0, 20),
-            header_csrf: req.headers['csrf-token']?.substring(0, 20),
+            bodyCsrfPresent: Boolean(req.body?._csrf),
+            headerCsrfPresent: Boolean(
+                req.headers['csrf-token'] || req.headers['x-csrf-token']
+            ),
             error: err.message || 'No error message'
         });
 
