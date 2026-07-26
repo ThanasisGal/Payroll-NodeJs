@@ -39,6 +39,15 @@ const checkUserAuth = require('../middlewares/auth-middleware.js');
 const getSessionVars = require('../middlewares/session-variables.js');
 const checkAuth = require('../middlewares/checkValidUser.js');
 const requireUserPrivilegeForm = require('../middlewares/requireUserPrivilegeForm');
+const { requireUserPrivilegeAction } = require('../middlewares/requireUserPrivilegeForm');
+const {
+    authorizeCompanyCreate,
+    authorizeCompanyUpdate,
+    authorizeCompanyChildCreate,
+    validateYpokatasthmaCreate,
+    validatePasswordCreate,
+    authorizeAntistoixishUpdate
+} = require('../middlewares/companyWriteAccess');
 const requireEmploymentReviewAccess = requireUserPrivilegeForm('ElegxosApasxolhseonPeriodoy');
 const requireAdminRole = require('../middlewares/requireAdminRole.js');
 const { requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole.js');
@@ -171,7 +180,12 @@ router.get('/companies/genikastoixeia', checkAuth, companiesController.mainCompa
 
 router.get('/companies/genikastoixeia/add', checkAuth, companiesController.addCompanyForm);
 
-router.post('/companies/genikastoixeia/add', companiesController.postCompanyForm);
+router.post(
+    '/companies/genikastoixeia/add',
+    requireUserPrivilegeAction('Companies', 'create'),
+    authorizeCompanyCreate,
+    companiesController.postCompanyForm
+);
 
 router.post('/companies/genikastoixeia/search', companiesController.searchPostCompanies);
 
@@ -194,7 +208,13 @@ router.get(
     ypokatasthmataController.addYpokatasthmataForm
 );
 
-router.post('/companies/ypokatasthmata/add', ypokatasthmataController.postYpokatasthmataForm);
+router.post(
+    '/companies/ypokatasthmata/add',
+    requireUserPrivilegeAction('Ypokatasthmata', 'create'),
+    validateYpokatasthmaCreate,
+    authorizeCompanyChildCreate,
+    ypokatasthmataController.postYpokatasthmataForm
+);
 
 router.post('/companies/ypokatasthmata/search', ypokatasthmataController.searchPostYpokatasthmata);
 
@@ -266,7 +286,13 @@ router.get('/companies/passwords', checkAuth, passwordsController.mainPasswordsF
 
 router.get('/companies/passwords/add', checkAuth, passwordsController.addPasswordsForm);
 
-router.post('/companies/passwords/add', passwordsController.postPasswordsForm);
+router.post(
+    '/companies/passwords/add',
+    requireUserPrivilegeAction('Passwords', 'create'),
+    validatePasswordCreate,
+    authorizeCompanyChildCreate,
+    passwordsController.postPasswordsForm
+);
 
 router.get('/companies/passwords/search', checkAuth, passwordsController.searchGetPasswords);
 
@@ -852,10 +878,17 @@ router.get(
 
 router.post(
     '/api/companies/antistoixiseis/update/:antistoixishId',
+    requireUserPrivilegeAction('Antistoixiseis', 'update'),
+    authorizeAntistoixishUpdate,
     antistoixiseisController.postAntistoixiseisUpdate
 );
 
-router.post('/api/companies/update/:companyId', companiesController.postCompanyUpdate);
+router.post(
+    '/api/companies/update/:companyId',
+    requireUserPrivilegeAction('Companies', 'update'),
+    authorizeCompanyUpdate,
+    companiesController.postCompanyUpdate
+);
 
 router.get('/api/companyDescription', mainAppController.getCompanyDescription);
 
