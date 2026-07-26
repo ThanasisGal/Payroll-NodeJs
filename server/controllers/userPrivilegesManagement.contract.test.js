@@ -65,6 +65,7 @@ function catalogModelFor(entries) {
 function hierarchyFor(catalog) {
     return catalog.map((entry, index) => ({
         form: entry.form,
+        sidebarNodeId: `li${index + 1}`,
         itemLabel: entry.formLabel,
         itemOrder: index,
         ancestors: [{ key: 'test-root', label: 'Δοκιμές', order: 0 }]
@@ -231,6 +232,7 @@ test('serialization fails closed when hierarchy is missing or malformed', () => 
     assert.throws(
         () => serializePrivilegeDocuments(catalog, [], undefined, [{
             form: 'Alpha',
+            sidebarNodeId: 'li1',
             itemLabel: 'Άλφα',
             itemOrder: -1,
             ancestors: [{ key: 'root', label: 'Ρίζα', order: 0 }]
@@ -618,8 +620,12 @@ test('catalog visible order exactly matches canonical data-privilege-form sideba
         .sort((a, b) => a.sidebarOrder - b.sidebarOrder || a.form.localeCompare(b.form));
     assert.deepStrictEqual(visibleCatalog.map((entry) => entry.form), sidebarForms);
     assert.strictEqual(new Set(visibleCatalog.map((entry) => entry.sidebarOrder)).size, visibleCatalog.length);
+    assert.deepStrictEqual(
+        visibleCatalog.map((entry) => entry.sidebarOrder),
+        sidebarForms.map((_, index) => (index + 1) * 1000)
+    );
     const employmentReview = visibleCatalog.find((entry) => entry.form === 'ElegxosApasxolhseonPeriodoy');
-    assert.strictEqual(employmentReview.sidebarOrder, sidebarForms.indexOf('ElegxosApasxolhseonPeriodoy'));
+    assert.strictEqual(employmentReview.sidebarOrder, 12000);
     assert.strictEqual(employmentReview.formLabel, 'Έλεγχος Απασχολήσεων');
 });
 

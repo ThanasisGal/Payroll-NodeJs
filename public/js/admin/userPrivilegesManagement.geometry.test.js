@@ -250,6 +250,7 @@ async function measure(page) {
                 const firstCheckbox = document.querySelector(
                     'tr[data-privilege-form-row="true"] input:not(:disabled)'
                 );
+                firstCheckbox.checked = true;
                 const checkedBeforeCollapse = firstCheckbox.checked;
                 hierarchyButton.click();
                 const collapsedRowsHidden = [...document.querySelectorAll(
@@ -278,6 +279,7 @@ async function measure(page) {
                     disabledAfterFirst,
                     adminAfterRead,
                     globalToggle,
+                    checkboxClasses: [...firstCheckbox.classList],
                     collapsedRowsHidden,
                     checkboxPreserved,
                     collapsedAria,
@@ -313,6 +315,37 @@ async function measure(page) {
                 className: 'user-privileges-column-toggle is-partial'
             });
             assert.strictEqual(tableBehavior.globalToggle, true);
+            assert.deepStrictEqual(tableBehavior.checkboxClasses, [
+                'form-check-input',
+                'custom-checkbox',
+                'checkbox-class',
+                'user-privileges-checkbox'
+            ]);
+            if (viewport.width === 1024) {
+                const visualCheckbox = page.locator(
+                    'tr[data-privilege-form-row="true"] input:not(:disabled)'
+                ).first();
+                const checkedVisual = await visualCheckbox.evaluate((checkbox) => {
+                    checkbox.checked = true;
+                    return {
+                        background: getComputedStyle(checkbox).backgroundColor,
+                        border: getComputedStyle(checkbox).borderColor,
+                        mark: getComputedStyle(checkbox, '::before').color,
+                        checked: checkbox.checked
+                    };
+                });
+                assert.deepStrictEqual(checkedVisual, {
+                    background: 'rgb(0, 128, 0)',
+                    border: 'rgb(0, 128, 0)',
+                    mark: 'rgb(255, 255, 255)',
+                    checked: true
+                });
+                assert.strictEqual(
+                    await page.locator('#userPrivilegesTableBody input:disabled').first()
+                        .evaluate((checkbox) => getComputedStyle(checkbox).opacity),
+                    '0.55'
+                );
+            }
             assert.strictEqual(tableBehavior.collapsedRowsHidden, true);
             assert.strictEqual(tableBehavior.checkboxPreserved, true);
             assert.strictEqual(tableBehavior.collapsedAria, 'false');

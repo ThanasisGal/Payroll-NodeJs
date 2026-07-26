@@ -3,7 +3,10 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { userPrivilegeSidebarHierarchy } = require('../constants/userPrivilegeSidebarHierarchy');
+const {
+    userPrivilegeSidebarHierarchy,
+    compareHierarchyEntries
+} = require('../constants/userPrivilegeSidebarHierarchy');
 const {
     USER_PRIVILEGE_FORM_CATALOG_SEED: seedData
 } = require('../seeds/userPrivilegeFormCatalogSeedData');
@@ -23,7 +26,8 @@ function parseSidebar(source) {
 
     tokens.forEach((token) => {
         if (/^<li\b/i.test(token)) {
-            stack.push({ label: '' });
+            const idMatch = token.match(/\bid=["']([^"']+)["']/i);
+            stack.push({ label: '', id: idMatch?.[1] || '' });
         } else if (/^<\/li/i.test(token)) {
             stack.pop();
         } else if (/^<a\b/i.test(token)) {
@@ -42,6 +46,7 @@ function parseSidebar(source) {
                     ['Αρχεία', 'Κινήσεις', 'Εκτυπώσεις'].includes(item));
                 forms.push({
                     form: anchor.form,
+                    sidebarNodeId: stack[stack.length - 1].id,
                     itemLabel: label,
                     ancestorLabels: allAncestors.slice(rootIndex)
                 });
@@ -54,52 +59,35 @@ function parseSidebar(source) {
     return forms;
 }
 
-function addOrders(forms) {
-    const siblingCounters = new Map();
-    const pathOrders = new Map();
-    return forms.map((form) => {
-        let parentPath = '';
-        const ancestors = form.ancestorLabels.map((label) => {
-            const pathKey = `${parentPath}\u0000${label}`;
-            if (!pathOrders.has(pathKey)) {
-                const nextOrder = siblingCounters.get(parentPath) || 0;
-                pathOrders.set(pathKey, nextOrder);
-                siblingCounters.set(parentPath, nextOrder + 1);
-            }
-            const order = pathOrders.get(pathKey);
-            parentPath = pathKey;
-            return { label, order };
-        });
-        const itemOrder = siblingCounters.get(parentPath) || 0;
-        siblingCounters.set(parentPath, itemOrder + 1);
-        return { ...form, ancestors, itemOrder };
-    });
-}
-
 const sidebarSource = fs.readFileSync(
     path.join(__dirname, '../../views/partials/sidebar.ejs'),
     'utf8'
 );
-const sidebarForms = addOrders(parseSidebar(sidebarSource));
+const sidebarForms = parseSidebar(sidebarSource);
 const visibleCatalog = seedData
     .filter((entry) => entry.active === true && entry.showInPrivileges === true)
     .sort((left, right) => left.sidebarOrder - right.sidebarOrder);
+const sortedHierarchy = [...userPrivilegeSidebarHierarchy].sort(compareHierarchyEntries);
 
 assert.strictEqual(sidebarForms.length, 24);
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.form), visibleCatalog.map((entry) => entry.form));
 assert.deepStrictEqual(sidebarForms.map((entry) => entry.itemLabel), visibleCatalog.map((entry) => entry.formLabel));
-assert.deepStrictEqual(userPrivilegeSidebarHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));
+assert.deepStrictEqual(sortedHierarchy.map((entry) => entry.form), sidebarForms.map((entry) => entry.form));
 
-userPrivilegeSidebarHierarchy.forEach((entry, index) => {
+sortedHierarchy.forEach((entry, index) => {
     const sidebar = sidebarForms[index];
     assert.strictEqual(entry.itemLabel, sidebar.itemLabel, `${entry.form}: leaf label`);
-    assert.strictEqual(entry.itemOrder, sidebar.itemOrder, `${entry.form}: item order`);
+    assert.strictEqual(entry.sidebarNodeId, sidebar.sidebarNodeId, `${entry.form}: sidebar node id`);
     assert.deepStrictEqual(
-        entry.ancestors.map(({ label, order }) => ({ label, order })),
-        sidebar.ancestors,
+        entry.ancestors.map(({ label }) => label),
+        sidebar.ancestorLabels,
         `${entry.form}: hierarchy path`
     );
 });
+
+assert.ok(sortedHierarchy.every((entry) => /^li[0-9]+$/.test(entry.sidebarNodeId)));
+assert.strictEqual(new Set(sortedHierarchy.map((entry) => entry.sidebarNodeId)).size, sidebarForms.length);
+assert.ok(visibleCatalog.every((entry) => entry.sidebarOrder >= 1000));
 
 const hiddenCatalog = seedData.filter((entry) => entry.showInPrivileges === false);
 assert.ok(hiddenCatalog.every((entry) => !userPrivilegeSidebarHierarchy.some((item) => item.form === entry.form)));

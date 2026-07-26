@@ -127,6 +127,10 @@ assert.strictEqual(formRow.dataset.rowId, '');
 assert.strictEqual(formRow.children[0].scope, 'row');
 assert.strictEqual(formRow.children[0].textContent, 'Πρώτη');
 assert.strictEqual(formRow.children[1].children[0].tagName, 'INPUT');
+assert.strictEqual(
+    formRow.children[1].children[0].className,
+    'form-check-input custom-checkbox checkbox-class user-privileges-checkbox'
+);
 const submitted = api.collectPrivilegeRows({
     querySelectorAll(selector) {
         assert.strictEqual(selector, 'tr[data-privilege-form-row="true"]');

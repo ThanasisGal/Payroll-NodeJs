@@ -268,7 +268,7 @@
             const td = documentRef.createElement('td');
             const checkbox = documentRef.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.className = 'form-check-input user-privileges-checkbox';
+            checkbox.className = 'form-check-input custom-checkbox checkbox-class user-privileges-checkbox';
             checkbox.id = checkboxId(row.id || row.form, key);
             checkbox.dataset.key = key;
             checkbox.checked = row.privileges?.[key] === true;
