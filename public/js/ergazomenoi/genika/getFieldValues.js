@@ -1619,6 +1619,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function presentErganiRestSubmissionResult(result) {
+        if (!window.ErganiRestSubmissionUi) {
+            throw new Error('Δεν φορτώθηκε η κοινή ροή αποτελεσμάτων ΕΡΓΑΝΗ.');
+        }
+        return window.ErganiRestSubmissionUi.presentSubmissionResultSafely(result);
+    }
+
     function hasE3NSubmittedPdf(result) {
         return Boolean(result?.pdfUrl || result?.pdfS3Url || result?.pdf_url);
     }
@@ -1896,10 +1903,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload = { success: false, message: await response.text() };
             }
 
-            Swal.close();
-
             if (!response.ok || payload?.success !== true) {
-                const failedPayload = {
+                return {
                     ...payload,
                     success: false,
                     error:
@@ -1909,24 +1914,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         `HTTP ${response.status}`
                 };
 
-                await showWTOWeekRestResultSwal(failedPayload);
-                return failedPayload;
             }
 
-            if (payload?.pdfUrl || payload?.pdfS3Url || payload?.pdf_url) {
-                await showErganiSubmittedPdfModal(payload);
-            }
-
-            await showWTOWeekRestResultSwal(payload);
             return payload;
         } catch (error) {
-            Swal.close();
-            const failedPayload = {
+            return {
                 success: false,
                 error: error?.message || String(error)
             };
-            await showWTOWeekRestResultSwal(failedPayload);
-            return failedPayload;
         }
     }
 
@@ -1944,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let e3Result = { success: true, skipped: true };
         let wtoResult = { success: true, skipped: true };
+        const submissionResults = [];
 
         if (!isRestSubmit || !ergazomenosId) {
             return { e3Result, wtoResult, skipped: true };
@@ -1953,26 +1949,31 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 console.log('[E3-REST-UPLOAD] Submitting E3N via REST JSON...');
                 e3Result = await submitE3NRestToErganh(ergazomenosId);
-                if (e3Result?.cancelled) {
-                    return { e3Result, wtoResult, skipped: false };
-                }
-                Swal.close();
-                await showE3NSubmittedPdfIfAvailable(e3Result);
-                await showE3NRestResultSwal(e3Result);
             } catch (e) {
-                Swal.close();
                 console.error('[E3-REST-UPLOAD] ❌ Exception:', e?.message || e);
                 e3Result = { success: false, error: e?.message || String(e) };
-                await showE3NRestResultSwal(e3Result);
             }
+
+            if (e3Result?.cancelled) {
+                return { e3Result, wtoResult, submissionResults, skipped: false };
+            }
+            submissionResults.push(e3Result);
+            await presentErganiRestSubmissionResult(e3Result);
         }
 
         if (userWantsWto) {
             console.log('[WTO-REST-UPLOAD] Submitting WTOWeek via REST JSON...');
-            wtoResult = await submitWTOWeekRestToErganh(ergazomenosId);
+            try {
+                wtoResult = await submitWTOWeekRestToErganh(ergazomenosId);
+            } catch (e) {
+                console.error('[WTO-REST-UPLOAD] ❌ Exception:', e?.message || e);
+                wtoResult = { success: false, error: e?.message || String(e) };
+            }
+            submissionResults.push(wtoResult);
+            await presentErganiRestSubmissionResult(wtoResult);
         }
 
-        return { e3Result, wtoResult, redirectUrl };
+        return { e3Result, wtoResult, submissionResults, redirectUrl };
     }
 
     // ============================================================================

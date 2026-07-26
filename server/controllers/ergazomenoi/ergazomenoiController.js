@@ -13,6 +13,7 @@ const { generateE7NXML } = require('../../utils/xmlGenerators/e7N_v1Generator');
 
 const { s3Client } = require('../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { requireScopedEmployeeForUpdate } = require('./employeeUpdateScope');
 
 const Models_A = require('../../models/stathera_arxeia');
 const Models_B = require('../../models/privileges');
@@ -3251,14 +3252,26 @@ class ergazomenoiController {
 
     static postErgazomenoiUpdate = async (req, res) => {
         const ergazomenoiId = req.params.ergazomenoiId;
-        const { formData, filesToUpdate } = req.body;
+        const { formData = {}, filesToUpdate } = req.body || {};
 
-        const omadaErgasias = formData.team;
-        const kodikosEtaireias = formData.company_kod;
-        const kodikosErgazomenoy = formData.kodikosHidden;
+        const omadaErgasias = req.session?.userTeam;
+        const kodikosEtaireias = req.session?.companyInUse;
         let aa_eggr = null,
             recExist = false,
             existingIstorikoRecord = null;
+
+        const scopedAccess = await requireScopedEmployeeForUpdate({
+            req,
+            res,
+            model: ErgazomenoiModel,
+            objectId: mongoose.Types.ObjectId
+        });
+        if (!scopedAccess) return;
+        const { employeeScope, employeeCode: kodikosErgazomenoy } = scopedAccess;
+
+        formData.team = omadaErgasias;
+        formData.company_kod = kodikosEtaireias;
+        formData.kodikosHidden = kodikosErgazomenoy;
 
         // =========================================================================
         // ✅ 1) ΑΝΑΓΝΩΣΗ ΙΣΤΟΡΙΚΟΥ
@@ -3648,7 +3661,7 @@ class ergazomenoiController {
             });
 
             updatedErgazomenos = await ErgazomenoiModel.findOneAndUpdate(
-                { _id: ergazomenoiId },
+                employeeScope,
                 { $set: filteredDataErgazomenoi },
                 { returnDocument: 'after' } // ✅ Επιστρέφει το updated document
             );
@@ -4099,9 +4112,7 @@ class ergazomenoiController {
         // ✅ Αποθήκευση S3 keys στη ΒΔ (μόνο αν υπάρχουν νέα PDFs)
         if (Object.keys(pdfPathUpdates).length > 0) {
             try {
-                await ErgazomenoiModel.findByIdAndUpdate(ergazomenoiId, {
-                    $set: pdfPathUpdates
-                });
+                await ErgazomenoiModel.updateOne(employeeScope, { $set: pdfPathUpdates });
                 console.log(`✅ [UPDATE] PDF paths saved to DB:`, Object.keys(pdfPathUpdates));
             } catch (error) {
                 console.error('❌ [UPDATE] Failed to save PDF paths:', error);
@@ -4131,7 +4142,7 @@ class ergazomenoiController {
                 const contractS3Key = await generateContractPDF(updatedErgazomenos, userContext);
                 const pdfUrl = await generatePresignedUrl(contractS3Key, 600);
 
-                await ErgazomenoiModel.findByIdAndUpdate(ergazomenoiId, {
+                await ErgazomenoiModel.updateOne(employeeScope, {
                     arxeio_apodoxhs_oron_atomikhs_symbashs_path: contractS3Key
                 });
 
@@ -4217,7 +4228,6 @@ class ergazomenoiController {
             logger.info('E3 XML generation requested (UPDATE)', {
                 module: 'E3-XML',
                 employee_kod: updatedErgazomenos.kodikos,
-                employee_afm: updatedErgazomenos.afm,
                 company: company?.eponymia || 'N/A'
             });
 
@@ -4320,7 +4330,6 @@ class ergazomenoiController {
                 logger.info('WTO XML generation requested (UPDATE — Οριστική)', {
                     module: 'WTO-XML',
                     employee_kod: updatedErgazomenos.kodikos,
-                    employee_afm: updatedErgazomenos.afm,
                     company: company?.eponymia || 'N/A',
                     isPermanent: true
                 });
@@ -4384,7 +4393,6 @@ class ergazomenoiController {
             logger.info('MA XML generation requested', {
                 module: 'MA-XML',
                 employee_kod: updatedErgazomenos.kodikos,
-                employee_afm: updatedErgazomenos.afm,
                 company: company?.eponymia || 'N/A',
                 type: filesToUpdate?.ma_222
                     ? 'ΛΥΣΗ ΣΥΜΒΑΣΗΣ ΟΡΙΣΜΕΝΟΥ ΧΡΟΝΟΥ'
@@ -4684,7 +4692,11 @@ class ergazomenoiController {
         try {
             const ergazomenosId = req.params.id;
 
-            const ergazomenos = await ErgazomenoiModel.findById(ergazomenosId);
+            const ergazomenos = await ErgazomenoiModel.findOne({
+                _id: ergazomenosId,
+                team: req.session?.userTeam,
+                company_kod: req.session?.companyInUse
+            });
 
             if (!ergazomenos) {
                 return res.status(404).json({
@@ -4715,8 +4727,12 @@ class ergazomenoiController {
     static getAllErgazomenoiWithUrls = async (req, res) => {
         try {
             const companyId = req.session.companyInUse;
+            const sessionTeam = req.session.userTeam;
 
-            const ergazomenoi = await ErgazomenoiModel.find({ company_kod: companyId });
+            const ergazomenoi = await ErgazomenoiModel.find({
+                team: sessionTeam,
+                company_kod: companyId
+            });
 
             // ✅ Add presigned URLs for all ergazomenoi
             const ergazomenoiWithUrls = await Promise.all(
