@@ -644,6 +644,14 @@ jobs:
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaOrchestrationService.test.js
           node server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplySafetyContract.test.js
 
+      - name: Validate repo-transfer functional and operational contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferFunctionalOperationalValidation.test.js
+          node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js
+
       - name: Validate linked repo-transfer decision feature when present
         shell: bash
         run: |
