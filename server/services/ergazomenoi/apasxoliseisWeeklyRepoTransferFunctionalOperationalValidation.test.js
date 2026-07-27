@@ -39,11 +39,17 @@ const {
     reconstructWeeklyRepoTransferDecision
 } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 const {
+    buildWeeklyRepoTransferSinglePairGroupProjection
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
+const {
     writeWeeklyRepoTransferAtomically
 } = require('./apasxoliseisWeeklyRepoTransferAtomicWriterService');
 const {
     applyWeeklyRepoTransfer
 } = require('./apasxoliseisWeeklyRepoTransferApplyService');
+const {
+    loadWeeklyRepoTransferDecisionBatch
+} = require('./apasxoliseisWeeklyRepoTransferDecisionBatchService');
 const {
     validateRepoTransferApplyBody
 } = require('../../middlewares/repoTransferApplyBodyParser');
@@ -70,15 +76,19 @@ const COMMAND = Object.freeze({
     request_id: 'validation-request-0001'
 });
 const EMPLOYMENT_FIXTURES = Object.freeze([
-    Object.freeze({ family: 'FULL', typos_apasxolhshs: 'PLHRHS' }),
-    Object.freeze({ family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH' }),
-    Object.freeze({ family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS' }),
+    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v1', targetCategory: 'ΑΝ', mhniaia_repo: 2, dailyHours: 8 }),
+    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, dailyHours: 4 }),
+    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, dailyHours: 4 }),
     Object.freeze({
+        name: 'MERIKH_REDUCED_DAYS_AND_HOURS',
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'MERIKH',
+        contractVersion: 'v2',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v2',
+        targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 3,
-        mo_oron_hmerhsias_ergasias: 4
+        mhniaia_repo: 2,
+        dailyHours: 4
     })
 ]);
 const COVERAGE_FILES = Object.freeze([
@@ -111,42 +121,100 @@ function guardValues(repo, category, cardsHours) {
         is_locked: false
     };
 }
-function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
-    const sourceCurrent = guardValues(true, 'ΜΕ', 8);
-    const targetCurrent = guardValues(false, 'ΕΡΓ', 0);
-    const snapshot = {
-        proposal_id: 'repo-transfer-functional-validation',
-        proposal_version: 'repo-transfer-single-pair-proposal:v2',
-        choice_code: 'choice',
+function weekRows(employment) {
+    const sourceOffset = employment.family === 'FULL' ? 1 : 2;
+    const targetOffset = 4;
+    const rows = Array.from({ length: 7 }, (_, offset) => ({
+        _id: offset === sourceOffset ? IDS.source : offset === targetOffset ? IDS.target : `507f1f77bcf86cd7994390${20 + offset}`,
         team: SESSION.userTeam,
         company_kod: SESSION.companyInUse,
         ypokatasthma: '0001',
-        employee_id: IDS.employee,
-        employee_kodikos: '001',
-        week_start: '2026-07-12',
-        week_end: '2026-07-18',
-        employment,
-        source: {
-            prodhlomena_oraria_id: IDS.source,
-            hmeromhnia: '2026-07-13',
-            current_values: sourceCurrent,
-            proposed_values: applyValues(false, 'ΕΡΓ'),
-            lock_state: false
-        },
-        target: {
-            prodhlomena_oraria_id: IDS.target,
-            hmeromhnia: '2026-07-14',
-            current_values: targetCurrent,
-            proposed_values: applyValues(true, 'ΜΕ'),
-            lock_state: false
-        }
+        kodikos: '001',
+        hmeromhnia: new Date(Date.UTC(2026, 6, 12 + offset)),
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: employment.dailyHours,
+        cards_ores_ergasias: employment.dailyHours,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: employment.dailyHours === 8 ? '17:00' : '13:00',
+        cards_apo_ora_02: '',
+        cards_eos_ora_02: '',
+        cards_apo_ora_03: '',
+        cards_eos_ora_03: '',
+        repo: false,
+        is_locked: false
+    }));
+    Object.assign(rows[sourceOffset], {
+        kathgoria_ergasias: employment.family === 'FULL' ? 'ΑΝ' : 'ΜΕ',
+        ores_ergasias: 0
+    });
+    Object.assign(rows[targetOffset], {
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    Object.assign(rows[6], {
+        kathgoria_ergasias: employment.family === 'FULL' ? 'ΑΝ' : 'ΜΕ',
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    return rows;
+}
+async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
+    const rows = weekRows(employment);
+    const employmentProfile = {
+        typos_apasxolhshs: employment.typos_apasxolhshs,
+        mhniaia_repo: employment.mhniaia_repo,
+        mo_oron_hmerhsias_ergasias: employment.dailyHours
     };
+    const projectionBuilder = (input) => buildWeeklyRepoTransferSinglePairGroupProjection(input);
+    const projection = projectionBuilder({
+        weekRows: rows,
+        employmentProfile,
+        contractVersion: employment.contractVersion,
+        holidayByDateKey: new Map(),
+        existingAuditCountByRowKey: new Map()
+    });
+    assert.strictEqual(projection.projection_status, 'READY', `${employment.name} projection: ${JSON.stringify(projection.reasons || [])}`);
+    assert.strictEqual(projection.groups.length, 1);
+    const group = projection.groups[0];
+    const context = {
+        candidates: rows.filter((row) => [IDS.source, IDS.target].includes(String(row._id))),
+        weekRows: rows,
+        employee: { _id: IDS.employee, kodikos: '001' },
+        employmentProfile,
+        history: [],
+        audits: [],
+        week: { start: '2026-07-12', end: '2026-07-18' },
+        companyFlags: {},
+        companyKodikos: SESSION.companyKodikos,
+        holidayByDateKey: new Map()
+    };
+    const reconstructionCommand = {
+        proposal_id: group.group_id,
+        expected_source_id: IDS.source,
+        expected_target_id: IDS.target,
+        expected_proposal_version: employment.proposalVersion,
+        expected_choice_code: group.pair_contract.choice_code
+    };
+    const reconstruct = (commandOverrides = {}) => reconstructWeeklyRepoTransferDecision({
+        scope: { team: SESSION.userTeam, company_kod: SESSION.companyInUse },
+        command: { ...reconstructionCommand, ...commandOverrides },
+        contextLoader: async () => context,
+        projectionBuilder
+    });
+    const reconstruction = await reconstruct();
+    const snapshot = reconstruction.snapshot;
+    assert.strictEqual(snapshot.proposal_version, employment.proposalVersion);
+    assert.strictEqual(snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
+    assert.strictEqual(snapshot.target.proposed_values.kathgoria_ergasias_apologistika, employment.targetCategory);
     const decision = {
         _id: IDS.decision,
         decision_code: 'APPROVE_PROPOSAL',
         decision_status: 'RECORDED',
         canonical_snapshot: snapshot,
-        snapshot_fingerprint: fingerprintSnapshot(snapshot),
+        snapshot_fingerprint: reconstruction.fingerprint,
         proposal_id: snapshot.proposal_id,
         team: snapshot.team,
         company_kod: snapshot.company_kod,
@@ -158,21 +226,28 @@ function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
         source_prodhlomena_oraria_id: IDS.source,
         target_prodhlomena_oraria_id: IDS.target
     };
-    return { snapshot, decision };
+    return { snapshot, decision, group, context, reconstruct, employment };
 }
 function matches(record, filter) {
-    return Object.entries(filter).every(([key, value]) => String(record?.[key] ?? '') === String(value ?? ''));
+    return Object.entries(filter).every(([key, value]) => {
+        const actual = record?.[key];
+        if (actual instanceof Date || value instanceof Date) {
+            return new Date(actual).toISOString() === new Date(value).toISOString();
+        }
+        return Object.is(actual ?? null, value ?? null);
+    });
 }
-function createStore(options = {}) {
-    const fixture = canonicalFixture();
+async function createStore(options = {}) {
+    const fixture = await canonicalFixture(options.employment || EMPLOYMENT_FIXTURES[1]);
     const committed = {
         rows: {
-            [IDS.source]: { _id: IDS.source, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001', hmeromhnia: new Date('2026-07-13T00:00:00.000Z'), ...fixture.snapshot.source.current_values, __v: 1, is_locked: false },
-            [IDS.target]: { _id: IDS.target, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001', hmeromhnia: new Date('2026-07-14T00:00:00.000Z'), ...fixture.snapshot.target.current_values, __v: 2, is_locked: false }
+            [IDS.source]: { _id: IDS.source, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001', hmeromhnia: new Date(`${fixture.snapshot.source.hmeromhnia}T00:00:00.000Z`), ...fixture.snapshot.source.current_values, __v: 1, is_locked: false },
+            [IDS.target]: { _id: IDS.target, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001', hmeromhnia: new Date(`${fixture.snapshot.target.hmeromhnia}T00:00:00.000Z`), ...fixture.snapshot.target.current_values, __v: 2, is_locked: false }
         },
         audits: [],
         executions: []
     };
+    const initialRows = structuredClone(committed.rows);
     let staged;
     const counters = { transactions: 0, commits: 0, aborts: 0, updates: 0, writerCalls: 0 };
     const session = {
@@ -241,11 +316,14 @@ function createStore(options = {}) {
                 : null
         })
     };
-    const reconstruct = async () => ({
-        snapshot: structuredClone(fixture.snapshot),
-        fingerprint: fixture.decision.snapshot_fingerprint
+    let reconstructionCalls = 0;
+    const realPreflight = (args) => preflightWeeklyRepoTransferApply({
+        ...args,
+        reconstruct: async () => {
+            reconstructionCalls++;
+            return fixture.reconstruct();
+        }
     });
-    const realPreflight = (args) => preflightWeeklyRepoTransferApply({ ...args, reconstruct });
     const realWriter = async ({ plan }) => {
         counters.writerCalls++;
         return writeWeeklyRepoTransferAtomically({
@@ -258,7 +336,7 @@ function createStore(options = {}) {
             now: () => new Date('2026-07-14T10:00:00.000Z')
         });
     };
-    return { fixture, committed, counters, decisionModel, executionModel, realPreflight, realWriter };
+    return { fixture, committed, initialRows, counters, decisionModel, executionModel, realPreflight, realWriter, get reconstructionCalls() { return reconstructionCalls; } };
 }
 async function integratedApply(store, payload = COMMAND, session = SESSION) {
     return applyWeeklyRepoTransfer({
@@ -280,82 +358,66 @@ function bodyResult(body, contentType = 'application/json') {
     return result;
 }
 function assertRolledBack(store) {
-    assert.strictEqual(store.committed.rows[IDS.source].repo_apologistika, true);
-    assert.strictEqual(store.committed.rows[IDS.target].repo_apologistika, false);
+    assert.deepStrictEqual(store.committed.rows, store.initialRows);
     assert.strictEqual(store.committed.audits.length, 0);
     assert.strictEqual(store.committed.executions.length, 0);
     assert.strictEqual(store.counters.commits, 0);
 }
-async function validateRealReconstruction() {
-    const group = {
-        group_id: 'functional-reconstruction',
-        group_key: 'functional-key',
-        group_type: 'ATOMIC_PAIRED_PROPOSAL',
-        scenario_code: 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR',
-        policy_code: 'WEEKLY_REPO_BALANCE',
-        secondary_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
-        pair_contract: {
-            proposal_version: 'repo-transfer-single-pair-proposal:v2',
-            choice_code: 'choice',
-            policy_versions: {}
+function fakeQuery(rows) {
+    return {
+        select() { return this; },
+        sort() { return this; },
+        lean: async () => rows
+    };
+}
+async function authoritativeAppliedState(store) {
+    const employee = {
+        _id: IDS.employee,
+        team: SESSION.userTeam,
+        company_kod: SESSION.companyInUse,
+        ypokatasthma: '0001',
+        kodikos: '001',
+        energos: true,
+        archived: false,
+        kathestos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
+        typos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
+        mhniaia_repo: store.fixture.employment.mhniaia_repo,
+        mo_oron_hmerhsias_ergasias: store.fixture.employment.dailyHours
+    };
+    const result = await loadWeeklyRepoTransferDecisionBatch({
+        session: SESSION,
+        filters: { apo_hmeromhnia: '2026-07-12', eos_hmeromhnia: '2026-07-18', ypokatasthma: '0001' },
+        models: {
+            prodhlomenaModel: { find: () => fakeQuery(Object.values(store.committed.rows)) },
+            employeeModel: { find: () => fakeQuery([employee]) },
+            historyModel: { find: () => fakeQuery([]) },
+            auditModel: { find: () => fakeQuery(store.committed.audits) },
+            decisionModel: { find: () => fakeQuery([store.fixture.decision]) },
+            executionModel: { find: () => fakeQuery(store.committed.executions) }
         },
-        items: [
-            {
-                role: 'SOURCE_BECOMES_WORK',
-                prodhlomena_oraria_id: IDS.source,
-                hmeromhnia: '2026-07-13',
-                proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' },
-                flags: { approval_supported: false, runtime_apply_supported: false }
+        holidayContextBuilder: async () => ({
+            companyFlags: {
+                apasxolhsh_kata_tis_argies: false,
+                leitoyrgia_stis_mh_ypoxreotikes_argies: false
             },
-            {
-                role: 'TARGET_BECOMES_REPO',
-                prodhlomena_oraria_id: IDS.target,
-                hmeromhnia: '2026-07-14',
-                proposed_values: { kathgoria_ergasias_apologistika: 'ΜΕ' },
-                flags: { approval_supported: false, runtime_apply_supported: false }
-            }
-        ]
-    };
-    const context = {
-        candidates: [
-            { _id: IDS.source, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001' },
-            { _id: IDS.target, team: SESSION.userTeam, company_kod: SESSION.companyInUse, ypokatasthma: '0001', kodikos: '001' }
-        ],
-        weekRows: [
-            { _id: IDS.source, hmeromhnia: '2026-07-13' },
-            { _id: IDS.target, hmeromhnia: '2026-07-14' }
-        ],
-        employee: { _id: IDS.employee },
-        employmentProfile: EMPLOYMENT_FIXTURES[1],
-        history: [],
-        audits: [],
-        week: { start: '2026-07-12', end: '2026-07-18' },
-        companyFlags: {},
-        companyKodikos: SESSION.companyKodikos,
-        holidayByDateKey: new Map()
-    };
-    const result = await reconstructWeeklyRepoTransferDecision({
-        scope: { team: SESSION.userTeam, company_kod: SESSION.companyInUse },
-        command: {
-            proposal_id: group.group_id,
-            expected_source_id: IDS.source,
-            expected_target_id: IDS.target,
-            expected_proposal_version: group.pair_contract.proposal_version,
-            expected_choice_code: group.pair_contract.choice_code
-        },
-        contextLoader: async () => context,
-        projectionBuilder: (input) => {
-            assert.strictEqual(input.contractVersion, 'v2');
-            return { projection_status: 'READY', groups: [group] };
-        }
+            company_kodikos: SESSION.companyKodikos,
+            argiesByDateKey: new Map()
+        }),
+        runtimeStateLoader: async () => ({ enabled: true }),
+        indexStateLoader: async () => ({ ready: true })
     });
-    assert.strictEqual(result.snapshot.source.prodhlomena_oraria_id, IDS.source);
-    assert.strictEqual(result.snapshot.target.prodhlomena_oraria_id, IDS.target);
-    assert.strictEqual(result.fingerprint.length, 64);
+    const record = result.records.find((item) => item.proposal_id === store.fixture.decision.proposal_id);
+    assert.ok(record);
+    assert.strictEqual(record.apply_state, 'ALREADY_APPLIED');
+    assert.strictEqual(record.can_apply, false);
+    assert.strictEqual(record.current_execution.execution_status, 'APPLIED');
+    assert.strictEqual(record.current_execution.id, String(store.committed.executions[0]._id));
+    return record;
 }
 
 async function run() {
-    const existingCoverage = COVERAGE_FILES.map((file) => fs.readFileSync(require.resolve(`./${file}`), 'utf8')).join('\n');
+    // Static inventory only: behavioral evidence comes from the executed suites and assertions below.
+    const staticCoverageInventory = COVERAGE_FILES.map((file) => fs.readFileSync(require.resolve(`./${file}`), 'utf8')).join('\n');
     for (const evidence of [
         'DECISION_NOT_APPROVED',
         'SCOPE_MISMATCH',
@@ -372,11 +434,10 @@ async function run() {
         'STALE_DECISION',
         'ALREADY_APPLIED'
     ]) {
-        assert.ok(existingCoverage.includes(evidence), `Missing focused evidence for ${evidence}`);
+        assert.ok(staticCoverageInventory.includes(evidence), `Static inventory missing ${evidence}`);
     }
     assert.deepStrictEqual(EMPLOYMENT_FIXTURES.map((item) => item.typos_apasxolhshs), ['PLHRHS', 'MERIKH', 'EK_PERITROPHS', 'MERIKH']);
     assert.strictEqual(EMPLOYMENT_FIXTURES[3].profile_case, 'REDUCED_DAYS_AND_DAILY_HOURS');
-    await validateRealReconstruction();
     assert.deepStrictEqual(validateApplyCommand(COMMAND), COMMAND);
     assert.strictEqual(commandIdentity(COMMAND).length, 64);
     assert.strictEqual(bodyResult({ request_id: COMMAND.request_id }).next, true);
@@ -395,33 +456,59 @@ async function run() {
     assert.strictEqual((await getWeeklyRepoTransferApplyIndexState({ indexLoader: async () => [] })).ready, false);
     assert.strictEqual((await getWeeklyRepoTransferApplyIndexState({ indexLoader: async () => { throw new Error('private index failure'); } })).ready, false);
 
-    const successStore = createStore();
-    const success = await integratedApply(successStore);
-    assert.strictEqual(success.idempotent, false);
-    assert.strictEqual(success.execution.execution_status, 'APPLIED');
-    assert.strictEqual(successStore.counters.transactions, 1);
-    assert.strictEqual(successStore.counters.commits, 1);
-    assert.strictEqual(successStore.counters.updates, 2);
-    assert.strictEqual(successStore.committed.rows[IDS.source].kathgoria_ergasias_apologistika, 'ΕΡΓ');
-    assert.strictEqual(successStore.committed.rows[IDS.target].kathgoria_ergasias_apologistika, 'ΜΕ');
-    assert.strictEqual(successStore.committed.audits.length, 2);
-    assert.strictEqual(successStore.committed.executions.length, 1);
-    for (const secret of ['canonical_snapshot', 'snapshot_fingerprint', 'command_identity', 'request_id']) {
-        assert.ok(!Object.hasOwn(success.execution, secret));
-    }
+    const successfulStores = [];
+    for (const employment of EMPLOYMENT_FIXTURES) {
+        const store = await createStore({ employment });
+        assert.strictEqual(store.fixture.snapshot.proposal_version, employment.proposalVersion);
+        assert.strictEqual(store.fixture.snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
+        assert.strictEqual(store.fixture.snapshot.target.proposed_values.kathgoria_ergasias_apologistika, employment.targetCategory);
+        assert.strictEqual(store.fixture.snapshot.source.prodhlomena_oraria_id, IDS.source);
+        assert.strictEqual(store.fixture.snapshot.target.prodhlomena_oraria_id, IDS.target);
+        assert.strictEqual(store.fixture.decision.snapshot_fingerprint.length, 64);
 
-    const replay = await integratedApply(successStore);
-    assert.strictEqual(replay.idempotent, true);
-    assert.strictEqual(replay.execution.id, success.execution.id);
-    assert.strictEqual(successStore.counters.writerCalls, 1);
-    assert.strictEqual(successStore.committed.audits.length, 2);
-    assert.strictEqual(successStore.committed.executions.length, 1);
+        const success = await integratedApply(store);
+        assert.strictEqual(store.reconstructionCalls, 1, `${employment.name} must use real reconstruction in preflight`);
+        assert.strictEqual(success.idempotent, false);
+        assert.strictEqual(success.execution.execution_status, 'APPLIED');
+        assert.strictEqual(store.counters.transactions, 1);
+        assert.strictEqual(store.counters.commits, 1);
+        assert.strictEqual(store.counters.updates, 2);
+        assert.strictEqual(store.committed.rows[IDS.source].kathgoria_ergasias_apologistika, 'ΕΡΓ');
+        assert.strictEqual(store.committed.rows[IDS.target].kathgoria_ergasias_apologistika, employment.targetCategory);
+        assert.strictEqual(store.committed.audits.length, 2);
+        assert.strictEqual(store.committed.executions.length, 1);
+        for (const secret of ['canonical_snapshot', 'snapshot_fingerprint', 'command_identity', 'request_id']) {
+            assert.ok(!Object.hasOwn(success.execution, secret));
+        }
+
+        const replay = await integratedApply(store);
+        assert.strictEqual(replay.idempotent, true);
+        assert.strictEqual(replay.execution.id, success.execution.id);
+        assert.strictEqual(store.counters.writerCalls, 1);
+        assert.strictEqual(store.counters.transactions, 1);
+        assert.strictEqual(store.committed.audits.length, 2);
+        assert.strictEqual(store.committed.executions.length, 1);
+        await authoritativeAppliedState(store);
+        successfulStores.push(store);
+    }
+    assert.strictEqual(successfulStores.length, EMPLOYMENT_FIXTURES.length);
+    const successStore = successfulStores[1];
+    const writerCallsBeforeReconstructionMismatches = successStore.counters.writerCalls;
+    for (const mismatch of [
+        { expected_proposal_version: successStore.fixture.employment.contractVersion === 'v1' ? 'repo-transfer-single-pair-proposal:v2' : 'repo-transfer-single-pair-proposal:v1' },
+        { expected_choice_code: 'wrong-choice' },
+        { expected_source_id: IDS.target },
+        { expected_target_id: IDS.source }
+    ]) {
+        await assert.rejects(() => successStore.fixture.reconstruct(mismatch), (error) => error.statusCode === 409);
+    }
+    assert.strictEqual(successStore.counters.writerCalls, writerCallsBeforeReconstructionMismatches);
 
     await assert.rejects(
         () => integratedApply(successStore, { ...COMMAND, request_id: 'validation-request-0002' }),
         (error) => error.code === 'DECISION_ALREADY_APPLIED'
     );
-    const conflictStore = createStore();
+    const conflictStore = await createStore();
     conflictStore.committed.executions.push({
         ...successStore.committed.executions[0],
         decision_id: '507f1f77bcf86cd799439088',
@@ -436,22 +523,22 @@ async function run() {
         [{ ...COMMAND, extra: true }, 'INVALID_APPLY_COMMAND'],
         [{ ...COMMAND, decision_id: IDS.source }, 'DECISION_NOT_FOUND']
     ]) {
-        const store = createStore();
+        const store = await createStore();
         await assert.rejects(() => integratedApply(store, payload), (error) => error.code === code);
         assert.strictEqual(store.counters.writerCalls, 0);
     }
     for (const role of ['HR', 'U']) {
-        const store = createStore();
+        const store = await createStore();
         await assert.rejects(() => integratedApply(store, COMMAND, { ...SESSION, userRole: role }), (error) => error.code === 'APPLY_NOT_AUTHORIZED');
         assert.strictEqual(store.counters.writerCalls, 0);
     }
 
     for (const failAt of ['before-source', 'source-update', 'target-update', 'source-audit', 'target-audit', 'execution', 'commit', 'abort']) {
-        const store = createStore({ failAt });
+        const store = await createStore({ failAt });
         await assert.rejects(() => integratedApply(store));
         assertRolledBack(store);
     }
-    const unavailable = createStore({ transactionsAvailable: false });
+    const unavailable = await createStore({ transactionsAvailable: false });
     await assert.rejects(() => integratedApply(unavailable), (error) => error.code === 'TRANSACTIONS_UNAVAILABLE');
     assertRolledBack(unavailable);
 

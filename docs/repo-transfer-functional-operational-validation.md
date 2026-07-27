@@ -26,8 +26,9 @@
 | `ALREADY_APPLIED` | timestamp/actor και απουσία apply control | batch και VM-based UI behavior |
 
 Η απομονωμένη κάλυψη ήταν επαρκής ανά service, αλλά δεν υπήρχε κοινή
-database-free απόδειξη που να περνά το ίδιο fixture από command validation,
-preflight και apply service έως τον πραγματικό atomic writer. Το
+database-free απόδειξη που να περνά canonical employment fixtures από
+command validation, πραγματικό reconstruction, preflight και apply service
+έως τον πραγματικό atomic writer. Το
 `apasxoliseisWeeklyRepoTransferFunctionalOperationalValidation.test.js`
 καλύπτει αυτό το κενό με κοινά fixtures και transactional fake store. Τα
 controller/route tests παραμένουν source contracts επειδή η φόρτωση της
@@ -35,23 +36,38 @@ controller/route tests παραμένουν source contracts επειδή η φ�
 
 ## Τι αποδεικνύει το ενοποιημένο harness
 
-- canonical fixtures για πλήρη, μερική, εκ περιτροπής και διαλείπουσα
-  απασχόληση, χωρίς αλλαγή της πολιτικής,
+- behavioral success chain για FULL μέσω πραγματικού v1 proposal contract,
+  με target `ΑΝ`,
+- behavioral success chains για MERIKH, EK_PERITROPHS και MERIKH με
+  μειωμένες εβδομαδιαίες ημέρες και μειωμένες ημερήσιες ώρες μέσω του
+  πραγματικού v2 partial-family contract, με target `ΜΕ`,
 - πραγματικό apply command validation και session authorization,
 - πραγματικό runtime και index-readiness contract,
-- πραγματικό preflight με injected authoritative reconstruction,
+- πραγματικό analyzer/proposal/group projection και
+  `reconstructWeeklyRepoTransferDecision` μέσα στην ίδια success chain,
+- snapshot και fingerprint που παράγονται και επαναχρησιμοποιούνται από το
+  ίδιο reconstruction contract κατά το preflight,
 - πραγματικό apply service και πραγματικό transaction-only writer,
 - ακριβώς δύο staged row updates, δύο audit records και ένα `APPLIED`
   execution,
 - idempotent replay και network-uncertainty replay με το ίδιο request id,
 - request-id conflict και already-applied προστασία,
+- authoritative post-apply ανάγνωση μέσω
+  `loadWeeklyRepoTransferDecisionBatch`, με `ALREADY_APPLIED`,
+  `can_apply=false` και το ίδιο `APPLIED` execution,
 - rollback σε source/target/audit/execution/commit/abort failure,
 - fail-fast απαγόρευση DB connection, network listener/outbound request και
   filesystem deployment writes.
 
-Τα εξειδικευμένα tests συνεχίζουν να αποτελούν την αναλυτική απόδειξη για
+Τα εξειδικευμένα behavioral tests που εκτελούνται από το CI συνεχίζουν να
+αποτελούν την αναλυτική απόδειξη για
 wrong scope, rejection/needs-review, stale fingerprint, changed rows,
 locked rows, duplicate races, controller error mapping και κάθε UI state.
+Ο token/source inventory έλεγχος του συγκεντρωτικού harness είναι μόνο
+στατικό sanity check ότι τα σχετικά focused αρχεία παραμένουν παρόντα. Δεν
+θεωρείται behavioral evidence και δεν αντικαθιστά την εκτέλεσή τους. Τα
+controller/route contracts παραμένουν ρητά static source contracts· δεν
+υπάρχει ισχυρισμός πραγματικού HTTP route integration.
 
 ## Προϋποθέσεις πριν από μελλοντική ενεργοποίηση
 
