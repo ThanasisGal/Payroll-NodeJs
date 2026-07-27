@@ -164,7 +164,10 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     assert.strictEqual(result.records[0].history_count, 2);
     assert.strictEqual(deps.counter.executions, 1);
     assert.strictEqual(result.records[0].apply_state, 'NOT_AUTHORIZED');
+    assert.strictEqual(result.records[0].can_apply, false);
     assert.strictEqual(result.records[0].apply_allowed, false);
+    assert.deepStrictEqual(result.records[0].apply_readiness, { status: 'BLOCKED', reason: 'NOT_AUTHORIZED' });
+    assert.strictEqual(result.records[0].runtime_enabled, false);
     assert.deepStrictEqual(result.records[0].history.map((entry) => entry.is_current), [true, false]);
     assert.ok(!JSON.stringify(result).includes('snapshot_fingerprint'));
     assert.ok(!JSON.stringify(result).includes('canonical_snapshot'));
@@ -184,7 +187,18 @@ async function testReadyAndHistoricalExecutionPrecedence() {
         runtimeStateLoader: async () => ({ enabled: true }), indexStateLoader: async () => ({ ready: true })
     });
     assert.strictEqual(ready.records[0].apply_state, 'READY_TO_APPLY');
+    assert.strictEqual(ready.records[0].can_apply, true);
     assert.strictEqual(ready.records[0].apply_allowed, true);
+    assert.deepStrictEqual(ready.records[0].apply_readiness, { status: 'READY', reason: null });
+    assert.strictEqual(ready.records[0].runtime_enabled, true);
+    assert.strictEqual(ready.records[0].index_ready, true);
+    assert.deepStrictEqual(ready.records[0].apply_context, {
+        team: 'THA',
+        company_kodikos: '0004',
+        ypokatasthma: '0000',
+        week_start: approved.week_start,
+        week_end: approved.week_end
+    });
 
     const execution = { _id: new mongoose.Types.ObjectId(), decision_id: approvedId, proposal_id: proposalId, execution_status: 'APPLIED', applied_at: new Date('2026-07-15'), created_by_user_name: 'Executor' };
     const appliedDeps = dependencies(rows, [approved], [execution]);
@@ -195,8 +209,52 @@ async function testReadyAndHistoricalExecutionPrecedence() {
     });
     assert.strictEqual(applied.records[0].current_decision, null);
     assert.strictEqual(applied.records[0].apply_state, 'ALREADY_APPLIED');
+    assert.strictEqual(applied.records[0].can_apply, false);
     assert.strictEqual(applied.records[0].apply_allowed, false);
     assert.strictEqual(applied.records[0].current_execution.decision_id, String(approvedId));
+}
+
+async function testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData() {
+    const rows = week('2026-07-05', '0001');
+    const initial = await load(rows);
+    const proposalId = initial.result.records[0].proposal_id;
+    const approved = {
+        _id: new mongoose.Types.ObjectId(),
+        proposal_id: proposalId,
+        snapshot_fingerprint: 'current',
+        decision_code: 'APPROVE_PROPOSAL',
+        decision_status: 'RECORDED',
+        week_start: date('2026-07-05', 0),
+        week_end: date('2026-07-05', 6)
+    };
+    async function capability({ runtime, indexes, fingerprint = 'current' }) {
+        const deps = dependencies(rows, [approved]);
+        const result = await loadWeeklyRepoTransferDecisionBatch({
+            session: { ...session, userRole: 'A' },
+            filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' },
+            ...deps,
+            canonicalSnapshotBuilder: () => ({}),
+            snapshotFingerprintBuilder: () => fingerprint,
+            runtimeStateLoader: async () => ({ enabled: runtime }),
+            indexStateLoader: async () => ({ ready: indexes })
+        });
+        return result.records[0];
+    }
+    const runtimeBlocked = await capability({ runtime: false, indexes: true });
+    assert.strictEqual(runtimeBlocked.apply_state, 'RUNTIME_DISABLED');
+    assert.strictEqual(runtimeBlocked.can_apply, false);
+    assert.strictEqual(runtimeBlocked.apply_readiness.reason, 'RUNTIME_DISABLED');
+    assert.strictEqual(runtimeBlocked.index_ready, false);
+
+    const indexBlocked = await capability({ runtime: true, indexes: false });
+    assert.strictEqual(indexBlocked.apply_state, 'INDEXES_NOT_READY');
+    assert.strictEqual(indexBlocked.can_apply, false);
+    assert.strictEqual(indexBlocked.apply_readiness.reason, 'INDEXES_NOT_READY');
+
+    const stale = await capability({ runtime: true, indexes: true, fingerprint: 'changed' });
+    assert.strictEqual(stale.apply_state, 'STALE_DECISION');
+    assert.strictEqual(stale.can_apply, false);
+    assert.strictEqual(stale.current_decision, null);
 }
 
 async function testResolvedProjectionReturnsAppliedOnlyRecord() {
@@ -244,6 +302,7 @@ async function run() {
     await testManyProposalsKeepConstantQueryCounts();
     await testCurrentAndHistoricalAssociationIsSafe();
     await testReadyAndHistoricalExecutionPrecedence();
+    await testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData();
     await testResolvedProjectionReturnsAppliedOnlyRecord();
     await testTwentyPeriodDecisionsUseTwoConstantQueries();
     await testFilterAndScopeRejections();

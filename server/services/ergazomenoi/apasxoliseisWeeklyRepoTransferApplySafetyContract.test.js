@@ -43,7 +43,9 @@ assert.ok(/catch \{ transactionCapable = false; \}/.test(writer)); assert.ok(!/f
 const frontendApply = read(runtimeFiles[3]).slice(read(runtimeFiles[3]).indexOf('async function submitRepoTransferApply'), read(runtimeFiles[3]).indexOf('function renderAtomicRepoTransferProjection'));
 assert.ok(frontendApply.indexOf("title: 'Δεν εφαρμόστηκε η πρόταση'") < frontendApply.indexOf('await refreshRepoTransferDecisions()'));
 assert.ok(frontendApply.includes("icon: 'warning'"));
-assert.ok(frontendApply.includes("title: 'Η πρόταση εφαρμόστηκε'"));
+assert.ok(frontendApply.includes("title: 'Η μεταφορά ρεπό εφαρμόστηκε επιτυχώς.'"));
+assert.ok(frontendApply.includes("decisionState?.can_apply !== true"));
+assert.ok(frontendApply.includes("refreshedState?.apply_state !== 'ALREADY_APPLIED'"));
 const committedSuccessPath = frontendApply.slice(frontendApply.indexOf('Swal.close();\n    try {'));
 assert.ok(!committedSuccessPath.includes('button.disabled = false'));
 assert.ok(/generallyEnabled[\s\S]*=== 'true'/.test(read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService.js')));
