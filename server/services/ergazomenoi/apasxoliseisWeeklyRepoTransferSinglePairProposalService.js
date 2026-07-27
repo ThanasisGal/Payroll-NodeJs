@@ -2,9 +2,11 @@
 // This module must stay isolated from runtime and write dependencies.
 
 const {
-    analyzeWeeklyRepoTransferSinglePair,
+    analyzeWeeklyRepoTransferSinglePairV1,
+    analyzeWeeklyRepoTransferSinglePairV2,
     SCENARIO_CODE,
     SCENARIO_VERSION,
+    SCENARIO_VERSION_V2,
     ELIGIBILITY_STATUS
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 const {
@@ -15,6 +17,7 @@ const {
 } = require('./apasxoliseisPolicyCatalogService');
 
 const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v1';
+const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v2';
 const CHOICE_CODE = 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR';
 
 const PROPOSAL_STATUS = Object.freeze({
@@ -169,21 +172,32 @@ function buildResult({
     reasons,
     warnings,
     policyContext = null,
-    items = []
+    items = [],
+    scenarioVersion = SCENARIO_VERSION,
+    proposalVersion = PROPOSAL_VERSION,
+    atomicPairRequired = true,
+    runtimeApplySupported = false,
+    applyReadinessReason = null,
+    allowedHrChoices = [],
+    investigationGuidance = [],
+    reviewOnlyOutcome = null
 }) {
     const metadata = copyAnalysisMetadata(analysis);
     const ready = proposalStatus === PROPOSAL_STATUS.READY;
 
     return deepFreeze({
         scenario_code: SCENARIO_CODE,
-        scenario_version: SCENARIO_VERSION,
-        proposal_version: PROPOSAL_VERSION,
+        scenario_version: scenarioVersion,
+        proposal_version: proposalVersion,
         proposal_status: proposalStatus,
         choice_code: CHOICE_CODE,
         requires_hr_review: true,
         can_auto_apply: false,
-        atomic_pair_required: true,
-        runtime_apply_supported: false,
+        atomic_pair_required: atomicPairRequired,
+        runtime_apply_supported: runtimeApplySupported,
+        allowed_hr_choices: [...allowedHrChoices],
+        investigation_guidance: [...investigationGuidance],
+        review_only_outcome: reviewOnlyOutcome,
         reasons: [...new Set(reasons ?? metadata.reasons)],
         warnings: [...new Set(warnings ?? metadata.warnings)],
         week: metadata.week,
@@ -200,19 +214,38 @@ function buildResult({
         })),
         apply_readiness: {
             status: 'BLOCKED',
-            reason: ready ? 'ATOMIC_APPLY_SUPPORT_REQUIRED' : 'PROPOSAL_NOT_READY'
+            reason: applyReadinessReason ||
+                (ready ? 'ATOMIC_APPLY_SUPPORT_REQUIRED' : 'PROPOSAL_NOT_READY')
         }
     });
 }
 
-function invalidResult(analysis, reason, policyContext = null) {
+function invalidResult(
+    analysis,
+    reason,
+    policyContext = null,
+    {
+        scenarioVersion = SCENARIO_VERSION,
+        proposalVersion = PROPOSAL_VERSION
+    } = {}
+) {
     return buildResult({
         analysis,
         proposalStatus: PROPOSAL_STATUS.INVALID_ANALYSIS,
         reasons: [...(analysis.reasons || []), reason],
         warnings: analysis.warnings,
-        policyContext
+        policyContext,
+        scenarioVersion,
+        proposalVersion
     });
+}
+
+function normalizePositiveFiniteNumber(value) {
+    if (!['string', 'number'].includes(typeof value)) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    const normalized = Number(trimmed.replace(',', '.'));
+    return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
 }
 
 function findReferencedRow(weekRows, reference, role) {
@@ -302,9 +335,21 @@ function buildWeeklyRepoTransferSinglePairProposal({
     weekRows = [],
     employmentProfile = {},
     holidayByDateKey = new Map(),
-    existingAuditCountByRowKey = new Map()
-} = {}) {
-    const analysis = analyzeWeeklyRepoTransferSinglePair({
+    existingAuditCountByRowKey = new Map(),
+    contractVersion = 'v1'
+} = {}, dependencies = {}) {
+    if (!['v1', 'v2'].includes(contractVersion)) {
+        throw new TypeError('Unsupported repo-transfer proposal contract version.');
+    }
+    const legacy = contractVersion === 'v1';
+    const analyzer = dependencies.analyzer || (
+        legacy
+            ? analyzeWeeklyRepoTransferSinglePairV1
+            : analyzeWeeklyRepoTransferSinglePairV2
+    );
+    const scenarioVersion = legacy ? SCENARIO_VERSION : SCENARIO_VERSION_V2;
+    const proposalVersion = legacy ? PROPOSAL_VERSION : PROPOSAL_VERSION_V2;
+    const analysis = analyzer({
         weekRows,
         employmentProfile,
         holidayByDateKey,
@@ -312,27 +357,130 @@ function buildWeeklyRepoTransferSinglePairProposal({
     });
 
     if (analysis.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {
+        const operationType = analysis.semantic_proposal?.operation_type;
+        const noTarget =
+            operationType === 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY';
+        const blockedTarget = operationType === 'PARTIAL_OFFSET_TARGET_BLOCKED';
+        const reviewOnly = noTarget || blockedTarget;
+        const sourceRow = reviewOnly
+            ? (Array.isArray(weekRows) ? weekRows : []).find(
+                (row) => dateKeyUtc(row?.hmeromhnia) === analysis.source?.hmeromhnia
+            )
+            : null;
+        const reviewCardHours = reviewOnly
+            ? sourceRow
+                ? normalizePositiveFiniteNumber(sourceRow.cards_ores_ergasias)
+                : null
+            : null;
+        if (reviewOnly && reviewCardHours === null) {
+            return invalidResult(
+                analysis,
+                'SOURCE_CARD_HOURS_NOT_MATERIALIZABLE',
+                null,
+                { scenarioVersion, proposalVersion }
+            );
+        }
         return buildResult({
             analysis,
-            proposalStatus: PROPOSAL_STATUS.NOT_AVAILABLE
+            proposalStatus: PROPOSAL_STATUS.NOT_AVAILABLE,
+            scenarioVersion,
+            proposalVersion,
+            atomicPairRequired: reviewOnly ? false : true,
+            runtimeApplySupported: false,
+            applyReadinessReason: noTarget
+                ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                : blockedTarget
+                    ? 'OFFSET_TARGET_BLOCKED'
+                    : 'PROPOSAL_NOT_READY',
+            investigationGuidance: noTarget
+                ? analysis.semantic_proposal.investigation_guidance
+                : [],
+            reviewOnlyOutcome: reviewOnly ? {
+                outcome_code: operationType,
+                reason: noTarget
+                    ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                    : 'OFFSET_TARGET_BLOCKED',
+                source: {
+                    prodhlomena_oraria_id: normalizeId(sourceRow?._id || sourceRow?.id),
+                    hmeromhnia: dateKeyUtc(sourceRow?.hmeromhnia),
+                    cards_ores_ergasias: reviewCardHours,
+                    card_intervals: CARD_INTERVAL_FIELDS.map(([start, end]) => ({
+                        apo: normalizePrimitiveString(sourceRow?.[start]),
+                        eos: normalizePrimitiveString(sourceRow?.[end])
+                    })).filter((interval) => interval.apo && interval.eos),
+                    proposed_category: 'ΕΡΓ'
+                },
+                employee_kodikos: normalizePrimitiveString(
+                    analysis.employee?.kodikos,
+                    100
+                ),
+                week_start: normalizePrimitiveString(analysis.week?.start_date, 10),
+                week_end: normalizePrimitiveString(analysis.week?.end_date, 10),
+                team: normalizePrimitiveString(analysis.employee?.team),
+                company_kod: normalizePrimitiveString(analysis.employee?.company_kod),
+                ypokatasthma: normalizePrimitiveString(sourceRow?.ypokatasthma, 100),
+                blocked_target_candidates_count: blockedTarget
+                    ? analysis.semantic_proposal.blocked_target_candidates_count
+                    : 0,
+                blocked_target_reasons: blockedTarget
+                    ? [...analysis.semantic_proposal.blocked_target_reasons]
+                    : [],
+                blocked_target_candidates: blockedTarget
+                    ? analysis.semantic_proposal.blocked_target_candidates.map((candidate) => ({
+                        prodhlomena_oraria_id: candidate.prodhlomena_oraria_id,
+                        hmeromhnia: candidate.hmeromhnia,
+                        current_category: candidate.current_category,
+                        blocker_reasons: [...candidate.blocker_reasons]
+                    }))
+                    : [],
+                investigation_guidance: noTarget
+                    ? [...analysis.semantic_proposal.investigation_guidance]
+                    : [],
+                requires_hr_review: true,
+                can_auto_apply: false,
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                apply_readiness: {
+                    status: 'BLOCKED',
+                    reason: noTarget
+                        ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                        : 'OFFSET_TARGET_BLOCKED'
+                }
+            } : null
         });
     }
 
-    const policy = readPolicyContext();
-    if (!policy) return invalidResult(analysis, 'POLICY_CATALOG_NOT_MATERIALIZABLE');
+    const policy = (dependencies.readPolicyContext || readPolicyContext)();
+    const versions = { scenarioVersion, proposalVersion };
+    if (!policy) {
+        return invalidResult(
+            analysis,
+            'POLICY_CATALOG_NOT_MATERIALIZABLE',
+            null,
+            versions
+        );
+    }
 
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const sourceMatch = findReferencedRow(rows, analysis.source, 'SOURCE');
-    if (!sourceMatch.row) return invalidResult(analysis, sourceMatch.reason, policy.metadata);
+    if (!sourceMatch.row) {
+        return invalidResult(analysis, sourceMatch.reason, policy.metadata, versions);
+    }
     const targetMatch = findReferencedRow(rows, analysis.target, 'TARGET');
-    if (!targetMatch.row) return invalidResult(analysis, targetMatch.reason, policy.metadata);
+    if (!targetMatch.row) {
+        return invalidResult(analysis, targetMatch.reason, policy.metadata, versions);
+    }
 
     const sourceId = normalizePrimitiveString(analysis.source?.prodhlomena_oraria_id, 100);
     const targetId = normalizePrimitiveString(analysis.target?.prodhlomena_oraria_id, 100);
-    if (!sourceId) return invalidResult(analysis, 'MISSING_SOURCE_RECORD_ID', policy.metadata);
-    if (!targetId) return invalidResult(analysis, 'MISSING_TARGET_RECORD_ID', policy.metadata);
+    if (!sourceId) {
+        return invalidResult(analysis, 'MISSING_SOURCE_RECORD_ID', policy.metadata, versions);
+    }
+    if (!targetId) {
+        return invalidResult(analysis, 'MISSING_TARGET_RECORD_ID', policy.metadata, versions);
+    }
     if (sourceId === targetId) {
-        return invalidResult(analysis, 'DUPLICATE_PAIR_RECORD_ID', policy.metadata);
+        return invalidResult(analysis, 'DUPLICATE_PAIR_RECORD_ID', policy.metadata, versions);
     }
 
     const sourceMaterialization = materializeSourceValues(sourceMatch.row);
@@ -340,14 +488,16 @@ function buildWeeklyRepoTransferSinglePairProposal({
         return invalidResult(
             analysis,
             'SOURCE_CARD_INTERVALS_NOT_MATERIALIZABLE',
-            policy.metadata
+            policy.metadata,
+            versions
         );
     }
     if (sourceMaterialization.invalidHours) {
         return invalidResult(
             analysis,
             'SOURCE_CARD_HOURS_NOT_MATERIALIZABLE',
-            policy.metadata
+            policy.metadata,
+            versions
         );
     }
 
@@ -356,14 +506,26 @@ function buildWeeklyRepoTransferSinglePairProposal({
         10
     );
     if (!['ΑΝ', 'ΜΕ'].includes(targetCategory)) {
-        return invalidResult(analysis, 'TARGET_CATEGORY_NOT_MATERIALIZABLE', policy.metadata);
+        return invalidResult(
+            analysis,
+            'TARGET_CATEGORY_NOT_MATERIALIZABLE',
+            policy.metadata,
+            versions
+        );
     }
-    const targetProposedValues = materializeTargetValues(targetCategory);
+    const targetProposedValues = (
+        dependencies.materializeTargetValues || materializeTargetValues
+    )(targetCategory);
     if (
         !hasOnlyAllowedFields(sourceMaterialization.proposedValues, policy.allowedFields) ||
         !hasOnlyAllowedFields(targetProposedValues, policy.allowedFields)
     ) {
-        return invalidResult(analysis, 'PROPOSED_FIELD_NOT_ALLOWED', policy.metadata);
+        return invalidResult(
+            analysis,
+            'PROPOSED_FIELD_NOT_ALLOWED',
+            policy.metadata,
+            versions
+        );
     }
 
     const employeeKodikos = normalizePrimitiveString(analysis.employee?.kodikos, 100);
@@ -390,7 +552,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
         analysis,
         proposalStatus: PROPOSAL_STATUS.READY,
         policyContext: policy.metadata,
-        items
+        items,
+        scenarioVersion,
+        proposalVersion
     });
 }
 
@@ -398,5 +562,6 @@ module.exports = {
     buildWeeklyRepoTransferSinglePairProposal,
     PROPOSAL_STATUS,
     PROPOSAL_VERSION,
+    PROPOSAL_VERSION_V2,
     CHOICE_CODE
 };

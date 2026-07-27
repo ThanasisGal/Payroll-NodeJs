@@ -186,7 +186,17 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     const candidateScopes = new Set(context.candidates.map((row) => [String(row.team), String(row.company_kod), String(row.ypokatasthma), String(row.kodikos)].join('|')));
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
-    const projection = projectionBuilder({ weekRows: context.weekRows, employmentProfile: context.employmentProfile || context.employee, holidayByDateKey: context.holidayByDateKey || new Map(), existingAuditCountByRowKey: auditCounts });
+    const contractVersion = command.expected_proposal_version ===
+        'repo-transfer-single-pair-proposal:v1'
+        ? 'v1'
+        : command.expected_proposal_version ===
+            'repo-transfer-single-pair-proposal:v2'
+            ? 'v2'
+            : null;
+    if (!contractVersion) {
+        throw conflict('Η έκδοση της πρότασης δεν υποστηρίζεται.');
+    }
+    const projection = projectionBuilder({ weekRows: context.weekRows, employmentProfile: context.employmentProfile || context.employee, holidayByDateKey: context.holidayByDateKey || new Map(), existingAuditCountByRowKey: auditCounts, contractVersion });
     if (projection.projection_status !== PROJECTION_STATUS.READY || projection.groups?.length !== 1) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
     const group = projection.groups[0]; const items = group.items || [];
     if (items.length !== 2 || items[0]?.role !== 'SOURCE_BECOMES_WORK' || items[1]?.role !== 'TARGET_BECOMES_REPO') throw conflict('Η συνδεδεμένη πρόταση δεν είναι έγκυρη. Ανανεώστε τον έλεγχο.');

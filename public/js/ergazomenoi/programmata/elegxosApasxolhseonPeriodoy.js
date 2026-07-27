@@ -3697,6 +3697,8 @@ function renderAtomicRepoTransferSummary(projection = {}) {
         ['Συνδεδεμένες προτάσεις', 'decision_units_count'],
         ['Προτάσεις προς έλεγχο από HR', 'ready_count'],
         ['Εργαζόμενοι', 'employees_count'],
+        ['Περιπτώσεις προς διερεύνηση', 'review_outcomes_count'],
+        ['Εργαζόμενοι προς διερεύνηση', 'review_outcome_employees_count'],
         ['Χωρίς ασφαλή πρόταση', 'not_available_count'],
         ['Περιπτώσεις με μη έγκυρα στοιχεία', 'invalid_projection_count']
     ];
@@ -3756,7 +3758,9 @@ function renderAtomicRepoTransferIntervals(proposedValues = {}) {
 function renderAtomicRepoTransferItem(item = {}, role) {
     const isSource = role === 'SOURCE_BECOMES_WORK';
     const proposedValues = item.proposed_values || {};
-    const title = isSource ? 'Ημέρα που γίνεται εργασία' : 'Ημέρα που γίνεται ρεπό';
+    const title = isSource
+        ? 'Ημέρα που γίνεται εργασία — μη προδηλωμένη εργασία με κάρτες, Προτείνεται ΕΡΓ'
+        : 'Ημέρα που γίνεται ρεπό — προδηλωμένη εργασία χωρίς κάρτες, Προτείνεται ΜΕ';
     const panelClass = isSource
         ? 'atomic-repo-transfer-source'
         : 'atomic-repo-transfer-target';
@@ -3814,20 +3818,70 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED:
         'Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
     NO_TARGET_CANDIDATE: 'Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
+    NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS:
+        'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
     INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
     MULTIPLE_SOURCE_CANDIDATES:
-        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.'
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
+    MULTIPLE_TARGET_CANDIDATES:
+        'Βρέθηκαν περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες. Απαιτείται έλεγχος πριν επιλεγεί ημέρα ρεπό.',
+    REPO_LIMIT_EXCEEDED:
+        'Η αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό της εβδομάδας.',
+    TARGET_LOCKED: 'Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.',
+    TARGET_MANUAL_OVERRIDE:
+        'Η προτεινόμενη ημέρα ρεπό έχει ήδη χειροκίνητη αλλαγή ή καταγεγραμμένο έλεγχο.',
+    TARGET_LEAVE_OR_SICKNESS:
+        'Η προτεινόμενη ημέρα ρεπό έχει άδεια ή ασθένεια.',
+    TARGET_HOLIDAY: 'Η προτεινόμενη ημέρα ρεπό συμπίπτει με αργία που εμποδίζει την αλλαγή.',
+    SOURCE_LOCKED: 'Η ημέρα εργασίας με κάρτες είναι κλειδωμένη.',
+    SOURCE_MANUAL_OVERRIDE:
+        'Η ημέρα εργασίας με κάρτες έχει ήδη χειροκίνητη αλλαγή ή καταγεγραμμένο έλεγχο.',
+    SOURCE_LEAVE_OR_SICKNESS:
+        'Η ημέρα εργασίας με κάρτες έχει άδεια ή ασθένεια.',
+    SOURCE_HOLIDAY:
+        'Η ημέρα εργασίας με κάρτες συμπίπτει με αργία που εμποδίζει την αλλαγή.',
+    SOURCE_INVALID_CARD_EVIDENCE:
+        'Τα στοιχεία καρτών της ημέρας εργασίας δεν είναι πλήρη ή συνεπή.',
+    SOURCE_ALREADY_PROCESSED:
+        'Η ημέρα εργασίας με κάρτες έχει ήδη ουσιαστικά απολογιστικά στοιχεία.',
+    TARGET_ALREADY_PROCESSED:
+        'Η προτεινόμενη ημέρα ρεπό έχει ήδη ουσιαστικά απολογιστικά στοιχεία.',
+    TARGET_CONFLICTING_REPO_STATE:
+        'Η προδηλωμένη ημέρα χωρίς κάρτες έχει αντικρουόμενη ένδειξη ρεπό.',
+    TARGET_CONFLICTING_FACTS:
+        'Τα στοιχεία της προδηλωμένης ημέρας χωρίς κάρτες δεν είναι συνεπή.',
+    TARGET_CONFLICTING_APOLOGISTIKA_CATEGORY:
+        'Η προδηλωμένη ημέρα χωρίς κάρτες έχει διαφορετική απολογιστική κατηγορία.',
+    TARGET_INVALID_APOLOGISTIKA_NUMERIC_VALUE:
+        'Η προδηλωμένη ημέρα χωρίς κάρτες έχει μη έγκυρη αριθμητική απολογιστική τιμή.',
+    TARGET_ZERO_HOURS_WITH_CARD_INTERVALS:
+        'Η προδηλωμένη ημέρα έχει μηδενικές συνολικές ώρες καρτών αλλά περιέχει πλήρες διάστημα κάρτας.',
+    TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR:
+        'Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.',
+    TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL:
+        'Η ημέρα περιέχει ζεύγος κάρτας με ίδια ώρα εισόδου και εξόδου.',
+    TARGET_INVALID_CARD_HOURS_VALUE:
+        'Η συνολική τιμή ωρών καρτών της ημέρας δεν είναι έγκυρη.',
+    TARGET_INVALID_CARD_TIME_VALUE:
+        'Η ημέρα περιέχει μη έγκυρη τιμή ώρας κάρτας.',
+    UNSUPPORTED_EMPLOYMENT_TYPE:
+        'Ο τύπος απασχόλησης δεν αναγνωρίζεται με ασφάλεια.',
+    CROSS_WEEK_ROWS:
+        'Τα στοιχεία εκτείνονται σε περισσότερες από μία φυσικές εβδομάδες.'
 });
 
 const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
+
+function getAtomicRepoTransferDiagnosticLabel(code) {
+    return atomicRepoTransferDiagnosticLabels[String(code || '').trim()] ||
+        atomicRepoTransferUnknownDiagnosticLabel;
+}
 
 function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
     return Object.entries(reasonCounts || {})
         .map(([code, rawCount]) => ({
             count: Number(rawCount),
-            label:
-                atomicRepoTransferDiagnosticLabels[String(code || '').trim()] ||
-                atomicRepoTransferUnknownDiagnosticLabel
+            label: getAtomicRepoTransferDiagnosticLabel(code)
         }))
         .filter(({ count }) => Number.isFinite(count) && count > 0)
         .sort((left, right) => {
@@ -4541,13 +4595,139 @@ function renderAtomicRepoTransferProjection(projection) {
     if (!projection) return '';
 
     const groups = Array.isArray(projection.groups) ? projection.groups : [];
+    const reviewOutcomes = Array.isArray(projection.review_outcomes)
+        ? projection.review_outcomes
+        : [];
+    const reviewOutcomesHtml = reviewOutcomes.map((outcome) => {
+        const blockedTarget = outcome?.outcome_code === 'PARTIAL_OFFSET_TARGET_BLOCKED';
+        const guidanceLabels = (Array.isArray(outcome?.investigation_guidance)
+            ? outcome.investigation_guidance
+            : [])
+            .filter((value) => ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'].includes(value))
+            .map((value) => value === 'ΑΔΕΙΑ' ? 'άδεια' : 'απουσία');
+        const blockerLabels = (Array.isArray(outcome?.blocked_target_reasons)
+            ? [...new Set(outcome.blocked_target_reasons)]
+            : [])
+            .sort()
+            .map(getAtomicRepoTransferDiagnosticLabel);
+        const rawBlockedCandidates = Array.isArray(outcome?.blocked_target_candidates)
+            ? outcome.blocked_target_candidates
+            : [];
+        const blockedCandidatesAreSafe = rawBlockedCandidates.length > 0 &&
+            rawBlockedCandidates.every((candidate) => {
+                if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                    return false;
+                }
+                const date = String(candidate.hmeromhnia || '').trim();
+                const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
+                    ? new Date(`${date}T00:00:00.000Z`)
+                    : null;
+                return (
+                    parsedDate &&
+                    !Number.isNaN(parsedDate.getTime()) &&
+                    parsedDate.toISOString().slice(0, 10) === date &&
+                    typeof candidate.current_category === 'string' &&
+                    Array.isArray(candidate.blocker_reasons) &&
+                    candidate.blocker_reasons.every((reason) => typeof reason === 'string')
+                );
+            });
+        const blockedCandidates = blockedCandidatesAreSafe ? rawBlockedCandidates : [];
+        const blockedCandidatesHtml = blockedTarget && blockedCandidates.length
+            ? `
+                <div class="small mt-2">
+                    <div class="fw-semibold">
+                        ${blockedCandidates.length === 1
+                            ? 'Βρέθηκε μία υποψήφια ημέρα που δεν μπορεί να χρησιμοποιηθεί:'
+                            : `Βρέθηκαν ${escapeHtml(blockedCandidates.length)} υποψήφιες ημέρες που δεν μπορούν να χρησιμοποιηθούν:`}
+                    </div>
+                    <ul class="mb-0">
+                        ${blockedCandidates.map((candidate) => {
+                            const candidateReasons = [...new Set(candidate.blocker_reasons)]
+                                .sort()
+                                .map(getAtomicRepoTransferDiagnosticLabel);
+                            return `<li>
+                                <span>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}
+                                    — ${escapeHtml(candidate.current_category || '-')}</span>
+                                ${candidateReasons.map((label) =>
+                                    `<div>${escapeHtml(label)}</div>`
+                                ).join('')}
+                            </li>`;
+                        }).join('')}
+                    </ul>
+                </div>
+            `
+            : '';
+        return `
+        <article class="atomic-repo-transfer-group">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span class="badge text-bg-warning">Χρειάζεται περαιτέρω έλεγχο</span>
+                <span class="fw-semibold">${escapeHtml(blockedTarget
+                    ? 'Ημέρα αντιστάθμισης με εμπόδιο'
+                    : 'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης')}</span>
+            </div>
+            <div class="small mb-2">
+                Εργαζόμενος: <strong>${escapeHtml(outcome?.employee_kodikos || '-')}</strong>
+                ${outcome?.ypokatasthma ? ` · Υποκατάστημα: ${escapeHtml(outcome.ypokatasthma)}` : ''}
+                <br>
+                Εβδομάδα: ${escapeHtml(formatPolicyPreviewDate(outcome?.week_start))}
+                –${escapeHtml(formatPolicyPreviewDate(outcome?.week_end))}
+            </div>
+            <div class="small">
+                Ημέρα με κάρτες: ${escapeHtml(formatPolicyPreviewDate(outcome?.source?.hmeromhnia))}
+                · Ώρες καρτών: ${escapeHtml(formatAtomicRepoTransferHours(
+                    outcome?.source?.cards_ores_ergasias
+                ))}
+                · Προτείνεται αναγνώριση ως <strong>ΕΡΓ</strong>.
+            </div>
+            <div class="small mt-1">
+                ${blockedTarget
+                    ? `Βρέθηκε προδηλωμένη ημέρα χωρίς κάρτες, αλλά δεν μπορεί να χρησιμοποιηθεί
+                       με ασφάλεια ως ημέρα μη εργασίας.
+                       ${blockerLabels.map((label) =>
+                           `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(label)}</div>`
+                       ).join('')}
+                       ${blockedCandidatesHtml}`
+                    : `Δεν βρέθηκε προδηλωμένη ημέρα εργασίας χωρίς κάρτες που να μπορεί να
+                       χρησιμοποιηθεί ως ημέρα μη εργασίας.
+                       ${guidanceLabels.length
+                           ? `<div>Πιθανή αιτία προς διερεύνηση από το HR:
+                                <strong>${escapeHtml(guidanceLabels.join(' ή '))}</strong>
+                                σε άλλη συγκεκριμένη ημέρα της εβδομάδας.</div>`
+                           : ''}`
+                }
+            </div>
+            <div class="small text-muted mt-2">
+                ${blockedTarget
+                    ? `Δεν έχει επιλεγεί ασφαλής ημέρα-στόχος και δεν έχει δημιουργηθεί
+                       αποθηκεύσιμη πρόταση ή απόφαση HR.`
+                    : `Δεν έχει δημιουργηθεί πρόταση εφαρμογής. Δεν υπάρχει target ημερομηνία,
+                       αποθηκεύσιμη επιλογή ή απόφαση HR.`}
+            </div>
+        </article>
+    `;
+    }).join('');
     const groupsHtml = groups.length
         ? groups.map((group, index) => renderAtomicRepoTransferGroup(group, index)).join('')
-        : `
+        : reviewOutcomes.length ? '' : `
             <div class="atomic-repo-transfer-empty">
                 Δεν δημιουργήθηκε αυτόματη πρόταση.
             </div>
         `;
+    const groupSafetyHtml = groups.length ? `
+        <div class="atomic-repo-transfer-main-warning">
+            <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
+            <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
+        </div>
+        <div class="atomic-repo-transfer-unavailable">
+            Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
+        </div>
+    ` : '';
+    const reviewSafetyHtml = reviewOutcomes.length ? `
+        <div class="atomic-repo-transfer-main-warning">
+            Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR.
+            Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής.
+        </div>
+    ` : '';
 
     return `
         <section class="atomic-repo-transfer-section" aria-labelledby="atomicRepoTransferTitle">
@@ -4555,19 +4735,21 @@ function renderAtomicRepoTransferProjection(projection) {
                 <div class="card-body">
                     <div class="atomic-repo-transfer-header">
                         <div class="fw-semibold" id="atomicRepoTransferTitle">
-                            Προτάσεις Μεταφοράς Ρεπό
+                            ${groups.length ? 'Προτάσεις Μεταφοράς Ρεπό' : 'Έλεγχος Μεταφοράς Ρεπό'}
                         </div>
                         <span class="atomic-repo-transfer-readonly-badge">Μόνο για έλεγχο</span>
                     </div>
-                    <div class="atomic-repo-transfer-main-warning">
-                        <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
-                        <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
-                    </div>
-                    <div class="atomic-repo-transfer-unavailable">
-                        Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
-                    </div>
+                    ${groupSafetyHtml}
+                    ${reviewSafetyHtml}
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
+                    ${reviewOutcomes.length
+                        ? `<div class="fw-semibold mt-3 mb-2">Περιπτώσεις προς διερεύνηση</div>
+                           <div class="atomic-repo-transfer-groups">${reviewOutcomesHtml}</div>`
+                        : ''}
+                    ${groups.length && reviewOutcomes.length
+                        ? '<div class="fw-semibold mt-3 mb-2">Συνδεδεμένες προτάσεις</div>'
+                        : ''}
                     <div class="atomic-repo-transfer-groups">${groupsHtml}</div>
                 </div>
             </div>

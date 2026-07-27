@@ -8,6 +8,7 @@ const {
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
 const SCENARIO_VERSION = 'repo-transfer-single-pair:v1';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v2';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -20,6 +21,11 @@ const EMPLOYMENT_TYPE = Object.freeze({
     FULL: 'PLHRHS',
     PARTIAL: 'MERIKH',
     ROTATIONAL: 'EK_PERITROPHS'
+});
+
+const EMPLOYMENT_FAMILY = Object.freeze({
+    FULL: 'FULL',
+    PARTIAL_FAMILY: 'PARTIAL_FAMILY'
 });
 
 function isPlainObject(value) {
@@ -47,6 +53,16 @@ function toFiniteNumber(value) {
 }
 
 function classifyApologistikaNumber(value) {
+    if (value === null || value === undefined) return { kind: 'ZERO', value: 0 };
+    if (typeof value === 'string' && value.trim() === '') return { kind: 'ZERO', value: 0 };
+    if (!['string', 'number'].includes(typeof value)) return { kind: 'INVALID', value: null };
+
+    const number = toFiniteNumber(value);
+    if (number === null || number < 0) return { kind: 'INVALID', value: null };
+    return { kind: number === 0 ? 'ZERO' : 'POSITIVE', value: number };
+}
+
+function classifyCardHours(value) {
     if (value === null || value === undefined) return { kind: 'ZERO', value: 0 };
     if (typeof value === 'string' && value.trim() === '') return { kind: 'ZERO', value: 0 };
     if (!['string', 'number'].includes(typeof value)) return { kind: 'INVALID', value: null };
@@ -115,10 +131,10 @@ function startOfWeekSundayUtc(dateKey) {
 function normalizeEmploymentType(value) {
     const raw = toTrimmedString(value).toUpperCase().replace(/\s+/g, '_');
 
-    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
+    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIHRIS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
         return EMPLOYMENT_TYPE.FULL;
     }
-    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PART_TIME'].includes(raw)) {
+    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PARTIAL', 'PART_TIME'].includes(raw)) {
         return EMPLOYMENT_TYPE.PARTIAL;
     }
     if (
@@ -128,6 +144,8 @@ function normalizeEmploymentType(value) {
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
             'EK_PERITROPHS',
+            'EK_PERITROPIS',
+            'EK_PERITROPH',
             'EK_PERITROPHIS',
             'ROTATIONAL'
         ].includes(raw)
@@ -453,6 +471,7 @@ function buildRowInfo(row, contexts) {
     );
     const facts = buildApasxoliseisScenarioFacts(row, { existingAuditCount });
     const cardHours = toFiniteNumber(row.cards_ores_ergasias);
+    const cardHoursState = classifyCardHours(row.cards_ores_ergasias);
     const holidayState = resolveRepoTransferHolidayState(
         row,
         contexts.holidayByDateKey,
@@ -490,6 +509,7 @@ function buildRowInfo(row, contexts) {
         dateKey,
         facts,
         cardHours,
+        cardHoursState,
         holidayState,
         manualOverride,
         criticalWarnings,
@@ -649,7 +669,7 @@ function buildResult({
     });
 }
 
-function analyzeWeeklyRepoTransferSinglePair({
+function analyzeWeeklyRepoTransferSinglePairV1({
     weekRows = [],
     employmentProfile = {},
     holidayByDateKey = new Map(),
@@ -836,11 +856,256 @@ function analyzeWeeklyRepoTransferSinglePair({
     });
 }
 
+function employmentFamily(employmentType) {
+    if (employmentType === EMPLOYMENT_TYPE.FULL) return EMPLOYMENT_FAMILY.FULL;
+    if ([EMPLOYMENT_TYPE.PARTIAL, EMPLOYMENT_TYPE.ROTATIONAL].includes(employmentType)) {
+        return EMPLOYMENT_FAMILY.PARTIAL_FAMILY;
+    }
+    return null;
+}
+
+function withScenarioVersion(result, scenarioVersion) {
+    return deepFreeze({ ...result, scenario_version: scenarioVersion });
+}
+
+function partialSourceFacts(info) {
+    const declared = info.facts.declared;
+    return (
+        declared.isDeclaredNonWork &&
+        declared.hasDeclaredHours === false &&
+        declared.hasDeclaredIntervals === false &&
+        info.cardHours !== null &&
+        info.cardHours > 0 &&
+        info.facts.cards.cardIntervalsNormalized.length > 0 &&
+        info.facts.cards.incompleteCardPairs.length === 0
+    );
+}
+
+function partialTargetFacts(info) {
+    const declared = info.facts.declared;
+    return (
+        declared.isDeclaredWork &&
+        (declared.hasDeclaredHours || declared.hasDeclaredIntervals) &&
+        ['ZERO', 'INVALID'].includes(info.cardHoursState.kind)
+    );
+}
+
+function partialTargetCardEvidenceExclusions(info) {
+    const reasons = [];
+    if (info.cardHoursState.kind === 'INVALID') {
+        reasons.push('TARGET_INVALID_CARD_HOURS_VALUE');
+    }
+    if (info.facts.cards.cardIntervalsNormalized.length > 0) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
+    }
+    if (info.facts.cards.incompleteCardPairs.length > 0) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
+    }
+    if (info.facts.cards.hasZeroLengthCardInterval) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL');
+    }
+    if (info.facts.cards.hasInvalidCardTimeValue) {
+        reasons.push('TARGET_INVALID_CARD_TIME_VALUE');
+    }
+    return reasons;
+}
+
+function partialTargetExclusions(info) {
+    return [
+        ...targetExclusions(info),
+        ...partialTargetCardEvidenceExclusions(info)
+    ];
+}
+
+function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
+    const rows = Array.isArray(input.weekRows) ? input.weekRows : [];
+    const profile = asPlainObject(input.employmentProfile);
+    const employmentType = normalizeEmploymentType(profile.typos_apasxolhshs);
+    const family = employmentFamily(employmentType);
+
+    // FULL deliberately retains the exact v1 analyzer and result contract.
+    if (family === EMPLOYMENT_FAMILY.FULL) {
+        return analyzeWeeklyRepoTransferSinglePairV1(input);
+    }
+    if (!family) {
+        return withScenarioVersion(
+            analyzeWeeklyRepoTransferSinglePairV1(input),
+            SCENARIO_VERSION_V2
+        );
+    }
+
+    // Rotational/discontinuous profiles intentionally reuse the established MERIKH
+    // repo-limit policy. Only the normalized employment identity is restored below.
+    const equivalentInput = {
+        ...input,
+        employmentProfile: {
+            ...profile,
+            typos_apasxolhshs: EMPLOYMENT_TYPE.PARTIAL
+        }
+    };
+    const establishedResult = analyzeWeeklyRepoTransferSinglePairV1(equivalentInput);
+    if (rows.length !== 7 || rows.some((row) => !isPlainObject(row))) {
+        return withScenarioVersion(establishedResult, SCENARIO_VERSION_V2);
+    }
+
+    const rowInfos = rows.map((row) =>
+        buildRowInfo(row, {
+            holidayByDateKey: input.holidayByDateKey || new Map(),
+            existingAuditCountByRowKey: input.existingAuditCountByRowKey || new Map(),
+            employmentProfile: profile
+        })
+    );
+    const strictSources = rowInfos.filter(partialSourceFacts);
+    const cleanSources = strictSources.filter((info) => sourceExclusions(info).length === 0);
+    const strictTargets = rowInfos.filter(partialTargetFacts);
+    const cleanTargets = strictTargets.filter(
+        (info) => partialTargetExclusions(info).length === 0
+    );
+    const common = {
+        ...establishedResult,
+        scenario_version: SCENARIO_VERSION_V2,
+        employee: {
+            ...establishedResult.employee,
+            typos_apasxolhshs: employmentType
+        }
+    };
+    if (
+        establishedResult.eligibility_status === ELIGIBILITY_STATUS.INVALID_INPUT ||
+        establishedResult.reasons.includes('INVALID_MHNIAIA_REPO')
+    ) {
+        return deepFreeze(common);
+    }
+
+    if (cleanSources.length !== 1) {
+        return deepFreeze({
+            ...common,
+            eligibility_status: strictSources.length > 0
+                ? ELIGIBILITY_STATUS.NEEDS_REVIEW
+                : ELIGIBILITY_STATUS.NOT_APPLICABLE,
+            reasons: [
+                cleanSources.length > 1 ? 'MULTIPLE_SOURCE_CANDIDATES' : 'NO_SOURCE_CANDIDATE',
+                ...strictSources.flatMap(sourceExclusions)
+            ],
+            counts: {
+                ...common.counts,
+                source_candidates: cleanSources.length,
+                target_candidates: cleanTargets.length
+            },
+            source: null,
+            target: null,
+            semantic_proposal: null
+        });
+    }
+
+    if (strictTargets.length === 0) {
+        return deepFreeze({
+            ...common,
+            eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'],
+            counts: {
+                ...common.counts,
+                source_candidates: 1,
+                target_candidates: 0
+            },
+            source: rowReference(cleanSources[0], 'ΕΡΓ'),
+            target: null,
+            semantic_proposal: {
+                operation_type: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+                source_role: 'SOURCE_BECOMES_WORK'
+            }
+        });
+    }
+
+    if (cleanTargets.length === 0) {
+        const blockedTargets = strictTargets
+            .map((info) => ({
+                ...rowReference(info, null),
+                blocker_reasons: [...new Set(partialTargetExclusions(info))].sort()
+            }))
+            .sort(
+                (left, right) =>
+                    left.hmeromhnia.localeCompare(right.hmeromhnia) ||
+                    String(left.prodhlomena_oraria_id || '').localeCompare(
+                        String(right.prodhlomena_oraria_id || '')
+                    )
+            );
+        const blockedTargetReasons = [
+            ...new Set(blockedTargets.flatMap((target) => target.blocker_reasons))
+        ].sort();
+        return deepFreeze({
+            ...common,
+            eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: blockedTargetReasons,
+            counts: {
+                ...common.counts,
+                source_candidates: 1,
+                target_candidates: 0
+            },
+            source: rowReference(cleanSources[0], 'ΕΡΓ'),
+            target: null,
+            semantic_proposal: {
+                operation_type: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                investigation_guidance: [],
+                source_role: 'SOURCE_BECOMES_WORK',
+                blocked_target_candidates_count: blockedTargets.length,
+                blocked_target_reasons: blockedTargetReasons,
+                blocked_target_candidates: blockedTargets
+            }
+        });
+    }
+
+    if (cleanTargets.length > 1) {
+        return deepFreeze({
+            ...common,
+            eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['MULTIPLE_TARGET_CANDIDATES'],
+            counts: {
+                ...common.counts,
+                source_candidates: 1,
+                target_candidates: cleanTargets.length
+            },
+            source: null,
+            target: null,
+            semantic_proposal: null
+        });
+    }
+
+    if (establishedResult.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {
+        return deepFreeze(common);
+    }
+
+    return deepFreeze({
+        ...common,
+        source: rowReference(cleanSources[0], 'ΕΡΓ'),
+        target: rowReference(cleanTargets[0], 'ΜΕ'),
+        semantic_proposal: {
+            ...establishedResult.semantic_proposal,
+            source_role: 'SOURCE_BECOMES_WORK',
+            target_role: 'TARGET_BECOMES_REPO',
+            employment_family: EMPLOYMENT_FAMILY.PARTIAL_FAMILY
+        }
+    });
+}
+
+function analyzeWeeklyRepoTransferSinglePair(input = {}) {
+    return analyzeWeeklyRepoTransferSinglePairV1(input);
+}
+
 module.exports = {
     analyzeWeeklyRepoTransferSinglePair,
+    analyzeWeeklyRepoTransferSinglePairV1,
+    analyzeWeeklyRepoTransferSinglePairV2,
     normalizeEmploymentType,
     SCENARIO_CODE,
     SCENARIO_VERSION,
+    SCENARIO_VERSION_V2,
     ELIGIBILITY_STATUS,
-    EMPLOYMENT_TYPE
+    EMPLOYMENT_TYPE,
+    EMPLOYMENT_FAMILY,
+    employmentFamily
 };

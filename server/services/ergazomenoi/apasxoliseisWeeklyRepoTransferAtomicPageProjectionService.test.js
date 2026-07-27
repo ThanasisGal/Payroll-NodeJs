@@ -97,6 +97,16 @@ function weeklyInput(
     };
 }
 
+function noTargetPartTimeWeek(start, employeeKodikos) {
+    const rows = partTimeWeek(start, employeeKodikos);
+    Object.assign(rows[4], {
+        cards_ores_ergasias: 4,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '13:00'
+    });
+    return rows;
+}
+
 function testCompleteWeekInputConstruction() {
     const validRows = fullTimeWeek();
     const partialRows = fullTimeWeek('2026-07-12', '002').slice(0, 4);
@@ -174,7 +184,9 @@ function testValidFullTimeAndPartTimeWeeks() {
         employees_count: 1,
         ready_count: 1,
         not_available_count: 0,
-        invalid_projection_count: 0
+        invalid_projection_count: 0,
+        review_outcomes_count: 0,
+        review_outcome_employees_count: 0
     });
     assert.strictEqual(fullTime.groups.length, 1);
     assert.deepStrictEqual(
@@ -396,7 +408,11 @@ function testNonReadyInvalidAndDuplicateDiagnostics() {
     });
     assert.strictEqual(nonReady.summary.not_available_count, 1);
     assert.strictEqual(nonReady.summary.groups_count, 0);
-    assert.strictEqual(nonReady.reason_counts.ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED, 1);
+    assert.strictEqual(nonReady.reason_counts.NO_SOURCE_CANDIDATE, 1);
+    assert.strictEqual(
+        nonReady.reason_counts.ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED,
+        undefined
+    );
 
     const invalid = buildWeeklyRepoTransferAtomicPageProjection(
         { weeklyInputs: [weeklyInput(fullTimeWeek())] },
@@ -521,6 +537,82 @@ function testWarningsAndResponseComposition() {
     assert.strictEqual(JSON.stringify(response).includes('APPROVE_PREFILL'), false);
 }
 
+function testReviewOutcomeSummaryIdentityAndSorting() {
+    const sameEmployee = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [
+            weeklyInput(
+                noTargetPartTimeWeek('2026-07-12', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            ),
+            weeklyInput(
+                noTargetPartTimeWeek('2026-07-05', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            )
+        ]
+    });
+    assert.strictEqual(sameEmployee.summary.review_outcomes_count, 2);
+    assert.strictEqual(sameEmployee.summary.review_outcome_employees_count, 1);
+    assert.strictEqual(sameEmployee.summary.employees_count, 1);
+    assert.deepStrictEqual(
+        sameEmployee.review_outcomes.map((outcome) => outcome.week_start),
+        ['2026-07-05', '2026-07-12']
+    );
+
+    const differentEmployees = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [
+            weeklyInput(
+                noTargetPartTimeWeek('2026-07-05', '002'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            ),
+            weeklyInput(
+                noTargetPartTimeWeek('2026-07-05', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            )
+        ]
+    });
+    assert.strictEqual(differentEmployees.summary.review_outcomes_count, 2);
+    assert.strictEqual(differentEmployees.summary.review_outcome_employees_count, 2);
+    assert.strictEqual(differentEmployees.summary.employees_count, 2);
+    assert.deepStrictEqual(
+        differentEmployees.review_outcomes.map((outcome) => outcome.employee_kodikos),
+        ['001', '002']
+    );
+
+    const sameCodeDifferentBranches = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: ['0002', '0001'].map((ypokatasthma) => {
+            const rows = noTargetPartTimeWeek('2026-07-05', '001').map((row) => ({
+                ...row,
+                ypokatasthma
+            }));
+            return weeklyInput(
+                rows,
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            );
+        })
+    });
+    assert.strictEqual(sameCodeDifferentBranches.summary.review_outcomes_count, 2);
+    assert.strictEqual(sameCodeDifferentBranches.summary.review_outcome_employees_count, 2);
+    assert.strictEqual(sameCodeDifferentBranches.summary.employees_count, 2);
+    assert.deepStrictEqual(
+        sameCodeDifferentBranches.review_outcomes.map((outcome) => outcome.ypokatasthma),
+        ['0001', '0002']
+    );
+
+    const combined = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [
+            weeklyInput(fullTimeWeek('2026-07-05', '001')),
+            weeklyInput(
+                noTargetPartTimeWeek('2026-07-05', '002'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            )
+        ]
+    });
+    assert.strictEqual(combined.summary.groups_count, 1);
+    assert.strictEqual(combined.summary.review_outcomes_count, 1);
+    assert.strictEqual(combined.summary.review_outcome_employees_count, 1);
+    assert.strictEqual(combined.summary.employees_count, 2);
+}
+
 function run() {
     testCompleteWeekInputConstruction();
     testValidFullTimeAndPartTimeWeeks();
@@ -533,6 +625,7 @@ function run() {
     testSplitShiftReachesPageProjection();
     testDeterminismOwnershipAndInputPreservation();
     testWarningsAndResponseComposition();
+    testReviewOutcomeSummaryIdentityAndSorting();
     console.log('apasxoliseis weekly repo transfer atomic page projection tests passed');
 }
 

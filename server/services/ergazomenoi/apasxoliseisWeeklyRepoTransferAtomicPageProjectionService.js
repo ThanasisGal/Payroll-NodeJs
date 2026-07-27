@@ -244,6 +244,23 @@ function sortedCounts(counts) {
     );
 }
 
+function scopedEmployeeIdentity({
+    team,
+    company_kod,
+    ypokatasthma,
+    employee_kodikos
+} = {}) {
+    const parts = [
+        primitiveString(team),
+        primitiveString(company_kod),
+        primitiveString(ypokatasthma, 100),
+        primitiveString(employee_kodikos, 100)
+    ];
+    return parts[0] && parts[1] && parts[3]
+        ? [parts[0], parts[1], parts[2] || '', parts[3]].join('|')
+        : null;
+}
+
 function cloneAtomicGroup(group) {
     const cloned = clonePlain(group);
     cloned.representative_item = cloned.items[0];
@@ -289,6 +306,8 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     const reasonCounts = {};
     const warningCounts = {};
     const groupsById = new Map();
+    const reviewOutcomes = [];
+    const groupEmployeeIdentities = new Set();
     const summary = {
         weeks_evaluated: Array.isArray(weeklyInputs) ? weeklyInputs.length : 0,
         groups_count: 0,
@@ -306,10 +325,13 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             weekRows: weeklyInput?.weekRows,
             employmentProfile: weeklyInput?.employmentProfile,
             holidayByDateKey: weeklyInput?.holidayByDateKey,
-            existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey
+            existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey,
+            contractVersion: 'v2'
         });
         incrementCounts(reasonCounts, projection?.reasons);
         incrementCounts(warningCounts, projection?.warnings);
+        (Array.isArray(projection?.review_outcomes) ? projection.review_outcomes : [])
+            .forEach((outcome) => reviewOutcomes.push(clonePlain(outcome)));
 
         if (projection?.projection_status === SINGLE_WEEK_PROJECTION_STATUS.NOT_AVAILABLE) {
             summary.not_available_count++;
@@ -337,19 +359,49 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             return;
         }
         groupsById.set(group.group_id, cloneAtomicGroup(group));
+        const firstWeekRow = Array.isArray(weeklyInput?.weekRows)
+            ? weeklyInput.weekRows[0]
+            : null;
+        const groupEmployeeIdentity = scopedEmployeeIdentity({
+            team: firstWeekRow?.team,
+            company_kod: firstWeekRow?.company_kod,
+            ypokatasthma: firstWeekRow?.ypokatasthma,
+            employee_kodikos: group.representative_item?.employee_kodikos
+        });
+        if (groupEmployeeIdentity) groupEmployeeIdentities.add(groupEmployeeIdentity);
         summary.ready_count++;
     });
 
     const groups = [...groupsById.values()].sort(compareGroups);
-    const employees = new Set(
-        groups
-            .map((group) => primitiveString(group.representative_item?.employee_kodikos, 100))
+    const sortedReviewOutcomes = reviewOutcomes.sort((left, right) =>
+        String(left?.week_start || '').localeCompare(String(right?.week_start || '')) ||
+        String(left?.team || '').localeCompare(String(right?.team || '')) ||
+        String(left?.company_kod || '').localeCompare(String(right?.company_kod || '')) ||
+        String(left?.ypokatasthma || '').localeCompare(String(right?.ypokatasthma || '')) ||
+        String(left?.employee_kodikos || '').localeCompare(
+            String(right?.employee_kodikos || ''),
+            'el',
+            { numeric: true, sensitivity: 'base' }
+        ) ||
+        String(left?.source?.hmeromhnia || '').localeCompare(
+            String(right?.source?.hmeromhnia || '')
+        )
+    );
+    const reviewEmployeeIdentities = new Set(
+        sortedReviewOutcomes
+            .map(scopedEmployeeIdentity)
             .filter(Boolean)
     );
+    const employees = new Set([
+        ...groupEmployeeIdentities,
+        ...reviewEmployeeIdentities
+    ]);
     summary.groups_count = groups.length;
     summary.decision_units_count = groups.length;
     summary.items_count = groups.length * 2;
     summary.employees_count = employees.size;
+    summary.review_outcomes_count = sortedReviewOutcomes.length;
+    summary.review_outcome_employees_count = reviewEmployeeIdentities.size;
 
     return deepFreeze({
         version: 1,
@@ -358,6 +410,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         summary,
         reason_counts: sortedCounts(reasonCounts),
         warning_counts: sortedCounts(warningCounts),
+        review_outcomes: sortedReviewOutcomes,
         groups
     });
 }
