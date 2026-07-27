@@ -169,8 +169,10 @@ for (const [label, mutate, context, reason] of [
     rows[3].is_locked = true;
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
     assert.ok(result.reasons.includes('TARGET_LOCKED'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, []);
 }
 
 {
@@ -215,6 +217,10 @@ for (const mutate of [
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
     assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.strictEqual(
+        result.semantic_proposal.operation_type,
+        'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY'
+    );
 }
 
 {
@@ -224,6 +230,101 @@ for (const mutate of [
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
     assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+}
+
+{
+    const blockerCases = [
+        {
+            name: 'audit',
+            mutate: () => {},
+            contexts: {
+                existingAuditCountByRowKey: new Map([
+                    ['507f1f77bcf86cd799439013', 1]
+                ])
+            },
+            reason: 'TARGET_MANUAL_OVERRIDE'
+        },
+        {
+            name: 'leave',
+            mutate: (rows) => { rows[3].adeia = true; },
+            contexts: {},
+            reason: 'TARGET_LEAVE_OR_SICKNESS'
+        },
+        {
+            name: 'holiday',
+            mutate: () => {},
+            contexts: {
+                holidayByDateKey: new Map([
+                    [date(3), { isHoliday: true, isMandatoryHoliday: true }]
+                ])
+            },
+            reason: 'TARGET_HOLIDAY'
+        },
+        {
+            name: 'already processed',
+            mutate: (rows) => {
+                rows[3].kathgoria_ergasias_apologistika = 'ΜΕ';
+                rows[3].repo_apologistika = true;
+            },
+            contexts: {},
+            reason: 'TARGET_ALREADY_PROCESSED'
+        },
+        {
+            name: 'invalid apologistika numeric',
+            mutate: (rows) => { rows[3].ores_ergasias_apologistika = 'invalid'; },
+            contexts: {},
+            reason: 'TARGET_INVALID_APOLOGISTIKA_NUMERIC_VALUE'
+        }
+    ];
+    blockerCases.forEach(({ name, mutate, contexts, reason }) => {
+        const rows = week();
+        mutate(rows);
+        const result = analyze(rows, 'MERIKH', {}, contexts);
+        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', name);
+        assert.ok(result.reasons.includes(reason), name);
+        assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'), name);
+        assert.strictEqual(
+            result.semantic_proposal.operation_type,
+            'PARTIAL_OFFSET_TARGET_BLOCKED',
+            name
+        );
+        assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, [], name);
+
+        const proposal = buildWeeklyRepoTransferSinglePairProposal({
+            weekRows: rows,
+            employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
+            contractVersion: 'v2',
+            ...contexts
+        });
+        assert.strictEqual(proposal.review_only_outcome.outcome_code, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+        assert.deepStrictEqual(proposal.investigation_guidance, []);
+        assert.deepStrictEqual(proposal.review_only_outcome.investigation_guidance, []);
+        assert.strictEqual(
+            proposal.review_only_outcome.apply_readiness.reason,
+            'OFFSET_TARGET_BLOCKED'
+        );
+        assert.strictEqual(proposal.atomic_pair_required, false);
+        assert.strictEqual(proposal.items.length, 0);
+    });
+}
+
+{
+    const rows = week({ targets: [2, 4] });
+    rows[4].is_locked = true;
+    rows[2].adeia = true;
+    const result = analyze(rows);
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.deepStrictEqual(result.semantic_proposal.blocked_target_reasons, [
+        'TARGET_ALREADY_PROCESSED',
+        'TARGET_LEAVE_OR_SICKNESS',
+        'TARGET_LOCKED'
+    ]);
+    assert.deepStrictEqual(
+        result.semantic_proposal.blocked_target_candidates.map((target) => target.hmeromhnia),
+        [date(2), date(4)]
+    );
+    assert.strictEqual(result.semantic_proposal.blocked_target_candidates_count, 2);
+    assert.strictEqual(result.target, null);
 }
 
 {
@@ -278,6 +379,22 @@ for (const mutate of [
     assert.strictEqual(page.summary.review_outcomes_count, 1);
     assert.strictEqual(page.summary.review_outcome_employees_count, 1);
     assert.strictEqual(page.summary.employees_count, 1);
+}
+
+for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
+    const rows = week({ targets: [] });
+    rows[1].cards_ores_ergasias = invalidHours;
+    const validFallbackAnalysis = analyze(week({ targets: [] }));
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    }, {
+        analyzer: () => validFallbackAnalysis
+    });
+    assert.strictEqual(proposal.proposal_status, 'INVALID_ANALYSIS');
+    assert.ok(proposal.reasons.includes('SOURCE_CARD_HOURS_NOT_MATERIALIZABLE'));
+    assert.strictEqual(proposal.review_only_outcome, null);
 }
 
 {

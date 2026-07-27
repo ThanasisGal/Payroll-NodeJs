@@ -188,6 +188,7 @@ function testNoTargetFallbackIsInformationalOnly() {
         warning_counts: {},
         groups: [],
         review_outcomes: [{
+            outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
             source: {
                 hmeromhnia: '2026-07-06',
                 cards_ores_ergasias: 4.5,
@@ -202,6 +203,8 @@ function testNoTargetFallbackIsInformationalOnly() {
         }]
     });
     assertContains(html, [
+        'Έλεγχος Μεταφοράς Ρεπό',
+        'Δεν βρέθηκε προδηλωμένη ημέρα εργασίας χωρίς κάρτες',
         'Πιθανή αιτία προς διερεύνηση από το HR',
         'άδεια ή απουσία',
         'Δεν έχει δημιουργηθεί πρόταση εφαρμογής',
@@ -224,6 +227,60 @@ function testNoTargetFallbackIsInformationalOnly() {
     assert.ok(!visibleText.includes('NaN'));
     assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
     assert.ok(!html.includes('atomic-repo-transfer-decision-btn'));
+}
+
+function testNoTargetGuidanceComesOnlyFromServer() {
+    const html = render({
+        summary: { review_outcomes_count: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
+            employee_kodikos: '001',
+            week_start: '2026-07-05',
+            week_end: '2026-07-11',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            investigation_guidance: []
+        }]
+    });
+    assert.ok(!getVisibleText(html).includes('άδεια ή απουσία'));
+    assert.ok(!getVisibleText(html).includes('Πιθανή αιτία προς διερεύνηση'));
+
+    const unknown = render({
+        summary: { review_outcomes_count: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            investigation_guidance: ['UNKNOWN']
+        }]
+    });
+    assert.ok(!getVisibleText(unknown).includes('UNKNOWN'));
+    assert.ok(!getVisibleText(unknown).includes('Πιθανή αιτία προς διερεύνηση'));
+}
+
+function testBlockedTargetOutcomeIsDistinctAndReadOnly() {
+    const html = render({
+        summary: { review_outcomes_count: 1, review_outcome_employees_count: 1 },
+        reason_counts: { TARGET_LOCKED: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+            employee_kodikos: '001',
+            week_start: '2026-07-05',
+            week_end: '2026-07-11',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            blocked_target_reasons: ['TARGET_LOCKED'],
+            investigation_guidance: []
+        }]
+    });
+    const visible = getVisibleText(html);
+    assert.ok(visible.includes('Βρέθηκε προδηλωμένη ημέρα χωρίς κάρτες'));
+    assert.ok(visible.includes('Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.'));
+    assert.ok(!visible.includes('Δεν βρέθηκε προδηλωμένη ημέρα'));
+    assert.ok(!visible.includes('άδεια ή απουσία'));
+    assert.ok(!visible.includes('TARGET_LOCKED'));
+    assert.ok(!html.includes('atomic-repo-transfer-decision-btn'));
+    assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
 }
 
 function testGroupsAndReviewOutcomesRenderSeparateSafetyMessages() {
@@ -1528,6 +1585,8 @@ async function testHrLoadingLocksAndRestoresFilters() {
 const tests = [
     testReadyFullTimeAndSplitShift,
     testNoTargetFallbackIsInformationalOnly,
+    testNoTargetGuidanceComesOnlyFromServer,
+    testBlockedTargetOutcomeIsDistinctAndReadOnly,
     testGroupsAndReviewOutcomesRenderSeparateSafetyMessages,
     testCompleteVisibleSectionContainsNoTechnicalTerms,
     testPartTimeTargetIsNotAnError,

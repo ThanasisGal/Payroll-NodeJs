@@ -958,14 +958,11 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
         });
     }
 
-    if (cleanTargets.length === 0) {
+    if (strictTargets.length === 0) {
         return deepFreeze({
             ...common,
             eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
-            reasons: [
-                'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS',
-                ...strictTargets.flatMap(targetExclusions)
-            ],
+            reasons: ['NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'],
             counts: {
                 ...common.counts,
                 source_candidates: 1,
@@ -979,6 +976,46 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
                 runtime_apply_supported: false,
                 investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
                 source_role: 'SOURCE_BECOMES_WORK'
+            }
+        });
+    }
+
+    if (cleanTargets.length === 0) {
+        const blockedTargets = strictTargets
+            .map((info) => ({
+                ...rowReference(info, null),
+                blocker_reasons: [...new Set(targetExclusions(info))].sort()
+            }))
+            .sort(
+                (left, right) =>
+                    left.hmeromhnia.localeCompare(right.hmeromhnia) ||
+                    String(left.prodhlomena_oraria_id || '').localeCompare(
+                        String(right.prodhlomena_oraria_id || '')
+                    )
+            );
+        const blockedTargetReasons = [
+            ...new Set(blockedTargets.flatMap((target) => target.blocker_reasons))
+        ].sort();
+        return deepFreeze({
+            ...common,
+            eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: blockedTargetReasons,
+            counts: {
+                ...common.counts,
+                source_candidates: 1,
+                target_candidates: 0
+            },
+            source: rowReference(cleanSources[0], 'ΕΡΓ'),
+            target: null,
+            semantic_proposal: {
+                operation_type: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                investigation_guidance: [],
+                source_role: 'SOURCE_BECOMES_WORK',
+                blocked_target_candidates_count: blockedTargets.length,
+                blocked_target_reasons: blockedTargetReasons,
+                blocked_target_candidates: blockedTargets
             }
         });
     }

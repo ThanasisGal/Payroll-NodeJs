@@ -240,11 +240,12 @@ function invalidResult(
     });
 }
 
-function normalizeNonNegativeFiniteNumber(value) {
-    if (value === null || value === undefined || value === '') return 0;
+function normalizePositiveFiniteNumber(value) {
     if (!['string', 'number'].includes(typeof value)) return null;
-    const normalized = Number(String(value).replace(',', '.').trim());
-    return Number.isFinite(normalized) && normalized >= 0 ? normalized : null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    const normalized = Number(trimmed.replace(',', '.'));
+    return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
 }
 
 function findReferencedRow(weekRows, reference, role) {
@@ -356,20 +357,22 @@ function buildWeeklyRepoTransferSinglePairProposal({
     });
 
     if (analysis.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {
-        const fallback =
-            analysis.semantic_proposal?.operation_type ===
-            'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY';
-        const sourceRow = fallback
+        const operationType = analysis.semantic_proposal?.operation_type;
+        const noTarget =
+            operationType === 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY';
+        const blockedTarget = operationType === 'PARTIAL_OFFSET_TARGET_BLOCKED';
+        const reviewOnly = noTarget || blockedTarget;
+        const sourceRow = reviewOnly
             ? (Array.isArray(weekRows) ? weekRows : []).find(
                 (row) => dateKeyUtc(row?.hmeromhnia) === analysis.source?.hmeromhnia
             )
             : null;
-        const fallbackCardHours = fallback
+        const reviewCardHours = reviewOnly
             ? sourceRow
-                ? normalizeNonNegativeFiniteNumber(sourceRow.cards_ores_ergasias)
+                ? normalizePositiveFiniteNumber(sourceRow.cards_ores_ergasias)
                 : null
             : null;
-        if (fallback && fallbackCardHours === null) {
+        if (reviewOnly && reviewCardHours === null) {
             return invalidResult(
                 analysis,
                 'SOURCE_CARD_HOURS_NOT_MATERIALIZABLE',
@@ -382,21 +385,25 @@ function buildWeeklyRepoTransferSinglePairProposal({
             proposalStatus: PROPOSAL_STATUS.NOT_AVAILABLE,
             scenarioVersion,
             proposalVersion,
-            atomicPairRequired: fallback ? false : true,
+            atomicPairRequired: reviewOnly ? false : true,
             runtimeApplySupported: false,
-            applyReadinessReason: fallback
+            applyReadinessReason: noTarget
                 ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
-                : 'PROPOSAL_NOT_READY',
-            investigationGuidance: fallback
+                : blockedTarget
+                    ? 'OFFSET_TARGET_BLOCKED'
+                    : 'PROPOSAL_NOT_READY',
+            investigationGuidance: noTarget
                 ? analysis.semantic_proposal.investigation_guidance
                 : [],
-            reviewOnlyOutcome: fallback ? {
-                outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
-                reason: 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS',
+            reviewOnlyOutcome: reviewOnly ? {
+                outcome_code: operationType,
+                reason: noTarget
+                    ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                    : 'OFFSET_TARGET_BLOCKED',
                 source: {
                     prodhlomena_oraria_id: normalizeId(sourceRow?._id || sourceRow?.id),
                     hmeromhnia: dateKeyUtc(sourceRow?.hmeromhnia),
-                    cards_ores_ergasias: fallbackCardHours,
+                    cards_ores_ergasias: reviewCardHours,
                     card_intervals: CARD_INTERVAL_FIELDS.map(([start, end]) => ({
                         apo: normalizePrimitiveString(sourceRow?.[start]),
                         eos: normalizePrimitiveString(sourceRow?.[end])
@@ -412,14 +419,32 @@ function buildWeeklyRepoTransferSinglePairProposal({
                 team: normalizePrimitiveString(analysis.employee?.team),
                 company_kod: normalizePrimitiveString(analysis.employee?.company_kod),
                 ypokatasthma: normalizePrimitiveString(sourceRow?.ypokatasthma, 100),
-                investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+                blocked_target_candidates_count: blockedTarget
+                    ? analysis.semantic_proposal.blocked_target_candidates_count
+                    : 0,
+                blocked_target_reasons: blockedTarget
+                    ? [...analysis.semantic_proposal.blocked_target_reasons]
+                    : [],
+                blocked_target_candidates: blockedTarget
+                    ? analysis.semantic_proposal.blocked_target_candidates.map((candidate) => ({
+                        prodhlomena_oraria_id: candidate.prodhlomena_oraria_id,
+                        hmeromhnia: candidate.hmeromhnia,
+                        current_category: candidate.current_category,
+                        blocker_reasons: [...candidate.blocker_reasons]
+                    }))
+                    : [],
+                investigation_guidance: noTarget
+                    ? [...analysis.semantic_proposal.investigation_guidance]
+                    : [],
                 requires_hr_review: true,
                 can_auto_apply: false,
                 atomic_pair_required: false,
                 runtime_apply_supported: false,
                 apply_readiness: {
                     status: 'BLOCKED',
-                    reason: 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                    reason: noTarget
+                        ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                        : 'OFFSET_TARGET_BLOCKED'
                 }
             } : null
         });

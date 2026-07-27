@@ -578,6 +578,26 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
         ['001', '002']
     );
 
+    const sameCodeDifferentBranches = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: ['0002', '0001'].map((ypokatasthma) => {
+            const rows = noTargetPartTimeWeek('2026-07-05', '001').map((row) => ({
+                ...row,
+                ypokatasthma
+            }));
+            return weeklyInput(
+                rows,
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+            );
+        })
+    });
+    assert.strictEqual(sameCodeDifferentBranches.summary.review_outcomes_count, 2);
+    assert.strictEqual(sameCodeDifferentBranches.summary.review_outcome_employees_count, 2);
+    assert.strictEqual(sameCodeDifferentBranches.summary.employees_count, 2);
+    assert.deepStrictEqual(
+        sameCodeDifferentBranches.review_outcomes.map((outcome) => outcome.ypokatasthma),
+        ['0001', '0002']
+    );
+
     const combined = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(fullTimeWeek('2026-07-05', '001')),
