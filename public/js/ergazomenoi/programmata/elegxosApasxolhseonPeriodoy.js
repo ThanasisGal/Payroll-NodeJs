@@ -3854,6 +3854,10 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Η προδηλωμένη ημέρα χωρίς κάρτες έχει διαφορετική απολογιστική κατηγορία.',
     TARGET_INVALID_APOLOGISTIKA_NUMERIC_VALUE:
         'Η προδηλωμένη ημέρα χωρίς κάρτες έχει μη έγκυρη αριθμητική απολογιστική τιμή.',
+    TARGET_ZERO_HOURS_WITH_CARD_INTERVALS:
+        'Η προδηλωμένη ημέρα έχει μηδενικές συνολικές ώρες καρτών αλλά περιέχει πλήρες διάστημα κάρτας.',
+    TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR:
+        'Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.',
     UNSUPPORTED_EMPLOYMENT_TYPE:
         'Ο τύπος απασχόλησης δεν αναγνωρίζεται με ασφάλεια.',
     CROSS_WEEK_ROWS:
@@ -4639,8 +4643,11 @@ function renderAtomicRepoTransferProjection(projection) {
                 }
             </div>
             <div class="small text-muted mt-2">
-                Δεν έχει δημιουργηθεί πρόταση εφαρμογής. Δεν υπάρχει target ημερομηνία,
-                αποθηκεύσιμη επιλογή ή απόφαση HR.
+                ${blockedTarget
+                    ? `Δεν έχει επιλεγεί ασφαλής ημέρα-στόχος και δεν έχει δημιουργηθεί
+                       αποθηκεύσιμη πρόταση ή απόφαση HR.`
+                    : `Δεν έχει δημιουργηθεί πρόταση εφαρμογής. Δεν υπάρχει target ημερομηνία,
+                       αποθηκεύσιμη επιλογή ή απόφαση HR.`}
             </div>
         </article>
     `;

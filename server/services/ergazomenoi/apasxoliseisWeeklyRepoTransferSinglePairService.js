@@ -874,10 +874,26 @@ function partialTargetFacts(info) {
     return (
         declared.isDeclaredWork &&
         (declared.hasDeclaredHours || declared.hasDeclaredIntervals) &&
-        info.cardHours === 0 &&
-        info.facts.cards.cardIntervalsNormalized.length === 0 &&
-        info.facts.cards.incompleteCardPairs.length === 0
+        info.cardHours === 0
     );
+}
+
+function partialTargetCardEvidenceExclusions(info) {
+    const reasons = [];
+    if (info.facts.cards.cardIntervalsNormalized.length > 0) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
+    }
+    if (info.facts.cards.incompleteCardPairs.length > 0) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
+    }
+    return reasons;
+}
+
+function partialTargetExclusions(info) {
+    return [
+        ...targetExclusions(info),
+        ...partialTargetCardEvidenceExclusions(info)
+    ];
 }
 
 function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
@@ -921,7 +937,9 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
     const strictSources = rowInfos.filter(partialSourceFacts);
     const cleanSources = strictSources.filter((info) => sourceExclusions(info).length === 0);
     const strictTargets = rowInfos.filter(partialTargetFacts);
-    const cleanTargets = strictTargets.filter((info) => targetExclusions(info).length === 0);
+    const cleanTargets = strictTargets.filter(
+        (info) => partialTargetExclusions(info).length === 0
+    );
     const common = {
         ...establishedResult,
         scenario_version: SCENARIO_VERSION_V2,
@@ -984,7 +1002,7 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
         const blockedTargets = strictTargets
             .map((info) => ({
                 ...rowReference(info, null),
-                blocker_reasons: [...new Set(targetExclusions(info))].sort()
+                blocker_reasons: [...new Set(partialTargetExclusions(info))].sort()
             }))
             .sort(
                 (left, right) =>

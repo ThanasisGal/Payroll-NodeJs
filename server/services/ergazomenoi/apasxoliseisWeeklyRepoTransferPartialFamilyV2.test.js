@@ -229,7 +229,83 @@ for (const mutate of [
     rows[3].cards_eos_ora_01 = '13:00';
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.ok(result.reasons.includes('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, []);
+    assert.deepStrictEqual(result.semantic_proposal.blocked_target_reasons, [
+        'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS'
+    ]);
+
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    });
+    assert.strictEqual(proposal.review_only_outcome.outcome_code, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.deepStrictEqual(proposal.review_only_outcome.investigation_guidance, []);
+    assert.strictEqual(proposal.items.length, 0);
+    assert.strictEqual(proposal.group_id, undefined);
+    assert.strictEqual(proposal.decision_payload, undefined);
+    assert.strictEqual(proposal.writer_plan, undefined);
+}
+
+{
+    const rows = week();
+    rows[3].cards_apo_ora_01 = '09:00';
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.ok(result.reasons.includes('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, []);
+}
+
+{
+    const rows = week({ targets: [2, 4] });
+    rows[4].cards_apo_ora_01 = '10:00';
+    rows[4].cards_eos_ora_01 = '14:00';
+    rows[2].cards_apo_ora_01 = '09:00';
+    const result = analyze(rows);
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.deepStrictEqual(result.semantic_proposal.blocked_target_reasons, [
+        'TARGET_ZERO_HOURS_WITH_CARD_INTERVALS',
+        'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
+    ]);
+    assert.deepStrictEqual(
+        result.semantic_proposal.blocked_target_candidates.map((target) => ({
+            date: target.hmeromhnia,
+            reasons: target.blocker_reasons
+        })),
+        [
+            {
+                date: date(2),
+                reasons: ['TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR']
+            },
+            {
+                date: date(4),
+                reasons: ['TARGET_ZERO_HOURS_WITH_CARD_INTERVALS']
+            }
+        ]
+    );
+    assert.strictEqual(result.semantic_proposal.blocked_target_candidates_count, 2);
+}
+
+{
+    const rows = week({ targets: [2, 4] });
+    rows[4].cards_apo_ora_01 = '10:00';
+    rows[4].cards_eos_ora_01 = '14:00';
+    const v1 = analyzeWeeklyRepoTransferSinglePairV1({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 }
+    });
+    const v2 = analyze(rows);
+    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(v1.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
+    assert.ok(v2.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v2.target, null);
+    assert.strictEqual(v2.semantic_proposal, null);
 }
 
 {
