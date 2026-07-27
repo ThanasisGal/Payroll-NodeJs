@@ -3858,6 +3858,12 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Η προδηλωμένη ημέρα έχει μηδενικές συνολικές ώρες καρτών αλλά περιέχει πλήρες διάστημα κάρτας.',
     TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR:
         'Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.',
+    TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL:
+        'Η ημέρα περιέχει ζεύγος κάρτας με ίδια ώρα εισόδου και εξόδου.',
+    TARGET_INVALID_CARD_HOURS_VALUE:
+        'Η συνολική τιμή ωρών καρτών της ημέρας δεν είναι έγκυρη.',
+    TARGET_INVALID_CARD_TIME_VALUE:
+        'Η ημέρα περιέχει μη έγκυρη τιμή ώρας κάρτας.',
     UNSUPPORTED_EMPLOYMENT_TYPE:
         'Ο τύπος απασχόλησης δεν αναγνωρίζεται με ασφάλεια.',
     CROSS_WEEK_ROWS:
@@ -4604,6 +4610,53 @@ function renderAtomicRepoTransferProjection(projection) {
             : [])
             .sort()
             .map(getAtomicRepoTransferDiagnosticLabel);
+        const rawBlockedCandidates = Array.isArray(outcome?.blocked_target_candidates)
+            ? outcome.blocked_target_candidates
+            : [];
+        const blockedCandidatesAreSafe = rawBlockedCandidates.length > 0 &&
+            rawBlockedCandidates.every((candidate) => {
+                if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                    return false;
+                }
+                const date = String(candidate.hmeromhnia || '').trim();
+                const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
+                    ? new Date(`${date}T00:00:00.000Z`)
+                    : null;
+                return (
+                    parsedDate &&
+                    !Number.isNaN(parsedDate.getTime()) &&
+                    parsedDate.toISOString().slice(0, 10) === date &&
+                    typeof candidate.current_category === 'string' &&
+                    Array.isArray(candidate.blocker_reasons) &&
+                    candidate.blocker_reasons.every((reason) => typeof reason === 'string')
+                );
+            });
+        const blockedCandidates = blockedCandidatesAreSafe ? rawBlockedCandidates : [];
+        const blockedCandidatesHtml = blockedTarget && blockedCandidates.length
+            ? `
+                <div class="small mt-2">
+                    <div class="fw-semibold">
+                        ${blockedCandidates.length === 1
+                            ? 'Βρέθηκε μία υποψήφια ημέρα που δεν μπορεί να χρησιμοποιηθεί:'
+                            : `Βρέθηκαν ${escapeHtml(blockedCandidates.length)} υποψήφιες ημέρες που δεν μπορούν να χρησιμοποιηθούν:`}
+                    </div>
+                    <ul class="mb-0">
+                        ${blockedCandidates.map((candidate) => {
+                            const candidateReasons = [...new Set(candidate.blocker_reasons)]
+                                .sort()
+                                .map(getAtomicRepoTransferDiagnosticLabel);
+                            return `<li>
+                                <span>${escapeHtml(formatPolicyPreviewDate(candidate.hmeromhnia))}
+                                    — ${escapeHtml(candidate.current_category || '-')}</span>
+                                ${candidateReasons.map((label) =>
+                                    `<div>${escapeHtml(label)}</div>`
+                                ).join('')}
+                            </li>`;
+                        }).join('')}
+                    </ul>
+                </div>
+            `
+            : '';
         return `
         <article class="atomic-repo-transfer-group">
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -4632,7 +4685,8 @@ function renderAtomicRepoTransferProjection(projection) {
                        με ασφάλεια ως ημέρα μη εργασίας.
                        ${blockerLabels.map((label) =>
                            `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(label)}</div>`
-                       ).join('')}`
+                       ).join('')}
+                       ${blockedCandidatesHtml}`
                     : `Δεν βρέθηκε προδηλωμένη ημέρα εργασίας χωρίς κάρτες που να μπορεί να
                        χρησιμοποιηθεί ως ημέρα μη εργασίας.
                        ${guidanceLabels.length

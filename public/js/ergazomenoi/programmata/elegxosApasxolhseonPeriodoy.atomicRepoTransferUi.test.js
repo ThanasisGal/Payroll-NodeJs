@@ -326,6 +326,80 @@ function testCardConflictedTargetOutcomeIsSpecificAndReadOnly() {
     assert.ok(!incompleteVisible.includes('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'));
 }
 
+function testBlockedTargetCandidateDetailsAreSafeAndScoped() {
+    const html = render({
+        summary: { review_outcomes_count: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            blocked_target_reasons: [
+                'TARGET_INVALID_CARD_HOURS_VALUE',
+                'TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR'
+            ],
+            blocked_target_candidates_count: 2,
+            blocked_target_candidates: [
+                {
+                    prodhlomena_oraria_id: 'must-not-render-1',
+                    hmeromhnia: '2026-07-08',
+                    current_category: 'ΕΡΓ',
+                    blocker_reasons: ['TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR']
+                },
+                {
+                    prodhlomena_oraria_id: 'must-not-render-2',
+                    hmeromhnia: '2026-07-10',
+                    current_category: '<ΕΡΓ>',
+                    blocker_reasons: ['TARGET_INVALID_CARD_HOURS_VALUE']
+                }
+            ],
+            investigation_guidance: []
+        }]
+    });
+    const visible = getVisibleText(html);
+    assert.ok(visible.includes('Βρέθηκαν 2 υποψήφιες ημέρες'));
+    assert.ok(visible.includes('08/07/2026 — ΕΡΓ'));
+    assert.ok(visible.includes('10/07/2026 — &lt;ΕΡΓ&gt;'));
+    assert.ok(visible.includes('Η προδηλωμένη ημέρα περιέχει ελλιπές ζεύγος εισόδου–εξόδου κάρτας.'));
+    assert.ok(visible.includes('Η συνολική τιμή ωρών καρτών της ημέρας δεν είναι έγκυρη.'));
+    assert.ok(!visible.includes('must-not-render'));
+    assert.ok(!visible.includes('TARGET_INVALID_CARD_HOURS_VALUE'));
+    assert.ok(!html.includes('atomic-repo-transfer-decision-btn'));
+    assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
+
+    const singular = render({
+        summary: { review_outcomes_count: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            blocked_target_reasons: ['TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL'],
+            blocked_target_candidates: [{
+                hmeromhnia: '2026-07-08',
+                current_category: 'ΕΡΓ',
+                blocker_reasons: ['TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL']
+            }]
+        }]
+    });
+    assert.ok(getVisibleText(singular).includes('Βρέθηκε μία υποψήφια ημέρα'));
+    assert.ok(getVisibleText(singular).includes(
+        'Η ημέρα περιέχει ζεύγος κάρτας με ίδια ώρα εισόδου και εξόδου.'
+    ));
+
+    const malformed = render({
+        summary: { review_outcomes_count: 1 },
+        groups: [],
+        review_outcomes: [{
+            outcome_code: 'PARTIAL_OFFSET_TARGET_BLOCKED',
+            source: { hmeromhnia: '2026-07-06', cards_ores_ergasias: 4.5 },
+            blocked_target_reasons: ['TARGET_INVALID_CARD_TIME_VALUE'],
+            blocked_target_candidates: [{ hmeromhnia: 'not-a-date', blocker_reasons: null }]
+        }]
+    });
+    const malformedVisible = getVisibleText(malformed);
+    assert.ok(malformedVisible.includes('Η ημέρα περιέχει μη έγκυρη τιμή ώρας κάρτας.'));
+    assert.ok(!malformedVisible.includes('Υποψήφιες ημέρες'));
+}
+
 function testGroupsAndReviewOutcomesRenderSeparateSafetyMessages() {
     const projection = readyProjection({ targetCategory: 'ΜΕ' });
     projection.review_outcomes = [{
@@ -1631,6 +1705,7 @@ const tests = [
     testNoTargetGuidanceComesOnlyFromServer,
     testBlockedTargetOutcomeIsDistinctAndReadOnly,
     testCardConflictedTargetOutcomeIsSpecificAndReadOnly,
+    testBlockedTargetCandidateDetailsAreSafeAndScoped,
     testGroupsAndReviewOutcomesRenderSeparateSafetyMessages,
     testCompleteVisibleSectionContainsNoTechnicalTerms,
     testPartTimeTargetIsNotAnError,

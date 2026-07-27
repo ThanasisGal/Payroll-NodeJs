@@ -191,6 +191,12 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
     const currentApologistikaHours = toNumberOrZero(sourceRow.ores_ergasias_apologistika);
     const kathgoriaErgasias = toTrimmedString(sourceRow.kathgoria_ergasias);
     const cardIntervalsNormalized = getCompleteNonZeroIntervals(cardIntervalsRaw);
+    const hasInvalidCardTimeValue = CARD_INTERVAL_FIELDS.some(([startField, endField]) =>
+        [startField, endField].some((field) => {
+            const rawValue = sourceRow[field];
+            return toTrimmedString(rawValue) !== '' && normalizeTimeValue(rawValue) === null;
+        })
+    );
     const existingAuditCount = Math.max(
         Number.parseInt(String(context.existingAuditCount ?? 0), 10) || 0,
         0
@@ -213,6 +219,7 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
         cardIntervalsNormalized,
         hasCards: cardIntervalsNormalized.length > 0 || cardHours > 0,
         hasZeroLengthCardInterval: cardIntervalsRaw.some((interval) => interval.isZeroLength),
+        hasInvalidCardTimeValue,
         cardHours,
         incompleteCardPairs: getIncompleteIntervals(cardIntervalsRaw)
     };

@@ -16,6 +16,9 @@ const {
 const {
     buildWeeklyRepoTransferAtomicPageProjection
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
+    buildApasxoliseisScenarioFacts
+} = require('./apasxoliseisScenarioFactsService');
 
 const START = '2026-07-05';
 
@@ -262,6 +265,82 @@ for (const mutate of [
 }
 
 {
+    const rows = week();
+    rows[3].cards_apo_ora_01 = '09:00';
+    rows[3].cards_eos_ora_01 = '09:00';
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.ok(result.reasons.includes('TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, []);
+
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    });
+    assert.strictEqual(proposal.review_only_outcome.outcome_code, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.strictEqual(proposal.items.length, 0);
+    assert.strictEqual(proposal.decision_payload, undefined);
+    assert.strictEqual(proposal.writer_plan, undefined);
+}
+
+for (const invalidCardHours of ['invalid', -1, NaN, Infinity, -Infinity, {}, []]) {
+    const rows = week();
+    rows[3].cards_ores_ergasias = invalidCardHours;
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.ok(result.reasons.includes('TARGET_INVALID_CARD_HOURS_VALUE'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, []);
+}
+
+for (const zeroCardHours of [0, '0', '0,00', '0.00', '', null]) {
+    const rows = week();
+    rows[3].cards_ores_ergasias = zeroCardHours;
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(result.target.hmeromhnia, date(3));
+}
+
+{
+    const rows = week({ targets: [] });
+    const result = analyze(rows);
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY');
+    assert.ok(!result.reasons.includes('TARGET_INVALID_CARD_HOURS_VALUE'));
+}
+
+for (const invalidTimes of [
+    { cards_apo_ora_01: 'invalid', cards_eos_ora_01: '13:00' },
+    { cards_apo_ora_01: '09:00', cards_eos_ora_01: 'invalid' },
+    { cards_apo_ora_01: 'invalid', cards_eos_ora_01: 'also-invalid' },
+    { cards_apo_ora_02: '25:00', cards_eos_ora_02: '13:00' },
+    { cards_apo_ora_03: '09:00', cards_eos_ora_03: '99:00' }
+]) {
+    const rows = week();
+    Object.assign(rows[3], invalidTimes);
+    const facts = buildApasxoliseisScenarioFacts(rows[3]);
+    assert.strictEqual(facts.cards.hasInvalidCardTimeValue, true);
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_OFFSET_TARGET_BLOCKED');
+    assert.ok(result.reasons.includes('TARGET_INVALID_CARD_TIME_VALUE'));
+    assert.ok(!result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+}
+
+{
+    const rows = week({ targets: [] });
+    rows[3].cards_ores_ergasias = 2;
+    rows[3].cards_apo_ora_01 = '09:00';
+    rows[3].cards_eos_ora_01 = '11:00';
+    const result = analyze(rows);
+    assert.strictEqual(result.semantic_proposal.operation_type, 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY');
+    assert.ok(!result.reasons.includes('TARGET_INVALID_CARD_HOURS_VALUE'));
+}
+
+{
     const rows = week({ targets: [2, 4] });
     rows[4].cards_apo_ora_01 = '10:00';
     rows[4].cards_eos_ora_01 = '14:00';
@@ -289,6 +368,33 @@ for (const mutate of [
         ]
     );
     assert.strictEqual(result.semantic_proposal.blocked_target_candidates_count, 2);
+}
+
+{
+    const rows = week({ targets: [2, 4] });
+    rows[4].cards_apo_ora_01 = '10:00';
+    rows[4].cards_eos_ora_01 = '10:00';
+    const v1 = analyzeWeeklyRepoTransferSinglePairV1({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 }
+    });
+    const v2 = analyze(rows);
+    assert.ok(v1.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
+    assert.ok(v2.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+}
+
+{
+    const rows = week({ targets: [2, 4] });
+    rows[4].cards_ores_ergasias = 'invalid';
+    const v1 = analyzeWeeklyRepoTransferSinglePairV1({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 }
+    });
+    const v2 = analyze(rows);
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(v2.eligibility_status, v1.eligibility_status);
+    assert.strictEqual(v2.target.hmeromhnia, date(2));
 }
 
 {

@@ -62,6 +62,16 @@ function classifyApologistikaNumber(value) {
     return { kind: number === 0 ? 'ZERO' : 'POSITIVE', value: number };
 }
 
+function classifyCardHours(value) {
+    if (value === null || value === undefined) return { kind: 'ZERO', value: 0 };
+    if (typeof value === 'string' && value.trim() === '') return { kind: 'ZERO', value: 0 };
+    if (!['string', 'number'].includes(typeof value)) return { kind: 'INVALID', value: null };
+
+    const number = toFiniteNumber(value);
+    if (number === null || number < 0) return { kind: 'INVALID', value: null };
+    return { kind: number === 0 ? 'ZERO' : 'POSITIVE', value: number };
+}
+
 function normalizePrimitiveString(value, maxLength = 150) {
     if (!['string', 'number', 'bigint', 'boolean'].includes(typeof value)) return null;
     if (typeof value === 'number' && !Number.isFinite(value)) return null;
@@ -461,6 +471,7 @@ function buildRowInfo(row, contexts) {
     );
     const facts = buildApasxoliseisScenarioFacts(row, { existingAuditCount });
     const cardHours = toFiniteNumber(row.cards_ores_ergasias);
+    const cardHoursState = classifyCardHours(row.cards_ores_ergasias);
     const holidayState = resolveRepoTransferHolidayState(
         row,
         contexts.holidayByDateKey,
@@ -498,6 +509,7 @@ function buildRowInfo(row, contexts) {
         dateKey,
         facts,
         cardHours,
+        cardHoursState,
         holidayState,
         manualOverride,
         criticalWarnings,
@@ -874,17 +886,26 @@ function partialTargetFacts(info) {
     return (
         declared.isDeclaredWork &&
         (declared.hasDeclaredHours || declared.hasDeclaredIntervals) &&
-        info.cardHours === 0
+        ['ZERO', 'INVALID'].includes(info.cardHoursState.kind)
     );
 }
 
 function partialTargetCardEvidenceExclusions(info) {
     const reasons = [];
+    if (info.cardHoursState.kind === 'INVALID') {
+        reasons.push('TARGET_INVALID_CARD_HOURS_VALUE');
+    }
     if (info.facts.cards.cardIntervalsNormalized.length > 0) {
         reasons.push('TARGET_ZERO_HOURS_WITH_CARD_INTERVALS');
     }
     if (info.facts.cards.incompleteCardPairs.length > 0) {
         reasons.push('TARGET_ZERO_HOURS_WITH_INCOMPLETE_CARD_PAIR');
+    }
+    if (info.facts.cards.hasZeroLengthCardInterval) {
+        reasons.push('TARGET_ZERO_HOURS_WITH_ZERO_LENGTH_CARD_INTERVAL');
+    }
+    if (info.facts.cards.hasInvalidCardTimeValue) {
+        reasons.push('TARGET_INVALID_CARD_TIME_VALUE');
     }
     return reasons;
 }
