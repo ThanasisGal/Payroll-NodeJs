@@ -42,6 +42,10 @@ const {
     buildWeeklyRepoTransferSinglePairGroupProjection
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 const {
+    analyzeWeeklyRepoTransferSinglePairV1,
+    analyzeWeeklyRepoTransferSinglePairV2
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
     writeWeeklyRepoTransferAtomically
 } = require('./apasxoliseisWeeklyRepoTransferAtomicWriterService');
 const {
@@ -76,9 +80,9 @@ const COMMAND = Object.freeze({
     request_id: 'validation-request-0001'
 });
 const EMPLOYMENT_FIXTURES = Object.freeze([
-    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v1', targetCategory: 'ΑΝ', mhniaia_repo: 2, dailyHours: 8 }),
-    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, dailyHours: 4 }),
-    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, dailyHours: 4 }),
+    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v1', targetCategory: 'ΑΝ', mhniaia_repo: 2, workdays: 5, dailyHours: 8 }),
+    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
     Object.freeze({
         name: 'MERIKH_REDUCED_DAYS_AND_HOURS',
         family: 'PARTIAL_FAMILY',
@@ -87,7 +91,20 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         proposalVersion: 'repo-transfer-single-pair-proposal:v2',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 2,
+        mhniaia_repo: 0,
+        workdays: 4,
+        dailyHours: 4
+    }),
+    Object.freeze({
+        name: 'EK_PERITROPHS_REDUCED_DAYS_AND_HOURS',
+        family: 'PARTIAL_FAMILY',
+        typos_apasxolhshs: 'EK_PERITROPHS',
+        contractVersion: 'v2',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v2',
+        targetCategory: 'ΜΕ',
+        profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
+        mhniaia_repo: 0,
+        workdays: 4,
         dailyHours: 4
     })
 ]);
@@ -159,6 +176,15 @@ function weekRows(employment) {
         cards_apo_ora_01: '',
         cards_eos_ora_01: ''
     });
+    if (employment.workdays === 4) {
+        Object.assign(rows[0], {
+            kathgoria_ergasias: 'ΜΕ',
+            ores_ergasias: 0,
+            cards_ores_ergasias: 0,
+            cards_apo_ora_01: '',
+            cards_eos_ora_01: ''
+        });
+    }
     return rows;
 }
 async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
@@ -166,9 +192,22 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     const employmentProfile = {
         typos_apasxolhshs: employment.typos_apasxolhshs,
         mhniaia_repo: employment.mhniaia_repo,
+        hmeres_ergasias_ebdomadas: employment.workdays,
+        ores_ergasias_ebdomadas: employment.workdays * employment.dailyHours,
         mo_oron_hmerhsias_ergasias: employment.dailyHours
     };
     const projectionBuilder = (input) => buildWeeklyRepoTransferSinglePairGroupProjection(input);
+    const analysis = (
+        employment.contractVersion === 'v1'
+            ? analyzeWeeklyRepoTransferSinglePairV1
+            : analyzeWeeklyRepoTransferSinglePairV2
+    )({
+        weekRows: rows,
+        employmentProfile,
+        holidayByDateKey: new Map(),
+        existingAuditCountByRowKey: new Map()
+    });
+    assert.strictEqual(analysis.eligibility_status, 'ELIGIBLE', employment.name);
     const projection = projectionBuilder({
         weekRows: rows,
         employmentProfile,
@@ -226,7 +265,7 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
         source_prodhlomena_oraria_id: IDS.source,
         target_prodhlomena_oraria_id: IDS.target
     };
-    return { snapshot, decision, group, context, reconstruct, employment };
+    return { snapshot, decision, group, analysis, context, reconstruct, employment };
 }
 function matches(record, filter) {
     return Object.entries(filter).every(([key, value]) => {
@@ -382,6 +421,9 @@ async function authoritativeAppliedState(store) {
         kathestos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
         typos_apasxolhshs: store.fixture.employment.typos_apasxolhshs,
         mhniaia_repo: store.fixture.employment.mhniaia_repo,
+        hmeres_ergasias_ebdomadas: store.fixture.employment.workdays,
+        ores_ergasias_ebdomadas:
+            store.fixture.employment.workdays * store.fixture.employment.dailyHours,
         mo_oron_hmerhsias_ergasias: store.fixture.employment.dailyHours
     };
     const result = await loadWeeklyRepoTransferDecisionBatch({
@@ -436,7 +478,10 @@ async function run() {
     ]) {
         assert.ok(staticCoverageInventory.includes(evidence), `Static inventory missing ${evidence}`);
     }
-    assert.deepStrictEqual(EMPLOYMENT_FIXTURES.map((item) => item.typos_apasxolhshs), ['PLHRHS', 'MERIKH', 'EK_PERITROPHS', 'MERIKH']);
+    assert.deepStrictEqual(
+        EMPLOYMENT_FIXTURES.map((item) => item.typos_apasxolhshs),
+        ['PLHRHS', 'MERIKH', 'EK_PERITROPHS', 'MERIKH', 'EK_PERITROPHS']
+    );
     assert.strictEqual(EMPLOYMENT_FIXTURES[3].profile_case, 'REDUCED_DAYS_AND_DAILY_HOURS');
     assert.deepStrictEqual(validateApplyCommand(COMMAND), COMMAND);
     assert.strictEqual(commandIdentity(COMMAND).length, 64);
@@ -459,6 +504,23 @@ async function run() {
     const successfulStores = [];
     for (const employment of EMPLOYMENT_FIXTURES) {
         const store = await createStore({ employment });
+        const declaredWorkdays = store.fixture.context.weekRows.filter(
+            (row) => row.kathgoria_ergasias === 'ΕΡΓ'
+        ).length;
+        const declaredNonWorkdays = store.fixture.context.weekRows.filter(
+            (row) => ['ΜΕ', 'ΑΝ'].includes(row.kathgoria_ergasias)
+        ).length;
+        const actualWorkdaysBefore = store.fixture.context.weekRows.filter(
+            (row) => Number(row.cards_ores_ergasias) > 0
+        ).length;
+        assert.strictEqual(declaredWorkdays, employment.workdays, employment.name);
+        assert.strictEqual(declaredNonWorkdays, 7 - employment.workdays, employment.name);
+        assert.strictEqual(actualWorkdaysBefore, employment.workdays, employment.name);
+        if (employment.workdays === 4) {
+            assert.strictEqual(store.fixture.analysis.counts.existing_actual_repo, 2);
+            assert.strictEqual(store.fixture.analysis.counts.predicted_final_repo, 3);
+            assert.strictEqual(store.fixture.analysis.employee.mhniaia_repo, 3);
+        }
         assert.strictEqual(store.fixture.snapshot.proposal_version, employment.proposalVersion);
         assert.strictEqual(store.fixture.snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
         assert.strictEqual(store.fixture.snapshot.target.proposed_values.kathgoria_ergasias_apologistika, employment.targetCategory);
@@ -475,6 +537,21 @@ async function run() {
         assert.strictEqual(store.counters.updates, 2);
         assert.strictEqual(store.committed.rows[IDS.source].kathgoria_ergasias_apologistika, 'ΕΡΓ');
         assert.strictEqual(store.committed.rows[IDS.target].kathgoria_ergasias_apologistika, employment.targetCategory);
+        const proposedCategories = store.fixture.context.weekRows.map((row) => {
+            if (String(row._id) === IDS.source) return 'ΕΡΓ';
+            if (String(row._id) === IDS.target) return employment.targetCategory;
+            return row.kathgoria_ergasias;
+        });
+        assert.strictEqual(
+            proposedCategories.filter((category) => category === 'ΕΡΓ').length,
+            employment.workdays,
+            employment.name
+        );
+        assert.strictEqual(
+            proposedCategories.filter((category) => ['ΜΕ', 'ΑΝ'].includes(category)).length,
+            7 - employment.workdays,
+            employment.name
+        );
         assert.strictEqual(store.committed.audits.length, 2);
         assert.strictEqual(store.committed.executions.length, 1);
         for (const secret of ['canonical_snapshot', 'snapshot_fingerprint', 'command_identity', 'request_id']) {

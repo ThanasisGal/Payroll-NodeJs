@@ -669,12 +669,17 @@ function buildResult({
     });
 }
 
-function analyzeWeeklyRepoTransferSinglePairV1({
-    weekRows = [],
-    employmentProfile = {},
-    holidayByDateKey = new Map(),
-    existingAuditCountByRowKey = new Map()
-} = {}) {
+function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
+    const {
+        weekRows = [],
+        employmentProfile = {},
+        holidayByDateKey = new Map(),
+        existingAuditCountByRowKey = new Map()
+    } = input;
+    const repoLimitIsValid =
+        typeof options.repoLimitIsValid === 'function'
+            ? options.repoLimitIsValid
+            : (value) => Number.isSafeInteger(value) && [1, 2].includes(value);
     const rows = Array.isArray(weekRows) ? weekRows : [];
     const profile = asPlainObject(employmentProfile);
     const base = {
@@ -745,7 +750,7 @@ function analyzeWeeklyRepoTransferSinglePairV1({
     }
 
     const repoLimit = profile.mhniaia_repo;
-    if (!Number.isSafeInteger(repoLimit) || ![1, 2].includes(repoLimit)) {
+    if (!repoLimitIsValid(repoLimit)) {
         return buildResult({
             ...base,
             status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
@@ -856,12 +861,70 @@ function analyzeWeeklyRepoTransferSinglePairV1({
     });
 }
 
+function analyzeWeeklyRepoTransferSinglePairV1(input = {}) {
+    return analyzeWeeklyRepoTransferSinglePairInternal(input);
+}
+
 function employmentFamily(employmentType) {
     if (employmentType === EMPLOYMENT_TYPE.FULL) return EMPLOYMENT_FAMILY.FULL;
     if ([EMPLOYMENT_TYPE.PARTIAL, EMPLOYMENT_TYPE.ROTATIONAL].includes(employmentType)) {
         return EMPLOYMENT_FAMILY.PARTIAL_FAMILY;
     }
     return null;
+}
+
+function normalizeProfileInteger(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (!['string', 'number'].includes(typeof value)) return NaN;
+    const normalized = Number(String(value).replace(',', '.').trim());
+    return Number.isSafeInteger(normalized) ? normalized : NaN;
+}
+
+function resolvePartialFamilyExpectedRepo(profile = {}) {
+    const rawWorkdays = profile.hmeres_ergasias_ebdomadas;
+    const workdaysMissing =
+        rawWorkdays === null || rawWorkdays === undefined || rawWorkdays === '';
+    const workdays = normalizeProfileInteger(rawWorkdays);
+    const rawExplicitRepo = profile.mhniaia_repo;
+    const explicitRepo = normalizeProfileInteger(rawExplicitRepo);
+    const explicitRepoMissing =
+        rawExplicitRepo === null || rawExplicitRepo === undefined || rawExplicitRepo === '';
+    const positiveExplicitRepo =
+        Number.isSafeInteger(explicitRepo) && explicitRepo > 0 ? explicitRepo : null;
+
+    if (!workdaysMissing) {
+        if (!Number.isSafeInteger(workdays) || workdays < 1 || workdays > 6) {
+            return {
+                ok: false,
+                reason: 'PARTIAL_WEEKLY_WORKDAYS_INVALID',
+                expectedRepo: null
+            };
+        }
+        const expectedRepo = 7 - workdays;
+        if (
+            !explicitRepoMissing &&
+            !(Number.isSafeInteger(explicitRepo) && explicitRepo >= 0)
+        ) {
+            return {
+                ok: false,
+                reason: 'PARTIAL_WEEKLY_REPO_PROFILE_INVALID',
+                expectedRepo: null
+            };
+        }
+        if (positiveExplicitRepo !== null && positiveExplicitRepo !== expectedRepo) {
+            return {
+                ok: false,
+                reason: 'PARTIAL_WEEKLY_REPO_PROFILE_CONFLICT',
+                expectedRepo: null
+            };
+        }
+        return { ok: true, reason: null, expectedRepo };
+    }
+
+    if (Number.isSafeInteger(explicitRepo) && [1, 2].includes(explicitRepo)) {
+        return { ok: true, reason: null, expectedRepo: explicitRepo };
+    }
+    return { ok: false, reason: 'INVALID_MHNIAIA_REPO', expectedRepo: null };
 }
 
 function withScenarioVersion(result, scenarioVersion) {
@@ -936,14 +999,22 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
 
     // Rotational/discontinuous profiles intentionally reuse the established MERIKH
     // repo-limit policy. Only the normalized employment identity is restored below.
+    const resolvedExpectedRepo = resolvePartialFamilyExpectedRepo(profile);
     const equivalentInput = {
         ...input,
         employmentProfile: {
             ...profile,
-            typos_apasxolhshs: EMPLOYMENT_TYPE.PARTIAL
+            typos_apasxolhshs: EMPLOYMENT_TYPE.PARTIAL,
+            mhniaia_repo: resolvedExpectedRepo.ok ? resolvedExpectedRepo.expectedRepo : 0
         }
     };
-    const establishedResult = analyzeWeeklyRepoTransferSinglePairV1(equivalentInput);
+    const establishedResult = analyzeWeeklyRepoTransferSinglePairInternal(
+        equivalentInput,
+        {
+            repoLimitIsValid: (value) =>
+                Number.isSafeInteger(value) && value >= 1 && value <= 6
+        }
+    );
     if (rows.length !== 7 || rows.some((row) => !isPlainObject(row))) {
         return withScenarioVersion(establishedResult, SCENARIO_VERSION_V2);
     }
@@ -966,9 +1037,22 @@ function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
         scenario_version: SCENARIO_VERSION_V2,
         employee: {
             ...establishedResult.employee,
-            typos_apasxolhshs: employmentType
+            typos_apasxolhshs: employmentType,
+            mhniaia_repo: resolvedExpectedRepo.ok
+                ? resolvedExpectedRepo.expectedRepo
+                : establishedResult.employee.mhniaia_repo
         }
     };
+    if (!resolvedExpectedRepo.ok) {
+        return deepFreeze({
+            ...common,
+            eligibility_status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: [resolvedExpectedRepo.reason],
+            source: null,
+            target: null,
+            semantic_proposal: null
+        });
+    }
     if (
         establishedResult.eligibility_status === ELIGIBILITY_STATUS.INVALID_INPUT ||
         establishedResult.reasons.includes('INVALID_MHNIAIA_REPO')
@@ -1100,6 +1184,7 @@ module.exports = {
     analyzeWeeklyRepoTransferSinglePair,
     analyzeWeeklyRepoTransferSinglePairV1,
     analyzeWeeklyRepoTransferSinglePairV2,
+    resolvePartialFamilyExpectedRepo,
     normalizeEmploymentType,
     SCENARIO_CODE,
     SCENARIO_VERSION,

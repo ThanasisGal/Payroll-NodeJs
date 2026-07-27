@@ -119,6 +119,7 @@ async function defaultContextLoader({
     const employmentProfile = {
         typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
         mhniaia_repo: weeklyProfileInfo.expectedWeeklyRepo,
+        hmeres_ergasias_ebdomadas: effectiveProfile.hmeres_ergasias_ebdomadas,
         mo_oron_hmerhsias_ergasias: Number(effectiveProfile.mo_oron_hmerhsias_ergasias || 0),
         external_break_minutes: employee.dialleima_entos_ektos_orarioy === true
             ? 0

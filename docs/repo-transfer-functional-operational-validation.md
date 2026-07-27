@@ -34,6 +34,30 @@ command validation, πραγματικό reconstruction, preflight και apply 
 controller/route tests παραμένουν source contracts επειδή η φόρτωση της
 κανονικής εφαρμογής θα μπορούσε να εκκινήσει πραγματικές υποδομές.
 
+## Reduced-workdays partial-family contract
+
+Η validation αποκάλυψε πραγματικό production gap: το legacy
+`mhniaia_repo` αναπαριστά μόνο τις καθιερωμένες τιμές 1/2 και επιστρέφει
+`0` για έγκυρο τετραήμερο profile. Η διόρθωση περιορίζεται στη v2
+`PARTIAL_FAMILY`. Όταν το authoritative
+`hmeres_ergasias_ebdomadas` είναι ακέραιος από 1 έως 6, ο αναμενόμενος
+αριθμός μη εργάσιμων ημερών είναι:
+
+`7 - hmeres_ergasias_ebdomadas`
+
+Άρα ένα τετραήμερο profile έχει expected count 3. Legacy
+`mhniaia_repo: 0` θεωρείται μη διαθέσιμη legacy τιμή όταν υπάρχουν έγκυρες
+ημέρες και δεν εμποδίζει τον υπολογισμό. Θετικό explicit repo count που
+διαφέρει από το αποτέλεσμα απορρίπτεται fail-closed με
+`PARTIAL_WEEKLY_REPO_PROFILE_CONFLICT`. Άκυρες ή ασαφείς ημέρες
+απορρίπτονται χωρίς inference από τις εβδομαδιαίες ώρες.
+
+Το direct v1 contract και το FULL παραμένουν αμετάβλητα: δέχονται μόνο
+repo limits 1/2 και το FULL target παραμένει `ΑΝ`. Το HR page projection,
+το decision reconstruction και το decision batch μεταφέρουν πλέον το ίδιο
+ήδη επιλυμένο authoritative `hmeres_ergasias_ebdomadas` στο v2 analyzer.
+Δεν προστέθηκε schema, DB query ή controller business logic.
+
 ## Τι αποδεικνύει το ενοποιημένο harness
 
 - behavioral success chain για FULL μέσω πραγματικού v1 proposal contract,
@@ -41,6 +65,10 @@ controller/route tests παραμένουν source contracts επειδή η φ�
 - behavioral success chains για MERIKH, EK_PERITROPHS και MERIKH με
   μειωμένες εβδομαδιαίες ημέρες και μειωμένες ημερήσιες ώρες μέσω του
   πραγματικού v2 partial-family contract, με target `ΜΕ`,
+- πραγματικές success chains MERIKH και EK_PERITROPHS 4×4: τέσσερις
+  δηλωμένες ημέρες εργασίας, τρεις δηλωμένες μη εργάσιμες ημέρες,
+  `existing_actual_repo=2`, `predicted_final_repo=3`, target `ΜΕ` και
+  αμετάβλητη ισορροπία 4/3 μετά τη μεταφορά,
 - πραγματικό apply command validation και session authorization,
 - πραγματικό runtime και index-readiness contract,
 - πραγματικό analyzer/proposal/group projection και
