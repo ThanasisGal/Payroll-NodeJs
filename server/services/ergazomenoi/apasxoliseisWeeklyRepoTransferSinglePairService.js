@@ -8,6 +8,7 @@ const {
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
 const SCENARIO_VERSION = 'repo-transfer-single-pair:v1';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v2';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -20,6 +21,11 @@ const EMPLOYMENT_TYPE = Object.freeze({
     FULL: 'PLHRHS',
     PARTIAL: 'MERIKH',
     ROTATIONAL: 'EK_PERITROPHS'
+});
+
+const EMPLOYMENT_FAMILY = Object.freeze({
+    FULL: 'FULL',
+    PARTIAL_FAMILY: 'PARTIAL_FAMILY'
 });
 
 function isPlainObject(value) {
@@ -115,10 +121,10 @@ function startOfWeekSundayUtc(dateKey) {
 function normalizeEmploymentType(value) {
     const raw = toTrimmedString(value).toUpperCase().replace(/\s+/g, '_');
 
-    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
+    if (['0', '00', 'ΠΛΗΡΗΣ', 'PLHRHS', 'PLIHRIS', 'PLIRIS', 'FULL', 'FULL_TIME'].includes(raw)) {
         return EMPLOYMENT_TYPE.FULL;
     }
-    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PART_TIME'].includes(raw)) {
+    if (['1', '01', 'ΜΕΡΙΚΗ', 'MERIKH', 'MERIKI', 'PARTIAL', 'PART_TIME'].includes(raw)) {
         return EMPLOYMENT_TYPE.PARTIAL;
     }
     if (
@@ -128,6 +134,8 @@ function normalizeEmploymentType(value) {
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ',
             'ΕΚ_ΠΕΡΙΤΡΟΠΗΣ_ΑΠΑΣΧΟΛΗΣΗ',
             'EK_PERITROPHS',
+            'EK_PERITROPIS',
+            'EK_PERITROPH',
             'EK_PERITROPHIS',
             'ROTATIONAL'
         ].includes(raw)
@@ -649,7 +657,7 @@ function buildResult({
     });
 }
 
-function analyzeWeeklyRepoTransferSinglePair({
+function analyzeWeeklyRepoTransferSinglePairV1({
     weekRows = [],
     employmentProfile = {},
     holidayByDateKey = new Map(),
@@ -836,11 +844,204 @@ function analyzeWeeklyRepoTransferSinglePair({
     });
 }
 
+function employmentFamily(employmentType) {
+    if (employmentType === EMPLOYMENT_TYPE.FULL) return EMPLOYMENT_FAMILY.FULL;
+    if ([EMPLOYMENT_TYPE.PARTIAL, EMPLOYMENT_TYPE.ROTATIONAL].includes(employmentType)) {
+        return EMPLOYMENT_FAMILY.PARTIAL_FAMILY;
+    }
+    return null;
+}
+
+function withScenarioVersion(result, scenarioVersion) {
+    return deepFreeze({ ...result, scenario_version: scenarioVersion });
+}
+
+function partialSourceFacts(info) {
+    const declared = info.facts.declared;
+    return (
+        declared.isDeclaredNonWork &&
+        declared.hasDeclaredHours === false &&
+        declared.hasDeclaredIntervals === false &&
+        info.cardHours !== null &&
+        info.cardHours > 0 &&
+        info.facts.cards.cardIntervalsNormalized.length > 0 &&
+        info.facts.cards.incompleteCardPairs.length === 0
+    );
+}
+
+function partialTargetFacts(info) {
+    const declared = info.facts.declared;
+    return (
+        declared.isDeclaredWork &&
+        (declared.hasDeclaredHours || declared.hasDeclaredIntervals) &&
+        info.cardHours === 0 &&
+        info.facts.cards.cardIntervalsNormalized.length === 0 &&
+        info.facts.cards.incompleteCardPairs.length === 0
+    );
+}
+
+function analyzeWeeklyRepoTransferSinglePairV2(input = {}) {
+    const rows = Array.isArray(input.weekRows) ? input.weekRows : [];
+    const profile = asPlainObject(input.employmentProfile);
+    const employmentType = normalizeEmploymentType(profile.typos_apasxolhshs);
+    const family = employmentFamily(employmentType);
+
+    // FULL deliberately retains the exact v1 eligibility semantics.
+    if (family === EMPLOYMENT_FAMILY.FULL) {
+        return analyzeWeeklyRepoTransferSinglePairV1(input);
+    }
+
+    const base = {
+        status: ELIGIBILITY_STATUS.INVALID_INPUT,
+        reasons: [],
+        week: {},
+        employee: {
+            typos_apasxolhshs: employmentType,
+            mhniaia_repo: profile.mhniaia_repo,
+            profile_source: profile.source,
+            profile_istoriko_id: profile.istorikoId,
+            profile_effective_date:
+                profile.effective_date || profile.hmeromhnia_isxyos_oron_ergasias_apo,
+            profile_changed_inside_week: profile.profile_changed_inside_week
+        }
+    };
+    const result = (values) => withScenarioVersion(buildResult(values), SCENARIO_VERSION_V2);
+
+    if (!family) return result({ ...base, reasons: ['UNSUPPORTED_EMPLOYMENT_TYPE'] });
+    if (rows.length !== 7) return result({ ...base, reasons: ['INCOMPLETE_WEEK_DATA'] });
+    if (rows.some((row) => !isPlainObject(row))) {
+        return result({ ...base, reasons: ['INVALID_WEEK_ROW'] });
+    }
+    const keys = rows.map((row) => dateKeyUtc(row.hmeromhnia));
+    if (keys.some((key) => !key)) return result({ ...base, reasons: ['INVALID_WEEK_DATE'] });
+    if (new Set(keys).size !== 7) return result({ ...base, reasons: ['DUPLICATE_WEEK_DATE'] });
+    const weekStarts = new Set(keys.map(startOfWeekSundayUtc));
+    if (weekStarts.size !== 1) return result({ ...base, reasons: ['CROSS_WEEK_ROWS'] });
+    const weekStart = [...weekStarts][0];
+    const expectedKeys = Array.from({ length: 7 }, (_, index) => addDaysUtc(weekStart, index));
+    if (expectedKeys.some((key) => !keys.includes(key))) {
+        return result({ ...base, reasons: ['INCOMPLETE_WEEK_DATA'] });
+    }
+    base.week = { start_date: weekStart, end_date: addDaysUtc(weekStart, 6) };
+
+    const identities = rows.map((row) => [
+        toTrimmedString(row.team),
+        toTrimmedString(row.company_kod),
+        toTrimmedString(row.kodikos)
+    ]);
+    if (identities.some((parts) => parts.some((part) => !part))) {
+        return result({ ...base, reasons: ['MISSING_EMPLOYEE_IDENTITY'] });
+    }
+    if (new Set(identities.map((parts) => parts.join('|'))).size !== 1) {
+        return result({ ...base, reasons: ['MULTIPLE_EMPLOYEES'] });
+    }
+    [base.employee.team, base.employee.company_kod, base.employee.kodikos] = identities[0];
+
+    const rowInfos = rows.map((row) =>
+        buildRowInfo(row, {
+            holidayByDateKey: input.holidayByDateKey || new Map(),
+            existingAuditCountByRowKey: input.existingAuditCountByRowKey || new Map(),
+            employmentProfile: profile
+        })
+    ).sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+
+    const rawSources = rowInfos.filter(partialSourceFacts);
+    const cleanSources = rawSources.filter((info) => sourceExclusions(info).length === 0);
+    const rawTargets = rowInfos.filter(partialTargetFacts);
+    const firstRawTarget = rawTargets[0] || null;
+    const counts = {
+        source_candidates: cleanSources.length,
+        target_candidates: rawTargets.filter((info) => targetExclusions(info).length === 0).length
+    };
+
+    if (cleanSources.length !== 1) {
+        return result({
+            ...base,
+            status: rawSources.length > 0
+                ? ELIGIBILITY_STATUS.NEEDS_REVIEW
+                : ELIGIBILITY_STATUS.NOT_APPLICABLE,
+            reasons: [
+                cleanSources.length > 1 ? 'MULTIPLE_SOURCE_CANDIDATES' : 'NO_SOURCE_CANDIDATE',
+                ...rawSources.flatMap(sourceExclusions)
+            ],
+            counts
+        });
+    }
+
+    if (!firstRawTarget) {
+        const source = rowReference(cleanSources[0], 'ΕΡΓ');
+        return result({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'],
+            counts,
+            source,
+            semanticProposal: {
+                operation_type: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                allowed_hr_choices: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+                source_role: 'SOURCE_BECOMES_WORK'
+            }
+        });
+    }
+
+    const firstTargetBlockers = targetExclusions(firstRawTarget);
+    if (firstTargetBlockers.length > 0) {
+        return result({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: firstTargetBlockers,
+            counts,
+            source: rowReference(cleanSources[0], 'ΕΡΓ'),
+            target: rowReference(firstRawTarget, 'ΜΕ')
+        });
+    }
+
+    const additionalCleanTargets = rawTargets
+        .slice(1)
+        .filter((info) => targetExclusions(info).length === 0).length;
+    const declaredWorkBefore = rowInfos.filter((info) => info.facts.declared.isDeclaredWork).length;
+    const declaredWorkAfter = declaredWorkBefore;
+    const warnings = additionalCleanTargets > 0
+        ? [`ADDITIONAL_TARGET_CANDIDATES_IGNORED:${additionalCleanTargets}`]
+        : [];
+
+    return result({
+        ...base,
+        status: ELIGIBILITY_STATUS.ELIGIBLE,
+        warnings,
+        counts: {
+            ...counts,
+            scheduled_work_days_before: declaredWorkBefore,
+            scheduled_work_days_after: declaredWorkAfter
+        },
+        source: rowReference(cleanSources[0], 'ΕΡΓ'),
+        target: rowReference(firstRawTarget, 'ΜΕ'),
+        semanticProposal: {
+            operation_type: 'REPO_TRANSFER_WITHIN_WEEK',
+            atomic_pair_required: true,
+            source_role: 'SOURCE_BECOMES_WORK',
+            target_role: 'TARGET_BECOMES_NON_WORK',
+            employment_family: EMPLOYMENT_FAMILY.PARTIAL_FAMILY
+        }
+    });
+}
+
+function analyzeWeeklyRepoTransferSinglePair(input = {}) {
+    return analyzeWeeklyRepoTransferSinglePairV1(input);
+}
+
 module.exports = {
     analyzeWeeklyRepoTransferSinglePair,
+    analyzeWeeklyRepoTransferSinglePairV1,
+    analyzeWeeklyRepoTransferSinglePairV2,
     normalizeEmploymentType,
     SCENARIO_CODE,
     SCENARIO_VERSION,
+    SCENARIO_VERSION_V2,
     ELIGIBILITY_STATUS,
-    EMPLOYMENT_TYPE
+    EMPLOYMENT_TYPE,
+    EMPLOYMENT_FAMILY,
+    employmentFamily
 };

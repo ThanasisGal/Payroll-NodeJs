@@ -7,6 +7,7 @@ const {
     buildWeeklyRepoTransferSinglePairProposal,
     PROPOSAL_STATUS,
     PROPOSAL_VERSION,
+    PROPOSAL_VERSION_V2,
     CHOICE_CODE
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 
@@ -67,12 +68,12 @@ function groupKeyValue(value) {
     return encodeURIComponent(value);
 }
 
-function buildGroupKey({ employeeKodikos, weekStart, weekEnd, sourceId, targetId }) {
+function buildGroupKey({ employeeKodikos, weekStart, weekEnd, sourceId, targetId, proposalVersion }) {
     return [
         `group_type=${GROUP_TYPE}`,
         `scenario=${SCENARIO_CODE}`,
         `choice=${CHOICE_CODE}`,
-        `proposal_version=${PROPOSAL_VERSION}`,
+        `proposal_version=${proposalVersion}`,
         `employee=${groupKeyValue(employeeKodikos)}`,
         `week=${groupKeyValue(weekStart)}:${groupKeyValue(weekEnd)}`,
         `source=${groupKeyValue(sourceId)}`,
@@ -118,6 +119,9 @@ function buildEmptyResult({ proposal, projectionStatus, reason = null }) {
         summary: emptySummary(1),
         reasons,
         warnings: copyReasons(proposal?.warnings),
+        review_outcomes: proposal?.review_only_outcome
+            ? [{ ...proposal.review_only_outcome }]
+            : [],
         groups: []
     });
 }
@@ -125,7 +129,7 @@ function buildEmptyResult({ proposal, projectionStatus, reason = null }) {
 function validateReadyProposal(proposal) {
     if (
         proposal?.scenario_code !== SCENARIO_CODE ||
-        proposal?.proposal_version !== PROPOSAL_VERSION ||
+        ![PROPOSAL_VERSION, PROPOSAL_VERSION_V2].includes(proposal?.proposal_version) ||
         proposal?.choice_code !== CHOICE_CODE ||
         proposal?.atomic_pair_required !== true ||
         proposal?.requires_hr_review !== true ||
@@ -220,13 +224,15 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
     weekRows = [],
     employmentProfile = {},
     holidayByDateKey = new Map(),
-    existingAuditCountByRowKey = new Map()
+    existingAuditCountByRowKey = new Map(),
+    contractVersion = 'v1'
 } = {}) {
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows,
         employmentProfile,
         holidayByDateKey,
-        existingAuditCountByRowKey
+        existingAuditCountByRowKey,
+        contractVersion
     });
 
     if (proposal.proposal_status !== PROPOSAL_STATUS.READY) {
@@ -252,7 +258,8 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         weekStart: proposal.week.start_date,
         weekEnd: proposal.week.end_date,
         sourceId: sourceProposalItem.prodhlomena_oraria_id,
-        targetId: targetProposalItem.prodhlomena_oraria_id
+        targetId: targetProposalItem.prodhlomena_oraria_id,
+        proposalVersion: proposal.proposal_version
     });
     const items = [
         projectItem(sourceProposalItem, groupKey),
@@ -287,7 +294,7 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         items,
         pair_contract: {
             choice_code: CHOICE_CODE,
-            proposal_version: PROPOSAL_VERSION,
+            proposal_version: proposal.proposal_version,
             policy_versions: {
                 weekly_repo: proposal.policy_context.weekly_repo_policy_version,
                 source_work: proposal.policy_context.source_work_policy_version
@@ -319,6 +326,7 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         },
         reasons: copyReasons(proposal.reasons),
         warnings,
+        review_outcomes: [],
         groups: [group]
     });
 }

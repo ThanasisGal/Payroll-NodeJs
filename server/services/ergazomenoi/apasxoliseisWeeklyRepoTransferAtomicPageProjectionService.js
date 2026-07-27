@@ -289,6 +289,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     const reasonCounts = {};
     const warningCounts = {};
     const groupsById = new Map();
+    const reviewOutcomes = [];
     const summary = {
         weeks_evaluated: Array.isArray(weeklyInputs) ? weeklyInputs.length : 0,
         groups_count: 0,
@@ -306,10 +307,13 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             weekRows: weeklyInput?.weekRows,
             employmentProfile: weeklyInput?.employmentProfile,
             holidayByDateKey: weeklyInput?.holidayByDateKey,
-            existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey
+            existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey,
+            contractVersion: 'v2'
         });
         incrementCounts(reasonCounts, projection?.reasons);
         incrementCounts(warningCounts, projection?.warnings);
+        (Array.isArray(projection?.review_outcomes) ? projection.review_outcomes : [])
+            .forEach((outcome) => reviewOutcomes.push(clonePlain(outcome)));
 
         if (projection?.projection_status === SINGLE_WEEK_PROJECTION_STATUS.NOT_AVAILABLE) {
             summary.not_available_count++;
@@ -358,6 +362,11 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         summary,
         reason_counts: sortedCounts(reasonCounts),
         warning_counts: sortedCounts(warningCounts),
+        review_outcomes: reviewOutcomes.sort((left, right) =>
+            String(left?.source?.hmeromhnia || '').localeCompare(
+                String(right?.source?.hmeromhnia || '')
+            )
+        ),
         groups
     });
 }

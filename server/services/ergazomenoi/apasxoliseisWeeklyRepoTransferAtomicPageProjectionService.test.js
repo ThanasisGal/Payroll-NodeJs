@@ -396,7 +396,11 @@ function testNonReadyInvalidAndDuplicateDiagnostics() {
     });
     assert.strictEqual(nonReady.summary.not_available_count, 1);
     assert.strictEqual(nonReady.summary.groups_count, 0);
-    assert.strictEqual(nonReady.reason_counts.ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED, 1);
+    assert.strictEqual(nonReady.reason_counts.NO_SOURCE_CANDIDATE, 1);
+    assert.strictEqual(
+        nonReady.reason_counts.ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED,
+        undefined
+    );
 
     const invalid = buildWeeklyRepoTransferAtomicPageProjection(
         { weeklyInputs: [weeklyInput(fullTimeWeek())] },

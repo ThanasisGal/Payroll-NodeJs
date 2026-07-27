@@ -2,9 +2,11 @@
 // This module must stay isolated from runtime and write dependencies.
 
 const {
-    analyzeWeeklyRepoTransferSinglePair,
+    analyzeWeeklyRepoTransferSinglePairV1,
+    analyzeWeeklyRepoTransferSinglePairV2,
     SCENARIO_CODE,
     SCENARIO_VERSION,
+    SCENARIO_VERSION_V2,
     ELIGIBILITY_STATUS
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 const {
@@ -15,6 +17,7 @@ const {
 } = require('./apasxoliseisPolicyCatalogService');
 
 const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v1';
+const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v2';
 const CHOICE_CODE = 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR';
 
 const PROPOSAL_STATUS = Object.freeze({
@@ -133,7 +136,7 @@ function copyAnalysisMetadata(analysis) {
     };
 }
 
-function readPolicyContext() {
+function readPolicyContext(contractVersion = 'v1') {
     const weeklyRepoPolicy = getApasxoliseisPolicyByCode(WEEKLY_REPO_POLICY_CODE);
     const sourceWorkPolicy = getApasxoliseisPolicyByCode(SOURCE_WORK_POLICY_CODE);
     const weeklyFields = weeklyRepoPolicy?.proposed_update_fields;
@@ -155,9 +158,11 @@ function readPolicyContext() {
     return {
         metadata: {
             weekly_repo_policy_code: WEEKLY_REPO_POLICY_CODE,
-            weekly_repo_policy_version: weeklyRepoPolicy.policy_version,
+            weekly_repo_policy_version:
+                contractVersion === 'v2' ? 'foundation:v2' : weeklyRepoPolicy.policy_version,
             source_work_policy_code: SOURCE_WORK_POLICY_CODE,
-            source_work_policy_version: sourceWorkPolicy.policy_version
+            source_work_policy_version:
+                contractVersion === 'v2' ? 'foundation:v2' : sourceWorkPolicy.policy_version
         },
         allowedFields: new Set([...weeklyFields, ...sourceFields])
     };
@@ -169,21 +174,30 @@ function buildResult({
     reasons,
     warnings,
     policyContext = null,
-    items = []
+    items = [],
+    scenarioVersion = SCENARIO_VERSION,
+    proposalVersion = PROPOSAL_VERSION,
+    atomicPairRequired = true,
+    runtimeApplySupported = false,
+    applyReadinessReason = null,
+    allowedHrChoices = [],
+    reviewOnlyOutcome = null
 }) {
     const metadata = copyAnalysisMetadata(analysis);
     const ready = proposalStatus === PROPOSAL_STATUS.READY;
 
     return deepFreeze({
         scenario_code: SCENARIO_CODE,
-        scenario_version: SCENARIO_VERSION,
-        proposal_version: PROPOSAL_VERSION,
+        scenario_version: scenarioVersion,
+        proposal_version: proposalVersion,
         proposal_status: proposalStatus,
         choice_code: CHOICE_CODE,
         requires_hr_review: true,
         can_auto_apply: false,
-        atomic_pair_required: true,
-        runtime_apply_supported: false,
+        atomic_pair_required: atomicPairRequired,
+        runtime_apply_supported: runtimeApplySupported,
+        allowed_hr_choices: [...allowedHrChoices],
+        review_only_outcome: reviewOnlyOutcome,
         reasons: [...new Set(reasons ?? metadata.reasons)],
         warnings: [...new Set(warnings ?? metadata.warnings)],
         week: metadata.week,
@@ -200,7 +214,8 @@ function buildResult({
         })),
         apply_readiness: {
             status: 'BLOCKED',
-            reason: ready ? 'ATOMIC_APPLY_SUPPORT_REQUIRED' : 'PROPOSAL_NOT_READY'
+            reason: applyReadinessReason ||
+                (ready ? 'ATOMIC_APPLY_SUPPORT_REQUIRED' : 'PROPOSAL_NOT_READY')
         }
     });
 }
@@ -302,9 +317,16 @@ function buildWeeklyRepoTransferSinglePairProposal({
     weekRows = [],
     employmentProfile = {},
     holidayByDateKey = new Map(),
-    existingAuditCountByRowKey = new Map()
+    existingAuditCountByRowKey = new Map(),
+    contractVersion = 'v1'
 } = {}) {
-    const analysis = analyzeWeeklyRepoTransferSinglePair({
+    const legacy = contractVersion === 'v1';
+    const analyzer = legacy
+        ? analyzeWeeklyRepoTransferSinglePairV1
+        : analyzeWeeklyRepoTransferSinglePairV2;
+    const scenarioVersion = legacy ? SCENARIO_VERSION : SCENARIO_VERSION_V2;
+    const proposalVersion = legacy ? PROPOSAL_VERSION : PROPOSAL_VERSION_V2;
+    const analysis = analyzer({
         weekRows,
         employmentProfile,
         holidayByDateKey,
@@ -312,13 +334,54 @@ function buildWeeklyRepoTransferSinglePairProposal({
     });
 
     if (analysis.eligibility_status !== ELIGIBILITY_STATUS.ELIGIBLE) {
+        const fallback =
+            analysis.semantic_proposal?.operation_type ===
+            'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY';
+        const sourceRow = fallback
+            ? (Array.isArray(weekRows) ? weekRows : []).find(
+                (row) => dateKeyUtc(row?.hmeromhnia) === analysis.source?.hmeromhnia
+            )
+            : null;
         return buildResult({
             analysis,
-            proposalStatus: PROPOSAL_STATUS.NOT_AVAILABLE
+            proposalStatus: PROPOSAL_STATUS.NOT_AVAILABLE,
+            scenarioVersion,
+            proposalVersion,
+            atomicPairRequired: fallback ? false : true,
+            runtimeApplySupported: false,
+            applyReadinessReason: fallback
+                ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                : 'PROPOSAL_NOT_READY',
+            allowedHrChoices: fallback
+                ? analysis.semantic_proposal.allowed_hr_choices
+                : [],
+            reviewOnlyOutcome: fallback ? {
+                outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
+                reason: 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS',
+                source: {
+                    prodhlomena_oraria_id: normalizeId(sourceRow?._id || sourceRow?.id),
+                    hmeromhnia: dateKeyUtc(sourceRow?.hmeromhnia),
+                    cards_ores_ergasias: Number(sourceRow?.cards_ores_ergasias),
+                    card_intervals: CARD_INTERVAL_FIELDS.map(([start, end]) => ({
+                        apo: normalizePrimitiveString(sourceRow?.[start]),
+                        eos: normalizePrimitiveString(sourceRow?.[end])
+                    })).filter((interval) => interval.apo && interval.eos),
+                    proposed_category: 'ΕΡΓ'
+                },
+                allowed_hr_choices: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+                requires_hr_review: true,
+                can_auto_apply: false,
+                atomic_pair_required: false,
+                runtime_apply_supported: false,
+                apply_readiness: {
+                    status: 'BLOCKED',
+                    reason: 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
+                }
+            } : null
         });
     }
 
-    const policy = readPolicyContext();
+    const policy = readPolicyContext(contractVersion);
     if (!policy) return invalidResult(analysis, 'POLICY_CATALOG_NOT_MATERIALIZABLE');
 
     const rows = Array.isArray(weekRows) ? weekRows : [];
@@ -390,7 +453,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
         analysis,
         proposalStatus: PROPOSAL_STATUS.READY,
         policyContext: policy.metadata,
-        items
+        items,
+        scenarioVersion,
+        proposalVersion
     });
 }
 
@@ -398,5 +463,6 @@ module.exports = {
     buildWeeklyRepoTransferSinglePairProposal,
     PROPOSAL_STATUS,
     PROPOSAL_VERSION,
+    PROPOSAL_VERSION_V2,
     CHOICE_CODE
 };

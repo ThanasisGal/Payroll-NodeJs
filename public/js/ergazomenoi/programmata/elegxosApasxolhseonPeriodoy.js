@@ -3756,7 +3756,9 @@ function renderAtomicRepoTransferIntervals(proposedValues = {}) {
 function renderAtomicRepoTransferItem(item = {}, role) {
     const isSource = role === 'SOURCE_BECOMES_WORK';
     const proposedValues = item.proposed_values || {};
-    const title = isSource ? 'Ημέρα που γίνεται εργασία' : 'Ημέρα που γίνεται ρεπό';
+    const title = isSource
+        ? 'Ημέρα που γίνεται εργασία — μη προδηλωμένη εργασία με κάρτες, Προτείνεται ΕΡΓ'
+        : 'Ημέρα που γίνεται ρεπό — πρώτη προδηλωμένη ημέρα χωρίς κάρτες, Προτείνεται ΜΕ';
     const panelClass = isSource
         ? 'atomic-repo-transfer-source'
         : 'atomic-repo-transfer-target';
@@ -3814,6 +3816,8 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     ROTATIONAL_EMPLOYMENT_NOT_SUPPORTED:
         'Η εκ περιτροπής απασχόληση δεν υποστηρίζεται ακόμη από την αυτόματη διαδικασία.',
     NO_TARGET_CANDIDATE: 'Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.',
+    NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS:
+        'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
     INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
     MULTIPLE_SOURCE_CANDIDATES:
         'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.'
@@ -4541,9 +4545,34 @@ function renderAtomicRepoTransferProjection(projection) {
     if (!projection) return '';
 
     const groups = Array.isArray(projection.groups) ? projection.groups : [];
+    const reviewOutcomes = Array.isArray(projection.review_outcomes)
+        ? projection.review_outcomes
+        : [];
+    const reviewOutcomesHtml = reviewOutcomes.map((outcome) => `
+        <article class="atomic-repo-transfer-group">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span class="badge text-bg-warning">Χρειάζεται περαιτέρω έλεγχο</span>
+                <span class="fw-semibold">Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης</span>
+            </div>
+            <div class="small">
+                Η ${escapeHtml(formatPolicyPreviewDate(outcome?.source?.hmeromhnia))}
+                έχει κάρτες (${escapeHtml(outcome?.source?.cards_ores_ergasias ?? 0)} ώρες)
+                και προτείνεται να αναγνωριστεί ως <strong>ΕΡΓ</strong>.
+            </div>
+            <div class="small mt-1">
+                Δεν βρέθηκε αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.
+                Επιτρεπόμενες επιλογές διερεύνησης HR:
+                <strong>${escapeHtml((outcome?.allowed_hr_choices || []).join(' / '))}</strong>.
+            </div>
+            <div class="small text-muted mt-2">
+                Δεν υπάρχει target ημερομηνία ή σχέδιο εφαρμογής. Οι επιλογές ΑΔΕΙΑ/ΑΠΟΥΣΙΑ
+                δεν εφαρμόζονται στην ημέρα με κάρτες και απαιτούν συγκεκριμένη authoritative ημέρα.
+            </div>
+        </article>
+    `).join('');
     const groupsHtml = groups.length
         ? groups.map((group, index) => renderAtomicRepoTransferGroup(group, index)).join('')
-        : `
+        : reviewOutcomes.length ? '' : `
             <div class="atomic-repo-transfer-empty">
                 Δεν δημιουργήθηκε αυτόματη πρόταση.
             </div>
@@ -4568,6 +4597,7 @@ function renderAtomicRepoTransferProjection(projection) {
                     </div>
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
+                    <div class="atomic-repo-transfer-groups">${reviewOutcomesHtml}</div>
                     <div class="atomic-repo-transfer-groups">${groupsHtml}</div>
                 </div>
             </div>
