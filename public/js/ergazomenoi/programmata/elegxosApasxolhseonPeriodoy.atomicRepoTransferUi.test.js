@@ -177,6 +177,33 @@ function testReadyFullTimeAndSplitShift() {
     assert.ok(!/\batomic\b/i.test(getVisibleText(html)));
 }
 
+function testNoTargetFallbackIsInformationalOnly() {
+    const html = render({
+        summary: {},
+        reason_counts: { NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS: 1 },
+        warning_counts: {},
+        groups: [],
+        review_outcomes: [{
+            source: {
+                hmeromhnia: '2026-07-06',
+                cards_ores_ergasias: 4,
+                proposed_category: 'ΕΡΓ'
+            },
+            investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+            runtime_apply_supported: false
+        }]
+    });
+    assertContains(html, [
+        'Πιθανή αιτία προς διερεύνηση από το HR',
+        'άδεια ή απουσία',
+        'Δεν έχει δημιουργηθεί πρόταση εφαρμογής',
+        'Δεν υπάρχει target ημερομηνία',
+        'Χρειάζεται περαιτέρω έλεγχο'
+    ]);
+    assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
+    assert.ok(!html.includes('atomic-repo-transfer-decision-btn'));
+}
+
 function testCompleteVisibleSectionContainsNoTechnicalTerms() {
     const projection = readyProjection();
     projection.projection_status = 'READY';
@@ -1419,6 +1446,7 @@ async function testHrLoadingLocksAndRestoresFilters() {
 
 const tests = [
     testReadyFullTimeAndSplitShift,
+    testNoTargetFallbackIsInformationalOnly,
     testCompleteVisibleSectionContainsNoTechnicalTerms,
     testPartTimeTargetIsNotAnError,
     testEmptyFirstIntervalDoesNotCompactSecond,

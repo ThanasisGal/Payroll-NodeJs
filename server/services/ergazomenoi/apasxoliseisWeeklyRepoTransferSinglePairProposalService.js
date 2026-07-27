@@ -136,7 +136,7 @@ function copyAnalysisMetadata(analysis) {
     };
 }
 
-function readPolicyContext(contractVersion = 'v1') {
+function readPolicyContext() {
     const weeklyRepoPolicy = getApasxoliseisPolicyByCode(WEEKLY_REPO_POLICY_CODE);
     const sourceWorkPolicy = getApasxoliseisPolicyByCode(SOURCE_WORK_POLICY_CODE);
     const weeklyFields = weeklyRepoPolicy?.proposed_update_fields;
@@ -158,11 +158,9 @@ function readPolicyContext(contractVersion = 'v1') {
     return {
         metadata: {
             weekly_repo_policy_code: WEEKLY_REPO_POLICY_CODE,
-            weekly_repo_policy_version:
-                contractVersion === 'v2' ? 'foundation:v2' : weeklyRepoPolicy.policy_version,
+            weekly_repo_policy_version: weeklyRepoPolicy.policy_version,
             source_work_policy_code: SOURCE_WORK_POLICY_CODE,
-            source_work_policy_version:
-                contractVersion === 'v2' ? 'foundation:v2' : sourceWorkPolicy.policy_version
+            source_work_policy_version: sourceWorkPolicy.policy_version
         },
         allowedFields: new Set([...weeklyFields, ...sourceFields])
     };
@@ -181,6 +179,7 @@ function buildResult({
     runtimeApplySupported = false,
     applyReadinessReason = null,
     allowedHrChoices = [],
+    investigationGuidance = [],
     reviewOnlyOutcome = null
 }) {
     const metadata = copyAnalysisMetadata(analysis);
@@ -197,6 +196,7 @@ function buildResult({
         atomic_pair_required: atomicPairRequired,
         runtime_apply_supported: runtimeApplySupported,
         allowed_hr_choices: [...allowedHrChoices],
+        investigation_guidance: [...investigationGuidance],
         review_only_outcome: reviewOnlyOutcome,
         reasons: [...new Set(reasons ?? metadata.reasons)],
         warnings: [...new Set(warnings ?? metadata.warnings)],
@@ -320,6 +320,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
     existingAuditCountByRowKey = new Map(),
     contractVersion = 'v1'
 } = {}) {
+    if (!['v1', 'v2'].includes(contractVersion)) {
+        throw new TypeError('Unsupported repo-transfer proposal contract version.');
+    }
     const legacy = contractVersion === 'v1';
     const analyzer = legacy
         ? analyzeWeeklyRepoTransferSinglePairV1
@@ -352,8 +355,8 @@ function buildWeeklyRepoTransferSinglePairProposal({
             applyReadinessReason: fallback
                 ? 'NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'
                 : 'PROPOSAL_NOT_READY',
-            allowedHrChoices: fallback
-                ? analysis.semantic_proposal.allowed_hr_choices
+            investigationGuidance: fallback
+                ? analysis.semantic_proposal.investigation_guidance
                 : [],
             reviewOnlyOutcome: fallback ? {
                 outcome_code: 'PARTIAL_UNEXPECTED_WORK_WITHOUT_OFFSET_DAY',
@@ -368,7 +371,7 @@ function buildWeeklyRepoTransferSinglePairProposal({
                     })).filter((interval) => interval.apo && interval.eos),
                     proposed_category: 'ΕΡΓ'
                 },
-                allowed_hr_choices: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
+                investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
                 requires_hr_review: true,
                 can_auto_apply: false,
                 atomic_pair_required: false,
@@ -381,7 +384,7 @@ function buildWeeklyRepoTransferSinglePairProposal({
         });
     }
 
-    const policy = readPolicyContext(contractVersion);
+    const policy = readPolicyContext();
     if (!policy) return invalidResult(analysis, 'POLICY_CATALOG_NOT_MATERIALIZABLE');
 
     const rows = Array.isArray(weekRows) ? weekRows : [];

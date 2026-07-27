@@ -1,6 +1,7 @@
 const assert = require('assert');
 
 const {
+    analyzeWeeklyRepoTransferSinglePairV1,
     analyzeWeeklyRepoTransferSinglePairV2,
     normalizeEmploymentType,
     employmentFamily
@@ -9,6 +10,9 @@ const {
     buildWeeklyRepoTransferSinglePairProposal,
     PROPOSAL_VERSION_V2
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
+const {
+    buildWeeklyRepoTransferSinglePairGroupProjection
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 const {
     buildWeeklyRepoTransferAtomicPageProjection
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
@@ -39,7 +43,7 @@ function row(offset, values = {}) {
     };
 }
 
-function week({ sources = [1], targets = [3] } = {}) {
+function week({ sources = [1], targets = [3], existingRepo = [] } = {}) {
     const rows = Array.from({ length: 7 }, (_, offset) => row(offset));
     sources.forEach((offset) => Object.assign(rows[offset], {
         kathgoria_ergasias: 'ΜΕ',
@@ -52,87 +56,232 @@ function week({ sources = [1], targets = [3] } = {}) {
         cards_apo_ora_01: '',
         cards_eos_ora_01: ''
     }));
+    existingRepo.forEach((offset) => Object.assign(rows[offset], {
+        kathgoria_ergasias: 'ΜΕ',
+        ores_ergasias: 0,
+        apo_ora_01: '',
+        eos_ora_01: '',
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    }));
     return rows;
 }
 
-function analyze(rows, type) {
+function analyze(rows, type = 'MERIKH', profile = {}, contexts = {}) {
     return analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: type }
+        employmentProfile: {
+            typos_apasxolhshs: type,
+            mhniaia_repo: 1,
+            ...profile
+        },
+        holidayByDateKey: contexts.holidayByDateKey || new Map(),
+        existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
 }
 
-for (const type of ['EK_PERITROPHS', 'MERIKH']) {
-    const result = analyze(week(), type);
-    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v2');
-    assert.strictEqual(result.source.hmeromhnia, date(1));
-    assert.strictEqual(result.source.semantic_target_category, 'ΕΡΓ');
-    assert.strictEqual(result.target.hmeromhnia, date(3));
-    assert.strictEqual(result.target.semantic_target_category, 'ΜΕ');
-    assert.strictEqual(result.semantic_proposal.employment_family, 'PARTIAL_FAMILY');
+function assertEquivalentPartialPolicy(rows, profile = {}) {
+    const merikhV1 = analyzeWeeklyRepoTransferSinglePairV1({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1, ...profile }
+    });
+    for (const type of ['MERIKH', 'EK_PERITROPHS', '2', '02', 'EK_PERITROPIS', 'ROTATIONAL']) {
+        const result = analyze(rows, type, profile);
+        assert.strictEqual(result.eligibility_status, merikhV1.eligibility_status, type);
+        assert.deepStrictEqual(result.reasons, merikhV1.reasons, type);
+        assert.strictEqual(result.counts.existing_actual_repo, merikhV1.counts.existing_actual_repo);
+        assert.strictEqual(result.counts.predicted_final_repo, merikhV1.counts.predicted_final_repo);
+    }
 }
 
-assert.strictEqual(employmentFamily(normalizeEmploymentType('1')), 'PARTIAL_FAMILY');
-assert.strictEqual(employmentFamily(normalizeEmploymentType('2')), 'PARTIAL_FAMILY');
-for (const alias of ['PARTIAL', 'EK_PERITROPIS', 'EK_PERITROPH']) {
+{
+    const rows = week();
+    assertEquivalentPartialPolicy(rows);
+    const result = analyze(rows, 'EK_PERITROPHS');
+    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v2');
+    assert.strictEqual(result.source.semantic_target_category, 'ΕΡΓ');
+    assert.strictEqual(result.target.semantic_target_category, 'ΜΕ');
+    assert.strictEqual(result.counts.existing_actual_repo, 0);
+    assert.strictEqual(result.counts.predicted_final_repo, 1);
+}
+
+for (const profile of [
+    { hmeres_ergasias_ebdomadas: 4 },
+    { mo_oron_hmerhsias_ergasias: 4 },
+    { hmeres_ergasias_ebdomadas: 4, mo_oron_hmerhsias_ergasias: 4 }
+]) {
+    assertEquivalentPartialPolicy(week(), profile);
+}
+
+for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS', 'EK_PERITROPH', 'ROTATIONAL']) {
     assert.strictEqual(employmentFamily(normalizeEmploymentType(alias)), 'PARTIAL_FAMILY');
 }
 
 {
-    const result = analyze(week({ sources: [1, 2] }), 'MERIKH');
+    const result = analyze(week(), 'MERIKH', { mhniaia_repo: 0 });
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('INVALID_MHNIAIA_REPO'));
+}
+
+{
+    const deficit = analyze(week(), 'MERIKH', { mhniaia_repo: 2 });
+    assert.strictEqual(deficit.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(deficit.reasons.includes('REPO_DEFICIT_REMAINS'));
+
+    const exceeded = analyze(week({ existingRepo: [6] }), 'MERIKH', { mhniaia_repo: 1 });
+    assert.strictEqual(exceeded.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(exceeded.reasons.includes('REPO_LIMIT_EXCEEDED'));
+}
+
+{
+    const result = analyze(week({ sources: [1, 2] }));
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
     assert.ok(result.reasons.includes('MULTIPLE_SOURCE_CANDIDATES'));
-    assert.strictEqual(result.source, null);
 }
 
 {
-    const rows = week({ targets: [4, 2] });
-    const result = analyze(rows.reverse(), 'EK_PERITROPHS');
-    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.target.hmeromhnia, date(2));
-    assert.ok(result.warnings.includes('ADDITIONAL_TARGET_CANDIDATES_IGNORED:1'));
-}
-
-{
-    const rows = week({ targets: [2, 4] });
-    rows[2].is_locked = true;
-    const result = analyze(rows, 'MERIKH');
+    const result = analyze(week({ targets: [2, 4] }));
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('MULTIPLE_TARGET_CANDIDATES'));
+    assert.strictEqual(result.target, null);
+}
+
+for (const [label, mutate, context, reason] of [
+    ['locked source', (rows) => { rows[1].is_locked = true; }, {}, 'SOURCE_LOCKED'],
+    ['audited source', () => {}, { existingAuditCountByRowKey: new Map([['507f1f77bcf86cd799439011', 1]]) }, 'SOURCE_MANUAL_OVERRIDE'],
+    ['leave source', (rows) => { rows[1].adeia = true; }, {}, 'SOURCE_LEAVE_OR_SICKNESS'],
+    ['sick source', (rows) => { rows[1].astheneia = true; }, {}, 'SOURCE_LEAVE_OR_SICKNESS'],
+    ['incomplete cards', (rows) => { rows[1].cards_eos_ora_01 = ''; }, {}, 'NO_SOURCE_CANDIDATE'],
+    ['card hours without interval', (rows) => { rows[1].cards_apo_ora_01 = ''; rows[1].cards_eos_ora_01 = ''; }, {}, 'NO_SOURCE_CANDIDATE']
+]) {
+    const rows = week();
+    mutate(rows);
+    const result = analyze(rows, 'MERIKH', {}, context);
+    assert.notStrictEqual(result.eligibility_status, 'ELIGIBLE', label);
+    assert.ok(result.reasons.includes(reason), `${label}: ${result.reasons.join(',')}`);
+}
+
+{
+    const rows = week();
+    rows[3].is_locked = true;
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
     assert.ok(result.reasons.includes('TARGET_LOCKED'));
-    assert.strictEqual(result.target.hmeromhnia, date(2));
+}
+
+{
+    const result = analyze(week(), 'MERIKH', {}, {
+        existingAuditCountByRowKey: new Map([['507f1f77bcf86cd799439013', 1]])
+    });
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('TARGET_MANUAL_OVERRIDE'));
+}
+
+for (const mutate of [
+    (rows) => { rows[3].adeia = true; },
+    (rows) => { rows[3].astheneia = true; }
+]) {
+    const rows = week();
+    mutate(rows);
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('TARGET_LEAVE_OR_SICKNESS'));
+}
+
+{
+    const rows = week();
+    const holidayByDateKey = new Map([[date(1), { isHoliday: true, isMandatoryHoliday: true }]]);
+    const result = analyze(rows, 'MERIKH', {}, { holidayByDateKey });
+    assert.notStrictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.ok(result.reasons.includes('SOURCE_HOLIDAY'));
+}
+
+{
+    const holidayByDateKey = new Map([[date(3), { isHoliday: true, isMandatoryHoliday: true }]]);
+    const result = analyze(week(), 'MERIKH', {}, { holidayByDateKey });
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('TARGET_HOLIDAY'));
+}
+
+{
+    const rows = week();
+    rows[3].ores_ergasias = 0;
+    rows[3].apo_ora_01 = '';
+    rows[3].eos_ora_01 = '';
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
+}
+
+{
+    const rows = week();
+    rows[3].cards_apo_ora_01 = '09:00';
+    rows[3].cards_eos_ora_01 = '13:00';
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
+    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
 }
 
 {
     const rows = week({ targets: [] });
-    const result = analyze(rows, 'MERIKH');
+    const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(result.reasons.includes('NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS'));
-    assert.deepStrictEqual(result.semantic_proposal.allowed_hr_choices, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
+    assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
     assert.strictEqual(result.semantic_proposal.atomic_pair_required, false);
 
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH' },
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.proposal_version, PROPOSAL_VERSION_V2);
     assert.strictEqual(proposal.atomic_pair_required, false);
     assert.strictEqual(proposal.runtime_apply_supported, false);
     assert.strictEqual(proposal.apply_readiness.status, 'BLOCKED');
-    assert.deepStrictEqual(proposal.allowed_hr_choices, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
+    assert.deepStrictEqual(proposal.investigation_guidance, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
+    assert.deepStrictEqual(proposal.allowed_hr_choices, []);
     assert.deepStrictEqual(proposal.items, []);
 
     const page = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [{
             weekRows: rows,
-            employmentProfile: { typos_apasxolhshs: 'MERIKH' }
+            employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 }
         }]
     });
     assert.strictEqual(page.groups.length, 0);
     assert.strictEqual(page.review_outcomes.length, 1);
     assert.strictEqual(page.review_outcomes[0].source.proposed_category, 'ΕΡΓ');
-    assert.strictEqual(page.review_outcomes[0].runtime_apply_supported, false);
+    assert.deepStrictEqual(
+        page.review_outcomes[0].investigation_guidance,
+        ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']
+    );
+}
+
+{
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: week(),
+        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    });
+    assert.strictEqual(proposal.proposal_status, 'READY');
+    assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v1');
+    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v1');
+    assert.strictEqual(proposal.items[0].proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
+    assert.strictEqual(proposal.items[1].proposed_values.kathgoria_ergasias_apologistika, 'ΜΕ');
+    assert.strictEqual(proposal.items[1].proposed_values.repo_apologistika, true);
+
+    const projection = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: week(),
+        employmentProfile: { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    });
+    assert.strictEqual(projection.projection_status, 'READY');
+    assert.ok(projection.groups[0].group_key.includes(
+        'proposal_version=repo-transfer-single-pair-proposal:v2'
+    ));
 }
 
 {
@@ -140,5 +289,18 @@ for (const alias of ['PARTIAL', 'EK_PERITROPIS', 'EK_PERITROPH']) {
     assert.strictEqual(result.eligibility_status, 'INVALID_INPUT');
     assert.ok(result.reasons.includes('UNSUPPORTED_EMPLOYMENT_TYPE'));
 }
+
+{
+    const rows = week();
+    rows[6].hmeromhnia = '2026-07-12';
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'INVALID_INPUT');
+    assert.ok(result.reasons.includes('CROSS_WEEK_ROWS'));
+}
+
+assert.throws(
+    () => buildWeeklyRepoTransferSinglePairProposal({ contractVersion: 'future' }),
+    /Unsupported repo-transfer proposal contract version/
+);
 
 console.log('apasxoliseis partial-family v2 tests passed');

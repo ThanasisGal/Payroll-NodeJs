@@ -54,7 +54,7 @@ async function run() {
     let auditMap;
     await assert.rejects(() => reconstructWeeklyRepoTransferDecision({
         scope,
-        command: { proposal_id: 'not-ready', expected_source_id: String(sourceId), expected_target_id: String(targetId), expected_proposal_version: 'v1', expected_choice_code: 'c' },
+        command: { proposal_id: 'not-ready', expected_source_id: String(sourceId), expected_target_id: String(targetId), expected_proposal_version: 'repo-transfer-single-pair-proposal:v1', expected_choice_code: 'c' },
         contextLoader: async () => context,
         projectionBuilder: (input) => { auditMap = input.existingAuditCountByRowKey; return { projection_status: 'NOT_AVAILABLE', groups: [] }; }
     }), (error) => error.statusCode === 409);

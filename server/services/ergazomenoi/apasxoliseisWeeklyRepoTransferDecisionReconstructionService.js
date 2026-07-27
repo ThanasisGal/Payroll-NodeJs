@@ -186,13 +186,11 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     const candidateScopes = new Set(context.candidates.map((row) => [String(row.team), String(row.company_kod), String(row.ypokatasthma), String(row.kodikos)].join('|')));
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
-    const contractVersion = ['v1', 'repo-transfer-single-pair-proposal:v1'].includes(
-        command.expected_proposal_version
-    )
+    const contractVersion = command.expected_proposal_version ===
+        'repo-transfer-single-pair-proposal:v1'
         ? 'v1'
-        : ['v2', 'repo-transfer-single-pair-proposal:v2'].includes(
-            command.expected_proposal_version
-        )
+        : command.expected_proposal_version ===
+            'repo-transfer-single-pair-proposal:v2'
             ? 'v2'
             : null;
     if (!contractVersion) {

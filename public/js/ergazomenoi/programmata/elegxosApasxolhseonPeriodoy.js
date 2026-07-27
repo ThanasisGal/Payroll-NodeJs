@@ -4561,12 +4561,13 @@ function renderAtomicRepoTransferProjection(projection) {
             </div>
             <div class="small mt-1">
                 Δεν βρέθηκε αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.
-                Επιτρεπόμενες επιλογές διερεύνησης HR:
-                <strong>${escapeHtml((outcome?.allowed_hr_choices || []).join(' / '))}</strong>.
+                Πιθανή αιτία προς διερεύνηση από το HR:
+                <strong>άδεια ή απουσία</strong>
+                σε άλλη συγκεκριμένη ημέρα της εβδομάδας.
             </div>
             <div class="small text-muted mt-2">
-                Δεν υπάρχει target ημερομηνία ή σχέδιο εφαρμογής. Οι επιλογές ΑΔΕΙΑ/ΑΠΟΥΣΙΑ
-                δεν εφαρμόζονται στην ημέρα με κάρτες και απαιτούν συγκεκριμένη authoritative ημέρα.
+                Δεν έχει δημιουργηθεί πρόταση εφαρμογής. Δεν υπάρχει target ημερομηνία,
+                αποθηκεύσιμη επιλογή ή απόφαση HR.
             </div>
         </article>
     `).join('');

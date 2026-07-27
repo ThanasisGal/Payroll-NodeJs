@@ -741,6 +741,7 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairProposalService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferSinglePairService.test.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferPartialFamilyV2.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyCommandService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplyPreflightService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicWriterService.test.js"
