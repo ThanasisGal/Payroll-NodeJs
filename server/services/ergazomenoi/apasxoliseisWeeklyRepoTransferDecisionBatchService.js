@@ -72,6 +72,21 @@ function executionPresentation(execution) {
         created_by_user_name: execution.created_by_user_name || ''
     } : null;
 }
+function applyCapability({ applyState, runtimeEnabled, indexReady, context = null }) {
+    const canApply = applyState === 'READY_TO_APPLY';
+    return {
+        apply_state: applyState,
+        can_apply: canApply,
+        apply_allowed: canApply,
+        apply_readiness: {
+            status: canApply ? 'READY' : 'BLOCKED',
+            reason: canApply ? null : applyState
+        },
+        runtime_enabled: runtimeEnabled === true,
+        index_ready: indexReady === true,
+        apply_context: context
+    };
+}
 
 async function loadWeeklyRepoTransferDecisionBatch({
     session,
@@ -242,13 +257,26 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 else if (!runtimeState.enabled) apply_state = 'RUNTIME_DISABLED';
                 else if (!indexState.ready) apply_state = 'INDEXES_NOT_READY';
                 else apply_state = 'READY_TO_APPLY';
+            } else if (!rawCurrent && proposalDecisions.some((decision) => decision.decision_code === 'APPROVE_PROPOSAL')) {
+                apply_state = 'STALE_DECISION';
             }
+            const applyContext = rawCurrent ? {
+                team: text(rawCurrent.team || scope.team, 50),
+                company_kodikos: text(session.companyKodikos, 50),
+                ypokatasthma: text(rawCurrent.ypokatasthma || normalized.ypokatasthma, 20),
+                week_start: rawCurrent.week_start || null,
+                week_end: rawCurrent.week_end || null
+            } : null;
             return {
                 proposal_id: group.group_id,
                 current_decision: history.find((decision) => decision.is_current) || null,
                 current_execution: executionPresentation(execution),
-                apply_state,
-                apply_allowed: apply_state === 'READY_TO_APPLY',
+                ...applyCapability({
+                    applyState: apply_state,
+                    runtimeEnabled: runtimeState.enabled,
+                    indexReady: indexState.ready,
+                    context: applyContext
+                }),
                 history,
                 history_count: history.length
             };
@@ -263,8 +291,11 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 proposal_id: proposalId,
                 current_decision: null,
                 current_execution: executionPresentation(execution),
-                apply_state: 'ALREADY_APPLIED',
-                apply_allowed: false,
+                ...applyCapability({
+                    applyState: 'ALREADY_APPLIED',
+                    runtimeEnabled: runtimeState.enabled,
+                    indexReady: indexState.ready
+                }),
                 history,
                 history_count: history.length
             };
