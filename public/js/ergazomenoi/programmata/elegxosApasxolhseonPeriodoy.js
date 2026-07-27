@@ -3697,6 +3697,8 @@ function renderAtomicRepoTransferSummary(projection = {}) {
         ['Συνδεδεμένες προτάσεις', 'decision_units_count'],
         ['Προτάσεις προς έλεγχο από HR', 'ready_count'],
         ['Εργαζόμενοι', 'employees_count'],
+        ['Περιπτώσεις προς διερεύνηση', 'review_outcomes_count'],
+        ['Εργαζόμενοι προς διερεύνηση', 'review_outcome_employees_count'],
         ['Χωρίς ασφαλή πρόταση', 'not_available_count'],
         ['Περιπτώσεις με μη έγκυρα στοιχεία', 'invalid_projection_count']
     ];
@@ -3758,7 +3760,7 @@ function renderAtomicRepoTransferItem(item = {}, role) {
     const proposedValues = item.proposed_values || {};
     const title = isSource
         ? 'Ημέρα που γίνεται εργασία — μη προδηλωμένη εργασία με κάρτες, Προτείνεται ΕΡΓ'
-        : 'Ημέρα που γίνεται ρεπό — πρώτη προδηλωμένη ημέρα χωρίς κάρτες, Προτείνεται ΜΕ';
+        : 'Ημέρα που γίνεται ρεπό — προδηλωμένη εργασία χωρίς κάρτες, Προτείνεται ΜΕ';
     const panelClass = isSource
         ? 'atomic-repo-transfer-source'
         : 'atomic-repo-transfer-target';
@@ -3820,7 +3822,34 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
     INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
     MULTIPLE_SOURCE_CANDIDATES:
-        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.'
+        'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
+    MULTIPLE_TARGET_CANDIDATES:
+        'Βρέθηκαν περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες. Απαιτείται έλεγχος πριν επιλεγεί ημέρα ρεπό.',
+    REPO_LIMIT_EXCEEDED:
+        'Η αλλαγή θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό της εβδομάδας.',
+    TARGET_LOCKED: 'Η προτεινόμενη ημέρα ρεπό είναι κλειδωμένη.',
+    TARGET_MANUAL_OVERRIDE:
+        'Η προτεινόμενη ημέρα ρεπό έχει ήδη χειροκίνητη αλλαγή ή καταγεγραμμένο έλεγχο.',
+    TARGET_LEAVE_OR_SICKNESS:
+        'Η προτεινόμενη ημέρα ρεπό έχει άδεια ή ασθένεια.',
+    TARGET_HOLIDAY: 'Η προτεινόμενη ημέρα ρεπό συμπίπτει με αργία που εμποδίζει την αλλαγή.',
+    SOURCE_LOCKED: 'Η ημέρα εργασίας με κάρτες είναι κλειδωμένη.',
+    SOURCE_MANUAL_OVERRIDE:
+        'Η ημέρα εργασίας με κάρτες έχει ήδη χειροκίνητη αλλαγή ή καταγεγραμμένο έλεγχο.',
+    SOURCE_LEAVE_OR_SICKNESS:
+        'Η ημέρα εργασίας με κάρτες έχει άδεια ή ασθένεια.',
+    SOURCE_HOLIDAY:
+        'Η ημέρα εργασίας με κάρτες συμπίπτει με αργία που εμποδίζει την αλλαγή.',
+    SOURCE_INVALID_CARD_EVIDENCE:
+        'Τα στοιχεία καρτών της ημέρας εργασίας δεν είναι πλήρη ή συνεπή.',
+    SOURCE_ALREADY_PROCESSED:
+        'Η ημέρα εργασίας με κάρτες έχει ήδη ουσιαστικά απολογιστικά στοιχεία.',
+    TARGET_ALREADY_PROCESSED:
+        'Η προτεινόμενη ημέρα ρεπό έχει ήδη ουσιαστικά απολογιστικά στοιχεία.',
+    UNSUPPORTED_EMPLOYMENT_TYPE:
+        'Ο τύπος απασχόλησης δεν αναγνωρίζεται με ασφάλεια.',
+    CROSS_WEEK_ROWS:
+        'Τα στοιχεία εκτείνονται σε περισσότερες από μία φυσικές εβδομάδες.'
 });
 
 const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
@@ -4554,10 +4583,19 @@ function renderAtomicRepoTransferProjection(projection) {
                 <span class="badge text-bg-warning">Χρειάζεται περαιτέρω έλεγχο</span>
                 <span class="fw-semibold">Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης</span>
             </div>
+            <div class="small mb-2">
+                Εργαζόμενος: <strong>${escapeHtml(outcome?.employee_kodikos || '-')}</strong>
+                ${outcome?.ypokatasthma ? ` · Υποκατάστημα: ${escapeHtml(outcome.ypokatasthma)}` : ''}
+                <br>
+                Εβδομάδα: ${escapeHtml(formatPolicyPreviewDate(outcome?.week_start))}
+                –${escapeHtml(formatPolicyPreviewDate(outcome?.week_end))}
+            </div>
             <div class="small">
-                Η ${escapeHtml(formatPolicyPreviewDate(outcome?.source?.hmeromhnia))}
-                έχει κάρτες (${escapeHtml(outcome?.source?.cards_ores_ergasias ?? 0)} ώρες)
-                και προτείνεται να αναγνωριστεί ως <strong>ΕΡΓ</strong>.
+                Ημέρα με κάρτες: ${escapeHtml(formatPolicyPreviewDate(outcome?.source?.hmeromhnia))}
+                · Ώρες καρτών: ${escapeHtml(formatAtomicRepoTransferHours(
+                    outcome?.source?.cards_ores_ergasias
+                ))}
+                · Προτείνεται αναγνώριση ως <strong>ΕΡΓ</strong>.
             </div>
             <div class="small mt-1">
                 Δεν βρέθηκε αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.
@@ -4578,6 +4616,21 @@ function renderAtomicRepoTransferProjection(projection) {
                 Δεν δημιουργήθηκε αυτόματη πρόταση.
             </div>
         `;
+    const groupSafetyHtml = groups.length ? `
+        <div class="atomic-repo-transfer-main-warning">
+            <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
+            <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
+        </div>
+        <div class="atomic-repo-transfer-unavailable">
+            Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
+        </div>
+    ` : '';
+    const reviewSafetyHtml = reviewOutcomes.length ? `
+        <div class="atomic-repo-transfer-main-warning">
+            Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR.
+            Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής.
+        </div>
+    ` : '';
 
     return `
         <section class="atomic-repo-transfer-section" aria-labelledby="atomicRepoTransferTitle">
@@ -4589,13 +4642,8 @@ function renderAtomicRepoTransferProjection(projection) {
                         </div>
                         <span class="atomic-repo-transfer-readonly-badge">Μόνο για έλεγχο</span>
                     </div>
-                    <div class="atomic-repo-transfer-main-warning">
-                        <div>Η πρόταση μεταφοράς ρεπό περιλαμβάνει δύο συνδεδεμένες αλλαγές και εφαρμόζεται μόνο ως σύνολο.</div>
-                        <div>Η πρόταση εμφανίζεται μόνο για έλεγχο. Δεν έχει γίνει καμία αλλαγή στα δεδομένα.</div>
-                    </div>
-                    <div class="atomic-repo-transfer-unavailable">
-                        Η εφαρμογή της πρότασης δεν είναι ακόμη διαθέσιμη.
-                    </div>
+                    ${groupSafetyHtml}
+                    ${reviewSafetyHtml}
                     ${renderAtomicRepoTransferSummary(projection)}
                     ${renderAtomicRepoTransferDiagnostics(projection)}
                     <div class="atomic-repo-transfer-groups">${reviewOutcomesHtml}</div>

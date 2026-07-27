@@ -4,6 +4,7 @@ const {
     buildWeeklyRepoTransferSinglePairProposal,
     PROPOSAL_STATUS,
     PROPOSAL_VERSION,
+    PROPOSAL_VERSION_V2,
     CHOICE_CODE
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 const {
@@ -88,6 +89,14 @@ function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
+}
+
+function buildV2(rows, dependencies = {}) {
+    return buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 },
+        contractVersion: 'v2'
+    }, dependencies);
 }
 
 function expectedClearedTarget(category) {
@@ -469,6 +478,93 @@ function testMissingAndDuplicateIds() {
     assertInvalid(build(duplicate), 'DUPLICATE_PAIR_RECORD_ID');
 }
 
+function testV2InvalidResultsPreserveVersions() {
+    const assertV2Invalid = (result, reason) => {
+        assertInvalid(result, reason);
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v2');
+        assert.strictEqual(result.proposal_version, PROPOSAL_VERSION_V2);
+    };
+
+    const missingSource = partTimeWeek();
+    delete missingSource[2]._id;
+    assertV2Invalid(buildV2(missingSource), 'MISSING_SOURCE_RECORD_ID');
+
+    const missingTarget = partTimeWeek();
+    delete missingTarget[4]._id;
+    assertV2Invalid(buildV2(missingTarget), 'MISSING_TARGET_RECORD_ID');
+
+    const invalidIntervals = partTimeWeek();
+    invalidIntervals[2].cards_apo_ora_02 = 'invalid';
+    invalidIntervals[2].cards_eos_ora_02 = 'invalid';
+    assertV2Invalid(
+        buildV2(invalidIntervals),
+        'SOURCE_CARD_INTERVALS_NOT_MATERIALIZABLE'
+    );
+
+    const validRows = partTimeWeek();
+    const validAnalysis = require(
+        './apasxoliseisWeeklyRepoTransferSinglePairService'
+    ).analyzeWeeklyRepoTransferSinglePairV2({
+        weekRows: validRows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+    });
+
+    const invalidHours = partTimeWeek();
+    invalidHours[2].cards_ores_ergasias = 'invalid';
+    assertV2Invalid(
+        buildV2(invalidHours, { analyzer: () => validAnalysis }),
+        'SOURCE_CARD_HOURS_NOT_MATERIALIZABLE'
+    );
+
+    const fallbackRows = partTimeWeek();
+    Object.assign(fallbackRows[4], {
+        cards_ores_ergasias: 4,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '13:00'
+    });
+    const fallbackAnalysis = require(
+        './apasxoliseisWeeklyRepoTransferSinglePairService'
+    ).analyzeWeeklyRepoTransferSinglePairV2({
+        weekRows: fallbackRows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+    });
+    fallbackRows[2].cards_ores_ergasias = 'not-a-number';
+    assertV2Invalid(
+        buildV2(fallbackRows, { analyzer: () => fallbackAnalysis }),
+        'SOURCE_CARD_HOURS_NOT_MATERIALIZABLE'
+    );
+
+    assertV2Invalid(
+        buildV2(validRows, {
+            analyzer: () => ({
+                ...validAnalysis,
+                target: {
+                    ...validAnalysis.target,
+                    semantic_target_category: 'ΑΔΕΙΑ'
+                }
+            })
+        }),
+        'TARGET_CATEGORY_NOT_MATERIALIZABLE'
+    );
+
+    assertV2Invalid(
+        buildV2(validRows, {
+            materializeTargetValues: () => ({
+                kathgoria_ergasias_apologistika: 'ΜΕ',
+                unsupported_field: true
+            })
+        }),
+        'PROPOSED_FIELD_NOT_ALLOWED'
+    );
+
+    const v1MissingSource = fullTimeWeek();
+    delete v1MissingSource[1]._id;
+    const v1Result = build(v1MissingSource);
+    assertInvalid(v1Result, 'MISSING_SOURCE_RECORD_ID');
+    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v1');
+    assert.strictEqual(v1Result.proposal_version, PROPOSAL_VERSION);
+}
+
 function testNonEligibleAnalyzerPaths() {
     assertNotAvailable(
         build(fullTimeWeek(), { typos_apasxolhshs: 'EK_PERITROPHS', mhniaia_repo: 2 }),
@@ -583,6 +679,7 @@ function run() {
     testPartialProposalClearsProvisionalAutoLeaveFields();
     testPolicyAllowlistUnion();
     testMissingAndDuplicateIds();
+    testV2InvalidResultsPreserveVersions();
     testNonEligibleAnalyzerPaths();
     testInputImmutabilityAndFreezeIsolation();
     testOutputImmutabilityAndOwnership();

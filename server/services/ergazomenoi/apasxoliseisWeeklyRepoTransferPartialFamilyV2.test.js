@@ -30,6 +30,7 @@ function row(offset, values = {}) {
         _id: `507f1f77bcf86cd7994390${10 + offset}`,
         team: 'team',
         company_kod: 'company',
+        ypokatasthma: '0001',
         kodikos: '001',
         hmeromhnia: date(offset),
         kathgoria_ergasias: 'ΕΡΓ',
@@ -227,6 +228,7 @@ for (const mutate of [
 
 {
     const rows = week({ targets: [] });
+    rows[1].cards_ores_ergasias = '4,5';
     const result = analyze(rows);
     assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
     assert.deepStrictEqual(result.semantic_proposal.investigation_guidance, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
@@ -239,11 +241,24 @@ for (const mutate of [
     });
     assert.strictEqual(proposal.proposal_version, PROPOSAL_VERSION_V2);
     assert.strictEqual(proposal.atomic_pair_required, false);
+    assert.strictEqual(proposal.can_auto_apply, false);
     assert.strictEqual(proposal.runtime_apply_supported, false);
     assert.strictEqual(proposal.apply_readiness.status, 'BLOCKED');
     assert.deepStrictEqual(proposal.investigation_guidance, ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']);
     assert.deepStrictEqual(proposal.allowed_hr_choices, []);
     assert.deepStrictEqual(proposal.items, []);
+    assert.strictEqual(proposal.group_id, undefined);
+    assert.strictEqual(proposal.target, undefined);
+    assert.strictEqual(proposal.writer_plan, undefined);
+    assert.strictEqual(proposal.decision_payload, undefined);
+    assert.strictEqual(proposal.review_only_outcome.employee_kodikos, '001');
+    assert.strictEqual(proposal.review_only_outcome.team, 'team');
+    assert.strictEqual(proposal.review_only_outcome.company_kod, 'company');
+    assert.strictEqual(proposal.review_only_outcome.ypokatasthma, '0001');
+    assert.strictEqual(proposal.review_only_outcome.week_start, START);
+    assert.strictEqual(proposal.review_only_outcome.week_end, date(6));
+    assert.strictEqual(proposal.review_only_outcome.source.cards_ores_ergasias, 4.5);
+    assert.strictEqual(Object.isFrozen(proposal.review_only_outcome), true);
 
     const page = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [{
@@ -252,12 +267,28 @@ for (const mutate of [
         }]
     });
     assert.strictEqual(page.groups.length, 0);
+    assert.strictEqual(page.review_outcomes[0].group_id, undefined);
+    assert.strictEqual(page.review_outcomes[0].target, undefined);
     assert.strictEqual(page.review_outcomes.length, 1);
     assert.strictEqual(page.review_outcomes[0].source.proposed_category, 'ΕΡΓ');
     assert.deepStrictEqual(
         page.review_outcomes[0].investigation_guidance,
         ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']
     );
+    assert.strictEqual(page.summary.review_outcomes_count, 1);
+    assert.strictEqual(page.summary.review_outcome_employees_count, 1);
+    assert.strictEqual(page.summary.employees_count, 1);
+}
+
+{
+    const rows = week({ targets: [] });
+    rows[1].cards_ores_ergasias = '4.50';
+    const proposal = buildWeeklyRepoTransferSinglePairProposal({
+        weekRows: rows,
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 1 },
+        contractVersion: 'v2'
+    });
+    assert.strictEqual(proposal.review_only_outcome.source.cards_ores_ergasias, 4.5);
 }
 
 {

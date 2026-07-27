@@ -179,16 +179,24 @@ function testReadyFullTimeAndSplitShift() {
 
 function testNoTargetFallbackIsInformationalOnly() {
     const html = render({
-        summary: {},
+        summary: {
+            review_outcomes_count: 1,
+            review_outcome_employees_count: 1,
+            employees_count: 1
+        },
         reason_counts: { NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS: 1 },
         warning_counts: {},
         groups: [],
         review_outcomes: [{
             source: {
                 hmeromhnia: '2026-07-06',
-                cards_ores_ergasias: 4,
+                cards_ores_ergasias: 4.5,
                 proposed_category: 'ΕΡΓ'
             },
+            employee_kodikos: '001',
+            ypokatasthma: '0001',
+            week_start: '2026-07-05',
+            week_end: '2026-07-11',
             investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ'],
             runtime_apply_supported: false
         }]
@@ -198,10 +206,44 @@ function testNoTargetFallbackIsInformationalOnly() {
         'άδεια ή απουσία',
         'Δεν έχει δημιουργηθεί πρόταση εφαρμογής',
         'Δεν υπάρχει target ημερομηνία',
-        'Χρειάζεται περαιτέρω έλεγχο'
+        'Χρειάζεται περαιτέρω έλεγχο',
+        'Εργαζόμενος:',
+        '001',
+        'Εβδομάδα:',
+        '05/07/2026',
+        '11/07/2026',
+        'Ώρες καρτών:',
+        '4,50',
+        'Προτείνεται αναγνώριση ως',
+        'Περιπτώσεις προς διερεύνηση'
     ]);
+    const visibleText = getVisibleText(html);
+    assert.ok(!visibleText.includes('δύο συνδεδεμένες αλλαγές'));
+    assert.ok(!visibleText.includes('εφαρμόζεται μόνο ως σύνολο'));
+    assert.ok(!visibleText.includes('Εφαρμογή εγκεκριμένης μεταφοράς'));
+    assert.ok(!visibleText.includes('NaN'));
     assert.ok(!html.includes('atomic-repo-transfer-apply-btn'));
     assert.ok(!html.includes('atomic-repo-transfer-decision-btn'));
+}
+
+function testGroupsAndReviewOutcomesRenderSeparateSafetyMessages() {
+    const projection = readyProjection({ targetCategory: 'ΜΕ' });
+    projection.review_outcomes = [{
+        employee_kodikos: '002',
+        week_start: '2026-07-05',
+        week_end: '2026-07-11',
+        source: { hmeromhnia: '2026-07-07', cards_ores_ergasias: 3.5 },
+        investigation_guidance: ['ΑΔΕΙΑ', 'ΑΠΟΥΣΙΑ']
+    }];
+    const html = render(projection);
+    assertContains(html, [
+        'δύο συνδεδεμένες αλλαγές',
+        'εφαρμόζεται μόνο ως σύνολο',
+        'Οι παρακάτω περιπτώσεις χρειάζονται διερεύνηση από το HR',
+        'Δεν έχει δημιουργηθεί πρόταση μεταφοράς ή εφαρμογής',
+        'Συνδεδεμένη πρόταση μεταφοράς ρεπό',
+        'Μη προγραμματισμένη εργασία χωρίς ημέρα αντιστάθμισης'
+    ]);
 }
 
 function testCompleteVisibleSectionContainsNoTechnicalTerms() {
@@ -243,7 +285,12 @@ function testCompleteVisibleSectionContainsNoTechnicalTerms() {
 
 function testPartTimeTargetIsNotAnError() {
     const html = render(readyProjection({ targetCategory: 'ΜΕ' }));
-    assertContains(html, ['Πρόταση', 'ΜΕ']);
+    assertContains(html, [
+        'Πρόταση',
+        'ΜΕ',
+        'Ημέρα που γίνεται ρεπό — προδηλωμένη εργασία χωρίς κάρτες, Προτείνεται ΜΕ'
+    ]);
+    assert.ok(!html.includes('πρώτη προδηλωμένη ημέρα'));
     assert.ok(!html.includes('ΜΕ</dd> error'));
 }
 
@@ -633,6 +680,40 @@ function testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering() {
         visibleText.indexOf('Άλλη περίπτωση που χρειάζεται έλεγχο.') <
             visibleText.indexOf('Δεν βρέθηκε διαθέσιμη ημέρα για τη μεταφορά του ρεπό.')
     );
+}
+
+function testPartialFamilyDiagnosticsHaveSpecificGreekLabels() {
+    const reasonCodes = [
+        'MULTIPLE_TARGET_CANDIDATES',
+        'REPO_LIMIT_EXCEEDED',
+        'TARGET_LOCKED',
+        'TARGET_MANUAL_OVERRIDE',
+        'TARGET_LEAVE_OR_SICKNESS',
+        'TARGET_HOLIDAY',
+        'SOURCE_LOCKED',
+        'SOURCE_MANUAL_OVERRIDE',
+        'SOURCE_LEAVE_OR_SICKNESS',
+        'SOURCE_HOLIDAY',
+        'SOURCE_INVALID_CARD_EVIDENCE',
+        'SOURCE_ALREADY_PROCESSED',
+        'TARGET_ALREADY_PROCESSED',
+        'UNSUPPORTED_EMPLOYMENT_TYPE',
+        'CROSS_WEEK_ROWS'
+    ];
+    const projection = readyProjection();
+    projection.reason_counts = Object.fromEntries(
+        reasonCodes.map((code, index) => [code, index + 1])
+    );
+    const visibleText = getVisibleText(render(projection));
+    reasonCodes.forEach((code) => assert.ok(!visibleText.includes(code)));
+    assert.ok(!visibleText.includes('Άλλη περίπτωση που χρειάζεται έλεγχο.'));
+    [
+        'περισσότερες από μία προδηλωμένες ημέρες χωρίς κάρτες',
+        'θα υπερέβαινε τον προβλεπόμενο αριθμό ημερών ρεπό',
+        'ημέρα ρεπό είναι κλειδωμένη',
+        'τύπος απασχόλησης δεν αναγνωρίζεται',
+        'περισσότερες από μία φυσικές εβδομάδες'
+    ].forEach((label) => assert.ok(visibleText.includes(label), label));
 }
 
 function testEmptyProjection() {
@@ -1447,6 +1528,7 @@ async function testHrLoadingLocksAndRestoresFilters() {
 const tests = [
     testReadyFullTimeAndSplitShift,
     testNoTargetFallbackIsInformationalOnly,
+    testGroupsAndReviewOutcomesRenderSeparateSafetyMessages,
     testCompleteVisibleSectionContainsNoTechnicalTerms,
     testPartTimeTargetIsNotAnError,
     testEmptyFirstIntervalDoesNotCompactSecond,
@@ -1463,6 +1545,7 @@ const tests = [
     testEscaping,
     testDiagnostics,
     testUnknownDiagnosticUsesSafeFallbackAndStableLabelOrdering,
+    testPartialFamilyDiagnosticsHaveSpecificGreekLabels,
     testEmptyProjection,
     testRepoTransferStatusAndSafeMarkup,
     testScopedSemanticButtonCss,
