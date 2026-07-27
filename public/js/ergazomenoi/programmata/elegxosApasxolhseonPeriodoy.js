@@ -3981,6 +3981,9 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
         : '<div class="small text-muted">Δεν έχει καταγραφεί απόφαση για αυτή την πρόταση.</div>';
     const isCurrentApproval = recordedDecision?.decision_code === 'APPROVE_PROPOSAL';
     const applyState = String(decisionState?.apply_state || 'NOT_APPROVED');
+    const staleDecisionHtml = applyState === 'STALE_DECISION'
+        ? '<div class="small text-warning-emphasis mt-2">Η προηγούμενη έγκριση δεν ισχύει πλέον, επειδή τα δεδομένα της πρότασης έχουν αλλάξει. Απαιτείται νέος έλεγχος και νέα απόφαση.</div>'
+        : '';
     const applyMessages = {
         RUNTIME_DISABLED: 'Η εφαρμογή δεν είναι ακόμη ενεργοποιημένη.',
         INDEXES_NOT_READY: 'Η ασφαλής εφαρμογή δεν είναι ακόμη διαθέσιμη.',
@@ -4072,6 +4075,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                 <div class="small fw-semibold mb-1">Απόφαση για ολόκληρη τη συνδεδεμένη πρόταση</div>
                 ${hasSpecificBranch ? '' : '<div class="small text-warning-emphasis mb-2">Για την καταγραφή απόφασης επιλέξτε συγκεκριμένο υποκατάστημα.</div>'}
                 ${recordedDecisionHtml}
+                ${staleDecisionHtml}
                 ${previousDecisionHistory}
                 <div class="policy-preview-decision-actions mt-2">${decisionButtons}</div>
                 ${applyHtml}
@@ -4444,6 +4448,17 @@ function renderHrPendingCase() {
         const target = items.find((item) => item?.role === 'TARGET_BECOMES_REPO') || {};
         const employeeName = source.employee_name || target.employee_name || '';
         const employeeCode = source.employee_kodikos || target.employee_kodikos || '-';
+        const decisionState = currentRepoTransferDecisionsByProposalId.get(String(group.group_id || '')) || {};
+        const hasHistoricalApproval = Array.isArray(decisionState.history) &&
+            decisionState.history.some(
+                (decision) =>
+                    decision?.decision_code === 'APPROVE_PROPOSAL' &&
+                    decision?.is_current === false
+            );
+        const staleDecisionNotice =
+            decisionState.apply_state === 'STALE_DECISION' && hasHistoricalApproval
+                ? '<div class="alert alert-warning small mt-3 mb-3">Υπήρχε προηγούμενη έγκριση, αλλά τα δεδομένα της πρότασης έχουν αλλάξει. Ελέγξτε ξανά και καταγράψτε νέα απόφαση.</div>'
+                : '';
         const decisionActions = userCanRecordRepoTransferDecision()
             ? `<div class="hr-review-decision-actions">
                    <button type="button" class="btn policy-preview-decision-success hr-review-decision-btn employment-review-action-btn employment-review-action-success" data-decision-code="APPROVE_PROPOSAL">Αποδοχή πρότασης</button>
@@ -4458,6 +4473,7 @@ function renderHrPendingCase() {
                 <div>Ημερομηνίες: ${escapeHtml(formatPolicyPreviewDate(group.first_date))}–${escapeHtml(formatPolicyPreviewDate(group.last_date))}</div>
             </div>
             <div class="hr-review-days-grid">${renderHrReviewDay(source, 'work')}${renderHrReviewDay(target, 'rest')}</div>
+            ${staleDecisionNotice}
             <div class="hr-review-question">Είναι σωστή αυτή η πρόταση;</div>
             ${decisionActions}
         </article>`;
