@@ -744,6 +744,25 @@ function testSixDayRepoLimitWithExistingRepoIsExceeded() {
     assert.strictEqual(result.counts.predicted_final_repo, 2);
 }
 
+function testValidSixDayFullTimeRemainsV1RepoTransfer() {
+    const rows = fullTimeWeek();
+    rows[6] = workRow(6);
+    const result = analyze(rows, {
+        typos_apasxolhshs: 'PLHRHS',
+        hmeres_ergasias_ebdomadas: 6,
+        mhniaia_repo: 1
+    });
+    assertEligible(result, dateKey(1), dateKey(4), 'ΑΝ');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v1');
+    assert.deepStrictEqual(result.reasons, []);
+    assert.deepStrictEqual(result.counts, {
+        source_candidates: 1,
+        target_candidates: 1,
+        existing_actual_repo: 0,
+        predicted_final_repo: 1
+    });
+}
+
 function testSplitShiftPrioritySourceRemainsSupported() {
     const rows = autoLeavePriorityWeek();
     Object.assign(rows[1], {
@@ -1001,6 +1020,7 @@ function run() {
     testAutoCalculatedLeavePriorityBlockingStates();
     testAutoCalculatedLeaveWithTwoTargetsNeedsReview();
     testSixDayRepoLimitWithExistingRepoIsExceeded();
+    testValidSixDayFullTimeRemainsV1RepoTransfer();
     testSplitShiftPrioritySourceRemainsSupported();
     testInvalidRepoLimits();
     testInvalidWeekInputs();

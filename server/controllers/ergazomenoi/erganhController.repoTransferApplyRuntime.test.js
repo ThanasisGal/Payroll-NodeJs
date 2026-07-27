@@ -5,6 +5,28 @@ const path = require('path');
 const controller = fs.readFileSync(path.join(__dirname, 'erganhController.js'), 'utf8');
 const routes = fs.readFileSync(path.join(__dirname, '..', '..', 'routes', 'usersRoute.js'), 'utf8');
 const app = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'app.js'), 'utf8');
+const reconstructionService = fs.readFileSync(
+    path.join(
+        __dirname,
+        '..',
+        '..',
+        'services',
+        'ergazomenoi',
+        'apasxoliseisWeeklyRepoTransferDecisionReconstructionService.js'
+    ),
+    'utf8'
+);
+const decisionBatchService = fs.readFileSync(
+    path.join(
+        __dirname,
+        '..',
+        '..',
+        'services',
+        'ergazomenoi',
+        'apasxoliseisWeeklyRepoTransferDecisionBatchService.js'
+    ),
+    'utf8'
+);
 const action = controller.slice(controller.indexOf('static applyWeeklyRepoTransferDecision'), controller.indexOf('static getWeeklyRepoTransferDecisionBatch'));
 
 assert.ok(routes.includes("'/api/prodhlomena-oraria/review/repo-transfer-decisions/:decisionId/apply'"));
@@ -27,4 +49,19 @@ assert.ok(indexesIndex < applyIndex);
 assert.ok(action.includes('Η εφαρμογή ακυρώθηκε πλήρως. Δεν αποθηκεύτηκε καμία αλλαγή.'));
 assert.ok(!action.includes('error.message'));
 assert.ok(!controller.includes('erganhApi') && !controller.includes('syncIndexes') && !controller.includes('createIndexes'));
-console.log('PASS repo-transfer apply controller/runtime safety contract (16 tests)');
+
+// Static controller/profile propagation contract: each production reconstruction path
+// must forward the already-resolved authoritative weekly-workdays fact.
+for (const [label, source] of [
+    ['HR page projection', controller],
+    ['decision reconstruction', reconstructionService],
+    ['decision batch', decisionBatchService]
+]) {
+    assert.match(
+        source,
+        /hmeres_ergasias_ebdomadas\s*:\s*(?:\n\s*)?effective(?:Profile)?\.hmeres_ergasias_ebdomadas/,
+        `${label} must forward authoritative hmeres_ergasias_ebdomadas`
+    );
+}
+
+console.log('PASS repo-transfer apply controller/runtime safety and profile propagation contract (19 tests)');
