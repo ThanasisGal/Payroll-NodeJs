@@ -29,6 +29,26 @@ async function run() {
     assert.deepStrictEqual(result.snapshot.repo_resolution, group.repo_resolution);
     assert.strictEqual(result.fingerprint.length, 64);
     assert.strictEqual(JSON.stringify(context.weekRows), originalRows);
+    const changedResolutionGroup = {
+        ...group,
+        repo_resolution: {
+            ...group.repo_resolution,
+            effective_expected_weekly_repo: 2,
+            repo_resolution_source: 'EXPLICIT_MHNIAIA_REPO',
+            scheduled_work_days: 5,
+            effective_weekly_workdays: 5
+        }
+    };
+    const changedResolution = await reconstructWeeklyRepoTransferDecision({
+        scope: { team: 't', company_kod: 'c' },
+        command,
+        contextLoader: async () => context,
+        projectionBuilder: () => ({
+            projection_status: 'READY',
+            groups: [changedResolutionGroup]
+        })
+    });
+    assert.notStrictEqual(changedResolution.fingerprint, result.fingerprint);
     const holidayChanged = {
         ...context,
         holidayByDateKey: new Map([

@@ -92,7 +92,13 @@ function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = 
         return resolved(1, REPO_RESOLUTION_SOURCE.SIX_SCHEDULED_WORK_DAYS, scheduledDays, 6);
     }
 
-    const explicitRepo = profileInteger(effectiveProfile.mhniaia_repo);
+    const authoritativeRepo = Object.prototype.hasOwnProperty.call(
+        effectiveProfile,
+        'raw_mhniaia_repo'
+    )
+        ? effectiveProfile.raw_mhniaia_repo
+        : effectiveProfile.mhniaia_repo;
+    const explicitRepo = profileInteger(authoritativeRepo);
     if (Number.isSafeInteger(explicitRepo) && explicitRepo > 0) {
         return explicitRepo <= 6
             ? resolved(

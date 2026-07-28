@@ -80,7 +80,7 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
-function profileSignature(profile = {}) { return [profile.source || '', String(profile.istorikoId || ''), String(profile.mhniaia_repo ?? ''), String(profile.typos_apasxolhshs ?? ''), String(profile.hmeres_ergasias_ebdomadas ?? ''), String(profile.ores_ergasias_ebdomadas ?? '')].join('|'); }
+function profileSignature(profile = {}) { return [profile.source || '', String(profile.istorikoId || ''), String(profile.mhniaia_repo ?? ''), String(profile.raw_mhniaia_repo ?? ''), String(profile.typos_apasxolhshs ?? ''), String(profile.hmeres_ergasias_ebdomadas ?? ''), String(profile.ores_ergasias_ebdomadas ?? '')].join('|'); }
 function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
     return normalizeDateOnly(profile.hmeromhnia_isxyos_oron_ergasias_apo) ||
         normalizeDateOnly(profile.hmeromhnia_allaghs_orarioy_apo) ||

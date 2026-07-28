@@ -198,6 +198,7 @@ function buildFallbackTerms(ergazomenos = {}) {
         kathestos_apasxolhshs: employmentType,
         typos_apasxolhshs: employmentType,
         mhniaia_repo: resolveExpectedWeeklyRepo(ergazomenos),
+        raw_mhniaia_repo: ergazomenos.mhniaia_repo,
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -230,6 +231,7 @@ function buildTermsFromHistoryRecord(record) {
         kathestos_apasxolhshs: employmentType,
         typos_apasxolhshs: employmentType,
         mhniaia_repo: resolveExpectedWeeklyRepo(record),
+        raw_mhniaia_repo: record.mhniaia_repo,
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,

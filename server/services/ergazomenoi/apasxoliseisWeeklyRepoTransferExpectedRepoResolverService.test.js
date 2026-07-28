@@ -75,6 +75,30 @@ for (const invalid of [7, 1.5, 'invalid', -1]) {
 }
 
 {
+    const rawWinsOverLegacyDerived = resolve(scheduledRows(5), {
+        raw_mhniaia_repo: 3,
+        mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 4
+    });
+    assert.strictEqual(rawWinsOverLegacyDerived.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(
+        rawWinsOverLegacyDerived.repoResolutionSource,
+        REPO_RESOLUTION_SOURCE.EXPLICIT_MHNIAIA_REPO
+    );
+
+    const invalidRawDoesNotFallBack = resolve(scheduledRows(5), {
+        raw_mhniaia_repo: 7,
+        mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 5
+    });
+    assert.strictEqual(invalidRawDoesNotFallBack.ok, false);
+    assert.strictEqual(
+        invalidRawDoesNotFallBack.reason,
+        REPO_RESOLUTION_REASON.INVALID_EXPLICIT_MHNIAIA_REPO
+    );
+}
+
+{
     const result = resolve(scheduledRows(5, { cardsOnlySixth: true }), {
         mhniaia_repo: 0,
         hmeres_ergasias_ebdomadas: 5

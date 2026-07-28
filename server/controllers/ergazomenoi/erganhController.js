@@ -1543,6 +1543,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
             return {
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                 mhniaia_repo: effectiveProfile.mhniaia_repo,
+                raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
                 hmeres_ergasias_ebdomadas:
                     effectiveProfile.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias:
