@@ -196,7 +196,7 @@ function regression0002Rows() {
             _id: `0002-row-${index}`,
             team: 'THA',
             company_kod: '0004',
-            ypokatasthma: '0001',
+            ypokatasthma: '0000',
             kodikos: '0002',
             hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
             kathgoria_ergasias: category,
