@@ -317,19 +317,40 @@ function buildWeeklyCarryOverDifferences({
     analyses.forEach((analysis) => {
         const sourcePayrollMonth = toTrimmedString(analysis?.weekStart).slice(0, 7);
         const targetPayrollMonth = toTrimmedString(analysis?.weekEnd).slice(0, 7);
+        const requestedPayrollMonth =
+            toTrimmedString(analysis?.requestedPeriod?.start).slice(0, 7);
         if (
             analysis?.complete !== true ||
-            analysis?.status === 'OPEN_WEEK_PENDING_COMPLETION' ||
+            analysis?.status !== 'READY' ||
             !sourcePayrollMonth ||
             !targetPayrollMonth ||
-            sourcePayrollMonth === targetPayrollMonth
+            sourcePayrollMonth === targetPayrollMonth ||
+            requestedPayrollMonth !== targetPayrollMonth
         ) {
             return;
         }
 
-        const dailyFacts = Array.isArray(analysis.dailyFacts)
+        const dailyFacts = (Array.isArray(analysis.dailyFacts)
             ? analysis.dailyFacts
-            : [];
+            : [])
+            .filter((fact) =>
+                toTrimmedString(fact?.date).slice(0, 7) === sourcePayrollMonth
+            );
+        const sourceFactDates = [
+            ...new Set(
+                dailyFacts
+                    .filter((fact) =>
+                        [
+                            fact?.yperergasiaHours,
+                            fact?.nomimiYperoriaHours,
+                            fact?.paranomiYperoriaHours,
+                            fact?.sixthDayHours
+                        ].some((value) => toNumberOrZero(value) !== 0)
+                    )
+                    .map((fact) => toTrimmedString(fact?.date))
+                    .filter(Boolean)
+            )
+        ].sort();
         const breakdown = {
             yperergasia: roundHours(dailyFacts.reduce(
                 (sum, fact) => sum + toNumberOrZero(fact.yperergasiaHours),
@@ -358,16 +379,20 @@ function buildWeeklyCarryOverDifferences({
             breakdown
         });
         if (carryOver.ok !== true) return;
+        const auditableCarryOver = {
+            ...carryOver,
+            sourceFactDates
+        };
 
         if (materializedStore instanceof Map) {
-            const materialized = materializeInMemory(materializedStore, carryOver);
+            const materialized = materializeInMemory(materializedStore, auditableCarryOver);
             carryOvers.push({
-                ...carryOver,
+                ...auditableCarryOver,
                 materializationStatus: materialized.status
             });
             return;
         }
-        carryOvers.push(carryOver);
+        carryOvers.push(auditableCarryOver);
     });
 
     return carryOvers;
@@ -478,6 +503,44 @@ function buildSnapshotDocument(payload, key) {
     };
 }
 
+function buildReadyWorkFactsPayload({
+    input,
+    normalizedScope,
+    ypokatasthma = '',
+    requestedBy = '',
+    warnings = [],
+    detectorResult
+}) {
+    const dailyFacts = buildBaseDailyFacts({ detectorResult });
+    const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
+    const weeklyCarryOverDifferences = buildWeeklyCarryOverDifferences({
+        detectorResult,
+        scopeKey: [input.team, input.company_kod, input.kodikos].join('|')
+    });
+    const detectorWarnings = Array.isArray(detectorResult?.warnings)
+        ? detectorResult.warnings
+        : [];
+
+    return {
+        team: input.team,
+        company_kod: input.company_kod,
+        ypokatasthma,
+        kodikos: input.kodikos,
+        apo: input.apo,
+        eos: input.eos,
+        scope: normalizedScope,
+        requestedBy: toTrimmedString(requestedBy),
+        status: 'READY',
+        generatedAt: new Date().toISOString(),
+        phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
+        phaseSummary,
+        dailyFacts,
+        weeklyCarryOverDifferences,
+        totals: buildTotals(dailyFacts),
+        warnings: [...warnings, ...detectorWarnings]
+    };
+}
+
 async function generateWorkFactsForEmployeePeriod({
     team,
     company_kod,
@@ -486,7 +549,9 @@ async function generateWorkFactsForEmployeePeriod({
     eos,
     scope = 'MANUAL',
     ypokatasthma = '',
-    requestedBy = ''
+    requestedBy = '',
+    asOfDate = null,
+    clock
 }) {
     const input = validateInput({ team, company_kod, kodikos, apo, eos });
     const warnings = [...input.warnings];
@@ -512,36 +577,18 @@ async function generateWorkFactsForEmployeePeriod({
             company_kod: input.company_kod,
             kodikos: input.kodikos,
             apo: input.apo,
-            eos: input.eos
-        });
-        const dailyFacts = buildBaseDailyFacts({ detectorResult });
-        const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
-        const weeklyCarryOverDifferences = buildWeeklyCarryOverDifferences({
-            detectorResult,
-            scopeKey: [input.team, input.company_kod, input.kodikos].join('|')
-        });
-        const detectorWarnings = Array.isArray(detectorResult?.warnings)
-            ? detectorResult.warnings
-            : [];
-
-        return {
-            team: input.team,
-            company_kod: input.company_kod,
-            ypokatasthma,
-            kodikos: input.kodikos,
-            apo: input.apo,
             eos: input.eos,
-            scope: normalizedScope,
-            requestedBy: toTrimmedString(requestedBy),
-            status: 'READY',
-            generatedAt: new Date().toISOString(),
-            phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
-            phaseSummary,
-            dailyFacts,
-            weeklyCarryOverDifferences,
-            totals: buildTotals(dailyFacts),
-            warnings: [...warnings, ...detectorWarnings]
-        };
+            asOfDate,
+            clock
+        });
+        return buildReadyWorkFactsPayload({
+            input,
+            normalizedScope,
+            ypokatasthma,
+            requestedBy,
+            warnings,
+            detectorResult,
+        });
     } catch (error) {
         return buildFailedPayload({
             team: input.team,
@@ -638,7 +685,9 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
     scope = 'MANUAL',
     ypokatasthma = '',
     requestedBy = '',
-    force = false
+    force = false,
+    asOfDate = null,
+    clock
 }) {
     const normalizedScope = normalizeScopeValue(scope);
     const key = normalizeSnapshotKey({
@@ -674,7 +723,9 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
         eos,
         scope: normalizedScope,
         ypokatasthma,
-        requestedBy
+        requestedBy,
+        asOfDate,
+        clock
     });
 
     return saveWorkFactsSnapshot(
@@ -692,5 +743,6 @@ module.exports = {
     generateAndSaveWorkFactsForEmployeePeriod,
     findWorkFactsSnapshot,
     saveWorkFactsSnapshot,
-    buildWeeklyCarryOverDifferences
+    buildWeeklyCarryOverDifferences,
+    buildReadyWorkFactsPayload
 };

@@ -115,6 +115,7 @@ test('uncompleted trailing week is explicitly pending and is not an HR error', (
     applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
         requestedPeriodStart: '2026-06-01',
         requestedPeriodEnd: '2026-06-30',
+        asOfDate: '2026-07-02',
         weeklyAnalyses: analyses
     });
 
@@ -124,6 +125,38 @@ test('uncompleted trailing week is explicitly pending and is not an HR error', (
     assert.ok(dailyRows.every((day) =>
         day.weeklyComplianceStatus === 'OPEN_WEEK_PENDING_COMPLETION'
     ));
+});
+
+test('completed trailing week is analyzed normally after its authoritative as-of boundary', () => {
+    const { dailyRows, orariaByDate } = buildWeek({ start: '2026-06-29' });
+    const analyses = [];
+    applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-06-01',
+        requestedPeriodEnd: '2026-06-30',
+        asOfDate: '2026-07-06',
+        weeklyAnalyses: analyses
+    });
+
+    assert.equal(analyses[0].complete, true);
+    assert.equal(analyses[0].status, 'READY');
+    assert.equal(analyses[0].asOfDate, '2026-07-06');
+});
+
+test('missing rows after week completion require HR decision instead of remaining open', () => {
+    const { dailyRows, orariaByDate } = buildWeek({ start: '2026-06-29' });
+    orariaByDate.delete('2026-07-05');
+    const analyses = [];
+    applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-06-01',
+        requestedPeriodEnd: '2026-06-30',
+        asOfDate: '2026-07-10',
+        weeklyAnalyses: analyses
+    });
+
+    assert.equal(analyses[0].complete, false);
+    assert.equal(analyses[0].status, 'NEEDS_HR_DECISION');
+    assert.deepEqual(analyses[0].reasons, ['INCOMPLETE_COMPLETED_WEEK_DATA']);
+    assert.equal(analyses[0].asOfDate, '2026-07-10');
 });
 
 test('work-facts weekly path keeps an in-week profile change visible for HR decision', () => {

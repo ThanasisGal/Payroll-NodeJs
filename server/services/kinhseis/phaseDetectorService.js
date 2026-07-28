@@ -684,6 +684,7 @@ function applyWeeklySixthSeventhDayFacts(
     {
         requestedPeriodStart = null,
         requestedPeriodEnd = null,
+        asOfDate = null,
         weeklyAnalyses = []
     } = {}
 ) {
@@ -710,15 +711,19 @@ function applyWeeklySixthSeventhDayFacts(
             expectedDateKeys.every((date) => orariaByDate.has(date));
 
         if (!hasSevenContextDays || !hasSevenSourceRows) {
-            const requestedEndKey = dateKeyUtc(requestedPeriodEnd);
+            const asOfDateKey = dateKeyUtc(asOfDate);
             const isOpenTrailingWeek =
-                Boolean(requestedEndKey) && range.weekEndKey > requestedEndKey;
+                Boolean(asOfDateKey) && range.weekEndKey > asOfDateKey;
             const status = isOpenTrailingWeek
                 ? 'OPEN_WEEK_PENDING_COMPLETION'
                 : 'NEEDS_HR_DECISION';
             const reasons = isOpenTrailingWeek
                 ? []
-                : ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'];
+                : [
+                    asOfDateKey
+                        ? 'INCOMPLETE_COMPLETED_WEEK_DATA'
+                        : 'INVALID_AS_OF_DATE'
+                ];
             days.forEach((day) => {
                 day.weeklySixthSeventhPolicyVersion =
                     SIXTH_SEVENTH_POLICY_VERSION;
@@ -735,6 +740,7 @@ function applyWeeklySixthSeventhDayFacts(
                     start: dateKeyUtc(requestedPeriodStart),
                     end: dateKeyUtc(requestedPeriodEnd)
                 },
+                asOfDate: asOfDateKey,
                 status,
                 reasons,
                 warnings: [],
@@ -780,6 +786,7 @@ function applyWeeklySixthSeventhDayFacts(
                 start: dateKeyUtc(requestedPeriodStart),
                 end: dateKeyUtc(requestedPeriodEnd)
             },
+            asOfDate: dateKeyUtc(asOfDate),
             status: analysis.status,
             reasons: analysis.reasons,
             warnings: analysis.warnings,
@@ -1115,7 +1122,9 @@ async function detectPayrollPhases({
     period,
     periodApoOverride,
     periodEosOverride,
-    includeWeeklyAnalysisContext = false
+    includeWeeklyAnalysisContext = false,
+    asOfDate = null,
+    clock = () => new Date()
 }) {
     const warnings = [];
     const hasExplicitPeriodRange = Boolean(periodApoOverride || periodEosOverride);
@@ -1155,6 +1164,9 @@ async function detectPayrollPhases({
     const contextPeriodEnd = includeWeeklyAnalysisContext
         ? endOfWeekSundayUtc(periodEnd)
         : periodEnd;
+    const resolvedAsOfDate =
+        dateKeyUtc(asOfDate) ||
+        dateKeyUtc(typeof clock === 'function' ? clock() : null);
     const analysisFrom = maxDate(contextPeriodStart, hireDate);
     const analysisTo = minDate(contextPeriodEnd, leaveDate);
     const kartaErgasias = employee.karta_ergasias === true;
@@ -1259,6 +1271,7 @@ async function detectPayrollPhases({
         {
             requestedPeriodStart: periodStart,
             requestedPeriodEnd: periodEnd,
+            asOfDate: resolvedAsOfDate,
             weeklyAnalyses
         }
     );
@@ -1317,7 +1330,9 @@ async function detectPayrollPhasesForDateRange({
     kodikos,
     ypokatasthma = '',
     apo,
-    eos
+    eos,
+    asOfDate = null,
+    clock
 }) {
     return detectPayrollPhases({
         team,
@@ -1326,7 +1341,9 @@ async function detectPayrollPhasesForDateRange({
         ypokatasthma,
         periodApoOverride: apo,
         periodEosOverride: eos,
-        includeWeeklyAnalysisContext: true
+        includeWeeklyAnalysisContext: true,
+        asOfDate,
+        clock
     });
 }
 
