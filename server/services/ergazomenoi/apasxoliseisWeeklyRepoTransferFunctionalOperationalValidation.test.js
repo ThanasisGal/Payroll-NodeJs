@@ -91,7 +91,7 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         proposalVersion: 'repo-transfer-single-pair-proposal:v2',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 0,
+        mhniaia_repo: 3,
         workdays: 4,
         dailyHours: 4
     }),
@@ -103,7 +103,7 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         proposalVersion: 'repo-transfer-single-pair-proposal:v2',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 0,
+        mhniaia_repo: 3,
         workdays: 4,
         dailyHours: 4
     })

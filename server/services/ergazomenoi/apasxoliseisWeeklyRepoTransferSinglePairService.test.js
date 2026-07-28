@@ -381,7 +381,8 @@ function testExactRepoCount() {
     const deficitRows = fullTimeWeek();
     deficitRows[6] = workRow(6);
     const deficit = analyze(deficitRows);
-    assertReason(deficit, 'REPO_DEFICIT_REMAINS');
+    assert.strictEqual(deficit.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(deficit.employee.repo_resolution_source, 'SIX_SCHEDULED_WORK_DAYS');
     assert.strictEqual(deficit.counts.predicted_final_repo, 1);
 
     const excess = analyze(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 });
@@ -782,12 +783,19 @@ function testSplitShiftPrioritySourceRemainsSupported() {
 }
 
 function testInvalidRepoLimits() {
-    [0, 3, 1.5, '2', 'invalid', undefined].forEach((mhniaiaRepo) => {
+    [1.5, 'invalid'].forEach((mhniaiaRepo) => {
         const result = analyze(fullTimeWeek(), {
             typos_apasxolhshs: 'PLHRHS',
             mhniaia_repo: mhniaiaRepo
         });
-        assertReason(result, 'INVALID_MHNIAIA_REPO');
+        assertReason(result, 'INVALID_EXPLICIT_MHNIAIA_REPO');
+    });
+    [0, undefined].forEach((mhniaiaRepo) => {
+        const result = analyze(fullTimeWeek(), {
+            typos_apasxolhshs: 'PLHRHS',
+            mhniaia_repo: mhniaiaRepo
+        });
+        assertReason(result, 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS');
     });
 }
 
@@ -905,7 +913,10 @@ function testRepoLimitResultNormalizationDoesNotFreezeInvalidInputs() {
             mhniaia_repo: invalidRepoValue
         });
         assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-        assert.ok(result.reasons.includes('INVALID_MHNIAIA_REPO'));
+        assert.ok(result.reasons.some((reason) => [
+            'INVALID_EXPLICIT_MHNIAIA_REPO',
+            'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
+        ].includes(reason)));
         assert.strictEqual(result.employee.mhniaia_repo, null);
         assert.notStrictEqual(result.employee.mhniaia_repo, invalidRepoValue);
         assert.strictEqual(Object.isFrozen(invalidRepoValue), false);

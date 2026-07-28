@@ -365,7 +365,7 @@ function testNonReadyProposalPaths() {
 
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
-    assertNotAvailable(build(deficit), 'REPO_DEFICIT_REMAINS');
+    assert.strictEqual(build(deficit).projection_status, 'READY');
     assertNotAvailable(
         build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 }),
         'REPO_LIMIT_EXCEEDED'

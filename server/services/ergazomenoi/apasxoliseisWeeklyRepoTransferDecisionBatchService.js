@@ -173,7 +173,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
             const effective = profileInfo.effectiveProfile || {};
             const profile = {
                 typos_apasxolhshs: effective.typos_apasxolhshs || '',
-                mhniaia_repo: profileInfo.expectedWeeklyRepo,
+                mhniaia_repo: effective.mhniaia_repo,
                 hmeres_ergasias_ebdomadas: effective.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: Number(effective.mo_oron_hmerhsias_ergasias || 0),
                 external_break_minutes: employee.dialleima_entos_ektos_orarioy === true ? 0 : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),
