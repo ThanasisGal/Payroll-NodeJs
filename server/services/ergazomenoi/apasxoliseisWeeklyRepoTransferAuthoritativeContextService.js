@@ -63,6 +63,38 @@ function buildArgiesByDateKey(argies = [], companyFlags = {}) {
     }
     return map;
 }
+function isZeroHours(value) {
+    const numeric = Number(value || 0);
+    return !Number.isFinite(numeric) || Math.abs(numeric) < 0.000001;
+}
+function resolveNoCardsDisplayStatus(
+    row = {},
+    { argiesByDateKey = new Map(), companyFlags = {} } = {}
+) {
+    if (
+        String(row.kathgoria_ergasias || '').trim() !== 'ΕΡΓ' ||
+        isZeroHours(row.ores_ergasias) ||
+        !isZeroHours(row.cards_ores_ergasias)
+    ) {
+        return '';
+    }
+
+    const argia = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
+    if (!argia) return 'ΑΔΕΙΑ';
+
+    const companyOperatesOnHoliday =
+        typeof argia.companyOperatesOnHoliday === 'boolean'
+            ? argia.companyOperatesOnHoliday
+            : argia.ypoxreotikh_argia === true
+              ? companyFlags.apasxolhsh_kata_tis_argies === true
+              : companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true;
+
+    return companyOperatesOnHoliday ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
+}
+function resolveCurrentApologistikaDisplayCategory(row = {}, context = {}) {
+    const storedCategory = String(row.kathgoria_ergasias_apologistika || '').trim();
+    return storedCategory || resolveNoCardsDisplayStatus(row, context);
+}
 async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, periodEnd, companiesModel = CompaniesModel, argiesModel = ArgiesModel }) {
     const sessionTeam = String(team || '').trim();
     const id = String(companyId || '').trim();
@@ -139,6 +171,7 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
 module.exports = {
     ATOMIC_REPO_TRANSFER_ROW_FIELDS, ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS,
     ATOMIC_REPO_TRANSFER_HISTORY_FIELDS, getCompanyHolidayFlags, buildArgiesByDateKey,
-    buildNoCardsDisplayContext, getEffectiveRepoProfileForDate,
+    buildNoCardsDisplayContext, resolveNoCardsDisplayStatus,
+    resolveCurrentApologistikaDisplayCategory, getEffectiveRepoProfileForDate,
     getProfileDateForDeviation, getWeeklyRepoProfileInfo
 };

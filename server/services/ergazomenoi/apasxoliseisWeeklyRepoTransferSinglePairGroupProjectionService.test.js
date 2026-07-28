@@ -480,6 +480,28 @@ function testOutputOwnershipAndFreeze() {
     assert.strictEqual(group.first_date instanceof Date, false);
 }
 
+function testTargetPresentationMetadataDoesNotChangeGroupIdentity() {
+    const result = build(fullTimeWeek());
+    const group = result.groups[0];
+    const target = group.items[1];
+
+    assert.strictEqual(target.kathgoria_ergasias, 'ΕΡΓ');
+    assert.strictEqual(
+        target.current_kathgoria_ergasias_apologistika,
+        'ΑΔΕΙΑ'
+    );
+    assert.strictEqual(
+        target.proposed_values.kathgoria_ergasias_apologistika,
+        'ΑΝ'
+    );
+    assert.strictEqual(
+        group.group_id,
+        'policy-preview-paired-group-' +
+            require('crypto').createHash('sha1').update(group.group_key).digest('hex').slice(0, 16)
+    );
+    assert.ok(!group.group_key.includes('ΑΔΕΙΑ'));
+}
+
 function run() {
     testValidFullTimeProjection();
     testValidPartTimeProjection();
@@ -491,6 +513,7 @@ function run() {
     testMissingAndDuplicateIdsDoNotCreateGroups();
     testInputImmutability();
     testOutputOwnershipAndFreeze();
+    testTargetPresentationMetadataDoesNotChangeGroupIdentity();
     console.log('apasxoliseis weekly repo transfer single-pair group projection tests passed');
 }
 

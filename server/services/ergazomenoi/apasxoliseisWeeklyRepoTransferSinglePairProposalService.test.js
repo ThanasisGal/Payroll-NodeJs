@@ -192,6 +192,7 @@ function testValidFullTimeProposal() {
         employee_kodikos: '001',
         hmeromhnia: dateKey(4),
         current_category: 'ΕΡΓ',
+        current_apologistika_category: 'ΑΔΕΙΑ',
         proposed_values: expectedClearedTarget('ΑΝ')
     });
     assert.deepStrictEqual(result.policy_context, {
@@ -675,6 +676,20 @@ function testDeterminismAcrossInputOrder() {
     assert.deepStrictEqual(shuffled, expected);
 }
 
+function testTargetCarriesDerivedCurrentDisplayCategoryWithoutChangingProposal() {
+    const result = build(fullTimeWeek());
+    const target = result.items[1];
+
+    assert.strictEqual(target.current_category, 'ΕΡΓ');
+    assert.strictEqual(target.current_apologistika_category, 'ΑΔΕΙΑ');
+    assert.strictEqual(
+        target.proposed_values.kathgoria_ergasias_apologistika,
+        'ΑΝ'
+    );
+    assert.strictEqual(result.proposal_version, PROPOSAL_VERSION);
+    assert.strictEqual(result.choice_code, CHOICE_CODE);
+}
+
 function run() {
     testValidFullTimeProposal();
     testValidPartTimeProposal();
@@ -693,6 +708,7 @@ function run() {
     testInputImmutabilityAndFreezeIsolation();
     testOutputImmutabilityAndOwnership();
     testDeterminismAcrossInputOrder();
+    testTargetCarriesDerivedCurrentDisplayCategoryWithoutChangingProposal();
     console.log('apasxoliseis weekly repo transfer single-pair proposal tests passed');
 }
 

@@ -1226,6 +1226,12 @@ function testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct() {
         'ΑΔΕΙΑ',
         'ΑΝ'
     ]);
+    assert.ok(
+        detailed.indexOf('ΕΡΓ') <
+            detailed.indexOf('ΑΔΕΙΑ') &&
+            detailed.indexOf('ΑΔΕΙΑ') <
+                detailed.lastIndexOf('ΑΝ')
+    );
 
     const compact = sandbox.renderHrReviewDay(item, 'rest');
     assertContains(compact, [

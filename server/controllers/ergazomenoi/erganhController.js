@@ -152,6 +152,7 @@ const {
     getCompanyHolidayFlags,
     buildArgiesByDateKey,
     buildNoCardsDisplayContext,
+    resolveNoCardsDisplayStatus,
     getEffectiveRepoProfileForDate,
     getProfileDateForDeviation,
     getWeeklyRepoProfileInfo
@@ -1332,19 +1333,6 @@ function isNoCardDeclaredWorkRow(row = {}) {
 
 function isMisthotosEmployee(row = {}) {
     return String(row.typos_ergazomenon || '').trim() === 'Μ';
-}
-
-function resolveNoCardsDisplayStatus(row = {}, { argiesByDateKey = new Map(), companyFlags = {} } = {}) {
-    if (!isNoCardDeclaredWorkRow(row)) return '';
-
-    const argia = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
-    if (!argia) return 'ΑΔΕΙΑ';
-
-    if (argia.ypoxreotikh_argia === true) {
-        return companyFlags.apasxolhsh_kata_tis_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
-    }
-
-    return companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
 }
 
 function buildReviewHolidayResponseFields(row = {}, context = {}) {

@@ -15,6 +15,9 @@ const {
 const {
     getApasxoliseisPolicyByCode
 } = require('./apasxoliseisPolicyCatalogService');
+const {
+    resolveCurrentApologistikaDisplayCategory
+} = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 
 const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v3';
 const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v3';
@@ -225,6 +228,12 @@ function buildResult({
             employee_kodikos: item.employee_kodikos,
             hmeromhnia: item.hmeromhnia,
             current_category: item.current_category,
+            ...(item.current_apologistika_category
+                ? {
+                      current_apologistika_category:
+                          item.current_apologistika_category
+                  }
+                : {}),
             proposed_values: { ...item.proposed_values }
         })),
         apply_readiness: {
@@ -552,7 +561,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
             hmeromhnia: analysis.source.hmeromhnia,
             current_category: analysis.source.current_category,
             current_apologistika_category: normalizePrimitiveString(
-                sourceMatch.row.kathgoria_ergasias_apologistika,
+                resolveCurrentApologistikaDisplayCategory(sourceMatch.row, {
+                    argiesByDateKey: holidayByDateKey
+                }),
                 20
             ),
             proposed_values: sourceMaterialization.proposedValues
@@ -564,7 +575,9 @@ function buildWeeklyRepoTransferSinglePairProposal({
             hmeromhnia: analysis.target.hmeromhnia,
             current_category: analysis.target.current_category,
             current_apologistika_category: normalizePrimitiveString(
-                targetMatch.row.kathgoria_ergasias_apologistika,
+                resolveCurrentApologistikaDisplayCategory(targetMatch.row, {
+                    argiesByDateKey: holidayByDateKey
+                }),
                 20
             ),
             proposed_values: targetProposedValues

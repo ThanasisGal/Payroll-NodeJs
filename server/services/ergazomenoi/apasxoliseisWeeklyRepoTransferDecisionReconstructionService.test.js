@@ -29,6 +29,31 @@ async function run() {
     assert.deepStrictEqual(result.snapshot.repo_resolution, group.repo_resolution);
     assert.strictEqual(result.fingerprint.length, 64);
     assert.strictEqual(JSON.stringify(context.weekRows), originalRows);
+    const presentationOnlyGroup = {
+        ...group,
+        items: [
+            group.items[0],
+            {
+                ...group.items[1],
+                kathgoria_ergasias: 'ΕΡΓ',
+                current_kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ'
+            }
+        ]
+    };
+    const presentationOnlyResult = await reconstructWeeklyRepoTransferDecision({
+        scope: { team: 't', company_kod: 'c' },
+        command,
+        contextLoader: async () => context,
+        projectionBuilder: () => ({
+            projection_status: 'READY',
+            groups: [presentationOnlyGroup]
+        })
+    });
+    assert.strictEqual(presentationOnlyResult.fingerprint, result.fingerprint);
+    assert.strictEqual(
+        presentationOnlyResult.group.items[1].current_kathgoria_ergasias_apologistika,
+        'ΑΔΕΙΑ'
+    );
     const changedResolutionGroup = {
         ...group,
         repo_resolution: {
