@@ -1258,6 +1258,16 @@ function testOpenAndCompletedPartialWeekMessagesStayDistinct() {
     assert.ok(!pendingHtml.includes('Χρειάζεται απόφαση HR'));
 }
 
+function testWeeklyDeviationPresentationUsesMondaySundayPolicy() {
+    assert.ok(source.includes('Εβδομάδα Δευτέρα–Κυριακή'));
+    assert.ok(source.includes("data-week-policy=\"${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}\""));
+    assert.ok(source.includes('Ιστορική εγγραφή παλιάς πολιτικής'));
+    assert.ok(source.includes("dev.status === 'OPEN_WEEK_PENDING_COMPLETION'"));
+    assert.ok(source.includes('currentPendingDeviationWeeks = payload.pendingDeviationWeeks || []'));
+    assert.ok(source.includes('currentLegacyDeviations = payload.legacyDeviations || []'));
+    assert.ok(!source.includes('Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο'));
+}
+
 function testEmploymentReviewFinalUiContract() {
     assert.ok(viewSource.includes('data-dropdown-direction="down"'));
     const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
@@ -1914,6 +1924,7 @@ const tests = [
     testAllKnownBackendGroupingCodesHaveGreekLabels,
     testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,
     testOpenAndCompletedPartialWeekMessagesStayDistinct,
+    testWeeklyDeviationPresentationUsesMondaySundayPolicy,
     testEmploymentReviewFinalUiContract,
     testCorrectiveDropdownAndPageShellContract,
     testEmploymentReviewBranchActionLayoutContract,

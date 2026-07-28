@@ -253,6 +253,8 @@ const scenarioProposedUpdateFillableFields = new Set([
 
 let currentReviewRows = [];
 let currentReviewDeviations = [];
+let currentPendingDeviationWeeks = [];
+let currentLegacyDeviations = [];
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentRepoTransferDecisionsByProposalId = new Map();
@@ -432,7 +434,11 @@ function updateScenarioReviewFilterNotice() {
 }
 
 function renderCurrentReviewRows() {
-    renderReviewRows(getVisibleReviewRows(), currentReviewDeviations);
+    renderReviewRows(getVisibleReviewRows(), [
+        ...currentReviewDeviations,
+        ...currentPendingDeviationWeeks,
+        ...currentLegacyDeviations
+    ]);
     updateScenarioReviewFilterNotice();
     updateReviewFilterLayoutState();
 }
@@ -1683,6 +1689,23 @@ function renderDeviationProfileCell(dev) {
 }
 
 function renderDeviationNoteCell(dev) {
+    if (dev.status === 'OPEN_WEEK_PENDING_COMPLETION') {
+        return `
+            <span class="badge text-bg-info">Αναμονή ολοκλήρωσης</span>
+            <div class="small mt-1">
+                Η εβδομάδα ${escapeHtml(formatDate(dev.week_apo || dev.weekStart))}–${escapeHtml(formatDate(dev.week_eos || dev.weekEnd))}
+                δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.
+            </div>
+        `;
+    }
+
+    if (dev.is_legacy_policy === true) {
+        return `
+            <span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>
+            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+        `;
+    }
+
     if (dev.profile_changed_inside_week) {
         const excessRepo =
             Number(dev.actual_repo ?? dev.pragmatikaRepo ?? 0) -
@@ -1697,7 +1720,7 @@ function renderDeviationNoteCell(dev) {
                 ⚠ Αλλαγή όρων εργασίας μέσα στην εβδομάδα
             </div>
             <small class="text-muted">
-                Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο της εβδομάδας.
+                Η εβδομάδα απαιτεί απόφαση HR επειδή άλλαξαν κρίσιμοι όροι εργασίας.
             </small>
             ${excessText}
             ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
@@ -1733,12 +1756,23 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
     const rowsHtml = deviations
         .map(
             (dev) => `
-                <tr class="${dev.profile_changed_inside_week ? 'table-warning' : ''}">
+                <tr
+                    class="${
+                        dev.is_legacy_policy === true
+                            ? 'table-secondary'
+                            : dev.status === 'OPEN_WEEK_PENDING_COMPLETION'
+                              ? 'table-info'
+                              : dev.profile_changed_inside_week
+                                ? 'table-warning'
+                                : ''
+                    }"
+                    data-week-policy="${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}"
+                >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
-                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '')}</td>
-                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '')}</td>
-                    <td>${renderDeviationProfileCell(dev)}</td>
+                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '-')}</td>
+                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '-')}</td>
+                    <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td>${renderDeviationNoteCell(dev)}</td>
                 </tr>
             `
@@ -1747,7 +1781,10 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
 
     wrapperTr.innerHTML = `
         <td colspan="13" class="p-2 bg-warning-subtle">
-            <div class="fw-bold mb-1">Αποκλίσεις εβδομαδιαίων ρεπό</div>
+            <div class="fw-bold mb-1">
+                Αποκλίσεις εβδομαδιαίων ρεπό
+                <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered mb-0 bg-white">
                     <thead class="table-light">
@@ -5198,6 +5235,8 @@ async function loadResults() {
 
         currentReviewRows = rows;
         currentReviewDeviations = payload.deviations || [];
+        currentPendingDeviationWeeks = payload.pendingDeviationWeeks || [];
+        currentLegacyDeviations = payload.legacyDeviations || [];
         renderCurrentReviewRows();
 
         const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([

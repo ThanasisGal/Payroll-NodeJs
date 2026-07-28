@@ -157,6 +157,12 @@ const {
     getWeeklyRepoProfileInfo
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
+    POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
+    SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
+    buildWeeklyRepoDeviationPreview,
+    normalizeLegacyDeviation
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
+const {
     createPolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords
 } = require('../../services/ergazomenoi/apasxoliseisPolicyPreviewApprovalService');
@@ -1824,6 +1830,8 @@ async function runWeeklyRepoPostCheck({
                     week_eos: asDateOnlyUtc(week.weekEnd),
                     weekStart: dateKeyUtc(week.weekStart),
                     weekEnd: dateKeyUtc(week.weekEnd),
+                    policyVersion: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
+                    sourceVersion: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
                     expected_repo: expectedWeeklyRepo,
                     repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
                     repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
@@ -1888,6 +1896,8 @@ async function runWeeklyRepoPostCheck({
                 onoma: d.onoma,
                 week_apo: d.week_apo,
                 week_eos: d.week_eos,
+                policyVersion: d.policyVersion,
+                sourceVersion: d.sourceVersion,
                 expected_repo: d.expected_repo,
                 actual_repo: d.actual_repo,
                 profile_changed_inside_week: d.profile_changed_inside_week,
@@ -4819,7 +4829,32 @@ class erganhController {
                 filter.$and = mongoose.trusted(andFilters);
             }
 
-            const [rows, total] = await Promise.all([
+            const requestedPeriodStart = apo_hmeromhnia
+                ? clampDateStartUtc(`${apo_hmeromhnia}T00:00:00.000Z`)
+                : null;
+            const requestedPeriodEnd = eos_hmeromhnia
+                ? clampDateEndUtc(`${eos_hmeromhnia}T23:59:59.999Z`)
+                : null;
+            const deviationContextFilter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+            if (requestedPeriodStart && requestedPeriodEnd) {
+                deviationContextFilter.hmeromhnia = mongoose.trusted({
+                    $gte: startOfWeekMondayUtc(requestedPeriodStart),
+                    $lte: endOfWeekSundayUtc(requestedPeriodEnd)
+                });
+            }
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                deviationContextFilter.ypokatasthma = String(ypokatasthma)
+                    .trim()
+                    .padStart(4, '0');
+            }
+            if (kodikos && String(kodikos).trim() !== '') {
+                deviationContextFilter.kodikos = String(kodikos).trim();
+            }
+
+            const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
                         'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
@@ -4840,10 +4875,25 @@ class erganhController {
                     .skip(skip)
                     .limit(limitNum)
                     .lean(),
-                ProdhlomenaOrariaModel.countDocuments(filter)
+                ProdhlomenaOrariaModel.countDocuments(filter),
+                requestedPeriodStart && requestedPeriodEnd
+                    ? ProdhlomenaOrariaModel.find(deviationContextFilter)
+                          .select(
+                              'ypokatasthma kodikos hmeromhnia kathgoria_ergasias ' +
+                                  'ores_ergasias cards_ores_ergasias'
+                          )
+                          .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                          .lean()
+                    : []
             ]);
 
-            const kodikoiRows = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+            const kodikoiRows = [
+                ...new Set(
+                    [...rows, ...deviationContextRows]
+                        .map((r) => r.kodikos)
+                        .filter(Boolean)
+                )
+            ];
 
             const ergazomenoi = await ErgazomenoiModel.find({
                 team: sessionTeam,
@@ -4865,17 +4915,20 @@ class erganhController {
             // στην περίοδο μπορεί να έχει αλλάξει 5ήμερο/6ήμερο ή
             // πλήρης/μερική/εκ περιτροπής απασχόληση.
             // ============================================================
-            const reviewPeriodStart = apo_hmeromhnia
-                ? clampDateStartUtc(`${apo_hmeromhnia}T00:00:00.000Z`)
+            const reviewPeriodStart = requestedPeriodStart
+                ? requestedPeriodStart
                 : rows.length > 0
                   ? clampDateStartUtc(rows[0].hmeromhnia)
                   : null;
 
-            const reviewPeriodEnd = eos_hmeromhnia
-                ? clampDateEndUtc(`${eos_hmeromhnia}T23:59:59.999Z`)
+            const reviewPeriodEnd = requestedPeriodEnd
+                ? requestedPeriodEnd
                 : rows.length > 0
                   ? clampDateEndUtc(rows[rows.length - 1].hmeromhnia)
                   : null;
+            const reviewAnalysisEnd = reviewPeriodEnd
+                ? endOfWeekSundayUtc(reviewPeriodEnd)
+                : null;
 
             const istorikoRowsByKodikos = new Map();
 
@@ -4892,7 +4945,7 @@ class erganhController {
                     $or: mongoose.trusted([
                         {
                             hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             }),
                             $or: mongoose.trusted([
                                 {
@@ -4906,7 +4959,7 @@ class erganhController {
                         {
                             hmeromhnia_isxyos_oron_ergasias_apo: null,
                             hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             }),
                             $or: mongoose.trusted([
                                 {
@@ -4921,7 +4974,7 @@ class erganhController {
                             hmeromhnia_isxyos_oron_ergasias_apo: null,
                             hmeromhnia_allaghs_orarioy_apo: null,
                             hmeromhnia_allaghs_symbashs: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             })
                         }
                     ])
@@ -5052,33 +5105,64 @@ class erganhController {
                 };
             });
 
-            const enrichedDeviations = deviations.map((d) => ({
-                _id: d._id,
-                ypokatasthma: d.ypokatasthma || '',
-                kodikos: d.kodikos || '',
-                eponymo: d.eponymo || '',
-                onoma: d.onoma || '',
-                week_apo: d.week_apo,
-                week_eos: d.week_eos,
-                weekStart: dateKeyUtc(d.week_apo),
-                weekEnd: dateKeyUtc(d.week_eos),
-                expected_repo: Number(d.expected_repo || 0),
-                actual_repo: Number(d.actual_repo || 0),
-                profile_changed_inside_week: d.profile_changed_inside_week === true,
-                excess_repo: Number(d.excess_repo || 0),
-                effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
-                effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
-                effective_profile_source: d.effective_profile_source || '',
-                effective_profile_date: d.effective_profile_date,
-                effective_profile_istoriko_id: d.effective_profile_istoriko_id || null,
-                previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
-                previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
-                previous_profile_source: d.previous_profile_source || '',
-                previous_profile_date: d.previous_profile_date,
-                previous_profile_istoriko_id: d.previous_profile_istoriko_id || null,
-                deviation_type: d.deviation_type || '',
-                note: d.note || ''
-            }));
+            const deviationPreview =
+                reviewPeriodStart && reviewPeriodEnd
+                    ? buildWeeklyRepoDeviationPreview({
+                          rows: deviationContextRows,
+                          periodStart: reviewPeriodStart,
+                          periodEnd: reviewPeriodEnd,
+                          asOfDate: req.session.appDate,
+                          resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) =>
+                              getWeeklyRepoProfileInfo({
+                                  week: {
+                                      naturalWeekStart: new Date(`${weekStart}T00:00:00.000Z`),
+                                      naturalWeekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
+                                      weekStart: new Date(`${weekStart}T00:00:00.000Z`),
+                                      weekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
+                                      isFullWeek: true
+                                  },
+                                  istorikoRows:
+                                      istorikoRowsByKodikos.get(String(employeeKodikos)) || [],
+                                  ergazomenos: ergByKodikos.get(String(employeeKodikos)) || {}
+                              }),
+                          resolveDailyProfile: (row) =>
+                              getEffectiveRepoProfileForDate(
+                                  row.hmeromhnia,
+                                  istorikoRowsByKodikos.get(String(row.kodikos)) || [],
+                                  ergByKodikos.get(String(row.kodikos)) || {}
+                              ),
+                          isFullTimeProfile: isFullTimeWorkTerms
+                      })
+                    : { deviations: [], pendingWeeks: [], policyVersion: null };
+            const withEmployeeNames = (item) => {
+                const erg = ergByKodikos.get(String(item.kodikos)) || {};
+                return {
+                    ...item,
+                    eponymo: erg.eponymo || '',
+                    onoma: erg.onoma || ''
+                };
+            };
+            const enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
+            const pendingDeviationWeeks = deviationPreview.pendingWeeks.map(withEmployeeNames);
+            const legacyDeviations = deviations
+                .map((d) =>
+                    normalizeLegacyDeviation({
+                        _id: d._id,
+                        ypokatasthma: d.ypokatasthma || '',
+                        kodikos: d.kodikos || '',
+                        eponymo: d.eponymo || '',
+                        onoma: d.onoma || '',
+                        week_apo: d.week_apo,
+                        week_eos: d.week_eos,
+                        expected_repo: Number(d.expected_repo || 0),
+                        actual_repo: Number(d.actual_repo || 0),
+                        deviation_type: d.deviation_type || '',
+                        note: d.note || '',
+                        policyVersion: d.policyVersion || null,
+                        sourceVersion: d.sourceVersion || null
+                    })
+                )
+                .filter((d) => d.is_legacy_policy === true);
 
             return res.json({
                 success: true,
@@ -5087,7 +5171,10 @@ class erganhController {
                 total,
                 totalPages: Math.ceil(total / limitNum),
                 rows: enrichedRows,
-                deviations: enrichedDeviations
+                deviations: enrichedDeviations,
+                pendingDeviationWeeks,
+                legacyDeviations,
+                deviationPolicyVersion: deviationPreview.policyVersion
             });
         } catch (error) {
             console.error('[getProdhlomenaOrariaForReview] ❌', error);

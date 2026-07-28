@@ -489,8 +489,10 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
 
-        // Όταν αλλάζουν οι όροι εργασίας μέσα στην ίδια εβδομάδα,
-        // ο έλεγχος ρεπό χρησιμοποιεί το profile που ισχύει το Σάββατο.
+        // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
+        // επανερμηνεύονται ως Monday-Sunday current-policy preview.
+        policyVersion: { type: String, trim: true, default: null },
+        sourceVersion: { type: String, trim: true, default: null },
         profile_changed_inside_week: { type: Boolean, default: false },
         excess_repo: { type: Number, default: 0 },
 
