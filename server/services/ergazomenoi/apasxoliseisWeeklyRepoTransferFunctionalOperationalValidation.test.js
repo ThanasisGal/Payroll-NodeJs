@@ -91,7 +91,7 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         proposalVersion: 'repo-transfer-single-pair-proposal:v2',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 0,
+        mhniaia_repo: 3,
         workdays: 4,
         dailyHours: 4
     }),
@@ -103,7 +103,7 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         proposalVersion: 'repo-transfer-single-pair-proposal:v2',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 0,
+        mhniaia_repo: 3,
         workdays: 4,
         dailyHours: 4
     })
@@ -192,6 +192,7 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     const employmentProfile = {
         typos_apasxolhshs: employment.typos_apasxolhshs,
         mhniaia_repo: employment.mhniaia_repo,
+        raw_mhniaia_repo: employment.mhniaia_repo,
         hmeres_ergasias_ebdomadas: employment.workdays,
         ores_ergasias_ebdomadas: employment.workdays * employment.dailyHours,
         mo_oron_hmerhsias_ergasias: employment.dailyHours
@@ -245,6 +246,11 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
     });
     const reconstruction = await reconstruct();
     const snapshot = reconstruction.snapshot;
+    assert.deepStrictEqual(snapshot.repo_resolution, group.repo_resolution);
+    assert.strictEqual(
+        snapshot.employment_profile.raw_mhniaia_repo,
+        employment.mhniaia_repo
+    );
     assert.strictEqual(snapshot.proposal_version, employment.proposalVersion);
     assert.strictEqual(snapshot.source.proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
     assert.strictEqual(snapshot.target.proposed_values.kathgoria_ergasias_apologistika, employment.targetCategory);

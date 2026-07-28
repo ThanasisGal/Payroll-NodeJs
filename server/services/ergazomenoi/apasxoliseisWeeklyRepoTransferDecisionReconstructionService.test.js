@@ -6,6 +6,12 @@ const targetId = '507f1f77bcf86cd799439012';
 const group = {
     group_id: 'proposal-1', group_key: 'key', group_type: 'ATOMIC_PAIRED_PROPOSAL', scenario_code: 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR',
     policy_code: 'WEEKLY_REPO_BALANCE', secondary_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
+    repo_resolution: {
+        effective_expected_weekly_repo: 1,
+        repo_resolution_source: 'SIX_SCHEDULED_WORK_DAYS',
+        scheduled_work_days: 6,
+        effective_weekly_workdays: 6
+    },
     pair_contract: { proposal_version: 'repo-transfer-single-pair-proposal:v1', choice_code: 'choice', policy_versions: {} },
     items: [
         { role: 'SOURCE_BECOMES_WORK', prodhlomena_oraria_id: sourceId, hmeromhnia: '2026-06-15', proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' }, flags: { approval_supported: false, runtime_apply_supported: false } },
@@ -20,8 +26,29 @@ async function run() {
     const result = await reconstructWeeklyRepoTransferDecision({ scope: { team: 't', company_kod: 'c' }, command, contextLoader: async () => context, projectionBuilder: () => ({ projection_status: 'READY', groups: [group] }) });
     assert.strictEqual(result.snapshot.source.prodhlomena_oraria_id, sourceId);
     assert.strictEqual(result.snapshot.target.prodhlomena_oraria_id, targetId);
+    assert.deepStrictEqual(result.snapshot.repo_resolution, group.repo_resolution);
     assert.strictEqual(result.fingerprint.length, 64);
     assert.strictEqual(JSON.stringify(context.weekRows), originalRows);
+    const changedResolutionGroup = {
+        ...group,
+        repo_resolution: {
+            ...group.repo_resolution,
+            effective_expected_weekly_repo: 2,
+            repo_resolution_source: 'EXPLICIT_MHNIAIA_REPO',
+            scheduled_work_days: 5,
+            effective_weekly_workdays: 5
+        }
+    };
+    const changedResolution = await reconstructWeeklyRepoTransferDecision({
+        scope: { team: 't', company_kod: 'c' },
+        command,
+        contextLoader: async () => context,
+        projectionBuilder: () => ({
+            projection_status: 'READY',
+            groups: [changedResolutionGroup]
+        })
+    });
+    assert.notStrictEqual(changedResolution.fingerprint, result.fingerprint);
     const holidayChanged = {
         ...context,
         holidayByDateKey: new Map([

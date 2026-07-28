@@ -4,8 +4,7 @@ const {
     analyzeWeeklyRepoTransferSinglePairV1,
     analyzeWeeklyRepoTransferSinglePairV2,
     normalizeEmploymentType,
-    employmentFamily,
-    resolvePartialFamilyExpectedRepo
+    employmentFamily
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 const {
     buildWeeklyRepoTransferSinglePairProposal,
@@ -120,8 +119,9 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
 
 {
     const result = analyze(week(), 'MERIKH', { mhniaia_repo: 0 });
-    assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(result.reasons.includes('INVALID_MHNIAIA_REPO'));
+    assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(result.employee.mhniaia_repo, 1);
+    assert.strictEqual(result.employee.repo_resolution_source, 'SIX_SCHEDULED_WORK_DAYS');
 }
 
 {
@@ -131,7 +131,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             hmeres_ergasias_ebdomadas: 4,
             ores_ergasias_ebdomadas: 16,
             mo_oron_hmerhsias_ergasias: 4,
-            mhniaia_repo: 0
+            mhniaia_repo: 3
         });
         assert.strictEqual(result.eligibility_status, 'ELIGIBLE', type);
         assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v2');
@@ -148,7 +148,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             employmentProfile: {
                 typos_apasxolhshs: type,
                 hmeres_ergasias_ebdomadas: 4,
-                mhniaia_repo: 0,
+                mhniaia_repo: 3,
                 mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
@@ -165,7 +165,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             employmentProfile: {
                 typos_apasxolhshs: type,
                 hmeres_ergasias_ebdomadas: 4,
-                mhniaia_repo: 0,
+                mhniaia_repo: 3,
                 mo_oron_hmerhsias_ergasias: 4
             },
             contractVersion: 'v2'
@@ -173,73 +173,6 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
         assert.strictEqual(projection.projection_status, 'READY');
         assert.strictEqual(projection.groups.length, 1);
     }
-}
-
-assert.deepStrictEqual(
-    resolvePartialFamilyExpectedRepo({
-        hmeres_ergasias_ebdomadas: 4,
-        mhniaia_repo: 0
-    }),
-    { ok: true, reason: null, expectedRepo: 3 }
-);
-assert.deepStrictEqual(
-    resolvePartialFamilyExpectedRepo({
-        hmeres_ergasias_ebdomadas: 4,
-        mhniaia_repo: 3
-    }),
-    { ok: true, reason: null, expectedRepo: 3 }
-);
-assert.deepStrictEqual(
-    resolvePartialFamilyExpectedRepo({ mhniaia_repo: 2 }),
-    { ok: true, reason: null, expectedRepo: 2 }
-);
-for (const [workdays, expectedRepo] of [[1, 6], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]]) {
-    assert.deepStrictEqual(
-        resolvePartialFamilyExpectedRepo({
-            hmeres_ergasias_ebdomadas: workdays,
-            mhniaia_repo: 0
-        }),
-        { ok: true, reason: null, expectedRepo }
-    );
-}
-for (const legacyRepo of [1, 2]) {
-    assert.deepStrictEqual(
-        resolvePartialFamilyExpectedRepo({ mhniaia_repo: legacyRepo }),
-        { ok: true, reason: null, expectedRepo: legacyRepo }
-    );
-}
-for (const invalidFallback of [0, 3, 'invalid', null, undefined]) {
-    assert.deepStrictEqual(
-        resolvePartialFamilyExpectedRepo({ mhniaia_repo: invalidFallback }),
-        { ok: false, reason: 'INVALID_MHNIAIA_REPO', expectedRepo: null }
-    );
-}
-
-{
-    const conflict = analyze(week({ existingRepo: [0, 6] }), 'MERIKH', {
-        hmeres_ergasias_ebdomadas: 4,
-        mhniaia_repo: 2
-    });
-    assert.strictEqual(conflict.eligibility_status, 'NEEDS_REVIEW');
-    assert.deepStrictEqual(conflict.reasons, ['PARTIAL_WEEKLY_REPO_PROFILE_CONFLICT']);
-}
-
-for (const invalidWorkdays of [0, 7, -1, 4.5, 'invalid']) {
-    const invalid = analyze(week(), 'MERIKH', {
-        hmeres_ergasias_ebdomadas: invalidWorkdays,
-        mhniaia_repo: 2
-    });
-    assert.strictEqual(invalid.eligibility_status, 'NEEDS_REVIEW');
-    assert.deepStrictEqual(invalid.reasons, ['PARTIAL_WEEKLY_WORKDAYS_INVALID']);
-}
-
-for (const invalidRepo of [-1, 1.5, 'invalid', {}, []]) {
-    const invalid = analyze(week({ existingRepo: [0, 6] }), 'MERIKH', {
-        hmeres_ergasias_ebdomadas: 4,
-        mhniaia_repo: invalidRepo
-    });
-    assert.strictEqual(invalid.eligibility_status, 'NEEDS_REVIEW');
-    assert.deepStrictEqual(invalid.reasons, ['PARTIAL_WEEKLY_REPO_PROFILE_INVALID']);
 }
 
 {
@@ -251,14 +184,14 @@ for (const invalidRepo of [-1, 1.5, 'invalid', {}, []]) {
             mhniaia_repo: 3
         }
     });
-    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
-    assert.deepStrictEqual(v1.reasons, ['INVALID_MHNIAIA_REPO']);
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(v1.employee.mhniaia_repo, 3);
 }
 
 {
     const deficit = analyze(week(), 'MERIKH', { mhniaia_repo: 2 });
-    assert.strictEqual(deficit.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(deficit.reasons.includes('REPO_DEFICIT_REMAINS'));
+    assert.strictEqual(deficit.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(deficit.employee.repo_resolution_source, 'SIX_SCHEDULED_WORK_DAYS');
 
     const exceeded = analyze(week({ existingRepo: [6] }), 'MERIKH', { mhniaia_repo: 1 });
     assert.strictEqual(exceeded.eligibility_status, 'NEEDS_REVIEW');

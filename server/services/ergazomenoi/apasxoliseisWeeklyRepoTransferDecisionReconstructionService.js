@@ -118,7 +118,8 @@ async function defaultContextLoader({
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
     const employmentProfile = {
         typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
-        mhniaia_repo: weeklyProfileInfo.expectedWeeklyRepo,
+        mhniaia_repo: effectiveProfile.mhniaia_repo,
+        raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
         hmeres_ergasias_ebdomadas: effectiveProfile.hmeres_ergasias_ebdomadas,
         mo_oron_hmerhsias_ergasias: Number(effectiveProfile.mo_oron_hmerhsias_ergasias || 0),
         external_break_minutes: employee.dialleima_entos_ektos_orarioy === true
@@ -156,6 +157,7 @@ function buildCanonicalSnapshot({ scope, context, group }) {
         policy_versions: normalize(group.pair_contract.policy_versions || {}), team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: String(context.candidates[0].ypokatasthma), employee_id: String(context.employee._id),
         employee_kodikos: String(context.candidates[0].kodikos), week_start: context.week.start, week_end: context.week.end,
+        repo_resolution: normalize(group.repo_resolution),
         employment_profile: normalize({
             employee_id: context.employee._id,
             employee_updated_at: context.employee.updatedAt,

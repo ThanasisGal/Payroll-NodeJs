@@ -10,6 +10,12 @@ const {
     buildNoCardsDisplayContext
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { ROW_FIELDS } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
+const {
+    resolveEffectiveExpectedWeeklyRepo
+} = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
+const {
+    buildWeeklyRepoTransferSinglePairGroupProjection
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 
 function testRowFieldEquivalence() {
     const authoritative = new Set(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
@@ -81,6 +87,156 @@ function testCanonicalWeeklyProfile() {
         changed.previousProfileDate,
         getProfileDateForDeviation(changed.previousProfile, week.weekStart)
     );
+}
+
+function naturalWeek(start = '2026-06-07') {
+    return {
+        naturalWeekEnd: new Date('2026-06-13T23:59:59.999Z'),
+        weekStart: new Date(`${start}T00:00:00.000Z`),
+        weekEnd: new Date('2026-06-13T23:59:59.999Z'),
+        isFullWeek: true
+    };
+}
+
+function scheduledRows(count) {
+    return Array.from({ length: 7 }, (_, index) => ({
+        hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
+        kathgoria_ergasias: index < count ? 'ΕΡΓ' : 'ΜΕ',
+        ores_ergasias: index < count ? 8 : 0,
+        apo_ora_01: index < count ? '09:00' : '',
+        eos_ora_01: index < count ? '17:00' : ''
+    }));
+}
+
+function repoTransferProfile(profile) {
+    return {
+        typos_apasxolhshs: profile.typos_apasxolhshs,
+        mhniaia_repo: profile.mhniaia_repo,
+        raw_mhniaia_repo: profile.raw_mhniaia_repo,
+        hmeres_ergasias_ebdomadas: profile.hmeres_ergasias_ebdomadas
+    };
+}
+
+function resolveThroughAuthoritativeProfile({ employee, history = [], rows }) {
+    const profileInfo = getWeeklyRepoProfileInfo({
+        week: naturalWeek(),
+        istorikoRows: history,
+        ergazomenos: employee
+    });
+    return {
+        profileInfo,
+        result: resolveEffectiveExpectedWeeklyRepo({
+            weekRows: rows,
+            effectiveProfile: repoTransferProfile(profileInfo.effectiveProfile)
+        })
+    };
+}
+
+function testRawAuthoritativeRepoResolution() {
+    const employee = {
+        kathestos_apasxolhshs: '1',
+        mhniaia_repo: 3,
+        hmeres_ergasias_ebdomadas: 4
+    };
+    const employeeResult = resolveThroughAuthoritativeProfile({
+        employee,
+        rows: scheduledRows(5)
+    });
+    assert.strictEqual(employeeResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 3);
+    assert.strictEqual(employeeResult.result.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(employeeResult.result.repoResolutionSource, 'EXPLICIT_MHNIAIA_REPO');
+
+    const history = [{
+        _id: 'history-authoritative',
+        afora_allagh_oron_ergasias: true,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
+        kathestos_apasxolhshs: '1',
+        mhniaia_repo: 4,
+        hmeres_ergasias_ebdomadas: 4
+    }];
+    const historyResult = resolveThroughAuthoritativeProfile({
+        employee: { ...employee, mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 },
+        history,
+        rows: scheduledRows(5)
+    });
+    assert.strictEqual(historyResult.profileInfo.effectiveProfile.source, 'ISTORIKO');
+    assert.strictEqual(historyResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 4);
+    assert.strictEqual(historyResult.result.effectiveExpectedWeeklyRepo, 4);
+
+    const invalid = resolveThroughAuthoritativeProfile({
+        employee: { ...employee, mhniaia_repo: 7, hmeres_ergasias_ebdomadas: 5 },
+        rows: scheduledRows(5)
+    }).result;
+    assert.strictEqual(invalid.ok, false);
+    assert.strictEqual(invalid.reason, 'INVALID_EXPLICIT_MHNIAIA_REPO');
+    assert.strictEqual(invalid.effectiveExpectedWeeklyRepo, null);
+
+    for (const [workdays, expected] of [[5, 2], [6, 1]]) {
+        const fallback = resolveThroughAuthoritativeProfile({
+            employee: { ...employee, mhniaia_repo: 0, hmeres_ergasias_ebdomadas: workdays },
+            rows: scheduledRows(5)
+        }).result;
+        assert.strictEqual(fallback.effectiveExpectedWeeklyRepo, expected);
+        assert.strictEqual(fallback.repoResolutionSource, 'WEEKLY_WORKDAYS_FALLBACK');
+    }
+
+    const sixScheduled = resolveThroughAuthoritativeProfile({
+        employee: { ...employee, mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 },
+        rows: scheduledRows(6)
+    }).result;
+    assert.strictEqual(sixScheduled.effectiveExpectedWeeklyRepo, 1);
+    assert.strictEqual(sixScheduled.repoResolutionSource, 'SIX_SCHEDULED_WORK_DAYS');
+}
+
+function regression0002Rows() {
+    const categories = ['ΕΡΓ', 'ΑΝ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ'];
+    return categories.map((category, index) => {
+        const hasCards = index === 1 || (category === 'ΕΡΓ' && index !== 3);
+        return {
+            _id: `0002-row-${index}`,
+            team: 'THA',
+            company_kod: '0004',
+            ypokatasthma: '0000',
+            kodikos: '0002',
+            hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
+            kathgoria_ergasias: category,
+            ores_ergasias: category === 'ΕΡΓ' ? 8 : 0,
+            apo_ora_01: category === 'ΕΡΓ' ? '09:00' : '',
+            eos_ora_01: category === 'ΕΡΓ' ? '17:00' : '',
+            cards_ores_ergasias: hasCards ? 8 : 0,
+            cards_apo_ora_01: hasCards ? '09:00' : '',
+            cards_eos_ora_01: hasCards ? '17:00' : '',
+            is_locked: false
+        };
+    });
+}
+
+function test0002ThroughAuthoritativeProjectionPath() {
+    const rows = regression0002Rows();
+    const profileInfo = getWeeklyRepoProfileInfo({
+        week: naturalWeek(),
+        ergazomenos: {
+            kodikos: '0002',
+            kathestos_apasxolhshs: '0',
+            mhniaia_repo: 2,
+            hmeres_ergasias_ebdomadas: 5
+        }
+    });
+    const projection = buildWeeklyRepoTransferSinglePairGroupProjection({
+        weekRows: rows,
+        employmentProfile: repoTransferProfile(profileInfo.effectiveProfile)
+    });
+    assert.strictEqual(projection.projection_status, 'READY');
+    assert.strictEqual(projection.groups.length, 1);
+    assert.deepStrictEqual(projection.groups[0].repo_resolution, {
+        effective_expected_weekly_repo: 1,
+        repo_resolution_source: 'SIX_SCHEDULED_WORK_DAYS',
+        scheduled_work_days: 6,
+        effective_weekly_workdays: 6
+    });
+    assert.strictEqual(projection.groups[0].items[0].hmeromhnia, '2026-06-08');
+    assert.strictEqual(projection.groups[0].items[1].hmeromhnia, '2026-06-10');
+    assert.ok(!projection.reasons.includes('REPO_DEFICIT_REMAINS'));
 }
 
 function testProfileDateForDeviationPrecedenceAndFallbacks() {
@@ -186,6 +342,8 @@ async function run() {
     testHolidayContexts();
     testProfileDateForDeviationPrecedenceAndFallbacks();
     testCanonicalWeeklyProfile();
+    testRawAuthoritativeRepoResolution();
+    test0002ThroughAuthoritativeProjectionPath();
     testControllerImportsSharedProfileDateHelper();
     await testTeamScopedCompanyResolution();
     console.log('weekly repo transfer authoritative context tests passed');

@@ -234,6 +234,25 @@ function testDerivedCurrentAndHistoryRepo() {
     );
 }
 
+function testRawAuthoritativeRepoIsPreservedWithoutChangingLegacyRepo() {
+    for (const rawValue of [3, 4, 6, 7, 1.5, -1, 'invalid']) {
+        const current = currentProfile({
+            mhniaia_repo: rawValue,
+            hmeres_ergasias_ebdomadas: 5
+        });
+        assert.strictEqual(current.raw_mhniaia_repo, rawValue);
+        assert.strictEqual(current.mhniaia_repo, 2);
+
+        const history = effectiveHistory({
+            mhniaia_repo: rawValue,
+            hmeres_ergasias_ebdomadas: 6
+        });
+        assert.strictEqual(history.raw_mhniaia_repo, rawValue);
+        assert.strictEqual(history.mhniaia_repo, 1);
+        assert.strictEqual(history.source, 'ISTORIKO');
+    }
+}
+
 function testWeeklyDayStringAndCurrentContractFallbacks() {
     assert.strictEqual(
         effectiveHistory({
@@ -346,6 +365,7 @@ function run() {
     testWeeklyWorkdaysNormalizationAndPriority();
     testExplicitRepoWins();
     testDerivedCurrentAndHistoryRepo();
+    testRawAuthoritativeRepoIsPreservedWithoutChangingLegacyRepo();
     testWeeklyDayStringAndCurrentContractFallbacks();
     testUnsupportedWorkdaysRemainUnresolved();
     testSnapshotFields();

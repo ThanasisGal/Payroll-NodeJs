@@ -309,7 +309,14 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
                 reason: 'ATOMIC_APPLY_SUPPORT_REQUIRED'
             }
         },
-        warnings: [...warnings]
+        warnings: [...warnings],
+        repo_resolution: {
+            effective_expected_weekly_repo:
+                proposal.employee.effective_expected_weekly_repo,
+            repo_resolution_source: proposal.employee.repo_resolution_source,
+            scheduled_work_days: proposal.employee.scheduled_work_days,
+            effective_weekly_workdays: proposal.employee.effective_weekly_workdays
+        }
     };
 
     return deepFreeze({

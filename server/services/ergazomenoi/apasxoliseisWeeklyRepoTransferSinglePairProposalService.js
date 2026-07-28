@@ -115,6 +115,21 @@ function copyAnalysisMetadata(analysis) {
             mhniaia_repo: Number.isSafeInteger(analysis?.employee?.mhniaia_repo)
                 ? analysis.employee.mhniaia_repo
                 : null,
+            effective_expected_weekly_repo:
+                Number.isSafeInteger(analysis?.employee?.effective_expected_weekly_repo)
+                    ? analysis.employee.effective_expected_weekly_repo
+                    : null,
+            repo_resolution_source: normalizePrimitiveString(
+                analysis?.employee?.repo_resolution_source
+            ),
+            scheduled_work_days:
+                Number.isSafeInteger(analysis?.employee?.scheduled_work_days)
+                    ? analysis.employee.scheduled_work_days
+                    : null,
+            effective_weekly_workdays:
+                Number.isSafeInteger(analysis?.employee?.effective_weekly_workdays)
+                    ? analysis.employee.effective_weekly_workdays
+                    : null,
             profile_source: normalizePrimitiveString(analysis?.employee?.profile_source),
             profile_istoriko_id: normalizePrimitiveString(
                 analysis?.employee?.profile_istoriko_id,

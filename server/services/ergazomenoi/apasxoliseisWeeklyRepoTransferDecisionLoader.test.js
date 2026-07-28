@@ -41,10 +41,42 @@ async function run() {
     assert.strictEqual(context.weekRows.length, 7);
     assert.strictEqual(context.employee, employee);
     assert.strictEqual(context.employmentProfile.profile_source, 'ERG_AKTUAL');
+    assert.strictEqual(context.employmentProfile.raw_mhniaia_repo, 2);
     assert.strictEqual(String(context.audits[0].prodhlomena_oraria_id), String(sourceId));
     assert.strictEqual(configured.log.prodFilters[0].team, 'THA');
     assert.strictEqual(configured.log.prodFilters[1].ypokatasthma, '0000');
     assert.ok(configured.log.selects.includes(ROW_FIELDS.join(' ')));
+
+    const rawEmployee = { ...employee, mhniaia_repo: 3, hmeres_ergasias_ebdomadas: 4 };
+    const employeeRawContext = await defaultContextLoader({
+        scope,
+        sourceId: String(sourceId),
+        targetId: String(targetId),
+        models: models({ employees: [rawEmployee] }).value,
+        holidayContextBuilder
+    });
+    assert.strictEqual(employeeRawContext.employmentProfile.mhniaia_repo, 0);
+    assert.strictEqual(employeeRawContext.employmentProfile.raw_mhniaia_repo, 3);
+
+    const historyRawContext = await defaultContextLoader({
+        scope,
+        sourceId: String(sourceId),
+        targetId: String(targetId),
+        models: models({
+            employees: [rawEmployee],
+            history: [{
+                _id: new mongoose.Types.ObjectId(),
+                afora_allagh_oron_ergasias: true,
+                hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-01T00:00:00Z'),
+                kathestos_apasxolhshs: '0',
+                mhniaia_repo: 4,
+                hmeres_ergasias_ebdomadas: 4
+            }]
+        }).value,
+        holidayContextBuilder
+    });
+    assert.strictEqual(historyRawContext.employmentProfile.profile_source, 'ISTORIKO');
+    assert.strictEqual(historyRawContext.employmentProfile.raw_mhniaia_repo, 4);
 
     for (const employees of [[], [employee, { ...employee, _id: new mongoose.Types.ObjectId() }], [{ ...employee, ypokatasthma: '0001' }]]) {
         await assert.rejects(() => defaultContextLoader({ scope, sourceId: String(sourceId), targetId: String(targetId), models: models({ employees }).value, holidayContextBuilder }), (error) => error.statusCode === 409);
