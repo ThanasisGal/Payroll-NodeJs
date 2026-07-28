@@ -285,8 +285,20 @@ function compareGroups(left, right) {
 
 function buildWeeklyRepoTransferAtomicPageProjection(
     { weeklyInputs = [], inputReasonCodes = [] } = {},
-    { singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection } = {}
+    {
+        singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection,
+        presentationStart = null,
+        presentationEnd = null
+    } = {}
 ) {
+    const presentationStartKey = dateKeyUtc(presentationStart);
+    const presentationEndKey = dateKeyUtc(presentationEnd);
+    const hasPresentationRange = Boolean(presentationStartKey && presentationEndKey);
+    const isPresentationDate = (value) => {
+        const key = dateKeyUtc(value);
+        return !hasPresentationRange ||
+            Boolean(key && key >= presentationStartKey && key <= presentationEndKey);
+    };
     const reasonCounts = {};
     const warningCounts = {};
     const groupsById = new Map();
@@ -337,6 +349,11 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             incrementCounts(reasonCounts, ['ATOMIC_GROUP_RESULT_INVALID']);
             return;
         }
+        if (!group.items.every((item) => isPresentationDate(item?.hmeromhnia))) {
+            summary.context_only_groups_count =
+                (summary.context_only_groups_count || 0) + 1;
+            return;
+        }
 
         if (groupsById.has(group.group_id)) {
             incrementCounts(reasonCounts, ['DUPLICATE_ATOMIC_GROUP_ID']);
@@ -357,7 +374,15 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     });
 
     const groups = [...groupsById.values()].sort(compareGroups);
-    const sortedReviewOutcomes = reviewOutcomes.sort((left, right) =>
+    const sortedReviewOutcomes = reviewOutcomes
+        .filter((outcome) => {
+            const dates = [
+                outcome?.source?.hmeromhnia,
+                outcome?.target?.hmeromhnia
+            ].filter(Boolean);
+            return dates.length === 0 || dates.every(isPresentationDate);
+        })
+        .sort((left, right) =>
         String(left?.week_start || '').localeCompare(String(right?.week_start || '')) ||
         String(left?.team || '').localeCompare(String(right?.team || '')) ||
         String(left?.company_kod || '').localeCompare(String(right?.company_kod || '')) ||
@@ -370,7 +395,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         String(left?.source?.hmeromhnia || '').localeCompare(
             String(right?.source?.hmeromhnia || '')
         )
-    );
+        );
     const reviewEmployeeIdentities = new Set(
         sortedReviewOutcomes
             .map(scopedEmployeeIdentity)

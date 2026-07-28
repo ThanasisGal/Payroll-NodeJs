@@ -298,6 +298,62 @@ async function testFilterAndScopeRejections() {
     }
 }
 
+async function testFirstCrossMonthWeekUsesMondayReadContextOnly() {
+    const rows = week('2026-06-29', '0001');
+    assert.equal(rows.length, 7);
+    rows.forEach((row) => Object.assign(row, {
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 8,
+        cards_apo_ora_01: '09:00',
+        cards_eos_ora_01: '17:00'
+    }));
+    Object.assign(rows[3], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_ores_ergasias: 8
+    });
+    Object.assign(rows[4], {
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    Object.assign(rows[6], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+
+    const { result, counter } = await load(rows, [], [], {
+        apo_hmeromhnia: '2026-07-02',
+        eos_hmeromhnia: '2026-07-05',
+        ypokatasthma: '0000'
+    });
+
+    assert.equal(counter.filters.rows.hmeromhnia.$gte.toISOString(), '2026-06-29T00:00:00.000Z');
+    assert.equal(counter.filters.rows.hmeromhnia.$lte.toISOString(), '2026-07-05T23:59:59.999Z');
+    assert.deepStrictEqual(result.requested_period, {
+        start: '2026-07-02',
+        end: '2026-07-05'
+    });
+    assert.deepStrictEqual(result.read_context, {
+        start: '2026-06-29',
+        end: '2026-07-05'
+    });
+    assert.equal(result.current_groups_count, 1);
+    assert.equal(result.reason_counts.INCOMPLETE_EMPLOYEE_WEEK || 0, 0);
+    assert.equal(result.reason_counts.PARTIAL_WEEK_OUTSIDE_FILTER_RANGE || 0, 0);
+    assert.ok(result.records[0]);
+    assert.ok(
+        result.records.every((record) =>
+            !JSON.stringify(record).includes('2026-06-29') &&
+            !JSON.stringify(record).includes('2026-06-30')
+        )
+    );
+}
+
 async function run() {
     await testZeroProposalsUsesOneBatchOfQueries();
     await testManyProposalsKeepConstantQueryCounts();
@@ -307,6 +363,7 @@ async function run() {
     await testResolvedProjectionReturnsAppliedOnlyRecord();
     await testTwentyPeriodDecisionsUseTwoConstantQueries();
     await testFilterAndScopeRejections();
+    await testFirstCrossMonthWeekUsesMondayReadContextOnly();
     console.log('weekly repo transfer decision batch tests passed');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

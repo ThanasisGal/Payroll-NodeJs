@@ -1572,9 +1572,7 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
 
         const isFullWeek =
             dateKeyUtc(weekStart) === dateKeyUtc(naturalWeekStart) &&
-            dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd) &&
-            weekStart.getUTCDay() === 1 &&
-            weekEnd.getUTCDay() === 0;
+            dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd);
 
         ranges.push({
             naturalWeekStart,
@@ -7261,7 +7259,9 @@ class erganhController {
                     const weekStartDate = startOfWeekMondayUtc(calculationRec.hmeromhnia);
 
                     const isFirstPartialWeek =
-                        weekStartDate < periodStartDate && periodStartDate.getUTCDay() !== 0;
+                        weekStartDate < periodStartDate &&
+                        dateKeyUtc(startOfWeekMondayUtc(periodStartDate)) !==
+                            dateKeyUtc(periodStartDate);
 
                     weeklyStateMap.set(weekKey, {
                         weeklyRegularCardsMinutes: 0,
@@ -7270,7 +7270,7 @@ class erganhController {
                         weeklyLegalLimitMinutes: rules.weeklyLegalLimitMinutes,
                         usedOverworkMinutes: 0,
 
-                        // true μόνο για την 1η εβδομάδα της περιόδου όταν η περίοδος δεν ξεκινά Κυριακή
+                        // true μόνο για την 1η εβδομάδα όταν η περίοδος δεν ξεκινά Δευτέρα
                         isFirstPartialWeek
                     });
                 }

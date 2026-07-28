@@ -29,6 +29,10 @@ const {
 const { validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('./apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { getWeeklyRepoTransferApplyIndexState } = require('./apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
+const {
+    startOfWeekMondayUtc,
+    dateKeyUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 function requestError(message, statusCode = 400) {
     const error = new Error(message);
@@ -100,6 +104,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
 }) {
     const scope = validateSessionScope(session);
     const normalized = validateBatchFilters(filters);
+    const readContextStart = startOfWeekMondayUtc(normalized.start.date);
+    const readContextEnd = normalized.end.date;
     const prodhlomenaModel = models.prodhlomenaModel || ProdhlomenaOrariaModel;
     const employeeModel = models.employeeModel || ErgazomenoiModel;
     const historyModel = models.historyModel === undefined ? IstorikoProslhpseonAllagonModel : models.historyModel;
@@ -110,7 +116,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
         team: scope.team,
         company_kod: scope.company_kod,
         ypokatasthma: normalized.ypokatasthma,
-        hmeromhnia: mongoose.trusted({ $gte: normalized.start.date, $lte: normalized.end.date })
+        hmeromhnia: mongoose.trusted({ $gte: readContextStart, $lte: readContextEnd })
     };
     const rows = await prodhlomenaModel.find(rowFilter)
         .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
@@ -133,8 +139,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
             companyId: scope.company_kod,
             companyKodikos: text(session.companyKodikos, 50),
             etos: scope.etos,
-            periodStart: normalized.start.date,
-            periodEnd: normalized.end.date,
+            periodStart: readContextStart,
+            periodEnd: readContextEnd,
             companiesModel: models.companiesModel,
             argiesModel: models.argiesModel
         })
@@ -189,7 +195,10 @@ async function loadWeeklyRepoTransferDecisionBatch({
             return profile;
         }
     });
-    const projection = buildWeeklyRepoTransferAtomicPageProjection(inputs);
+    const projection = buildWeeklyRepoTransferAtomicPageProjection(inputs, {
+        presentationStart: normalized.start.date,
+        presentationEnd: normalized.end.date
+    });
     const current = projection.groups.map((group) => {
         const sourceId = String(group.items[0].prodhlomena_oraria_id);
         const weekRows = inputs.weeklyInputs.find((input) => input.weekRows.some((row) => String(row._id) === sourceId))?.weekRows || [];
@@ -311,7 +320,15 @@ async function loadWeeklyRepoTransferDecisionBatch({
         applied_only_count: appliedOnlyRecords.length,
         projection_status: projection.projection_status,
         reason_counts: projection.reason_counts,
-        warning_counts: projection.warning_counts
+        warning_counts: projection.warning_counts,
+        requested_period: {
+            start: normalized.start.key,
+            end: normalized.end.key
+        },
+        read_context: {
+            start: dateKeyUtc(readContextStart),
+            end: dateKeyUtc(readContextEnd)
+        }
     };
 }
 

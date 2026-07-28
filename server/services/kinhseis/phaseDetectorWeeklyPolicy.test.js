@@ -2,15 +2,23 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-    applyWeeklySixthSeventhDayFacts
+    applyWeeklySixthSeventhDayFacts,
+    filterDailyRowsToRequestedPeriod
 } = require('./phaseDetectorService');
 
-function buildWeek({ changedProfile = false } = {}) {
+function buildWeek({
+    changedProfile = false,
+    start = '2026-06-08',
+    hours = Array(7).fill(7)
+} = {}) {
     const dailyRows = [];
     const orariaByDate = new Map();
+    const startDate = new Date(`${start}T00:00:00.000Z`);
 
     for (let index = 0; index < 7; index += 1) {
-        const date = `2026-06-${String(8 + index).padStart(2, '0')}`;
+        const current = new Date(startDate);
+        current.setUTCDate(current.getUTCDate() + index);
+        const date = current.toISOString().slice(0, 10);
         dailyRows.push({
             date,
             kathestos_apasxolhshs: 'FULL',
@@ -24,7 +32,7 @@ function buildWeek({ changedProfile = false } = {}) {
         orariaByDate.set(date, {
             kathgoria_ergasias: 'ΕΡΓ',
             ores_ergasias: 8,
-            cards_ores_ergasias: 7
+            cards_ores_ergasias: hours[index]
         });
     }
 
@@ -44,6 +52,78 @@ test('work-facts weekly path classifies sixth and seventh days without losing ac
             'SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'
         )
     );
+});
+
+test('first cross-month week uses previous-month context but presents requested dates only', () => {
+    const { dailyRows, orariaByDate } = buildWeek({
+        start: '2026-06-29',
+        hours: [4, 7, 4, 4, 4, 4, 6]
+    });
+    const analyses = [];
+    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-07-01',
+        requestedPeriodEnd: '2026-07-31',
+        weeklyAnalyses: analyses
+    });
+    const requested = filterDailyRowsToRequestedPeriod(
+        result,
+        '2026-07-01',
+        '2026-07-31'
+    );
+
+    assert.equal(analyses[0].complete, true);
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
+    assert.deepEqual(requested.map((day) => day.date), [
+        '2026-07-01',
+        '2026-07-02',
+        '2026-07-03',
+        '2026-07-04',
+        '2026-07-05'
+    ]);
+});
+
+test('completed trailing cross-month week classifies next-month seventh day', () => {
+    const { dailyRows, orariaByDate } = buildWeek({
+        start: '2026-06-29',
+        hours: [4, 7, 4, 4, 4, 4, 6]
+    });
+    const analyses = [];
+    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-06-01',
+        requestedPeriodEnd: '2026-06-30',
+        weeklyAnalyses: analyses
+    });
+    const requested = filterDailyRowsToRequestedPeriod(
+        result,
+        '2026-06-01',
+        '2026-06-30'
+    );
+
+    assert.equal(analyses[0].status, 'READY');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
+    assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
+});
+
+test('uncompleted trailing week is explicitly pending and is not an HR error', () => {
+    const { dailyRows, orariaByDate } = buildWeek({ start: '2026-06-29' });
+    for (const key of [...orariaByDate.keys()]) {
+        if (key > '2026-06-30') orariaByDate.delete(key);
+    }
+    const analyses = [];
+    applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-06-01',
+        requestedPeriodEnd: '2026-06-30',
+        weeklyAnalyses: analyses
+    });
+
+    assert.equal(analyses[0].complete, false);
+    assert.equal(analyses[0].status, 'OPEN_WEEK_PENDING_COMPLETION');
+    assert.deepEqual(analyses[0].reasons, []);
+    assert.ok(dailyRows.every((day) =>
+        day.weeklyComplianceStatus === 'OPEN_WEEK_PENDING_COMPLETION'
+    ));
 });
 
 test('work-facts weekly path keeps an in-week profile change visible for HR decision', () => {

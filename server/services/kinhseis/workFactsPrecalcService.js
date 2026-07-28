@@ -1,5 +1,9 @@
 const phaseDetectorService = require('./phaseDetectorService');
 const { ApasxolhseisPeriodFactsModel } = require('../../models/kinhseis');
+const {
+    createWeeklyPayrollCarryOver,
+    materializeInMemory
+} = require('./weeklyPayrollCarryOverService');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
 const SOURCE_VERSION = 'workFactsPrecalc:v2';
@@ -300,6 +304,75 @@ function buildTotals(dailyFacts) {
     }, buildEmptyTotals());
 }
 
+function buildWeeklyCarryOverDifferences({
+    detectorResult,
+    scopeKey,
+    materializedStore = null
+} = {}) {
+    const analyses = Array.isArray(detectorResult?.weeklyAnalyses)
+        ? detectorResult.weeklyAnalyses
+        : [];
+    const carryOvers = [];
+
+    analyses.forEach((analysis) => {
+        const sourcePayrollMonth = toTrimmedString(analysis?.weekStart).slice(0, 7);
+        const targetPayrollMonth = toTrimmedString(analysis?.weekEnd).slice(0, 7);
+        if (
+            analysis?.complete !== true ||
+            analysis?.status === 'OPEN_WEEK_PENDING_COMPLETION' ||
+            !sourcePayrollMonth ||
+            !targetPayrollMonth ||
+            sourcePayrollMonth === targetPayrollMonth
+        ) {
+            return;
+        }
+
+        const dailyFacts = Array.isArray(analysis.dailyFacts)
+            ? analysis.dailyFacts
+            : [];
+        const breakdown = {
+            yperergasia: roundHours(dailyFacts.reduce(
+                (sum, fact) => sum + toNumberOrZero(fact.yperergasiaHours),
+                0
+            )),
+            yperoria: roundHours(dailyFacts.reduce(
+                (sum, fact) =>
+                    sum +
+                    toNumberOrZero(fact.nomimiYperoriaHours) +
+                    toNumberOrZero(fact.paranomiYperoriaHours),
+                0
+            )),
+            sixthDay: roundHours(dailyFacts.reduce(
+                (sum, fact) => sum + toNumberOrZero(fact.sixthDayHours),
+                0
+            )),
+            otherWeekly: 0
+        };
+        if (Object.values(breakdown).every((value) => value === 0)) return;
+
+        const carryOver = createWeeklyPayrollCarryOver({
+            scopeKey,
+            sourceWeekDate: analysis.weekStart,
+            sourcePayrollMonth,
+            targetPayrollMonth,
+            breakdown
+        });
+        if (carryOver.ok !== true) return;
+
+        if (materializedStore instanceof Map) {
+            const materialized = materializeInMemory(materializedStore, carryOver);
+            carryOvers.push({
+                ...carryOver,
+                materializationStatus: materialized.status
+            });
+            return;
+        }
+        carryOvers.push(carryOver);
+    });
+
+    return carryOvers;
+}
+
 function validateInput({ team, company_kod, kodikos, apo, eos }) {
     const warnings = [];
     const cleanTeam = toTrimmedString(team);
@@ -443,6 +516,10 @@ async function generateWorkFactsForEmployeePeriod({
         });
         const dailyFacts = buildBaseDailyFacts({ detectorResult });
         const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
+        const weeklyCarryOverDifferences = buildWeeklyCarryOverDifferences({
+            detectorResult,
+            scopeKey: [input.team, input.company_kod, input.kodikos].join('|')
+        });
         const detectorWarnings = Array.isArray(detectorResult?.warnings)
             ? detectorResult.warnings
             : [];
@@ -461,7 +538,7 @@ async function generateWorkFactsForEmployeePeriod({
             phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
             phaseSummary,
             dailyFacts,
-            weeklyCarryOverDifferences: [],
+            weeklyCarryOverDifferences,
             totals: buildTotals(dailyFacts),
             warnings: [...warnings, ...detectorWarnings]
         };
@@ -614,5 +691,6 @@ module.exports = {
     generateWorkFactsForEmployeePeriod,
     generateAndSaveWorkFactsForEmployeePeriod,
     findWorkFactsSnapshot,
-    saveWorkFactsSnapshot
+    saveWorkFactsSnapshot,
+    buildWeeklyCarryOverDifferences
 };

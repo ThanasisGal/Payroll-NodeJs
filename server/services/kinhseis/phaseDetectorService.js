@@ -18,9 +18,13 @@ const {
     resolveDailyActualWorkFacts
 } = require('../ergazomenoi/apasxoliseisDailyActualWorkFactsService');
 const {
+    POLICY_VERSION: SIXTH_SEVENTH_POLICY_VERSION,
     analyzeWeeklySixthSeventhDay
 } = require('../ergazomenoi/apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
+    dateKeyUtc,
+    startOfWeekMondayUtc,
+    endOfWeekSundayUtc,
     getMondaySundayWeekRange
 } = require('../../utils/date/mondaySundayWeek');
 
@@ -275,8 +279,12 @@ function isBoundaryPartialWeekPhase(phase = {}, activeFrom, activeTo) {
 
     if (!phaseApo || !phaseEos || !start || !end) return false;
 
-    const startsAtBoundary = phaseApo.getTime() === start.getTime() && start.getUTCDay() !== 1;
-    const endsAtBoundary = phaseEos.getTime() === end.getTime() && end.getUTCDay() !== 0;
+    const startsAtBoundary =
+        phaseApo.getTime() === start.getTime() &&
+        dateKeyUtc(startOfWeekMondayUtc(start)) !== dateKeyUtc(start);
+    const endsAtBoundary =
+        phaseEos.getTime() === end.getTime() &&
+        dateKeyUtc(endOfWeekSundayUtc(end)) !== dateKeyUtc(end);
 
     return startsAtBoundary || endsAtBoundary;
 }
@@ -670,7 +678,15 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
     return rows;
 }
 
-function applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate) {
+function applyWeeklySixthSeventhDayFacts(
+    dailyRows,
+    orariaByDate,
+    {
+        requestedPeriodStart = null,
+        requestedPeriodEnd = null,
+        weeklyAnalyses = []
+    } = {}
+) {
     const byWeek = new Map();
     dailyRows.forEach((day) => {
         const range = getMondaySundayWeekRange(day.date);
@@ -680,7 +696,53 @@ function applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate) {
     });
 
     byWeek.forEach((days) => {
-        if (days.length !== 7) return;
+        const range = getMondaySundayWeekRange(days[0]?.date);
+        if (!range) return;
+        const expectedDateKeys = Array.from(
+            { length: 7 },
+            (_, index) => formatDateYMD(addDays(range.weekStart, index))
+        );
+        const hasSevenContextDays =
+            days.length === 7 &&
+            expectedDateKeys.every((date) => days.some((day) => day.date === date));
+        const hasSevenSourceRows =
+            orariaByDate instanceof Map &&
+            expectedDateKeys.every((date) => orariaByDate.has(date));
+
+        if (!hasSevenContextDays || !hasSevenSourceRows) {
+            const requestedEndKey = dateKeyUtc(requestedPeriodEnd);
+            const isOpenTrailingWeek =
+                Boolean(requestedEndKey) && range.weekEndKey > requestedEndKey;
+            const status = isOpenTrailingWeek
+                ? 'OPEN_WEEK_PENDING_COMPLETION'
+                : 'NEEDS_HR_DECISION';
+            const reasons = isOpenTrailingWeek
+                ? []
+                : ['INVALID_OR_INCOMPLETE_MONDAY_SUNDAY_WEEK'];
+            days.forEach((day) => {
+                day.weeklySixthSeventhPolicyVersion =
+                    SIXTH_SEVENTH_POLICY_VERSION;
+                day.weeklyComplianceStatus = status;
+                day.weeklyComplianceReasons = reasons;
+                day.weeklyComplianceWarnings = [];
+                day.isSixthDay = false;
+                day.isSeventhDay = false;
+            });
+            weeklyAnalyses.push({
+                weekStart: range.weekStartKey,
+                weekEnd: range.weekEndKey,
+                requestedPeriod: {
+                    start: dateKeyUtc(requestedPeriodStart),
+                    end: dateKeyUtc(requestedPeriodEnd)
+                },
+                status,
+                reasons,
+                warnings: [],
+                complete: false,
+                dailyFacts: days.map((day) => ({ ...day }))
+            });
+            return;
+        }
         const signatures = new Set(days.map((day) => [
             day.kathestos_apasxolhshs,
             day.hmeres_ergasias_ebdomadas,
@@ -711,9 +773,36 @@ function applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate) {
             day.isSeventhDay = analysis.seventhDay?.hmeromhnia === day.date;
             if (day.isSixthDay) day.sixthDayHours = analysis.sixthDay.actualWorkHours;
         });
+        weeklyAnalyses.push({
+            weekStart: range.weekStartKey,
+            weekEnd: range.weekEndKey,
+            requestedPeriod: {
+                start: dateKeyUtc(requestedPeriodStart),
+                end: dateKeyUtc(requestedPeriodEnd)
+            },
+            status: analysis.status,
+            reasons: analysis.reasons,
+            warnings: analysis.warnings,
+            complete: true,
+            premiumRate: analysis.premiumRate ?? null,
+            premiumRateSource: analysis.premiumRateSource || null,
+            sixthDay: analysis.sixthDay || null,
+            seventhDay: analysis.seventhDay || null,
+            dailyFacts: days.map((day) => ({ ...day }))
+        });
     });
 
     return dailyRows;
+}
+
+function filterDailyRowsToRequestedPeriod(dailyRows, requestedStart, requestedEnd) {
+    const start = normalizeDateOnly(requestedStart);
+    const end = normalizeDateOnly(requestedEnd);
+    if (!start || !end) return [];
+    return (Array.isArray(dailyRows) ? dailyRows : []).filter((day) => {
+        const dayDate = normalizeDateOnly(day?.date);
+        return dayDate && dayDate >= start && dayDate <= end;
+    });
 }
 
 function buildDayGroupKeyParts(day) {
@@ -1025,7 +1114,8 @@ async function detectPayrollPhases({
     year,
     period,
     periodApoOverride,
-    periodEosOverride
+    periodEosOverride,
+    includeWeeklyAnalysisContext = false
 }) {
     const warnings = [];
     const hasExplicitPeriodRange = Boolean(periodApoOverride || periodEosOverride);
@@ -1059,6 +1149,14 @@ async function detectPayrollPhases({
     const leaveDate = normalizeDateOnly(employee.hmeromhnia_apoxorhshs);
     const activeFrom = maxDate(periodStart, hireDate);
     const activeTo = minDate(periodEnd, leaveDate);
+    const contextPeriodStart = includeWeeklyAnalysisContext
+        ? startOfWeekMondayUtc(periodStart)
+        : periodStart;
+    const contextPeriodEnd = includeWeeklyAnalysisContext
+        ? endOfWeekSundayUtc(periodEnd)
+        : periodEnd;
+    const analysisFrom = maxDate(contextPeriodStart, hireDate);
+    const analysisTo = minDate(contextPeriodEnd, leaveDate);
     const kartaErgasias = employee.karta_ergasias === true;
 
     const emptyPayload = {
@@ -1075,13 +1173,16 @@ async function detectPayrollPhases({
             periodStart: formatDateOnly(periodStart),
             periodEnd: formatDateOnly(periodEnd),
             activeFrom: formatDateOnly(activeFrom),
-            activeTo: formatDateOnly(activeTo)
+            activeTo: formatDateOnly(activeTo),
+            analysisContextStart: formatDateOnly(analysisFrom),
+            analysisContextEnd: formatDateOnly(analysisTo)
         },
         phases: [],
         contractStatusIntervals: [],
         operationalPhases: [],
         operationalPhasesCount: 0,
         hasOperationalSplit: false,
+        weeklyAnalyses: [],
         warnings
     };
 
@@ -1094,13 +1195,13 @@ async function detectPayrollPhases({
         team,
         company_kod,
         kodikos,
-        periodEos: activeTo
+        periodEos: analysisTo
     });
     const contractStatusIntervals = buildContractStatusIntervals({
         historyRows: contractHistoryRows,
         employee,
-        periodApo: activeFrom,
-        periodEos: activeTo,
+        periodApo: analysisFrom,
+        periodEos: analysisTo,
         warnings
     });
 
@@ -1109,13 +1210,13 @@ async function detectPayrollPhases({
         company_kod,
         kodikos,
         aa_eggrafhs: employee.aa_eggrafhs,
-        periodApo: activeFrom,
-        periodEos: activeTo
+        periodApo: analysisFrom,
+        periodEos: analysisTo
     });
 
     const dailyTerms = buildDailyOrarioTermsForPeriod({
-        periodApo: activeFrom,
-        periodEos: activeTo,
+        periodApo: analysisFrom,
+        periodEos: analysisTo,
         istorikoRows,
         ergazomenos: employee
     });
@@ -1126,8 +1227,8 @@ async function detectPayrollPhases({
         company_kod,
         kodikos,
         hmeromhnia: mongoose.trusted({
-            $gte: activeFrom,
-            $lte: activeTo
+            $gte: analysisFrom,
+            $lte: analysisTo
         })
     };
 
@@ -1144,16 +1245,27 @@ async function detectPayrollPhases({
         warnings.push('Δεν βρέθηκαν προδηλωμένες γραμμές για το ενεργό διάστημα.');
     }
 
-    const dailyRows = applyWeeklySixthSeventhDayFacts(
+    const weeklyAnalyses = [];
+    const analysisDailyRows = applyWeeklySixthSeventhDayFacts(
         buildDailyRows({
-            activeFrom,
-            activeTo,
+            activeFrom: analysisFrom,
+            activeTo: analysisTo,
             termsByDate,
             orariaByDate,
             kartaErgasias,
             warnings
         }),
-        orariaByDate
+        orariaByDate,
+        {
+            requestedPeriodStart: periodStart,
+            requestedPeriodEnd: periodEnd,
+            weeklyAnalyses
+        }
+    );
+    const dailyRows = filterDailyRowsToRequestedPeriod(
+        analysisDailyRows,
+        activeFrom,
+        activeTo
     );
     const phases = applyContractStatusBoundaryOverrides(
         groupDailyRowsIntoPhases(dailyRows, employee, kartaErgasias),
@@ -1177,16 +1289,24 @@ async function detectPayrollPhases({
             activeTo: formatDateOnly(activeTo)
         },
         phases,
-        contractStatusIntervals: contractStatusIntervals.map((interval) => ({
-            apo: formatDateOnly(interval.apo),
-            eos: formatDateOnly(interval.eos),
-            kathestos: interval.kathestos,
-            kathestosCode: interval.kathestosCode,
-            source: interval.source
-        })),
+        contractStatusIntervals: contractStatusIntervals
+            .map((interval) => ({
+                ...interval,
+                apo: maxDate(interval.apo, activeFrom),
+                eos: minDate(interval.eos, activeTo)
+            }))
+            .filter((interval) => interval.apo <= interval.eos)
+            .map((interval) => ({
+                apo: formatDateOnly(interval.apo),
+                eos: formatDateOnly(interval.eos),
+                kathestos: interval.kathestos,
+                kathestosCode: interval.kathestosCode,
+                source: interval.source
+            })),
         operationalPhases,
         operationalPhasesCount: operationalPhases.length,
         hasOperationalSplit: operationalPhases.length > 1,
+        weeklyAnalyses,
         warnings
     };
 }
@@ -1205,7 +1325,8 @@ async function detectPayrollPhasesForDateRange({
         kodikos,
         ypokatasthma,
         periodApoOverride: apo,
-        periodEosOverride: eos
+        periodEosOverride: eos,
+        includeWeeklyAnalysisContext: true
     });
 }
 
@@ -1213,5 +1334,6 @@ module.exports = {
     detectPayrollPhases,
     detectPayrollPhasesForDateRange,
     buildPeriodRange,
-    applyWeeklySixthSeventhDayFacts
+    applyWeeklySixthSeventhDayFacts,
+    filterDailyRowsToRequestedPeriod
 };
