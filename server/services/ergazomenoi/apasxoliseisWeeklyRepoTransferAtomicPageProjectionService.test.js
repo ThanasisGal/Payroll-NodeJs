@@ -188,6 +188,29 @@ function testCompleteWeekInputConstruction() {
     );
 }
 
+function testOpenTrailingWeekIsDistinctFromCompletedPartialFilter() {
+    const trailingRows = fullTimeWeek('2026-06-29', '001').slice(0, 2);
+    const open = buildWeeklyRepoTransferAtomicInputs({
+        rows: trailingRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(open.weeklyInputs, []);
+    assert.deepStrictEqual(open.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const completedPartial = buildWeeklyRepoTransferAtomicInputs({
+        rows: trailingRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(completedPartial.weeklyInputs, []);
+    assert.deepStrictEqual(completedPartial.inputReasonCodes, [INPUT_REASON.PARTIAL_WEEK]);
+}
+
 function testValidFullTimeAndPartTimeWeeks() {
     const fullTime = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [weeklyInput(fullTimeWeek())]
@@ -641,6 +664,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 
 function run() {
     testCompleteWeekInputConstruction();
+    testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
     testValidFullTimeAndPartTimeWeeks();
     testInputConstructionSeparatesEmployeesAndWeeks();
     testBranchAwareBucketsAndResolverContext();

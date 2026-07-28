@@ -1398,6 +1398,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     fullPeriodFilter,
     requestedPeriodStart,
     requestedPeriodEnd,
+    authoritativeAsOfDate,
     holidayByDateKey,
     holidayContextResolved
 }) {
@@ -1503,6 +1504,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
         rows: atomicRows,
         periodStart: requestedPeriodStart,
         periodEnd: requestedPeriodEnd,
+        asOfDate: authoritativeAsOfDate,
         holidayByDateKey,
         existingAuditCountByRowKey,
         resolveEmploymentProfile: ({
@@ -5299,6 +5301,7 @@ class erganhController {
                 fullPeriodFilter: filter,
                 requestedPeriodStart,
                 requestedPeriodEnd,
+                authoritativeAsOfDate: req.session.appDate,
                 holidayByDateKey: scenarioContext.argiesByDateKey || new Map(),
                 holidayContextResolved:
                     requestedPeriodStart?.getUTCFullYear() ===

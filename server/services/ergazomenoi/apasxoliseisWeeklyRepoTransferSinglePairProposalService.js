@@ -551,6 +551,10 @@ function buildWeeklyRepoTransferSinglePairProposal({
             employee_kodikos: employeeKodikos,
             hmeromhnia: analysis.source.hmeromhnia,
             current_category: analysis.source.current_category,
+            current_apologistika_category: normalizePrimitiveString(
+                sourceMatch.row.kathgoria_ergasias_apologistika,
+                20
+            ),
             proposed_values: sourceMaterialization.proposedValues
         },
         {
@@ -559,6 +563,10 @@ function buildWeeklyRepoTransferSinglePairProposal({
             employee_kodikos: employeeKodikos,
             hmeromhnia: analysis.target.hmeromhnia,
             current_category: analysis.target.current_category,
+            current_apologistika_category: normalizePrimitiveString(
+                targetMatch.row.kathgoria_ergasias_apologistika,
+                20
+            ),
             proposed_values: targetProposedValues
         }
     ];

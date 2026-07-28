@@ -4,6 +4,15 @@ const path = require('path');
 const vm = require('vm');
 const ejs = require('ejs');
 const { execFileSync } = require('child_process');
+const {
+    POLICY_RESULT_STATUS,
+    POLICY_MODE,
+    getApasxoliseisPolicyCatalog
+} = require('../../../../server/services/ergazomenoi/apasxoliseisPolicyCatalogService');
+const {
+    SCENARIO_CODES,
+    REASON_CODES
+} = require('../../../../server/services/ergazomenoi/apasxoliseisScenarioMatcherService');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
@@ -839,7 +848,7 @@ function testDiagnostics() {
     assertContains(html, [
         'Περιπτώσεις χωρίς αυτόματη πρόταση',
         'Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:',
-        '8 περιπτώσεις: Το επιλεγμένο διάστημα δεν περιλαμβάνει ολόκληρη εβδομάδα.',
+        '8 περιπτώσεις: Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
         '7 περιπτώσεις: Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
         '6 περιπτώσεις: Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
         '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
@@ -1171,6 +1180,84 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(!/(?:^|\n)\s*(?:body|html)\b[^{}]*\{[^}]*overflow\s*:/im.test(addedCss));
 }
 
+function testAllKnownBackendGroupingCodesHaveGreekLabels() {
+    const known = [
+        [Object.values(POLICY_RESULT_STATUS), sandbox.getPolicyPreviewStatusLabel],
+        [getApasxoliseisPolicyCatalog().map((policy) => policy.policy_code), sandbox.getPolicyPreviewPolicyLabel],
+        [Object.values(SCENARIO_CODES), sandbox.getPolicyPreviewScenarioLabel],
+        [Object.values(POLICY_MODE), sandbox.getPolicyPreviewActionLabel],
+        [
+            [...Object.values(REASON_CODES), 'EMPLOYEE_CARD_NOT_REQUIRED', 'NO_APOLOGISTIKO_REVIEW_REQUIRED'],
+            sandbox.getPolicyPreviewReasonLabel
+        ]
+    ];
+    known.forEach(([codes, resolver]) => {
+        codes.forEach((code) => {
+            const resolved = resolver(code);
+            const label = typeof resolved === 'string' ? resolved : resolved.label;
+            assert.ok(label);
+            assert.ok(!label.includes('Άγνωστο μοτίβ'));
+            assert.ok(!label.includes('Μη χαρτογραφημένο αποτέλεσμα'), `${code} is not mapped`);
+        });
+    });
+
+    const unmapped = sandbox.getPolicyPreviewPolicyLabel('CUSTOM_<script>_CODE');
+    assert.strictEqual(unmapped, 'Μη χαρτογραφημένο αποτέλεσμα (CUSTOM_script_CODE)');
+    assert.ok(!unmapped.includes('<'));
+}
+
+function testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct() {
+    const item = {
+        employee_kodikos: '0001',
+        hmeromhnia: '2026-06-26',
+        kathgoria_ergasias: 'ΕΡΓ',
+        current_kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        proposed_values: {
+            kathgoria_ergasias_apologistika: 'ΑΝ',
+            repo_apologistika: true
+        }
+    };
+    const detailed = sandbox.renderAtomicRepoTransferItem(item, 'TARGET_BECOMES_REPO');
+    assertContains(detailed, [
+        'Προδηλωμένη κατηγορία',
+        'Απολογιστική/εμφανιζόμενη κατηγορία',
+        'Προτεινόμενη κατηγορία',
+        'ΕΡΓ',
+        'ΑΔΕΙΑ',
+        'ΑΝ'
+    ]);
+
+    const compact = sandbox.renderHrReviewDay(item, 'rest');
+    assertContains(compact, [
+        'Προδηλωμένη',
+        'Απολογιστική',
+        'Πρόταση μεταφοράς',
+        'ΕΡΓ',
+        'ΑΔΕΙΑ',
+        'ΑΝ'
+    ]);
+}
+
+function testOpenAndCompletedPartialWeekMessagesStayDistinct() {
+    vm.runInContext(
+        "currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-06-01&eos_hmeromhnia=2026-06-30')",
+        sandbox
+    );
+    assert.strictEqual(
+        sandbox.getAtomicRepoTransferDiagnosticLabel('OPEN_WEEK_PENDING_COMPLETION'),
+        'Η εβδομάδα 29/06/2026–05/07/2026 δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.'
+    );
+    assert.strictEqual(
+        sandbox.getAtomicRepoTransferDiagnosticLabel('PARTIAL_WEEK_OUTSIDE_FILTER_RANGE'),
+        'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.'
+    );
+    const pendingHtml = sandbox.renderAtomicRepoTransferDiagnosticEntries({
+        OPEN_WEEK_PENDING_COMPLETION: 1
+    });
+    assert.ok(pendingHtml.includes('Αναμονή ολοκλήρωσης'));
+    assert.ok(!pendingHtml.includes('Χρειάζεται απόφαση HR'));
+}
+
 function testEmploymentReviewFinalUiContract() {
     assert.ok(viewSource.includes('data-dropdown-direction="down"'));
     const repositionStart = dropdownHelperSource.indexOf('const reposition = () => {');
@@ -1204,8 +1291,13 @@ function testEmploymentReviewFinalUiContract() {
     const shellCss = cssSource.slice(shellCssStart, cssSource.indexOf('}', shellCssStart));
     assert.ok(!/(?:transform|translate)\s*[:(]/.test(shellCss));
     assert.ok(!/#hrReviewStartBtn\s*\{[^}]*(?:transform|translate|position|margin)/s.test(cssSource));
-    assert.ok(cssSource.includes('--employment-review-viewport-offset: 17rem'));
-    assert.ok(cssSource.includes('--employment-review-viewport-offset: 25.5rem'));
+    assert.ok(cssSource.includes('--employment-review-bottom-clearance: 3.25rem'));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 20.25rem'));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 28.75rem'));
+    assert.ok(20.25 - 17 >= 3);
+    assert.ok(28.75 - 25.5 >= 3);
+    assert.ok(/\.employment-review-card\s*\{[^}]*overflow:\s*visible/.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*padding-bottom:\s*0\.5rem/.test(cssSource));
     assert.ok(cssSource.includes('overflow-y: auto'));
 
     ['hrReviewStartBtn', 'showAdvancedReviewBtn', 'showMinimalReviewBtn'].forEach((id) => {
@@ -1819,6 +1911,9 @@ const tests = [
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
+    testAllKnownBackendGroupingCodesHaveGreekLabels,
+    testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,
+    testOpenAndCompletedPartialWeekMessagesStayDistinct,
     testEmploymentReviewFinalUiContract,
     testCorrectiveDropdownAndPageShellContract,
     testEmploymentReviewBranchActionLayoutContract,

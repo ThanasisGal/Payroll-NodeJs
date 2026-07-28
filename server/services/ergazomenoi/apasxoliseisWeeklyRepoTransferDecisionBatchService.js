@@ -164,6 +164,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
         rows,
         periodStart: normalized.start.date,
         periodEnd: normalized.end.date,
+        asOfDate: session.appDate,
         holidayByDateKey: holidayContext.argiesByDateKey,
         existingAuditCountByRowKey: auditCounts,
         resolveEmploymentProfile: ({ ypokatasthma, employee_kodikos, week_start, week_end }) => {

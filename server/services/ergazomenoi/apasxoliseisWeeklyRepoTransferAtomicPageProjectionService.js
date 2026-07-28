@@ -20,6 +20,7 @@ const INPUT_REASON = Object.freeze({
     DATE_RANGE_REQUIRED: 'ATOMIC_DATE_RANGE_REQUIRED',
     INVALID_ROW: 'INVALID_ATOMIC_ROW_IDENTITY_OR_DATE',
     PARTIAL_WEEK: 'PARTIAL_WEEK_OUTSIDE_FILTER_RANGE',
+    OPEN_WEEK: 'OPEN_WEEK_PENDING_COMPLETION',
     DUPLICATE_DATE: 'DUPLICATE_EMPLOYEE_WEEK_DATE',
     INCOMPLETE_WEEK: 'INCOMPLETE_EMPLOYEE_WEEK',
     PROFILE_NOT_RESOLVED: 'EMPLOYMENT_PROFILE_NOT_RESOLVED',
@@ -131,6 +132,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     rows = [],
     periodStart = null,
     periodEnd = null,
+    asOfDate = null,
     resolveEmploymentProfile,
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map()
@@ -145,6 +147,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     }
     const periodStartKey = dateKeyUtc(periodStart);
     const periodEndKey = dateKeyUtc(periodEnd);
+    const asOfDateKey = dateKeyUtc(asOfDate);
 
     const buckets = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -162,7 +165,11 @@ function buildWeeklyRepoTransferAtomicInputs({
         .sort((left, right) => left.key.localeCompare(right.key))
         .forEach((bucket) => {
             if (bucket.weekEnd > periodEndKey) {
-                inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
+                inputReasonCodes.push(
+                    asOfDateKey && bucket.weekEnd > asOfDateKey
+                        ? INPUT_REASON.OPEN_WEEK
+                        : INPUT_REASON.PARTIAL_WEEK
+                );
                 return;
             }
 

@@ -14,7 +14,8 @@ function makeRow({
     mode = 'REVIEW_ONLY',
     reason = 'DEFAULT_REASON',
     proposedUpdates = {},
-    cardHours = 0
+    cardHours = 0,
+    apologistikaCategory = ''
 }) {
     return {
         prodhlomena_oraria_id: id,
@@ -26,6 +27,7 @@ function makeRow({
         },
         scenarioFactsSummary: {
             declared_category: 'ΕΡΓ',
+            apologistika_category: apologistikaCategory,
             card_hours: cardHours,
             has_cards: cardHours > 0
         },
@@ -41,6 +43,28 @@ function makeRow({
             batch_approvable: false
         }
     };
+}
+
+function testPresentationKeepsUnderlyingApologistikaCategory() {
+    const grouping = buildApasxoliseisPolicyPreviewGrouping([
+        makeRow({
+            id: 'employee-0001-2026-06-26',
+            kodikos: '0001',
+            date: '2026-06-26',
+            status: 'NEEDS_REVIEW',
+            policyCode: 'WEEKLY_REPO_BALANCE',
+            scenarioCode: 'REPO_TRANSFER_WITHIN_WEEK',
+            reason: 'REPO_TRANSFER_CANDIDATE',
+            apologistikaCategory: 'ΑΔΕΙΑ',
+            proposedUpdates: {
+                kathgoria_ergasias_apologistika: 'ΑΝ'
+            }
+        })
+    ]);
+    const item = grouping.groups[0].items[0];
+    assert.strictEqual(item.kathgoria_ergasias, 'ΕΡΓ');
+    assert.strictEqual(item.kathgoria_ergasias_apologistika, 'ΑΔΕΙΑ');
+    assert.strictEqual(item.proposed_values.kathgoria_ergasias_apologistika, 'ΑΝ');
 }
 
 function testEmptyList() {
@@ -208,5 +232,6 @@ testSamePatternBecomesOneGroup();
 testDeterministicSorting();
 testMissingPolicyOrScenario();
 testDateOnlyStringPassesThrough();
+testPresentationKeepsUnderlyingApologistikaCategory();
 
 console.log('apasxoliseis policy preview grouping tests passed');

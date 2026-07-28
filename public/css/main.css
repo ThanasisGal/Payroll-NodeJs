@@ -14323,10 +14323,17 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
+    --employment-review-bottom-clearance: 3.25rem;
     width: 94% !important;
     max-width: none;
     margin-left: 3%;
     margin-right: 3%;
+    padding-bottom: 0.5rem;
+    overflow: visible;
+}
+
+.employment-review-card {
+    overflow: visible;
 }
 
 .hr-review-filters {
@@ -14590,7 +14597,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container {
-    --employment-review-viewport-offset: 17rem;
+    --employment-review-viewport-offset: 20.25rem;
     max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
     max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
     overflow-y: auto;
@@ -14600,7 +14607,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container--advanced {
-    --employment-review-viewport-offset: 25.5rem;
+    --employment-review-viewport-offset: 28.75rem;
 }
 
 .employment-review-scroll-container .results-table-wrapper {
