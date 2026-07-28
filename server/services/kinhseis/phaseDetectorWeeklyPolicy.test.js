@@ -41,7 +41,9 @@ function buildWeek({
 
 test('work-facts weekly path classifies sixth and seventh days without losing actual hours', () => {
     const { dailyRows, orariaByDate } = buildWeek();
-    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate);
+    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        asOfDate: '2026-06-15'
+    });
 
     assert.equal(result[5].isSixthDay, true);
     assert.equal(result[5].sixthDayHours, 7);
@@ -63,6 +65,7 @@ test('first cross-month week uses previous-month context but presents requested 
     const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
         requestedPeriodStart: '2026-07-01',
         requestedPeriodEnd: '2026-07-31',
+        asOfDate: '2026-07-06',
         weeklyAnalyses: analyses
     });
     const requested = filterDailyRowsToRequestedPeriod(
@@ -92,6 +95,7 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
     const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
         requestedPeriodStart: '2026-06-01',
         requestedPeriodEnd: '2026-06-30',
+        asOfDate: '2026-07-06',
         weeklyAnalyses: analyses
     });
     const requested = filterDailyRowsToRequestedPeriod(
@@ -104,6 +108,24 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
     assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
+});
+
+test('seven future source rows do not prove temporal week completion', () => {
+    const { dailyRows, orariaByDate } = buildWeek({ start: '2026-06-29' });
+    const analyses = [];
+    applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-06-01',
+        requestedPeriodEnd: '2026-06-30',
+        asOfDate: '2026-07-02',
+        weeklyAnalyses: analyses
+    });
+
+    assert.equal(orariaByDate.size, 7);
+    assert.equal(analyses[0].status, 'OPEN_WEEK_PENDING_COMPLETION');
+    assert.equal(analyses[0].complete, false);
+    assert.equal(analyses[0].sixthDay, undefined);
+    assert.equal(analyses[0].seventhDay, undefined);
+    assert.ok(dailyRows.every((day) => !day.isSixthDay && !day.isSeventhDay));
 });
 
 test('uncompleted trailing week is explicitly pending and is not an HR error', () => {
@@ -161,7 +183,9 @@ test('missing rows after week completion require HR decision instead of remainin
 
 test('work-facts weekly path keeps an in-week profile change visible for HR decision', () => {
     const { dailyRows, orariaByDate } = buildWeek({ changedProfile: true });
-    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate);
+    const result = applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        asOfDate: '2026-06-15'
+    });
 
     result.forEach((day) => {
         assert.equal(day.weeklyComplianceStatus, 'NEEDS_HR_DECISION');
@@ -169,4 +193,20 @@ test('work-facts weekly path keeps an in-week profile change visible for HR deci
         assert.equal(day.isSixthDay, false);
         assert.equal(day.isSeventhDay, false);
     });
+});
+
+test('invalid explicit as-of date fails closed without clock fallback or classification', () => {
+    const { dailyRows, orariaByDate } = buildWeek({ start: '2026-06-29' });
+    const analyses = [];
+    applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate, {
+        requestedPeriodStart: '2026-07-01',
+        requestedPeriodEnd: '2026-07-31',
+        asOfDate: 'not-a-date',
+        weeklyAnalyses: analyses
+    });
+
+    assert.equal(analyses[0].status, 'NEEDS_HR_DECISION');
+    assert.equal(analyses[0].complete, false);
+    assert.deepEqual(analyses[0].reasons, ['INVALID_AS_OF_DATE']);
+    assert.ok(dailyRows.every((day) => !day.isSixthDay && !day.isSeventhDay));
 });

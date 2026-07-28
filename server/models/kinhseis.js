@@ -503,6 +503,12 @@ const ApasxolhseisPeriodFactsSchema = new Schema(
         generatedAt: { type: Date },
         generatedBy: { type: String, trim: true },
         sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v2' },
+        asOfDate: { type: Date },
+        asOfDateSource: {
+            type: String,
+            enum: ['SESSION_APP_DATE', 'SYSTEM_CLOCK'],
+            trim: true
+        },
 
         locked: { type: Boolean, default: false },
         lockedAt: { type: Date },
@@ -592,6 +598,12 @@ const PayrollPrecalcJobSchema = new Schema(
 
         jobKey: { type: String, required: true, trim: true },
         requestedBy: { type: String, trim: true },
+        asOfDate: { type: Date },
+        asOfDateSource: {
+            type: String,
+            enum: ['SESSION_APP_DATE', 'SYSTEM_CLOCK'],
+            trim: true
+        },
         startedAt: { type: Date },
         finishedAt: { type: Date },
 

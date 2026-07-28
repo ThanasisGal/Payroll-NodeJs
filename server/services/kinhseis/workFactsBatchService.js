@@ -4,7 +4,8 @@ const { ErgazomenoiModel } = require('../../models/ergazomenoi');
 const { PayrollPrecalcJobModel } = require('../../models/kinhseis');
 const {
     generateAndSaveWorkFactsForEmployeePeriod,
-    findWorkFactsSnapshot
+    findWorkFactsSnapshot,
+    resolveWorkFactsAsOfContext
 } = require('./workFactsPrecalcService');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
@@ -148,6 +149,7 @@ function normalizeJobForReturn(job, extra = {}) {
         ...extra,
         apo: formatDateYMD(plain.apo),
         eos: formatDateYMD(plain.eos),
+        asOfDate: formatDateYMD(plain.asOfDate),
         startedAt: plain.startedAt instanceof Date ? plain.startedAt.toISOString() : plain.startedAt,
         finishedAt: plain.finishedAt instanceof Date
             ? plain.finishedAt.toISOString()
@@ -170,6 +172,8 @@ function normalizeBatchJobForStatus(job) {
         scope: normalized.scope || '',
         apo: normalized.apo || '',
         eos: normalized.eos || '',
+        asOfDate: normalized.asOfDate || '',
+        asOfDateSource: normalized.asOfDateSource || '',
         ypokatasthma: normalized.ypokatasthma || '',
         startedAt: normalized.startedAt || null,
         finishedAt: normalized.finishedAt || null,
@@ -291,7 +295,14 @@ async function recoverStaleRunningJobByKey(jobKey, now = new Date()) {
     ).lean();
 }
 
-async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma }) {
+async function markJobRunning({
+    key,
+    jobKey,
+    requestedBy,
+    force,
+    ypokatasthma,
+    asOfContext
+}) {
     const recoveredStaleJob = await recoverStaleRunningJobByKey(jobKey);
 
     const runningFields = {
@@ -303,6 +314,8 @@ async function markJobRunning({ key, jobKey, requestedBy, force, ypokatasthma })
         scope: key.scope,
         status: 'RUNNING',
         requestedBy: toTrimmedString(requestedBy),
+        asOfDate: parseDateOnlyUTC(asOfContext.asOfDate),
+        asOfDateSource: asOfContext.asOfDateSource,
         startedAt: new Date(),
         finishedAt: null,
         employeesTotal: 0,
@@ -485,6 +498,8 @@ function buildBaseBatchResult({
         apo: key.apoYMD,
         eos: key.eosYMD,
         ypokatasthma,
+        asOfDate: job?.asOfDate || '',
+        asOfDateSource: job?.asOfDateSource || '',
         totals,
         items,
         warnings,
@@ -572,8 +587,24 @@ async function startWorkFactsBatchJob({
     kodikoi = [],
     dryRun = false,
     limit = null,
-    maxEmployees = null
+    maxEmployees = null,
+    asOfDate = null,
+    asOfDateSource = '',
+    clock
 }) {
+    const asOfContext = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: asOfDate,
+        explicitSource: asOfDateSource,
+        clock
+    });
+    if (!asOfContext.ok) {
+        return {
+            success: false,
+            statusCode: 400,
+            reason: asOfContext.reason,
+            result: null
+        };
+    }
     const context = buildBatchRunContext({
         team,
         company_kod,
@@ -601,7 +632,8 @@ async function startWorkFactsBatchJob({
         jobKey: context.jobKey,
         requestedBy,
         force,
-        ypokatasthma: context.cleanYpokatasthma
+        ypokatasthma: context.cleanYpokatasthma,
+        asOfContext
     });
 
     return {
@@ -627,7 +659,11 @@ async function generateWorkFactsForCompanyPeriod({
     limit = null,
     maxEmployees = null,
     updateProgressEachEmployee = false,
-    startedJob = null
+    startedJob = null,
+    asOfDate = null,
+    asOfDateSource = '',
+    clock,
+    dependencies = {}
 }) {
     const context = buildBatchRunContext({
         team,
@@ -653,6 +689,27 @@ async function generateWorkFactsForCompanyPeriod({
     let activeJob = null;
     const hasStartedJob = Boolean(startedJob && startedJob.jobKey === jobKey);
     const startedJobId = hasStartedJob ? getJobId(startedJob) : '';
+    const asOfContext = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: hasStartedJob ? startedJob.asOfDate : asOfDate,
+        explicitSource: hasStartedJob
+            ? startedJob.asOfDateSource
+            : asOfDateSource,
+        clock
+    });
+    if (!asOfContext.ok) {
+        return buildFailedBatchResult({
+            key,
+            jobKey,
+            dryRun,
+            warnings: [asOfContext.reason]
+        });
+    }
+    const employeeLoader = dependencies.employeeLoader || loadEmployeesForBatch;
+    const snapshotFinder = dependencies.snapshotFinder || findWorkFactsSnapshot;
+    const snapshotGenerator =
+        dependencies.snapshotGenerator || generateAndSaveWorkFactsForEmployeePeriod;
+    const jobFinisher = dependencies.jobFinisher || finishJob;
+    const progressUpdater = dependencies.progressUpdater || updateJobProgress;
 
     if (hasStartedJob) {
         activeJob = startedJob;
@@ -662,7 +719,8 @@ async function generateWorkFactsForCompanyPeriod({
             jobKey,
             requestedBy,
             force,
-            ypokatasthma: cleanYpokatasthma
+            ypokatasthma: cleanYpokatasthma,
+            asOfContext
         });
 
         if (runningJob.skipped) {
@@ -685,7 +743,7 @@ async function generateWorkFactsForCompanyPeriod({
     };
 
     try {
-        const employees = await loadEmployeesForBatch({
+        const employees = await employeeLoader({
             team: key.team,
             company_kod: key.company_kod,
             apo: key.apo,
@@ -711,7 +769,7 @@ async function generateWorkFactsForCompanyPeriod({
             }
 
             try {
-                const existingSnapshot = await findWorkFactsSnapshot({
+                const existingSnapshot = await snapshotFinder({
                     team: key.team,
                     company_kod: key.company_kod,
                     kodikos,
@@ -760,7 +818,7 @@ async function generateWorkFactsForCompanyPeriod({
                     continue;
                 }
 
-                const snapshot = await generateAndSaveWorkFactsForEmployeePeriod({
+                const snapshot = await snapshotGenerator({
                     team: key.team,
                     company_kod: key.company_kod,
                     kodikos,
@@ -768,7 +826,9 @@ async function generateWorkFactsForCompanyPeriod({
                     eos: key.eosYMD,
                     scope: key.scope,
                     requestedBy,
-                    force
+                    force,
+                    asOfDate: asOfContext.asOfDate,
+                    asOfDateSource: asOfContext.asOfDateSource
                 });
 
                 if (snapshot?.saveStatus === 'LOCKED_SKIPPED') {
@@ -811,7 +871,7 @@ async function generateWorkFactsForCompanyPeriod({
                 });
             } finally {
                 if (dryRun !== true && updateProgressEachEmployee === true) {
-                    await updateJobProgress({
+                    await progressUpdater({
                         jobKey,
                         jobId: startedJobId,
                         progress: {
@@ -863,7 +923,7 @@ async function generateWorkFactsForCompanyPeriod({
             return result;
         }
 
-        const finishedJob = await finishJob({
+        const finishedJob = await jobFinisher({
             jobKey,
             jobId: startedJobId,
             update: {
@@ -905,7 +965,7 @@ async function generateWorkFactsForCompanyPeriod({
             });
         }
 
-        const finishedJob = await finishJob({
+        const finishedJob = await jobFinisher({
             jobKey,
             jobId: startedJobId,
             update: {

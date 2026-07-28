@@ -4,7 +4,8 @@ const test = require('node:test');
 const {
     buildWeeklyCarryOverDifferences,
     generateWorkFactsForEmployeePeriod,
-    buildReadyWorkFactsPayload
+    buildReadyWorkFactsPayload,
+    resolveWorkFactsAsOfContext
 } = require('./workFactsPrecalcService');
 const phaseDetectorService = require('./phaseDetectorService');
 
@@ -122,12 +123,99 @@ test('production work-facts payload no longer hardcodes an empty carry-over arra
             kodikos: 'employee',
             apo: '2026-07-01',
             eos: '2026-07-31',
-            scope: 'MONTHLY'
+            scope: 'MONTHLY',
+            asOfDate: '28/07/2026',
+            asOfDateSource: 'SESSION_APP_DATE'
         });
 
         assert.equal(payload.status, 'READY');
+        assert.equal(payload.asOfDate, '2026-07-28');
+        assert.equal(payload.asOfDateSource, 'SESSION_APP_DATE');
         assert.equal(payload.weeklyCarryOverDifferences.length, 1);
         assert.equal(payload.weeklyCarryOverDifferences[0].targetPayrollMonth, '2026-07');
+    } finally {
+        phaseDetectorService.detectPayrollPhasesForDateRange = originalDetector;
+    }
+});
+
+test('session appDate is normalized and invalid explicit values never use the clock', () => {
+    let clockCalls = 0;
+    const valid = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: '02/07/2026',
+        explicitSource: 'SESSION_APP_DATE',
+        clock: () => {
+            clockCalls += 1;
+            return new Date('2030-01-01T00:00:00.000Z');
+        }
+    });
+    const invalid = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: '31/02/2026',
+        explicitSource: 'SESSION_APP_DATE',
+        clock: () => {
+            clockCalls += 1;
+            return new Date('2030-01-01T00:00:00.000Z');
+        }
+    });
+
+    assert.deepEqual(valid, {
+        ok: true,
+        asOfDate: '2026-07-02',
+        asOfDateSource: 'SESSION_APP_DATE',
+        reason: null
+    });
+    assert.deepEqual(invalid, {
+        ok: false,
+        asOfDate: null,
+        asOfDateSource: 'SESSION_APP_DATE',
+        reason: 'INVALID_AS_OF_DATE'
+    });
+    assert.equal(clockCalls, 0);
+});
+
+test('system clock fallback is deterministic and used only when appDate is absent', () => {
+    let clockCalls = 0;
+    const context = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: '',
+        clock: () => {
+            clockCalls += 1;
+            return new Date('2026-07-03T23:59:59.000Z');
+        }
+    });
+
+    assert.deepEqual(context, {
+        ok: true,
+        asOfDate: '2026-07-03',
+        asOfDateSource: 'SYSTEM_CLOCK',
+        reason: null
+    });
+    assert.equal(clockCalls, 1);
+});
+
+test('invalid explicit appDate fails generation before phase detection', async () => {
+    const originalDetector = phaseDetectorService.detectPayrollPhasesForDateRange;
+    let detectorCalls = 0;
+    phaseDetectorService.detectPayrollPhasesForDateRange = async () => {
+        detectorCalls += 1;
+        return {};
+    };
+    try {
+        const payload = await generateWorkFactsForEmployeePeriod({
+            team: 'THA',
+            company_kod: 'company',
+            kodikos: 'employee',
+            apo: '2026-07-01',
+            eos: '2026-07-31',
+            scope: 'MONTHLY',
+            asOfDate: 'invalid',
+            asOfDateSource: 'SESSION_APP_DATE',
+            clock: () => new Date('2026-07-28T00:00:00.000Z')
+        });
+
+        assert.equal(payload.status, 'FAILED');
+        assert.equal(payload.asOfDate, null);
+        assert.equal(payload.asOfDateSource, 'SESSION_APP_DATE');
+        assert.ok(payload.warnings.includes('INVALID_AS_OF_DATE'));
+        assert.equal(detectorCalls, 0);
     } finally {
         phaseDetectorService.detectPayrollPhasesForDateRange = originalDetector;
     }

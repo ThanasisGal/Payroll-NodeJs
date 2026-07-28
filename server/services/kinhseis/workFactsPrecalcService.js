@@ -67,6 +67,67 @@ function dateOnlyUTC(value) {
     return date ? date : null;
 }
 
+function normalizeWorkFactsAsOfDate(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return formatDateYMD(new Date(Date.UTC(
+            value.getUTCFullYear(),
+            value.getUTCMonth(),
+            value.getUTCDate()
+        )));
+    }
+    const raw = toTrimmedString(value);
+    const greekDate = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const candidate = greekDate
+        ? `${greekDate[3]}-${greekDate[2]}-${greekDate[1]}`
+        : raw;
+    const parsed = parseDateOnlyUTC(candidate);
+    return parsed ? formatDateYMD(parsed) : null;
+}
+
+function resolveWorkFactsAsOfContext({
+    explicitAsOfDate,
+    explicitSource = 'SESSION_APP_DATE',
+    clock = () => new Date()
+} = {}) {
+    const hasExplicitValue =
+        explicitAsOfDate !== null &&
+        explicitAsOfDate !== undefined &&
+        toTrimmedString(explicitAsOfDate) !== '';
+    if (hasExplicitValue) {
+        const normalized = normalizeWorkFactsAsOfDate(explicitAsOfDate);
+        return normalized
+            ? Object.freeze({
+                ok: true,
+                asOfDate: normalized,
+                asOfDateSource: toTrimmedString(explicitSource) || 'SESSION_APP_DATE',
+                reason: null
+            })
+            : Object.freeze({
+                ok: false,
+                asOfDate: null,
+                asOfDateSource: toTrimmedString(explicitSource) || 'SESSION_APP_DATE',
+                reason: 'INVALID_AS_OF_DATE'
+            });
+    }
+
+    const normalized = normalizeWorkFactsAsOfDate(
+        typeof clock === 'function' ? clock() : null
+    );
+    return normalized
+        ? Object.freeze({
+            ok: true,
+            asOfDate: normalized,
+            asOfDateSource: 'SYSTEM_CLOCK',
+            reason: null
+        })
+        : Object.freeze({
+            ok: false,
+            asOfDate: null,
+            asOfDateSource: 'SYSTEM_CLOCK',
+            reason: 'INVALID_AS_OF_DATE'
+        });
+}
+
 function normalizeScope(scope, warnings) {
     const normalizedScope = toTrimmedString(scope).toUpperCase();
 
@@ -94,7 +155,9 @@ function buildFailedPayload({
     eos,
     scope,
     requestedBy,
-    warnings
+    warnings,
+    asOfDate = null,
+    asOfDateSource = ''
 }) {
     return {
         team: toTrimmedString(team),
@@ -105,6 +168,8 @@ function buildFailedPayload({
         eos,
         scope,
         requestedBy: toTrimmedString(requestedBy),
+        asOfDate,
+        asOfDateSource,
         status: 'FAILED',
         generatedAt: new Date().toISOString(),
         phases: [],
@@ -466,6 +531,7 @@ function normalizeSnapshotForReturn(snapshot, extra = {}) {
         ...extra,
         apo: formatDateYMD(plain.apo),
         eos: formatDateYMD(plain.eos),
+        asOfDate: formatDateYMD(plain.asOfDate),
         generatedAt: plain.generatedAt instanceof Date
             ? plain.generatedAt.toISOString()
             : plain.generatedAt
@@ -491,6 +557,8 @@ function buildSnapshotDocument(payload, key) {
         generatedAt: Number.isNaN(generatedAtDate.getTime()) ? new Date() : generatedAtDate,
         generatedBy: toTrimmedString(payload.generatedBy || payload.requestedBy),
         sourceVersion: toTrimmedString(payload.sourceVersion) || SOURCE_VERSION,
+        asOfDate: payload.asOfDate ? parseDateOnlyUTC(payload.asOfDate) : null,
+        asOfDateSource: toTrimmedString(payload.asOfDateSource) || undefined,
         phases: Array.isArray(payload.phases) ? payload.phases : [],
         phaseSummary: Array.isArray(payload.phaseSummary) ? payload.phaseSummary : [],
         dailyFacts: Array.isArray(payload.dailyFacts) ? payload.dailyFacts : [],
@@ -509,7 +577,8 @@ function buildReadyWorkFactsPayload({
     ypokatasthma = '',
     requestedBy = '',
     warnings = [],
-    detectorResult
+    detectorResult,
+    asOfContext = null
 }) {
     const dailyFacts = buildBaseDailyFacts({ detectorResult });
     const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
@@ -532,6 +601,9 @@ function buildReadyWorkFactsPayload({
         requestedBy: toTrimmedString(requestedBy),
         status: 'READY',
         generatedAt: new Date().toISOString(),
+        asOfDate: asOfContext?.asOfDate || detectorResult?.asOfDate || null,
+        asOfDateSource:
+            asOfContext?.asOfDateSource || detectorResult?.asOfDateSource || '',
         phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
         phaseSummary,
         dailyFacts,
@@ -551,11 +623,17 @@ async function generateWorkFactsForEmployeePeriod({
     ypokatasthma = '',
     requestedBy = '',
     asOfDate = null,
+    asOfDateSource = '',
     clock
 }) {
     const input = validateInput({ team, company_kod, kodikos, apo, eos });
     const warnings = [...input.warnings];
     const normalizedScope = normalizeScope(scope, warnings);
+    const asOfContext = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: asOfDate,
+        explicitSource: asOfDateSource,
+        clock
+    });
 
     if (!input.isValid) {
         return buildFailedPayload({
@@ -567,7 +645,24 @@ async function generateWorkFactsForEmployeePeriod({
             eos: input.eos,
             scope: normalizedScope,
             requestedBy,
-            warnings
+            warnings,
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
+        });
+    }
+    if (!asOfContext.ok) {
+        return buildFailedPayload({
+            team: input.team,
+            company_kod: input.company_kod,
+            ypokatasthma: toTrimmedString(ypokatasthma),
+            kodikos: input.kodikos,
+            apo: input.apo,
+            eos: input.eos,
+            scope: normalizedScope,
+            requestedBy,
+            warnings: [...warnings, asOfContext.reason],
+            asOfDate: null,
+            asOfDateSource: asOfContext.asOfDateSource
         });
     }
 
@@ -578,8 +673,8 @@ async function generateWorkFactsForEmployeePeriod({
             kodikos: input.kodikos,
             apo: input.apo,
             eos: input.eos,
-            asOfDate,
-            clock
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
         });
         return buildReadyWorkFactsPayload({
             input,
@@ -588,6 +683,7 @@ async function generateWorkFactsForEmployeePeriod({
             requestedBy,
             warnings,
             detectorResult,
+            asOfContext
         });
     } catch (error) {
         return buildFailedPayload({
@@ -599,7 +695,9 @@ async function generateWorkFactsForEmployeePeriod({
             eos: input.eos,
             scope: normalizedScope,
             requestedBy,
-            warnings: [...warnings, error.message || 'Σφάλμα παραγωγής work facts.']
+            warnings: [...warnings, error.message || 'Σφάλμα παραγωγής work facts.'],
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
         });
     }
 }
@@ -687,6 +785,7 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
     requestedBy = '',
     force = false,
     asOfDate = null,
+    asOfDateSource = '',
     clock
 }) {
     const normalizedScope = normalizeScopeValue(scope);
@@ -725,6 +824,7 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
         ypokatasthma,
         requestedBy,
         asOfDate,
+        asOfDateSource,
         clock
     });
 
@@ -744,5 +844,7 @@ module.exports = {
     findWorkFactsSnapshot,
     saveWorkFactsSnapshot,
     buildWeeklyCarryOverDifferences,
-    buildReadyWorkFactsPayload
+    buildReadyWorkFactsPayload,
+    normalizeWorkFactsAsOfDate,
+    resolveWorkFactsAsOfContext
 };

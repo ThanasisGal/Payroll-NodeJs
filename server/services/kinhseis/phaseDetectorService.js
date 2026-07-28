@@ -41,6 +41,10 @@ function toTrimmedString(value) {
     return String(value ?? '').trim();
 }
 
+function hasExplicitDateValue(value) {
+    return value !== null && value !== undefined && toTrimmedString(value) !== '';
+}
+
 function toNumberOrZero(value) {
     if (value === null || value === undefined || value === '') return 0;
 
@@ -710,25 +714,30 @@ function applyWeeklySixthSeventhDayFacts(
             orariaByDate instanceof Map &&
             expectedDateKeys.every((date) => orariaByDate.has(date));
 
-        if (!hasSevenContextDays || !hasSevenSourceRows) {
-            const asOfDateKey = dateKeyUtc(asOfDate);
-            const isOpenTrailingWeek =
-                Boolean(asOfDateKey) && range.weekEndKey > asOfDateKey;
-            const status = isOpenTrailingWeek
-                ? 'OPEN_WEEK_PENDING_COMPLETION'
-                : 'NEEDS_HR_DECISION';
-            const reasons = isOpenTrailingWeek
-                ? []
-                : [
-                    asOfDateKey
-                        ? 'INCOMPLETE_COMPLETED_WEEK_DATA'
-                        : 'INVALID_AS_OF_DATE'
-                ];
+        const asOfDateKey = dateKeyUtc(asOfDate);
+        const temporalStatus = !asOfDateKey
+            ? {
+                status: 'NEEDS_HR_DECISION',
+                reasons: ['INVALID_AS_OF_DATE']
+            }
+            : range.weekEndKey > asOfDateKey
+                ? {
+                    status: 'OPEN_WEEK_PENDING_COMPLETION',
+                    reasons: []
+                }
+                : !hasSevenContextDays || !hasSevenSourceRows
+                    ? {
+                        status: 'NEEDS_HR_DECISION',
+                        reasons: ['INCOMPLETE_COMPLETED_WEEK_DATA']
+                    }
+                    : null;
+
+        if (temporalStatus) {
             days.forEach((day) => {
                 day.weeklySixthSeventhPolicyVersion =
                     SIXTH_SEVENTH_POLICY_VERSION;
-                day.weeklyComplianceStatus = status;
-                day.weeklyComplianceReasons = reasons;
+                day.weeklyComplianceStatus = temporalStatus.status;
+                day.weeklyComplianceReasons = temporalStatus.reasons;
                 day.weeklyComplianceWarnings = [];
                 day.isSixthDay = false;
                 day.isSeventhDay = false;
@@ -741,8 +750,8 @@ function applyWeeklySixthSeventhDayFacts(
                     end: dateKeyUtc(requestedPeriodEnd)
                 },
                 asOfDate: asOfDateKey,
-                status,
-                reasons,
+                status: temporalStatus.status,
+                reasons: temporalStatus.reasons,
                 warnings: [],
                 complete: false,
                 dailyFacts: days.map((day) => ({ ...day }))
@@ -1124,6 +1133,7 @@ async function detectPayrollPhases({
     periodEosOverride,
     includeWeeklyAnalysisContext = false,
     asOfDate = null,
+    asOfDateSource = '',
     clock = () => new Date()
 }) {
     const warnings = [];
@@ -1164,9 +1174,13 @@ async function detectPayrollPhases({
     const contextPeriodEnd = includeWeeklyAnalysisContext
         ? endOfWeekSundayUtc(periodEnd)
         : periodEnd;
-    const resolvedAsOfDate =
-        dateKeyUtc(asOfDate) ||
-        dateKeyUtc(typeof clock === 'function' ? clock() : null);
+    const hasExplicitAsOfDate = hasExplicitDateValue(asOfDate);
+    const resolvedAsOfDate = hasExplicitAsOfDate
+        ? dateKeyUtc(asOfDate)
+        : dateKeyUtc(typeof clock === 'function' ? clock() : null);
+    const resolvedAsOfDateSource = hasExplicitAsOfDate
+        ? toTrimmedString(asOfDateSource) || 'SESSION_APP_DATE'
+        : 'SYSTEM_CLOCK';
     const analysisFrom = maxDate(contextPeriodStart, hireDate);
     const analysisTo = minDate(contextPeriodEnd, leaveDate);
     const kartaErgasias = employee.karta_ergasias === true;
@@ -1195,6 +1209,8 @@ async function detectPayrollPhases({
         operationalPhasesCount: 0,
         hasOperationalSplit: false,
         weeklyAnalyses: [],
+        asOfDate: resolvedAsOfDate,
+        asOfDateSource: resolvedAsOfDateSource,
         warnings
     };
 
@@ -1320,6 +1336,8 @@ async function detectPayrollPhases({
         operationalPhasesCount: operationalPhases.length,
         hasOperationalSplit: operationalPhases.length > 1,
         weeklyAnalyses,
+        asOfDate: resolvedAsOfDate,
+        asOfDateSource: resolvedAsOfDateSource,
         warnings
     };
 }
@@ -1332,6 +1350,7 @@ async function detectPayrollPhasesForDateRange({
     apo,
     eos,
     asOfDate = null,
+    asOfDateSource = '',
     clock
 }) {
     return detectPayrollPhases({
@@ -1343,6 +1362,7 @@ async function detectPayrollPhasesForDateRange({
         periodEosOverride: eos,
         includeWeeklyAnalysisContext: true,
         asOfDate,
+        asOfDateSource,
         clock
     });
 }
