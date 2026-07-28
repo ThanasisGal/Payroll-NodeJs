@@ -8,10 +8,14 @@ const {
 const {
     resolveEffectiveExpectedWeeklyRepo
 } = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
+const {
+    dateKeyUtc,
+    startOfWeekMondayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
-const SCENARIO_VERSION = 'repo-transfer-single-pair:v1';
-const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v2';
+const SCENARIO_VERSION = 'repo-transfer-single-pair:v3';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v3';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -104,30 +108,9 @@ function normalizeId(value, maxLength = 100) {
     return null;
 }
 
-function dateKeyUtc(value) {
-    if (!value) return null;
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-        const key = value.trim();
-        const parsed = new Date(`${key}T00:00:00.000Z`);
-        return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== key
-            ? null
-            : key;
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString().slice(0, 10);
-}
-
 function addDaysUtc(dateKey, days) {
     const date = new Date(`${dateKey}T00:00:00.000Z`);
     date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-}
-
-function startOfWeekSundayUtc(dateKey) {
-    const date = new Date(`${dateKey}T00:00:00.000Z`);
-    date.setUTCDate(date.getUTCDate() - date.getUTCDay());
     return date.toISOString().slice(0, 10);
 }
 
@@ -727,7 +710,9 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
         return buildResult({ ...base, reasons: ['DUPLICATE_WEEK_DATE'] });
     }
 
-    const weekStartKeys = new Set(keys.map(startOfWeekSundayUtc));
+    const weekStartKeys = new Set(
+        keys.map((key) => dateKeyUtc(startOfWeekMondayUtc(key)))
+    );
     if (weekStartKeys.size !== 1) {
         return buildResult({ ...base, reasons: ['CROSS_WEEK_ROWS'] });
     }

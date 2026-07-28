@@ -14,6 +14,15 @@ const {
     formatDateYMD,
     addDays
 } = require('../../utils/ergazomenoi/buildDailyOrarioTermsForPeriod');
+const {
+    resolveDailyActualWorkFacts
+} = require('../ergazomenoi/apasxoliseisDailyActualWorkFactsService');
+const {
+    analyzeWeeklySixthSeventhDay
+} = require('../ergazomenoi/apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
+    getMondaySundayWeekRange
+} = require('../../utils/date/mondaySundayWeek');
 
 const HOURS_TOLERANCE = 0.01;
 const WEEKLY_40H_TOLERANCE = 0.1;
@@ -594,6 +603,8 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
         const expectedWorkInfo = buildExpectedWorkInfo(orario, kartaErgasias, dayWarnings);
         const classification = classifyDay(expectedWorkInfo.classificationHours, fullDailyHours);
         const dailyFactHours = buildDailyFactHours(orario);
+        const actualWorkFacts = resolveDailyActualWorkFacts(orario || {});
+        dayWarnings.push(...actualWorkFacts.warnings);
 
         if (!orario) {
             dayWarnings.push(
@@ -621,10 +632,18 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
             hmeres_ergasias_ebdomadas: toNumberOrZero(terms.hmeres_ergasias_ebdomadas),
             ores_ergasias_ebdomadas: toNumberOrZero(terms.ores_ergasias_ebdomadas),
             mo_oron_hmerhsias_ergasias: toNumberOrZero(terms.mo_oron_hmerhsias_ergasias),
+            pososto_prosayxhshs_6hs_hmeras:
+                terms.pososto_prosayxhshs_6hs_hmeras,
             sourceField: expectedWorkInfo.sourceField,
             classificationSourceField: expectedWorkInfo.classificationSourceField,
             expectedWorkDay: expectedWorkInfo.expectedWorkDay,
             actualWorkedDay: expectedWorkInfo.actualWorkedDay,
+            actualWorkHours: actualWorkFacts.actualWorkHours,
+            leaveHours: actualWorkFacts.leaveHours,
+            sicknessHours: actualWorkFacts.sicknessHours,
+            countsAsActualWorkDay: actualWorkFacts.countsAsActualWorkDay,
+            actualWorkFactReasons: actualWorkFacts.reasons,
+            actualWorkFactWarnings: actualWorkFacts.warnings,
             effectiveKathgoria: expectedWorkInfo.effectiveKathgoria,
             scheduledKathgoria: expectedWorkInfo.scheduledKathgoria,
             actualKathgoria: expectedWorkInfo.actualKathgoria,
@@ -651,11 +670,58 @@ function buildDailyRows({ activeFrom, activeTo, termsByDate, orariaByDate, karta
     return rows;
 }
 
+function applyWeeklySixthSeventhDayFacts(dailyRows, orariaByDate) {
+    const byWeek = new Map();
+    dailyRows.forEach((day) => {
+        const range = getMondaySundayWeekRange(day.date);
+        if (!range) return;
+        if (!byWeek.has(range.weekStartKey)) byWeek.set(range.weekStartKey, []);
+        byWeek.get(range.weekStartKey).push(day);
+    });
+
+    byWeek.forEach((days) => {
+        if (days.length !== 7) return;
+        const signatures = new Set(days.map((day) => [
+            day.kathestos_apasxolhshs,
+            day.hmeres_ergasias_ebdomadas,
+            day.ores_ergasias_ebdomadas,
+            day.mo_oron_hmerhsias_ergasias,
+            day.pososto_prosayxhshs_6hs_hmeras
+        ].join('|')));
+        const first = days[0];
+        const analysis = analyzeWeeklySixthSeventhDay({
+            weekRows: days.map((day) => ({
+                ...(orariaByDate.get(day.date) || {}),
+                hmeromhnia: day.date
+            })),
+            effectiveProfile: {
+                hmeres_ergasias_ebdomadas: first.hmeres_ergasias_ebdomadas,
+                pososto_prosayxhshs_6hs_hmeras:
+                    first.pososto_prosayxhshs_6hs_hmeras,
+                source: first.termsSource,
+                profile_changed_inside_week: signatures.size > 1
+            }
+        });
+        days.forEach((day) => {
+            day.weeklySixthSeventhPolicyVersion = analysis.policyVersion;
+            day.weeklyComplianceStatus = analysis.status;
+            day.weeklyComplianceReasons = analysis.reasons;
+            day.weeklyComplianceWarnings = analysis.warnings;
+            day.isSixthDay = analysis.sixthDay?.hmeromhnia === day.date;
+            day.isSeventhDay = analysis.seventhDay?.hmeromhnia === day.date;
+            if (day.isSixthDay) day.sixthDayHours = analysis.sixthDay.actualWorkHours;
+        });
+    });
+
+    return dailyRows;
+}
+
 function buildDayGroupKeyParts(day) {
     return {
         hmeres_ergasias_ebdomadas: day.hmeres_ergasias_ebdomadas,
         ores_ergasias_ebdomadas: day.ores_ergasias_ebdomadas,
         mo_oron_hmerhsias_ergasias: day.mo_oron_hmerhsias_ergasias,
+        pososto_prosayxhshs_6hs_hmeras: day.pososto_prosayxhshs_6hs_hmeras,
         kathestos_apasxolhshs: day.kathestos_apasxolhshs,
         typos_ebdomadas: day.typos_ebdomadas,
         sourceField: day.sourceField,
@@ -780,6 +846,8 @@ function buildPhaseFromDays(days, index, employee, kartaErgasias) {
         hmeres_ergasias_ebdomadas: firstDay.hmeres_ergasias_ebdomadas,
         ores_ergasias_ebdomadas: firstDay.ores_ergasias_ebdomadas,
         mo_oron_hmerhsias_ergasias: firstDay.mo_oron_hmerhsias_ergasias,
+        pososto_prosayxhshs_6hs_hmeras:
+            firstDay.pososto_prosayxhshs_6hs_hmeras,
         kathestos_apasxolhshs: firstDay.kathestos_apasxolhshs,
         typos_ebdomadas: firstDay.typos_ebdomadas,
         sourceField: firstDay.sourceField,
@@ -809,11 +877,26 @@ function buildPhaseFromDays(days, index, employee, kartaErgasias) {
             hmeres_ergasias_ebdomadas: day.hmeres_ergasias_ebdomadas,
             ores_ergasias_ebdomadas: day.ores_ergasias_ebdomadas,
             mo_oron_hmerhsias_ergasias: day.mo_oron_hmerhsias_ergasias,
+            pososto_prosayxhshs_6hs_hmeras:
+                day.pososto_prosayxhshs_6hs_hmeras,
             sourceField: day.sourceField,
             classificationSourceField: day.classificationSourceField,
             relevantHours: day.relevantHours,
             expectedWorkDay: day.expectedWorkDay,
             actualWorkedDay: day.actualWorkedDay,
+            actualWorkHours: day.actualWorkHours,
+            leaveHours: day.leaveHours,
+            sicknessHours: day.sicknessHours,
+            countsAsActualWorkDay: day.countsAsActualWorkDay,
+            actualWorkFactReasons: day.actualWorkFactReasons,
+            actualWorkFactWarnings: day.actualWorkFactWarnings,
+            weeklySixthSeventhPolicyVersion:
+                day.weeklySixthSeventhPolicyVersion || null,
+            weeklyComplianceStatus: day.weeklyComplianceStatus || null,
+            weeklyComplianceReasons: day.weeklyComplianceReasons || [],
+            weeklyComplianceWarnings: day.weeklyComplianceWarnings || [],
+            isSixthDay: day.isSixthDay === true,
+            isSeventhDay: day.isSeventhDay === true,
             effectiveKathgoria: day.effectiveKathgoria,
             scheduledKathgoria: day.scheduledKathgoria,
             actualKathgoria: day.actualKathgoria,
@@ -1061,14 +1144,17 @@ async function detectPayrollPhases({
         warnings.push('Δεν βρέθηκαν προδηλωμένες γραμμές για το ενεργό διάστημα.');
     }
 
-    const dailyRows = buildDailyRows({
-        activeFrom,
-        activeTo,
-        termsByDate,
-        orariaByDate,
-        kartaErgasias,
-        warnings
-    });
+    const dailyRows = applyWeeklySixthSeventhDayFacts(
+        buildDailyRows({
+            activeFrom,
+            activeTo,
+            termsByDate,
+            orariaByDate,
+            kartaErgasias,
+            warnings
+        }),
+        orariaByDate
+    );
     const phases = applyContractStatusBoundaryOverrides(
         groupDailyRowsIntoPhases(dailyRows, employee, kartaErgasias),
         contractStatusIntervals,
@@ -1126,5 +1212,6 @@ async function detectPayrollPhasesForDateRange({
 module.exports = {
     detectPayrollPhases,
     detectPayrollPhasesForDateRange,
-    buildPeriodRange
+    buildPeriodRange,
+    applyWeeklySixthSeventhDayFacts
 };

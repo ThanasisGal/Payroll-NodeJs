@@ -1,14 +1,12 @@
 // Pure resolver for the expected weekly repo count used by every repo-transfer stage.
 
 const REPO_RESOLUTION_SOURCE = Object.freeze({
-    SIX_SCHEDULED_WORK_DAYS: 'SIX_SCHEDULED_WORK_DAYS',
-    EXPLICIT_MHNIAIA_REPO: 'EXPLICIT_MHNIAIA_REPO',
-    WEEKLY_WORKDAYS_FALLBACK: 'WEEKLY_WORKDAYS_FALLBACK'
+    CONTRACTUAL_WEEKLY_WORKDAYS: 'CONTRACTUAL_WEEKLY_WORKDAYS'
 });
 
 const REPO_RESOLUTION_REASON = Object.freeze({
-    INVALID_EXPLICIT_MHNIAIA_REPO: 'INVALID_EXPLICIT_MHNIAIA_REPO',
-    INVALID_EFFECTIVE_WEEKLY_WORKDAYS: 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
+    INVALID_EFFECTIVE_WEEKLY_WORKDAYS: 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS',
+    PROFILE_CHANGED_INSIDE_WEEK: 'PROFILE_CHANGED_INSIDE_WEEK'
 });
 
 const DECLARED_INTERVAL_FIELDS = Object.freeze([
@@ -88,36 +86,15 @@ function diagnostic(reason, scheduledDays, effectiveWeeklyWorkdays = null) {
 
 function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = {} } = {}) {
     const scheduledDays = scheduledWorkDays(weekRows);
-    if (scheduledDays >= 6) {
-        return resolved(1, REPO_RESOLUTION_SOURCE.SIX_SCHEDULED_WORK_DAYS, scheduledDays, 6);
-    }
-
-    const authoritativeRepo = Object.prototype.hasOwnProperty.call(
-        effectiveProfile,
-        'raw_mhniaia_repo'
-    )
-        ? effectiveProfile.raw_mhniaia_repo
-        : effectiveProfile.mhniaia_repo;
-    const explicitRepo = profileInteger(authoritativeRepo);
-    if (Number.isSafeInteger(explicitRepo) && explicitRepo > 0) {
-        return explicitRepo <= 6
-            ? resolved(
-                  explicitRepo,
-                  REPO_RESOLUTION_SOURCE.EXPLICIT_MHNIAIA_REPO,
-                  scheduledDays,
-                  profileInteger(effectiveProfile.hmeres_ergasias_ebdomadas)
-              )
-            : diagnostic(REPO_RESOLUTION_REASON.INVALID_EXPLICIT_MHNIAIA_REPO, scheduledDays);
-    }
-    if (explicitRepo !== null && explicitRepo !== 0) {
-        return diagnostic(REPO_RESOLUTION_REASON.INVALID_EXPLICIT_MHNIAIA_REPO, scheduledDays);
+    if (effectiveProfile.profile_changed_inside_week === true) {
+        return diagnostic(REPO_RESOLUTION_REASON.PROFILE_CHANGED_INSIDE_WEEK, scheduledDays);
     }
 
     const workdays = profileInteger(effectiveProfile.hmeres_ergasias_ebdomadas);
     if (workdays === 5 || workdays === 6) {
         return resolved(
             workdays === 5 ? 2 : 1,
-            REPO_RESOLUTION_SOURCE.WEEKLY_WORKDAYS_FALLBACK,
+            REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS,
             scheduledDays,
             workdays
         );

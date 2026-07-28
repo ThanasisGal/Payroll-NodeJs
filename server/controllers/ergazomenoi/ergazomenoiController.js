@@ -407,6 +407,14 @@ function getTyposApasxolhshsFromFormData(formData = {}) {
     return resolveEmploymentTypeFromFormData(formData);
 }
 
+function parseSixthDayPremiumRate(value, { defaultForNew = false } = {}) {
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return defaultForNew ? 40 : null;
+    }
+    const number = Number(String(value).replace(',', '.').trim());
+    return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 function buildIstorikoWorkTermsSnapshot(formData = {}, fallbackErgazomenos = {}) {
     const hmeres = toNumberOrNull(formData.hmeres_ergasias_ebdomadas);
     const weeklyHours = toNumberOrNull(formData.ores_ergasias_ebdomadas);
@@ -902,6 +910,10 @@ class ergazomenoiController {
                     toNumberOrNull(data.mhniaia_repo) ??
                     toNumberOrNull(ergazomenos.mhniaia_repo) ??
                     0,
+                pososto_prosayxhshs_6hs_hmeras:
+                    Object.prototype.hasOwnProperty.call(data, 'pososto_prosayxhshs_6hs_hmeras')
+                        ? toNumberOrNull(data.pososto_prosayxhshs_6hs_hmeras)
+                        : toNumberOrNull(ergazomenos.pososto_prosayxhshs_6hs_hmeras),
                 employment_profile_source: data.employment_profile_source || 'ERGOMENOI_CONTROLLER',
                 afora_allagh_oron_ergasias:
                     data.afora_allagh_oron_ergasias === true ||
@@ -939,6 +951,20 @@ class ergazomenoiController {
 
                     continue;
                 }
+
+                const historySixthDayPremiumRate = parseSixthDayPremiumRate(
+                    data.pososto_prosayxhshs_6hs_hmeras
+                );
+                if (historySixthDayPremiumRate === null) {
+                    return res.status(400).json({
+                        success: false,
+                        reason: 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
+                        message:
+                            'Η προσαύξηση 6ης ημέρας του ιστορικού πρέπει να είναι μη αρνητικός αριθμός.'
+                    });
+                }
+                data.pososto_prosayxhshs_6hs_hmeras =
+                    historySixthDayPremiumRate;
 
                 if (state === 'modified') {
                     if (!_id) continue;
@@ -1241,8 +1267,20 @@ class ergazomenoiController {
             aa_eggr = null,
             kodikosValue = 0;
 
-        const { formData } = req.body;
+        const { formData = {} } = req.body || {};
         const filesToUpdate = req.body?.filesToUpdate || {};
+        const sixthDayPremiumRate = parseSixthDayPremiumRate(
+            formData?.pososto_prosayxhshs_6hs_hmeras,
+            { defaultForNew: true }
+        );
+        if (sixthDayPremiumRate === null) {
+            return res.status(400).json({
+                success: false,
+                reason: 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
+                message: 'Η προσαύξηση 6ης ημέρας πρέπει να είναι μη αρνητικός αριθμός.'
+            });
+        }
+        formData.pososto_prosayxhshs_6hs_hmeras = sixthDayPremiumRate;
 
         // ============================================================================
         // ✅ AUTO ENABLE E7N / MA_222
@@ -1599,6 +1637,8 @@ class ergazomenoiController {
             formData.symfonhtheis_misthos_apasxolhseis;
         newErgazomenos.paketo_apodoxon = formData.paketo_apodoxon;
         newErgazomenos.mhniaia_repo = formData.mhniaia_repo;
+        newErgazomenos.pososto_prosayxhshs_6hs_hmeras =
+            toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras);
         newErgazomenos.ypologismos_foroy = formData.ypologismos_foroy;
         newErgazomenos.oysiodeis_oroi = formData.oysiodeis_oroi_stathera || '0';
         newErgazomenos.oros_sth_symbash_n_3986_2011 = formData.oros_sth_symbash_n_3986_2011;
@@ -3267,6 +3307,17 @@ class ergazomenoiController {
             objectId: mongoose.Types.ObjectId
         });
         if (!scopedAccess) return;
+        const sixthDayPremiumRate = parseSixthDayPremiumRate(
+            formData.pososto_prosayxhshs_6hs_hmeras
+        );
+        if (sixthDayPremiumRate === null) {
+            return res.status(400).json({
+                success: false,
+                reason: 'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE',
+                message: 'Η προσαύξηση 6ης ημέρας πρέπει να είναι μη αρνητικός αριθμός.'
+            });
+        }
+        formData.pososto_prosayxhshs_6hs_hmeras = sixthDayPremiumRate;
         const { employeeScope, employeeCode: kodikosErgazomenoy } = scopedAccess;
 
         formData.team = omadaErgasias;
@@ -3559,6 +3610,8 @@ class ergazomenoiController {
             symfonhtheis_misthos_apasxolhseis: formData.symfonhtheis_misthos_apasxolhseis,
             paketo_apodoxon: formData.paketo_apodoxon,
             mhniaia_repo: formData.mhniaia_repo,
+            pososto_prosayxhshs_6hs_hmeras:
+                toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras),
             ypologismos_foroy: formData.ypologismos_foroy,
             updatedAt: Date.now()
         };

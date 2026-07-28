@@ -2,7 +2,7 @@ const phaseDetectorService = require('./phaseDetectorService');
 const { ApasxolhseisPeriodFactsModel } = require('../../models/kinhseis');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
-const SOURCE_VERSION = 'workFactsPrecalc:v1';
+const SOURCE_VERSION = 'workFactsPrecalc:v2';
 const HOURS_FIELDS = [
     'workingHours',
     'absenceHours',
@@ -106,6 +106,7 @@ function buildFailedPayload({
         phases: [],
         phaseSummary: [],
         dailyFacts: [],
+        weeklyCarryOverDifferences: [],
         totals: buildEmptyTotals(),
         warnings
     };
@@ -205,6 +206,24 @@ function buildBaseDailyFacts({ detectorResult }) {
                 effectiveKathestos,
                 source: operationalPhase ? 'OPERATIONAL_PHASE' : 'DIAGNOSTIC_PHASE_FALLBACK',
                 workingHours: roundHours(day?.payHours ?? day?.hours),
+                actualWorkHours: roundHours(day?.actualWorkHours),
+                leaveHours: roundHours(day?.leaveHours),
+                sicknessHours: roundHours(day?.sicknessHours),
+                countsAsActualWorkDay: day?.countsAsActualWorkDay === true,
+                actualWorkFactReasons: Array.isArray(day?.actualWorkFactReasons)
+                    ? day.actualWorkFactReasons
+                    : [],
+                weeklySixthSeventhPolicyVersion:
+                    day?.weeklySixthSeventhPolicyVersion || null,
+                weeklyComplianceStatus: day?.weeklyComplianceStatus || null,
+                weeklyComplianceReasons: Array.isArray(day?.weeklyComplianceReasons)
+                    ? day.weeklyComplianceReasons
+                    : [],
+                weeklyComplianceWarnings: Array.isArray(day?.weeklyComplianceWarnings)
+                    ? day.weeklyComplianceWarnings
+                    : [],
+                isSixthDay: day?.isSixthDay === true,
+                isSeventhDay: day?.isSeventhDay === true,
                 absenceHours: roundHours(day?.absenceHours),
                 nightHours: roundHours(day?.nightHours),
                 holidayHours: roundHours(day?.holidayHours),
@@ -377,6 +396,9 @@ function buildSnapshotDocument(payload, key) {
         phases: Array.isArray(payload.phases) ? payload.phases : [],
         phaseSummary: Array.isArray(payload.phaseSummary) ? payload.phaseSummary : [],
         dailyFacts: Array.isArray(payload.dailyFacts) ? payload.dailyFacts : [],
+        weeklyCarryOverDifferences: Array.isArray(payload.weeklyCarryOverDifferences)
+            ? payload.weeklyCarryOverDifferences
+            : [],
         totals: payload.totals && typeof payload.totals === 'object' ? payload.totals : {},
         warnings: Array.isArray(payload.warnings) ? payload.warnings.map(toTrimmedString) : [],
         inputFingerprint: toTrimmedString(payload.inputFingerprint)
@@ -439,6 +461,7 @@ async function generateWorkFactsForEmployeePeriod({
             phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
             phaseSummary,
             dailyFacts,
+            weeklyCarryOverDifferences: [],
             totals: buildTotals(dailyFacts),
             warnings: [...warnings, ...detectorWarnings]
         };

@@ -502,7 +502,7 @@ const ApasxolhseisPeriodFactsSchema = new Schema(
 
         generatedAt: { type: Date },
         generatedBy: { type: String, trim: true },
-        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v1' },
+        sourceVersion: { type: String, trim: true, default: 'workFactsPrecalc:v2' },
 
         locked: { type: Boolean, default: false },
         lockedAt: { type: Date },
@@ -512,6 +512,7 @@ const ApasxolhseisPeriodFactsSchema = new Schema(
         phases: { type: Schema.Types.Mixed, default: [] },
         phaseSummary: { type: Schema.Types.Mixed, default: [] },
         dailyFacts: { type: Schema.Types.Mixed, default: [] },
+        weeklyCarryOverDifferences: { type: Schema.Types.Mixed, default: [] },
         totals: { type: Schema.Types.Mixed, default: {} },
         warnings: [{ type: String, trim: true }],
 

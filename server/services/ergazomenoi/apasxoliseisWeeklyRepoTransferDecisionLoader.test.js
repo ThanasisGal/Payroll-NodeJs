@@ -9,7 +9,7 @@ const {
 const sourceId = new mongoose.Types.ObjectId('507f1f77bcf86cd799439011');
 const targetId = new mongoose.Types.ObjectId('507f1f77bcf86cd799439012');
 function row(id, date) { return { _id: id, team: 'THA', company_kod: 'company-id', ypokatasthma: '0000', kodikos: '0001', hmeromhnia: new Date(`${date}T00:00:00Z`), kathgoria_ergasias: 'ΕΡΓ', cards_ores_ergasias: 0, is_locked: false }; }
-const weekRows = Array.from({ length: 7 }, (_, index) => row(index === 1 ? sourceId : index === 5 ? targetId : new mongoose.Types.ObjectId(), `2026-06-${String(14 + index).padStart(2, '0')}`));
+const weekRows = Array.from({ length: 7 }, (_, index) => row(index === 1 ? sourceId : index === 5 ? targetId : new mongoose.Types.ObjectId(), `2026-06-${String(15 + index).padStart(2, '0')}`));
 
 function query(result, log) {
     return {
@@ -86,7 +86,7 @@ async function run() {
     let auditMap;
     await assert.rejects(() => reconstructWeeklyRepoTransferDecision({
         scope,
-        command: { proposal_id: 'not-ready', expected_source_id: String(sourceId), expected_target_id: String(targetId), expected_proposal_version: 'repo-transfer-single-pair-proposal:v1', expected_choice_code: 'c' },
+        command: { proposal_id: 'not-ready', expected_source_id: String(sourceId), expected_target_id: String(targetId), expected_proposal_version: 'repo-transfer-single-pair-proposal:v3', expected_choice_code: 'c' },
         contextLoader: async () => context,
         projectionBuilder: (input) => { auditMap = input.existingAuditCountByRowKey; return { projection_status: 'NOT_AVAILABLE', groups: [] }; }
     }), (error) => error.statusCode === 409);

@@ -11,7 +11,7 @@ const {
     getApasxoliseisPolicyByCode
 } = require('./apasxoliseisPolicyCatalogService');
 
-const WEEK_START = '2026-07-05';
+const WEEK_START = '2026-07-06';
 
 function dateKey(offset) {
     const date = new Date(`${WEEK_START}T00:00:00.000Z`);
@@ -85,7 +85,7 @@ function partTimeWeek() {
 function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: profile,
+        employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
@@ -94,7 +94,11 @@ function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 },
 function buildV2(rows, dependencies = {}) {
     return buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 },
+        employmentProfile: {
+            typos_apasxolhshs: 'MERIKH',
+            mhniaia_repo: 2,
+            hmeres_ergasias_ebdomadas: 5
+        },
         contractVersion: 'v2'
     }, dependencies);
 }
@@ -118,7 +122,7 @@ function expectedClearedTarget(category) {
 
 function assertReadyContract(result, sourceDate, targetDate, targetCategory) {
     assert.strictEqual(result.scenario_code, 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v1');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
     assert.strictEqual(result.proposal_version, PROPOSAL_VERSION);
     assert.strictEqual(result.proposal_status, PROPOSAL_STATUS.READY);
     assert.strictEqual(result.choice_code, CHOICE_CODE);
@@ -192,7 +196,7 @@ function testValidFullTimeProposal() {
     });
     assert.deepStrictEqual(result.policy_context, {
         weekly_repo_policy_code: 'WEEKLY_REPO_BALANCE',
-        weekly_repo_policy_version: 'foundation:v1',
+        weekly_repo_policy_version: 'foundation:v2',
         source_work_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
         source_work_policy_version: 'foundation:v1'
     });
@@ -481,7 +485,7 @@ function testMissingAndDuplicateIds() {
 function testV2InvalidResultsPreserveVersions() {
     const assertV2Invalid = (result, reason) => {
         assertInvalid(result, reason);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v2');
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
         assert.strictEqual(result.proposal_version, PROPOSAL_VERSION_V2);
     };
 
@@ -506,7 +510,7 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: validRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
     });
 
     const invalidHours = partTimeWeek();
@@ -526,7 +530,7 @@ function testV2InvalidResultsPreserveVersions() {
         './apasxoliseisWeeklyRepoTransferSinglePairService'
     ).analyzeWeeklyRepoTransferSinglePairV2({
         weekRows: fallbackRows,
-        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+        employmentProfile: { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
     });
     fallbackRows[2].cards_ores_ergasias = 'not-a-number';
     assertV2Invalid(
@@ -561,7 +565,7 @@ function testV2InvalidResultsPreserveVersions() {
     delete v1MissingSource[1]._id;
     const v1Result = build(v1MissingSource);
     assertInvalid(v1Result, 'MISSING_SOURCE_RECORD_ID');
-    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v1');
+    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v3');
     assert.strictEqual(v1Result.proposal_version, PROPOSAL_VERSION);
 }
 
@@ -585,10 +589,11 @@ function testNonEligibleAnalyzerPaths() {
 
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
-    assert.strictEqual(build(deficit).proposal_status, 'READY');
-    assertNotAvailable(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 }),
-        'REPO_LIMIT_EXCEEDED'
+    assertNotAvailable(build(deficit), 'REPO_DEFICIT_REMAINS');
+    assert.strictEqual(
+        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
+            .proposal_status,
+        'READY'
     );
     assertNotAvailable(build(fullTimeWeek().slice(0, 6)), 'INCOMPLETE_WEEK_DATA');
 }
@@ -624,7 +629,11 @@ function testInputImmutabilityAndFreezeIsolation() {
     assert.strictEqual(Object.isFrozen(mutableHoliday), false);
 
     const frozenRows = deepFreezeFixture(fullTimeWeek());
-    const frozenProfile = deepFreezeFixture({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 });
+    const frozenProfile = deepFreezeFixture({
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 5
+    });
     const frozenHoliday = deepFreezeFixture(new Map([[dateKey(0), deepFreezeFixture({ isHoliday: false })]]));
     const frozenAudit = deepFreezeFixture({});
     const result = buildWeeklyRepoTransferSinglePairProposal({

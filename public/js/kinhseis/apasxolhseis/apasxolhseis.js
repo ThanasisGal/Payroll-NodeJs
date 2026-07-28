@@ -1879,7 +1879,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Λήψη παραμέτρων
         let ypologismos = sharedParams.genikesParametroi[16].ypologismos;
-        let timhPercent = parseFloat(sharedParams.genikesParametroi[16].timh) / 100;
+        let sixthDayPremiumRate = Number(
+            String(
+                sharedParams.ergazomenoi.pososto_prosayxhshs_6hs_hmeras ?? ''
+            ).replace(',', '.')
+        );
+        if (!Number.isFinite(sixthDayPremiumRate) || sixthDayPremiumRate < 0) {
+            axiaErgasias6Hmeras.value = '';
+            axiaErgasias6Hmeras.dataset.hrDecisionReason =
+                'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE';
+            return;
+        }
+        delete axiaErgasias6Hmeras.dataset.hrDecisionReason;
+        let timhPercent = sixthDayPremiumRate / 100;
 
         // Υπολογισμός βάσει τύπου
         let oromisthio =

@@ -287,6 +287,7 @@ const ErgazomenoiSchema = new Schema(
         symfonhtheis_misthos_apasxolhseis: { type: Number, default: 0 },
         paketo_apodoxon: { type: Number, default: 0 },
         mhniaia_repo: { type: Number, default: 0 },
+        pososto_prosayxhshs_6hs_hmeras: { type: Number, min: 0 },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
         oysiodeis_oroi: { type: String, trim: true },
@@ -752,6 +753,10 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         mhniaia_repo: {
             type: Number,
             default: 0
+        },
+        pososto_prosayxhshs_6hs_hmeras: {
+            type: Number,
+            min: 0
         },
 
         // Για να ξέρουμε ποια εγγραφή χρησιμοποιήθηκε σαν profile αλλαγής

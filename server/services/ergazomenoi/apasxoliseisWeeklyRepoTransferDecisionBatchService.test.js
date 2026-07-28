@@ -67,6 +67,7 @@ function dependencies(rows, decisions = [], executions = []) {
         kathestos_apasxolhshs: 'PLHRHS',
         typos_apasxolhshs: 'PLHRHS',
         mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 5,
         mo_oron_hmerhsias_ergasias: 8
     }));
     return {
@@ -93,7 +94,7 @@ function dependencies(rows, decisions = [], executions = []) {
     };
 }
 
-async function load(rows, decisions = [], executions = [], range = { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-18', ypokatasthma: '0000' }) {
+async function load(rows, decisions = [], executions = [], range = { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-19', ypokatasthma: '0000' }) {
     const deps = dependencies(rows, decisions, executions);
     const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: range, ...deps });
     return { result, counter: deps.counter };
@@ -120,9 +121,9 @@ async function testZeroProposalsUsesOneBatchOfQueries() {
 
 async function testManyProposalsKeepConstantQueryCounts() {
     const rows = [
-        ...week('2026-07-05', '0001'),
-        ...week('2026-07-12', '0001'),
-        ...week('2026-07-05', '0002')
+        ...week('2026-07-06', '0001'),
+        ...week('2026-07-13', '0001'),
+        ...week('2026-07-06', '0002')
     ];
     const { result, counter } = await load(rows);
     assert.strictEqual(result.current_groups_count, 3);
@@ -145,7 +146,7 @@ async function testManyProposalsKeepConstantQueryCounts() {
 }
 
 async function testCurrentAndHistoricalAssociationIsSafe() {
-    const rows = week('2026-07-05', '0001');
+    const rows = week('2026-07-06', '0001');
     const initial = await load(rows);
     const proposalId = initial.result.records[0].proposal_id;
     const decisions = [
@@ -155,7 +156,7 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
     const deps = dependencies(rows, decisions);
     const result = await loadWeeklyRepoTransferDecisionBatch({
         session,
-        filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' },
+        filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' },
         ...deps,
         canonicalSnapshotBuilder: () => ({}),
         snapshotFingerprintBuilder: () => 'current'
@@ -175,14 +176,14 @@ async function testCurrentAndHistoricalAssociationIsSafe() {
 }
 
 async function testReadyAndHistoricalExecutionPrecedence() {
-    const rows = week('2026-07-05', '0001');
+    const rows = week('2026-07-06', '0001');
     const initial = await load(rows);
     const proposalId = initial.result.records[0].proposal_id;
     const approvedId = new mongoose.Types.ObjectId();
-    const approved = { _id: approvedId, proposal_id: proposalId, snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', week_start: date('2026-07-05', 0), week_end: date('2026-07-05', 6), created_at: new Date('2026-07-02') };
+    const approved = { _id: approvedId, proposal_id: proposalId, snapshot_fingerprint: 'current', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', week_start: date('2026-07-06', 0), week_end: date('2026-07-06', 6), created_at: new Date('2026-07-02') };
     const readyDeps = dependencies(rows, [approved]);
     const ready = await loadWeeklyRepoTransferDecisionBatch({
-        session: { ...session, userRole: 'A' }, filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }, ...readyDeps,
+        session: { ...session, userRole: 'A' }, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...readyDeps,
         canonicalSnapshotBuilder: () => ({}), snapshotFingerprintBuilder: () => 'current',
         runtimeStateLoader: async () => ({ enabled: true }), indexStateLoader: async () => ({ ready: true })
     });
@@ -203,7 +204,7 @@ async function testReadyAndHistoricalExecutionPrecedence() {
     const execution = { _id: new mongoose.Types.ObjectId(), decision_id: approvedId, proposal_id: proposalId, execution_status: 'APPLIED', applied_at: new Date('2026-07-15'), created_by_user_name: 'Executor' };
     const appliedDeps = dependencies(rows, [approved], [execution]);
     const applied = await loadWeeklyRepoTransferDecisionBatch({
-        session, filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }, ...appliedDeps,
+        session, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...appliedDeps,
         canonicalSnapshotBuilder: () => ({}), snapshotFingerprintBuilder: () => 'changed',
         runtimeStateLoader: async () => ({ enabled: false }), indexStateLoader: async () => ({ ready: false })
     });
@@ -215,7 +216,7 @@ async function testReadyAndHistoricalExecutionPrecedence() {
 }
 
 async function testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData() {
-    const rows = week('2026-07-05', '0001');
+    const rows = week('2026-07-06', '0001');
     const initial = await load(rows);
     const proposalId = initial.result.records[0].proposal_id;
     const approved = {
@@ -224,14 +225,14 @@ async function testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData() 
         snapshot_fingerprint: 'current',
         decision_code: 'APPROVE_PROPOSAL',
         decision_status: 'RECORDED',
-        week_start: date('2026-07-05', 0),
-        week_end: date('2026-07-05', 6)
+        week_start: date('2026-07-06', 0),
+        week_end: date('2026-07-06', 6)
     };
     async function capability({ runtime, indexes, fingerprint = 'current' }) {
         const deps = dependencies(rows, [approved]);
         const result = await loadWeeklyRepoTransferDecisionBatch({
             session: { ...session, userRole: 'A' },
-            filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' },
+            filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' },
             ...deps,
             canonicalSnapshotBuilder: () => ({}),
             snapshotFingerprintBuilder: () => fingerprint,
@@ -259,10 +260,10 @@ async function testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData() 
 
 async function testResolvedProjectionReturnsAppliedOnlyRecord() {
     const decisionId = new mongoose.Types.ObjectId();
-    const decision = { _id: decisionId, proposal_id: 'resolved-proposal', snapshot_fingerprint: 'old', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', week_start: date('2026-07-05', 0), week_end: date('2026-07-05', 6), created_by_user_name: '<HR>', request_id: 'secret', command_identity: 'secret', canonical_snapshot: { secret: true } };
+    const decision = { _id: decisionId, proposal_id: 'resolved-proposal', snapshot_fingerprint: 'old', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', week_start: date('2026-07-06', 0), week_end: date('2026-07-06', 6), created_by_user_name: '<HR>', request_id: 'secret', command_identity: 'secret', canonical_snapshot: { secret: true } };
     const execution = { _id: new mongoose.Types.ObjectId(), decision_id: decisionId, proposal_id: decision.proposal_id, execution_status: 'APPLIED', applied_at: new Date('2026-07-15'), created_by_user_name: '<Executor>', before_snapshot: { secret: true }, after_snapshot: { secret: true }, request_id: 'secret', command_identity: 'secret' };
     const deps = dependencies([], [decision], [execution]);
-    const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }, ...deps });
+    const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...deps });
     assert.strictEqual(result.current_groups_count, 0);
     assert.strictEqual(result.applied_only_count, 1);
     assert.strictEqual(result.records.length, 1);
@@ -275,10 +276,10 @@ async function testResolvedProjectionReturnsAppliedOnlyRecord() {
 }
 
 async function testTwentyPeriodDecisionsUseTwoConstantQueries() {
-    const decisions = Array.from({ length: 20 }, (_, index) => ({ _id: new mongoose.Types.ObjectId(), proposal_id: `resolved-${index}`, snapshot_fingerprint: `old-${index}`, decision_code: index % 2 ? 'REJECT_PROPOSAL' : 'NEEDS_MORE_REVIEW', decision_status: 'RECORDED', week_start: date('2026-07-05', 0), week_end: date('2026-07-05', 6) }));
+    const decisions = Array.from({ length: 20 }, (_, index) => ({ _id: new mongoose.Types.ObjectId(), proposal_id: `resolved-${index}`, snapshot_fingerprint: `old-${index}`, decision_code: index % 2 ? 'REJECT_PROPOSAL' : 'NEEDS_MORE_REVIEW', decision_status: 'RECORDED', week_start: date('2026-07-06', 0), week_end: date('2026-07-06', 6) }));
     const executions = decisions.map((decision, index) => ({ _id: new mongoose.Types.ObjectId(), decision_id: decision._id, proposal_id: decision.proposal_id, execution_status: 'APPLIED', applied_at: new Date(Date.UTC(2026, 6, 15, 0, index)), created_by_user_name: 'Executor' }));
     const deps = dependencies([], decisions, executions);
-    const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }, ...deps });
+    const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...deps });
     assert.strictEqual(deps.counter.decisions, 1);
     assert.strictEqual(deps.counter.executions, 1);
     assert.strictEqual(result.applied_only_count, 20);
@@ -289,11 +290,11 @@ async function testTwentyPeriodDecisionsUseTwoConstantQueries() {
 
 async function testFilterAndScopeRejections() {
     for (const branch of ['', 'ALL', '0000,0001']) {
-        assert.throws(() => validateBatchFilters({ apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: branch }), (error) => error.statusCode === 400);
+        assert.throws(() => validateBatchFilters({ apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: branch }), (error) => error.statusCode === 400);
     }
     assert.throws(() => validateBatchFilters({ apo_hmeromhnia: '2026-01-01', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }), (error) => error.statusCode === 400);
     for (const field of ['userTeam', 'companyInUse']) {
-        await assert.rejects(() => loadWeeklyRepoTransferDecisionBatch({ session: { ...session, [field]: '' }, filters: { apo_hmeromhnia: '2026-07-05', eos_hmeromhnia: '2026-07-11', ypokatasthma: '0000' }, ...dependencies([]) }), (error) => error.statusCode === 403);
+        await assert.rejects(() => loadWeeklyRepoTransferDecisionBatch({ session: { ...session, [field]: '' }, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...dependencies([]) }), (error) => error.statusCode === 403);
     }
 }
 

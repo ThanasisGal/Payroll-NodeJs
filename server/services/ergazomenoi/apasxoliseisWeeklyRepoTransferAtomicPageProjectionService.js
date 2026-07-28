@@ -5,6 +5,10 @@ const {
     buildWeeklyRepoTransferSinglePairGroupProjection,
     PROJECTION_STATUS: SINGLE_WEEK_PROJECTION_STATUS
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
+const {
+    dateKeyUtc,
+    startOfWeekMondayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const PAGE_PROJECTION_STATUS = Object.freeze({
     READY: 'READY'
@@ -36,29 +40,9 @@ function primitiveString(value, maxLength = 200) {
     return normalized ? normalized.slice(0, maxLength) : null;
 }
 
-function dateKeyUtc(value) {
-    if (!value) return null;
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-        const key = value.trim();
-        const parsed = new Date(`${key}T00:00:00.000Z`);
-        return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== key
-            ? null
-            : key;
-    }
-
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-}
-
 function addDaysDateKey(dateKey, days) {
     const date = new Date(`${dateKey}T00:00:00.000Z`);
     date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-}
-
-function sundayDateKey(dateKey) {
-    const date = new Date(`${dateKey}T00:00:00.000Z`);
-    date.setUTCDate(date.getUTCDate() - date.getUTCDay());
     return date.toISOString().slice(0, 10);
 }
 
@@ -131,7 +115,7 @@ function bucketIdentity(row, rowDateKey) {
     const employeeKodikos = primitiveString(row?.kodikos, 100);
     if (!team || !companyKod || !ypokatasthma || !employeeKodikos || !rowDateKey) return null;
 
-    const weekStart = sundayDateKey(rowDateKey);
+    const weekStart = dateKeyUtc(startOfWeekMondayUtc(rowDateKey));
     return {
         key: JSON.stringify([team, companyKod, ypokatasthma, employeeKodikos, weekStart]),
         team,
@@ -177,7 +161,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     [...buckets.values()]
         .sort((left, right) => left.key.localeCompare(right.key))
         .forEach((bucket) => {
-            if (bucket.weekStart < periodStartKey || bucket.weekEnd > periodEndKey) {
+            if (bucket.weekEnd > periodEndKey) {
                 inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
                 return;
             }

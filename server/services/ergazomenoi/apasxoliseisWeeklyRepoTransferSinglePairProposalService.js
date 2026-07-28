@@ -16,8 +16,8 @@ const {
     getApasxoliseisPolicyByCode
 } = require('./apasxoliseisPolicyCatalogService');
 
-const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v1';
-const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v2';
+const PROPOSAL_VERSION = 'repo-transfer-single-pair-proposal:v3';
+const PROPOSAL_VERSION_V2 = 'repo-transfer-single-pair-proposal:v3';
 const CHOICE_CODE = 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR';
 
 const PROPOSAL_STATUS = Object.freeze({

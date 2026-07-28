@@ -175,6 +175,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 typos_apasxolhshs: effective.typos_apasxolhshs || '',
                 mhniaia_repo: effective.mhniaia_repo,
                 raw_mhniaia_repo: effective.raw_mhniaia_repo,
+                pososto_prosayxhshs_6hs_hmeras:
+                    effective.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas: effective.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: Number(effective.mo_oron_hmerhsias_ergasias || 0),
                 external_break_minutes: employee.dialleima_entos_ektos_orarioy === true ? 0 : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),

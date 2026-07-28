@@ -9,6 +9,10 @@ const path = require('path');
 const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
+const {
+    startOfWeekMondayUtc,
+    endOfWeekSundayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -1281,28 +1285,13 @@ function calculateTimePeriodsInPairs(timePeriods, orariaNoCards) {
     return timePeriods;
 }
 
-function startOfWeekSundayUtc(date) {
-    const d = new Date(date);
-    const day = d.getUTCDay(); // Κυριακή = 0
-    d.setUTCHours(0, 0, 0, 0);
-    d.setUTCDate(d.getUTCDate() - day);
-    return d;
-}
-
 function isDateInsideRange(date, fromDate, toDate) {
     const d = new Date(date).getTime();
     return d >= fromDate.getTime() && d <= toDate.getTime();
 }
 
-function getWeekKeySunday(date) {
-    return dateKeyUtc(startOfWeekSundayUtc(date));
-}
-
-function endOfWeekSaturdayUtc(date) {
-    const start = startOfWeekSundayUtc(date);
-    const end = addDaysUtc(start, 6);
-    end.setUTCHours(23, 59, 59, 999);
-    return end;
+function getWeekKeyMonday(date) {
+    return dateKeyUtc(startOfWeekMondayUtc(date));
 }
 
 function clampDateStartUtc(date) {
@@ -1544,6 +1533,8 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                 mhniaia_repo: effectiveProfile.mhniaia_repo,
                 raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
+                pososto_prosayxhshs_6hs_hmeras:
+                    effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas:
                     effectiveProfile.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias:
@@ -1569,11 +1560,11 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
     const periodEnd = clampDateEndUtc(eosDate);
     const ranges = [];
 
-    let cursor = startOfWeekSundayUtc(periodStart);
+    let cursor = startOfWeekMondayUtc(periodStart);
 
     while (cursor.getTime() <= periodEnd.getTime()) {
-        const naturalWeekStart = startOfWeekSundayUtc(cursor);
-        const naturalWeekEnd = endOfWeekSaturdayUtc(cursor);
+        const naturalWeekStart = startOfWeekMondayUtc(cursor);
+        const naturalWeekEnd = endOfWeekSundayUtc(cursor);
 
         const weekStart =
             naturalWeekStart.getTime() < periodStart.getTime() ? periodStart : naturalWeekStart;
@@ -1582,8 +1573,8 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
         const isFullWeek =
             dateKeyUtc(weekStart) === dateKeyUtc(naturalWeekStart) &&
             dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd) &&
-            weekStart.getUTCDay() === 0 &&
-            weekEnd.getUTCDay() === 6;
+            weekStart.getUTCDay() === 1 &&
+            weekEnd.getUTCDay() === 0;
 
         ranges.push({
             naturalWeekStart,
@@ -1811,7 +1802,13 @@ async function runWeeklyRepoPostCheck({
                 }
             }
 
-            if (week.isFullWeek && Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)) {
+            if (
+                week.isFullWeek &&
+                (
+                    weeklyProfileInfo.repoResolutionReason ||
+                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)
+                )
+            ) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
 
                 result.deviations.push({
@@ -1828,6 +1825,8 @@ async function runWeeklyRepoPostCheck({
                     weekStart: dateKeyUtc(week.weekStart),
                     weekEnd: dateKeyUtc(week.weekEnd),
                     expected_repo: expectedWeeklyRepo,
+                    repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
+                    repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
                     actual_repo: pragmatikaRepo,
                     mhniaia_repo: expectedWeeklyRepo,
                     pragmatikaRepo,
@@ -7039,7 +7038,7 @@ class erganhController {
             const apoDate = dateRange.startDate;
             const eosDate = new Date(dateRange.endDate);
             eosDate.setUTCHours(23, 59, 59, 999);
-            const calculationStartDate = startOfWeekSundayUtc(apoDate);
+            const calculationStartDate = startOfWeekMondayUtc(apoDate);
 
             const selectedYpokatasthma = scopedYpokatasthma;
 
@@ -7253,13 +7252,13 @@ class erganhController {
                     istorikoRows
                 );
 
-                const weekKey = `${calculationRec.kodikos}|${getWeekKeySunday(calculationRec.hmeromhnia)}`;
+                const weekKey = `${calculationRec.kodikos}|${getWeekKeyMonday(calculationRec.hmeromhnia)}`;
 
                 if (!weeklyStateMap.has(weekKey)) {
                     const rules = getWorkTimeRules(effectiveErgazomenos);
 
                     const periodStartDate = new Date(apoDate);
-                    const weekStartDate = startOfWeekSundayUtc(calculationRec.hmeromhnia);
+                    const weekStartDate = startOfWeekMondayUtc(calculationRec.hmeromhnia);
 
                     const isFirstPartialWeek =
                         weekStartDate < periodStartDate && periodStartDate.getUTCDay() !== 0;
@@ -7368,7 +7367,7 @@ class erganhController {
                 Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
                 Object.assign(update, checkOresApoysias(workingContext));
 
-                const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
+                const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
 
                 if (weeklyState) {

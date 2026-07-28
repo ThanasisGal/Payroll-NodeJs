@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const { CompaniesModel } = require('../../models/companies');
 const { ArgiesModel } = require('../../models/stathera_arxeia');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const {
+    dateKeyUtc,
+    addDaysUtc,
+    endOfWeekSundayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
@@ -20,7 +25,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
-    'mhniaia_repo hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
+    'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
@@ -28,13 +33,10 @@ const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas mhniaia_repo ' +
+    'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
     'employment_profile_source afora_allagh_oron_ergasias createdAt updatedAt';
 
-function dateKeyUtc(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10); }
-function addDaysUtc(date, days) { const next = new Date(date); next.setUTCDate(next.getUTCDate() + days); return next; }
 function clampDateStartUtc(value) { const date = new Date(value); date.setUTCHours(0, 0, 0, 0); return date; }
-function endOfWeekSaturdayUtc(value) { const date = clampDateStartUtc(value); date.setUTCDate(date.getUTCDate() + (6 - date.getUTCDay())); date.setUTCHours(23, 59, 59, 999); return date; }
 function normalizeDateOnly(value) { return value ? dateKeyUtc(value) : null; }
 
 function getCompanyHolidayFlags(company = {}) {
@@ -80,7 +82,15 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
-function profileSignature(profile = {}) { return [profile.source || '', String(profile.istorikoId || ''), String(profile.mhniaia_repo ?? ''), String(profile.raw_mhniaia_repo ?? ''), String(profile.typos_apasxolhshs ?? ''), String(profile.hmeres_ergasias_ebdomadas ?? ''), String(profile.ores_ergasias_ebdomadas ?? '')].join('|'); }
+function profileSignature(profile = {}) {
+    return [
+        String(profile.typos_apasxolhshs ?? ''),
+        String(profile.hmeres_ergasias_ebdomadas ?? ''),
+        String(profile.ores_ergasias_ebdomadas ?? ''),
+        String(profile.mo_oron_hmerhsias_ergasias ?? ''),
+        String(profile.pososto_prosayxhshs_6hs_hmeras ?? '')
+    ].join('|');
+}
 function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
     return normalizeDateOnly(profile.hmeromhnia_isxyos_oron_ergasias_apo) ||
         normalizeDateOnly(profile.hmeromhnia_allaghs_orarioy_apo) ||
@@ -88,18 +98,39 @@ function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
         normalizeDateOnly(fallbackDate);
 }
 function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} }) {
-    const saturday = week.naturalWeekEnd || endOfWeekSaturdayUtc(week.weekStart);
+    const sunday = week.naturalWeekEnd || endOfWeekSundayUtc(week.weekStart);
     const profiles = [];
     for (let day = clampDateStartUtc(week.weekStart); day <= week.weekEnd; day = addDaysUtc(day, 1)) profiles.push(getEffectiveRepoProfileForDate(day, istorikoRows, ergazomenos));
     const first = profiles[0] || getEffectiveRepoProfileForDate(week.weekStart, istorikoRows, ergazomenos);
-    const saturdayProfile = getEffectiveRepoProfileForDate(saturday, istorikoRows, ergazomenos);
+    const sundayProfile = getEffectiveRepoProfileForDate(sunday, istorikoRows, ergazomenos);
     const last = profiles[profiles.length - 1] || getEffectiveRepoProfileForDate(week.weekEnd, istorikoRows, ergazomenos);
-    const effective = week.isFullWeek ? saturdayProfile : last;
+    const profileChangedInsideWeek =
+        new Set(profiles.map(profileSignature)).size > 1 ||
+        profileSignature(first) !== profileSignature(sundayProfile);
+    const effective = {
+        ...(profiles[0] || first),
+        profile_changed_inside_week: profileChangedInsideWeek
+    };
+    const contractualWeeklyWorkdays = Number(effective.hmeres_ergasias_ebdomadas);
+    const expectedWeeklyRepo = profileChangedInsideWeek
+        ? null
+        : contractualWeeklyWorkdays === 5
+            ? 2
+            : contractualWeeklyWorkdays === 6
+                ? 1
+                : null;
     return {
-        expectedWeeklyRepo: Number(effective.mhniaia_repo ?? 0) || 0,
-        profileChangedInsideWeek: new Set(profiles.map(profileSignature)).size > 1 || profileSignature(first) !== profileSignature(saturdayProfile),
+        expectedWeeklyRepo,
+        repoResolutionSource:
+            expectedWeeklyRepo === null ? null : 'CONTRACTUAL_WEEKLY_WORKDAYS',
+        repoResolutionReason: profileChangedInsideWeek
+            ? 'PROFILE_CHANGED_INSIDE_WEEK'
+            : expectedWeeklyRepo === null
+                ? 'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
+                : null,
+        profileChangedInsideWeek,
         effectiveProfile: effective,
-        effectiveProfileDate: getProfileDateForDeviation(effective, saturday),
+        effectiveProfileDate: getProfileDateForDeviation(effective, week.weekStart),
         previousProfile: first,
         previousProfileDate: getProfileDateForDeviation(first, week.weekStart)
     };
