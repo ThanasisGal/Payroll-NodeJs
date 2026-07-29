@@ -317,7 +317,13 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
                 proposal.employee.effective_expected_weekly_repo,
             repo_resolution_source: proposal.employee.repo_resolution_source,
             scheduled_work_days: proposal.employee.scheduled_work_days,
-            effective_weekly_workdays: proposal.employee.effective_weekly_workdays
+            effective_weekly_workdays: proposal.employee.effective_weekly_workdays,
+            current_actual_repo: proposal.weekly_resolution?.current_actual_repo ?? null,
+            resolved_repo: proposal.weekly_resolution?.resolved_repo ?? null,
+            actual_workdays: proposal.weekly_resolution?.actual_workdays ?? null,
+            sixth_day_count: proposal.weekly_resolution?.sixth_day_count ?? 0,
+            seventh_day_count: proposal.weekly_resolution?.seventh_day_count ?? 0,
+            sixth_seventh_day: proposal.weekly_resolution?.sixth_seventh_day || null
         }
     };
 

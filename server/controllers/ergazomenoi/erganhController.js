@@ -4888,8 +4888,11 @@ class erganhController {
                 requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
                           .select(
-                              'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                                  'repo_apologistika ores_ergasias ores_ergasias_apologistika cards_ores_ergasias'
+                              'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                                  'repo repo_apologistika adeia kathgoria_adeias adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika ' +
+                                  'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                                  'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                                  'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias is_locked'
                           )
                           .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
                           .lean()

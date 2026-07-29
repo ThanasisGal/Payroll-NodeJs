@@ -150,7 +150,8 @@ function copyAnalysisMetadata(analysis) {
             target_candidates: analysis?.counts?.target_candidates ?? 0,
             existing_actual_repo: analysis?.counts?.existing_actual_repo ?? null,
             predicted_final_repo: analysis?.counts?.predicted_final_repo ?? null
-        }
+        },
+        weekly_resolution: analysis?.weekly_resolution || null
     };
 }
 
@@ -221,6 +222,7 @@ function buildResult({
         week: metadata.week,
         employee: metadata.employee,
         counts: metadata.counts,
+        weekly_resolution: metadata.weekly_resolution,
         policy_context: policyContext ? { ...policyContext } : null,
         items: items.map((item) => ({
             role: item.role,

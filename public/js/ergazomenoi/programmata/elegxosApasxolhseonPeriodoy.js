@@ -1868,8 +1868,16 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
                     <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '-')}</td>
                     <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '-')}</td>
+                    <td class="text-end">${escapeHtml(dev.resolved_repo ?? dev.actual_repo ?? '-')}</td>
+                    <td class="text-end">${escapeHtml(dev.actual_workdays ?? '-')}</td>
+                    <td class="text-end">${escapeHtml(dev.sixth_day_count ?? 0)}</td>
+                    <td class="text-end">${escapeHtml(dev.seventh_day_count ?? 0)}</td>
                     <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
-                    <td>${renderDeviationNoteCell(dev)}</td>
+                    <td>${renderDeviationNoteCell(dev)}${
+                        Array.isArray(dev.repo_transfer_reasons) && dev.repo_transfer_reasons.length
+                            ? `<div class="small text-muted mt-1">${escapeHtml(dev.repo_transfer_reasons.join(', '))}</div>`
+                            : ''
+                    }</td>
                 </tr>
             `
         )
@@ -1889,6 +1897,10 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
                             <th>Έως</th>
                             <th class="text-end">Αναμενόμενα ρεπό</th>
                             <th class="text-end">Πραγματικά ρεπό</th>
+                            <th class="text-end">Προτεινόμενα/επιλυμένα ρεπό</th>
+                            <th class="text-end">Πραγματικές ημέρες εργασίας</th>
+                            <th class="text-end">6η ημέρα</th>
+                            <th class="text-end">7η ημέρα/παράβαση</th>
                             <th>Profile</th>
                             <th>Σχόλιο</th>
                         </tr>
@@ -4066,12 +4078,35 @@ function renderAtomicRepoTransferIntervals(proposedValues = {}) {
     `;
 }
 
+function renderAtomicRepoTransferResolution(group = {}) {
+    const resolution = group.repo_resolution || {};
+    const fields = [
+        ['Αναμενόμενα ρεπό', resolution.effective_expected_weekly_repo],
+        ['Τρέχοντα πραγματικά ρεπό', resolution.current_actual_repo],
+        ['Προτεινόμενα/επιλυμένα ρεπό', resolution.resolved_repo],
+        ['Πραγματικές ημέρες εργασίας', resolution.actual_workdays],
+        ['6η ημέρα εργασίας', resolution.sixth_day_count],
+        ['7η ημέρα/παράβαση', resolution.seventh_day_count]
+    ];
+    if (fields.every(([, value]) => value === null || value === undefined)) return '';
+    return `
+        <div class="atomic-repo-transfer-summary mt-2" aria-label="Επίλυση εβδομαδιαίων ρεπό">
+            ${fields.map(([label, value]) => `
+                <div class="atomic-repo-transfer-summary-item">
+                    <span>${escapeHtml(label)}</span>
+                    <strong>${escapeHtml(value ?? '-')}</strong>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
 function renderAtomicRepoTransferItem(item = {}, role) {
     const isSource = role === 'SOURCE_BECOMES_WORK';
     const proposedValues = item.proposed_values || {};
     const title = isSource
         ? 'Ημέρα που γίνεται εργασία — μη προδηλωμένη εργασία με κάρτες, Προτείνεται ΕΡΓ'
-        : 'Ημέρα που γίνεται ρεπό — προδηλωμένη εργασία χωρίς κάρτες, Προτείνεται ΜΕ';
+        : `Ημέρα που γίνεται ρεπό — προδηλωμένη εργασία χωρίς κάρτες, Προτείνεται ${proposedValues.kathgoria_ergasias_apologistika || 'ΑΝ'}`;
     const panelClass = isSource
         ? 'atomic-repo-transfer-source'
         : 'atomic-repo-transfer-target';
@@ -4428,6 +4463,7 @@ function renderAtomicRepoTransferGroup(group = {}, index = 0) {
                           .join('')}</div>`
                     : ''
             }
+            ${renderAtomicRepoTransferResolution(group)}
             <div
                 class="atomic-repo-transfer-pair ${isExpanded ? '' : 'd-none'}"
                 id="${escapeHtml(detailsId)}">
