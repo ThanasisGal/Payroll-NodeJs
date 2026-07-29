@@ -170,23 +170,66 @@ function syncStoixeioRowTrash(idNum) {
     return Boolean(value);
 }
 
-function clearSingleStoixeioRow(idNum) {
+function reloadStoixeioRowOptions(idNum) {
+    const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+    const tom = selectEl?.tomselect;
+    if (!selectEl || !tom) return Promise.resolve(false);
+
+    selectEl.dataset.preloadAll = 'true';
+    tom.settings._preloadAll = true;
+    tom.nextPage = null;
+
+    try {
+        tom.setTextboxValue('');
+        tom.clearFilter();
+    } catch (error) {
+        console.error(`Stoixeio row ${idNum} filter reset failed`, error);
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            try {
+                tom.off('load', finish);
+                tom.refreshOptions(false);
+                tom.enable();
+                tom.close();
+            } catch (error) {
+                console.error(`Stoixeio row ${idNum} option refresh failed`, error);
+                resolve(false);
+                return;
+            }
+            resolve(true);
+        };
+
+        try {
+            tom.on('load', finish);
+            tom.load('');
+        } catch (error) {
+            try {
+                tom.off('load', finish);
+                tom.enable();
+                tom.close();
+            } catch (_) {}
+            console.error(`Stoixeio row ${idNum} option reload failed`, error);
+            resolve(false);
+        }
+    });
+}
+
+async function clearSingleStoixeioRow(idNum) {
     const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
     const row = document.getElementById(`row_${idNum}`);
+    const tom = selectEl?.tomselect;
 
-    if (selectEl?.tomselect) {
-        const tom = selectEl.tomselect;
-
+    if (tom) {
         try {
             removeLockedTomStyle(tom);
             tom.ignoreFocusOpen = true;
             tom.clear(true);
             tom.clearOptions();
-            tom.refreshItems();
-            tom.refreshState();
-            tom.close();
-            tom.control_input?.blur();
-            tom.ignoreFocusOpen = false;
         } catch (_) {}
     }
 
@@ -198,6 +241,19 @@ function clearSingleStoixeioRow(idNum) {
     calculateTotal();
     applyNomimaFromSymbashTotals();
     syncStoixeioRowTrash(idNum);
+
+    if (tom) {
+        try {
+            await reloadStoixeioRowOptions(idNum);
+        } finally {
+            try {
+                tom.close();
+                tom.control_input?.blur();
+                tom.enable();
+            } catch (_) {}
+            tom.ignoreFocusOpen = false;
+        }
+    }
 }
 
 // ========================================================================
@@ -678,7 +734,7 @@ function addEventListeners() {
             if (!rowNumMatch) return;
 
             const rowNum = rowNumMatch[0];
-            clearSingleStoixeioRow(rowNum);
+            void clearSingleStoixeioRow(rowNum);
         }
     });
 }
@@ -2407,3 +2463,4 @@ window.loadStoixeiaSymbaseonFromAPI = loadStoixeiaSymbaseonFromAPI;
 window.calculateTotal = calculateTotal;
 window.calculatePartTimeWages = calculatePartTimeWages;
 window.syncStoixeioRowTrash = syncStoixeioRowTrash;
+window.reloadStoixeioRowOptions = reloadStoixeioRowOptions;
