@@ -11744,6 +11744,15 @@ body.loader-active > *:not(.app-loader) {
     content: '▸ ';
 }
 
+.employee-group-row.expanded td::before {
+    content: '▾ ';
+}
+
+.employee-group-row:focus-visible td {
+    outline: 3px solid #0d6efd;
+    outline-offset: -3px;
+}
+
 /* .modal-time-input {
     height: 42px;
     min-height: 42px;
@@ -14346,7 +14355,7 @@ body.loader-active > *:not(.app-loader) {
     grid-template-columns:
         minmax(0, 1fr)
         minmax(0, 1fr)
-        minmax(18rem, 1.35fr)
+        minmax(18rem, 2fr)
         2.5rem
         max-content;
     column-gap: 0.75rem;
@@ -14470,6 +14479,19 @@ body.loader-active > *:not(.app-loader) {
     border: 1px solid #badbcc;
     border-radius: 0.625rem;
     background: #fff;
+}
+
+.applied-repo-transfer-item .badge {
+    font-weight: 800;
+}
+
+.applied-repo-transfer-target-result {
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    border-left: 0.3rem solid #198754;
+    background: #e8f5ee;
+    color: #0f5132;
+    font-weight: 800;
 }
 
 .employment-review-advanced-branch {
@@ -14631,6 +14653,7 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-scroll-container {
     --employment-review-viewport-offset: 20.25rem;
+    --employment-review-table-sticky-top: 0px;
     max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
     max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
     overflow-y: auto;
@@ -14645,7 +14668,28 @@ body.loader-active > *:not(.app-loader) {
 
 .employment-review-scroll-container .results-table-wrapper {
     max-height: none;
-    overflow-y: visible;
+    overflow: visible;
+}
+
+.employment-review-scroll-container #resultsTable {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+}
+
+.employment-review-scroll-container #resultsTable th,
+.employment-review-scroll-container #resultsTable td {
+    overflow-wrap: anywhere;
+}
+
+.employment-review-scroll-container #resultsTable thead th {
+    position: sticky;
+    top: var(--employment-review-table-sticky-top);
+    z-index: 15;
+    background-color: #212529;
+    color: #ffffff;
+    border-color: #495057;
+    background-clip: padding-box;
 }
 
 @media (max-width: 991.98px) {

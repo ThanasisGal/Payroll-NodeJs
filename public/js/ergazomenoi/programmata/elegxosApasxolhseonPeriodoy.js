@@ -332,10 +332,73 @@ function scenarioReasonLabel(reason) {
     return scenarioReasonLabels[key] || key;
 }
 
-function renderScenarioBadge(row) {
+function buildRepoTransferReviewRowStates() {
+    const states = new Map();
+
+    currentRepoTransferDecisionsByProposalId.forEach((record) => {
+        const history = record?.applied_history;
+        if (!history || record?.current_execution?.execution_status !== 'APPLIED') return;
+
+        [
+            ['source', history.source],
+            ['target', history.target]
+        ].forEach(([role, item]) => {
+            const id = rowIdentityKey(item?.prodhlomena_oraria_id);
+            if (!id) return;
+
+            states.set(id, {
+                applied: true,
+                pending: false,
+                role
+            });
+        });
+    });
+
+    const groups = Array.isArray(currentAtomicRepoTransferProjection?.groups)
+        ? currentAtomicRepoTransferProjection.groups
+        : [];
+    groups.forEach((group) => {
+        if (isHrReviewGroupCompleted(group)) return;
+
+        (group.items || []).forEach((item) => {
+            const id = rowIdentityKey(item?.prodhlomena_oraria_id);
+            if (!id || states.has(id)) return;
+
+            states.set(id, {
+                applied: false,
+                pending: true,
+                role:
+                    item?.role === 'TARGET_BECOMES_REPO'
+                        ? 'target'
+                        : item?.role === 'SOURCE_BECOMES_WORK'
+                          ? 'source'
+                          : ''
+            });
+        });
+    });
+
+    return states;
+}
+
+function renderScenarioBadge(row, repoTransferState) {
+    if (repoTransferState?.applied === true && repoTransferState.role === 'target') {
+        return `
+            <div class="review-scenario-badge-row">
+                <span class="review-scenario-badge review-scenario-badge-applied">
+                    ΕΦΑΡΜΟΣΤΗΚΕ
+                </span>
+            </div>
+        `;
+    }
+
     const decision = row?.scenarioDecision;
 
     if (!decision || !decision.scenario_code) return '';
+    if (
+        decision.requires_review === true &&
+        repoTransferState !== undefined &&
+        repoTransferState?.pending !== true
+    ) return '';
 
     const label = scenarioLabel(decision);
     const badgeClass =
@@ -795,6 +858,16 @@ function isApologistikoIntervalPresent(row) {
     );
 }
 
+function hasValidCardInterval(row = {}) {
+    return [1, 2, 3].some((n) => {
+        const p = pairNo(n);
+        return (
+            timeToMinutes(row[`cards_apo_ora_${p}`]) !== null &&
+            timeToMinutes(row[`cards_eos_ora_${p}`]) !== null
+        );
+    });
+}
+
 function yperoriaCellClass(row) {
     if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
     if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
@@ -1053,6 +1126,15 @@ function ensureReviewTableStructure() {
                 text-align: center;
             }
 
+            .cell-repo-day-applied {
+                background-color: #198754 !important;
+                color: #ffffff !important;
+                border: 2px solid #0f5132 !important;
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+                font-weight: 800;
+                text-align: center;
+            }
+
             .cell-declared-repo-day {
                 background-color: #f1f3f5 !important;
                 color: #495057 !important;
@@ -1140,6 +1222,12 @@ function ensureReviewTableStructure() {
                 background-color: #e7f1ff;
                 border: 1px solid #b6d4fe;
                 color: #084298;
+            }
+
+            .review-scenario-badge-applied {
+                background-color: #ffffff;
+                border: 1px solid #ffffff;
+                color: #0f5132;
             }
 
             .review-scenario-confidence {
@@ -1908,7 +1996,8 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
         row.kathgoria_ergasias_apologistika || ''
     ).trim();
     const persistedRepo =
-        row.repo_apologistika === true || persistedCategory === 'ΑΝ';
+        row.repo_apologistika === true ||
+        (persistedCategory === 'ΑΝ' && derived.isApologistikoRepoRow === true);
 
     if (persistedRepo) {
         return {
@@ -1969,9 +2058,84 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
     };
 }
 
+function resolveReviewRowPresentation(
+    row = {},
+    derived = {},
+    repoTransferState = null
+) {
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original || row.kathgoria_ergasias || ''
+    ).trim();
+    const hasActualCards =
+        num(row.cards_ores_ergasias) > 0 || hasValidCardInterval(row);
+    const isAppliedRow = repoTransferState?.applied === true;
+    const isOriginalDeclaredRepo =
+        declaredCategory === 'ΑΝ' &&
+        !hasActualCards &&
+        !isAppliedRow;
+    const apologistiko = isOriginalDeclaredRepo
+        ? {
+            text: '-',
+            className: '',
+            source: 'declared_repo_neutral'
+        }
+        : resolveReviewApologistikoPresentation(row, derived);
+    const isAppliedRepoTarget =
+        isAppliedRow &&
+        repoTransferState.role === 'target' &&
+        apologistiko.text === 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ';
+
+    return {
+        declared: {
+            text: derived.declaredText || '-',
+            className: derived.declaredClass || ''
+        },
+        apologistiko: {
+            ...apologistiko,
+            className: isAppliedRepoTarget
+                ? 'cell-repo-day-applied'
+                : apologistiko.className
+        },
+        badgeState: isOriginalDeclaredRepo ? {} : repoTransferState || {},
+        isAppliedRow,
+        isAppliedRepoTarget,
+        isOriginalDeclaredRepo
+    };
+}
+
+function setEmployeeGroupExpanded(groupTr, expanded) {
+    const groupId = String(groupTr?.dataset?.groupId || '');
+    if (!groupId) return;
+
+    groupTr.classList.toggle('collapsed', !expanded);
+    groupTr.classList.toggle('expanded', expanded);
+    groupTr.setAttribute('aria-expanded', String(expanded));
+
+    document.querySelectorAll(
+        `tr.employee-detail-row[data-group-id="${groupId}"],
+         tr.employee-subtotal-row[data-group-id="${groupId}"],
+         tr.employee-deviation-row[data-group-id="${groupId}"]`
+    ).forEach((row) => row.classList.toggle('d-none', !expanded));
+}
+
+function toggleEmployeeGroupAccordion(groupTr) {
+    const willExpand = groupTr.classList.contains('collapsed');
+
+    if (willExpand) {
+        document.querySelectorAll(
+            '#resultsTable tbody tr.employee-group-row[aria-expanded="true"]'
+        ).forEach((otherGroup) => {
+            if (otherGroup !== groupTr) setEmployeeGroupExpanded(otherGroup, false);
+        });
+    }
+
+    setEmployeeGroupExpanded(groupTr, willExpand);
+}
+
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
 
+    const repoTransferRowStates = buildRepoTransferReviewRowStates();
     const deviationsByKodikos = buildDeviationsByKodikos(deviations);
     const rowsByKodikos = new Map();
     rows.forEach((row) => {
@@ -2014,6 +2178,9 @@ function renderReviewRows(rows = [], deviations = []) {
             groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
             groupTr.dataset.groupId = groupId;
             groupTr.style.cursor = 'pointer';
+            groupTr.tabIndex = 0;
+            groupTr.setAttribute('role', 'button');
+            groupTr.setAttribute('aria-expanded', 'false');
 
             const groupDeviations = deviationsByKodikos.get(groupKey) || [];
             const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
@@ -2032,18 +2199,12 @@ function renderReviewRows(rows = [], deviations = []) {
                 </td>
             `;
 
-            groupTr.addEventListener('click', () => {
-                groupTr.classList.toggle('collapsed');
+            groupTr.addEventListener('click', () => toggleEmployeeGroupAccordion(groupTr));
+            groupTr.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
 
-                const rows = document.querySelectorAll(
-                    `tr.employee-detail-row[data-group-id="${groupId}"],
-                     tr.employee-subtotal-row[data-group-id="${groupId}"],
-                     tr.employee-deviation-row[data-group-id="${groupId}"]`
-                );
-
-                rows.forEach((r) => {
-                    r.classList.toggle('d-none');
-                });
+                event.preventDefault();
+                toggleEmployeeGroupAccordion(groupTr);
             });
 
             tbody.appendChild(groupTr);
@@ -2096,13 +2257,8 @@ function renderReviewRows(rows = [], deviations = []) {
             (effectiveKathgoria === 'ΜΕ' || (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
             num(row.cards_ores_ergasias) === 0;
 
-        const apologistikoPresentation = resolveReviewApologistikoPresentation(row, {
-            apologistikoText,
-            isApologistikoRepoRow,
-            isApologistikoNonWorkRow
-        });
-        const apologistikoDisplayText = apologistikoPresentation.text;
-        const apologistikoDisplayClass = apologistikoPresentation.className;
+        const repoTransferState =
+            repoTransferRowStates.get(rowIdentityKey(row._id)) || null;
 
         const isDeclaredRestOrNonWork =
             row.apologistiko_biblio !== true &&
@@ -2120,6 +2276,22 @@ function renderReviewRows(rows = [], deviations = []) {
                 ? 'cell-declared-repo-day'
                 : 'cell-non-work-day'
             : '';
+        const rowPresentation = resolveReviewRowPresentation(
+            row,
+            {
+                apologistikoText,
+                isApologistikoRepoRow,
+                isApologistikoNonWorkRow,
+                declaredText,
+                declaredClass
+            },
+            repoTransferState
+        );
+
+        if (rowPresentation.isAppliedRow) {
+            tr.classList.add('row-repo-transfer-applied');
+            tr.dataset.repoTransferRole = repoTransferState.role;
+        }
 
         const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
 
@@ -2129,11 +2301,11 @@ function renderReviewRows(rows = [], deviations = []) {
             <td>${renderReviewDateCell(row)}</td>
             <td>${row.ypokatasthma || ''}</td>
             <td>${row.kodikos || ''}</td>
-            <td${tdClass(declaredClass)}>${declaredText}</td>
+            <td${tdClass(rowPresentation.declared.className)}>${rowPresentation.declared.text}</td>
             <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
-            <td${tdClass(apologistikoDisplayClass)}>
-                ${apologistikoDisplayText}
-                ${renderScenarioBadge(row)}
+            <td${tdClass(rowPresentation.apologistiko.className)}>
+                ${rowPresentation.apologistiko.text}
+                ${renderScenarioBadge(row, rowPresentation.badgeState)}
             </td>
             <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
                 ${renderHoursCell(row)}
@@ -4714,7 +4886,7 @@ function renderAppliedRepoTransferHistory() {
                             ${escapeHtml(formatPolicyPreviewDate(history.source.hmeromhnia))}
                             → ${escapeHtml(formatAppliedRepoTransferResult(history.source.result))}
                         </div>
-                        <div>
+                        <div class="applied-repo-transfer-target-result">
                             ${escapeHtml(formatPolicyPreviewDate(history.target.hmeromhnia))}
                             → ${escapeHtml(formatAppliedRepoTransferResult(
                                 history.target.result,
@@ -5412,6 +5584,7 @@ async function loadResults() {
                 console.warn('[loadResults] Repo-transfer decisions unavailable:', repoTransferDecisionsError);
                 currentRepoTransferDecisionsByProposalId = new Map();
             }
+            renderCurrentReviewRows();
             renderPolicyPreviewGroups(groupingResult.value.grouping, {
                 atomicGroupProjection: groupingResult.value.atomicGroupProjection
             });

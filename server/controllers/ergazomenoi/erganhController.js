@@ -3354,9 +3354,17 @@ function reviewApologistikoDisplay(row = {}) {
     const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
 
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
     if (
         row.repo_apologistika === true ||
-        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ'
+        (
+            persistedCategory === 'ΑΝ' &&
+            row.apologistiko_biblio === true &&
+            hasNoCards &&
+            isFullTimeProfile
+        )
     ) {
         return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'repo' };
     }
@@ -3379,9 +3387,6 @@ function reviewApologistikoDisplay(row = {}) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
-    const persistedCategory = String(
-        row.kathgoria_ergasias_apologistika || ''
-    ).trim();
     if (!persistedCategory) {
         const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
         if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {

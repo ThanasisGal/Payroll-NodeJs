@@ -188,6 +188,198 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
     assert.strictEqual(derived.source, 'derived');
 }
 
+function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
+    const presentation = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: false,
+        cards_ores_ergasias: 7.6,
+        apo_ora_01_apologistika: '08:30',
+        eos_ora_01_apologistika: '16:06'
+    }, {
+        apologistikoText: '08:30–16:06',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+
+    assert.strictEqual(presentation.text, '08:30–16:06');
+    assert.strictEqual(presentation.className, 'cell-apologistiko');
+    assert.notStrictEqual(presentation.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+}
+
+function testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow() {
+    vm.runInContext(`
+        currentAtomicRepoTransferProjection = { groups: [] };
+        currentRepoTransferDecisionsByProposalId = new Map([[
+            'applied-proposal',
+            {
+                current_execution: { execution_status: 'APPLIED' },
+                applied_history: {
+                    source: { prodhlomena_oraria_id: 'source-row' },
+                    target: { prodhlomena_oraria_id: 'target-row' }
+                }
+            }
+        ]]);
+    `, sandbox);
+
+    const states = sandbox.buildRepoTransferReviewRowStates();
+    assert.strictEqual(states.size, 2);
+    assert.strictEqual(states.get('target-row').applied, true);
+    assert.strictEqual(states.get('target-row').role, 'target');
+    assert.strictEqual(states.has('unrelated-row'), false);
+
+    const pendingScenario = {
+        scenarioDecision: {
+            scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+            requires_review: true
+        }
+    };
+    const appliedBadge = sandbox.renderScenarioBadge(
+        pendingScenario,
+        states.get('target-row')
+    );
+    assert.ok(appliedBadge.includes('ΕΦΑΡΜΟΣΤΗΚΕ'));
+    assert.ok(!appliedBadge.includes('ΠΡΟΣ ΕΛΕΓΧΟ'));
+    assert.strictEqual(sandbox.renderScenarioBadge(pendingScenario, null), '');
+}
+
+function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() {
+    const neutral = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0
+    }, {
+        declaredText: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+        declaredClass: 'cell-declared-repo-day',
+        apologistikoText: '-',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, null);
+    assert.strictEqual(neutral.declared.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(neutral.apologistiko.text, '-');
+    assert.strictEqual(neutral.apologistiko.className, '');
+    assert.strictEqual(neutral.isOriginalDeclaredRepo, true);
+    assert.strictEqual(
+        sandbox.renderScenarioBadge({
+            scenarioDecision: {
+                scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+                requires_review: true
+            }
+        }, neutral.badgeState),
+        ''
+    );
+
+    const unexpectedWork = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: false,
+        cards_ores_ergasias: 7.5,
+        cards_apo_ora_01: '08:00',
+        cards_eos_ora_01: '15:30',
+        apo_ora_01_apologistika: '08:00',
+        eos_ora_01_apologistika: '15:30'
+    }, {
+        declaredText: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+        declaredClass: 'cell-declared-repo-day',
+        apologistikoText: '08:00–15:30',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, { pending: true, applied: false });
+    assert.strictEqual(unexpectedWork.isOriginalDeclaredRepo, false);
+    assert.strictEqual(unexpectedWork.apologistiko.text, '08:00–15:30');
+    assert.strictEqual(unexpectedWork.badgeState.pending, true);
+
+    const applied = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0
+    }, {
+        declaredText: '08:30–16:30',
+        declaredClass: '',
+        apologistikoText: '-',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, { pending: false, applied: true, role: 'target' });
+    assert.strictEqual(applied.apologistiko.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(applied.apologistiko.className, 'cell-repo-day-applied');
+    assert.strictEqual(applied.isAppliedRepoTarget, true);
+}
+
+function mockClassList(initial = []) {
+    const values = new Set(initial);
+    return {
+        contains: (value) => values.has(value),
+        toggle: (value, force) => {
+            if (force === true) values.add(value);
+            else if (force === false) values.delete(value);
+            else if (values.has(value)) values.delete(value);
+            else values.add(value);
+        }
+    };
+}
+
+function testEmployeeGroupsUseAccessibleSingleOpenAccordion() {
+    const groups = ['0001', '0002', '0003'].map((groupId) => {
+        const attributes = { 'aria-expanded': 'false' };
+        return {
+            dataset: { groupId },
+            classList: mockClassList(['collapsed']),
+            setAttribute: (key, value) => { attributes[key] = value; },
+            getAttribute: (key) => attributes[key]
+        };
+    });
+    const detailRows = new Map(
+        groups.map((group) => [
+            group.dataset.groupId,
+            [{ classList: mockClassList(['d-none']) }]
+        ])
+    );
+    const originalQuerySelectorAll = documentStub.querySelectorAll;
+    documentStub.querySelectorAll = (selector) => {
+        if (selector.includes('employee-group-row')) {
+            return groups.filter(
+                (group) => group.getAttribute('aria-expanded') === 'true'
+            );
+        }
+        const groupId = selector.match(/data-group-id="([^"]+)"/)?.[1];
+        return detailRows.get(groupId) || [];
+    };
+
+    try {
+        sandbox.toggleEmployeeGroupAccordion(groups[0]);
+        assert.strictEqual(groups[0].getAttribute('aria-expanded'), 'true');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 1);
+
+        sandbox.toggleEmployeeGroupAccordion(groups[1]);
+        assert.strictEqual(groups[0].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups[1].getAttribute('aria-expanded'), 'true');
+        assert.strictEqual(groups[2].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 1);
+        assert.strictEqual(detailRows.get('0001')[0].classList.contains('d-none'), true);
+        assert.strictEqual(detailRows.get('0002')[0].classList.contains('d-none'), false);
+
+        sandbox.toggleEmployeeGroupAccordion(groups[1]);
+        assert.strictEqual(groups[1].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 0);
+    } finally {
+        documentStub.querySelectorAll = originalQuerySelectorAll;
+    }
+
+    assert.ok(source.includes("groupTr.tabIndex = 0"));
+    assert.ok(source.includes("groupTr.setAttribute('role', 'button')"));
+    assert.ok(source.includes("groupTr.setAttribute('aria-expanded', 'false')"));
+    assert.ok(source.includes("event.key !== 'Enter' && event.key !== ' '"));
+    assert.ok(source.includes('event.preventDefault()'));
+}
+
 function testAppliedHistoryRendersWithoutCurrentProjectionGroup() {
     vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([[
         'resolved-proposal',
@@ -1229,6 +1421,38 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(/overflow-y\s*:\s*auto\s*;/.test(scrollCss));
     assert.ok(/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
     assert.ok(/max-height\s*:[^;]*(?:100vh|100dvh)/.test(scrollCss));
+    assert.ok(/--employment-review-table-sticky-top\s*:\s*0px/.test(scrollCss));
+
+    const wrapperSelector =
+        '.employment-review-scroll-container .results-table-wrapper {';
+    const wrapperStart = cssSource.indexOf(wrapperSelector);
+    const wrapperCss = cssSource.slice(
+        wrapperStart,
+        cssSource.indexOf('}', wrapperStart)
+    );
+    assert.ok(/overflow\s*:\s*visible/.test(wrapperCss));
+
+    const stickySelector =
+        '.employment-review-scroll-container #resultsTable thead th {';
+    const stickyStart = cssSource.indexOf(stickySelector);
+    const stickyCss = cssSource.slice(
+        stickyStart,
+        cssSource.indexOf('}', stickyStart)
+    );
+    assert.ok(/position\s*:\s*sticky/.test(stickyCss));
+    assert.ok(/top\s*:\s*var\(--employment-review-table-sticky-top\)/.test(stickyCss));
+    assert.ok(/z-index\s*:\s*15/.test(stickyCss));
+    assert.ok(/background-color\s*:\s*#212529/.test(stickyCss));
+    assert.ok(/border-color\s*:\s*#495057/.test(stickyCss));
+    assert.ok(/background-clip\s*:\s*padding-box/.test(stickyCss));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable {\n    width: 100%;\n    table-layout: fixed;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable th,\n' +
+        '.employment-review-scroll-container #resultsTable td {\n' +
+        '    overflow-wrap: anywhere;'
+    ));
 
     const cssDiff = execFileSync('git', ['diff', '--unified=0', '--', cssPath], {
         encoding: 'utf8'
@@ -1441,7 +1665,9 @@ function testEmploymentReviewBranchActionLayoutContract() {
     const gridCss = cssSource.slice(gridStart, cssSource.indexOf('}', gridStart));
     assert.ok(/display:\s*grid/.test(gridCss));
     assert.ok(/grid-template-columns:[\s\S]*2\.5rem[\s\S]*max-content/.test(gridCss));
+    assert.ok(/minmax\(18rem,\s*2fr\)/.test(gridCss));
     assert.ok(/column-gap:\s*0\.75rem/.test(gridCss));
+    assert.ok(viewSource.includes('class="col-md-4 employment-review-advanced-branch"'));
 
     const branchStart = cssSource.indexOf('.employment-review-branch-control {');
     const branchCss = cssSource.slice(branchStart, cssSource.indexOf('}', branchStart));
@@ -1955,6 +2181,10 @@ async function testHrLoadingLocksAndRestoresFilters() {
 
 const tests = [
     testPersistedRepoCategoryOverridesDerivedLeave,
+    testPersistedAnWithCardsIsNotBlanketRepoPresentation,
+    testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
+    testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
+    testEmployeeGroupsUseAccessibleSingleOpenAccordion,
     testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,
     testNoTargetFallbackIsInformationalOnly,
