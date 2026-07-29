@@ -13,6 +13,7 @@ const {
 const outcomes = fixtures.map((fixture) => {
     const replayRows = fixture.rows.map((row) => ({
             ...row,
+            id: `sanitized-${row.hmeromhnia}`,
             team: 'THA',
             company_kod: '0004',
             kodikos: fixture.employeeCode,
@@ -59,25 +60,31 @@ assert.deepStrictEqual(
         eligibility
     })),
     [
-        { employeeCode: '0005', week: '2026-06-01/2026-06-07', eligibility: 'NEEDS_REVIEW' },
-        { employeeCode: '0002', week: '2026-06-15/2026-06-21', eligibility: 'NEEDS_REVIEW' },
-        { employeeCode: '0002', week: '2026-06-22/2026-06-28', eligibility: 'NEEDS_REVIEW' },
+        { employeeCode: '0005', week: '2026-06-01/2026-06-07', eligibility: 'ELIGIBLE' },
+        { employeeCode: '0002', week: '2026-06-15/2026-06-21', eligibility: 'ELIGIBLE' },
+        { employeeCode: '0002', week: '2026-06-22/2026-06-28', eligibility: 'ELIGIBLE' },
         { employeeCode: '0003', week: '2026-06-01/2026-06-07', eligibility: 'NOT_APPLICABLE' }
     ]
 );
 for (const outcome of outcomes.slice(0, 3)) {
-    assert.ok(outcome.reasons.includes('NO_SOURCE_CANDIDATE'));
-    assert.ok(outcome.reasons.includes('SOURCE_ALREADY_PROCESSED'));
+    assert.deepStrictEqual(outcome.reasons, []);
+    assert.strictEqual(outcome.resolvedRepos, 1);
+    assert.strictEqual(outcome.actualWorkdays, 6);
+    assert.strictEqual(outcome.sixthDayStatus, 'READY');
+    assert.strictEqual(outcome.seventhDay, null);
 }
-assert.strictEqual(outcomes[0].sixthDayStatus, 'READY');
-for (const outcome of outcomes.slice(1, 3)) {
-    assert.strictEqual(outcome.sixthDayStatus, 'NEEDS_HR_DECISION');
-    assert.ok(
-        outcome.sixthDayReasons.includes(
-            'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
-        )
-    );
-}
+assert.deepStrictEqual(
+    outcomes.slice(0, 3).map(({ source, target, sixthDay }) => ({
+        source,
+        target,
+        sixthDay
+    })),
+    [
+        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-07' },
+        { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-21' },
+        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-28' }
+    ]
+);
 assert.ok(
     fixtures.every(
         (fixture) =>

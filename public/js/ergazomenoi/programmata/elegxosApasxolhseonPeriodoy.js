@@ -4179,8 +4179,12 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Οι κρίσιμοι όροι εργασίας άλλαξαν μέσα στην εβδομάδα Δευτέρα–Κυριακή και απαιτείται απόφαση HR.',
     MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
         'Το ημερομηνιακά ισχύον ποσοστό προσαύξησης 6ης ημέρας λείπει ή δεν είναι έγκυρο.',
+    ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION:
+        'Το ποσοστό προσαύξησης 6ης ημέρας είναι μηδενικό, αλλά δεν τεκμηριώνεται επιτρεπόμενη ειδική κατηγορία εξαίρεσης.',
     SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
-        'Δεν μπορεί να προσδιοριστεί με ασφάλεια η 6η ημέρα από τις πραγματικές ώρες εργασίας.',
+        'Δεν μπορεί να προσδιοριστεί με ασφάλεια η 6η ημέρα από τις δηλωμένες ώρες και τις ώρες καρτών.',
+    SIXTH_DAY_INCOMPLETE_CARD_INTERVAL:
+        'Η επιλεγμένη 6η ημέρα έχει θετικές ώρες καρτών αλλά ελλιπές διάστημα κάρτας.',
     SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT:
         'ΣΗΜΑΝΤΙΚΟ: Η επιλεγμένη 6η ημέρα υπερβαίνει τις οκτώ πραγματικές ώρες.',
     SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION:

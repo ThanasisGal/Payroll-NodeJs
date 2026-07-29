@@ -12,6 +12,11 @@ assert.ok(routeSource.includes("router.get('/api/prodhlomena-oraria/review'"));
 assert.ok(routeSource.includes('erganhController.getProdhlomenaOrariaForReview'));
 assert.ok(source.includes('buildWeeklyRepoDeviationPreview({'));
 assert.ok(source.includes('rows: deviationContextRows'));
+assert.ok(source.includes('holidayByDateKey:'));
+assert.ok(source.includes('existingAuditCountByRowKey:'));
+assert.ok(source.includes('deviationAuditCountByRowKey'));
+assert.ok(source.includes('external_break_minutes:'));
+assert.ok(source.includes('eidikh_kathgoria_ergazomenoy:'));
 const deviationSelectStart = source.indexOf(
     'ProdhlomenaOrariaModel.find(deviationContextFilter)'
 );

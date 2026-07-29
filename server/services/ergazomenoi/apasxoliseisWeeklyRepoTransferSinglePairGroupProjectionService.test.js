@@ -368,7 +368,8 @@ function testNonReadyProposalPaths() {
     const sixthDayResolution = build(deficit, {
         typos_apasxolhshs: 'PLHRHS',
         mhniaia_repo: 2,
-        pososto_prosayxhshs_6hs_hmeras: 0
+        pososto_prosayxhshs_6hs_hmeras: 0,
+        eidikh_kathgoria_ergazomenoy: '0009'
     });
     assert.strictEqual(sixthDayResolution.projection_status, 'READY');
     assert.strictEqual(

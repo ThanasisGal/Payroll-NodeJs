@@ -60,7 +60,8 @@ function sixWorkdaysWithAutoLeave() {
 const profile = {
     typos_apasxolhshs: 'PLHRHS',
     hmeres_ergasias_ebdomadas: 5,
-    pososto_prosayxhshs_6hs_hmeras: 0
+    pososto_prosayxhshs_6hs_hmeras: 0,
+    eidikh_kathgoria_ergazomenoy: '0009'
 };
 
 assert.ok(!APPLY_FIELDS.includes('adeia'));

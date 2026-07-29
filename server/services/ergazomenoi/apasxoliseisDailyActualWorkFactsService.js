@@ -56,6 +56,7 @@ function resolveDailyActualWorkFacts(row = {}) {
     if (reasons.length > 0) {
         return Object.freeze({
             category,
+            declaredWorkHours: declared.ok ? declared.value : null,
             cardHours: cards.ok ? cards.value : null,
             hasCompleteCardEvidence,
             actualWorkHours: 0,
@@ -103,6 +104,7 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     return Object.freeze({
         category,
+        declaredWorkHours: declared.value,
         cardHours: cards.value,
         hasCompleteCardEvidence,
         actualWorkHours,

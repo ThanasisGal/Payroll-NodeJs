@@ -209,6 +209,7 @@ function buildResult({
         scenario_version: scenarioVersion,
         proposal_version: proposalVersion,
         proposal_status: proposalStatus,
+        eligibility_status: analysis?.eligibility_status || null,
         choice_code: CHOICE_CODE,
         requires_hr_review: true,
         can_auto_apply: false,

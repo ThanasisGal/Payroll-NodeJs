@@ -331,7 +331,7 @@ test('real weekly analysis flows through work-facts payload into target-only car
     assert.deepEqual(payload.weeklyCarryOverDifferences[0].breakdown, {
         yperergasia: 1,
         yperoria: 0.5,
-        sixthDay: 7,
+        sixthDay: 0,
         otherWeekly: 0
     });
     assert.deepEqual(

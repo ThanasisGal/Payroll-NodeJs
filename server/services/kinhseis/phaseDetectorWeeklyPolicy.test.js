@@ -77,7 +77,7 @@ test('first cross-month week uses previous-month context but presents requested 
     );
 
     assert.equal(analyses[0].complete, true);
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), [
         '2026-07-01',
@@ -107,7 +107,7 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
     );
 
     assert.equal(analyses[0].status, 'READY');
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
 });

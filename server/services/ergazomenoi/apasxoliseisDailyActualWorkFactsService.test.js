@@ -12,6 +12,7 @@ function facts(category, ores, cards, flags = {}) {
     });
 }
 const expected = (values) => ({
+    declaredWorkHours: values.actualWorkHours === 0 ? 0 : 8,
     cardHours: 0,
     hasCompleteCardEvidence: false,
     ...values

@@ -8,6 +8,7 @@ const {
 
 const POLICY_VERSION = 'sepe-weekly-sixth-seventh-day:v1';
 const STATUS = Object.freeze({ READY: 'READY', NOT_APPLICABLE: 'NOT_APPLICABLE', NEEDS_HR_DECISION: 'NEEDS_HR_DECISION' });
+const ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES = new Set(['0009', '0018', '0020', '0021']);
 
 function validRate(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
@@ -17,15 +18,32 @@ function validRate(value) {
 
 function selectSixthDay(candidates) {
     const cardProvenCandidates = candidates.filter(
-        (day) => day.cardHours > 0 && day.hasCompleteCardEvidence === true
+        (day) => day.cardHours > 0
     );
     const preferred = cardProvenCandidates.filter(
-        (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
+        (day) => day.declaredWorkHours > 5 && day.declaredWorkHours <= 8
     );
-    if (preferred.length > 0) return { day: preferred[preferred.length - 1], warning: null };
-    const overEight = cardProvenCandidates.filter((day) => day.actualWorkHours > 8);
+    if (preferred.length > 0) {
+        const day = preferred[preferred.length - 1];
+        return {
+            day,
+            warnings: day.hasCompleteCardEvidence
+                ? []
+                : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL']
+        };
+    }
+    const overEight = cardProvenCandidates.filter((day) => day.declaredWorkHours > 8);
     if (overEight.length > 0) {
-        return { day: overEight[overEight.length - 1], warning: 'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT' };
+        const day = overEight[overEight.length - 1];
+        return {
+            day,
+            warnings: [
+                'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT',
+                ...(day.hasCompleteCardEvidence
+                    ? []
+                    : ['SIXTH_DAY_INCOMPLETE_CARD_INTERVAL'])
+            ]
+        };
     }
     return { day: null, reason: 'SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC' };
 }
@@ -68,6 +86,25 @@ function analyzeWeeklySixthSeventhDay({
     if (premiumRate === null) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null });
     }
+    const specialCategory = String(
+        effectiveProfile.eidikh_kathgoria_ergazomenoy ||
+        effectiveProfile.eidikh_periptosh ||
+        ''
+    ).trim().padStart(4, '0');
+    if (
+        premiumRate === 0 &&
+        !ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
+    ) {
+        return Object.freeze({
+            policyVersion: POLICY_VERSION,
+            status: STATUS.NEEDS_HR_DECISION,
+            reasons: ['ZERO_SIXTH_DAY_PREMIUM_RATE_WITHOUT_EXEMPTION'],
+            warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))],
+            dailyFacts,
+            sixthDay: null,
+            seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null
+        });
+    }
     const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
     const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;
     const selected = selectSixthDay(sixthCandidates);
@@ -80,7 +117,7 @@ function analyzeWeeklySixthSeventhDay({
         : null;
     const warnings = [...new Set([
         ...dailyFacts.flatMap((day) => day.warnings),
-        ...(selected.warning ? [selected.warning] : []),
+        ...(selected.warnings || []),
         ...(seventhDay ? ['SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION'] : [])
     ])];
     return Object.freeze({
@@ -97,4 +134,11 @@ function analyzeWeeklySixthSeventhDay({
     });
 }
 
-module.exports = { POLICY_VERSION, STATUS, validRate, selectSixthDay, analyzeWeeklySixthSeventhDay };
+module.exports = {
+    POLICY_VERSION,
+    STATUS,
+    ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES,
+    validRate,
+    selectSixthDay,
+    analyzeWeeklySixthSeventhDay
+};

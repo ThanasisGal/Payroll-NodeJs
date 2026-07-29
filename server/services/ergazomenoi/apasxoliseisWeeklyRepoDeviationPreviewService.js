@@ -81,7 +81,9 @@ function buildWeeklyRepoDeviationPreview({
     asOfDate,
     resolveWeeklyProfile,
     resolveDailyProfile,
-    isFullTimeProfile
+    isFullTimeProfile,
+    holidayByDateKey = new Map(),
+    existingAuditCountByRowKey = new Map()
 } = {}) {
     const requestedStart = dateKeyUtc(periodStart);
     const requestedEnd = dateKeyUtc(periodEnd);
@@ -199,7 +201,9 @@ function buildWeeklyRepoDeviationPreview({
             });
             const repoTransfer = analyzeWeeklyRepoTransferForEmploymentContract({
                 weekRows: uniqueRows,
-                employmentProfile: effectiveProfile
+                employmentProfile: effectiveProfile,
+                holidayByDateKey,
+                existingAuditCountByRowKey
             });
             const resolution = repoTransfer.weekly_resolution;
             deviations.push({
@@ -219,6 +223,10 @@ function buildWeeklyRepoDeviationPreview({
                     (sixthSeventhDay.seventhDay ? 1 : 0),
                 repo_transfer_status: repoTransfer.eligibility_status,
                 repo_transfer_reasons: [...(repoTransfer.reasons || [])],
+                repo_transfer_source_available:
+                    !repoTransfer.reasons.includes('NO_SOURCE_CANDIDATE'),
+                repo_transfer_target_available:
+                    !repoTransfer.reasons.includes('NO_TARGET_CANDIDATE'),
                 profile_changed_inside_week:
                     profileReason === 'PROFILE_CHANGED_INSIDE_WEEK',
                 deviation_type:

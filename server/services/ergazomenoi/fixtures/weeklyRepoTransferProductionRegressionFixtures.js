@@ -21,6 +21,32 @@ const work = (date, cards, from, to, overrides = {}) => ({
     astheneia: false,
     astheneia_apologistika: false,
     argia: false,
+    argia_apologistika: false,
+    apologistiko_biblio: cards > 0,
+    is_locked: false,
+    apo_ora_01: '',
+    eos_ora_01: '',
+    apo_ora_02: '',
+    eos_ora_02: '',
+    apo_ora_03: '',
+    eos_ora_03: '',
+    apo_ora_01_apologistika: '',
+    eos_ora_01_apologistika: '',
+    apo_ora_02_apologistika: '',
+    eos_ora_02_apologistika: '',
+    apo_ora_03_apologistika: '',
+    eos_ora_03_apologistika: '',
+    cards_apo_ora_02: '',
+    cards_eos_ora_02: '',
+    cards_apo_ora_03: '',
+    cards_eos_ora_03: '',
+    ores_nyxtas_apologistika: 0,
+    ores_argion_prosayxhsh_apologistika: 0,
+    ores_argion_ergasia_apologistika: 0,
+    ores_prostheths_ergasias_apologistika: 0,
+    ores_yperergasias_apologistika: 0,
+    ores_nominhs_yperorias_apologistika: 0,
+    ores_paranomhs_yperorias_apologistika: 0,
     ...interval(from, to),
     ...overrides
 });
@@ -34,26 +60,34 @@ const autoLeave = (date, from, to) =>
         kathgoria_adeias_apologistika: 'ΑΔΑΛ'
     });
 
-const profile = (premiumRate, monthlyRepos) => ({
+const profile = (premiumRate, monthlyRepos, effectiveDate) => ({
     typos_apasxolhshs: '0',
     hmeres_ergasias_ebdomadas: 5,
     ores_ergasias_ebdomadas: 40,
     mo_oron_hmerhsias_ergasias: 8,
     mhniaia_repo: monthlyRepos,
     pososto_prosayxhshs_6hs_hmeras: premiumRate,
-    source: 'ISTORIKO/HISTORY'
+    dialleima_se_lepta: 30,
+    dialleima_entos_ektos_orarioy: false,
+    external_break_minutes: 30,
+    source: 'ERG_AKTUAL',
+    effective_date: effectiveDate,
+    eidikh_kathgoria_ergazomenoy: '0009'
 });
 
 module.exports = Object.freeze([
     {
         employeeCode: '0005',
         week: '2026-06-01/2026-06-07',
-        employmentProfile: profile(0, 1),
+        employmentProfile: profile(0, 1, '2026-06-01'),
         rows: [
             work('2026-06-01', 8.35, '14:11', '22:32', { ores_ergasias_apologistika: 7.85 }),
             work('2026-06-02', 7.1, '15:12', '22:18', {
                 kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
-                ores_ergasias_apologistika: 6.6
+                ores_ergasias_apologistika: 6.6,
+                apo_ora_01_apologistika: '15:12',
+                eos_ora_01_apologistika: '23:12',
+                ores_nyxtas_apologistika: 0.3
             }),
             work('2026-06-03', 10.2, '12:09', '22:21', { ores_ergasias_apologistika: 9.7 }),
             autoLeave('2026-06-04', '13:00', '21:00'),
@@ -65,11 +99,14 @@ module.exports = Object.freeze([
     {
         employeeCode: '0002',
         week: '2026-06-15/2026-06-21',
-        employmentProfile: profile(null, 2),
+        employmentProfile: profile(0, 2, '2026-06-15'),
         rows: [
             work('2026-06-15', 8.816667, '14:08', '22:57', {
                 kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
-                ores_ergasias_apologistika: 8.32
+                ores_ergasias_apologistika: 8.32,
+                apo_ora_01_apologistika: '14:08',
+                eos_ora_01_apologistika: '22:08',
+                ores_nyxtas_apologistika: 0.95
             }),
             work('2026-06-16', 8.18333, '14:17', '22:28', {
                 kathgoria_ergasias_apologistika: 'ΑΝ',
@@ -99,11 +136,14 @@ module.exports = Object.freeze([
     {
         employeeCode: '0002',
         week: '2026-06-22/2026-06-28',
-        employmentProfile: profile(null, 2),
+        employmentProfile: profile(0, 2, '2026-06-22'),
         rows: [
             work('2026-06-22', 7.6667, '14:49', '22:29', {
                 kathgoria_ergasias: 'ΑΝ', repo: true, ores_ergasias: 0,
-                ores_ergasias_apologistika: 7.17
+                ores_ergasias_apologistika: 7.17,
+                apo_ora_01_apologistika: '14:49',
+                eos_ora_01_apologistika: '22:49',
+                ores_nyxtas_apologistika: 0.48
             }),
             work('2026-06-23', 8.1333, '14:22', '22:30', { kathgoria_ergasias_apologistika: 'ΑΝ', ores_ergasias_apologistika: 7.63 }),
             autoLeave('2026-06-24', '13:00', '21:00'),
@@ -116,14 +156,20 @@ module.exports = Object.freeze([
     {
         employeeCode: '0003',
         week: '2026-06-01/2026-06-07',
-        employmentProfile: profile(null, 2),
+        employmentProfile: profile(null, 2, '2026-06-01'),
         rows: [
             work('2026-06-01', 0, '', '', {
                 kathgoria_ergasias: 'ΑΝ', kathgoria_ergasias_apologistika: 'ΑΝ',
                 repo: true, repo_apologistika: true, ores_ergasias: 0,
                 ores_ergasias_apologistika: 0
             }),
-            work('2026-06-02', 8, '10:09', '', { ores_ergasias_apologistika: 7.5 }),
+            work('2026-06-02', 8, '10:09', '', {
+                apo_ora_01: '09:00',
+                eos_ora_01: '17:00',
+                apo_ora_01_apologistika: '10:09',
+                eos_ora_01_apologistika: '18:09',
+                ores_ergasias_apologistika: 7.5
+            }),
             autoLeave('2026-06-03', '09:00', '17:00'),
             autoLeave('2026-06-04', '09:00', '17:00'),
             autoLeave('2026-06-05', '09:00', '17:00'),

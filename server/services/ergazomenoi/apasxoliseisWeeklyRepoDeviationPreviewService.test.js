@@ -11,6 +11,10 @@ const {
 const {
     buildWeeklyRepoTransferAtomicPageProjection
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
+const {
+    buildWeeklyRepoTransferSinglePairGroupProjection
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
+const productionFixtures = require('./fixtures/weeklyRepoTransferProductionRegressionFixtures');
 
 function rows(start, count = 7, overrides = {}) {
     return Array.from({ length: count }, (_, offset) => {
@@ -273,6 +277,115 @@ function testDeviationAndAtomicUseTheSameContractSelector() {
     assert.deepStrictEqual(capturedVersions, ['v1', 'v2', 'v2', 'v2']);
 }
 
+function testDeviationAndAtomicContextParity() {
+    const fixture = productionFixtures[0];
+    const baseRows = fixture.rows.map((row) => ({
+        ...row,
+        _id: `parity-${row.hmeromhnia}`,
+        team: 'THA',
+        company_kod: '0004',
+        ypokatasthma: '0000',
+        kodikos: '0005'
+    }));
+    const cases = [
+        { name: 'automatic leave target', profile: fixture.employmentProfile },
+        {
+            name: 'holiday target',
+            profile: fixture.employmentProfile,
+            holidayByDateKey: new Map([
+                ['2026-06-04', { blocksRepoTransfer: true }]
+            ])
+        },
+        {
+            name: 'audited source',
+            profile: fixture.employmentProfile,
+            existingAuditCountByRowKey: new Map([
+                ['parity-2026-06-02', 1]
+            ])
+        },
+        {
+            name: 'partial contract',
+            profile: { ...fixture.employmentProfile, typos_apasxolhshs: 'MERIKH' }
+        },
+        {
+            name: 'rotational contract',
+            profile: {
+                ...fixture.employmentProfile,
+                typos_apasxolhshs: 'EK_PERITROPHS'
+            }
+        }
+    ];
+
+    for (const parityCase of cases) {
+        const holidayByDateKey = parityCase.holidayByDateKey || new Map();
+        const existingAuditCountByRowKey =
+            parityCase.existingAuditCountByRowKey || new Map();
+        const preview = buildWeeklyRepoDeviationPreview({
+            rows: baseRows,
+            periodStart: '2026-06-01',
+            periodEnd: '2026-06-07',
+            asOfDate: '2026-06-08',
+            holidayByDateKey,
+            existingAuditCountByRowKey,
+            resolveWeeklyProfile: () => ({
+                expectedWeeklyRepo: 2,
+                effectiveProfile: parityCase.profile
+            })
+        });
+        const deviation = preview.deviations[0];
+        const atomic = buildWeeklyRepoTransferSinglePairGroupProjection({
+            weekRows: baseRows,
+            employmentProfile: parityCase.profile,
+            holidayByDateKey,
+            existingAuditCountByRowKey,
+            contractVersion:
+                parityCase.profile.typos_apasxolhshs === '0' ? 'v1' : 'v2'
+        });
+        const group = atomic.groups[0] || null;
+        const atomicResolution = group?.repo_resolution || atomic.repo_resolution;
+
+        assert.strictEqual(
+            deviation.repo_transfer_status,
+            group ? 'ELIGIBLE' : atomic.eligibility_status,
+            parityCase.name
+        );
+        assert.deepStrictEqual(
+            deviation.repo_transfer_reasons,
+            atomic.reasons,
+            parityCase.name
+        );
+        assert.strictEqual(
+            deviation.repo_transfer_source_available,
+            group
+                ? group.items.some((item) => item.role === 'SOURCE_BECOMES_WORK')
+                : atomic.source_available,
+            parityCase.name
+        );
+        assert.strictEqual(
+            deviation.repo_transfer_target_available,
+            group
+                ? group.items.some((item) => item.role === 'TARGET_BECOMES_REPO')
+                : atomic.target_available,
+            parityCase.name
+        );
+        assert.strictEqual(
+            deviation.resolved_repo,
+            atomicResolution?.resolved_repo ?? deviation.actual_repo,
+            parityCase.name
+        );
+        assert.strictEqual(
+            deviation.sixth_day_count,
+            atomicResolution?.sixth_day_count ?? 0,
+            parityCase.name
+        );
+        assert.strictEqual(
+            deviation.seventh_day_count,
+            atomicResolution?.seventh_day_count ?? 0,
+            parityCase.name
+        );
+    }
+}
+
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
 testContractualProfileControlsExpectedRepo();
@@ -280,5 +393,6 @@ testOpenTrailingWeekIsPendingNotDeviation();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
 testLegacyPersistedRangeIsExplicit();
 testDeviationAndAtomicUseTheSameContractSelector();
+testDeviationAndAtomicContextParity();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

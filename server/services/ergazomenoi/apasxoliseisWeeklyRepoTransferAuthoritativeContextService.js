@@ -26,7 +26,8 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';
+    'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
+    'dialleima_entos_ektos_orarioy dialleima_se_lepta';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +
