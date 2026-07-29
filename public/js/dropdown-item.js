@@ -1286,6 +1286,11 @@ function updateOverflow(tom) {
     const isMulti = tom.settings.mode?.includes?.('multi');
 
     if (!isMulti) {
+        if (tom.input?.dataset.externalReset === 'true') {
+            wrapper.querySelectorAll('.ts-single-reset-btn').forEach((button) => button.remove());
+            return;
+        }
+
         let trash = wrapper.querySelector('.ts-single-reset-btn');
         if (!trash) {
             trash = document.createElement('button');

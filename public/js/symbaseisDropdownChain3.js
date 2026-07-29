@@ -28,6 +28,7 @@ import { initTomDropdown } from './dropdown-item.js';
 
     const katNode = el('kathgoria_symbashs');
     const eidNode = el('eidikothta_symbashs');
+    const editApodoxesScope = el('editApodoxesTomDropdownScope');
 
     const katUrl = katNode?.hasAttribute('multiple')
         ? '/api/dropdown/symbaseis/kathgoria_symbashs_multi'
@@ -40,7 +41,33 @@ import { initTomDropdown } from './dropdown-item.js';
     /* ═══════════════════════════════════════════════════════════════
      * 🗑️ TRASH
      * ═══════════════════════════════════════════════════════════════ */
+    function syncExternalTrash(id) {
+        if (!editApodoxesScope) return false;
+
+        const inst = ts(id);
+        const input = el(id);
+        const button = editApodoxesScope.querySelector(`[data-tom-target="${id}"]`);
+        if (!button) return false;
+
+        inst?.wrapper
+            ?.querySelectorAll('.ts-single-reset-btn')
+            .forEach((inlineButton) => inlineButton.remove());
+
+        let value = '';
+        try {
+            value = inst?.getValue?.() || '';
+        } catch (_) {}
+        value = String(value || input?.value || hid(id)?.value || '').trim();
+        button.hidden = !value;
+        return Boolean(value);
+    }
+
     function forceTrashVisible(id) {
+        if (editApodoxesScope) {
+            syncExternalTrash(id);
+            return;
+        }
+
         const inst = ts(id);
         if (!inst?.wrapper) return;
         if (!inst.items?.length) return;
@@ -79,7 +106,49 @@ import { initTomDropdown } from './dropdown-item.js';
 
     function forceAllTrashVisible() {
         ['symbash', 'kathgoria_symbashs', 'eidikothta_symbashs'].forEach((id) => {
-            if (ts(id)?.items?.length) forceTrashVisible(id);
+            if (editApodoxesScope || ts(id)?.items?.length) forceTrashVisible(id);
+        });
+    }
+
+    function clearBasicSelectionThroughChain(id) {
+        const inst = ts(id);
+        if (!inst) return;
+
+        try {
+            inst.enable();
+        } catch (_) {}
+        inst.wrapper?.classList.remove('ts-locked');
+        inst.wrapper?.classList.remove('ts-disabled-selected');
+        inst.ignoreFocusOpen = true;
+        try {
+            inst.clear();
+            inst.close();
+            inst.control_input?.blur();
+        } finally {
+            inst.ignoreFocusOpen = false;
+            syncExternalTrash(id);
+            setTimeout(() => forceAllTrashVisible(), 0);
+        }
+    }
+
+    function bindExternalTrashButtons() {
+        if (!editApodoxesScope) return;
+
+        editApodoxesScope.querySelectorAll('[data-tom-target]').forEach((button) => {
+            if (button.dataset.trashBound === 'true') return;
+            button.dataset.trashBound = 'true';
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                clearBasicSelectionThroughChain(button.dataset.tomTarget);
+            });
+        });
+
+        ['symbash', 'kathgoria_symbashs', 'eidikothta_symbashs'].forEach((id) => {
+            const input = el(id);
+            if (!input || input.dataset.externalTrashSyncBound === 'true') return;
+            input.dataset.externalTrashSyncBound = 'true';
+            input.addEventListener('change', () => syncExternalTrash(id));
         });
     }
 
@@ -329,6 +398,10 @@ import { initTomDropdown } from './dropdown-item.js';
     }
 
     if (katNode) {
+        katNode.__onClearChain = () => {
+            cascadeFromKat();
+        };
+
         katNode.__onItemAddChain = (val) => {
             const v = (val || '').trim();
             if (!v) return;
@@ -384,6 +457,10 @@ import { initTomDropdown } from './dropdown-item.js';
     }
 
     if (eidNode) {
+        eidNode.__onClearChain = () => {
+            cascadeFromEid();
+        };
+
         eidNode.__onItemAddChain = (val) => {
             const v = (val || '').trim();
             if (!v) return;
@@ -433,6 +510,8 @@ import { initTomDropdown } from './dropdown-item.js';
     forceInit('symbash', '/api/dropdown/symbaseis/symbash');
     forceInit('kathgoria_symbashs', katUrl, katParams);
     forceInit('eidikothta_symbashs', eidUrl, eidParams);
+    bindExternalTrashButtons();
+    forceAllTrashVisible();
 
     /* ═══════════════════════════════════════════════════════════════
      * ✅ IMMEDIATE LOCK — ΠΑΝΤΑ locked αμέσως μετά forceInit
@@ -478,6 +557,8 @@ import { initTomDropdown } from './dropdown-item.js';
         hid,
         forceTrashVisible,
         forceAllTrashVisible,
+        syncExternalTrash,
+        clearBasicSelectionThroughChain,
         applyLock,
         applyUnlock,
         cascadeFromSym,

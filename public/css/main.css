@@ -11086,6 +11086,26 @@ body.loader-active > *:not(.app-loader) {
     opacity: 1 !important;
 }
 
+/* Employee edit → Αποδοχές: το μοναδικό clear action μένει έξω από το TomSelect. */
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash {
+    align-self: center;
+    align-items: center;
+    justify-content: center;
+    color: #8b0000;
+    cursor: pointer;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+}
+
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash:not([hidden]) {
+    display: inline-flex;
+}
+
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash[hidden] {
+    display: none !important;
+}
+
 .swal-overflow {
     max-height: 250px;
     overflow-y: auto;
