@@ -1198,18 +1198,26 @@ function ensureReviewTableStructure() {
                 flex-wrap: wrap;
                 align-items: center;
                 justify-content: center;
+                width: 100%;
+                min-width: 0;
                 gap: 0.25rem;
                 margin-top: 0.25rem;
             }
 
             .review-scenario-badge {
                 display: inline-block;
-                padding: 0.12rem 0.4rem;
+                box-sizing: border-box;
+                max-width: 100%;
+                padding: 0.18rem 0.35rem;
                 border-radius: 999px;
                 font-size: 0.72rem;
                 font-weight: 700;
-                line-height: 1.25;
-                white-space: nowrap;
+                line-height: 1.2;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: normal;
+                text-align: center;
+                vertical-align: middle;
             }
 
             .review-scenario-badge-review {

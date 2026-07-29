@@ -1453,6 +1453,26 @@ function testEmploymentReviewScrollContainerContract() {
         '.employment-review-scroll-container #resultsTable td {\n' +
         '    overflow-wrap: anywhere;'
     ));
+    const colgroupMarkup = viewSource.match(
+        /<colgroup class="employment-review-results-columns">[\s\S]*?<\/colgroup>/
+    )?.[0] || '';
+    assert.strictEqual((colgroupMarkup.match(/<col\b/g) || []).length, 13);
+    assert.ok(colgroupMarkup.includes('review-col-apologistiko'));
+    assert.ok(cssSource.includes(
+        '.employment-review-results-columns .review-col-apologistiko {\n    width: 15%;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable th:nth-child(6),'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable td:nth-child(6) {\n' +
+        '    overflow: hidden;'
+    ));
+    assert.ok(source.includes('max-width: 100%;'));
+    assert.ok(source.includes('white-space: normal;'));
+    assert.ok(source.includes('overflow-wrap: anywhere;'));
+    assert.ok(source.includes('word-break: normal;'));
+    assert.ok(source.includes('text-align: center;'));
 
     const cssDiff = execFileSync('git', ['diff', '--unified=0', '--', cssPath], {
         encoding: 'utf8'

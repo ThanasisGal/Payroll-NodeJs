@@ -14682,6 +14682,43 @@ body.loader-active > *:not(.app-loader) {
     overflow-wrap: anywhere;
 }
 
+.employment-review-results-columns .review-col-date {
+    width: 7%;
+}
+
+.employment-review-results-columns .review-col-branch {
+    width: 7%;
+}
+
+.employment-review-results-columns .review-col-code,
+.employment-review-results-columns .review-col-absences,
+.employment-review-results-columns .review-col-night,
+.employment-review-results-columns .review-col-holiday,
+.employment-review-results-columns .review-col-additional {
+    width: 6%;
+}
+
+.employment-review-results-columns .review-col-declared,
+.employment-review-results-columns .review-col-cards {
+    width: 10%;
+}
+
+.employment-review-results-columns .review-col-apologistiko {
+    width: 15%;
+}
+
+.employment-review-results-columns .review-col-hours,
+.employment-review-results-columns .review-col-overwork,
+.employment-review-results-columns .review-col-overtime {
+    width: 7%;
+}
+
+.employment-review-scroll-container #resultsTable th:nth-child(6),
+.employment-review-scroll-container #resultsTable td:nth-child(6) {
+    overflow: hidden;
+    text-align: center;
+}
+
 .employment-review-scroll-container #resultsTable thead th {
     position: sticky;
     top: var(--employment-review-table-sticky-top);
