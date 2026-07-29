@@ -1539,6 +1539,9 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                     employee.dialleima_entos_ektos_orarioy === true
                         ? 0
                         : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),
+                eidikh_kathgoria_ergazomenoy:
+                    employee.eidikh_kathgoria_ergazomenoy || '',
+                eidikh_periptosh: employee.eidikh_periptosh || '',
                 source:
                     effectiveProfile.employment_profile_source || effectiveProfile.source || '',
                 istorikoId: effectiveProfile.istorikoId || null,
@@ -4888,8 +4891,11 @@ class erganhController {
                 requestedPeriodStart && requestedPeriodEnd
                     ? ProdhlomenaOrariaModel.find(deviationContextFilter)
                           .select(
-                              'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
-                                  'repo_apologistika ores_ergasias ores_ergasias_apologistika cards_ores_ergasias'
+                              'team company_kod ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                                  'repo repo_apologistika adeia kathgoria_adeias ores_apoysias adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika ' +
+                                  'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
+                                  'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
+                                  'ores_ergasias ores_ergasias_apologistika ores_apoysias_apologistika cards_ores_ergasias is_locked'
                           )
                           .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
                           .lean()
@@ -4910,9 +4916,11 @@ class erganhController {
                 kodikos: mongoose.trusted({ $in: kodikoiRows })
             })
                 .select(
-                    'kodikos eponymo onoma mhniaia_repo ' +
+                    'kodikos eponymo onoma mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                         'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                        + ' dialleima_se_lepta dialleima_entos_ektos_orarioy'
+                        + ' eidikh_kathgoria_ergazomenoy eidikh_periptosh'
                 )
                 .lean();
 
@@ -4994,7 +5002,8 @@ class erganhController {
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
                             'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
-                            'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
+                            'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+                            'employment_profile_source afora_allagh_oron_ergasias createdAt'
                     )
                     .sort({
                         kodikos: 1,
@@ -5058,6 +5067,26 @@ class erganhController {
                           periodEnd: reviewPeriodEnd
                       })
                     : {};
+            const deviationAuditRows = deviationContextRows.length
+                ? await ProdhlomenaOrariaAuditModel.find({
+                      team: sessionTeam,
+                      company_kod: companyId,
+                      prodhlomena_oraria_id: mongoose.trusted({
+                          $in: deviationContextRows.map((row) => row._id)
+                      })
+                  })
+                      .select('prodhlomena_oraria_id')
+                      .lean()
+                : [];
+            const deviationAuditCountByRowKey = new Map();
+            deviationAuditRows.forEach((audit) => {
+                const rowId = String(audit.prodhlomena_oraria_id || '').trim();
+                if (!rowId) return;
+                deviationAuditCountByRowKey.set(
+                    rowId,
+                    (deviationAuditCountByRowKey.get(rowId) || 0) + 1
+                );
+            });
 
             const enrichedRows = rows.map((r) => {
                 const erg = ergByKodikos.get(r.kodikos);
@@ -5121,8 +5150,10 @@ class erganhController {
                           periodStart: reviewPeriodStart,
                           periodEnd: reviewPeriodEnd,
                           asOfDate: req.session.appDate,
-                          resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) =>
-                              getWeeklyRepoProfileInfo({
+                          resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) => {
+                              const employee =
+                                  ergByKodikos.get(String(employeeKodikos)) || {};
+                              const weeklyProfile = getWeeklyRepoProfileInfo({
                                   week: {
                                       naturalWeekStart: new Date(`${weekStart}T00:00:00.000Z`),
                                       naturalWeekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
@@ -5132,8 +5163,33 @@ class erganhController {
                                   },
                                   istorikoRows:
                                       istorikoRowsByKodikos.get(String(employeeKodikos)) || [],
-                                  ergazomenos: ergByKodikos.get(String(employeeKodikos)) || {}
-                              }),
+                                  ergazomenos: employee
+                              });
+                              return {
+                                  ...weeklyProfile,
+                                  effectiveProfile: {
+                                      ...(weeklyProfile.effectiveProfile || {}),
+                                      external_break_minutes:
+                                          employee.dialleima_entos_ektos_orarioy === true
+                                              ? 0
+                                              : Math.max(
+                                                    Number.parseInt(
+                                                        employee.dialleima_se_lepta || 0,
+                                                        10
+                                                    ) || 0,
+                                                    0
+                                                ),
+                                      eidikh_kathgoria_ergazomenoy:
+                                          employee.eidikh_kathgoria_ergazomenoy || '',
+                                      eidikh_periptosh:
+                                          employee.eidikh_periptosh || ''
+                                  }
+                              };
+                          },
+                          holidayByDateKey:
+                              noCardsDisplayContext.argiesByDateKey || new Map(),
+                          existingAuditCountByRowKey:
+                              deviationAuditCountByRowKey,
                           resolveDailyProfile: (row) =>
                               getEffectiveRepoProfileForDate(
                                   row.hmeromhnia,

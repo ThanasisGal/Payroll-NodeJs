@@ -150,7 +150,8 @@ function copyAnalysisMetadata(analysis) {
             target_candidates: analysis?.counts?.target_candidates ?? 0,
             existing_actual_repo: analysis?.counts?.existing_actual_repo ?? null,
             predicted_final_repo: analysis?.counts?.predicted_final_repo ?? null
-        }
+        },
+        weekly_resolution: analysis?.weekly_resolution || null
     };
 }
 
@@ -208,6 +209,7 @@ function buildResult({
         scenario_version: scenarioVersion,
         proposal_version: proposalVersion,
         proposal_status: proposalStatus,
+        eligibility_status: analysis?.eligibility_status || null,
         choice_code: CHOICE_CODE,
         requires_hr_review: true,
         can_auto_apply: false,
@@ -221,6 +223,7 @@ function buildResult({
         week: metadata.week,
         employee: metadata.employee,
         counts: metadata.counts,
+        weekly_resolution: metadata.weekly_resolution,
         policy_context: policyContext ? { ...policyContext } : null,
         items: items.map((item) => ({
             role: item.role,

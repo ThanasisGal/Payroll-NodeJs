@@ -4,6 +4,15 @@ const {
     startOfWeekMondayUtc,
     endOfWeekSundayUtc
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    resolveDailyActualWorkFacts
+} = require('./apasxoliseisDailyActualWorkFactsService');
+const {
+    analyzeWeeklySixthSeventhDay
+} = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
+    analyzeWeeklyRepoTransferForEmploymentContract
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 
 const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v1';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
@@ -72,7 +81,9 @@ function buildWeeklyRepoDeviationPreview({
     asOfDate,
     resolveWeeklyProfile,
     resolveDailyProfile,
-    isFullTimeProfile
+    isFullTimeProfile,
+    holidayByDateKey = new Map(),
+    existingAuditCountByRowKey = new Map()
 } = {}) {
     const requestedStart = dateKeyUtc(periodStart);
     const requestedEnd = dateKeyUtc(periodEnd);
@@ -162,6 +173,7 @@ function buildWeeklyRepoDeviationPreview({
                 : {};
         const expectedRepo = weeklyProfile.expectedWeeklyRepo;
         const profileReason = weeklyProfile.repoResolutionReason || null;
+        const effectiveProfile = weeklyProfile.effectiveProfile || {};
         const actualRepo = uniqueRows.filter((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
@@ -182,6 +194,18 @@ function buildWeeklyRepoDeviationPreview({
             !hasResolvedExpectedRepo ||
             Number(actualRepo) !== Number(expectedRepo)
         ) {
+            const dailyFacts = uniqueRows.map((row) => resolveDailyActualWorkFacts(row));
+            const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
+                weekRows: uniqueRows,
+                effectiveProfile
+            });
+            const repoTransfer = analyzeWeeklyRepoTransferForEmploymentContract({
+                weekRows: uniqueRows,
+                employmentProfile: effectiveProfile,
+                holidayByDateKey,
+                existingAuditCountByRowKey
+            });
+            const resolution = repoTransfer.weekly_resolution;
             deviations.push({
                 ...base,
                 status: profileReason ? STATUS.NEEDS_HR_DECISION : STATUS.READY,
@@ -190,6 +214,19 @@ function buildWeeklyRepoDeviationPreview({
                 reasons: profileReason ? [profileReason] : [],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,
+                resolved_repo: resolution?.resolved_repo ?? actualRepo,
+                actual_workdays: resolution?.actual_workdays ??
+                    dailyFacts.filter((facts) => facts.countsAsActualWorkDay).length,
+                sixth_day_count: resolution?.sixth_day_count ??
+                    (sixthSeventhDay.sixthDay ? 1 : 0),
+                seventh_day_count: resolution?.seventh_day_count ??
+                    (sixthSeventhDay.seventhDay ? 1 : 0),
+                repo_transfer_status: repoTransfer.eligibility_status,
+                repo_transfer_reasons: [...(repoTransfer.reasons || [])],
+                repo_transfer_source_available:
+                    !repoTransfer.reasons.includes('NO_SOURCE_CANDIDATE'),
+                repo_transfer_target_available:
+                    !repoTransfer.reasons.includes('NO_TARGET_CANDIDATE'),
                 profile_changed_inside_week:
                     profileReason === 'PROFILE_CHANGED_INSIDE_WEEK',
                 deviation_type:

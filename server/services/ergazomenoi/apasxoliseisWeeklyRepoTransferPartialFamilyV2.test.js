@@ -3,6 +3,8 @@ const assert = require('assert');
 const {
     analyzeWeeklyRepoTransferSinglePairV1,
     analyzeWeeklyRepoTransferSinglePairV2,
+    analyzeWeeklyRepoTransferForEmploymentContract,
+    resolveRepoTransferContractVersion,
     normalizeEmploymentType,
     employmentFamily
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
@@ -21,6 +23,15 @@ const {
 } = require('./apasxoliseisScenarioFactsService');
 
 const START = '2026-07-06';
+
+assert.strictEqual(resolveRepoTransferContractVersion({ typos_apasxolhshs: '0' }), 'v1');
+assert.strictEqual(resolveRepoTransferContractVersion({ typos_apasxolhshs: 'MERIKH' }), 'v2');
+assert.strictEqual(resolveRepoTransferContractVersion({ typos_apasxolhshs: 'EK_PERITROPHS' }), 'v2');
+assert.strictEqual(resolveRepoTransferContractVersion({
+    typos_apasxolhshs: 'MERIKH',
+    hmeres_ergasias_ebdomadas: 3,
+    mo_oron_hmerhsias_ergasias: 4
+}), 'v2');
 
 function date(offset) {
     const value = new Date(`${START}T00:00:00.000Z`);

@@ -9,6 +9,14 @@ const {
     resolveEffectiveExpectedWeeklyRepo
 } = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
 const {
+    analyzeWeeklySixthSeventhDay,
+    STATUS: SIXTH_DAY_STATUS
+} = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
+const {
+    LEAVE_PROVENANCE,
+    classifyLeaveProvenance
+} = require('./apasxoliseisLeaveProvenanceService');
+const {
     dateKeyUtc,
     startOfWeekMondayUtc
 } = require('../../utils/date/mondaySundayWeek');
@@ -264,9 +272,9 @@ function isProvisionalAutoCalculatedLeave({
         toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
 
     return (
+        classifyLeaveProvenance(row) === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE &&
         facts.declared.isDeclaredWork &&
         cardHours === 0 &&
-        facts.leave.hasDeclaredLeave === false &&
         blockingSickness === false &&
         holidayState.blocksRepoTransfer === false &&
         manualOverride === false &&
@@ -475,7 +483,9 @@ function buildRowInfo(row, contexts) {
         holidayState,
         manualOverride
     });
-    const blockingDeclaredLeave = facts.leave.hasDeclaredLeave;
+    const leaveProvenance = classifyLeaveProvenance(row);
+    const blockingDeclaredLeave =
+        leaveProvenance === LEAVE_PROVENANCE.HR_DECLARED_LEAVE;
     const blockingSickness =
         toBoolean(row.astheneia) || facts.apologistika.existingFlags.astheneia_apologistika;
     const blockingManualOrAuditedState = manualOverride;
@@ -500,6 +510,7 @@ function buildRowInfo(row, contexts) {
         manualOverride,
         criticalWarnings,
         blockingDeclaredLeave,
+        leaveProvenance,
         provisionalAutoCalculatedLeave,
         provisionalAutoCalculatedSourceWork,
         blockingSickness,
@@ -661,6 +672,17 @@ function buildResult({
             existing_actual_repo: counts.existing_actual_repo ?? null,
             predicted_final_repo: counts.predicted_final_repo ?? null
         },
+        weekly_resolution: counts.sixth_seventh_day
+            ? {
+                  expected_repo: employee.effective_expected_weekly_repo ?? null,
+                  current_actual_repo: counts.existing_actual_repo ?? null,
+                  resolved_repo: counts.resolved_repo ?? counts.predicted_final_repo ?? null,
+                  actual_workdays: counts.actual_workdays ?? null,
+                  sixth_day_count: counts.sixth_day_count ?? 0,
+                  seventh_day_count: counts.seventh_day_count ?? 0,
+                  sixth_seventh_day: counts.sixth_seventh_day
+              }
+            : null,
         source,
         target,
         semantic_proposal: semanticProposal
@@ -848,9 +870,86 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     };
     counts.existing_actual_repo = rowInfos.filter(isActualRepo).length;
     counts.predicted_final_repo = counts.existing_actual_repo + 1;
+    counts.resolved_repo = counts.predicted_final_repo;
+
+    const sixthDayProjectionRows = rows.map((row) => {
+        const id = normalizeId(row._id || row.id);
+        if (id === normalizeId(cleanSources[0].row._id || cleanSources[0].row.id)) {
+            return { ...row, kathgoria_ergasias_apologistika: 'ΕΡΓ' };
+        }
+        if (id === normalizeId(cleanTargets[0].row._id || cleanTargets[0].row.id)) {
+            return {
+                ...row,
+                kathgoria_ergasias_apologistika: targetCategory,
+                repo_apologistika: true,
+                adeia_apologistika: false,
+                kathgoria_adeias_apologistika: '',
+                ores_apoysias_apologistika: 0,
+                ores_ergasias_apologistika: 0
+            };
+        }
+        return row;
+    });
+    const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
+        weekRows: sixthDayProjectionRows,
+        effectiveProfile: profile
+    });
+    counts.actual_workdays = Array.isArray(sixthSeventhDay.dailyFacts)
+        ? sixthSeventhDay.dailyFacts.filter((day) => day.countsAsActualWorkDay).length
+        : null;
+    counts.sixth_day_count = sixthSeventhDay.sixthDay ? 1 : 0;
+    counts.seventh_day_count = sixthSeventhDay.seventhDay ? 1 : 0;
+    counts.sixth_seventh_day = {
+        policy_version: sixthSeventhDay.policyVersion,
+        status: sixthSeventhDay.status,
+        reasons: [...(sixthSeventhDay.reasons || [])],
+        warnings: [...(sixthSeventhDay.warnings || [])],
+        sixth_day: sixthSeventhDay.sixthDay || null,
+        seventh_day: sixthSeventhDay.seventhDay || null
+    };
 
     if (counts.predicted_final_repo !== repoLimit) {
         const warnings = [...new Set(targetWarnings(cleanTargets[0]))].sort();
+        const sixthDayExplainsOneMissingRepo =
+            employmentType === EMPLOYMENT_TYPE.FULL &&
+            Number(profile.hmeres_ergasias_ebdomadas) === 5 &&
+            counts.predicted_final_repo === repoLimit - 1 &&
+            counts.actual_workdays === 6 &&
+            sixthSeventhDay.status === SIXTH_DAY_STATUS.READY &&
+            Boolean(sixthSeventhDay.sixthDay) &&
+            !sixthSeventhDay.seventhDay;
+        if (sixthDayExplainsOneMissingRepo) {
+            return buildResult({
+                ...base,
+                status: ELIGIBILITY_STATUS.ELIGIBLE,
+                warnings: [...warnings, ...(sixthSeventhDay.warnings || [])],
+                counts,
+                source: rowReference(cleanSources[0], 'ΕΡΓ'),
+                target: rowReference(cleanTargets[0], targetCategory),
+                semanticProposal: {
+                    operation_type: 'REPO_TRANSFER_WITHIN_WEEK',
+                    atomic_pair_required: true,
+                    source_role: 'BECOMES_WORK',
+                    target_role: 'BECOMES_REPO',
+                    repo_deficit_resolution: 'ONE_REPO_PLUS_CLASSIFIED_SIXTH_DAY'
+                }
+            });
+        }
+        const unresolvedFiveDaySixthDayDecision =
+            employmentType === EMPLOYMENT_TYPE.FULL &&
+            Number(profile.hmeres_ergasias_ebdomadas) === 5 &&
+            counts.predicted_final_repo === repoLimit - 1 &&
+            counts.actual_workdays === 6 &&
+            sixthSeventhDay.status === SIXTH_DAY_STATUS.NEEDS_HR_DECISION;
+        if (unresolvedFiveDaySixthDayDecision) {
+            return buildResult({
+                ...base,
+                status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+                reasons: [...new Set(sixthSeventhDay.reasons || [])].sort(),
+                counts,
+                warnings: [...warnings, ...(sixthSeventhDay.warnings || [])]
+            });
+        }
         return buildResult({
             ...base,
             status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
@@ -894,6 +993,17 @@ function employmentFamily(employmentType) {
         return EMPLOYMENT_FAMILY.PARTIAL_FAMILY;
     }
     return null;
+}
+
+function resolveRepoTransferContractVersion(employmentProfile = {}) {
+    const employmentType = normalizeEmploymentType(employmentProfile.typos_apasxolhshs);
+    return employmentFamily(employmentType) === EMPLOYMENT_FAMILY.FULL ? 'v1' : 'v2';
+}
+
+function analyzeWeeklyRepoTransferForEmploymentContract(input = {}) {
+    return resolveRepoTransferContractVersion(input.employmentProfile) === 'v1'
+        ? analyzeWeeklyRepoTransferSinglePairV1(input)
+        : analyzeWeeklyRepoTransferSinglePairV2(input);
 }
 
 function withScenarioVersion(result, scenarioVersion) {
@@ -1146,5 +1256,7 @@ module.exports = {
     ELIGIBILITY_STATUS,
     EMPLOYMENT_TYPE,
     EMPLOYMENT_FAMILY,
-    employmentFamily
+    employmentFamily,
+    resolveRepoTransferContractVersion,
+    analyzeWeeklyRepoTransferForEmploymentContract
 };

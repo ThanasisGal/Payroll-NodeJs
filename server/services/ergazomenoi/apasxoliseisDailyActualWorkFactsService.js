@@ -12,6 +12,13 @@ const WARNING = Object.freeze({
     MIXED_WORK_AND_SICKNESS: 'MIXED_WORK_AND_SICKNESS',
     HOLIDAY_CARD_HOURS_EXCEED_DECLARED_HOURS: 'HOLIDAY_CARD_HOURS_EXCEED_DECLARED_HOURS'
 });
+const {
+    LEAVE_PROVENANCE,
+    classifyLeaveProvenance
+} = require('./apasxoliseisLeaveProvenanceService');
+const {
+    buildCardIntervals
+} = require('./apasxoliseisScenarioFactsService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -41,10 +48,17 @@ function resolveDailyActualWorkFacts(row = {}) {
     if (!declared.ok) reasons.push(REASON.INVALID_DECLARED_HOURS);
     if (!cards.ok) reasons.push(REASON.INVALID_CARD_HOURS);
 
+    const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
+    const hasCompleteCardEvidence = buildCardIntervals(row).some(
+        (interval) => interval.isComplete && !interval.isZeroLength
+    );
     if (reasons.length > 0) {
         return Object.freeze({
             category,
+            declaredWorkHours: declared.ok ? declared.value : null,
+            cardHours: cards.ok ? cards.value : null,
+            hasCompleteCardEvidence,
             actualWorkHours: 0,
             leaveHours: 0,
             sicknessHours: 0,
@@ -57,7 +71,9 @@ function resolveDailyActualWorkFacts(row = {}) {
     let actualWorkHours = 0;
     let leaveHours = 0;
     let sicknessHours = 0;
-    if (category === 'ΕΡΓ') {
+    if (leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
+        leaveHours = declared.value;
+    } else if (category === 'ΕΡΓ') {
         actualWorkHours = cards.value;
     } else if (category === 'ΑΔΕΙΑ') {
         actualWorkHours = cards.value > 0 ? cards.value : declared.value;
@@ -76,6 +92,8 @@ function resolveDailyActualWorkFacts(row = {}) {
         if (actualWorkHours > 0 && sicknessHours > 0) {
             warnings.push(WARNING.MIXED_WORK_AND_SICKNESS);
         }
+    } else if (category === 'ΑΝ' || category === 'ΜΕ') {
+        actualWorkHours = cards.value;
     } else {
         reasons.push(REASON.UNSUPPORTED_DAILY_CATEGORY);
     }
@@ -86,6 +104,9 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     return Object.freeze({
         category,
+        declaredWorkHours: declared.value,
+        cardHours: cards.value,
+        hasCompleteCardEvidence,
         actualWorkHours,
         leaveHours,
         sicknessHours,

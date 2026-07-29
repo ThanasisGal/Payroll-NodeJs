@@ -32,7 +32,9 @@ function buildWeek({
         orariaByDate.set(date, {
             kathgoria_ergasias: 'ΕΡΓ',
             ores_ergasias: 8,
-            cards_ores_ergasias: hours[index]
+            cards_ores_ergasias: hours[index],
+            cards_apo_ora_01: hours[index] > 0 ? '09:00' : '',
+            cards_eos_ora_01: hours[index] > 0 ? '17:00' : ''
         });
     }
 
@@ -75,7 +77,7 @@ test('first cross-month week uses previous-month context but presents requested 
     );
 
     assert.equal(analyses[0].complete, true);
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), [
         '2026-07-01',
@@ -105,7 +107,7 @@ test('completed trailing cross-month week classifies next-month seventh day', ()
     );
 
     assert.equal(analyses[0].status, 'READY');
-    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-06-30');
+    assert.equal(analyses[0].sixthDay.hmeromhnia, '2026-07-04');
     assert.equal(analyses[0].seventhDay.hmeromhnia, '2026-07-05');
     assert.deepEqual(requested.map((day) => day.date), ['2026-06-29', '2026-06-30']);
 });

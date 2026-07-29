@@ -238,6 +238,9 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 hmeres_ergasias_ebdomadas: effective.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: Number(effective.mo_oron_hmerhsias_ergasias || 0),
                 external_break_minutes: employee.dialleima_entos_ektos_orarioy === true ? 0 : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),
+                eidikh_kathgoria_ergazomenoy:
+                    employee.eidikh_kathgoria_ergazomenoy || '',
+                eidikh_periptosh: employee.eidikh_periptosh || '',
                 profile_source: effective.source || '',
                 profile_istoriko_id: effective.istorikoId ? String(effective.istorikoId) : null,
                 profile_effective_date: profileInfo.effectiveProfileDate,

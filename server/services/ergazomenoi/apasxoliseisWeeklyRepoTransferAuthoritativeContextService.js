@@ -11,7 +11,7 @@ const {
 const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
     'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
-    'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
+    'ores_ergasias repo adeia kathgoria_adeias ores_apoysias astheneia ' +
     'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
     'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
     'kathgoria_ergasias_apologistika apologistiko_biblio repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
@@ -26,7 +26,8 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
-    'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';
+    'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
+    'dialleima_entos_ektos_orarioy dialleima_se_lepta';
 
 const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     '_id kodikos aa_eggrafhs hmeromhnia_allaghs_symbashs ' +

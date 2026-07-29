@@ -9,6 +9,9 @@ const {
     dateKeyUtc,
     startOfWeekMondayUtc
 } = require('../../utils/date/mondaySundayWeek');
+const {
+    resolveRepoTransferContractVersion
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 
 const PAGE_PROJECTION_STATUS = Object.freeze({
     READY: 'READY'
@@ -329,7 +332,9 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             employmentProfile: weeklyInput?.employmentProfile,
             holidayByDateKey: weeklyInput?.holidayByDateKey,
             existingAuditCountByRowKey: weeklyInput?.existingAuditCountByRowKey,
-            contractVersion: 'v2'
+            contractVersion: resolveRepoTransferContractVersion(
+                weeklyInput?.employmentProfile
+            )
         });
         incrementCounts(reasonCounts, projection?.reasons);
         incrementCounts(warningCounts, projection?.warnings);

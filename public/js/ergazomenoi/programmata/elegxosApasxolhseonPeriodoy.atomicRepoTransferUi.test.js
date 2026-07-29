@@ -108,6 +108,14 @@ function readyProjection({ targetCategory = 'ΑΝ', sourceIntervals } = {}) {
                 count: 2,
                 decision_units_count: 1,
                 warnings: [],
+                repo_resolution: {
+                    effective_expected_weekly_repo: 2,
+                    current_actual_repo: 0,
+                    resolved_repo: 1,
+                    actual_workdays: 6,
+                    sixth_day_count: 1,
+                    seventh_day_count: 0
+                },
                 items: [
                     {
                         role: 'SOURCE_BECOMES_WORK',
@@ -154,6 +162,20 @@ function render(projection) {
 
 function assertContains(html, values) {
     values.forEach((value) => assert.ok(html.includes(value), `Missing: ${value}`));
+}
+
+function testWeeklyResolutionShowsRepoAndSixthDayFacts() {
+    const html = render(readyProjection());
+    assertContains(html, [
+        'Αναμενόμενα ρεπό',
+        'Τρέχοντα πραγματικά ρεπό',
+        'Προτεινόμενα/επιλυμένα ρεπό',
+        'Πραγματικές ημέρες εργασίας',
+        '6η ημέρα εργασίας',
+        '7η ημέρα/παράβαση'
+    ]);
+    assert.ok(html.includes('<strong>2</strong>'));
+    assert.ok(html.includes('<strong>6</strong>'));
 }
 
 function getVisibleText(html) {
@@ -2216,6 +2238,7 @@ async function testHrLoadingLocksAndRestoresFilters() {
 }
 
 const tests = [
+    testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testPersistedRepoCategoryOverridesDerivedLeave,
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,

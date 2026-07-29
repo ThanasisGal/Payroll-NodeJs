@@ -10,6 +10,9 @@ const {
     PROPOSAL_VERSION_V2,
     CHOICE_CODE
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
+const {
+    analyzeWeeklySixthSeventhDay
+} = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 
 const PROJECTION_STATUS = Object.freeze({
     READY: 'READY',
@@ -108,10 +111,36 @@ function emptySummary(notAvailableCount) {
     };
 }
 
-function buildEmptyResult({ proposal, projectionStatus, reason = null }) {
+function buildEmptyResult({
+    proposal,
+    projectionStatus,
+    reason = null,
+    weekRows = [],
+    employmentProfile = {}
+}) {
     const reasons = copyReasons(proposal?.reasons);
     if (reason && !reasons.includes(reason)) reasons.push(reason);
 
+    const sixthSeventhDay = analyzeWeeklySixthSeventhDay({
+        weekRows,
+        effectiveProfile: employmentProfile
+    });
+    const fallbackResolution = {
+        resolved_repo: proposal?.counts?.existing_actual_repo ?? null,
+        actual_workdays: Array.isArray(sixthSeventhDay.dailyFacts)
+            ? sixthSeventhDay.dailyFacts.filter((day) => day.countsAsActualWorkDay).length
+            : null,
+        sixth_day_count: sixthSeventhDay.sixthDay ? 1 : 0,
+        seventh_day_count: sixthSeventhDay.seventhDay ? 1 : 0,
+        sixth_seventh_day: {
+            policy_version: sixthSeventhDay.policyVersion,
+            status: sixthSeventhDay.status,
+            reasons: [...(sixthSeventhDay.reasons || [])],
+            warnings: [...(sixthSeventhDay.warnings || [])],
+            sixth_day: sixthSeventhDay.sixthDay || null,
+            seventh_day: sixthSeventhDay.seventhDay || null
+        }
+    };
     return deepFreeze({
         version: 1,
         scope: 'weekly_atomic_pair',
@@ -119,6 +148,10 @@ function buildEmptyResult({ proposal, projectionStatus, reason = null }) {
         summary: emptySummary(1),
         reasons,
         warnings: copyReasons(proposal?.warnings),
+        eligibility_status: proposal?.eligibility_status || null,
+        source_available: !reasons.includes('NO_SOURCE_CANDIDATE'),
+        target_available: !reasons.includes('NO_TARGET_CANDIDATE'),
+        repo_resolution: proposal?.weekly_resolution || fallbackResolution,
         review_outcomes: proposal?.review_only_outcome
             ? [{ ...proposal.review_only_outcome }]
             : [],
@@ -240,7 +273,9 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
     if (proposal.proposal_status !== PROPOSAL_STATUS.READY) {
         return buildEmptyResult({
             proposal,
-            projectionStatus: PROJECTION_STATUS.NOT_AVAILABLE
+            projectionStatus: PROJECTION_STATUS.NOT_AVAILABLE,
+            weekRows,
+            employmentProfile
         });
     }
 
@@ -249,7 +284,9 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
         return buildEmptyResult({
             proposal,
             projectionStatus: PROJECTION_STATUS.INVALID_PROJECTION,
-            reason: invalidReason
+            reason: invalidReason,
+            weekRows,
+            employmentProfile
         });
     }
 
@@ -312,12 +349,18 @@ function buildWeeklyRepoTransferSinglePairGroupProjection({
             }
         },
         warnings: [...warnings],
-        repo_resolution: {
+      repo_resolution: {
             effective_expected_weekly_repo:
                 proposal.employee.effective_expected_weekly_repo,
             repo_resolution_source: proposal.employee.repo_resolution_source,
             scheduled_work_days: proposal.employee.scheduled_work_days,
-            effective_weekly_workdays: proposal.employee.effective_weekly_workdays
+            effective_weekly_workdays: proposal.employee.effective_weekly_workdays,
+            current_actual_repo: proposal.weekly_resolution?.current_actual_repo ?? null,
+            resolved_repo: proposal.weekly_resolution?.resolved_repo ?? null,
+            actual_workdays: proposal.weekly_resolution?.actual_workdays ?? null,
+            sixth_day_count: proposal.weekly_resolution?.sixth_day_count ?? 0,
+            seventh_day_count: proposal.weekly_resolution?.seventh_day_count ?? 0,
+            sixth_seventh_day: proposal.weekly_resolution?.sixth_seventh_day || null
         }
     };
 

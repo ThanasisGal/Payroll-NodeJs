@@ -61,7 +61,7 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
             'repo-transfer-single-pair-proposal:v2'
         );
     }
-    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 52); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 53); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
     for (const field of ['cards_ores_ergasias','cards_apo_ora_01','kathgoria_ergasias','ores_nyxtas_apologistika']) { assert.strictEqual(accepted.plan.source.expected_current[field], currentValues[field]); assert.strictEqual(accepted.plan.target.expected_current[field], currentValues[field]); }
     assert.deepStrictEqual(Object.keys(payload), ['decision_id','request_id']);
     await run(({ decision }) => { decision.decision_code = 'REJECT_PROPOSAL'; }, 'DECISION_NOT_APPROVED');
