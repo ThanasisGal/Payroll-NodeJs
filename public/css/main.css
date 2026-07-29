@@ -14656,8 +14656,7 @@ body.loader-active > *:not(.app-loader) {
     --employment-review-table-sticky-top: 0px;
     max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
     max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
 }
@@ -14672,45 +14671,70 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container #resultsTable {
-    width: 100%;
+    width: max(100%, 89.25rem);
+    min-width: 89.25rem;
     table-layout: fixed;
     margin-bottom: 0;
 }
 
-.employment-review-scroll-container #resultsTable th,
-.employment-review-scroll-container #resultsTable td {
-    overflow-wrap: anywhere;
-}
-
 .employment-review-results-columns .review-col-date {
-    width: 7%;
+    width: 9rem;
 }
 
 .employment-review-results-columns .review-col-branch {
-    width: 7%;
+    width: 5.25rem;
 }
 
-.employment-review-results-columns .review-col-code,
-.employment-review-results-columns .review-col-absences,
-.employment-review-results-columns .review-col-night,
-.employment-review-results-columns .review-col-holiday,
-.employment-review-results-columns .review-col-additional {
-    width: 6%;
+.employment-review-results-columns .review-col-code {
+    width: 5.25rem;
 }
 
 .employment-review-results-columns .review-col-declared,
 .employment-review-results-columns .review-col-cards {
-    width: 10%;
+    width: 9.25rem;
 }
 
 .employment-review-results-columns .review-col-apologistiko {
-    width: 15%;
+    width: 13rem;
 }
 
 .employment-review-results-columns .review-col-hours,
+.employment-review-results-columns .review-col-night,
+.employment-review-results-columns .review-col-holiday {
+    width: 5rem;
+}
+
+.employment-review-results-columns .review-col-absences {
+    width: 5.75rem;
+}
+
+.employment-review-results-columns .review-col-additional {
+    width: 5.5rem;
+}
+
 .employment-review-results-columns .review-col-overwork,
 .employment-review-results-columns .review-col-overtime {
-    width: 7%;
+    width: 6rem;
+}
+
+.employment-review-scroll-container #resultsTable > thead > tr > th {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.employment-review-scroll-container #resultsTable td:nth-child(1),
+.employment-review-scroll-container #resultsTable td:nth-child(2),
+.employment-review-scroll-container #resultsTable td:nth-child(3),
+.employment-review-scroll-container #resultsTable td:nth-child(5),
+.employment-review-scroll-container #resultsTable td:nth-child(n + 7) {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.employment-review-scroll-container #resultsTable .review-interval-line {
+    white-space: nowrap;
 }
 
 .employment-review-scroll-container #resultsTable th:nth-child(6),

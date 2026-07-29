@@ -1418,8 +1418,8 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(selectorStart >= 0);
     const selectorEnd = cssSource.indexOf('}', selectorStart);
     const scrollCss = cssSource.slice(selectorStart, selectorEnd);
-    assert.ok(/overflow-y\s*:\s*auto\s*;/.test(scrollCss));
-    assert.ok(/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
+    assert.ok(/overflow\s*:\s*auto\s*;/.test(scrollCss));
+    assert.ok(!/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
     assert.ok(/max-height\s*:[^;]*(?:100vh|100dvh)/.test(scrollCss));
     assert.ok(/--employment-review-table-sticky-top\s*:\s*0px/.test(scrollCss));
 
@@ -1446,9 +1446,12 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(/border-color\s*:\s*#495057/.test(stickyCss));
     assert.ok(/background-clip\s*:\s*padding-box/.test(stickyCss));
     assert.ok(cssSource.includes(
-        '.employment-review-scroll-container #resultsTable {\n    width: 100%;\n    table-layout: fixed;'
+        '.employment-review-scroll-container #resultsTable {\n' +
+        '    width: max(100%, 89.25rem);\n' +
+        '    min-width: 89.25rem;\n' +
+        '    table-layout: fixed;'
     ));
-    assert.ok(cssSource.includes(
+    assert.ok(!cssSource.includes(
         '.employment-review-scroll-container #resultsTable th,\n' +
         '.employment-review-scroll-container #resultsTable td {\n' +
         '    overflow-wrap: anywhere;'
@@ -1459,7 +1462,20 @@ function testEmploymentReviewScrollContainerContract() {
     assert.strictEqual((colgroupMarkup.match(/<col\b/g) || []).length, 13);
     assert.ok(colgroupMarkup.includes('review-col-apologistiko'));
     assert.ok(cssSource.includes(
-        '.employment-review-results-columns .review-col-apologistiko {\n    width: 15%;'
+        '.employment-review-results-columns .review-col-apologistiko {\n    width: 13rem;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-results-columns .review-col-date {\n    width: 9rem;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable > thead > tr > th {\n' +
+        '    white-space: nowrap;\n' +
+        '    overflow-wrap: normal;\n' +
+        '    word-break: normal;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable .review-interval-line {\n' +
+        '    white-space: nowrap;'
     ));
     assert.ok(cssSource.includes(
         '.employment-review-scroll-container #resultsTable th:nth-child(6),'
@@ -1470,7 +1486,7 @@ function testEmploymentReviewScrollContainerContract() {
     ));
     assert.ok(source.includes('max-width: 100%;'));
     assert.ok(source.includes('white-space: normal;'));
-    assert.ok(source.includes('overflow-wrap: anywhere;'));
+    assert.ok(source.includes('overflow-wrap: break-word;'));
     assert.ok(source.includes('word-break: normal;'));
     assert.ok(source.includes('text-align: center;'));
 

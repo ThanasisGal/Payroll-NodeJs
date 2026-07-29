@@ -1214,7 +1214,7 @@ function ensureReviewTableStructure() {
                 font-weight: 700;
                 line-height: 1.2;
                 white-space: normal;
-                overflow-wrap: anywhere;
+                overflow-wrap: break-word;
                 word-break: normal;
                 text-align: center;
                 vertical-align: middle;
