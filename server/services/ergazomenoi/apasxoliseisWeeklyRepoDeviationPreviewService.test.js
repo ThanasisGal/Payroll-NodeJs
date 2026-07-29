@@ -5,6 +5,12 @@ const {
     normalizeLegacyDeviation,
     buildWeeklyRepoDeviationPreview
 } = require('./apasxoliseisWeeklyRepoDeviationPreviewService');
+const {
+    analyzeWeeklyRepoTransferForEmploymentContract
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
+    buildWeeklyRepoTransferAtomicPageProjection
+} = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
 
 function rows(start, count = 7, overrides = {}) {
     return Array.from({ length: count }, (_, offset) => {
@@ -189,11 +195,90 @@ function testLegacyPersistedRangeIsExplicit() {
     assert.strictEqual(current.is_legacy_policy, false);
 }
 
+function testDeviationAndAtomicUseTheSameContractSelector() {
+    const profiles = [
+        { typos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5, mhniaia_repo: 2 },
+        { typos_apasxolhshs: 'MERIKH', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
+        { typos_apasxolhshs: 'EK_PERITROPHS', hmeres_ergasias_ebdomadas: 6, mhniaia_repo: 1 },
+        {
+            typos_apasxolhshs: 'MERIKH',
+            hmeres_ergasias_ebdomadas: 3,
+            mo_oron_hmerhsias_ergasias: 4,
+            mhniaia_repo: 4
+        }
+    ];
+    const capturedVersions = [];
+    for (const profile of profiles) {
+        const weekRows = rows('2026-06-22').map((row, index) => ({
+            ...row,
+            _id: `contract-${profile.typos_apasxolhshs}-${index}`,
+            team: 'THA',
+            company_kod: '0004'
+        }));
+        const isFull = profile.typos_apasxolhshs === '0';
+        Object.assign(weekRows[0], {
+            kathgoria_ergasias: isFull ? 'ΑΝ' : 'ΜΕ',
+            ores_ergasias: 0
+        });
+        Object.assign(weekRows[6], {
+            cards_ores_ergasias: 0,
+            adeia_apologistika: isFull,
+            kathgoria_adeias_apologistika: isFull ? 'ΑΔΑΛ' : ''
+        });
+        const direct = analyzeWeeklyRepoTransferForEmploymentContract({
+            weekRows,
+            employmentProfile: profile
+        });
+        const preview = buildWeeklyRepoDeviationPreview({
+            rows: weekRows,
+            periodStart: '2026-06-01',
+            periodEnd: '2026-06-30',
+            asOfDate: '2026-06-30',
+            resolveWeeklyProfile: () => ({
+                expectedWeeklyRepo: profile.mhniaia_repo,
+                effectiveProfile: profile
+            })
+        });
+        const deviation = preview.deviations[0];
+        assert.strictEqual(deviation.repo_transfer_status, direct.eligibility_status);
+        assert.deepStrictEqual(deviation.repo_transfer_reasons, direct.reasons);
+        assert.strictEqual(
+            deviation.resolved_repo,
+            direct.weekly_resolution?.resolved_repo ?? deviation.actual_repo
+        );
+        assert.strictEqual(
+            deviation.sixth_day_count,
+            direct.weekly_resolution?.sixth_day_count ?? 0
+        );
+        assert.strictEqual(
+            deviation.seventh_day_count,
+            direct.weekly_resolution?.seventh_day_count ?? 0
+        );
+        buildWeeklyRepoTransferAtomicPageProjection(
+            { weeklyInputs: [{ weekRows, employmentProfile: profile }] },
+            {
+                singleWeekProjectionBuilder: ({ contractVersion }) => {
+                    capturedVersions.push(contractVersion);
+                    return {
+                        projection_status: 'NOT_AVAILABLE',
+                        reasons: direct.reasons,
+                        warnings: [],
+                        groups: [],
+                        review_outcomes: []
+                    };
+                }
+            }
+        );
+    }
+    assert.deepStrictEqual(capturedVersions, ['v1', 'v2', 'v2', 'v2']);
+}
+
 testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
 testRepoTransferLifecycleUsesEffectiveFinalRows();
 testLegacyPersistedRangeIsExplicit();
+testDeviationAndAtomicUseTheSameContractSelector();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

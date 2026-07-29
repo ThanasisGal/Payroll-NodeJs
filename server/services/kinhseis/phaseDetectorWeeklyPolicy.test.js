@@ -32,7 +32,9 @@ function buildWeek({
         orariaByDate.set(date, {
             kathgoria_ergasias: 'ΕΡΓ',
             ores_ergasias: 8,
-            cards_ores_ergasias: hours[index]
+            cards_ores_ergasias: hours[index],
+            cards_apo_ora_01: hours[index] > 0 ? '09:00' : '',
+            cards_eos_ora_01: hours[index] > 0 ? '17:00' : ''
         });
     }
 

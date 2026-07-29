@@ -68,6 +68,7 @@ assert.ok(!APPLY_FIELDS.includes('kathgoria_adeias'));
 assert.ok(!APPLY_FIELDS.includes('ores_apoysias'));
 assert.ok(CURRENT_GUARD_FIELDS.includes('adeia'));
 assert.ok(CURRENT_GUARD_FIELDS.includes('kathgoria_adeias'));
+assert.ok(CURRENT_GUARD_FIELDS.includes('ores_apoysias'));
 
 {
     const rows = sixWorkdaysWithAutoLeave();
@@ -122,6 +123,25 @@ assert.ok(CURRENT_GUARD_FIELDS.includes('kathgoria_adeias'));
     );
 }
 
+for (const marker of [
+    { adeia: true },
+    { kathgoria_adeias: 'HR' },
+    { ores_apoysias: 8 }
+]) {
+    const rows = sixWorkdaysWithAutoLeave();
+    Object.assign(rows[6], marker);
+    assert.strictEqual(
+        classifyLeaveProvenance(rows[6]),
+        LEAVE_PROVENANCE.HR_DECLARED_LEAVE
+    );
+    const analysis = analyzeWeeklyRepoTransferSinglePair({
+        weekRows: rows,
+        employmentProfile: profile
+    });
+    assert.notStrictEqual(analysis.eligibility_status, 'ELIGIBLE');
+    assert.ok(analysis.reasons.includes('TARGET_LEAVE_OR_SICKNESS'));
+}
+
 {
     const rows = sixWorkdaysWithAutoLeave();
     Object.assign(rows[6], { adeia: true, kathgoria_adeias: 'HR' });
@@ -169,19 +189,6 @@ assert.ok(CURRENT_GUARD_FIELDS.includes('kathgoria_adeias'));
     });
     assert.strictEqual(analysis.status, 'NOT_APPLICABLE');
     assert.strictEqual(analysis.sixthDay, undefined);
-}
-
-// Sanitized production regression signatures: employee code is the only identity.
-for (const employeeCode of ['0002', '0003', '0005']) {
-    const productionSignature = {
-        ...sixWorkdaysWithAutoLeave()[6],
-        _id: `sanitized-${employeeCode}`,
-        kodikos: employeeCode
-    };
-    assert.strictEqual(
-        classifyLeaveProvenance(productionSignature),
-        LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE
-    );
 }
 
 console.log('PASS auto-leave provenance and sixth-day repo-transfer integration');

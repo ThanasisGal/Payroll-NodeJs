@@ -12,6 +12,39 @@ assert.ok(routeSource.includes("router.get('/api/prodhlomena-oraria/review'"));
 assert.ok(routeSource.includes('erganhController.getProdhlomenaOrariaForReview'));
 assert.ok(source.includes('buildWeeklyRepoDeviationPreview({'));
 assert.ok(source.includes('rows: deviationContextRows'));
+const deviationSelectStart = source.indexOf(
+    'ProdhlomenaOrariaModel.find(deviationContextFilter)'
+);
+const deviationSelectEnd = source.indexOf(
+    '.sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })',
+    deviationSelectStart
+);
+assert.ok(deviationSelectStart >= 0 && deviationSelectEnd > deviationSelectStart);
+const deviationSelect = source.slice(deviationSelectStart, deviationSelectEnd);
+for (const field of [
+    'adeia',
+    'kathgoria_adeias',
+    'ores_apoysias',
+    'adeia_apologistika',
+    'kathgoria_adeias_apologistika',
+    'ores_apoysias_apologistika',
+    'astheneia',
+    'astheneia_apologistika',
+    'cards_ores_ergasias',
+    'cards_apo_ora_01',
+    'cards_eos_ora_01',
+    'ores_ergasias',
+    'ores_ergasias_apologistika',
+    'kathgoria_ergasias',
+    'kathgoria_ergasias_apologistika'
+]) {
+    assert.ok(
+        new RegExp(`(?:^|[^A-Za-z0-9_])${field}(?:$|[^A-Za-z0-9_])`).test(
+            deviationSelect
+        ),
+        `missing ${field}`
+    );
+}
 assert.ok(source.includes('asOfDate: req.session.appDate'));
 assert.ok(source.includes('$gte: startOfWeekMondayUtc(requestedPeriodStart)'));
 assert.ok(source.includes('$lte: endOfWeekSundayUtc(requestedPeriodEnd)'));

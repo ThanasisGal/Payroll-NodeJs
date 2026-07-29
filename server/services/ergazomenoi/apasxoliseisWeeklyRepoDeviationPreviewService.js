@@ -11,7 +11,7 @@ const {
     analyzeWeeklySixthSeventhDay
 } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 const {
-    analyzeWeeklyRepoTransferSinglePair
+    analyzeWeeklyRepoTransferForEmploymentContract
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
 
 const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v1';
@@ -197,7 +197,7 @@ function buildWeeklyRepoDeviationPreview({
                 weekRows: uniqueRows,
                 effectiveProfile
             });
-            const repoTransfer = analyzeWeeklyRepoTransferSinglePair({
+            const repoTransfer = analyzeWeeklyRepoTransferForEmploymentContract({
                 weekRows: uniqueRows,
                 employmentProfile: effectiveProfile
             });

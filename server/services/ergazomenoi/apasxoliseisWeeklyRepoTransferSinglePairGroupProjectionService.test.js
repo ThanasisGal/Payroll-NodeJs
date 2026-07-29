@@ -365,7 +365,20 @@ function testNonReadyProposalPaths() {
 
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
-    assertNotAvailable(build(deficit), 'REPO_DEFICIT_REMAINS');
+    const sixthDayResolution = build(deficit, {
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        pososto_prosayxhshs_6hs_hmeras: 0
+    });
+    assert.strictEqual(sixthDayResolution.projection_status, 'READY');
+    assert.strictEqual(
+        sixthDayResolution.groups[0].repo_resolution.resolved_repo,
+        1
+    );
+    assert.strictEqual(
+        sixthDayResolution.groups[0].repo_resolution.sixth_day_count,
+        1
+    );
     assert.strictEqual(
         build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
             .projection_status,

@@ -16,6 +16,9 @@ const {
     LEAVE_PROVENANCE,
     classifyLeaveProvenance
 } = require('./apasxoliseisLeaveProvenanceService');
+const {
+    buildCardIntervals
+} = require('./apasxoliseisScenarioFactsService');
 
 function nonNegativeNumber(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
@@ -47,9 +50,14 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     const leaveProvenance = classifyLeaveProvenance(row);
     const category = categoryOf(row);
+    const hasCompleteCardEvidence = buildCardIntervals(row).some(
+        (interval) => interval.isComplete && !interval.isZeroLength
+    );
     if (reasons.length > 0) {
         return Object.freeze({
             category,
+            cardHours: cards.ok ? cards.value : null,
+            hasCompleteCardEvidence,
             actualWorkHours: 0,
             leaveHours: 0,
             sicknessHours: 0,
@@ -95,6 +103,8 @@ function resolveDailyActualWorkFacts(row = {}) {
 
     return Object.freeze({
         category,
+        cardHours: cards.value,
+        hasCompleteCardEvidence,
         actualWorkHours,
         leaveHours,
         sicknessHours,

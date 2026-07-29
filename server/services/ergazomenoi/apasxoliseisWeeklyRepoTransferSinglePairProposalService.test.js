@@ -590,7 +590,10 @@ function testNonEligibleAnalyzerPaths() {
 
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
-    assertNotAvailable(build(deficit), 'REPO_DEFICIT_REMAINS');
+    assertNotAvailable(
+        build(deficit),
+        'MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'
+    );
     assert.strictEqual(
         build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
             .proposal_status,

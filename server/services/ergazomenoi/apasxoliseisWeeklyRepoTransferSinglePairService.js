@@ -935,6 +935,21 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 }
             });
         }
+        const unresolvedFiveDaySixthDayDecision =
+            employmentType === EMPLOYMENT_TYPE.FULL &&
+            Number(profile.hmeres_ergasias_ebdomadas) === 5 &&
+            counts.predicted_final_repo === repoLimit - 1 &&
+            counts.actual_workdays === 6 &&
+            sixthSeventhDay.status === SIXTH_DAY_STATUS.NEEDS_HR_DECISION;
+        if (unresolvedFiveDaySixthDayDecision) {
+            return buildResult({
+                ...base,
+                status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+                reasons: [...new Set(sixthSeventhDay.reasons || [])].sort(),
+                counts,
+                warnings: [...warnings, ...(sixthSeventhDay.warnings || [])]
+            });
+        }
         return buildResult({
             ...base,
             status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
@@ -978,6 +993,17 @@ function employmentFamily(employmentType) {
         return EMPLOYMENT_FAMILY.PARTIAL_FAMILY;
     }
     return null;
+}
+
+function resolveRepoTransferContractVersion(employmentProfile = {}) {
+    const employmentType = normalizeEmploymentType(employmentProfile.typos_apasxolhshs);
+    return employmentFamily(employmentType) === EMPLOYMENT_FAMILY.FULL ? 'v1' : 'v2';
+}
+
+function analyzeWeeklyRepoTransferForEmploymentContract(input = {}) {
+    return resolveRepoTransferContractVersion(input.employmentProfile) === 'v1'
+        ? analyzeWeeklyRepoTransferSinglePairV1(input)
+        : analyzeWeeklyRepoTransferSinglePairV2(input);
 }
 
 function withScenarioVersion(result, scenarioVersion) {
@@ -1230,5 +1256,7 @@ module.exports = {
     ELIGIBILITY_STATUS,
     EMPLOYMENT_TYPE,
     EMPLOYMENT_FAMILY,
-    employmentFamily
+    employmentFamily,
+    resolveRepoTransferContractVersion,
+    analyzeWeeklyRepoTransferForEmploymentContract
 };

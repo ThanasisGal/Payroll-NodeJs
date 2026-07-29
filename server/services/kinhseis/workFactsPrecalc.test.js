@@ -281,7 +281,9 @@ test('real weekly analysis flows through work-facts payload into target-only car
         orariaByDate.set(date, {
             kathgoria_ergasias: 'ΕΡΓ',
             ores_ergasias: 8,
-            cards_ores_ergasias: hours[index]
+            cards_ores_ergasias: hours[index],
+            cards_apo_ora_01: '09:00',
+            cards_eos_ora_01: '17:00'
         });
     }
     const weeklyAnalyses = [];

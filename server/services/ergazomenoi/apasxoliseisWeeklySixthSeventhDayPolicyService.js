@@ -16,9 +16,14 @@ function validRate(value) {
 }
 
 function selectSixthDay(candidates) {
-    const preferred = candidates.filter((day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8);
+    const cardProvenCandidates = candidates.filter(
+        (day) => day.cardHours > 0 && day.hasCompleteCardEvidence === true
+    );
+    const preferred = cardProvenCandidates.filter(
+        (day) => day.actualWorkHours > 5 && day.actualWorkHours <= 8
+    );
     if (preferred.length > 0) return { day: preferred[preferred.length - 1], warning: null };
-    const overEight = candidates.filter((day) => day.actualWorkHours > 8);
+    const overEight = cardProvenCandidates.filter((day) => day.actualWorkHours > 8);
     if (overEight.length > 0) {
         return { day: overEight[overEight.length - 1], warning: 'SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT' };
     }
@@ -48,10 +53,6 @@ function analyzeWeeklySixthSeventhDay({
     if (Number(effectiveProfile.hmeres_ergasias_ebdomadas) !== 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [], dailyFacts: [] });
     }
-    const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
-    if (premiumRate === null) {
-        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'], warnings: [], dailyFacts: [] });
-    }
     const dailyFacts = rows
         .map((row) => ({ hmeromhnia: dateKeyUtc(row.hmeromhnia), ...resolveDailyActualWorkFacts(row) }))
         .sort((a, b) => a.hmeromhnia.localeCompare(b.hmeromhnia));
@@ -62,6 +63,10 @@ function analyzeWeeklySixthSeventhDay({
     const actualDays = dailyFacts.filter((day) => day.countsAsActualWorkDay);
     if (actualDays.length <= 5) {
         return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NOT_APPLICABLE, reasons: [], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: null });
+    }
+    const premiumRate = validRate(effectiveProfile.pososto_prosayxhshs_6hs_hmeras);
+    if (premiumRate === null) {
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.NEEDS_HR_DECISION, reasons: ['MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'], warnings: [...new Set(dailyFacts.flatMap((day) => day.warnings))], dailyFacts, sixthDay: null, seventhDay: actualDays.length === 7 ? actualDays[actualDays.length - 1] : null });
     }
     const seventhDay = actualDays.length === 7 ? actualDays[actualDays.length - 1] : null;
     const sixthCandidates = seventhDay ? actualDays.slice(0, -1) : actualDays;

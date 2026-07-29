@@ -25,6 +25,7 @@ function testRowFieldEquivalence() {
         'ores_nyxtas_apologistika',
         'ores_argion_prosayxhsh_apologistika',
         'ores_argion_ergasia_apologistika',
+        'ores_apoysias',
         'ores_prostheths_ergasias_apologistika',
         'ores_yperergasias_argion_nyxtas_apologistika',
         'ores_nominhs_yperorias_argion_nyxtas_apologistika',
@@ -235,7 +236,7 @@ function test0002ThroughAuthoritativeProjectionPath() {
     });
     assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
     assert.strictEqual(projection.groups.length, 0);
-    assert.ok(projection.reasons.includes('REPO_DEFICIT_REMAINS'));
+    assert.ok(projection.reasons.includes('MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE'));
 }
 
 function testProfileDateForDeviationPrecedenceAndFallbacks() {

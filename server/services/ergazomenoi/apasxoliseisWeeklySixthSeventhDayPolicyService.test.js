@@ -11,7 +11,9 @@ function week(hours = [8, 8, 8, 8, 8, 7, 0]) {
         hmeromhnia: date.toISOString().slice(0, 10),
         kathgoria_ergasias: 'ΕΡΓ',
         ores_ergasias: 8,
-        cards_ores_ergasias: cards
+        cards_ores_ergasias: cards,
+        cards_apo_ora_01: cards > 0 ? '09:00' : '',
+        cards_eos_ora_01: cards > 0 ? '17:00' : ''
     });
     });
 }
@@ -42,6 +44,33 @@ assert.strictEqual(analyzeWeeklySixthSeventhDay({
     effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
     hourlyRate: 10
 }).sixthDay.hmeromhnia, '2026-08-01');
+
+const holidayWithoutCards = week([7, 7, 7, 7, 7, 7, 0]);
+Object.assign(holidayWithoutCards[5], {
+    argia: true,
+    cards_ores_ergasias: 0,
+    cards_apo_ora_01: '',
+    cards_eos_ora_01: ''
+});
+result = analyzeWeeklySixthSeventhDay({
+    weekRows: holidayWithoutCards,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10
+});
+assert.strictEqual(result.dailyFacts[5].countsAsActualWorkDay, true);
+assert.notStrictEqual(result.sixthDay.hmeromhnia, '2026-08-01');
+
+const noCardCandidate = week([0, 0, 0, 0, 0, 0, 0]);
+for (const day of noCardCandidate.slice(0, 6)) {
+    Object.assign(day, { argia: true, ores_ergasias: 8 });
+}
+result = analyzeWeeklySixthSeventhDay({
+    weekRows: noCardCandidate,
+    effectiveProfile: { hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 },
+    hourlyRate: 10
+});
+assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
+assert.ok(result.reasons.includes('SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC'));
 
 const mixedLeave = week([7, 7, 7, 7, 7, 4, 0]);
 Object.assign(mixedLeave[5], { adeia: true, kathgoria_ergasias: 'ΑΔΕΙΑ' });
