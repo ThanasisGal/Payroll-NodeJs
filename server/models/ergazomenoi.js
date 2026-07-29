@@ -287,6 +287,7 @@ const ErgazomenoiSchema = new Schema(
         symfonhtheis_misthos_apasxolhseis: { type: Number, default: 0 },
         paketo_apodoxon: { type: Number, default: 0 },
         mhniaia_repo: { type: Number, default: 0 },
+        pososto_prosayxhshs_6hs_hmeras: { type: Number, min: 0 },
         ypologismos_foroy: { type: Boolean, default: false },
         oros_sth_symbash_n_3986_2011: { type: Boolean, default: false },
         oysiodeis_oroi: { type: String, trim: true },
@@ -488,8 +489,10 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
 
-        // Όταν αλλάζουν οι όροι εργασίας μέσα στην ίδια εβδομάδα,
-        // ο έλεγχος ρεπό χρησιμοποιεί το profile που ισχύει το Σάββατο.
+        // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
+        // επανερμηνεύονται ως Monday-Sunday current-policy preview.
+        policyVersion: { type: String, trim: true, default: null },
+        sourceVersion: { type: String, trim: true, default: null },
         profile_changed_inside_week: { type: Boolean, default: false },
         excess_repo: { type: Number, default: 0 },
 
@@ -752,6 +755,10 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         mhniaia_repo: {
             type: Number,
             default: 0
+        },
+        pososto_prosayxhshs_6hs_hmeras: {
+            type: Number,
+            min: 0
         },
 
         // Για να ξέρουμε ποια εγγραφή χρησιμοποιήθηκε σαν profile αλλαγής

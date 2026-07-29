@@ -12,14 +12,14 @@ const group = {
         scheduled_work_days: 6,
         effective_weekly_workdays: 6
     },
-    pair_contract: { proposal_version: 'repo-transfer-single-pair-proposal:v1', choice_code: 'choice', policy_versions: {} },
+    pair_contract: { proposal_version: 'repo-transfer-single-pair-proposal:v3', choice_code: 'choice', policy_versions: {} },
     items: [
         { role: 'SOURCE_BECOMES_WORK', prodhlomena_oraria_id: sourceId, hmeromhnia: '2026-06-15', proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' }, flags: { approval_supported: false, runtime_apply_supported: false } },
         { role: 'TARGET_BECOMES_REPO', prodhlomena_oraria_id: targetId, hmeromhnia: '2026-06-16', proposed_values: { kathgoria_ergasias_apologistika: 'ΑΝ' }, flags: { approval_supported: false, runtime_apply_supported: false } }
     ]
 };
-const context = { candidates: [{ _id: sourceId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }, { _id: targetId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }], weekRows: [{ _id: sourceId, hmeromhnia: '2026-06-15' }, { _id: targetId, hmeromhnia: '2026-06-16' }], employee: { _id: '507f191e810c19729de860eb' }, employmentProfile: {}, history: [], audits: [], week: { start: '2026-06-14', end: '2026-06-20' }, companyFlags: {}, companyKodikos: '0004', holidayByDateKey: new Map() };
-const command = { proposal_id: 'proposal-1', expected_source_id: sourceId, expected_target_id: targetId, expected_proposal_version: 'repo-transfer-single-pair-proposal:v1', expected_choice_code: 'choice' };
+const context = { candidates: [{ _id: sourceId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }, { _id: targetId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }], weekRows: [{ _id: sourceId, hmeromhnia: '2026-06-15' }, { _id: targetId, hmeromhnia: '2026-06-16' }], employee: { _id: '507f191e810c19729de860eb' }, employmentProfile: { typos_apasxolhshs: 'PLHRHS' }, history: [], audits: [], week: { start: '2026-06-15', end: '2026-06-21' }, companyFlags: {}, companyKodikos: '0004', holidayByDateKey: new Map() };
+const command = { proposal_id: 'proposal-1', expected_source_id: sourceId, expected_target_id: targetId, expected_proposal_version: 'repo-transfer-single-pair-proposal:v3', expected_choice_code: 'choice' };
 
 async function run() {
     const originalRows = JSON.stringify(context.weekRows);
@@ -29,6 +29,31 @@ async function run() {
     assert.deepStrictEqual(result.snapshot.repo_resolution, group.repo_resolution);
     assert.strictEqual(result.fingerprint.length, 64);
     assert.strictEqual(JSON.stringify(context.weekRows), originalRows);
+    const presentationOnlyGroup = {
+        ...group,
+        items: [
+            group.items[0],
+            {
+                ...group.items[1],
+                kathgoria_ergasias: 'ΕΡΓ',
+                current_kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ'
+            }
+        ]
+    };
+    const presentationOnlyResult = await reconstructWeeklyRepoTransferDecision({
+        scope: { team: 't', company_kod: 'c' },
+        command,
+        contextLoader: async () => context,
+        projectionBuilder: () => ({
+            projection_status: 'READY',
+            groups: [presentationOnlyGroup]
+        })
+    });
+    assert.strictEqual(presentationOnlyResult.fingerprint, result.fingerprint);
+    assert.strictEqual(
+        presentationOnlyResult.group.items[1].current_kathgoria_ergasias_apologistika,
+        'ΑΔΕΙΑ'
+    );
     const changedResolutionGroup = {
         ...group,
         repo_resolution: {
@@ -57,33 +82,6 @@ async function run() {
     };
     const changedResult = await reconstructWeeklyRepoTransferDecision({ scope: { team: 't', company_kod: 'c' }, command, contextLoader: async () => holidayChanged, projectionBuilder: () => ({ projection_status: 'READY', groups: [group] }) });
     assert.notStrictEqual(changedResult.fingerprint, result.fingerprint);
-    {
-        const v2Group = {
-            ...group,
-            pair_contract: {
-                ...group.pair_contract,
-                proposal_version: 'repo-transfer-single-pair-proposal:v2'
-            }
-        };
-        let dispatchedVersion;
-        const v2Result = await reconstructWeeklyRepoTransferDecision({
-            scope: { team: 't', company_kod: 'c' },
-            command: {
-                ...command,
-                expected_proposal_version: 'repo-transfer-single-pair-proposal:v2'
-            },
-            contextLoader: async () => context,
-            projectionBuilder: (input) => {
-                dispatchedVersion = input.contractVersion;
-                return { projection_status: 'READY', groups: [v2Group] };
-            }
-        });
-        assert.strictEqual(dispatchedVersion, 'v2');
-        assert.strictEqual(
-            v2Result.snapshot.proposal_version,
-            'repo-transfer-single-pair-proposal:v2'
-        );
-    }
     for (const changed of [
         { expected_source_id: targetId }, { expected_target_id: sourceId }, { expected_proposal_version: 'repo-transfer-single-pair-proposal:v2' }, { expected_choice_code: 'other' }
     ]) await assert.rejects(() => reconstructWeeklyRepoTransferDecision({ scope: { team: 't', company_kod: 'c' }, command: { ...command, ...changed }, contextLoader: async () => context, projectionBuilder: () => ({ projection_status: 'READY', groups: [group] }) }), (error) => error.statusCode === 409);

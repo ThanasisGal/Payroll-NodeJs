@@ -4,6 +4,15 @@ const path = require('path');
 const vm = require('vm');
 const ejs = require('ejs');
 const { execFileSync } = require('child_process');
+const {
+    POLICY_RESULT_STATUS,
+    POLICY_MODE,
+    getApasxoliseisPolicyCatalog
+} = require('../../../../server/services/ergazomenoi/apasxoliseisPolicyCatalogService');
+const {
+    SCENARIO_CODES,
+    REASON_CODES
+} = require('../../../../server/services/ergazomenoi/apasxoliseisScenarioMatcherService');
 
 const sourcePath = path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
@@ -152,6 +161,259 @@ function getVisibleText(html) {
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function testPersistedRepoCategoryOverridesDerivedLeave() {
+    const applied = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΕΡΓ',
+        cards_ores_ergasias: 0,
+        noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        adeia_apologistika: false
+    }, { apologistikoText: '' });
+    assert.strictEqual(applied.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(applied.className, 'cell-repo-day');
+    assert.strictEqual(applied.source, 'persisted');
+
+    const derived = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΕΡΓ',
+        cards_ores_ergasias: 0,
+        noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        kathgoria_ergasias_apologistika: '',
+        repo_apologistika: false
+    }, { apologistikoText: '' });
+    assert.strictEqual(derived.text, 'ΑΔΕΙΑ');
+    assert.strictEqual(derived.className, 'cell-no-card-adeia');
+    assert.strictEqual(derived.source, 'derived');
+}
+
+function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
+    const presentation = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: false,
+        cards_ores_ergasias: 7.6,
+        apo_ora_01_apologistika: '08:30',
+        eos_ora_01_apologistika: '16:06'
+    }, {
+        apologistikoText: '08:30–16:06',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    });
+
+    assert.strictEqual(presentation.text, '08:30–16:06');
+    assert.strictEqual(presentation.className, 'cell-apologistiko');
+    assert.notStrictEqual(presentation.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+}
+
+function testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow() {
+    vm.runInContext(`
+        currentAtomicRepoTransferProjection = { groups: [] };
+        currentRepoTransferDecisionsByProposalId = new Map([[
+            'applied-proposal',
+            {
+                current_execution: { execution_status: 'APPLIED' },
+                applied_history: {
+                    source: { prodhlomena_oraria_id: 'source-row' },
+                    target: { prodhlomena_oraria_id: 'target-row' }
+                }
+            }
+        ]]);
+    `, sandbox);
+
+    const states = sandbox.buildRepoTransferReviewRowStates();
+    assert.strictEqual(states.size, 2);
+    assert.strictEqual(states.get('target-row').applied, true);
+    assert.strictEqual(states.get('target-row').role, 'target');
+    assert.strictEqual(states.has('unrelated-row'), false);
+
+    const pendingScenario = {
+        scenarioDecision: {
+            scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+            requires_review: true
+        }
+    };
+    const appliedBadge = sandbox.renderScenarioBadge(
+        pendingScenario,
+        states.get('target-row')
+    );
+    assert.ok(appliedBadge.includes('ΕΦΑΡΜΟΣΤΗΚΕ'));
+    assert.ok(!appliedBadge.includes('ΠΡΟΣ ΕΛΕΓΧΟ'));
+    assert.strictEqual(sandbox.renderScenarioBadge(pendingScenario, null), '');
+}
+
+function testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates() {
+    const neutral = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0
+    }, {
+        declaredText: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+        declaredClass: 'cell-declared-repo-day',
+        apologistikoText: '-',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, null);
+    assert.strictEqual(neutral.declared.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(neutral.apologistiko.text, '-');
+    assert.strictEqual(neutral.apologistiko.className, '');
+    assert.strictEqual(neutral.isOriginalDeclaredRepo, true);
+    assert.strictEqual(
+        sandbox.renderScenarioBadge({
+            scenarioDecision: {
+                scenario_code: 'UNKNOWN_PATTERN_REQUIRES_REVIEW',
+                requires_review: true
+            }
+        }, neutral.badgeState),
+        ''
+    );
+
+    const unexpectedWork = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΑΝ',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        repo_apologistika: false,
+        cards_ores_ergasias: 7.5,
+        cards_apo_ora_01: '08:00',
+        cards_eos_ora_01: '15:30',
+        apo_ora_01_apologistika: '08:00',
+        eos_ora_01_apologistika: '15:30'
+    }, {
+        declaredText: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+        declaredClass: 'cell-declared-repo-day',
+        apologistikoText: '08:00–15:30',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, { pending: true, applied: false });
+    assert.strictEqual(unexpectedWork.isOriginalDeclaredRepo, false);
+    assert.strictEqual(unexpectedWork.apologistiko.text, '08:00–15:30');
+    assert.strictEqual(unexpectedWork.badgeState.pending, true);
+
+    const applied = sandbox.resolveReviewRowPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        cards_ores_ergasias: 0
+    }, {
+        declaredText: '08:30–16:30',
+        declaredClass: '',
+        apologistikoText: '-',
+        isApologistikoRepoRow: false,
+        isApologistikoNonWorkRow: false
+    }, { pending: false, applied: true, role: 'target' });
+    assert.strictEqual(applied.apologistiko.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(applied.apologistiko.className, 'cell-repo-day-applied');
+    assert.strictEqual(applied.isAppliedRepoTarget, true);
+}
+
+function mockClassList(initial = []) {
+    const values = new Set(initial);
+    return {
+        contains: (value) => values.has(value),
+        toggle: (value, force) => {
+            if (force === true) values.add(value);
+            else if (force === false) values.delete(value);
+            else if (values.has(value)) values.delete(value);
+            else values.add(value);
+        }
+    };
+}
+
+function testEmployeeGroupsUseAccessibleSingleOpenAccordion() {
+    const groups = ['0001', '0002', '0003'].map((groupId) => {
+        const attributes = { 'aria-expanded': 'false' };
+        return {
+            dataset: { groupId },
+            classList: mockClassList(['collapsed']),
+            setAttribute: (key, value) => { attributes[key] = value; },
+            getAttribute: (key) => attributes[key]
+        };
+    });
+    const detailRows = new Map(
+        groups.map((group) => [
+            group.dataset.groupId,
+            [{ classList: mockClassList(['d-none']) }]
+        ])
+    );
+    const originalQuerySelectorAll = documentStub.querySelectorAll;
+    documentStub.querySelectorAll = (selector) => {
+        if (selector.includes('employee-group-row')) {
+            return groups.filter(
+                (group) => group.getAttribute('aria-expanded') === 'true'
+            );
+        }
+        const groupId = selector.match(/data-group-id="([^"]+)"/)?.[1];
+        return detailRows.get(groupId) || [];
+    };
+
+    try {
+        sandbox.toggleEmployeeGroupAccordion(groups[0]);
+        assert.strictEqual(groups[0].getAttribute('aria-expanded'), 'true');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 1);
+
+        sandbox.toggleEmployeeGroupAccordion(groups[1]);
+        assert.strictEqual(groups[0].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups[1].getAttribute('aria-expanded'), 'true');
+        assert.strictEqual(groups[2].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 1);
+        assert.strictEqual(detailRows.get('0001')[0].classList.contains('d-none'), true);
+        assert.strictEqual(detailRows.get('0002')[0].classList.contains('d-none'), false);
+
+        sandbox.toggleEmployeeGroupAccordion(groups[1]);
+        assert.strictEqual(groups[1].getAttribute('aria-expanded'), 'false');
+        assert.strictEqual(groups.filter(
+            (group) => group.getAttribute('aria-expanded') === 'true'
+        ).length, 0);
+    } finally {
+        documentStub.querySelectorAll = originalQuerySelectorAll;
+    }
+
+    assert.ok(source.includes("groupTr.tabIndex = 0"));
+    assert.ok(source.includes("groupTr.setAttribute('role', 'button')"));
+    assert.ok(source.includes("groupTr.setAttribute('aria-expanded', 'false')"));
+    assert.ok(source.includes("event.key !== 'Enter' && event.key !== ' '"));
+    assert.ok(source.includes('event.preventDefault()'));
+}
+
+function testAppliedHistoryRendersWithoutCurrentProjectionGroup() {
+    vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([[
+        'resolved-proposal',
+        {
+            apply_state: 'ALREADY_APPLIED',
+            can_apply: false,
+            current_execution: { execution_status: 'APPLIED' },
+            applied_history: {
+                execution_id: 'execution-1',
+                employee_name: 'Δοκιμή Εργαζομένου',
+                employee_kodikos: '0001',
+                week_start: '2026-06-22',
+                week_end: '2026-06-28',
+                source: { hmeromhnia: '2026-06-22', result: 'ΕΡΓ' },
+                target: { hmeromhnia: '2026-06-26', result: 'ΑΝ', repo_apologistika: true },
+                applied_at: '2026-07-29T04:00:00.000Z',
+                applied_by_user_name: 'Admin'
+            }
+        }
+    ]]); currentHrReviewProjection = { groups: [] }`, sandbox);
+    const html = sandbox.renderAppliedRepoTransferHistory();
+    assertContains(html, [
+        'Εφαρμοσμένες μεταφορές ρεπό',
+        'Εφαρμόστηκε',
+        'Δοκιμή Εργαζομένου',
+        '0001',
+        '22/06/2026',
+        '26/06/2026',
+        'ΕΡΓ',
+        'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+    ]);
+    assert.ok(!html.includes('hr-review-apply-btn'));
+    assert.ok(!html.includes('hr-review-decision-btn'));
+    assert.strictEqual(sandbox.window.EmploymentReviewHrTest.diagnostics().pendingGroups, 0);
 }
 
 function testReadyFullTimeAndSplitShift() {
@@ -839,7 +1101,7 @@ function testDiagnostics() {
     assertContains(html, [
         'Περιπτώσεις χωρίς αυτόματη πρόταση',
         'Για τις παρακάτω περιπτώσεις δεν δημιουργήθηκε ασφαλής πρόταση μεταφοράς ρεπό:',
-        '8 περιπτώσεις: Το επιλεγμένο διάστημα δεν περιλαμβάνει ολόκληρη εβδομάδα.',
+        '8 περιπτώσεις: Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
         '7 περιπτώσεις: Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
         '6 περιπτώσεις: Η προτεινόμενη αλλαγή δεν αποκαθιστά τον απαιτούμενο αριθμό ρεπό.',
         '5 περιπτώσεις: Δεν υπάρχουν πλήρη στοιχεία για ολόκληρη την εβδομάδα.',
@@ -1156,9 +1418,77 @@ function testEmploymentReviewScrollContainerContract() {
     assert.ok(selectorStart >= 0);
     const selectorEnd = cssSource.indexOf('}', selectorStart);
     const scrollCss = cssSource.slice(selectorStart, selectorEnd);
-    assert.ok(/overflow-y\s*:\s*auto\s*;/.test(scrollCss));
-    assert.ok(/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
+    assert.ok(/overflow\s*:\s*auto\s*;/.test(scrollCss));
+    assert.ok(!/overflow-x\s*:\s*hidden\s*;/.test(scrollCss));
     assert.ok(/max-height\s*:[^;]*(?:100vh|100dvh)/.test(scrollCss));
+    assert.ok(/--employment-review-table-sticky-top\s*:\s*0px/.test(scrollCss));
+
+    const wrapperSelector =
+        '.employment-review-scroll-container .results-table-wrapper {';
+    const wrapperStart = cssSource.indexOf(wrapperSelector);
+    const wrapperCss = cssSource.slice(
+        wrapperStart,
+        cssSource.indexOf('}', wrapperStart)
+    );
+    assert.ok(/overflow\s*:\s*visible/.test(wrapperCss));
+
+    const stickySelector =
+        '.employment-review-scroll-container #resultsTable thead th {';
+    const stickyStart = cssSource.indexOf(stickySelector);
+    const stickyCss = cssSource.slice(
+        stickyStart,
+        cssSource.indexOf('}', stickyStart)
+    );
+    assert.ok(/position\s*:\s*sticky/.test(stickyCss));
+    assert.ok(/top\s*:\s*var\(--employment-review-table-sticky-top\)/.test(stickyCss));
+    assert.ok(/z-index\s*:\s*15/.test(stickyCss));
+    assert.ok(/background-color\s*:\s*#212529/.test(stickyCss));
+    assert.ok(/border-color\s*:\s*#495057/.test(stickyCss));
+    assert.ok(/background-clip\s*:\s*padding-box/.test(stickyCss));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable {\n' +
+        '    width: max(100%, 89.25rem);\n' +
+        '    min-width: 89.25rem;\n' +
+        '    table-layout: fixed;'
+    ));
+    assert.ok(!cssSource.includes(
+        '.employment-review-scroll-container #resultsTable th,\n' +
+        '.employment-review-scroll-container #resultsTable td {\n' +
+        '    overflow-wrap: anywhere;'
+    ));
+    const colgroupMarkup = viewSource.match(
+        /<colgroup class="employment-review-results-columns">[\s\S]*?<\/colgroup>/
+    )?.[0] || '';
+    assert.strictEqual((colgroupMarkup.match(/<col\b/g) || []).length, 13);
+    assert.ok(colgroupMarkup.includes('review-col-apologistiko'));
+    assert.ok(cssSource.includes(
+        '.employment-review-results-columns .review-col-apologistiko {\n    width: 13rem;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-results-columns .review-col-date {\n    width: 9rem;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable > thead > tr > th {\n' +
+        '    white-space: nowrap;\n' +
+        '    overflow-wrap: normal;\n' +
+        '    word-break: normal;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable .review-interval-line {\n' +
+        '    white-space: nowrap;'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable th:nth-child(6),'
+    ));
+    assert.ok(cssSource.includes(
+        '.employment-review-scroll-container #resultsTable td:nth-child(6) {\n' +
+        '    overflow: hidden;'
+    ));
+    assert.ok(source.includes('max-width: 100%;'));
+    assert.ok(source.includes('white-space: normal;'));
+    assert.ok(source.includes('overflow-wrap: break-word;'));
+    assert.ok(source.includes('word-break: normal;'));
+    assert.ok(source.includes('text-align: center;'));
 
     const cssDiff = execFileSync('git', ['diff', '--unified=0', '--', cssPath], {
         encoding: 'utf8'
@@ -1169,6 +1499,100 @@ function testEmploymentReviewScrollContainerContract() {
         .map((line) => line.slice(1))
         .join('\n');
     assert.ok(!/(?:^|\n)\s*(?:body|html)\b[^{}]*\{[^}]*overflow\s*:/im.test(addedCss));
+}
+
+function testAllKnownBackendGroupingCodesHaveGreekLabels() {
+    const known = [
+        [Object.values(POLICY_RESULT_STATUS), sandbox.getPolicyPreviewStatusLabel],
+        [getApasxoliseisPolicyCatalog().map((policy) => policy.policy_code), sandbox.getPolicyPreviewPolicyLabel],
+        [Object.values(SCENARIO_CODES), sandbox.getPolicyPreviewScenarioLabel],
+        [Object.values(POLICY_MODE), sandbox.getPolicyPreviewActionLabel],
+        [
+            [...Object.values(REASON_CODES), 'EMPLOYEE_CARD_NOT_REQUIRED', 'NO_APOLOGISTIKO_REVIEW_REQUIRED'],
+            sandbox.getPolicyPreviewReasonLabel
+        ]
+    ];
+    known.forEach(([codes, resolver]) => {
+        codes.forEach((code) => {
+            const resolved = resolver(code);
+            const label = typeof resolved === 'string' ? resolved : resolved.label;
+            assert.ok(label);
+            assert.ok(!label.includes('Άγνωστο μοτίβ'));
+            assert.ok(!label.includes('Μη χαρτογραφημένο αποτέλεσμα'), `${code} is not mapped`);
+        });
+    });
+
+    const unmapped = sandbox.getPolicyPreviewPolicyLabel('CUSTOM_<script>_CODE');
+    assert.strictEqual(unmapped, 'Μη χαρτογραφημένο αποτέλεσμα (CUSTOM_script_CODE)');
+    assert.ok(!unmapped.includes('<'));
+}
+
+function testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct() {
+    const item = {
+        employee_kodikos: '0001',
+        hmeromhnia: '2026-06-26',
+        kathgoria_ergasias: 'ΕΡΓ',
+        current_kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        proposed_values: {
+            kathgoria_ergasias_apologistika: 'ΑΝ',
+            repo_apologistika: true
+        }
+    };
+    const detailed = sandbox.renderAtomicRepoTransferItem(item, 'TARGET_BECOMES_REPO');
+    assertContains(detailed, [
+        'Προδηλωμένη κατηγορία',
+        'Απολογιστική/εμφανιζόμενη κατηγορία',
+        'Προτεινόμενη κατηγορία',
+        'ΕΡΓ',
+        'ΑΔΕΙΑ',
+        'ΑΝ'
+    ]);
+    assert.ok(
+        detailed.indexOf('ΕΡΓ') <
+            detailed.indexOf('ΑΔΕΙΑ') &&
+            detailed.indexOf('ΑΔΕΙΑ') <
+                detailed.lastIndexOf('ΑΝ')
+    );
+
+    const compact = sandbox.renderHrReviewDay(item, 'rest');
+    assertContains(compact, [
+        'Προδηλωμένη',
+        'Απολογιστική',
+        'Πρόταση μεταφοράς',
+        'ΕΡΓ',
+        'ΑΔΕΙΑ',
+        'ΑΝ'
+    ]);
+}
+
+function testOpenAndCompletedPartialWeekMessagesStayDistinct() {
+    vm.runInContext(
+        "currentPolicyPreviewBaseParams = new URLSearchParams('apo_hmeromhnia=2026-06-01&eos_hmeromhnia=2026-06-30')",
+        sandbox
+    );
+    assert.strictEqual(
+        sandbox.getAtomicRepoTransferDiagnosticLabel('OPEN_WEEK_PENDING_COMPLETION'),
+        'Η εβδομάδα 29/06/2026–05/07/2026 δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.'
+    );
+    assert.strictEqual(
+        sandbox.getAtomicRepoTransferDiagnosticLabel('PARTIAL_WEEK_OUTSIDE_FILTER_RANGE'),
+        'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.'
+    );
+    const pendingHtml = sandbox.renderAtomicRepoTransferDiagnosticEntries({
+        OPEN_WEEK_PENDING_COMPLETION: 1
+    });
+    assert.ok(pendingHtml.includes('Αναμονή ολοκλήρωσης'));
+    assert.ok(!pendingHtml.includes('Χρειάζεται απόφαση HR'));
+}
+
+function testWeeklyDeviationPresentationUsesMondaySundayPolicy() {
+    assert.ok(source.includes('Εβδομάδα Δευτέρα–Κυριακή'));
+    assert.ok(source.includes("data-week-policy=\"${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}\""));
+    assert.ok(source.includes('Ιστορική εγγραφή παλιάς πολιτικής'));
+    assert.ok(source.includes("dev.status === 'OPEN_WEEK_PENDING_COMPLETION'"));
+    assert.ok(source.includes('currentPendingDeviationWeeks = payload.pendingDeviationWeeks || []'));
+    assert.ok(source.includes('currentLegacyDeviations = payload.legacyDeviations || []'));
+    assert.ok(!source.includes('Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο'));
 }
 
 function testEmploymentReviewFinalUiContract() {
@@ -1204,8 +1628,13 @@ function testEmploymentReviewFinalUiContract() {
     const shellCss = cssSource.slice(shellCssStart, cssSource.indexOf('}', shellCssStart));
     assert.ok(!/(?:transform|translate)\s*[:(]/.test(shellCss));
     assert.ok(!/#hrReviewStartBtn\s*\{[^}]*(?:transform|translate|position|margin)/s.test(cssSource));
-    assert.ok(cssSource.includes('--employment-review-viewport-offset: 17rem'));
-    assert.ok(cssSource.includes('--employment-review-viewport-offset: 25.5rem'));
+    assert.ok(cssSource.includes('--employment-review-bottom-clearance: 3.25rem'));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 20.25rem'));
+    assert.ok(cssSource.includes('--employment-review-viewport-offset: 28.75rem'));
+    assert.ok(20.25 - 17 >= 3);
+    assert.ok(28.75 - 25.5 >= 3);
+    assert.ok(/\.employment-review-card\s*\{[^}]*overflow:\s*visible/.test(cssSource));
+    assert.ok(/\.employment-review-page-shell\s*\{[^}]*padding-bottom:\s*0\.5rem/.test(cssSource));
     assert.ok(cssSource.includes('overflow-y: auto'));
 
     ['hrReviewStartBtn', 'showAdvancedReviewBtn', 'showMinimalReviewBtn'].forEach((id) => {
@@ -1272,7 +1701,9 @@ function testEmploymentReviewBranchActionLayoutContract() {
     const gridCss = cssSource.slice(gridStart, cssSource.indexOf('}', gridStart));
     assert.ok(/display:\s*grid/.test(gridCss));
     assert.ok(/grid-template-columns:[\s\S]*2\.5rem[\s\S]*max-content/.test(gridCss));
+    assert.ok(/minmax\(18rem,\s*2fr\)/.test(gridCss));
     assert.ok(/column-gap:\s*0\.75rem/.test(gridCss));
+    assert.ok(viewSource.includes('class="col-md-4 employment-review-advanced-branch"'));
 
     const branchStart = cssSource.indexOf('.employment-review-branch-control {');
     const branchCss = cssSource.slice(branchStart, cssSource.indexOf('}', branchStart));
@@ -1785,6 +2216,12 @@ async function testHrLoadingLocksAndRestoresFilters() {
 }
 
 const tests = [
+    testPersistedRepoCategoryOverridesDerivedLeave,
+    testPersistedAnWithCardsIsNotBlanketRepoPresentation,
+    testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
+    testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,
+    testEmployeeGroupsUseAccessibleSingleOpenAccordion,
+    testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,
     testNoTargetFallbackIsInformationalOnly,
     testNoTargetGuidanceComesOnlyFromServer,
@@ -1819,6 +2256,10 @@ const tests = [
     testAtomicStateSurvivesGenericRerenderAndClearsOnRequestState,
     testMinimalWorkspaceEjsContract,
     testEmploymentReviewScrollContainerContract,
+    testAllKnownBackendGroupingCodesHaveGreekLabels,
+    testCategoryPresentationKeepsDeclaredDisplayedAndProposedDistinct,
+    testOpenAndCompletedPartialWeekMessagesStayDistinct,
+    testWeeklyDeviationPresentationUsesMondaySundayPolicy,
     testEmploymentReviewFinalUiContract,
     testCorrectiveDropdownAndPageShellContract,
     testEmploymentReviewBranchActionLayoutContract,

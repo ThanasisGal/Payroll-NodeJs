@@ -38,7 +38,7 @@ function workRow(start, offset, employeeKodikos = '001', overrides = {}) {
     };
 }
 
-function fullTimeWeek(start = '2026-07-05', employeeKodikos = '001') {
+function fullTimeWeek(start = '2026-07-06', employeeKodikos = '001') {
     const rows = Array.from({ length: 7 }, (_, offset) =>
         workRow(start, offset, employeeKodikos)
     );
@@ -58,7 +58,7 @@ function fullTimeWeek(start = '2026-07-05', employeeKodikos = '001') {
     return rows;
 }
 
-function partTimeWeek(start = '2026-07-05', employeeKodikos = '001') {
+function partTimeWeek(start = '2026-07-06', employeeKodikos = '001') {
     const rows = Array.from({ length: 7 }, (_, offset) =>
         workRow(start, offset, employeeKodikos, { ores_ergasias: 4 })
     );
@@ -87,7 +87,11 @@ function partTimeWeek(start = '2026-07-05', employeeKodikos = '001') {
 
 function weeklyInput(
     rows,
-    employmentProfile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }
+    employmentProfile = {
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 5
+    }
 ) {
     return {
         weekRows: rows,
@@ -109,15 +113,19 @@ function noTargetPartTimeWeek(start, employeeKodikos) {
 
 function testCompleteWeekInputConstruction() {
     const validRows = fullTimeWeek();
-    const partialRows = fullTimeWeek('2026-07-12', '002').slice(0, 4);
+    const partialRows = fullTimeWeek('2026-07-13', '002').slice(0, 4);
     const calls = [];
     const result = buildWeeklyRepoTransferAtomicInputs({
         rows: [...partialRows, ...validRows].reverse(),
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-18',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-19',
         resolveEmploymentProfile: (context) => {
             calls.push(context);
-            return { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 };
+            return {
+                typos_apasxolhshs: 'PLHRHS',
+                mhniaia_repo: 2,
+                hmeres_ergasias_ebdomadas: 5
+            };
         }
     });
 
@@ -133,27 +141,35 @@ function testCompleteWeekInputConstruction() {
             company_kod: 'company-a',
             ypokatasthma: '0001',
             employee_kodikos: '001',
-            week_start: '2026-07-05',
-            week_end: '2026-07-11'
+            week_start: '2026-07-06',
+            week_end: '2026-07-12'
         }
     ]);
 
     const partialPeriod = buildWeeklyRepoTransferAtomicInputs({
         rows: validRows.slice(1),
-        periodStart: '2026-07-06',
-        periodEnd: '2026-07-11',
-        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
+        periodStart: '2026-07-07',
+        periodEnd: '2026-07-12',
+        resolveEmploymentProfile: () => ({
+            typos_apasxolhshs: 'PLHRHS',
+            mhniaia_repo: 2,
+            hmeres_ergasias_ebdomadas: 5
+        })
     });
     assert.deepStrictEqual(partialPeriod.weeklyInputs, []);
-    assert.deepStrictEqual(partialPeriod.inputReasonCodes, [INPUT_REASON.PARTIAL_WEEK]);
+    assert.deepStrictEqual(partialPeriod.inputReasonCodes, [INPUT_REASON.INCOMPLETE_WEEK]);
 
     const duplicateRows = fullTimeWeek();
     duplicateRows.push({ ...duplicateRows[3], _id: 'duplicate-date-row' });
     const duplicate = buildWeeklyRepoTransferAtomicInputs({
         rows: duplicateRows,
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-11',
-        resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
+        resolveEmploymentProfile: () => ({
+            typos_apasxolhshs: 'PLHRHS',
+            mhniaia_repo: 2,
+            hmeres_ergasias_ebdomadas: 5
+        })
     });
     assert.deepStrictEqual(duplicate.weeklyInputs, []);
     assert.deepStrictEqual(duplicate.inputReasonCodes, [INPUT_REASON.DUPLICATE_DATE]);
@@ -170,6 +186,29 @@ function testCompleteWeekInputConstruction() {
         unresolvedHolidayContext.reason_counts.ATOMIC_HOLIDAY_CONTEXT_NOT_RESOLVED,
         1
     );
+}
+
+function testOpenTrailingWeekIsDistinctFromCompletedPartialFilter() {
+    const trailingRows = fullTimeWeek('2026-06-29', '001').slice(0, 2);
+    const open = buildWeeklyRepoTransferAtomicInputs({
+        rows: trailingRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(open.weeklyInputs, []);
+    assert.deepStrictEqual(open.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const completedPartial = buildWeeklyRepoTransferAtomicInputs({
+        rows: trailingRows,
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(completedPartial.weeklyInputs, []);
+    assert.deepStrictEqual(completedPartial.inputReasonCodes, [INPUT_REASON.PARTIAL_WEEK]);
 }
 
 function testValidFullTimeAndPartTimeWeeks() {
@@ -196,7 +235,11 @@ function testValidFullTimeAndPartTimeWeeks() {
 
     const partTime = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
-            weeklyInput(partTimeWeek(), { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 })
+            weeklyInput(partTimeWeek(), {
+                typos_apasxolhshs: 'MERIKH',
+                mhniaia_repo: 2,
+                hmeres_ergasias_ebdomadas: 5
+            })
         ]
     });
     const target = partTime.groups[0].items[1];
@@ -205,9 +248,9 @@ function testValidFullTimeAndPartTimeWeeks() {
 }
 
 function testInputConstructionSeparatesEmployeesAndWeeks() {
-    const employeeOneFirstWeek = fullTimeWeek('2026-07-05', '001');
-    const employeeTwoFirstWeek = fullTimeWeek('2026-07-05', '002');
-    const employeeOneSecondWeek = fullTimeWeek('2026-07-12', '001');
+    const employeeOneFirstWeek = fullTimeWeek('2026-07-06', '001');
+    const employeeTwoFirstWeek = fullTimeWeek('2026-07-06', '002');
+    const employeeOneSecondWeek = fullTimeWeek('2026-07-13', '001');
     const rows = [
         ...employeeOneSecondWeek,
         ...employeeTwoFirstWeek,
@@ -216,11 +259,12 @@ function testInputConstructionSeparatesEmployeesAndWeeks() {
     const before = JSON.stringify(rows);
     const result = buildWeeklyRepoTransferAtomicInputs({
         rows,
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-18',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-19',
         resolveEmploymentProfile: () => ({
             typos_apasxolhshs: 'PLHRHS',
-            mhniaia_repo: 2
+            mhniaia_repo: 2,
+            hmeres_ergasias_ebdomadas: 5
         })
     });
 
@@ -232,9 +276,9 @@ function testInputConstructionSeparatesEmployeesAndWeeks() {
             input.weekRows[6].hmeromhnia
         ]),
         [
-            ['001', '2026-07-05', '2026-07-11'],
-            ['001', '2026-07-12', '2026-07-18'],
-            ['002', '2026-07-05', '2026-07-11']
+            ['001', '2026-07-06', '2026-07-12'],
+            ['001', '2026-07-13', '2026-07-19'],
+            ['002', '2026-07-06', '2026-07-12']
         ]
     );
     assert.strictEqual(JSON.stringify(rows), before);
@@ -250,11 +294,15 @@ function testBranchAwareBucketsAndResolverContext() {
     const contexts = [];
     const separated = buildWeeklyRepoTransferAtomicInputs({
         rows: [...branchTwo, ...branchOne].reverse(),
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-11',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
         resolveEmploymentProfile: (context) => {
             contexts.push(context);
-            return { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 };
+            return {
+                typos_apasxolhshs: 'PLHRHS',
+                mhniaia_repo: 2,
+                hmeres_ergasias_ebdomadas: 5
+            };
         }
     });
 
@@ -274,14 +322,14 @@ function testBranchAwareBucketsAndResolverContext() {
         company_kod: 'company-a',
         ypokatasthma: '0001',
         employee_kodikos: '001',
-        week_start: '2026-07-05',
-        week_end: '2026-07-11'
+        week_start: '2026-07-06',
+        week_end: '2026-07-12'
     });
 
     const complementary = buildWeeklyRepoTransferAtomicInputs({
         rows: [...branchOne.slice(0, 3), ...branchTwo.slice(3)],
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-11',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
         resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
     });
     assert.deepStrictEqual(complementary.weeklyInputs, []);
@@ -292,8 +340,8 @@ function testBranchAwareBucketsAndResolverContext() {
 
     const missingBranch = buildWeeklyRepoTransferAtomicInputs({
         rows: branchOne.map((row) => ({ ...row, ypokatasthma: '' })),
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-11',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
         resolveEmploymentProfile: () => ({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 })
     });
     assert.deepStrictEqual(missingBranch.weeklyInputs, []);
@@ -328,8 +376,8 @@ function testCompanyWideEmployeeUniquenessAndBranchCompatibility() {
 
     const branchMismatch = buildWeeklyRepoTransferAtomicInputs({
         rows: fullTimeWeek(),
-        periodStart: '2026-07-05',
-        periodEnd: '2026-07-11',
+        periodStart: '2026-07-06',
+        periodEnd: '2026-07-12',
         resolveEmploymentProfile: ({ ypokatasthma }) =>
             isEmployeeCompatibleWithBranch({ ...employee, ypokatasthma: '0002' }, ypokatasthma)
                 ? { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }
@@ -372,9 +420,9 @@ function testAtomicPeriodRangeLimit() {
 }
 
 function testMultipleEmployeesAndWeeksSortDeterministically() {
-    const employeeTwo = weeklyInput(fullTimeWeek('2026-07-05', '002'));
-    const employeeOne = weeklyInput(fullTimeWeek('2026-07-05', '001'));
-    const nextWeek = weeklyInput(fullTimeWeek('2026-07-12', '001'));
+    const employeeTwo = weeklyInput(fullTimeWeek('2026-07-06', '002'));
+    const employeeOne = weeklyInput(fullTimeWeek('2026-07-06', '001'));
+    const nextWeek = weeklyInput(fullTimeWeek('2026-07-13', '001'));
     const result = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [nextWeek, employeeTwo, employeeOne]
     });
@@ -389,9 +437,9 @@ function testMultipleEmployeesAndWeeksSortDeterministically() {
             group.representative_item.employee_kodikos
         ]),
         [
-            ['2026-07-06', '001'],
-            ['2026-07-06', '002'],
-            ['2026-07-13', '001']
+            ['2026-07-07', '001'],
+            ['2026-07-07', '002'],
+            ['2026-07-14', '001']
         ]
     );
     assert.notStrictEqual(result.groups[0].group_id, result.groups[2].group_id);
@@ -402,7 +450,8 @@ function testNonReadyInvalidAndDuplicateDiagnostics() {
         weeklyInputs: [
             weeklyInput(fullTimeWeek(), {
                 typos_apasxolhshs: 'EK_PERITROPHS',
-                mhniaia_repo: 2
+                mhniaia_repo: 2,
+                hmeres_ergasias_ebdomadas: 5
             })
         ]
     });
@@ -466,8 +515,8 @@ function testSplitShiftReachesPageProjection() {
 }
 
 function testDeterminismOwnershipAndInputPreservation() {
-    const rowsOne = fullTimeWeek('2026-07-05', '001');
-    const rowsTwo = fullTimeWeek('2026-07-05', '002');
+    const rowsOne = fullTimeWeek('2026-07-06', '001');
+    const rowsTwo = fullTimeWeek('2026-07-06', '002');
     const inputs = [weeklyInput(rowsTwo), weeklyInput(rowsOne)];
     const before = JSON.stringify([rowsOne, rowsTwo]);
     const first = buildWeeklyRepoTransferAtomicPageProjection({ weeklyInputs: inputs });
@@ -541,12 +590,12 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
     const sameEmployee = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(
-                noTargetPartTimeWeek('2026-07-12', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                noTargetPartTimeWeek('2026-07-13', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             ),
             weeklyInput(
-                noTargetPartTimeWeek('2026-07-05', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                noTargetPartTimeWeek('2026-07-06', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -555,18 +604,18 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
     assert.strictEqual(sameEmployee.summary.employees_count, 1);
     assert.deepStrictEqual(
         sameEmployee.review_outcomes.map((outcome) => outcome.week_start),
-        ['2026-07-05', '2026-07-12']
+        ['2026-07-06', '2026-07-13']
     );
 
     const differentEmployees = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
             weeklyInput(
-                noTargetPartTimeWeek('2026-07-05', '002'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                noTargetPartTimeWeek('2026-07-06', '002'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             ),
             weeklyInput(
-                noTargetPartTimeWeek('2026-07-05', '001'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                noTargetPartTimeWeek('2026-07-06', '001'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -580,13 +629,13 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 
     const sameCodeDifferentBranches = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: ['0002', '0001'].map((ypokatasthma) => {
-            const rows = noTargetPartTimeWeek('2026-07-05', '001').map((row) => ({
+            const rows = noTargetPartTimeWeek('2026-07-06', '001').map((row) => ({
                 ...row,
                 ypokatasthma
             }));
             return weeklyInput(
                 rows,
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             );
         })
     });
@@ -600,10 +649,10 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 
     const combined = buildWeeklyRepoTransferAtomicPageProjection({
         weeklyInputs: [
-            weeklyInput(fullTimeWeek('2026-07-05', '001')),
+            weeklyInput(fullTimeWeek('2026-07-06', '001')),
             weeklyInput(
-                noTargetPartTimeWeek('2026-07-05', '002'),
-                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2 }
+                noTargetPartTimeWeek('2026-07-06', '002'),
+                { typos_apasxolhshs: 'MERIKH', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
             )
         ]
     });
@@ -615,6 +664,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 
 function run() {
     testCompleteWeekInputConstruction();
+    testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
     testValidFullTimeAndPartTimeWeeks();
     testInputConstructionSeparatesEmployeesAndWeeks();
     testBranchAwareBucketsAndResolverContext();

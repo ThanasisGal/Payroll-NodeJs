@@ -7,6 +7,10 @@ const {
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
 const { PROPOSAL_VERSION, CHOICE_CODE } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 const {
+    normalizeEmploymentType,
+    EMPLOYMENT_TYPE
+} = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
     buildCompanyWideUniqueEmployeeByKodikos,
     isEmployeeCompatibleWithBranch
 } = require('./apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
@@ -17,17 +21,16 @@ const {
     buildNoCardsDisplayContext,
     getWeeklyRepoProfileInfo
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
+const { getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
 
-const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v1';
+const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v2';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
 
 function conflict(message) { const error = new Error(message); error.statusCode = 409; return error; }
 function dateKey(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10); }
 function weekBounds(value) {
-    const key = dateKey(value); if (!key) return null;
-    const start = new Date(`${key}T00:00:00.000Z`); start.setUTCDate(start.getUTCDate() - start.getUTCDay());
-    const end = new Date(start); end.setUTCDate(end.getUTCDate() + 6);
-    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    const range = getMondaySundayWeekRange(value);
+    return range ? { start: range.weekStartKey, end: range.weekEndKey } : null;
 }
 function normalize(value) {
     if (value === undefined) return null;
@@ -120,6 +123,8 @@ async function defaultContextLoader({
         typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
         mhniaia_repo: effectiveProfile.mhniaia_repo,
         raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
+        pososto_prosayxhshs_6hs_hmeras:
+            effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
         hmeres_ergasias_ebdomadas: effectiveProfile.hmeres_ergasias_ebdomadas,
         mo_oron_hmerhsias_ergasias: Number(effectiveProfile.mo_oron_hmerhsias_ergasias || 0),
         external_break_minutes: employee.dialleima_entos_ektos_orarioy === true
@@ -168,7 +173,11 @@ function buildCanonicalSnapshot({ scope, context, group }) {
                 effective_to: entry.hmeromhnia_isxyos_oron_ergasias_eos || entry.hmeromhnia_allaghs_orarioy_eos,
                 typos_apasxolhshs: entry.typos_apasxolhshs || entry.kathestos_apasxolhshs,
                 mhniaia_repo: entry.mhniaia_repo,
+                hmeres_ergasias_ebdomadas: entry.hmeres_ergasias_ebdomadas,
+                ores_ergasias_ebdomadas: entry.ores_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: entry.mo_oron_hmerhsias_ergasias,
+                pososto_prosayxhshs_6hs_hmeras:
+                    entry.pososto_prosayxhshs_6hs_hmeras,
                 updated_at: entry.updatedAt,
                 created_at: entry.createdAt
             }))
@@ -190,12 +199,12 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
     const contractVersion = command.expected_proposal_version ===
-        'repo-transfer-single-pair-proposal:v1'
-        ? 'v1'
-        : command.expected_proposal_version ===
-            'repo-transfer-single-pair-proposal:v2'
-            ? 'v2'
-            : null;
+        'repo-transfer-single-pair-proposal:v3'
+        ? normalizeEmploymentType(context.employmentProfile?.typos_apasxolhshs) ===
+            EMPLOYMENT_TYPE.FULL
+            ? 'v1'
+            : 'v2'
+        : null;
     if (!contractVersion) {
         throw conflict('Η έκδοση της πρότασης δεν υποστηρίζεται.');
     }

@@ -51,7 +51,7 @@ function escapeHtml(value) {
 }
 
 const scenarioCodeLabels = {
-    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Άγνωστο μοτίβο - προς έλεγχο',
+    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Μη ταξινομημένο μοτίβο - προς έλεγχο',
     DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
     DECLARED_WORK_NO_CARDS_LEAVE: 'Εργασία χωρίς κάρτες - άδεια',
     DECLARED_WORK_NO_CARDS_HOLIDAY_REQUIRED: 'Εργασία χωρίς κάρτες - υποχρεωτική αργία',
@@ -88,13 +88,18 @@ const scenarioReasonLabels = {
     DECLARED_NON_WORK_WITH_CARDS: 'Μη εργασία με κάρτες',
     REPO_TRANSFER_CANDIDATE: 'Πιθανή μεταφορά ρεπό',
     LEGAL_CLASSIFICATION_REQUIRED: 'Απαιτείται νομοθετική ταξινόμηση',
-    UNKNOWN_PATTERN: 'Άγνωστο μοτίβο'
+    UNKNOWN_PATTERN: 'Δεν βρέθηκε ασφαλής αντιστοίχιση γνωστού μοτίβου'
 };
 
 const policyPreviewStatusLabels = {
     OK: {
         label: 'OK',
         description: 'Εντάξει',
+        badgeClass: 'text-bg-success'
+    },
+    RESOLVED_BY_POLICY: {
+        label: 'Επιλύθηκε από πολιτική',
+        description: 'Η περίπτωση εξηγήθηκε από γνωστή πολιτική χωρίς αλλαγή δεδομένων.',
         badgeClass: 'text-bg-success'
     },
     PREFILLED_PENDING_APPROVAL: {
@@ -108,9 +113,14 @@ const policyPreviewStatusLabels = {
         badgeClass: 'text-bg-danger'
     },
     UNKNOWN_PATTERN: {
-        label: 'Άγνωστο μοτίβο',
-        description: 'Άγνωστο μοτίβο',
+        label: 'Μη ταξινομημένο μοτίβο',
+        description: 'Η περίπτωση δεν αντιστοιχίστηκε σε διαθέσιμη πολιτική και παραμένει για έλεγχο.',
         badgeClass: 'text-bg-secondary'
+    },
+    CONFLICT_AMBIGUOUS: {
+        label: 'Αμφίσημη σύγκρουση στοιχείων',
+        description: 'Υπάρχουν αντικρουόμενα στοιχεία ή περισσότερες από μία πιθανές ταξινομήσεις.',
+        badgeClass: 'text-bg-danger'
     }
 };
 
@@ -119,35 +129,56 @@ const policyPreviewPolicyLabels = {
     CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK: 'Δεν απαιτείται κάρτα για προδηλωμένο ωράριο',
     DECLARED_REPO_OR_NON_WORK_WITH_CARDS: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
     NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY: 'Εργασία χωρίς κάρτες λόγω άδειας ή αργίας',
-    UNKNOWN: 'Άγνωστη πολιτική'
+    WEEKLY_REPO_BALANCE: 'Ισορροπία εβδομαδιαίων ρεπό',
+    UNKNOWN: 'Δεν αντιστοιχίστηκε διαθέσιμη πολιτική'
 };
 
 const policyPreviewScenarioLabels = {
-    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Άγνωστο μοτίβο που χρειάζεται έλεγχο',
+    UNKNOWN_PATTERN_REQUIRES_REVIEW: 'Μη ταξινομημένο μοτίβο που χρειάζεται έλεγχο',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_REQUIRED:
+        'Εργασία χωρίς κάρτες σε υποχρεωτική αργία',
+    DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_WORKS:
+        'Εργασία χωρίς κάρτες σε προαιρετική αργία με λειτουργία εταιρείας',
     DECLARED_WORK_NO_CARDS_HOLIDAY_OPTIONAL_COMPANY_CLOSED:
         'Εργασία χωρίς κάρτες σε προαιρετική αργία με κλειστή εταιρεία',
     DECLARED_WORK_NO_CARDS_LEAVE: 'Εργασία χωρίς κάρτες λόγω άδειας',
     DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
     DECLARED_NON_WORK_WITH_CARDS: 'Δηλωμένη μη εργασία με κάρτες',
-    UNKNOWN: 'Άγνωστο σενάριο'
+    ZERO_LENGTH_CARD_INTERVAL: 'Μηδενικό διάστημα κάρτας',
+    SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'Σπαστό ωράριο με απόκλιση',
+    REPO_TRANSFER_WITHIN_WEEK: 'Πιθανή μεταφορά ρεπό εντός εβδομάδας',
+    UNKNOWN: 'Δεν αντιστοιχίστηκε διαθέσιμο σενάριο'
 };
 
 const policyPreviewActionLabels = {
     REVIEW_ONLY: 'Μόνο για έλεγχο',
+    SUGGESTION: 'Πρόταση προς αξιολόγηση',
     PREFILL: 'Προσυμπλήρωση',
+    AUTO_APPLY: 'Αυτόματη εφαρμογή όπου επιτρέπεται',
     OK: 'Καμία ενέργεια',
-    UNKNOWN: 'Άγνωστη ενέργεια'
+    UNKNOWN: 'Δεν προβλέπεται ενέργεια'
 };
 
 const policyPreviewReasonLabels = {
-    UNKNOWN_PATTERN: 'Άγνωστο μοτίβο',
+    DECLARED_WORK_WITHOUT_CARDS: 'Προδηλωμένη εργασία χωρίς κάρτες',
+    UNKNOWN_PATTERN: 'Δεν βρέθηκε ασφαλής αντιστοίχιση γνωστού μοτίβου',
     NO_APOLOGISTIKO_REVIEW_REQUIRED: 'Απαιτείται έλεγχος μη απολογιστικού βιβλίου',
     DECLARED_LEAVE_FOUND: 'Βρέθηκε δηλωμένη άδεια',
-    DECLARED_HOLIDAY_FOUND: 'Βρέθηκε δηλωμένη αργία',
+    HOLIDAY_REQUIRED_FOUND: 'Βρέθηκε υποχρεωτική αργία',
+    HOLIDAY_OPTIONAL_COMPANY_WORKS:
+        'Βρέθηκε προαιρετική αργία κατά την οποία η εταιρεία λειτουργεί',
+    HOLIDAY_OPTIONAL_COMPANY_CLOSED:
+        'Βρέθηκε προαιρετική αργία κατά την οποία η εταιρεία είναι κλειστή',
+    ZERO_LENGTH_CARD_INTERVAL_FOUND: 'Βρέθηκε μηδενικό διάστημα κάρτας',
+    SPLIT_SHIFT_DEVIATION_FOUND: 'Βρέθηκε απόκλιση σε σπαστό ωράριο',
+    DECLARED_REPO_WITH_CARDS: 'Βρέθηκε προδηλωμένο ρεπό με κάρτες',
+    DECLARED_NON_WORK_WITH_CARDS: 'Βρέθηκε προδηλωμένη μη εργασία με κάρτες',
+    REPO_TRANSFER_CANDIDATE: 'Βρέθηκε πιθανή μεταφορά ρεπό εντός εβδομάδας',
+    LEGAL_CLASSIFICATION_REQUIRED: 'Απαιτείται έλεγχος νομικής ταξινόμησης',
     CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
     EMPLOYEE_CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',
     NO_APOLOGISTIKO_BIBLIO: 'Δεν αφορά απολογιστικό βιβλίο',
-    UNKNOWN: 'Άγνωστη αιτιολογία'
+    UNKNOWN: 'Δεν καταγράφηκε ειδική αιτιολογία'
 };
 
 const policyPreviewFlagLabels = {
@@ -222,6 +253,8 @@ const scenarioProposedUpdateFillableFields = new Set([
 
 let currentReviewRows = [];
 let currentReviewDeviations = [];
+let currentPendingDeviationWeeks = [];
+let currentLegacyDeviations = [];
 let currentPolicyPreviewGrouping = null;
 let currentAtomicRepoTransferProjection = null;
 let currentRepoTransferDecisionsByProposalId = new Map();
@@ -299,10 +332,73 @@ function scenarioReasonLabel(reason) {
     return scenarioReasonLabels[key] || key;
 }
 
-function renderScenarioBadge(row) {
+function buildRepoTransferReviewRowStates() {
+    const states = new Map();
+
+    currentRepoTransferDecisionsByProposalId.forEach((record) => {
+        const history = record?.applied_history;
+        if (!history || record?.current_execution?.execution_status !== 'APPLIED') return;
+
+        [
+            ['source', history.source],
+            ['target', history.target]
+        ].forEach(([role, item]) => {
+            const id = rowIdentityKey(item?.prodhlomena_oraria_id);
+            if (!id) return;
+
+            states.set(id, {
+                applied: true,
+                pending: false,
+                role
+            });
+        });
+    });
+
+    const groups = Array.isArray(currentAtomicRepoTransferProjection?.groups)
+        ? currentAtomicRepoTransferProjection.groups
+        : [];
+    groups.forEach((group) => {
+        if (isHrReviewGroupCompleted(group)) return;
+
+        (group.items || []).forEach((item) => {
+            const id = rowIdentityKey(item?.prodhlomena_oraria_id);
+            if (!id || states.has(id)) return;
+
+            states.set(id, {
+                applied: false,
+                pending: true,
+                role:
+                    item?.role === 'TARGET_BECOMES_REPO'
+                        ? 'target'
+                        : item?.role === 'SOURCE_BECOMES_WORK'
+                          ? 'source'
+                          : ''
+            });
+        });
+    });
+
+    return states;
+}
+
+function renderScenarioBadge(row, repoTransferState) {
+    if (repoTransferState?.applied === true && repoTransferState.role === 'target') {
+        return `
+            <div class="review-scenario-badge-row">
+                <span class="review-scenario-badge review-scenario-badge-applied">
+                    ΕΦΑΡΜΟΣΤΗΚΕ
+                </span>
+            </div>
+        `;
+    }
+
     const decision = row?.scenarioDecision;
 
     if (!decision || !decision.scenario_code) return '';
+    if (
+        decision.requires_review === true &&
+        repoTransferState !== undefined &&
+        repoTransferState?.pending !== true
+    ) return '';
 
     const label = scenarioLabel(decision);
     const badgeClass =
@@ -401,7 +497,11 @@ function updateScenarioReviewFilterNotice() {
 }
 
 function renderCurrentReviewRows() {
-    renderReviewRows(getVisibleReviewRows(), currentReviewDeviations);
+    renderReviewRows(getVisibleReviewRows(), [
+        ...currentReviewDeviations,
+        ...currentPendingDeviationWeeks,
+        ...currentLegacyDeviations
+    ]);
     updateScenarioReviewFilterNotice();
     updateReviewFilterLayoutState();
 }
@@ -758,6 +858,16 @@ function isApologistikoIntervalPresent(row) {
     );
 }
 
+function hasValidCardInterval(row = {}) {
+    return [1, 2, 3].some((n) => {
+        const p = pairNo(n);
+        return (
+            timeToMinutes(row[`cards_apo_ora_${p}`]) !== null &&
+            timeToMinutes(row[`cards_eos_ora_${p}`]) !== null
+        );
+    });
+}
+
 function yperoriaCellClass(row) {
     if (sumParanomiYperoria(row) > 0) return 'cell-paranomi-yperoria';
     if (sumNomimiYperoria(row) > 0) return 'cell-nomimi-yperoria';
@@ -1016,6 +1126,15 @@ function ensureReviewTableStructure() {
                 text-align: center;
             }
 
+            .cell-repo-day-applied {
+                background-color: #198754 !important;
+                color: #ffffff !important;
+                border: 2px solid #0f5132 !important;
+                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+                font-weight: 800;
+                text-align: center;
+            }
+
             .cell-declared-repo-day {
                 background-color: #f1f3f5 !important;
                 color: #495057 !important;
@@ -1079,18 +1198,26 @@ function ensureReviewTableStructure() {
                 flex-wrap: wrap;
                 align-items: center;
                 justify-content: center;
+                width: 100%;
+                min-width: 0;
                 gap: 0.25rem;
                 margin-top: 0.25rem;
             }
 
             .review-scenario-badge {
                 display: inline-block;
-                padding: 0.12rem 0.4rem;
+                box-sizing: border-box;
+                max-width: 100%;
+                padding: 0.18rem 0.35rem;
                 border-radius: 999px;
                 font-size: 0.72rem;
                 font-weight: 700;
-                line-height: 1.25;
-                white-space: nowrap;
+                line-height: 1.2;
+                white-space: normal;
+                overflow-wrap: break-word;
+                word-break: normal;
+                text-align: center;
+                vertical-align: middle;
             }
 
             .review-scenario-badge-review {
@@ -1103,6 +1230,12 @@ function ensureReviewTableStructure() {
                 background-color: #e7f1ff;
                 border: 1px solid #b6d4fe;
                 color: #084298;
+            }
+
+            .review-scenario-badge-applied {
+                background-color: #ffffff;
+                border: 1px solid #ffffff;
+                color: #0f5132;
             }
 
             .review-scenario-confidence {
@@ -1652,6 +1785,23 @@ function renderDeviationProfileCell(dev) {
 }
 
 function renderDeviationNoteCell(dev) {
+    if (dev.status === 'OPEN_WEEK_PENDING_COMPLETION') {
+        return `
+            <span class="badge text-bg-info">Αναμονή ολοκλήρωσης</span>
+            <div class="small mt-1">
+                Η εβδομάδα ${escapeHtml(formatDate(dev.week_apo || dev.weekStart))}–${escapeHtml(formatDate(dev.week_eos || dev.weekEnd))}
+                δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.
+            </div>
+        `;
+    }
+
+    if (dev.is_legacy_policy === true) {
+        return `
+            <span class="badge text-bg-secondary">Ιστορική εγγραφή παλιάς πολιτικής</span>
+            ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
+        `;
+    }
+
     if (dev.profile_changed_inside_week) {
         const excessRepo =
             Number(dev.actual_repo ?? dev.pragmatikaRepo ?? 0) -
@@ -1666,7 +1816,7 @@ function renderDeviationNoteCell(dev) {
                 ⚠ Αλλαγή όρων εργασίας μέσα στην εβδομάδα
             </div>
             <small class="text-muted">
-                Υπερισχύουν οι όροι εργασίας που ίσχυαν το Σάββατο της εβδομάδας.
+                Η εβδομάδα απαιτεί απόφαση HR επειδή άλλαξαν κρίσιμοι όροι εργασίας.
             </small>
             ${excessText}
             ${dev.note ? `<div class="small mt-1">${escapeHtml(dev.note)}</div>` : ''}
@@ -1702,12 +1852,23 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
     const rowsHtml = deviations
         .map(
             (dev) => `
-                <tr class="${dev.profile_changed_inside_week ? 'table-warning' : ''}">
+                <tr
+                    class="${
+                        dev.is_legacy_policy === true
+                            ? 'table-secondary'
+                            : dev.status === 'OPEN_WEEK_PENDING_COMPLETION'
+                              ? 'table-info'
+                              : dev.profile_changed_inside_week
+                                ? 'table-warning'
+                                : ''
+                    }"
+                    data-week-policy="${dev.is_legacy_policy === true ? 'LEGACY' : 'MONDAY_SUNDAY'}"
+                >
                     <td>${formatDate(dev.week_apo || dev.weekStart)}</td>
                     <td>${formatDate(dev.week_eos || dev.weekEnd)}</td>
-                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '')}</td>
-                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '')}</td>
-                    <td>${renderDeviationProfileCell(dev)}</td>
+                    <td class="text-end">${escapeHtml(dev.expected_repo ?? dev.mhniaia_repo ?? '-')}</td>
+                    <td class="text-end fw-bold">${escapeHtml(dev.actual_repo ?? dev.pragmatikaRepo ?? '-')}</td>
+                    <td>${dev.status === 'OPEN_WEEK_PENDING_COMPLETION' || dev.is_legacy_policy === true ? '-' : renderDeviationProfileCell(dev)}</td>
                     <td>${renderDeviationNoteCell(dev)}</td>
                 </tr>
             `
@@ -1716,7 +1877,10 @@ function appendEmployeeDeviationRows(tbody, deviations, groupId) {
 
     wrapperTr.innerHTML = `
         <td colspan="13" class="p-2 bg-warning-subtle">
-            <div class="fw-bold mb-1">Αποκλίσεις εβδομαδιαίων ρεπό</div>
+            <div class="fw-bold mb-1">
+                Αποκλίσεις εβδομαδιαίων ρεπό
+                <span class="badge text-bg-light border ms-1">Εβδομάδα Δευτέρα–Κυριακή</span>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered mb-0 bg-white">
                     <thead class="table-light">
@@ -1835,9 +1999,151 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
+function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+    const persistedRepo =
+        row.repo_apologistika === true ||
+        (persistedCategory === 'ΑΝ' && derived.isApologistikoRepoRow === true);
+
+    if (persistedRepo) {
+        return {
+            text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+            className: 'cell-repo-day',
+            source: 'persisted'
+        };
+    }
+
+    if (persistedCategory === 'ΜΕ' || derived.isApologistikoNonWorkRow) {
+        return {
+            text: 'ΜΗ ΕΡΓΑΣΙΑ',
+            className: 'cell-non-work-day',
+            source: 'persisted'
+        };
+    }
+
+    if (persistedCategory) {
+        return {
+            text: derived.apologistikoText || persistedCategory,
+            className: isApologistikoIntervalPresent(row)
+                ? 'cell-apologistiko'
+                : '',
+            source: 'persisted'
+        };
+    }
+
+    const noCardsDisplayStatus = String(
+        row.noCardsDisplayStatus || row.no_cards_display_status || ''
+    ).trim();
+    if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
+        return {
+            text: noCardsDisplayStatus,
+            className:
+                noCardsDisplayStatus === 'ΑΔΕΙΑ'
+                    ? 'cell-no-card-adeia'
+                    : 'cell-no-card-argia',
+            source: 'derived'
+        };
+    }
+
+    if (derived.isApologistikoRepoRow) {
+        return {
+            text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+            className: 'cell-repo-day',
+            source: 'derived'
+        };
+    }
+
+    return {
+        text: derived.apologistikoText || '',
+        className: isApologistikoIntervalPresent(row)
+            ? 'cell-apologistiko'
+            : hasAdeiaSuggestion(row)
+              ? 'cell-adeia-suggestion'
+              : '',
+        source: 'derived'
+    };
+}
+
+function resolveReviewRowPresentation(
+    row = {},
+    derived = {},
+    repoTransferState = null
+) {
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original || row.kathgoria_ergasias || ''
+    ).trim();
+    const hasActualCards =
+        num(row.cards_ores_ergasias) > 0 || hasValidCardInterval(row);
+    const isAppliedRow = repoTransferState?.applied === true;
+    const isOriginalDeclaredRepo =
+        declaredCategory === 'ΑΝ' &&
+        !hasActualCards &&
+        !isAppliedRow;
+    const apologistiko = isOriginalDeclaredRepo
+        ? {
+            text: '-',
+            className: '',
+            source: 'declared_repo_neutral'
+        }
+        : resolveReviewApologistikoPresentation(row, derived);
+    const isAppliedRepoTarget =
+        isAppliedRow &&
+        repoTransferState.role === 'target' &&
+        apologistiko.text === 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ';
+
+    return {
+        declared: {
+            text: derived.declaredText || '-',
+            className: derived.declaredClass || ''
+        },
+        apologistiko: {
+            ...apologistiko,
+            className: isAppliedRepoTarget
+                ? 'cell-repo-day-applied'
+                : apologistiko.className
+        },
+        badgeState: isOriginalDeclaredRepo ? {} : repoTransferState || {},
+        isAppliedRow,
+        isAppliedRepoTarget,
+        isOriginalDeclaredRepo
+    };
+}
+
+function setEmployeeGroupExpanded(groupTr, expanded) {
+    const groupId = String(groupTr?.dataset?.groupId || '');
+    if (!groupId) return;
+
+    groupTr.classList.toggle('collapsed', !expanded);
+    groupTr.classList.toggle('expanded', expanded);
+    groupTr.setAttribute('aria-expanded', String(expanded));
+
+    document.querySelectorAll(
+        `tr.employee-detail-row[data-group-id="${groupId}"],
+         tr.employee-subtotal-row[data-group-id="${groupId}"],
+         tr.employee-deviation-row[data-group-id="${groupId}"]`
+    ).forEach((row) => row.classList.toggle('d-none', !expanded));
+}
+
+function toggleEmployeeGroupAccordion(groupTr) {
+    const willExpand = groupTr.classList.contains('collapsed');
+
+    if (willExpand) {
+        document.querySelectorAll(
+            '#resultsTable tbody tr.employee-group-row[aria-expanded="true"]'
+        ).forEach((otherGroup) => {
+            if (otherGroup !== groupTr) setEmployeeGroupExpanded(otherGroup, false);
+        });
+    }
+
+    setEmployeeGroupExpanded(groupTr, willExpand);
+}
+
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
 
+    const repoTransferRowStates = buildRepoTransferReviewRowStates();
     const deviationsByKodikos = buildDeviationsByKodikos(deviations);
     const rowsByKodikos = new Map();
     rows.forEach((row) => {
@@ -1880,6 +2186,9 @@ function renderReviewRows(rows = [], deviations = []) {
             groupTr.classList.add('table-secondary', 'employee-group-row', 'collapsed');
             groupTr.dataset.groupId = groupId;
             groupTr.style.cursor = 'pointer';
+            groupTr.tabIndex = 0;
+            groupTr.setAttribute('role', 'button');
+            groupTr.setAttribute('aria-expanded', 'false');
 
             const groupDeviations = deviationsByKodikos.get(groupKey) || [];
             const groupHasProfileChange = hasProfileChangeDeviation(groupDeviations);
@@ -1898,18 +2207,12 @@ function renderReviewRows(rows = [], deviations = []) {
                 </td>
             `;
 
-            groupTr.addEventListener('click', () => {
-                groupTr.classList.toggle('collapsed');
+            groupTr.addEventListener('click', () => toggleEmployeeGroupAccordion(groupTr));
+            groupTr.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
 
-                const rows = document.querySelectorAll(
-                    `tr.employee-detail-row[data-group-id="${groupId}"],
-                     tr.employee-subtotal-row[data-group-id="${groupId}"],
-                     tr.employee-deviation-row[data-group-id="${groupId}"]`
-                );
-
-                rows.forEach((r) => {
-                    r.classList.toggle('d-none');
-                });
+                event.preventDefault();
+                toggleEmployeeGroupAccordion(groupTr);
             });
 
             tbody.appendChild(groupTr);
@@ -1962,33 +2265,8 @@ function renderReviewRows(rows = [], deviations = []) {
             (effectiveKathgoria === 'ΜΕ' || (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
             num(row.cards_ores_ergasias) === 0;
 
-        const noCardsDisplayStatus = String(
-            row.noCardsDisplayStatus || row.no_cards_display_status || ''
-        ).trim();
-        const hasNoCardsDisplayStatus =
-            noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
-
-        const apologistikoDisplayText = hasNoCardsDisplayStatus
-            ? noCardsDisplayStatus
-            : isApologistikoRepoRow
-            ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
-            : isApologistikoNonWorkRow
-              ? 'ΜΗ ΕΡΓΑΣΙΑ'
-              : apologistikoText;
-
-        const apologistikoDisplayClass = hasNoCardsDisplayStatus
-            ? noCardsDisplayStatus === 'ΑΔΕΙΑ'
-                ? 'cell-no-card-adeia'
-                : 'cell-no-card-argia'
-            : isApologistikoRepoRow
-            ? 'cell-repo-day'
-            : isApologistikoNonWorkRow
-              ? 'cell-non-work-day'
-              : isApologistikoIntervalPresent(row)
-                ? 'cell-apologistiko'
-                : hasAdeiaSuggestion(row)
-                  ? 'cell-adeia-suggestion'
-                  : '';
+        const repoTransferState =
+            repoTransferRowStates.get(rowIdentityKey(row._id)) || null;
 
         const isDeclaredRestOrNonWork =
             row.apologistiko_biblio !== true &&
@@ -2006,6 +2284,22 @@ function renderReviewRows(rows = [], deviations = []) {
                 ? 'cell-declared-repo-day'
                 : 'cell-non-work-day'
             : '';
+        const rowPresentation = resolveReviewRowPresentation(
+            row,
+            {
+                apologistikoText,
+                isApologistikoRepoRow,
+                isApologistikoNonWorkRow,
+                declaredText,
+                declaredClass
+            },
+            repoTransferState
+        );
+
+        if (rowPresentation.isAppliedRow) {
+            tr.classList.add('row-repo-transfer-applied');
+            tr.dataset.repoTransferRole = repoTransferState.role;
+        }
 
         const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
 
@@ -2015,11 +2309,11 @@ function renderReviewRows(rows = [], deviations = []) {
             <td>${renderReviewDateCell(row)}</td>
             <td>${row.ypokatasthma || ''}</td>
             <td>${row.kodikos || ''}</td>
-            <td${tdClass(declaredClass)}>${declaredText}</td>
+            <td${tdClass(rowPresentation.declared.className)}>${rowPresentation.declared.text}</td>
             <td>${renderIntervalCell(row, 'cards_apo_ora', 'cards_eos_ora')}</td>
-            <td${tdClass(apologistikoDisplayClass)}>
-                ${apologistikoDisplayText}
-                ${renderScenarioBadge(row)}
+            <td${tdClass(rowPresentation.apologistiko.className)}>
+                ${rowPresentation.apologistiko.text}
+                ${renderScenarioBadge(row, rowPresentation.badgeState)}
             </td>
             <td${tdClass(breakSubtractedHoursValue(row) > 0 ? 'cell-break-subtracted' : '')}>
                 ${renderHoursCell(row)}
@@ -2071,8 +2365,8 @@ function getPolicyPreviewStatusLabel(status) {
 
     return (
         policyPreviewStatusLabels[key] || {
-            label: 'Άγνωστη τιμή',
-            description: 'Άγνωστη τιμή',
+            label: formatPolicyPreviewUnknownCode(key),
+            description: formatPolicyPreviewUnknownCode(key),
             badgeClass: 'text-bg-secondary'
         }
     );
@@ -2117,42 +2411,48 @@ function formatPolicyPreviewHours(value) {
     return numericValue.toFixed(2);
 }
 
-function formatPolicyPreviewUnknownCode(value, fallbackLabel = 'Άγνωστη τιμή') {
-    const key = String(value || '').trim();
+function sanitizePolicyPreviewCode(value) {
+    return String(value || '')
+        .trim()
+        .replace(/[^A-Za-z0-9_.:-]/g, '')
+        .slice(0, 80);
+}
 
-    return key ? fallbackLabel : '-';
+function formatPolicyPreviewUnknownCode(value) {
+    const key = sanitizePolicyPreviewCode(value);
+    return key ? `Μη χαρτογραφημένο αποτέλεσμα (${key})` : '-';
 }
 
 function getPolicyPreviewPolicyLabel(policyCode) {
     const key = String(policyCode || '').trim() || 'UNKNOWN';
 
-    return policyPreviewPolicyLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη πολιτική');
+    return policyPreviewPolicyLabels[key] || formatPolicyPreviewUnknownCode(key);
 }
 
 function getPolicyPreviewScenarioLabel(scenarioCode) {
     const key = String(scenarioCode || '').trim() || 'UNKNOWN';
 
     return (
-        policyPreviewScenarioLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστο σενάριο')
+        policyPreviewScenarioLabels[key] || formatPolicyPreviewUnknownCode(key)
     );
 }
 
 function getPolicyPreviewActionLabel(actionType) {
     const key = String(actionType || '').trim() || 'UNKNOWN';
 
-    return policyPreviewActionLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη ενέργεια');
+    return policyPreviewActionLabels[key] || formatPolicyPreviewUnknownCode(key);
 }
 
 function getPolicyPreviewReasonLabel(reasonCode) {
     const key = String(reasonCode || '').trim() || 'UNKNOWN';
 
-    return policyPreviewReasonLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη αιτιολογία');
+    return policyPreviewReasonLabels[key] || formatPolicyPreviewUnknownCode(key);
 }
 
 function getPolicyPreviewFlagLabel(flagKey) {
     const key = String(flagKey || '').trim();
 
-    return policyPreviewFlagLabels[key] || formatPolicyPreviewUnknownCode(key, 'Άγνωστη ένδειξη');
+    return policyPreviewFlagLabels[key] || formatPolicyPreviewUnknownCode(key);
 }
 
 function getPolicyPreviewFieldLabel(fieldKey) {
@@ -2169,8 +2469,12 @@ function getPolicyPreviewGroupTitle(group = {}) {
     const policyLabel = getPolicyPreviewPolicyLabel(group.policy_code);
     const scenarioLabel = getPolicyPreviewScenarioLabel(group.scenario_code);
 
-    if (policyLabel && policyLabel !== 'Άγνωστη πολιτική') return policyLabel;
-    if (scenarioLabel && scenarioLabel !== 'Άγνωστο σενάριο') return scenarioLabel;
+    if (policyPreviewPolicyLabels[String(group.policy_code || '').trim() || 'UNKNOWN']) {
+        return policyLabel;
+    }
+    if (policyPreviewScenarioLabels[String(group.scenario_code || '').trim() || 'UNKNOWN']) {
+        return scenarioLabel;
+    }
 
     return getPolicyPreviewStatusLabel(group.status).label;
 }
@@ -3540,22 +3844,25 @@ function formatPolicyPreviewIntervals(row = {}, apoPrefix, eosPrefix, suffix = '
 
 function renderPolicyPreviewDetailsRows(item = {}, reviewRow = null) {
     const row = reviewRow || {};
+    const proposedCategory =
+        item.proposed_values?.kathgoria_ergasias_apologistika || '-';
     const rows = reviewRow
         ? [
               ['Παράρτημα', row.ypokatasthma || '-'],
               ['Κωδικός εργαζομένου', row.kodikos || item.employee_kodikos || '-'],
               ['Ημερομηνία', formatPolicyPreviewDate(row.hmeromhnia || item.hmeromhnia)],
-              ['Προδηλωμένο', row.kathgoria_ergasias || item.kathgoria_ergasias || '-'],
+              ['Προδηλωμένη κατηγορία', row.kathgoria_ergasias || item.kathgoria_ergasias || '-'],
               ['Ωράριο', formatPolicyPreviewIntervals(row, 'apo_ora', 'eos_ora')],
               ['Προδηλωμένες ώρες', formatPolicyPreviewHours(row.ores_ergasias)],
               ['Κάρτες', formatPolicyPreviewIntervals(row, 'cards_apo_ora', 'cards_eos_ora')],
               ['Ώρες καρτών', formatPolicyPreviewHours(row.cards_ores_ergasias ?? item.cards_ores_ergasias)],
               [
-                  'Απολογιστικό',
+                  'Απολογιστική/εμφανιζόμενη κατηγορία',
                   row.kathgoria_ergasias_apologistika ||
                       item.kathgoria_ergasias_apologistika ||
                       '-'
               ],
+              ['Προτεινόμενη κατηγορία', proposedCategory],
               [
                   'Απολογιστικό ωράριο',
                   formatPolicyPreviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika')
@@ -3576,8 +3883,9 @@ function renderPolicyPreviewDetailsRows(item = {}, reviewRow = null) {
         : [
         ['Κωδικός εργαζομένου', item.employee_kodikos || '-'],
         ['Ημερομηνία', formatPolicyPreviewDate(item.hmeromhnia)],
-        ['Προδηλωμένο', item.kathgoria_ergasias || '-'],
-        ['Απολογιστικό', item.kathgoria_ergasias_apologistika || '-'],
+        ['Προδηλωμένη κατηγορία', item.kathgoria_ergasias || '-'],
+        ['Απολογιστική/εμφανιζόμενη κατηγορία', item.kathgoria_ergasias_apologistika || '-'],
+        ['Προτεινόμενη κατηγορία', proposedCategory],
         ['Ώρες καρτών', formatPolicyPreviewHours(item.cards_ores_ergasias)],
         ['ID εγγραφής', item.prodhlomena_oraria_id || '-']
     ];
@@ -3649,8 +3957,9 @@ function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
                     <tr>
                         <th>Κωδικός</th>
                         <th>Ημ/νία</th>
-                        <th>Προδηλωμένο</th>
-                        <th>Απολογιστικό</th>
+                        <th>Προδηλωμένη κατηγορία</th>
+                        <th>Απολογιστική κατηγορία</th>
+                        <th>Προτεινόμενη κατηγορία</th>
                         <th>Ώρες καρτών</th>
                         <th>Ενδείξεις</th>
                         <th>Λεπτομέρειες</th>
@@ -3665,6 +3974,7 @@ function renderPolicyPreviewGroupItems(items = [], groupIndex = 0) {
                                     <td>${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}</td>
                                     <td>${escapeHtml(item.kathgoria_ergasias || '-')}</td>
                                     <td>${escapeHtml(item.kathgoria_ergasias_apologistika || '-')}</td>
+                                    <td>${escapeHtml(item.proposed_values?.kathgoria_ergasias_apologistika || '-')}</td>
                                     <td>${escapeHtml(formatPolicyPreviewHours(item.cards_ores_ergasias))}</td>
                                     <td>${renderPolicyPreviewFlags(item.flags)}</td>
                                     <td>
@@ -3765,11 +4075,11 @@ function renderAtomicRepoTransferItem(item = {}, role) {
     const panelClass = isSource
         ? 'atomic-repo-transfer-source'
         : 'atomic-repo-transfer-target';
-    const currentCategory = item.kathgoria_ergasias || '-';
+    const declaredCategory = item.kathgoria_ergasias || '-';
+    const displayedCategory =
+        item.current_kathgoria_ergasias_apologistika || '-';
     const proposedCategory =
-        proposedValues.kathgoria_ergasias_apologistika ||
-        item.kathgoria_ergasias_apologistika ||
-        '-';
+        proposedValues.kathgoria_ergasias_apologistika || '-';
     const proposedHours = formatAtomicRepoTransferHours(
         proposedValues.ores_ergasias_apologistika
     );
@@ -3785,11 +4095,15 @@ function renderAtomicRepoTransferItem(item = {}, role) {
             </div>
             <dl class="atomic-repo-transfer-values">
                 <div>
-                    <dt>Τρέχον</dt>
-                    <dd>${escapeHtml(currentCategory)}</dd>
+                    <dt>Προδηλωμένη κατηγορία</dt>
+                    <dd>${escapeHtml(declaredCategory)}</dd>
                 </div>
                 <div>
-                    <dt>Πρόταση</dt>
+                    <dt>Απολογιστική/εμφανιζόμενη κατηγορία</dt>
+                    <dd>${escapeHtml(displayedCategory)}</dd>
+                </div>
+                <div>
+                    <dt>Προτεινόμενη κατηγορία</dt>
                     <dd>${escapeHtml(proposedCategory)}</dd>
                 </div>
                 <div>
@@ -3810,7 +4124,9 @@ function renderAtomicRepoTransferItem(item = {}, role) {
 
 const atomicRepoTransferDiagnosticLabels = Object.freeze({
     PARTIAL_WEEK_OUTSIDE_FILTER_RANGE:
-        'Το επιλεγμένο διάστημα δεν περιλαμβάνει ολόκληρη εβδομάδα.',
+        'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
+    OPEN_WEEK_PENDING_COMPLETION:
+        'Η τελευταία εβδομάδα δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.',
     NO_SOURCE_CANDIDATE:
         'Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
     REPO_DEFICIT_REMAINS:
@@ -3822,6 +4138,22 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
     NO_TARGET_SCHEDULED_WORK_WITHOUT_CARDS:
         'Βρέθηκε μη προγραμματισμένη εργασία με κάρτες, αλλά όχι αντισταθμιστική προδηλωμένη ημέρα χωρίς κάρτες.',
     INVALID_MHNIAIA_REPO: 'Ο προβλεπόμενος αριθμός εβδομαδιαίων ρεπό δεν είναι έγκυρος.',
+    INVALID_EFFECTIVE_WEEKLY_WORKDAYS:
+        'Δεν είναι δυνατό να επιβεβαιωθεί αν η σύμβαση προβλέπει πενθήμερη ή εξαήμερη εργασία.',
+    PROFILE_CHANGED_INSIDE_WEEK:
+        'Οι κρίσιμοι όροι εργασίας άλλαξαν μέσα στην εβδομάδα Δευτέρα–Κυριακή και απαιτείται απόφαση HR.',
+    MISSING_OR_INVALID_SIXTH_DAY_PREMIUM_RATE:
+        'Το ημερομηνιακά ισχύον ποσοστό προσαύξησης 6ης ημέρας λείπει ή δεν είναι έγκυρο.',
+    SIXTH_DAY_CANDIDATE_NOT_DETERMINISTIC:
+        'Δεν μπορεί να προσδιοριστεί με ασφάλεια η 6η ημέρα από τις πραγματικές ώρες εργασίας.',
+    SIXTH_DAY_DAILY_HOURS_EXCEED_EIGHT:
+        'ΣΗΜΑΝΤΙΚΟ: Η επιλεγμένη 6η ημέρα υπερβαίνει τις οκτώ πραγματικές ώρες.',
+    SEVENTH_CONSECUTIVE_ACTUAL_WORK_DAY_CONTRACT_VIOLATION:
+        'ΣΗΜΑΝΤΙΚΗ ΠΑΡΑΒΑΣΗ: Διαπιστώθηκε πραγματική απασχόληση και κατά την 7η ημέρα της εβδομάδας, κατά παράβαση των όρων της σύμβασης εργασίας.',
+    MIXED_WORK_AND_HOURLY_LEAVE:
+        'Υπάρχει μικτή πραγματική εργασία και ωροάδεια την ίδια ημέρα.',
+    MIXED_WORK_AND_SICKNESS:
+        'Υπάρχει μικτή πραγματική εργασία και ασθένεια την ίδια ημέρα.',
     MULTIPLE_SOURCE_CANDIDATES:
         'Βρέθηκαν περισσότερες από μία πιθανές ημέρες εργασίας σε δηλωμένο ρεπό και απαιτείται επιλογή.',
     MULTIPLE_TARGET_CANDIDATES:
@@ -3873,16 +4205,45 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
 
 const atomicRepoTransferUnknownDiagnosticLabel = 'Άλλη περίπτωση που χρειάζεται έλεγχο.';
 
+function getOpenTrailingWeekDiagnosticLabel() {
+    const periodEnd = String(
+        currentPolicyPreviewBaseParams?.get('eos_hmeromhnia') || ''
+    ).trim();
+    const endDate = /^\d{4}-\d{2}-\d{2}$/.test(periodEnd)
+        ? new Date(`${periodEnd}T00:00:00.000Z`)
+        : null;
+    if (!endDate || Number.isNaN(endDate.getTime())) {
+        return atomicRepoTransferDiagnosticLabels.OPEN_WEEK_PENDING_COMPLETION;
+    }
+    const day = endDate.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const weekStart = new Date(endDate);
+    weekStart.setUTCDate(weekStart.getUTCDate() + mondayOffset);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    return `Η εβδομάδα ${formatPolicyPreviewDate(
+        weekStart.toISOString().slice(0, 10)
+    )}–${formatPolicyPreviewDate(
+        weekEnd.toISOString().slice(0, 10)
+    )} δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.`;
+}
+
 function getAtomicRepoTransferDiagnosticLabel(code) {
-    return atomicRepoTransferDiagnosticLabels[String(code || '').trim()] ||
+    const normalizedCode = String(code || '').trim();
+    if (normalizedCode === 'OPEN_WEEK_PENDING_COMPLETION') {
+        return getOpenTrailingWeekDiagnosticLabel();
+    }
+    return atomicRepoTransferDiagnosticLabels[normalizedCode] ||
         atomicRepoTransferUnknownDiagnosticLabel;
 }
 
 function getAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
     return Object.entries(reasonCounts || {})
         .map(([code, rawCount]) => ({
+            code,
             count: Number(rawCount),
-            label: getAtomicRepoTransferDiagnosticLabel(code)
+            label: getAtomicRepoTransferDiagnosticLabel(code),
+            pendingCompletion: code === 'OPEN_WEEK_PENDING_COMPLETION'
         }))
         .filter(({ count }) => Number.isFinite(count) && count > 0)
         .sort((left, right) => {
@@ -3904,11 +4265,15 @@ function renderAtomicRepoTransferDiagnosticEntries(reasonCounts = {}) {
             </div>
             <div class="atomic-repo-transfer-diagnostic-list">
                 ${entries
-                    .map(({ count, label }) => {
+                    .map(({ count, label, pendingCompletion }) => {
                         const countLabel = count === 1 ? 'περίπτωση' : 'περιπτώσεις';
-                        return `<div class="atomic-repo-transfer-diagnostic-message">${escapeHtml(
-                            count
-                        )} ${countLabel}: ${escapeHtml(label)}</div>`;
+                        return `<div class="atomic-repo-transfer-diagnostic-message${
+                            pendingCompletion ? ' atomic-repo-transfer-pending-message' : ''
+                        }">${
+                            pendingCompletion
+                                ? '<span class="badge text-bg-info me-2">Αναμονή ολοκλήρωσης</span>'
+                                : ''
+                        }${escapeHtml(count)} ${countLabel}: ${escapeHtml(label)}</div>`;
                     })
                     .join('')}
             </div>
@@ -4138,7 +4503,8 @@ async function refreshRepoTransferDecisions() {
     const params = new URLSearchParams({
         apo_hmeromhnia: currentPolicyPreviewBaseParams.get('apo_hmeromhnia') || '',
         eos_hmeromhnia: currentPolicyPreviewBaseParams.get('eos_hmeromhnia') || '',
-        ypokatasthma: selectedBranch
+        ypokatasthma: selectedBranch,
+        kodikos: currentPolicyPreviewBaseParams.get('kodikos') || ''
     });
     currentRepoTransferDecisionsByProposalId = new Map();
     const response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/current?${params}`, {
@@ -4410,9 +4776,9 @@ function renderHrReviewDay(item = {}, kind) {
     const proposedValues = item.proposed_values || {};
     const isWorkDay = kind === 'work';
     const proposedCategory =
-        proposedValues.kathgoria_ergasias_apologistika ||
-        item.kathgoria_ergasias_apologistika ||
-        '-';
+        proposedValues.kathgoria_ergasias_apologistika || '-';
+    const displayedCategory =
+        item.current_kathgoria_ergasias_apologistika || '-';
     const hoursHtml = isWorkDay
         ? `<div><span>Προτεινόμενες ώρες</span><strong>${escapeHtml(
               formatAtomicRepoTransferHours(proposedValues.ores_ergasias_apologistika)
@@ -4424,8 +4790,9 @@ function renderHrReviewDay(item = {}, kind) {
             <h5>${isWorkDay ? 'Ημέρα που θα καταχωριστεί ως εργασία' : 'Ημέρα που θα καταχωριστεί ως ρεπό'}</h5>
             <div class="hr-review-day-date">${escapeHtml(formatPolicyPreviewDate(item.hmeromhnia))}</div>
             <div class="hr-review-day-values">
-                <div><span>Τρέχουσα κατηγορία</span><strong>${escapeHtml(item.kathgoria_ergasias || '-')}</strong></div>
-                <div><span>Προτεινόμενη κατηγορία</span><strong>${escapeHtml(proposedCategory)}</strong></div>
+                <div><span>Προδηλωμένη</span><strong>${escapeHtml(item.kathgoria_ergasias || '-')}</strong></div>
+                <div><span>Απολογιστική</span><strong>${escapeHtml(displayedCategory)}</strong></div>
+                <div><span>Πρόταση μεταφοράς</span><strong>${escapeHtml(proposedCategory)}</strong></div>
                 ${hoursHtml}
             </div>
             ${isWorkDay ? `<div class="hr-review-intervals">${renderHrReviewIntervals(proposedValues)}</div>` : ''}
@@ -4480,11 +4847,79 @@ function renderHrPendingCase() {
     }).join('');
 }
 
+function formatAppliedRepoTransferResult(result, repo = false) {
+    const category = String(result || '').trim();
+    return repo || category === 'ΑΝ' ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' : category || '-';
+}
+
+function getAppliedRepoTransferHistory() {
+    return [...currentRepoTransferDecisionsByProposalId.values()]
+        .map((record) => record?.applied_history)
+        .filter(
+            (history) =>
+                history &&
+                history.execution_id &&
+                history.source?.hmeromhnia &&
+                history.target?.hmeromhnia
+        )
+        .sort(
+            (left, right) =>
+                new Date(right.applied_at || 0) - new Date(left.applied_at || 0)
+        );
+}
+
+function renderAppliedRepoTransferHistory() {
+    const histories = getAppliedRepoTransferHistory();
+    if (histories.length === 0) return '';
+
+    return `
+        <section class="applied-repo-transfer-history" aria-label="Εφαρμοσμένες μεταφορές ρεπό">
+            <div class="fw-semibold mb-2">Εφαρμοσμένες μεταφορές ρεπό</div>
+            <ul class="applied-repo-transfer-list">
+                ${histories.map((history) => `
+                    <li class="applied-repo-transfer-item" data-execution-id="${escapeHtml(history.execution_id)}">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge text-bg-success">Εφαρμόστηκε</span>
+                            <strong>${escapeHtml(
+                                history.employee_name ||
+                                `Εργαζόμενος ${history.employee_kodikos || '-'}`
+                            )}</strong>
+                            <span>Κωδικός: ${escapeHtml(history.employee_kodikos || '-')}</span>
+                        </div>
+                        <div>
+                            Εβδομάδα ${escapeHtml(formatPolicyPreviewDate(history.week_start))}
+                            –${escapeHtml(formatPolicyPreviewDate(history.week_end))}
+                        </div>
+                        <div>
+                            ${escapeHtml(formatPolicyPreviewDate(history.source.hmeromhnia))}
+                            → ${escapeHtml(formatAppliedRepoTransferResult(history.source.result))}
+                        </div>
+                        <div class="applied-repo-transfer-target-result">
+                            ${escapeHtml(formatPolicyPreviewDate(history.target.hmeromhnia))}
+                            → ${escapeHtml(formatAppliedRepoTransferResult(
+                                history.target.result,
+                                history.target.repo_apologistika === true
+                            ))}
+                        </div>
+                        <div class="small text-muted">
+                            Εφαρμογή: ${escapeHtml(formatPolicyPreviewDateTime(history.applied_at))}
+                            ${history.applied_by_user_name
+                                ? ` · ${escapeHtml(history.applied_by_user_name)}`
+                                : ''}
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+        </section>
+    `;
+}
+
 function renderHrCompletedCases() {
     const container = document.getElementById('hrReviewCompletedContainer');
     if (!container) return;
 
-    if (currentHrCompletedGroups.length === 0) {
+    const appliedHistoryHtml = renderAppliedRepoTransferHistory();
+    if (currentHrCompletedGroups.length === 0 && !appliedHistoryHtml) {
         container.innerHTML = '';
         return;
     }
@@ -4524,12 +4959,13 @@ function renderHrCompletedCases() {
         })
         .join('');
 
-    container.innerHTML = `
+    const completedGroupsHtml = currentHrCompletedGroups.length ? `
         <details class="hr-review-completed-details">
             <summary>Ολοκληρωμένες περιπτώσεις (${escapeHtml(currentHrCompletedGroups.length)})</summary>
             <ul>${itemsHtml}</ul>
         </details>
-    `;
+    ` : '';
+    container.innerHTML = `${completedGroupsHtml}${appliedHistoryHtml}`;
 }
 
 function renderHrCompletionState() {
@@ -4664,8 +5100,9 @@ function bindHrReviewEvents() {
         if (!group) return;
         await submitRepoTransferApply(group, String(button.dataset.decisionId || ''), button);
     });
-    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', () => {
+    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', async () => {
         if (!userCanUseAdvancedEmploymentReview()) return;
+        await window.EmploymentReviewBranches?.preselectAdvancedBranch?.();
         document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
         document.getElementById('advancedReviewWorkspace')?.classList.remove('d-none');
     });
@@ -4886,6 +5323,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     if (!grouping) {
         container.innerHTML = `
             ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
+            ${renderAppliedRepoTransferHistory()}
             <div class="card border rounded">
                 <div class="card-body py-3">
                     <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
@@ -4955,6 +5393,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
     container.innerHTML = `
         ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
+        ${renderAppliedRepoTransferHistory()}
         <div class="card border rounded policy-preview-card">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
@@ -5033,13 +5472,27 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 async function loadResults() {
     try {
+        const advancedBranch = String(
+            document.getElementById('ypokatasthma_stathera_advanced')?.value ||
+            document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
+            document.getElementById('ypokatasthma')?.value ||
+            ''
+        ).trim();
+        const branchValidation = document.getElementById('advancedBranchValidation');
+        const invalidBranch =
+            !advancedBranch ||
+            advancedBranch.toUpperCase() === 'ALL' ||
+            advancedBranch.includes(',');
+        branchValidation?.classList.toggle('d-none', !invalidBranch);
+        if (invalidBranch) return;
+
         currentAtomicRepoTransferProjection = null;
         renderPolicyPreviewGroups(null, { loading: true });
 
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
-            ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
+            ypokatasthma: advancedBranch,
             kodikos: document.getElementById('kodikos')?.value || '',
             only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
             only_nyxta: document.getElementById('only_nyxta')?.checked || false,
@@ -5095,6 +5548,8 @@ async function loadResults() {
 
         currentReviewRows = rows;
         currentReviewDeviations = payload.deviations || [];
+        currentPendingDeviationWeeks = payload.pendingDeviationWeeks || [];
+        currentLegacyDeviations = payload.legacyDeviations || [];
         renderCurrentReviewRows();
 
         const [groupingResult, approvalsResult, dryRunResult] = await Promise.allSettled([
@@ -5137,6 +5592,7 @@ async function loadResults() {
                 console.warn('[loadResults] Repo-transfer decisions unavailable:', repoTransferDecisionsError);
                 currentRepoTransferDecisionsByProposalId = new Map();
             }
+            renderCurrentReviewRows();
             renderPolicyPreviewGroups(groupingResult.value.grouping, {
                 atomicGroupProjection: groupingResult.value.atomicGroupProjection
             });

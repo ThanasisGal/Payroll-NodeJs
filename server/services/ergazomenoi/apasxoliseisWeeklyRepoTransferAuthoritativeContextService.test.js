@@ -62,9 +62,9 @@ function testCanonicalWeeklyProfile() {
         mo_oron_hmerhsias_ergasias: 8
     };
     const week = {
-        naturalWeekEnd: new Date('2026-06-20T23:59:59.999Z'),
-        weekStart: new Date('2026-06-14T00:00:00.000Z'),
-        weekEnd: new Date('2026-06-20T23:59:59.999Z'),
+        naturalWeekEnd: new Date('2026-06-21T23:59:59.999Z'),
+        weekStart: new Date('2026-06-15T00:00:00.000Z'),
+        weekEnd: new Date('2026-06-21T23:59:59.999Z'),
         isFullWeek: true
     };
     const fallback = getWeeklyRepoProfileInfo({ week, ergazomenos: employee });
@@ -76,8 +76,9 @@ function testCanonicalWeeklyProfile() {
         { _id: 'h2', hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-06-18'), kathestos_apasxolhshs: '1', mhniaia_repo: 1, hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 30 }
     ];
     const changed = getWeeklyRepoProfileInfo({ week, istorikoRows: history, ergazomenos: employee });
-    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h2');
-    assert.strictEqual(changed.expectedWeeklyRepo, 1);
+    assert.strictEqual(String(changed.effectiveProfile.istorikoId), 'h1');
+    assert.strictEqual(changed.expectedWeeklyRepo, null);
+    assert.strictEqual(changed.repoResolutionReason, 'PROFILE_CHANGED_INSIDE_WEEK');
     assert.strictEqual(changed.profileChangedInsideWeek, true);
     assert.strictEqual(
         changed.effectiveProfileDate,
@@ -89,18 +90,18 @@ function testCanonicalWeeklyProfile() {
     );
 }
 
-function naturalWeek(start = '2026-06-07') {
+function naturalWeek(start = '2026-06-08') {
     return {
-        naturalWeekEnd: new Date('2026-06-13T23:59:59.999Z'),
+        naturalWeekEnd: new Date('2026-06-14T23:59:59.999Z'),
         weekStart: new Date(`${start}T00:00:00.000Z`),
-        weekEnd: new Date('2026-06-13T23:59:59.999Z'),
+        weekEnd: new Date('2026-06-14T23:59:59.999Z'),
         isFullWeek: true
     };
 }
 
 function scheduledRows(count) {
     return Array.from({ length: 7 }, (_, index) => ({
-        hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
+        hmeromhnia: `2026-06-${String(8 + index).padStart(2, '0')}`,
         kathgoria_ergasias: index < count ? 'ΕΡΓ' : 'ΜΕ',
         ores_ergasias: index < count ? 8 : 0,
         apo_ora_01: index < count ? '09:00' : '',
@@ -143,8 +144,11 @@ function testRawAuthoritativeRepoResolution() {
         rows: scheduledRows(5)
     });
     assert.strictEqual(employeeResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 3);
-    assert.strictEqual(employeeResult.result.effectiveExpectedWeeklyRepo, 3);
-    assert.strictEqual(employeeResult.result.repoResolutionSource, 'EXPLICIT_MHNIAIA_REPO');
+    assert.strictEqual(employeeResult.result.ok, false);
+    assert.strictEqual(
+        employeeResult.result.reason,
+        'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
+    );
 
     const history = [{
         _id: 'history-authoritative',
@@ -161,15 +165,15 @@ function testRawAuthoritativeRepoResolution() {
     });
     assert.strictEqual(historyResult.profileInfo.effectiveProfile.source, 'ISTORIKO');
     assert.strictEqual(historyResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 4);
-    assert.strictEqual(historyResult.result.effectiveExpectedWeeklyRepo, 4);
+    assert.strictEqual(historyResult.result.ok, false);
 
     const invalid = resolveThroughAuthoritativeProfile({
         employee: { ...employee, mhniaia_repo: 7, hmeres_ergasias_ebdomadas: 5 },
         rows: scheduledRows(5)
     }).result;
-    assert.strictEqual(invalid.ok, false);
-    assert.strictEqual(invalid.reason, 'INVALID_EXPLICIT_MHNIAIA_REPO');
-    assert.strictEqual(invalid.effectiveExpectedWeeklyRepo, null);
+    assert.strictEqual(invalid.ok, true);
+    assert.strictEqual(invalid.effectiveExpectedWeeklyRepo, 2);
+    assert.strictEqual(invalid.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
     for (const [workdays, expected] of [[5, 2], [6, 1]]) {
         const fallback = resolveThroughAuthoritativeProfile({
@@ -177,15 +181,18 @@ function testRawAuthoritativeRepoResolution() {
             rows: scheduledRows(5)
         }).result;
         assert.strictEqual(fallback.effectiveExpectedWeeklyRepo, expected);
-        assert.strictEqual(fallback.repoResolutionSource, 'WEEKLY_WORKDAYS_FALLBACK');
+        assert.strictEqual(fallback.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
     }
 
     const sixScheduled = resolveThroughAuthoritativeProfile({
         employee: { ...employee, mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 },
         rows: scheduledRows(6)
     }).result;
-    assert.strictEqual(sixScheduled.effectiveExpectedWeeklyRepo, 1);
-    assert.strictEqual(sixScheduled.repoResolutionSource, 'SIX_SCHEDULED_WORK_DAYS');
+    assert.strictEqual(sixScheduled.effectiveExpectedWeeklyRepo, 2);
+    assert.strictEqual(
+        sixScheduled.repoResolutionSource,
+        'CONTRACTUAL_WEEKLY_WORKDAYS'
+    );
 }
 
 function regression0002Rows() {
@@ -198,7 +205,7 @@ function regression0002Rows() {
             company_kod: '0004',
             ypokatasthma: '0000',
             kodikos: '0002',
-            hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
+            hmeromhnia: `2026-06-${String(8 + index).padStart(2, '0')}`,
             kathgoria_ergasias: category,
             ores_ergasias: category === 'ΕΡΓ' ? 8 : 0,
             apo_ora_01: category === 'ΕΡΓ' ? '09:00' : '',
@@ -226,17 +233,9 @@ function test0002ThroughAuthoritativeProjectionPath() {
         weekRows: rows,
         employmentProfile: repoTransferProfile(profileInfo.effectiveProfile)
     });
-    assert.strictEqual(projection.projection_status, 'READY');
-    assert.strictEqual(projection.groups.length, 1);
-    assert.deepStrictEqual(projection.groups[0].repo_resolution, {
-        effective_expected_weekly_repo: 1,
-        repo_resolution_source: 'SIX_SCHEDULED_WORK_DAYS',
-        scheduled_work_days: 6,
-        effective_weekly_workdays: 6
-    });
-    assert.strictEqual(projection.groups[0].items[0].hmeromhnia, '2026-06-08');
-    assert.strictEqual(projection.groups[0].items[1].hmeromhnia, '2026-06-10');
-    assert.ok(!projection.reasons.includes('REPO_DEFICIT_REMAINS'));
+    assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
+    assert.strictEqual(projection.groups.length, 0);
+    assert.ok(projection.reasons.includes('REPO_DEFICIT_REMAINS'));
 }
 
 function testProfileDateForDeviationPrecedenceAndFallbacks() {

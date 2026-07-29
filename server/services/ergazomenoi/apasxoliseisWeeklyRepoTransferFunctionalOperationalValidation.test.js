@@ -80,19 +80,19 @@ const COMMAND = Object.freeze({
     request_id: 'validation-request-0001'
 });
 const EMPLOYMENT_FIXTURES = Object.freeze([
-    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v1', targetCategory: 'ΑΝ', mhniaia_repo: 2, workdays: 5, dailyHours: 8 }),
-    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
-    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v2', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'FULL', family: 'FULL', typos_apasxolhshs: 'PLHRHS', contractVersion: 'v1', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΑΝ', mhniaia_repo: 2, workdays: 5, dailyHours: 8 }),
+    Object.freeze({ name: 'MERIKH', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'MERIKH', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
+    Object.freeze({ name: 'EK_PERITROPHS', family: 'PARTIAL_FAMILY', typos_apasxolhshs: 'EK_PERITROPHS', contractVersion: 'v2', proposalVersion: 'repo-transfer-single-pair-proposal:v3', targetCategory: 'ΜΕ', mhniaia_repo: 2, workdays: 5, dailyHours: 4 }),
     Object.freeze({
         name: 'MERIKH_REDUCED_DAYS_AND_HOURS',
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'MERIKH',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v2',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v3',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 3,
-        workdays: 4,
+        mhniaia_repo: 2,
+        workdays: 5,
         dailyHours: 4
     }),
     Object.freeze({
@@ -100,11 +100,11 @@ const EMPLOYMENT_FIXTURES = Object.freeze([
         family: 'PARTIAL_FAMILY',
         typos_apasxolhshs: 'EK_PERITROPHS',
         contractVersion: 'v2',
-        proposalVersion: 'repo-transfer-single-pair-proposal:v2',
+        proposalVersion: 'repo-transfer-single-pair-proposal:v3',
         targetCategory: 'ΜΕ',
         profile_case: 'REDUCED_DAYS_AND_DAILY_HOURS',
-        mhniaia_repo: 3,
-        workdays: 4,
+        mhniaia_repo: 2,
+        workdays: 5,
         dailyHours: 4
     })
 ]);
@@ -147,7 +147,7 @@ function weekRows(employment) {
         company_kod: SESSION.companyInUse,
         ypokatasthma: '0001',
         kodikos: '001',
-        hmeromhnia: new Date(Date.UTC(2026, 6, 12 + offset)),
+        hmeromhnia: new Date(Date.UTC(2026, 6, 13 + offset)),
         kathgoria_ergasias: 'ΕΡΓ',
         ores_ergasias: employment.dailyHours,
         cards_ores_ergasias: employment.dailyHours,
@@ -226,7 +226,7 @@ async function canonicalFixture(employment = EMPLOYMENT_FIXTURES[1]) {
         employmentProfile,
         history: [],
         audits: [],
-        week: { start: '2026-07-12', end: '2026-07-18' },
+        week: { start: '2026-07-13', end: '2026-07-19' },
         companyFlags: {},
         companyKodikos: SESSION.companyKodikos,
         holidayByDateKey: new Map()
@@ -434,7 +434,7 @@ async function authoritativeAppliedState(store) {
     };
     const result = await loadWeeklyRepoTransferDecisionBatch({
         session: SESSION,
-        filters: { apo_hmeromhnia: '2026-07-12', eos_hmeromhnia: '2026-07-18', ypokatasthma: '0001' },
+        filters: { apo_hmeromhnia: '2026-07-13', eos_hmeromhnia: '2026-07-19', ypokatasthma: '0001' },
         models: {
             prodhlomenaModel: { find: () => fakeQuery(Object.values(store.committed.rows)) },
             employeeModel: { find: () => fakeQuery([employee]) },

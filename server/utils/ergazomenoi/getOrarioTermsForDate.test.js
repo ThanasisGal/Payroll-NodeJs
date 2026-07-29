@@ -79,6 +79,19 @@ function testHistoryCanonicalEmploymentTypesAndPrecedence() {
     });
 }
 
+function testHistoricalSixthDayPremiumRatePrecedence() {
+    const profile = getOrarioTermsForDate(
+        '2026-06-10',
+        [historyRecord({ pososto_prosayxhshs_6hs_hmeras: 12.5 })],
+        { pososto_prosayxhshs_6hs_hmeras: 40 }
+    );
+    assert.strictEqual(profile.source, 'ISTORIKO');
+    assert.strictEqual(profile.pososto_prosayxhshs_6hs_hmeras, 12.5);
+
+    const fallback = currentProfile({ pososto_prosayxhshs_6hs_hmeras: 0 });
+    assert.strictEqual(fallback.pososto_prosayxhshs_6hs_hmeras, 0);
+}
+
 function testSafeLegacyFallback() {
     const expected = {
         PLHRHS: 'PLHRHS',
@@ -321,7 +334,8 @@ function testSnapshotFields() {
         kathestos_apasxolhshs: '0',
         typos_apasxolhshs: '0',
         typos_ebdomadas: '5HMERH',
-        mhniaia_repo: 2
+        mhniaia_repo: 2,
+        pososto_prosayxhshs_6hs_hmeras: null
     });
 
     const sixDay = buildCanonicalWorkTermsSnapshotFields({
@@ -334,7 +348,8 @@ function testSnapshotFields() {
         kathestos_apasxolhshs: '2',
         typos_apasxolhshs: '2',
         typos_ebdomadas: '6HMERH',
-        mhniaia_repo: 1
+        mhniaia_repo: 1,
+        pososto_prosayxhshs_6hs_hmeras: null
     });
 }
 
@@ -358,6 +373,7 @@ function testInputImmutability() {
 function run() {
     testCurrentCanonicalEmploymentTypes();
     testHistoryCanonicalEmploymentTypesAndPrecedence();
+    testHistoricalSixthDayPremiumRatePrecedence();
     testSafeLegacyFallback();
     testWeeklyDayValuesAreRejected();
     testInvalidCanonicalDoesNotUseLegacyFallback();

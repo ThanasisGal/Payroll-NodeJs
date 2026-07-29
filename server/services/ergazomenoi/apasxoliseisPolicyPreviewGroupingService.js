@@ -103,6 +103,7 @@ function buildPreviewItem(row = {}) {
         kathgoria_ergasias: factsSummary.declared_category || null,
         kathgoria_ergasias_apologistika:
             row.kathgoria_ergasias_apologistika ||
+            factsSummary.apologistika_category ||
             factsSummary.kathgoria_ergasias_apologistika ||
             null,
         cards_ores_ergasias: factsSummary.card_hours ?? null,

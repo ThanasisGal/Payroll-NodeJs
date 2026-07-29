@@ -12,7 +12,7 @@ const {
 
 function scheduledRows(count, { cardsOnlySixth = false } = {}) {
     return Array.from({ length: 7 }, (_, index) => ({
-        hmeromhnia: `2026-06-${String(7 + index).padStart(2, '0')}`,
+        hmeromhnia: `2026-06-${String(8 + index).padStart(2, '0')}`,
         kathgoria_ergasias: index < count ? 'ΕΡΓ' : 'ΑΝ',
         ores_ergasias: index < count ? 8 : 0,
         ...(cardsOnlySixth && index === 5
@@ -34,7 +34,7 @@ function resolve(rows, profile) {
         hmeres_ergasias_ebdomadas: 5
     });
     assert.strictEqual(result.effectiveExpectedWeeklyRepo, 2);
-    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.WEEKLY_WORKDAYS_FALLBACK);
+    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS);
 }
 
 {
@@ -45,13 +45,13 @@ function resolve(rows, profile) {
     assert.strictEqual(result.effectiveExpectedWeeklyRepo, 1);
 }
 
-for (const mhniaiaRepo of [1, 2]) {
+for (const mhniaiaRepo of [0, 1, 2, 6, 7, 1.5, 'invalid', -1]) {
     const result = resolve(scheduledRows(5), {
         mhniaia_repo: mhniaiaRepo,
         hmeres_ergasias_ebdomadas: 6
     });
-    assert.strictEqual(result.effectiveExpectedWeeklyRepo, mhniaiaRepo);
-    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.EXPLICIT_MHNIAIA_REPO);
+    assert.strictEqual(result.effectiveExpectedWeeklyRepo, 1);
+    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS);
 }
 
 for (const mhniaiaRepo of [0, 2]) {
@@ -59,42 +59,44 @@ for (const mhniaiaRepo of [0, 2]) {
         mhniaia_repo: mhniaiaRepo,
         hmeres_ergasias_ebdomadas: 5
     });
-    assert.strictEqual(result.effectiveExpectedWeeklyRepo, 1);
-    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.SIX_SCHEDULED_WORK_DAYS);
+    assert.strictEqual(result.effectiveExpectedWeeklyRepo, 2);
+    assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS);
     assert.strictEqual(result.scheduledWorkDays, 6);
-    assert.strictEqual(result.effectiveWeeklyWorkdays, 6);
-}
-
-for (const invalid of [7, 1.5, 'invalid', -1]) {
-    const result = resolve(scheduledRows(5), {
-        mhniaia_repo: invalid,
-        hmeres_ergasias_ebdomadas: 5
-    });
-    assert.strictEqual(result.ok, false);
-    assert.strictEqual(result.reason, REPO_RESOLUTION_REASON.INVALID_EXPLICIT_MHNIAIA_REPO);
+    assert.strictEqual(result.effectiveWeeklyWorkdays, 5);
 }
 
 {
-    const rawWinsOverLegacyDerived = resolve(scheduledRows(5), {
-        raw_mhniaia_repo: 3,
-        mhniaia_repo: 2,
-        hmeres_ergasias_ebdomadas: 4
+    const sevenActualDaysDoNotChangeContract = resolve(scheduledRows(7), {
+        mhniaia_repo: 0,
+        hmeres_ergasias_ebdomadas: 5
     });
-    assert.strictEqual(rawWinsOverLegacyDerived.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(sevenActualDaysDoNotChangeContract.effectiveExpectedWeeklyRepo, 2);
     assert.strictEqual(
-        rawWinsOverLegacyDerived.repoResolutionSource,
-        REPO_RESOLUTION_SOURCE.EXPLICIT_MHNIAIA_REPO
+        sevenActualDaysDoNotChangeContract.repoResolutionSource,
+        REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS
     );
+}
 
-    const invalidRawDoesNotFallBack = resolve(scheduledRows(5), {
-        raw_mhniaia_repo: 7,
+{
+    const contractualProfileWins = resolve(scheduledRows(5), {
+        raw_mhniaia_repo: 3,
         mhniaia_repo: 2,
         hmeres_ergasias_ebdomadas: 5
     });
-    assert.strictEqual(invalidRawDoesNotFallBack.ok, false);
+    assert.strictEqual(contractualProfileWins.effectiveExpectedWeeklyRepo, 2);
     assert.strictEqual(
-        invalidRawDoesNotFallBack.reason,
-        REPO_RESOLUTION_REASON.INVALID_EXPLICIT_MHNIAIA_REPO
+        contractualProfileWins.repoResolutionSource,
+        REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS
+    );
+
+    const changedProfile = resolve(scheduledRows(5), {
+        hmeres_ergasias_ebdomadas: 5,
+        profile_changed_inside_week: true
+    });
+    assert.strictEqual(changedProfile.ok, false);
+    assert.strictEqual(
+        changedProfile.reason,
+        REPO_RESOLUTION_REASON.PROFILE_CHANGED_INSIDE_WEEK
     );
 }
 
@@ -110,7 +112,7 @@ for (const invalid of [7, 1.5, 'invalid', -1]) {
 function regressionWeek() {
     const categories = ['ΕΡΓ', 'ΑΝ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ', 'ΕΡΓ'];
     return categories.map((category, index) => {
-        const date = `2026-06-${String(7 + index).padStart(2, '0')}`;
+        const date = `2026-06-${String(8 + index).padStart(2, '0')}`;
         const source = index === 1;
         const target = index === 3;
         const hasCards = source || (!target && category === 'ΕΡΓ');
@@ -152,12 +154,10 @@ for (const [type, analyzer] of [
             hmeres_ergasias_ebdomadas: 5
         }
     });
-    assert.strictEqual(result.employee.effective_expected_weekly_repo, 1);
-    assert.strictEqual(result.employee.repo_resolution_source, 'SIX_SCHEDULED_WORK_DAYS');
-    assert.ok(!result.reasons.includes('REPO_DEFICIT_REMAINS'));
-    assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.ELIGIBLE);
-    assert.strictEqual(result.source.hmeromhnia, '2026-06-08');
-    assert.strictEqual(result.target.hmeromhnia, '2026-06-10');
+    assert.strictEqual(result.employee.effective_expected_weekly_repo, 2);
+    assert.strictEqual(result.employee.repo_resolution_source, 'CONTRACTUAL_WEEKLY_WORKDAYS');
+    assert.ok(result.reasons.includes('REPO_DEFICIT_REMAINS'));
+    assert.strictEqual(result.eligibility_status, ELIGIBILITY_STATUS.NEEDS_REVIEW);
 }
 
 console.log('weekly repo-transfer effective expected repo resolver tests passed');

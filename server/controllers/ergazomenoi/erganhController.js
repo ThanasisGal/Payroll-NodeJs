@@ -9,6 +9,10 @@ const path = require('path');
 const fsPromises = require('fs').promises;
 const PDFDocument = require('pdfkit');
 const { chromium } = require('playwright');
+const {
+    startOfWeekMondayUtc,
+    endOfWeekSundayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -148,10 +152,17 @@ const {
     getCompanyHolidayFlags,
     buildArgiesByDateKey,
     buildNoCardsDisplayContext,
+    resolveNoCardsDisplayStatus,
     getEffectiveRepoProfileForDate,
     getProfileDateForDeviation,
     getWeeklyRepoProfileInfo
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
+const {
+    POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
+    SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
+    buildWeeklyRepoDeviationPreview,
+    normalizeLegacyDeviation
+} = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoDeviationPreviewService');
 const {
     createPolicyPreviewApprovalRecord,
     listPolicyPreviewApprovalRecords
@@ -1281,28 +1292,13 @@ function calculateTimePeriodsInPairs(timePeriods, orariaNoCards) {
     return timePeriods;
 }
 
-function startOfWeekSundayUtc(date) {
-    const d = new Date(date);
-    const day = d.getUTCDay(); // Κυριακή = 0
-    d.setUTCHours(0, 0, 0, 0);
-    d.setUTCDate(d.getUTCDate() - day);
-    return d;
-}
-
 function isDateInsideRange(date, fromDate, toDate) {
     const d = new Date(date).getTime();
     return d >= fromDate.getTime() && d <= toDate.getTime();
 }
 
-function getWeekKeySunday(date) {
-    return dateKeyUtc(startOfWeekSundayUtc(date));
-}
-
-function endOfWeekSaturdayUtc(date) {
-    const start = startOfWeekSundayUtc(date);
-    const end = addDaysUtc(start, 6);
-    end.setUTCHours(23, 59, 59, 999);
-    return end;
+function getWeekKeyMonday(date) {
+    return dateKeyUtc(startOfWeekMondayUtc(date));
 }
 
 function clampDateStartUtc(date) {
@@ -1337,19 +1333,6 @@ function isNoCardDeclaredWorkRow(row = {}) {
 
 function isMisthotosEmployee(row = {}) {
     return String(row.typos_ergazomenon || '').trim() === 'Μ';
-}
-
-function resolveNoCardsDisplayStatus(row = {}, { argiesByDateKey = new Map(), companyFlags = {} } = {}) {
-    if (!isNoCardDeclaredWorkRow(row)) return '';
-
-    const argia = argiesByDateKey.get(dateKeyUtc(row.hmeromhnia));
-    if (!argia) return 'ΑΔΕΙΑ';
-
-    if (argia.ypoxreotikh_argia === true) {
-        return companyFlags.apasxolhsh_kata_tis_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
-    }
-
-    return companyFlags.leitoyrgia_stis_mh_ypoxreotikes_argies === true ? 'ΑΔΕΙΑ' : 'ΑΡΓΙΑ';
 }
 
 function buildReviewHolidayResponseFields(row = {}, context = {}) {
@@ -1409,6 +1392,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
     fullPeriodFilter,
     requestedPeriodStart,
     requestedPeriodEnd,
+    authoritativeAsOfDate,
     holidayByDateKey,
     holidayContextResolved
 }) {
@@ -1514,6 +1498,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
         rows: atomicRows,
         periodStart: requestedPeriodStart,
         periodEnd: requestedPeriodEnd,
+        asOfDate: authoritativeAsOfDate,
         holidayByDateKey,
         existingAuditCountByRowKey,
         resolveEmploymentProfile: ({
@@ -1544,6 +1529,8 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                 typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                 mhniaia_repo: effectiveProfile.mhniaia_repo,
                 raw_mhniaia_repo: effectiveProfile.raw_mhniaia_repo,
+                pososto_prosayxhshs_6hs_hmeras:
+                    effectiveProfile.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas:
                     effectiveProfile.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias:
@@ -1569,11 +1556,11 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
     const periodEnd = clampDateEndUtc(eosDate);
     const ranges = [];
 
-    let cursor = startOfWeekSundayUtc(periodStart);
+    let cursor = startOfWeekMondayUtc(periodStart);
 
     while (cursor.getTime() <= periodEnd.getTime()) {
-        const naturalWeekStart = startOfWeekSundayUtc(cursor);
-        const naturalWeekEnd = endOfWeekSaturdayUtc(cursor);
+        const naturalWeekStart = startOfWeekMondayUtc(cursor);
+        const naturalWeekEnd = endOfWeekSundayUtc(cursor);
 
         const weekStart =
             naturalWeekStart.getTime() < periodStart.getTime() ? periodStart : naturalWeekStart;
@@ -1581,9 +1568,7 @@ function getWeekRangesInsidePeriod(apoDate, eosDate) {
 
         const isFullWeek =
             dateKeyUtc(weekStart) === dateKeyUtc(naturalWeekStart) &&
-            dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd) &&
-            weekStart.getUTCDay() === 0 &&
-            weekEnd.getUTCDay() === 6;
+            dateKeyUtc(weekEnd) === dateKeyUtc(naturalWeekEnd);
 
         ranges.push({
             naturalWeekStart,
@@ -1811,7 +1796,13 @@ async function runWeeklyRepoPostCheck({
                 }
             }
 
-            if (week.isFullWeek && Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)) {
+            if (
+                week.isFullWeek &&
+                (
+                    weeklyProfileInfo.repoResolutionReason ||
+                    Number(pragmatikaRepo) !== Number(expectedWeeklyRepo)
+                )
+            ) {
                 const excessRepo = Math.max(0, Number(pragmatikaRepo) - Number(expectedWeeklyRepo));
 
                 result.deviations.push({
@@ -1827,7 +1818,11 @@ async function runWeeklyRepoPostCheck({
                     week_eos: asDateOnlyUtc(week.weekEnd),
                     weekStart: dateKeyUtc(week.weekStart),
                     weekEnd: dateKeyUtc(week.weekEnd),
+                    policyVersion: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
+                    sourceVersion: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
                     expected_repo: expectedWeeklyRepo,
+                    repo_resolution_source: weeklyProfileInfo.repoResolutionSource,
+                    repo_resolution_reason: weeklyProfileInfo.repoResolutionReason,
                     actual_repo: pragmatikaRepo,
                     mhniaia_repo: expectedWeeklyRepo,
                     pragmatikaRepo,
@@ -1889,6 +1884,8 @@ async function runWeeklyRepoPostCheck({
                 onoma: d.onoma,
                 week_apo: d.week_apo,
                 week_eos: d.week_eos,
+                policyVersion: d.policyVersion,
+                sourceVersion: d.sourceVersion,
                 expected_repo: d.expected_repo,
                 actual_repo: d.actual_repo,
                 profile_changed_inside_week: d.profile_changed_inside_week,
@@ -3353,14 +3350,24 @@ function reviewProgramDisplay(row = {}) {
 }
 
 function reviewApologistikoDisplay(row = {}) {
-    const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
-    if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
-        return { text: noCardsDisplayStatus, type: `no_cards_${noCardsDisplayStatus}` };
-    }
-
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
     const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
+
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+    if (
+        row.repo_apologistika === true ||
+        (
+            persistedCategory === 'ΑΝ' &&
+            row.apologistiko_biblio === true &&
+            hasNoCards &&
+            isFullTimeProfile
+        )
+    ) {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'repo' };
+    }
 
     if (
         row.apologistiko_biblio === true &&
@@ -3380,8 +3387,19 @@ function reviewApologistikoDisplay(row = {}) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
+    if (!persistedCategory) {
+        const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
+        if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
+            return {
+                text: noCardsDisplayStatus,
+                type: `no_cards_${noCardsDisplayStatus}`
+            };
+        }
+    }
+
     const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
     if (intervals) return { text: intervals, type: 'apologistiko' };
+    if (persistedCategory) return { text: persistedCategory, type: 'persisted' };
 
     if (String(row.kathgoria_adeias_apologistika || '').trim()) {
         return { text: '-', type: 'adeia_suggestion' };
@@ -4820,7 +4838,32 @@ class erganhController {
                 filter.$and = mongoose.trusted(andFilters);
             }
 
-            const [rows, total] = await Promise.all([
+            const requestedPeriodStart = apo_hmeromhnia
+                ? clampDateStartUtc(`${apo_hmeromhnia}T00:00:00.000Z`)
+                : null;
+            const requestedPeriodEnd = eos_hmeromhnia
+                ? clampDateEndUtc(`${eos_hmeromhnia}T23:59:59.999Z`)
+                : null;
+            const deviationContextFilter = {
+                team: sessionTeam,
+                company_kod: companyId
+            };
+            if (requestedPeriodStart && requestedPeriodEnd) {
+                deviationContextFilter.hmeromhnia = mongoose.trusted({
+                    $gte: startOfWeekMondayUtc(requestedPeriodStart),
+                    $lte: endOfWeekSundayUtc(requestedPeriodEnd)
+                });
+            }
+            if (ypokatasthma && String(ypokatasthma).trim() !== '') {
+                deviationContextFilter.ypokatasthma = String(ypokatasthma)
+                    .trim()
+                    .padStart(4, '0');
+            }
+            if (kodikos && String(kodikos).trim() !== '') {
+                deviationContextFilter.kodikos = String(kodikos).trim();
+            }
+
+            const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
                         'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
@@ -4841,10 +4884,25 @@ class erganhController {
                     .skip(skip)
                     .limit(limitNum)
                     .lean(),
-                ProdhlomenaOrariaModel.countDocuments(filter)
+                ProdhlomenaOrariaModel.countDocuments(filter),
+                requestedPeriodStart && requestedPeriodEnd
+                    ? ProdhlomenaOrariaModel.find(deviationContextFilter)
+                          .select(
+                              'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                                  'repo_apologistika ores_ergasias ores_ergasias_apologistika cards_ores_ergasias'
+                          )
+                          .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
+                          .lean()
+                    : []
             ]);
 
-            const kodikoiRows = [...new Set(rows.map((r) => r.kodikos).filter(Boolean))];
+            const kodikoiRows = [
+                ...new Set(
+                    [...rows, ...deviationContextRows]
+                        .map((r) => r.kodikos)
+                        .filter(Boolean)
+                )
+            ];
 
             const ergazomenoi = await ErgazomenoiModel.find({
                 team: sessionTeam,
@@ -4866,17 +4924,20 @@ class erganhController {
             // στην περίοδο μπορεί να έχει αλλάξει 5ήμερο/6ήμερο ή
             // πλήρης/μερική/εκ περιτροπής απασχόληση.
             // ============================================================
-            const reviewPeriodStart = apo_hmeromhnia
-                ? clampDateStartUtc(`${apo_hmeromhnia}T00:00:00.000Z`)
+            const reviewPeriodStart = requestedPeriodStart
+                ? requestedPeriodStart
                 : rows.length > 0
                   ? clampDateStartUtc(rows[0].hmeromhnia)
                   : null;
 
-            const reviewPeriodEnd = eos_hmeromhnia
-                ? clampDateEndUtc(`${eos_hmeromhnia}T23:59:59.999Z`)
+            const reviewPeriodEnd = requestedPeriodEnd
+                ? requestedPeriodEnd
                 : rows.length > 0
                   ? clampDateEndUtc(rows[rows.length - 1].hmeromhnia)
                   : null;
+            const reviewAnalysisEnd = reviewPeriodEnd
+                ? endOfWeekSundayUtc(reviewPeriodEnd)
+                : null;
 
             const istorikoRowsByKodikos = new Map();
 
@@ -4893,7 +4954,7 @@ class erganhController {
                     $or: mongoose.trusted([
                         {
                             hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             }),
                             $or: mongoose.trusted([
                                 {
@@ -4907,7 +4968,7 @@ class erganhController {
                         {
                             hmeromhnia_isxyos_oron_ergasias_apo: null,
                             hmeromhnia_allaghs_orarioy_apo: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             }),
                             $or: mongoose.trusted([
                                 {
@@ -4922,7 +4983,7 @@ class erganhController {
                             hmeromhnia_isxyos_oron_ergasias_apo: null,
                             hmeromhnia_allaghs_orarioy_apo: null,
                             hmeromhnia_allaghs_symbashs: mongoose.trusted({
-                                $lte: reviewPeriodEnd
+                                $lte: reviewAnalysisEnd
                             })
                         }
                     ])
@@ -5053,33 +5114,64 @@ class erganhController {
                 };
             });
 
-            const enrichedDeviations = deviations.map((d) => ({
-                _id: d._id,
-                ypokatasthma: d.ypokatasthma || '',
-                kodikos: d.kodikos || '',
-                eponymo: d.eponymo || '',
-                onoma: d.onoma || '',
-                week_apo: d.week_apo,
-                week_eos: d.week_eos,
-                weekStart: dateKeyUtc(d.week_apo),
-                weekEnd: dateKeyUtc(d.week_eos),
-                expected_repo: Number(d.expected_repo || 0),
-                actual_repo: Number(d.actual_repo || 0),
-                profile_changed_inside_week: d.profile_changed_inside_week === true,
-                excess_repo: Number(d.excess_repo || 0),
-                effective_mhniaia_repo: Number(d.effective_mhniaia_repo || d.expected_repo || 0),
-                effective_typos_apasxolhshs: d.effective_typos_apasxolhshs || '',
-                effective_profile_source: d.effective_profile_source || '',
-                effective_profile_date: d.effective_profile_date,
-                effective_profile_istoriko_id: d.effective_profile_istoriko_id || null,
-                previous_mhniaia_repo: Number(d.previous_mhniaia_repo || 0),
-                previous_typos_apasxolhshs: d.previous_typos_apasxolhshs || '',
-                previous_profile_source: d.previous_profile_source || '',
-                previous_profile_date: d.previous_profile_date,
-                previous_profile_istoriko_id: d.previous_profile_istoriko_id || null,
-                deviation_type: d.deviation_type || '',
-                note: d.note || ''
-            }));
+            const deviationPreview =
+                reviewPeriodStart && reviewPeriodEnd
+                    ? buildWeeklyRepoDeviationPreview({
+                          rows: deviationContextRows,
+                          periodStart: reviewPeriodStart,
+                          periodEnd: reviewPeriodEnd,
+                          asOfDate: req.session.appDate,
+                          resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) =>
+                              getWeeklyRepoProfileInfo({
+                                  week: {
+                                      naturalWeekStart: new Date(`${weekStart}T00:00:00.000Z`),
+                                      naturalWeekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
+                                      weekStart: new Date(`${weekStart}T00:00:00.000Z`),
+                                      weekEnd: new Date(`${weekEnd}T23:59:59.999Z`),
+                                      isFullWeek: true
+                                  },
+                                  istorikoRows:
+                                      istorikoRowsByKodikos.get(String(employeeKodikos)) || [],
+                                  ergazomenos: ergByKodikos.get(String(employeeKodikos)) || {}
+                              }),
+                          resolveDailyProfile: (row) =>
+                              getEffectiveRepoProfileForDate(
+                                  row.hmeromhnia,
+                                  istorikoRowsByKodikos.get(String(row.kodikos)) || [],
+                                  ergByKodikos.get(String(row.kodikos)) || {}
+                              ),
+                          isFullTimeProfile: isFullTimeWorkTerms
+                      })
+                    : { deviations: [], pendingWeeks: [], policyVersion: null };
+            const withEmployeeNames = (item) => {
+                const erg = ergByKodikos.get(String(item.kodikos)) || {};
+                return {
+                    ...item,
+                    eponymo: erg.eponymo || '',
+                    onoma: erg.onoma || ''
+                };
+            };
+            const enrichedDeviations = deviationPreview.deviations.map(withEmployeeNames);
+            const pendingDeviationWeeks = deviationPreview.pendingWeeks.map(withEmployeeNames);
+            const legacyDeviations = deviations
+                .map((d) =>
+                    normalizeLegacyDeviation({
+                        _id: d._id,
+                        ypokatasthma: d.ypokatasthma || '',
+                        kodikos: d.kodikos || '',
+                        eponymo: d.eponymo || '',
+                        onoma: d.onoma || '',
+                        week_apo: d.week_apo,
+                        week_eos: d.week_eos,
+                        expected_repo: Number(d.expected_repo || 0),
+                        actual_repo: Number(d.actual_repo || 0),
+                        deviation_type: d.deviation_type || '',
+                        note: d.note || '',
+                        policyVersion: d.policyVersion || null,
+                        sourceVersion: d.sourceVersion || null
+                    })
+                )
+                .filter((d) => d.is_legacy_policy === true);
 
             return res.json({
                 success: true,
@@ -5088,7 +5180,10 @@ class erganhController {
                 total,
                 totalPages: Math.ceil(total / limitNum),
                 rows: enrichedRows,
-                deviations: enrichedDeviations
+                deviations: enrichedDeviations,
+                pendingDeviationWeeks,
+                legacyDeviations,
+                deviationPolicyVersion: deviationPreview.policyVersion
             });
         } catch (error) {
             console.error('[getProdhlomenaOrariaForReview] ❌', error);
@@ -5302,6 +5397,7 @@ class erganhController {
                 fullPeriodFilter: filter,
                 requestedPeriodStart,
                 requestedPeriodEnd,
+                authoritativeAsOfDate: req.session.appDate,
                 holidayByDateKey: scenarioContext.argiesByDateKey || new Map(),
                 holidayContextResolved:
                     requestedPeriodStart?.getUTCFullYear() ===
@@ -7039,7 +7135,7 @@ class erganhController {
             const apoDate = dateRange.startDate;
             const eosDate = new Date(dateRange.endDate);
             eosDate.setUTCHours(23, 59, 59, 999);
-            const calculationStartDate = startOfWeekSundayUtc(apoDate);
+            const calculationStartDate = startOfWeekMondayUtc(apoDate);
 
             const selectedYpokatasthma = scopedYpokatasthma;
 
@@ -7253,16 +7349,18 @@ class erganhController {
                     istorikoRows
                 );
 
-                const weekKey = `${calculationRec.kodikos}|${getWeekKeySunday(calculationRec.hmeromhnia)}`;
+                const weekKey = `${calculationRec.kodikos}|${getWeekKeyMonday(calculationRec.hmeromhnia)}`;
 
                 if (!weeklyStateMap.has(weekKey)) {
                     const rules = getWorkTimeRules(effectiveErgazomenos);
 
                     const periodStartDate = new Date(apoDate);
-                    const weekStartDate = startOfWeekSundayUtc(calculationRec.hmeromhnia);
+                    const weekStartDate = startOfWeekMondayUtc(calculationRec.hmeromhnia);
 
                     const isFirstPartialWeek =
-                        weekStartDate < periodStartDate && periodStartDate.getUTCDay() !== 0;
+                        weekStartDate < periodStartDate &&
+                        dateKeyUtc(startOfWeekMondayUtc(periodStartDate)) !==
+                            dateKeyUtc(periodStartDate);
 
                     weeklyStateMap.set(weekKey, {
                         weeklyRegularCardsMinutes: 0,
@@ -7271,7 +7369,7 @@ class erganhController {
                         weeklyLegalLimitMinutes: rules.weeklyLegalLimitMinutes,
                         usedOverworkMinutes: 0,
 
-                        // true μόνο για την 1η εβδομάδα της περιόδου όταν η περίοδος δεν ξεκινά Κυριακή
+                        // true μόνο για την 1η εβδομάδα όταν η περίοδος δεν ξεκινά Δευτέρα
                         isFirstPartialWeek
                     });
                 }
@@ -7368,7 +7466,7 @@ class erganhController {
                 Object.assign(update, checkRepoAdeiaAstheneiaApologistika(workingContext));
                 Object.assign(update, checkOresApoysias(workingContext));
 
-                const weekKey = `${rec.kodikos}|${getWeekKeySunday(rec.hmeromhnia)}`;
+                const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 const weeklyState = weeklyStateMap.get(weekKey);
 
                 if (weeklyState) {

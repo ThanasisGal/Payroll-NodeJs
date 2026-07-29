@@ -197,6 +197,8 @@ function projectItem(item, groupKey) {
         role: item.role,
         hmeromhnia: dateKey(item.hmeromhnia),
         kathgoria_ergasias: primitiveString(item.current_category, 20),
+        current_kathgoria_ergasias_apologistika:
+            primitiveString(item.current_apologistika_category, 20),
         kathgoria_ergasias_apologistika:
             primitiveString(item.proposed_values.kathgoria_ergasias_apologistika, 20),
         proposed_values: { ...item.proposed_values },

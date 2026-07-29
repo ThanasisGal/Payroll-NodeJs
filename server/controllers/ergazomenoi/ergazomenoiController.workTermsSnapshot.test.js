@@ -92,7 +92,8 @@ function testInvalidCanonicalSnapshotDoesNotUseLegacyFallback() {
         kathestos_apasxolhshs: '',
         typos_apasxolhshs: '',
         typos_ebdomadas: '5HMERH',
-        mhniaia_repo: 2
+        mhniaia_repo: 2,
+        pososto_prosayxhshs_6hs_hmeras: null
     });
 
     const validCanonical = snapshot({

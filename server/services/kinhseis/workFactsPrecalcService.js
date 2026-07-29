@@ -1,8 +1,12 @@
 const phaseDetectorService = require('./phaseDetectorService');
 const { ApasxolhseisPeriodFactsModel } = require('../../models/kinhseis');
+const {
+    createWeeklyPayrollCarryOver,
+    materializeInMemory
+} = require('./weeklyPayrollCarryOverService');
 
 const ALLOWED_SCOPES = new Set(['MONTHLY', 'TERMINATION', 'MANUAL']);
-const SOURCE_VERSION = 'workFactsPrecalc:v1';
+const SOURCE_VERSION = 'workFactsPrecalc:v2';
 const HOURS_FIELDS = [
     'workingHours',
     'absenceHours',
@@ -63,6 +67,67 @@ function dateOnlyUTC(value) {
     return date ? date : null;
 }
 
+function normalizeWorkFactsAsOfDate(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return formatDateYMD(new Date(Date.UTC(
+            value.getUTCFullYear(),
+            value.getUTCMonth(),
+            value.getUTCDate()
+        )));
+    }
+    const raw = toTrimmedString(value);
+    const greekDate = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const candidate = greekDate
+        ? `${greekDate[3]}-${greekDate[2]}-${greekDate[1]}`
+        : raw;
+    const parsed = parseDateOnlyUTC(candidate);
+    return parsed ? formatDateYMD(parsed) : null;
+}
+
+function resolveWorkFactsAsOfContext({
+    explicitAsOfDate,
+    explicitSource = 'SESSION_APP_DATE',
+    clock = () => new Date()
+} = {}) {
+    const hasExplicitValue =
+        explicitAsOfDate !== null &&
+        explicitAsOfDate !== undefined &&
+        toTrimmedString(explicitAsOfDate) !== '';
+    if (hasExplicitValue) {
+        const normalized = normalizeWorkFactsAsOfDate(explicitAsOfDate);
+        return normalized
+            ? Object.freeze({
+                ok: true,
+                asOfDate: normalized,
+                asOfDateSource: toTrimmedString(explicitSource) || 'SESSION_APP_DATE',
+                reason: null
+            })
+            : Object.freeze({
+                ok: false,
+                asOfDate: null,
+                asOfDateSource: toTrimmedString(explicitSource) || 'SESSION_APP_DATE',
+                reason: 'INVALID_AS_OF_DATE'
+            });
+    }
+
+    const normalized = normalizeWorkFactsAsOfDate(
+        typeof clock === 'function' ? clock() : null
+    );
+    return normalized
+        ? Object.freeze({
+            ok: true,
+            asOfDate: normalized,
+            asOfDateSource: 'SYSTEM_CLOCK',
+            reason: null
+        })
+        : Object.freeze({
+            ok: false,
+            asOfDate: null,
+            asOfDateSource: 'SYSTEM_CLOCK',
+            reason: 'INVALID_AS_OF_DATE'
+        });
+}
+
 function normalizeScope(scope, warnings) {
     const normalizedScope = toTrimmedString(scope).toUpperCase();
 
@@ -90,7 +155,9 @@ function buildFailedPayload({
     eos,
     scope,
     requestedBy,
-    warnings
+    warnings,
+    asOfDate = null,
+    asOfDateSource = ''
 }) {
     return {
         team: toTrimmedString(team),
@@ -101,11 +168,14 @@ function buildFailedPayload({
         eos,
         scope,
         requestedBy: toTrimmedString(requestedBy),
+        asOfDate,
+        asOfDateSource,
         status: 'FAILED',
         generatedAt: new Date().toISOString(),
         phases: [],
         phaseSummary: [],
         dailyFacts: [],
+        weeklyCarryOverDifferences: [],
         totals: buildEmptyTotals(),
         warnings
     };
@@ -205,6 +275,24 @@ function buildBaseDailyFacts({ detectorResult }) {
                 effectiveKathestos,
                 source: operationalPhase ? 'OPERATIONAL_PHASE' : 'DIAGNOSTIC_PHASE_FALLBACK',
                 workingHours: roundHours(day?.payHours ?? day?.hours),
+                actualWorkHours: roundHours(day?.actualWorkHours),
+                leaveHours: roundHours(day?.leaveHours),
+                sicknessHours: roundHours(day?.sicknessHours),
+                countsAsActualWorkDay: day?.countsAsActualWorkDay === true,
+                actualWorkFactReasons: Array.isArray(day?.actualWorkFactReasons)
+                    ? day.actualWorkFactReasons
+                    : [],
+                weeklySixthSeventhPolicyVersion:
+                    day?.weeklySixthSeventhPolicyVersion || null,
+                weeklyComplianceStatus: day?.weeklyComplianceStatus || null,
+                weeklyComplianceReasons: Array.isArray(day?.weeklyComplianceReasons)
+                    ? day.weeklyComplianceReasons
+                    : [],
+                weeklyComplianceWarnings: Array.isArray(day?.weeklyComplianceWarnings)
+                    ? day.weeklyComplianceWarnings
+                    : [],
+                isSixthDay: day?.isSixthDay === true,
+                isSeventhDay: day?.isSeventhDay === true,
                 absenceHours: roundHours(day?.absenceHours),
                 nightHours: roundHours(day?.nightHours),
                 holidayHours: roundHours(day?.holidayHours),
@@ -281,6 +369,100 @@ function buildTotals(dailyFacts) {
     }, buildEmptyTotals());
 }
 
+function buildWeeklyCarryOverDifferences({
+    detectorResult,
+    scopeKey,
+    materializedStore = null
+} = {}) {
+    const analyses = Array.isArray(detectorResult?.weeklyAnalyses)
+        ? detectorResult.weeklyAnalyses
+        : [];
+    const carryOvers = [];
+
+    analyses.forEach((analysis) => {
+        const sourcePayrollMonth = toTrimmedString(analysis?.weekStart).slice(0, 7);
+        const targetPayrollMonth = toTrimmedString(analysis?.weekEnd).slice(0, 7);
+        const requestedPayrollMonth =
+            toTrimmedString(analysis?.requestedPeriod?.start).slice(0, 7);
+        if (
+            analysis?.complete !== true ||
+            analysis?.status !== 'READY' ||
+            !sourcePayrollMonth ||
+            !targetPayrollMonth ||
+            sourcePayrollMonth === targetPayrollMonth ||
+            requestedPayrollMonth !== targetPayrollMonth
+        ) {
+            return;
+        }
+
+        const dailyFacts = (Array.isArray(analysis.dailyFacts)
+            ? analysis.dailyFacts
+            : [])
+            .filter((fact) =>
+                toTrimmedString(fact?.date).slice(0, 7) === sourcePayrollMonth
+            );
+        const sourceFactDates = [
+            ...new Set(
+                dailyFacts
+                    .filter((fact) =>
+                        [
+                            fact?.yperergasiaHours,
+                            fact?.nomimiYperoriaHours,
+                            fact?.paranomiYperoriaHours,
+                            fact?.sixthDayHours
+                        ].some((value) => toNumberOrZero(value) !== 0)
+                    )
+                    .map((fact) => toTrimmedString(fact?.date))
+                    .filter(Boolean)
+            )
+        ].sort();
+        const breakdown = {
+            yperergasia: roundHours(dailyFacts.reduce(
+                (sum, fact) => sum + toNumberOrZero(fact.yperergasiaHours),
+                0
+            )),
+            yperoria: roundHours(dailyFacts.reduce(
+                (sum, fact) =>
+                    sum +
+                    toNumberOrZero(fact.nomimiYperoriaHours) +
+                    toNumberOrZero(fact.paranomiYperoriaHours),
+                0
+            )),
+            sixthDay: roundHours(dailyFacts.reduce(
+                (sum, fact) => sum + toNumberOrZero(fact.sixthDayHours),
+                0
+            )),
+            otherWeekly: 0
+        };
+        if (Object.values(breakdown).every((value) => value === 0)) return;
+
+        const carryOver = createWeeklyPayrollCarryOver({
+            scopeKey,
+            sourceWeekDate: analysis.weekStart,
+            sourcePayrollMonth,
+            targetPayrollMonth,
+            breakdown
+        });
+        if (carryOver.ok !== true) return;
+        const auditableCarryOver = {
+            ...carryOver,
+            sourceFactDates
+        };
+
+        if (materializedStore instanceof Map) {
+            const materialized = materializeInMemory(materializedStore, auditableCarryOver);
+            carryOvers.push({
+                ...auditableCarryOver,
+                materializationStatus: materialized.status
+            });
+            return;
+        }
+        carryOvers.push(auditableCarryOver);
+    });
+
+    return carryOvers;
+}
+
 function validateInput({ team, company_kod, kodikos, apo, eos }) {
     const warnings = [];
     const cleanTeam = toTrimmedString(team);
@@ -349,6 +531,7 @@ function normalizeSnapshotForReturn(snapshot, extra = {}) {
         ...extra,
         apo: formatDateYMD(plain.apo),
         eos: formatDateYMD(plain.eos),
+        asOfDate: formatDateYMD(plain.asOfDate),
         generatedAt: plain.generatedAt instanceof Date
             ? plain.generatedAt.toISOString()
             : plain.generatedAt
@@ -374,12 +557,59 @@ function buildSnapshotDocument(payload, key) {
         generatedAt: Number.isNaN(generatedAtDate.getTime()) ? new Date() : generatedAtDate,
         generatedBy: toTrimmedString(payload.generatedBy || payload.requestedBy),
         sourceVersion: toTrimmedString(payload.sourceVersion) || SOURCE_VERSION,
+        asOfDate: payload.asOfDate ? parseDateOnlyUTC(payload.asOfDate) : null,
+        asOfDateSource: toTrimmedString(payload.asOfDateSource) || undefined,
         phases: Array.isArray(payload.phases) ? payload.phases : [],
         phaseSummary: Array.isArray(payload.phaseSummary) ? payload.phaseSummary : [],
         dailyFacts: Array.isArray(payload.dailyFacts) ? payload.dailyFacts : [],
+        weeklyCarryOverDifferences: Array.isArray(payload.weeklyCarryOverDifferences)
+            ? payload.weeklyCarryOverDifferences
+            : [],
         totals: payload.totals && typeof payload.totals === 'object' ? payload.totals : {},
         warnings: Array.isArray(payload.warnings) ? payload.warnings.map(toTrimmedString) : [],
         inputFingerprint: toTrimmedString(payload.inputFingerprint)
+    };
+}
+
+function buildReadyWorkFactsPayload({
+    input,
+    normalizedScope,
+    ypokatasthma = '',
+    requestedBy = '',
+    warnings = [],
+    detectorResult,
+    asOfContext = null
+}) {
+    const dailyFacts = buildBaseDailyFacts({ detectorResult });
+    const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
+    const weeklyCarryOverDifferences = buildWeeklyCarryOverDifferences({
+        detectorResult,
+        scopeKey: [input.team, input.company_kod, input.kodikos].join('|')
+    });
+    const detectorWarnings = Array.isArray(detectorResult?.warnings)
+        ? detectorResult.warnings
+        : [];
+
+    return {
+        team: input.team,
+        company_kod: input.company_kod,
+        ypokatasthma,
+        kodikos: input.kodikos,
+        apo: input.apo,
+        eos: input.eos,
+        scope: normalizedScope,
+        requestedBy: toTrimmedString(requestedBy),
+        status: 'READY',
+        generatedAt: new Date().toISOString(),
+        asOfDate: asOfContext?.asOfDate || detectorResult?.asOfDate || null,
+        asOfDateSource:
+            asOfContext?.asOfDateSource || detectorResult?.asOfDateSource || '',
+        phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
+        phaseSummary,
+        dailyFacts,
+        weeklyCarryOverDifferences,
+        totals: buildTotals(dailyFacts),
+        warnings: [...warnings, ...detectorWarnings]
     };
 }
 
@@ -391,11 +621,19 @@ async function generateWorkFactsForEmployeePeriod({
     eos,
     scope = 'MANUAL',
     ypokatasthma = '',
-    requestedBy = ''
+    requestedBy = '',
+    asOfDate = null,
+    asOfDateSource = '',
+    clock
 }) {
     const input = validateInput({ team, company_kod, kodikos, apo, eos });
     const warnings = [...input.warnings];
     const normalizedScope = normalizeScope(scope, warnings);
+    const asOfContext = resolveWorkFactsAsOfContext({
+        explicitAsOfDate: asOfDate,
+        explicitSource: asOfDateSource,
+        clock
+    });
 
     if (!input.isValid) {
         return buildFailedPayload({
@@ -407,7 +645,24 @@ async function generateWorkFactsForEmployeePeriod({
             eos: input.eos,
             scope: normalizedScope,
             requestedBy,
-            warnings
+            warnings,
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
+        });
+    }
+    if (!asOfContext.ok) {
+        return buildFailedPayload({
+            team: input.team,
+            company_kod: input.company_kod,
+            ypokatasthma: toTrimmedString(ypokatasthma),
+            kodikos: input.kodikos,
+            apo: input.apo,
+            eos: input.eos,
+            scope: normalizedScope,
+            requestedBy,
+            warnings: [...warnings, asOfContext.reason],
+            asOfDate: null,
+            asOfDateSource: asOfContext.asOfDateSource
         });
     }
 
@@ -417,31 +672,19 @@ async function generateWorkFactsForEmployeePeriod({
             company_kod: input.company_kod,
             kodikos: input.kodikos,
             apo: input.apo,
-            eos: input.eos
-        });
-        const dailyFacts = buildBaseDailyFacts({ detectorResult });
-        const phaseSummary = buildPhaseSummary({ dailyFacts, detectorResult });
-        const detectorWarnings = Array.isArray(detectorResult?.warnings)
-            ? detectorResult.warnings
-            : [];
-
-        return {
-            team: input.team,
-            company_kod: input.company_kod,
-            ypokatasthma,
-            kodikos: input.kodikos,
-            apo: input.apo,
             eos: input.eos,
-            scope: normalizedScope,
-            requestedBy: toTrimmedString(requestedBy),
-            status: 'READY',
-            generatedAt: new Date().toISOString(),
-            phases: Array.isArray(detectorResult?.phases) ? detectorResult.phases : [],
-            phaseSummary,
-            dailyFacts,
-            totals: buildTotals(dailyFacts),
-            warnings: [...warnings, ...detectorWarnings]
-        };
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
+        });
+        return buildReadyWorkFactsPayload({
+            input,
+            normalizedScope,
+            ypokatasthma,
+            requestedBy,
+            warnings,
+            detectorResult,
+            asOfContext
+        });
     } catch (error) {
         return buildFailedPayload({
             team: input.team,
@@ -452,7 +695,9 @@ async function generateWorkFactsForEmployeePeriod({
             eos: input.eos,
             scope: normalizedScope,
             requestedBy,
-            warnings: [...warnings, error.message || 'Σφάλμα παραγωγής work facts.']
+            warnings: [...warnings, error.message || 'Σφάλμα παραγωγής work facts.'],
+            asOfDate: asOfContext.asOfDate,
+            asOfDateSource: asOfContext.asOfDateSource
         });
     }
 }
@@ -538,7 +783,10 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
     scope = 'MANUAL',
     ypokatasthma = '',
     requestedBy = '',
-    force = false
+    force = false,
+    asOfDate = null,
+    asOfDateSource = '',
+    clock
 }) {
     const normalizedScope = normalizeScopeValue(scope);
     const key = normalizeSnapshotKey({
@@ -574,7 +822,10 @@ async function generateAndSaveWorkFactsForEmployeePeriod({
         eos,
         scope: normalizedScope,
         ypokatasthma,
-        requestedBy
+        requestedBy,
+        asOfDate,
+        asOfDateSource,
+        clock
     });
 
     return saveWorkFactsSnapshot(
@@ -591,5 +842,9 @@ module.exports = {
     generateWorkFactsForEmployeePeriod,
     generateAndSaveWorkFactsForEmployeePeriod,
     findWorkFactsSnapshot,
-    saveWorkFactsSnapshot
+    saveWorkFactsSnapshot,
+    buildWeeklyCarryOverDifferences,
+    buildReadyWorkFactsPayload,
+    normalizeWorkFactsAsOfDate,
+    resolveWorkFactsAsOfContext
 };

@@ -22,7 +22,7 @@ function normalizeDateOnly(value) {
         return null;
     }
 
-    d.setHours(0, 0, 0, 0);
+    d.setUTCHours(0, 0, 0, 0);
     return d;
 }
 
@@ -158,6 +158,11 @@ function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomeno
     const effectiveWorkdays = formWorkdays ?? fallbackWorkdays;
     const mhniaiaRepo =
         explicitFormRepo ?? explicitFallbackRepo ?? repoFromWeeklyWorkdays(effectiveWorkdays);
+    const sixthDayPremiumRate =
+        Object.prototype.hasOwnProperty.call(formData, 'pososto_prosayxhshs_6hs_hmeras') &&
+        String(formData.pososto_prosayxhshs_6hs_hmeras ?? '').trim() !== ''
+            ? toNumberOrNull(formData.pososto_prosayxhshs_6hs_hmeras)
+            : toNumberOrNull(fallbackErgazomenos.pososto_prosayxhshs_6hs_hmeras);
 
     return {
         kathestos_apasxolhshs: canonicalEmploymentType,
@@ -165,7 +170,8 @@ function buildCanonicalWorkTermsSnapshotFields(formData = {}, fallbackErgazomeno
         typos_ebdomadas:
             formData.typos_ebdomadas ||
             getTyposEbdomadasFromHmeres(effectiveWorkdays),
-        mhniaia_repo: mhniaiaRepo
+        mhniaia_repo: mhniaiaRepo,
+        pososto_prosayxhshs_6hs_hmeras: sixthDayPremiumRate
     };
 }
 
@@ -199,6 +205,7 @@ function buildFallbackTerms(ergazomenos = {}) {
         typos_apasxolhshs: employmentType,
         mhniaia_repo: resolveExpectedWeeklyRepo(ergazomenos),
         raw_mhniaia_repo: ergazomenos.mhniaia_repo,
+        pososto_prosayxhshs_6hs_hmeras: ergazomenos.pososto_prosayxhshs_6hs_hmeras,
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -232,6 +239,7 @@ function buildTermsFromHistoryRecord(record) {
         typos_apasxolhshs: employmentType,
         mhniaia_repo: resolveExpectedWeeklyRepo(record),
         raw_mhniaia_repo: record.mhniaia_repo,
+        pososto_prosayxhshs_6hs_hmeras: record.pososto_prosayxhshs_6hs_hmeras,
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,

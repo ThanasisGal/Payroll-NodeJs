@@ -11744,6 +11744,15 @@ body.loader-active > *:not(.app-loader) {
     content: '▸ ';
 }
 
+.employee-group-row.expanded td::before {
+    content: '▾ ';
+}
+
+.employee-group-row:focus-visible td {
+    outline: 3px solid #0d6efd;
+    outline-offset: -3px;
+}
+
 /* .modal-time-input {
     height: 42px;
     min-height: 42px;
@@ -14323,10 +14332,17 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-page-shell {
+    --employment-review-bottom-clearance: 3.25rem;
     width: 94% !important;
     max-width: none;
     margin-left: 3%;
     margin-right: 3%;
+    padding-bottom: 0.5rem;
+    overflow: visible;
+}
+
+.employment-review-card {
+    overflow: visible;
 }
 
 .hr-review-filters {
@@ -14339,7 +14355,7 @@ body.loader-active > *:not(.app-loader) {
     grid-template-columns:
         minmax(0, 1fr)
         minmax(0, 1fr)
-        minmax(18rem, 1.35fr)
+        minmax(18rem, 2fr)
         2.5rem
         max-content;
     column-gap: 0.75rem;
@@ -14440,6 +14456,52 @@ body.loader-active > *:not(.app-loader) {
 
 .hr-review-day-rest {
     background: #f3f0ff;
+}
+
+.applied-repo-transfer-history {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #a3cfbb;
+    border-radius: 0.75rem;
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+}
+
+.applied-repo-transfer-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.applied-repo-transfer-item {
+    padding: 0.75rem;
+    border: 1px solid #badbcc;
+    border-radius: 0.625rem;
+    background: #fff;
+}
+
+.applied-repo-transfer-item .badge {
+    font-weight: 800;
+}
+
+.applied-repo-transfer-target-result {
+    margin-top: 0.25rem;
+    padding: 0.35rem 0.5rem;
+    border-left: 0.3rem solid #198754;
+    background: #e8f5ee;
+    color: #0f5132;
+    font-weight: 800;
+}
+
+.employment-review-advanced-branch {
+    padding-right: 2.25rem;
+}
+
+@media (max-width: 767.98px) {
+    .employment-review-advanced-branch {
+        padding-right: calc(var(--bs-gutter-x) * 0.5);
+    }
 }
 
 .hr-review-day h5 {
@@ -14590,22 +14652,105 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .employment-review-scroll-container {
-    --employment-review-viewport-offset: 17rem;
+    --employment-review-viewport-offset: 20.25rem;
+    --employment-review-table-sticky-top: 0px;
     max-height: max(10rem, calc(100vh - var(--employment-review-viewport-offset)));
     max-height: max(10rem, calc(100dvh - var(--employment-review-viewport-offset)));
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: auto;
     overscroll-behavior-y: contain;
     scrollbar-gutter: stable;
 }
 
 .employment-review-scroll-container--advanced {
-    --employment-review-viewport-offset: 25.5rem;
+    --employment-review-viewport-offset: 28.75rem;
 }
 
 .employment-review-scroll-container .results-table-wrapper {
     max-height: none;
-    overflow-y: visible;
+    overflow: visible;
+}
+
+.employment-review-scroll-container #resultsTable {
+    width: max(100%, 89.25rem);
+    min-width: 89.25rem;
+    table-layout: fixed;
+    margin-bottom: 0;
+}
+
+.employment-review-results-columns .review-col-date {
+    width: 9rem;
+}
+
+.employment-review-results-columns .review-col-branch {
+    width: 5.25rem;
+}
+
+.employment-review-results-columns .review-col-code {
+    width: 5.25rem;
+}
+
+.employment-review-results-columns .review-col-declared,
+.employment-review-results-columns .review-col-cards {
+    width: 9.25rem;
+}
+
+.employment-review-results-columns .review-col-apologistiko {
+    width: 13rem;
+}
+
+.employment-review-results-columns .review-col-hours,
+.employment-review-results-columns .review-col-night,
+.employment-review-results-columns .review-col-holiday {
+    width: 5rem;
+}
+
+.employment-review-results-columns .review-col-absences {
+    width: 5.75rem;
+}
+
+.employment-review-results-columns .review-col-additional {
+    width: 5.5rem;
+}
+
+.employment-review-results-columns .review-col-overwork,
+.employment-review-results-columns .review-col-overtime {
+    width: 6rem;
+}
+
+.employment-review-scroll-container #resultsTable > thead > tr > th {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.employment-review-scroll-container #resultsTable td:nth-child(1),
+.employment-review-scroll-container #resultsTable td:nth-child(2),
+.employment-review-scroll-container #resultsTable td:nth-child(3),
+.employment-review-scroll-container #resultsTable td:nth-child(5),
+.employment-review-scroll-container #resultsTable td:nth-child(n + 7) {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.employment-review-scroll-container #resultsTable .review-interval-line {
+    white-space: nowrap;
+}
+
+.employment-review-scroll-container #resultsTable th:nth-child(6),
+.employment-review-scroll-container #resultsTable td:nth-child(6) {
+    overflow: hidden;
+    text-align: center;
+}
+
+.employment-review-scroll-container #resultsTable thead th {
+    position: sticky;
+    top: var(--employment-review-table-sticky-top);
+    z-index: 15;
+    background-color: #212529;
+    color: #ffffff;
+    border-color: #495057;
+    background-clip: padding-box;
 }
 
 @media (max-width: 991.98px) {

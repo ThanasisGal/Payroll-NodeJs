@@ -37,7 +37,8 @@ const { ApasxolhseisModel, AstheneiesModel, AdeiesModel } = Models_E;
 const phaseDetectorService = require('../../services/kinhseis/phaseDetectorService');
 const {
     generateAndSaveWorkFactsForEmployeePeriod,
-    findWorkFactsSnapshot
+    findWorkFactsSnapshot,
+    resolveWorkFactsAsOfContext
 } = require('../../services/kinhseis/workFactsPrecalcService');
 const {
     generateWorkFactsForCompanyPeriod,
@@ -77,6 +78,13 @@ function normalizeSnapshotDateParam(value) {
     return raw;
 }
 
+function resolveRequestWorkFactsAsOfContext(req) {
+    return resolveWorkFactsAsOfContext({
+        explicitAsOfDate: req.session?.appDate,
+        explicitSource: 'SESSION_APP_DATE'
+    });
+}
+
 function buildSnapshotCapabilities(snapshot = {}) {
     return {
         hasDailyFacts: Array.isArray(snapshot.dailyFacts) && snapshot.dailyFacts.length > 0,
@@ -105,6 +113,8 @@ function buildSnapshotPayload(snapshot = {}) {
         generatedAt: snapshot.generatedAt || null,
         generatedBy: snapshot.generatedBy || '',
         sourceVersion: snapshot.sourceVersion || '',
+        asOfDate: snapshot.asOfDate || '',
+        asOfDateSource: snapshot.asOfDateSource || '',
         inputFingerprint: snapshot.inputFingerprint || '',
         locked: snapshot.locked === true,
         totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
@@ -129,6 +139,8 @@ function buildSnapshotSummaryPayload(snapshot = {}) {
         eos: snapshot.eos || '',
         scope: snapshot.scope || '',
         generatedAt: snapshot.generatedAt || null,
+        asOfDate: snapshot.asOfDate || '',
+        asOfDateSource: snapshot.asOfDateSource || '',
         totals: snapshot.totals && typeof snapshot.totals === 'object' ? snapshot.totals : {},
         phaseSummary: Array.isArray(snapshot.phaseSummary) ? snapshot.phaseSummary : [],
         dailyFactsCount: Array.isArray(snapshot.dailyFacts) ? snapshot.dailyFacts.length : 0,
@@ -1022,6 +1034,14 @@ class kinhseisController {
                     missingFields
                 });
             }
+            const asOfContext = resolveRequestWorkFactsAsOfContext(req);
+            if (!asOfContext.ok) {
+                return res.status(400).json({
+                    success: false,
+                    reason: asOfContext.reason,
+                    message: 'Η ημερομηνία εφαρμογής της συνεδρίας δεν είναι έγκυρη.'
+                });
+            }
 
             const data = await phaseDetectorService.detectPayrollPhases({
                 team,
@@ -1029,7 +1049,9 @@ class kinhseisController {
                 kodikos,
                 ypokatasthma,
                 year,
-                period
+                period,
+                asOfDate: asOfContext.asOfDate,
+                asOfDateSource: asOfContext.asOfDateSource
             });
 
             return res.json({ success: true, data });
@@ -1401,11 +1423,19 @@ class kinhseisController {
             const ypokatasthma = String(body.ypokatasthma || '').trim();
             const scope = String(body.scope || 'MONTHLY').trim().toUpperCase() || 'MONTHLY';
             const force = parseBooleanParam(body.force, false);
+            const asOfContext = resolveRequestWorkFactsAsOfContext(req);
 
             if (!team || !company_kod) {
                 return res.status(400).json({
                     success: false,
                     message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+            if (!asOfContext.ok) {
+                return res.status(400).json({
+                    success: false,
+                    reason: asOfContext.reason,
+                    message: 'Η ημερομηνία εφαρμογής της συνεδρίας δεν είναι έγκυρη.'
                 });
             }
 
@@ -1487,7 +1517,9 @@ class kinhseisController {
                 scope,
                 ypokatasthma,
                 requestedBy,
-                force
+                force,
+                asOfDate: asOfContext.asOfDate,
+                asOfDateSource: asOfContext.asOfDateSource
             });
             const status = String(snapshot?.status || '').trim() || 'FAILED';
 
@@ -1542,12 +1574,20 @@ class kinhseisController {
             const force = parseBooleanParam(body.force, false);
             const dryRun = parseBooleanParam(body.dryRun, false);
             const maxEmployeesResult = parseBatchMaxEmployees(body.maxEmployees);
+            const asOfContext = resolveRequestWorkFactsAsOfContext(req);
 
             if (!team || !company_kod) {
                 return res.status(400).json({
                     success: false,
                     reason: 'missing_session',
                     message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+            if (!asOfContext.ok) {
+                return res.status(400).json({
+                    success: false,
+                    reason: asOfContext.reason,
+                    message: 'Η ημερομηνία εφαρμογής της συνεδρίας δεν είναι έγκυρη.'
                 });
             }
 
@@ -1685,7 +1725,9 @@ class kinhseisController {
                         scope,
                         ypokatasthma,
                         requestedBy,
-                        force: false
+                        force: false,
+                        asOfDate: asOfContext.asOfDate,
+                        asOfDateSource: asOfContext.asOfDateSource
                     });
                     const generatedStatus = String(snapshot?.status || '').trim();
 
@@ -1783,12 +1825,20 @@ class kinhseisController {
                 body.maxEmployees,
                 'maxEmployees'
             );
+            const asOfContext = resolveRequestWorkFactsAsOfContext(req);
 
             if (!team || !company_kod) {
                 return res.status(400).json({
                     success: false,
                     reason: 'missing_session',
                     message: 'Λείπουν απαραίτητα στοιχεία συνεδρίας.'
+                });
+            }
+            if (!asOfContext.ok) {
+                return res.status(400).json({
+                    success: false,
+                    reason: asOfContext.reason,
+                    message: 'Η ημερομηνία εφαρμογής της συνεδρίας δεν είναι έγκυρη.'
                 });
             }
 
@@ -1862,7 +1912,9 @@ class kinhseisController {
                 kodikoi,
                 dryRun,
                 limit,
-                maxEmployees
+                maxEmployees,
+                asOfDate: asOfContext.asOfDate,
+                asOfDateSource: asOfContext.asOfDateSource
             });
 
             if (startedJob.success !== true) {

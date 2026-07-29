@@ -213,7 +213,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
     },
     {
         policy_code: 'WEEKLY_REPO_BALANCE',
-        policy_version: 'foundation:v1',
+        policy_version: 'foundation:v2',
         title: 'Ισορροπία εβδομαδιαίων ρεπό',
         description:
             'Ελέγχει ή εξηγεί 1 ή 2 ρεπό ανά εβδομάδα και πιθανή αντικατάσταση ρεπό μέσα στην ίδια εβδομάδα.',

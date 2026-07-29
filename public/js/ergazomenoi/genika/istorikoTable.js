@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hmeres_ergasias_ebdomadas: 'Ημέρες Εργασίας Εβδομάδας',
         ores_ergasias_ebdomadas: 'Ώρες Εργασίας Εβδομάδας',
         mo_oron_hmerhsias_ergasias: 'Μ.Ο. Ημερήσιας Εργασίας',
+        pososto_prosayxhshs_6hs_hmeras: 'Προσαύξηση 6ης Ημέρας (%)',
         typos_apasxolhshs: 'Τύπος Απασχόλησης',
         typos_ebdomadas: 'Απασχόληση Βάσει Σύμβασης',
         afora_allagh_oron_ergasias: 'Αφορά Αλλαγή Όρων Εργασίας',

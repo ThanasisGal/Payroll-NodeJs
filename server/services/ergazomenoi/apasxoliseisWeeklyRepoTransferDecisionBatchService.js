@@ -29,6 +29,10 @@ const {
 const { validateApplySession } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
 const { getWeeklyRepoTransferApplyRuntimeState } = require('./apasxoliseisWeeklyRepoTransferApplyRuntimeGuardService');
 const { getWeeklyRepoTransferApplyIndexState } = require('./apasxoliseisWeeklyRepoTransferApplyIndexGuardService');
+const {
+    startOfWeekMondayUtc,
+    dateKeyUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 function requestError(message, statusCode = 400) {
     const error = new Error(message);
@@ -72,6 +76,57 @@ function executionPresentation(execution) {
         created_by_user_name: execution.created_by_user_name || ''
     } : null;
 }
+function appliedHistoryPresentation(decision, execution, employee = null) {
+    if (!decision || !execution || execution.execution_status !== 'APPLIED') return null;
+    const snapshot = decision.canonical_snapshot || {};
+    const source = snapshot.source || {};
+    const target = snapshot.target || {};
+    const after = execution.after_snapshot || {};
+    return {
+        decision_id: String(decision._id || ''),
+        execution_id: String(execution._id || ''),
+        proposal_id: String(decision.proposal_id || ''),
+        employee_id: String(decision.employee_id || snapshot.employee_id || ''),
+        employee_kodikos: text(decision.employee_kodikos || snapshot.employee_kodikos, 50),
+        employee_name: [
+            text(employee?.eponymo, 100),
+            text(employee?.onoma, 100)
+        ].filter(Boolean).join(' '),
+        week_start: decision.week_start || snapshot.week_start || null,
+        week_end: decision.week_end || snapshot.week_end || null,
+        source: {
+            prodhlomena_oraria_id: String(
+                decision.source_prodhlomena_oraria_id ||
+                source.prodhlomena_oraria_id ||
+                ''
+            ),
+            hmeromhnia: source.hmeromhnia || null,
+            result: text(
+                after.source?.kathgoria_ergasias_apologistika ||
+                source.proposed_values?.kathgoria_ergasias_apologistika,
+                20
+            )
+        },
+        target: {
+            prodhlomena_oraria_id: String(
+                decision.target_prodhlomena_oraria_id ||
+                target.prodhlomena_oraria_id ||
+                ''
+            ),
+            hmeromhnia: target.hmeromhnia || null,
+            result: text(
+                after.target?.kathgoria_ergasias_apologistika ||
+                target.proposed_values?.kathgoria_ergasias_apologistika,
+                20
+            ),
+            repo_apologistika:
+                after.target?.repo_apologistika === true ||
+                target.proposed_values?.repo_apologistika === true
+        },
+        applied_at: execution.applied_at || null,
+        applied_by_user_name: text(execution.created_by_user_name, 200)
+    };
+}
 function applyCapability({ applyState, runtimeEnabled, indexReady, context = null }) {
     const canApply = applyState === 'READY_TO_APPLY';
     return {
@@ -100,6 +155,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
 }) {
     const scope = validateSessionScope(session);
     const normalized = validateBatchFilters(filters);
+    const readContextStart = startOfWeekMondayUtc(normalized.start.date);
+    const readContextEnd = normalized.end.date;
     const prodhlomenaModel = models.prodhlomenaModel || ProdhlomenaOrariaModel;
     const employeeModel = models.employeeModel || ErgazomenoiModel;
     const historyModel = models.historyModel === undefined ? IstorikoProslhpseonAllagonModel : models.historyModel;
@@ -110,7 +167,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
         team: scope.team,
         company_kod: scope.company_kod,
         ypokatasthma: normalized.ypokatasthma,
-        hmeromhnia: mongoose.trusted({ $gte: normalized.start.date, $lte: normalized.end.date })
+        hmeromhnia: mongoose.trusted({ $gte: readContextStart, $lte: readContextEnd })
     };
     const rows = await prodhlomenaModel.find(rowFilter)
         .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS)
@@ -133,8 +190,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
             companyId: scope.company_kod,
             companyKodikos: text(session.companyKodikos, 50),
             etos: scope.etos,
-            periodStart: normalized.start.date,
-            periodEnd: normalized.end.date,
+            periodStart: readContextStart,
+            periodEnd: readContextEnd,
             companiesModel: models.companiesModel,
             argiesModel: models.argiesModel
         })
@@ -158,6 +215,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
         rows,
         periodStart: normalized.start.date,
         periodEnd: normalized.end.date,
+        asOfDate: session.appDate,
         holidayByDateKey: holidayContext.argiesByDateKey,
         existingAuditCountByRowKey: auditCounts,
         resolveEmploymentProfile: ({ ypokatasthma, employee_kodikos, week_start, week_end }) => {
@@ -175,6 +233,8 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 typos_apasxolhshs: effective.typos_apasxolhshs || '',
                 mhniaia_repo: effective.mhniaia_repo,
                 raw_mhniaia_repo: effective.raw_mhniaia_repo,
+                pososto_prosayxhshs_6hs_hmeras:
+                    effective.pososto_prosayxhshs_6hs_hmeras,
                 hmeres_ergasias_ebdomadas: effective.hmeres_ergasias_ebdomadas,
                 mo_oron_hmerhsias_ergasias: Number(effective.mo_oron_hmerhsias_ergasias || 0),
                 external_break_minutes: employee.dialleima_entos_ektos_orarioy === true ? 0 : Math.max(Number.parseInt(employee.dialleima_se_lepta || 0, 10) || 0, 0),
@@ -187,7 +247,10 @@ async function loadWeeklyRepoTransferDecisionBatch({
             return profile;
         }
     });
-    const projection = buildWeeklyRepoTransferAtomicPageProjection(inputs);
+    const projection = buildWeeklyRepoTransferAtomicPageProjection(inputs, {
+        presentationStart: normalized.start.date,
+        presentationEnd: normalized.end.date
+    });
     const current = projection.groups.map((group) => {
         const sourceId = String(group.items[0].prodhlomena_oraria_id);
         const weekRows = inputs.weeklyInputs.find((input) => input.weekRows.some((row) => String(row._id) === sourceId))?.weekRows || [];
@@ -213,21 +276,30 @@ async function loadWeeklyRepoTransferDecisionBatch({
         const snapshot = canonicalSnapshotBuilder({ scope, context, group });
         return { group, fingerprint: snapshotFingerprintBuilder(snapshot) };
     });
-    const decisions = await decisionModel.find({
+    const decisionFilter = {
         team: scope.team,
         company_kod: scope.company_kod,
         ypokatasthma: normalized.ypokatasthma,
         decision_status: 'RECORDED',
         week_start: mongoose.trusted({ $lte: normalized.end.date }),
         week_end: mongoose.trusted({ $gte: normalized.start.date })
-    }).select('-canonical_snapshot -canonical_group_key -command_identity -request_id').sort({ created_at: -1 }).lean();
+    };
+    const employeeCode = text(filters.kodikos, 50);
+    if (employeeCode) decisionFilter.employee_kodikos = employeeCode;
+    const decisions = await decisionModel.find(decisionFilter)
+        .select('-canonical_group_key -command_identity -request_id')
+        .sort({ created_at: -1 })
+        .lean();
     const periodDecisionIds = decisions.map((decision) => decision._id).filter(Boolean);
     const executions = periodDecisionIds.length
         ? await executionModel.find({
               team: scope.team,
               company_kod: scope.company_kod,
               decision_id: mongoose.trusted({ $in: periodDecisionIds })
-          }).select('_id decision_id proposal_id execution_status applied_at created_by_user_name').lean()
+          }).select(
+              '_id decision_id proposal_id execution_status applied_at created_by_user_name ' +
+              'source_prodhlomena_oraria_id target_prodhlomena_oraria_id after_snapshot'
+          ).lean()
         : [];
     const executionByDecisionId = new Map(executions.map((execution) => [String(execution.decision_id), execution]));
     const executedDecisionIds = new Set(executionByDecisionId.keys());
@@ -273,6 +345,11 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 proposal_id: group.group_id,
                 current_decision: history.find((decision) => decision.is_current) || null,
                 current_execution: executionPresentation(execution),
+                applied_history: appliedHistoryPresentation(
+                    executedDecision,
+                    execution,
+                    employeeByCode.get(text(executedDecision?.employee_kodikos))
+                ),
                 ...applyCapability({
                     applyState: apply_state,
                     runtimeEnabled: runtimeState.enabled,
@@ -293,6 +370,11 @@ async function loadWeeklyRepoTransferDecisionBatch({
                 proposal_id: proposalId,
                 current_decision: null,
                 current_execution: executionPresentation(execution),
+                applied_history: appliedHistoryPresentation(
+                    executedDecision,
+                    execution,
+                    employeeByCode.get(text(executedDecision?.employee_kodikos))
+                ),
                 ...applyCapability({
                     applyState: 'ALREADY_APPLIED',
                     runtimeEnabled: runtimeState.enabled,
@@ -309,11 +391,20 @@ async function loadWeeklyRepoTransferDecisionBatch({
         applied_only_count: appliedOnlyRecords.length,
         projection_status: projection.projection_status,
         reason_counts: projection.reason_counts,
-        warning_counts: projection.warning_counts
+        warning_counts: projection.warning_counts,
+        requested_period: {
+            start: normalized.start.key,
+            end: normalized.end.key
+        },
+        read_context: {
+            start: dateKeyUtc(readContextStart),
+            end: dateKeyUtc(readContextEnd)
+        }
     };
 }
 
 module.exports = {
     validateBatchFilters,
+    appliedHistoryPresentation,
     loadWeeklyRepoTransferDecisionBatch
 };

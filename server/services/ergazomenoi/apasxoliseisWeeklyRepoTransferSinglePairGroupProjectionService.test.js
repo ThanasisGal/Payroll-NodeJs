@@ -9,7 +9,7 @@ const {
     buildWeeklyRepoTransferSinglePairProposal
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairProposalService');
 
-const WEEK_START = '2026-07-05';
+const WEEK_START = '2026-07-06';
 
 function dateKey(offset) {
     const date = new Date(`${WEEK_START}T00:00:00.000Z`);
@@ -83,7 +83,7 @@ function partTimeWeek() {
 function build(rows, profile = { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }, contexts = {}) {
     return buildWeeklyRepoTransferSinglePairGroupProjection({
         weekRows: rows,
-        employmentProfile: profile,
+        employmentProfile: { hmeres_ergasias_ebdomadas: 5, ...profile },
         holidayByDateKey: contexts.holidayByDateKey || new Map(),
         existingAuditCountByRowKey: contexts.existingAuditCountByRowKey || new Map()
     });
@@ -118,9 +118,9 @@ function assertSafetyContract(group) {
     assert.strictEqual(group.employees_count, 1);
     assert.deepStrictEqual(group.pair_contract, {
         choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
-        proposal_version: 'repo-transfer-single-pair-proposal:v1',
+        proposal_version: 'repo-transfer-single-pair-proposal:v3',
         policy_versions: {
-            weekly_repo: 'foundation:v1',
+            weekly_repo: 'foundation:v2',
             source_work: 'foundation:v1'
         },
         atomic_pair_required: true,
@@ -177,8 +177,8 @@ function testValidFullTimeProjection() {
     assert.strictEqual(group.title, 'Μεταφορά ρεπό εντός εβδομάδας');
     assert.strictEqual(
         group.description,
-        'Μεταφορά ρεπό για τον εργαζόμενο 001: η 06/07/2026 γίνεται εργασία και η ' +
-            '09/07/2026 γίνεται ρεπό (ΑΝ, πλήρης απασχόληση). Η atomic read-only πρόταση ' +
+        'Μεταφορά ρεπό για τον εργαζόμενο 001: η 07/07/2026 γίνεται εργασία και η ' +
+            '10/07/2026 γίνεται ρεπό (ΑΝ, πλήρης απασχόληση). Η atomic read-only πρόταση ' +
             'απαιτεί ενιαία έγκριση και δεν είναι ακόμη διαθέσιμη για εφαρμογή.'
     );
     assert.strictEqual(group.first_date, dateKey(1));
@@ -237,8 +237,8 @@ function testStableGroupIdentity() {
         'group_type=ATOMIC_PAIRED_PROPOSAL|' +
             'scenario=REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR|' +
             'choice=TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR|' +
-            'proposal_version=repo-transfer-single-pair-proposal:v1|' +
-            'employee=001|week=2026-07-05:2026-07-11|source=row-1|target=row-4'
+            'proposal_version=repo-transfer-single-pair-proposal:v3|' +
+            'employee=001|week=2026-07-06:2026-07-12|source=row-1|target=row-4'
     );
     assert.match(first.groups[0].group_id, /^policy-preview-paired-group-[a-f0-9]{16}$/);
 
@@ -275,7 +275,7 @@ function testSplitShiftIntervalsArePreservedInProjection() {
     });
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: twoIntervalRows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
     });
     const twoIntervalResult = build(twoIntervalRows);
     assertReady(twoIntervalResult);
@@ -365,10 +365,11 @@ function testNonReadyProposalPaths() {
 
     const deficit = fullTimeWeek();
     deficit[6] = workRow(6);
-    assert.strictEqual(build(deficit).projection_status, 'READY');
-    assertNotAvailable(
-        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 }),
-        'REPO_LIMIT_EXCEEDED'
+    assertNotAvailable(build(deficit), 'REPO_DEFICIT_REMAINS');
+    assert.strictEqual(
+        build(fullTimeWeek(), { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 1 })
+            .projection_status,
+        'READY'
     );
     assertNotAvailable(build(fullTimeWeek().slice(0, 6)), 'INCOMPLETE_WEEK_DATA');
 }
@@ -428,7 +429,11 @@ function testInputImmutability() {
     assert.strictEqual(Object.isFrozen(holidayByDateKey), false);
 
     const frozenRows = deepFreezeFixture(fullTimeWeek());
-    const frozenProfile = deepFreezeFixture({ typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 });
+    const frozenProfile = deepFreezeFixture({
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        hmeres_ergasias_ebdomadas: 5
+    });
     const frozenHoliday = deepFreezeFixture(new Map([[dateKey(0), null]]));
     const frozenAudit = deepFreezeFixture({});
     assertReady(
@@ -445,7 +450,7 @@ function testOutputOwnershipAndFreeze() {
     const rows = fullTimeWeek();
     const proposal = buildWeeklyRepoTransferSinglePairProposal({
         weekRows: rows,
-        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2 }
+        employmentProfile: { typos_apasxolhshs: 'PLHRHS', mhniaia_repo: 2, hmeres_ergasias_ebdomadas: 5 }
     });
     const result = build(rows);
     const group = result.groups[0];
@@ -475,6 +480,28 @@ function testOutputOwnershipAndFreeze() {
     assert.strictEqual(group.first_date instanceof Date, false);
 }
 
+function testTargetPresentationMetadataDoesNotChangeGroupIdentity() {
+    const result = build(fullTimeWeek());
+    const group = result.groups[0];
+    const target = group.items[1];
+
+    assert.strictEqual(target.kathgoria_ergasias, 'ΕΡΓ');
+    assert.strictEqual(
+        target.current_kathgoria_ergasias_apologistika,
+        'ΑΔΕΙΑ'
+    );
+    assert.strictEqual(
+        target.proposed_values.kathgoria_ergasias_apologistika,
+        'ΑΝ'
+    );
+    assert.strictEqual(
+        group.group_id,
+        'policy-preview-paired-group-' +
+            require('crypto').createHash('sha1').update(group.group_key).digest('hex').slice(0, 16)
+    );
+    assert.ok(!group.group_key.includes('ΑΔΕΙΑ'));
+}
+
 function run() {
     testValidFullTimeProjection();
     testValidPartTimeProjection();
@@ -486,6 +513,7 @@ function run() {
     testMissingAndDuplicateIdsDoNotCreateGroups();
     testInputImmutability();
     testOutputOwnershipAndFreeze();
+    testTargetPresentationMetadataDoesNotChangeGroupIdentity();
     console.log('apasxoliseis weekly repo transfer single-pair group projection tests passed');
 }
 

@@ -90,6 +90,8 @@ function buildHolidayContext(row, argiesByDateKey) {
 function buildScenarioFactsSummary(facts = {}) {
     return {
         declared_category: facts?.declared?.kathgoria_ergasias || '',
+        apologistika_category:
+            facts?.apologistika?.currentApologistikaCategory || '',
         declared_hours: facts?.declared?.declaredHours || 0,
         card_hours: facts?.cards?.cardHours || 0,
         has_cards: facts?.cards?.hasCards === true,

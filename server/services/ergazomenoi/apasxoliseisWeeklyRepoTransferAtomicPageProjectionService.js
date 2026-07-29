@@ -5,6 +5,10 @@ const {
     buildWeeklyRepoTransferSinglePairGroupProjection,
     PROJECTION_STATUS: SINGLE_WEEK_PROJECTION_STATUS
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairGroupProjectionService');
+const {
+    dateKeyUtc,
+    startOfWeekMondayUtc
+} = require('../../utils/date/mondaySundayWeek');
 
 const PAGE_PROJECTION_STATUS = Object.freeze({
     READY: 'READY'
@@ -16,6 +20,7 @@ const INPUT_REASON = Object.freeze({
     DATE_RANGE_REQUIRED: 'ATOMIC_DATE_RANGE_REQUIRED',
     INVALID_ROW: 'INVALID_ATOMIC_ROW_IDENTITY_OR_DATE',
     PARTIAL_WEEK: 'PARTIAL_WEEK_OUTSIDE_FILTER_RANGE',
+    OPEN_WEEK: 'OPEN_WEEK_PENDING_COMPLETION',
     DUPLICATE_DATE: 'DUPLICATE_EMPLOYEE_WEEK_DATE',
     INCOMPLETE_WEEK: 'INCOMPLETE_EMPLOYEE_WEEK',
     PROFILE_NOT_RESOLVED: 'EMPLOYMENT_PROFILE_NOT_RESOLVED',
@@ -36,29 +41,9 @@ function primitiveString(value, maxLength = 200) {
     return normalized ? normalized.slice(0, maxLength) : null;
 }
 
-function dateKeyUtc(value) {
-    if (!value) return null;
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-        const key = value.trim();
-        const parsed = new Date(`${key}T00:00:00.000Z`);
-        return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== key
-            ? null
-            : key;
-    }
-
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
-}
-
 function addDaysDateKey(dateKey, days) {
     const date = new Date(`${dateKey}T00:00:00.000Z`);
     date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-}
-
-function sundayDateKey(dateKey) {
-    const date = new Date(`${dateKey}T00:00:00.000Z`);
-    date.setUTCDate(date.getUTCDate() - date.getUTCDay());
     return date.toISOString().slice(0, 10);
 }
 
@@ -131,7 +116,7 @@ function bucketIdentity(row, rowDateKey) {
     const employeeKodikos = primitiveString(row?.kodikos, 100);
     if (!team || !companyKod || !ypokatasthma || !employeeKodikos || !rowDateKey) return null;
 
-    const weekStart = sundayDateKey(rowDateKey);
+    const weekStart = dateKeyUtc(startOfWeekMondayUtc(rowDateKey));
     return {
         key: JSON.stringify([team, companyKod, ypokatasthma, employeeKodikos, weekStart]),
         team,
@@ -147,6 +132,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     rows = [],
     periodStart = null,
     periodEnd = null,
+    asOfDate = null,
     resolveEmploymentProfile,
     holidayByDateKey = new Map(),
     existingAuditCountByRowKey = new Map()
@@ -161,6 +147,7 @@ function buildWeeklyRepoTransferAtomicInputs({
     }
     const periodStartKey = dateKeyUtc(periodStart);
     const periodEndKey = dateKeyUtc(periodEnd);
+    const asOfDateKey = dateKeyUtc(asOfDate);
 
     const buckets = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -177,8 +164,12 @@ function buildWeeklyRepoTransferAtomicInputs({
     [...buckets.values()]
         .sort((left, right) => left.key.localeCompare(right.key))
         .forEach((bucket) => {
-            if (bucket.weekStart < periodStartKey || bucket.weekEnd > periodEndKey) {
-                inputReasonCodes.push(INPUT_REASON.PARTIAL_WEEK);
+            if (bucket.weekEnd > periodEndKey) {
+                inputReasonCodes.push(
+                    asOfDateKey && bucket.weekEnd > asOfDateKey
+                        ? INPUT_REASON.OPEN_WEEK
+                        : INPUT_REASON.PARTIAL_WEEK
+                );
                 return;
             }
 
@@ -301,8 +292,20 @@ function compareGroups(left, right) {
 
 function buildWeeklyRepoTransferAtomicPageProjection(
     { weeklyInputs = [], inputReasonCodes = [] } = {},
-    { singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection } = {}
+    {
+        singleWeekProjectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection,
+        presentationStart = null,
+        presentationEnd = null
+    } = {}
 ) {
+    const presentationStartKey = dateKeyUtc(presentationStart);
+    const presentationEndKey = dateKeyUtc(presentationEnd);
+    const hasPresentationRange = Boolean(presentationStartKey && presentationEndKey);
+    const isPresentationDate = (value) => {
+        const key = dateKeyUtc(value);
+        return !hasPresentationRange ||
+            Boolean(key && key >= presentationStartKey && key <= presentationEndKey);
+    };
     const reasonCounts = {};
     const warningCounts = {};
     const groupsById = new Map();
@@ -353,6 +356,11 @@ function buildWeeklyRepoTransferAtomicPageProjection(
             incrementCounts(reasonCounts, ['ATOMIC_GROUP_RESULT_INVALID']);
             return;
         }
+        if (!group.items.every((item) => isPresentationDate(item?.hmeromhnia))) {
+            summary.context_only_groups_count =
+                (summary.context_only_groups_count || 0) + 1;
+            return;
+        }
 
         if (groupsById.has(group.group_id)) {
             incrementCounts(reasonCounts, ['DUPLICATE_ATOMIC_GROUP_ID']);
@@ -373,7 +381,15 @@ function buildWeeklyRepoTransferAtomicPageProjection(
     });
 
     const groups = [...groupsById.values()].sort(compareGroups);
-    const sortedReviewOutcomes = reviewOutcomes.sort((left, right) =>
+    const sortedReviewOutcomes = reviewOutcomes
+        .filter((outcome) => {
+            const dates = [
+                outcome?.source?.hmeromhnia,
+                outcome?.target?.hmeromhnia
+            ].filter(Boolean);
+            return dates.length === 0 || dates.every(isPresentationDate);
+        })
+        .sort((left, right) =>
         String(left?.week_start || '').localeCompare(String(right?.week_start || '')) ||
         String(left?.team || '').localeCompare(String(right?.team || '')) ||
         String(left?.company_kod || '').localeCompare(String(right?.company_kod || '')) ||
@@ -386,7 +402,7 @@ function buildWeeklyRepoTransferAtomicPageProjection(
         String(left?.source?.hmeromhnia || '').localeCompare(
             String(right?.source?.hmeromhnia || '')
         )
-    );
+        );
     const reviewEmployeeIdentities = new Set(
         sortedReviewOutcomes
             .map(scopedEmployeeIdentity)

@@ -137,14 +137,34 @@
                         />
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="form-label">Παράρτημα</label>
+                    <div class="col-md-4 employment-review-advanced-branch">
+                        <label class="form-label" for="ypokatasthma">Παράρτημα</label>
                         <input
-                            type="text"
-                            id="ypokatasthma"
-                            class="form-control date-tall move-by-enter"
-                            placeholder="0000"
+                            type="hidden"
+                            id="ypokatasthma_stathera_advanced"
+                            value=""
+                            readonly
                         />
+                        <select
+                            id="ypokatasthma"
+                            class="tom-dropdown selectpicker-dropdown-normal left-align move-by-enter"
+                            aria-label="Παράρτημα αναλυτικής προβολής"
+                            data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyInUse || '' %>"
+                            data-target-input="ypokatasthma_stathera_advanced"
+                            data-preselect="ypokatasthma_stathera_advanced"
+                            data-dropdown-direction="down"
+                            data-preload-all="true"
+                            data-pad-length="4"
+                            data-xrhsh-related="false"
+                            data-team-related="false"
+                            data-company-related="false"
+                            data-mhnas-related="false"
+                            single
+                            placeholder="Επιλέξτε παράρτημα">
+                        </select>
+                        <div id="advancedBranchValidation" class="invalid-feedback d-block d-none">
+                            Επιλέξτε συγκεκριμένο παράρτημα.
+                        </div>
                     </div>
 
                     <div class="col-md-2">
@@ -237,6 +257,21 @@
 
                 <div class="table-responsive results-table-wrapper">
                     <table class="table table-bordered table-hover align-middle" id="resultsTable">
+                    <colgroup class="employment-review-results-columns">
+                        <col class="review-col-date" />
+                        <col class="review-col-branch" />
+                        <col class="review-col-code" />
+                        <col class="review-col-declared" />
+                        <col class="review-col-cards" />
+                        <col class="review-col-apologistiko" />
+                        <col class="review-col-hours" />
+                        <col class="review-col-absences" />
+                        <col class="review-col-night" />
+                        <col class="review-col-holiday" />
+                        <col class="review-col-additional" />
+                        <col class="review-col-overwork" />
+                        <col class="review-col-overtime" />
+                    </colgroup>
                     <thead class="table-dark">
                         <tr>
                             <th>Ημ/νία</th>
