@@ -119,6 +119,59 @@ function testOpenTrailingWeekIsPendingNotDeviation() {
     assert.strictEqual(result.pendingWeeks[0].weekEnd, '2026-07-05');
 }
 
+function repoTransferWeek({ applied = false } = {}) {
+    return rows('2026-06-22', 7, {
+        2: {
+            kathgoria_ergasias: 'ΑΝ',
+            ores_ergasias: 0,
+            cards_ores_ergasias: 0
+        },
+        ...(applied
+            ? {
+                  4: {
+                      kathgoria_ergasias: 'ΕΡΓ',
+                      kathgoria_ergasias_apologistika: 'ΑΝ',
+                      repo_apologistika: true,
+                      ores_ergasias: 8,
+                      ores_ergasias_apologistika: 0,
+                      cards_ores_ergasias: 0
+                  }
+              }
+            : {})
+    });
+}
+
+function previewRepoTransferWeek(options = {}) {
+    return buildWeeklyRepoDeviationPreview({
+        rows: repoTransferWeek(options),
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: fiveDayProfile
+    });
+}
+
+function testRepoTransferLifecycleUsesEffectiveFinalRows() {
+    const beforeApply = previewRepoTransferWeek();
+    assert.strictEqual(beforeApply.deviations.length, 1);
+    assert.strictEqual(beforeApply.deviations[0].expected_repo, 2);
+    assert.strictEqual(beforeApply.deviations[0].actual_repo, 1);
+
+    // An approval without an APPLIED execution does not alter the raw daily rows.
+    const approvedWithoutExecution = previewRepoTransferWeek();
+    assert.strictEqual(approvedWithoutExecution.deviations.length, 1);
+    assert.strictEqual(approvedWithoutExecution.deviations[0].actual_repo, 1);
+
+    const applied = previewRepoTransferWeek({ applied: true });
+    assert.strictEqual(applied.deviations.length, 0);
+    assert.strictEqual(applied.pendingWeeks.length, 0);
+
+    const rolledBack = previewRepoTransferWeek();
+    assert.strictEqual(rolledBack.deviations.length, 1);
+    assert.strictEqual(rolledBack.deviations[0].expected_repo, 2);
+    assert.strictEqual(rolledBack.deviations[0].actual_repo, 1);
+}
+
 function testLegacyPersistedRangeIsExplicit() {
     const legacy = normalizeLegacyDeviation({
         week_apo: '2026-06-14',
@@ -140,6 +193,7 @@ testSundayAndMondayUseDifferentBuckets();
 testCompletedMondaySundayRanges();
 testContractualProfileControlsExpectedRepo();
 testOpenTrailingWeekIsPendingNotDeviation();
+testRepoTransferLifecycleUsesEffectiveFinalRows();
 testLegacyPersistedRangeIsExplicit();
 
 console.log('weekly repo deviation Monday-Sunday preview tests passed');

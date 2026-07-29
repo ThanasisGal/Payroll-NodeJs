@@ -22,10 +22,21 @@ function employeeKey(row = {}) {
     return `${String(row.ypokatasthma || '').trim()}|${String(row.kodikos || '').trim()}`;
 }
 
-function isDeclaredRepo(row = {}, isFullTimeProfile = () => true) {
+function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+    const effectiveCategory =
+        persistedCategory || String(row.kathgoria_ergasias || '').trim();
+    const persistedRepo =
+        row.repo_apologistika === true || persistedCategory === 'ΑΝ';
+    const effectiveHours = persistedRepo
+        ? row.ores_ergasias_apologistika
+        : row.ores_ergasias;
+
     return (
-        String(row.kathgoria_ergasias || '').trim() === 'ΑΝ' &&
-        finiteZero(row.ores_ergasias) &&
+        (persistedRepo || effectiveCategory === 'ΑΝ') &&
+        finiteZero(effectiveHours) &&
         finiteZero(row.cards_ores_ergasias) &&
         isFullTimeProfile(row) === true
     );
@@ -156,14 +167,21 @@ function buildWeeklyRepoDeviationPreview({
                 typeof resolveDailyProfile === 'function'
                     ? resolveDailyProfile(row) || {}
                     : {};
-            return isDeclaredRepo(row, () =>
+            return isEffectiveRepo(row, () =>
                 typeof isFullTimeProfile === 'function'
                     ? isFullTimeProfile(dailyProfile)
                     : true
             );
         }).length;
 
-        if (profileReason || Number(actualRepo) !== Number(expectedRepo)) {
+        const hasResolvedExpectedRepo =
+            expectedRepo !== null &&
+            expectedRepo !== undefined &&
+            Number.isFinite(Number(expectedRepo));
+        if (
+            !hasResolvedExpectedRepo ||
+            Number(actualRepo) !== Number(expectedRepo)
+        ) {
             deviations.push({
                 ...base,
                 status: profileReason ? STATUS.NEEDS_HR_DECISION : STATUS.READY,
