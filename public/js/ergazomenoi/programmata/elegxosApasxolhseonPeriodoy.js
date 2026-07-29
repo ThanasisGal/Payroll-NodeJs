@@ -1903,6 +1903,72 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
+function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+    const persistedRepo =
+        row.repo_apologistika === true || persistedCategory === 'ΑΝ';
+
+    if (persistedRepo) {
+        return {
+            text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+            className: 'cell-repo-day',
+            source: 'persisted'
+        };
+    }
+
+    if (persistedCategory === 'ΜΕ' || derived.isApologistikoNonWorkRow) {
+        return {
+            text: 'ΜΗ ΕΡΓΑΣΙΑ',
+            className: 'cell-non-work-day',
+            source: 'persisted'
+        };
+    }
+
+    if (persistedCategory) {
+        return {
+            text: derived.apologistikoText || persistedCategory,
+            className: isApologistikoIntervalPresent(row)
+                ? 'cell-apologistiko'
+                : '',
+            source: 'persisted'
+        };
+    }
+
+    const noCardsDisplayStatus = String(
+        row.noCardsDisplayStatus || row.no_cards_display_status || ''
+    ).trim();
+    if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
+        return {
+            text: noCardsDisplayStatus,
+            className:
+                noCardsDisplayStatus === 'ΑΔΕΙΑ'
+                    ? 'cell-no-card-adeia'
+                    : 'cell-no-card-argia',
+            source: 'derived'
+        };
+    }
+
+    if (derived.isApologistikoRepoRow) {
+        return {
+            text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ',
+            className: 'cell-repo-day',
+            source: 'derived'
+        };
+    }
+
+    return {
+        text: derived.apologistikoText || '',
+        className: isApologistikoIntervalPresent(row)
+            ? 'cell-apologistiko'
+            : hasAdeiaSuggestion(row)
+              ? 'cell-adeia-suggestion'
+              : '',
+        source: 'derived'
+    };
+}
+
 function renderReviewRows(rows = [], deviations = []) {
     ensureReviewTableStructure();
 
@@ -2030,33 +2096,13 @@ function renderReviewRows(rows = [], deviations = []) {
             (effectiveKathgoria === 'ΜΕ' || (effectiveKathgoria === 'ΑΝ' && !isFullTimeProfile)) &&
             num(row.cards_ores_ergasias) === 0;
 
-        const noCardsDisplayStatus = String(
-            row.noCardsDisplayStatus || row.no_cards_display_status || ''
-        ).trim();
-        const hasNoCardsDisplayStatus =
-            noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ';
-
-        const apologistikoDisplayText = hasNoCardsDisplayStatus
-            ? noCardsDisplayStatus
-            : isApologistikoRepoRow
-            ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
-            : isApologistikoNonWorkRow
-              ? 'ΜΗ ΕΡΓΑΣΙΑ'
-              : apologistikoText;
-
-        const apologistikoDisplayClass = hasNoCardsDisplayStatus
-            ? noCardsDisplayStatus === 'ΑΔΕΙΑ'
-                ? 'cell-no-card-adeia'
-                : 'cell-no-card-argia'
-            : isApologistikoRepoRow
-            ? 'cell-repo-day'
-            : isApologistikoNonWorkRow
-              ? 'cell-non-work-day'
-              : isApologistikoIntervalPresent(row)
-                ? 'cell-apologistiko'
-                : hasAdeiaSuggestion(row)
-                  ? 'cell-adeia-suggestion'
-                  : '';
+        const apologistikoPresentation = resolveReviewApologistikoPresentation(row, {
+            apologistikoText,
+            isApologistikoRepoRow,
+            isApologistikoNonWorkRow
+        });
+        const apologistikoDisplayText = apologistikoPresentation.text;
+        const apologistikoDisplayClass = apologistikoPresentation.className;
 
         const isDeclaredRestOrNonWork =
             row.apologistiko_biblio !== true &&
@@ -4277,7 +4323,8 @@ async function refreshRepoTransferDecisions() {
     const params = new URLSearchParams({
         apo_hmeromhnia: currentPolicyPreviewBaseParams.get('apo_hmeromhnia') || '',
         eos_hmeromhnia: currentPolicyPreviewBaseParams.get('eos_hmeromhnia') || '',
-        ypokatasthma: selectedBranch
+        ypokatasthma: selectedBranch,
+        kodikos: currentPolicyPreviewBaseParams.get('kodikos') || ''
     });
     currentRepoTransferDecisionsByProposalId = new Map();
     const response = await fetch(`/api/prodhlomena-oraria/review/repo-transfer-decisions/current?${params}`, {
@@ -4620,11 +4667,79 @@ function renderHrPendingCase() {
     }).join('');
 }
 
+function formatAppliedRepoTransferResult(result, repo = false) {
+    const category = String(result || '').trim();
+    return repo || category === 'ΑΝ' ? 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ' : category || '-';
+}
+
+function getAppliedRepoTransferHistory() {
+    return [...currentRepoTransferDecisionsByProposalId.values()]
+        .map((record) => record?.applied_history)
+        .filter(
+            (history) =>
+                history &&
+                history.execution_id &&
+                history.source?.hmeromhnia &&
+                history.target?.hmeromhnia
+        )
+        .sort(
+            (left, right) =>
+                new Date(right.applied_at || 0) - new Date(left.applied_at || 0)
+        );
+}
+
+function renderAppliedRepoTransferHistory() {
+    const histories = getAppliedRepoTransferHistory();
+    if (histories.length === 0) return '';
+
+    return `
+        <section class="applied-repo-transfer-history" aria-label="Εφαρμοσμένες μεταφορές ρεπό">
+            <div class="fw-semibold mb-2">Εφαρμοσμένες μεταφορές ρεπό</div>
+            <ul class="applied-repo-transfer-list">
+                ${histories.map((history) => `
+                    <li class="applied-repo-transfer-item" data-execution-id="${escapeHtml(history.execution_id)}">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge text-bg-success">Εφαρμόστηκε</span>
+                            <strong>${escapeHtml(
+                                history.employee_name ||
+                                `Εργαζόμενος ${history.employee_kodikos || '-'}`
+                            )}</strong>
+                            <span>Κωδικός: ${escapeHtml(history.employee_kodikos || '-')}</span>
+                        </div>
+                        <div>
+                            Εβδομάδα ${escapeHtml(formatPolicyPreviewDate(history.week_start))}
+                            –${escapeHtml(formatPolicyPreviewDate(history.week_end))}
+                        </div>
+                        <div>
+                            ${escapeHtml(formatPolicyPreviewDate(history.source.hmeromhnia))}
+                            → ${escapeHtml(formatAppliedRepoTransferResult(history.source.result))}
+                        </div>
+                        <div>
+                            ${escapeHtml(formatPolicyPreviewDate(history.target.hmeromhnia))}
+                            → ${escapeHtml(formatAppliedRepoTransferResult(
+                                history.target.result,
+                                history.target.repo_apologistika === true
+                            ))}
+                        </div>
+                        <div class="small text-muted">
+                            Εφαρμογή: ${escapeHtml(formatPolicyPreviewDateTime(history.applied_at))}
+                            ${history.applied_by_user_name
+                                ? ` · ${escapeHtml(history.applied_by_user_name)}`
+                                : ''}
+                        </div>
+                    </li>
+                `).join('')}
+            </ul>
+        </section>
+    `;
+}
+
 function renderHrCompletedCases() {
     const container = document.getElementById('hrReviewCompletedContainer');
     if (!container) return;
 
-    if (currentHrCompletedGroups.length === 0) {
+    const appliedHistoryHtml = renderAppliedRepoTransferHistory();
+    if (currentHrCompletedGroups.length === 0 && !appliedHistoryHtml) {
         container.innerHTML = '';
         return;
     }
@@ -4664,12 +4779,13 @@ function renderHrCompletedCases() {
         })
         .join('');
 
-    container.innerHTML = `
+    const completedGroupsHtml = currentHrCompletedGroups.length ? `
         <details class="hr-review-completed-details">
             <summary>Ολοκληρωμένες περιπτώσεις (${escapeHtml(currentHrCompletedGroups.length)})</summary>
             <ul>${itemsHtml}</ul>
         </details>
-    `;
+    ` : '';
+    container.innerHTML = `${completedGroupsHtml}${appliedHistoryHtml}`;
 }
 
 function renderHrCompletionState() {
@@ -4804,8 +4920,9 @@ function bindHrReviewEvents() {
         if (!group) return;
         await submitRepoTransferApply(group, String(button.dataset.decisionId || ''), button);
     });
-    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', () => {
+    document.getElementById('showAdvancedReviewBtn')?.addEventListener('click', async () => {
         if (!userCanUseAdvancedEmploymentReview()) return;
+        await window.EmploymentReviewBranches?.preselectAdvancedBranch?.();
         document.getElementById('hrReviewWorkspace')?.classList.add('d-none');
         document.getElementById('advancedReviewWorkspace')?.classList.remove('d-none');
     });
@@ -5026,6 +5143,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
     if (!grouping) {
         container.innerHTML = `
             ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
+            ${renderAppliedRepoTransferHistory()}
             <div class="card border rounded">
                 <div class="card-body py-3">
                     <div class="fw-semibold mb-1">Ομαδοποίηση Ελέγχου Πολιτικών</div>
@@ -5095,6 +5213,7 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
     container.innerHTML = `
         ${renderAtomicRepoTransferProjection(currentAtomicRepoTransferProjection)}
+        ${renderAppliedRepoTransferHistory()}
         <div class="card border rounded policy-preview-card">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap mb-1">
@@ -5173,13 +5292,27 @@ function renderPolicyPreviewGroups(grouping, options = {}) {
 
 async function loadResults() {
     try {
+        const advancedBranch = String(
+            document.getElementById('ypokatasthma_stathera_advanced')?.value ||
+            document.getElementById('ypokatasthma')?.tomselect?.getValue?.() ||
+            document.getElementById('ypokatasthma')?.value ||
+            ''
+        ).trim();
+        const branchValidation = document.getElementById('advancedBranchValidation');
+        const invalidBranch =
+            !advancedBranch ||
+            advancedBranch.toUpperCase() === 'ALL' ||
+            advancedBranch.includes(',');
+        branchValidation?.classList.toggle('d-none', !invalidBranch);
+        if (invalidBranch) return;
+
         currentAtomicRepoTransferProjection = null;
         renderPolicyPreviewGroups(null, { loading: true });
 
         const params = new URLSearchParams({
             apo_hmeromhnia: document.getElementById('apo_hmeromhnia')?.value || '',
             eos_hmeromhnia: document.getElementById('eos_hmeromhnia')?.value || '',
-            ypokatasthma: document.getElementById('ypokatasthma')?.value || '',
+            ypokatasthma: advancedBranch,
             kodikos: document.getElementById('kodikos')?.value || '',
             only_apologistiko: document.getElementById('only_apologistiko')?.checked || false,
             only_nyxta: document.getElementById('only_nyxta')?.checked || false,

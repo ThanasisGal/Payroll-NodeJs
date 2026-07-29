@@ -14449,6 +14449,39 @@ body.loader-active > *:not(.app-loader) {
     background: #f3f0ff;
 }
 
+.applied-repo-transfer-history {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #a3cfbb;
+    border-radius: 0.75rem;
+    background: var(--bs-success-bg-subtle, #d1e7dd);
+}
+
+.applied-repo-transfer-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.applied-repo-transfer-item {
+    padding: 0.75rem;
+    border: 1px solid #badbcc;
+    border-radius: 0.625rem;
+    background: #fff;
+}
+
+.employment-review-advanced-branch {
+    padding-right: 2.25rem;
+}
+
+@media (max-width: 767.98px) {
+    .employment-review-advanced-branch {
+        padding-right: calc(var(--bs-gutter-x) * 0.5);
+    }
+}
+
 .hr-review-day h5 {
     margin-bottom: 0.35rem;
 }

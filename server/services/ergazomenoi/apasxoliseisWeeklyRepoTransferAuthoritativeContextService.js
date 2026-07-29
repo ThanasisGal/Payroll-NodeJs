@@ -23,7 +23,7 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     'ores_prostheths_ergasias_apologistika ores_apoysias_apologistika';
 
 const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
-    '_id kodikos ypokatasthma energos archived updatedAt ' +
+    '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'typos_ergazomenon dialleima_entos_ektos_orarioy dialleima_se_lepta';

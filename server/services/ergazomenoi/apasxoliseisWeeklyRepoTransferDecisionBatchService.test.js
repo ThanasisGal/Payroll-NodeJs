@@ -260,8 +260,45 @@ async function testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData() 
 
 async function testResolvedProjectionReturnsAppliedOnlyRecord() {
     const decisionId = new mongoose.Types.ObjectId();
-    const decision = { _id: decisionId, proposal_id: 'resolved-proposal', snapshot_fingerprint: 'old', decision_code: 'APPROVE_PROPOSAL', decision_status: 'RECORDED', week_start: date('2026-07-06', 0), week_end: date('2026-07-06', 6), created_by_user_name: '<HR>', request_id: 'secret', command_identity: 'secret', canonical_snapshot: { secret: true } };
-    const execution = { _id: new mongoose.Types.ObjectId(), decision_id: decisionId, proposal_id: decision.proposal_id, execution_status: 'APPLIED', applied_at: new Date('2026-07-15'), created_by_user_name: '<Executor>', before_snapshot: { secret: true }, after_snapshot: { secret: true }, request_id: 'secret', command_identity: 'secret' };
+    const sourceId = new mongoose.Types.ObjectId();
+    const targetId = new mongoose.Types.ObjectId();
+    const decision = {
+        _id: decisionId,
+        proposal_id: 'resolved-proposal',
+        snapshot_fingerprint: 'old',
+        decision_code: 'APPROVE_PROPOSAL',
+        decision_status: 'RECORDED',
+        employee_kodikos: '0001',
+        source_prodhlomena_oraria_id: sourceId,
+        target_prodhlomena_oraria_id: targetId,
+        week_start: date('2026-07-06', 0),
+        week_end: date('2026-07-06', 6),
+        created_by_user_name: '<HR>',
+        request_id: 'secret',
+        command_identity: 'secret',
+        canonical_snapshot: {
+            source: { prodhlomena_oraria_id: sourceId, hmeromhnia: '2026-07-06' },
+            target: { prodhlomena_oraria_id: targetId, hmeromhnia: '2026-07-10' }
+        }
+    };
+    const execution = {
+        _id: new mongoose.Types.ObjectId(),
+        decision_id: decisionId,
+        proposal_id: decision.proposal_id,
+        execution_status: 'APPLIED',
+        applied_at: new Date('2026-07-15'),
+        created_by_user_name: '<Executor>',
+        before_snapshot: { secret: true },
+        after_snapshot: {
+            source: { kathgoria_ergasias_apologistika: 'ΕΡΓ' },
+            target: {
+                kathgoria_ergasias_apologistika: 'ΑΝ',
+                repo_apologistika: true
+            }
+        },
+        request_id: 'secret',
+        command_identity: 'secret'
+    };
     const deps = dependencies([], [decision], [execution]);
     const result = await loadWeeklyRepoTransferDecisionBatch({ session, filters: { apo_hmeromhnia: '2026-07-06', eos_hmeromhnia: '2026-07-12', ypokatasthma: '0000' }, ...deps });
     assert.strictEqual(result.current_groups_count, 0);
@@ -270,9 +307,65 @@ async function testResolvedProjectionReturnsAppliedOnlyRecord() {
     assert.strictEqual(result.records[0].apply_state, 'ALREADY_APPLIED');
     assert.strictEqual(result.records[0].current_decision, null);
     assert.strictEqual(result.records[0].history[0].is_current, false);
+    assert.deepStrictEqual(result.records[0].applied_history, {
+        decision_id: String(decisionId),
+        execution_id: String(execution._id),
+        proposal_id: 'resolved-proposal',
+        employee_id: '',
+        employee_kodikos: '0001',
+        employee_name: '',
+        week_start: decision.week_start,
+        week_end: decision.week_end,
+        source: {
+            prodhlomena_oraria_id: String(sourceId),
+            hmeromhnia: '2026-07-06',
+            result: 'ΕΡΓ'
+        },
+        target: {
+            prodhlomena_oraria_id: String(targetId),
+            hmeromhnia: '2026-07-10',
+            result: 'ΑΝ',
+            repo_apologistika: true
+        },
+        applied_at: execution.applied_at,
+        applied_by_user_name: '<Executor>'
+    });
     assert.strictEqual(deps.counter.decisions, 1);
     assert.strictEqual(deps.counter.executions, 1);
     for (const secret of ['canonical_snapshot','request_id','command_identity','before_snapshot','after_snapshot']) assert.ok(!JSON.stringify(result).includes(secret));
+}
+
+async function testEmployeeFilterScopesAppliedHistory() {
+    const decision = {
+        _id: new mongoose.Types.ObjectId(),
+        proposal_id: 'employee-scoped',
+        snapshot_fingerprint: 'old',
+        decision_code: 'APPROVE_PROPOSAL',
+        decision_status: 'RECORDED',
+        employee_kodikos: '0001',
+        week_start: date('2026-07-06', 0),
+        week_end: date('2026-07-06', 6),
+        canonical_snapshot: {}
+    };
+    const execution = {
+        _id: new mongoose.Types.ObjectId(),
+        decision_id: decision._id,
+        execution_status: 'APPLIED',
+        after_snapshot: {},
+        applied_at: new Date('2026-07-15')
+    };
+    const deps = dependencies([], [decision], [execution]);
+    await loadWeeklyRepoTransferDecisionBatch({
+        session,
+        filters: {
+            apo_hmeromhnia: '2026-07-06',
+            eos_hmeromhnia: '2026-07-12',
+            ypokatasthma: '0000',
+            kodikos: '0001'
+        },
+        ...deps
+    });
+    assert.strictEqual(deps.counter.filters.decisions.employee_kodikos, '0001');
 }
 
 async function testTwentyPeriodDecisionsUseTwoConstantQueries() {
@@ -361,6 +454,7 @@ async function run() {
     await testReadyAndHistoricalExecutionPrecedence();
     await testApprovedCapabilityFailsClosedForRuntimeIndexesAndStaleData();
     await testResolvedProjectionReturnsAppliedOnlyRecord();
+    await testEmployeeFilterScopesAppliedHistory();
     await testTwentyPeriodDecisionsUseTwoConstantQueries();
     await testFilterAndScopeRejections();
     await testFirstCrossMonthWeekUsesMondayReadContextOnly();

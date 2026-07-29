@@ -163,6 +163,67 @@ function getVisibleText(html) {
         .trim();
 }
 
+function testPersistedRepoCategoryOverridesDerivedLeave() {
+    const applied = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΕΡΓ',
+        cards_ores_ergasias: 0,
+        noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        kathgoria_ergasias_apologistika: 'ΑΝ',
+        repo_apologistika: true,
+        adeia_apologistika: false
+    }, { apologistikoText: '' });
+    assert.strictEqual(applied.text, 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ');
+    assert.strictEqual(applied.className, 'cell-repo-day');
+    assert.strictEqual(applied.source, 'persisted');
+
+    const derived = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias: 'ΕΡΓ',
+        cards_ores_ergasias: 0,
+        noCardsDisplayStatus: 'ΑΔΕΙΑ',
+        kathgoria_ergasias_apologistika: '',
+        repo_apologistika: false
+    }, { apologistikoText: '' });
+    assert.strictEqual(derived.text, 'ΑΔΕΙΑ');
+    assert.strictEqual(derived.className, 'cell-no-card-adeia');
+    assert.strictEqual(derived.source, 'derived');
+}
+
+function testAppliedHistoryRendersWithoutCurrentProjectionGroup() {
+    vm.runInContext(`currentRepoTransferDecisionsByProposalId = new Map([[
+        'resolved-proposal',
+        {
+            apply_state: 'ALREADY_APPLIED',
+            can_apply: false,
+            current_execution: { execution_status: 'APPLIED' },
+            applied_history: {
+                execution_id: 'execution-1',
+                employee_name: 'Δοκιμή Εργαζομένου',
+                employee_kodikos: '0001',
+                week_start: '2026-06-22',
+                week_end: '2026-06-28',
+                source: { hmeromhnia: '2026-06-22', result: 'ΕΡΓ' },
+                target: { hmeromhnia: '2026-06-26', result: 'ΑΝ', repo_apologistika: true },
+                applied_at: '2026-07-29T04:00:00.000Z',
+                applied_by_user_name: 'Admin'
+            }
+        }
+    ]]); currentHrReviewProjection = { groups: [] }`, sandbox);
+    const html = sandbox.renderAppliedRepoTransferHistory();
+    assertContains(html, [
+        'Εφαρμοσμένες μεταφορές ρεπό',
+        'Εφαρμόστηκε',
+        'Δοκιμή Εργαζομένου',
+        '0001',
+        '22/06/2026',
+        '26/06/2026',
+        'ΕΡΓ',
+        'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ'
+    ]);
+    assert.ok(!html.includes('hr-review-apply-btn'));
+    assert.ok(!html.includes('hr-review-decision-btn'));
+    assert.strictEqual(sandbox.window.EmploymentReviewHrTest.diagnostics().pendingGroups, 0);
+}
+
 function testReadyFullTimeAndSplitShift() {
     const html = render(readyProjection());
     assertContains(html, [
@@ -1893,6 +1954,8 @@ async function testHrLoadingLocksAndRestoresFilters() {
 }
 
 const tests = [
+    testPersistedRepoCategoryOverridesDerivedLeave,
+    testAppliedHistoryRendersWithoutCurrentProjectionGroup,
     testReadyFullTimeAndSplitShift,
     testNoTargetFallbackIsInformationalOnly,
     testNoTargetGuidanceComesOnlyFromServer,

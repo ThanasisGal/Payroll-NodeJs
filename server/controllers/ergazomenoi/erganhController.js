@@ -3350,14 +3350,16 @@ function reviewProgramDisplay(row = {}) {
 }
 
 function reviewApologistikoDisplay(row = {}) {
-    const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
-    if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
-        return { text: noCardsDisplayStatus, type: `no_cards_${noCardsDisplayStatus}` };
-    }
-
     const effectiveKathgoria = reviewEffectiveKathgoria(row);
     const hasNoCards = reviewNum(row.cards_ores_ergasias) === 0;
     const isFullTimeProfile = reviewIsFullTimeProfile(row);
+
+    if (
+        row.repo_apologistika === true ||
+        String(row.kathgoria_ergasias_apologistika || '').trim() === 'ΑΝ'
+    ) {
+        return { text: 'ΑΝΑΠΑΥΣΗ / ΡΕΠΟ', type: 'repo' };
+    }
 
     if (
         row.apologistiko_biblio === true &&
@@ -3377,8 +3379,22 @@ function reviewApologistikoDisplay(row = {}) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
     }
 
+    const persistedCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+    if (!persistedCategory) {
+        const noCardsDisplayStatus = String(row.noCardsDisplayStatus || '').trim();
+        if (noCardsDisplayStatus === 'ΑΔΕΙΑ' || noCardsDisplayStatus === 'ΑΡΓΙΑ') {
+            return {
+                text: noCardsDisplayStatus,
+                type: `no_cards_${noCardsDisplayStatus}`
+            };
+        }
+    }
+
     const intervals = reviewIntervals(row, 'apo_ora', 'eos_ora', '_apologistika');
     if (intervals) return { text: intervals, type: 'apologistiko' };
+    if (persistedCategory) return { text: persistedCategory, type: 'persisted' };
 
     if (String(row.kathgoria_adeias_apologistika || '').trim()) {
         return { text: '-', type: 'adeia_suggestion' };
