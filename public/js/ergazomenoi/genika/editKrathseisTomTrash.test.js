@@ -184,6 +184,42 @@ test('edit Κρατήσεις markup owns exactly ten external trash3 controls',
     assert.match(cssSource, /#editKrathseisTomDropdownScope \.edit-employee-tom-trash/);
 });
 
+test('each main-row trash3 is rendered after its AMA input', () => {
+    for (let index = 1; index <= 7; index += 1) {
+        const idNum = String(index).padStart(2, '0');
+        const amaPosition = renderedView.indexOf(`id="ama_krathshs_${idNum}"`);
+        const trashPosition = renderedView.indexOf(
+            `data-tom-target="select_krathsh_${idNum}"`
+        );
+        assert.ok(amaPosition >= 0);
+        assert.ok(trashPosition > amaPosition);
+    }
+});
+
+test('AMA header uses the exact data-row columns and excludes the trash column', () => {
+    const headerEnd = renderedView.indexOf(
+        '<div class="row form-group g-3 align-items-center mb-1">'
+    );
+    const header = renderedView.slice(
+        renderedView.indexOf(
+            '<div class="row form-group g-3 align-items-center bg-3d4e001e'
+        ),
+        headerEnd
+    );
+    const positions = [
+        header.indexOf('class="col-1 text-center"'),
+        header.indexOf('class="col-8 text-center"'),
+        header.indexOf('class="col-0-2"'),
+        header.indexOf('class="col-1-5 text-center"'),
+        header.indexOf('class="col-0-3"')
+    ];
+
+    assert.ok(positions.every((position) => position >= 0));
+    assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+    assert.match(header, /class="col-1-5 text-center"[\s\S]*Α\.Μ\.Α\./);
+    assert.doesNotMatch(header, /margin-left|translateX|position:\s*absolute/);
+});
+
 test('preselected, empty and newly selected values synchronize trash visibility', () => {
     const harness = createHarness();
     assert.equal(syncKrathseisExternalTrash(harness.scope, harness.select.id), true);
