@@ -2,12 +2,18 @@ const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 
 const fs = require('fs-extra');
+const path = require('path');
 
 const Models_A = require('../../models/param');
 const Models_B = require('../../models/privileges');
 const Models_C = require('../../models/companies');
 const UserModel = require('../../models/userModel');
 const Models = require('../../models/stathera_arxeia');
+const {
+    CompanyUpdateValidationError,
+    CompanyUsersRequiredError,
+    normalizeCompanyUpdatePayload
+} = require('../../services/companies/companyUpdateNormalization');
 
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -26,6 +32,14 @@ const {
     EmmesosErgodothsModel,
     DiadoxosErgodothsModel
 } = Models;
+
+const relatedUpdateModels = Object.freeze({
+    texnikosAsfaleias: TexnikosAsfaleiasModel,
+    iatrosErgasias: IatrosErgasiasModel,
+    logisths: LogisthsModel,
+    emmesosErgodoths: EmmesosErgodothsModel,
+    diadoxosErgodoths: DiadoxosErgodothsModel
+});
 
 let redir,
     sTerm = '';
@@ -67,10 +81,35 @@ async function upsertSafe(Model, filter, set, setOnInsert = {}, options = {}) {
     } catch (e) {
         // handle race: second writer may see E11000
         if (e?.code === 11000) {
-            return await Model.findOneAndUpdate(filter, { $set: set }, { new: true }).exec();
+            return await Model.findOneAndUpdate(
+                filter,
+                { $set: set },
+                { new: true, ...options }
+            ).exec();
         }
         throw e;
     }
+}
+
+async function supportsTransactions(connection = mongoose.connection) {
+    try {
+        const hello = await connection.db.admin().command({ hello: 1 });
+        return Boolean(
+            (hello.setName || hello.msg === 'isdbgrid') &&
+                Number(hello.logicalSessionTimeoutMinutes) > 0
+        );
+    } catch (_) {
+        return false;
+    }
+}
+
+function logCompanyUpdateError(stage, error) {
+    console.error('[COMPANY_UPDATE]', {
+        stage,
+        name: error?.name,
+        field: error?.path || error?.fieldName,
+        message: error?.message
+    });
 }
 
 /* -------------------------- controller --------------------------------- */
@@ -752,242 +791,135 @@ class companiesController {
     static postCompanyUpdate = async (req, res) => {
         const sessionUserTeam = req.companyAccessScope.effectiveTeam;
         const companyId = req.companyAccessScope.companyId;
-
-        try {
-            // ensure stamps dir exists
-            await fs.mkdir(stampsDir(sessionUserTeam), { recursive: true });
-        } catch (_) {}
-
         const formData = req.body;
-
-        const formDataValues = {
-            eponymia: normalizeStr(formData.eponymia),
-            fatherName: normalizeStr(formData.fatherName).substring(0, 3),
-            firstName: normalizeStr(formData.firstName)
-        };
-
-        const originalPath = isWindows
-            ? 'C:\\stamps\\sfragida.png'
-            : '/home/ubuntu/stamps/sfragida.png';
-        let imagePath = '';
-        if (formData.sfragida) {
-            try {
-                imagePath = await renameAndMoveImage(
-                    originalPath,
-                    companyId,
-                    formDataValues,
-                    sessionUserTeam
-                );
-            } catch (_) {
-                imagePath = '';
+        let normalized;
+        try {
+            normalized = normalizeCompanyUpdatePayload(formData);
+        } catch (error) {
+            if (error instanceof CompanyUsersRequiredError) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'COMPANY_USERS_REQUIRED',
+                    message: error.message
+                });
             }
-        }
-
-        if (!formData.selectedUsers || formData.selectedUsers.length === 0) {
-            return res.json({
+            if (error instanceof CompanyUpdateValidationError) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'COMPANY_UPDATE_VALIDATION_ERROR',
+                    message: error.message
+                });
+            }
+            logCompanyUpdateError('COMPANY_BASE_UPDATE', error);
+            return res.status(500).json({
                 success: false,
-                message: `Πρέπει να γίνει ΥΠΟΧΡΕΩΤΙΚΑ Επιλογή Χρηστών (τουλάχιστον 1), <strong> στη σελίδα Διάφορα</strong>, που θα έχουν πρόσβαση στην εταιρεία`
+                code: 'COMPANY_UPDATE_FAILED',
+                message: 'Η ενημέρωση της εταιρείας απέτυχε.'
             });
         }
 
-        const filteredDataCompany = {
-            eponymia: formData.eponymia,
-            firstname: formData.firstName,
-            fathername: formData.fatherName,
-            activity: formData.activity,
-            afm: formData.afm,
-            adt: formData.adt,
-            titlos: formData.titlos,
-            odos: formData.odos,
-            arithmos: formData.arithmos,
-            tk: formData.tk,
-            perifereia: formData.perifereies,
-            nomos: formData.nomos,
-            dhmos: formData.dhmos,
-            polh: formData.polh,
-            thlefono: formData.thlefono,
-            fax: formData.fax,
-            email: formData.email,
-            anenergh: formData.anenergh,
-            nomikh_morfh: formData.nomikhmorfh_stathera,
-            pararthma_efka: formData.pararthmaefka_stathera,
-            doy_company: formData.doy_stathera,
-            tameio1: formData.kodikos_tameioy1,
-            tameio2: formData.kodikos_tameioy2,
-            tameio3: formData.kodikos_tameioy3,
-            tameio4: formData.kodikos_tameioy4,
-            ame1: formData.ame1,
-            ame2: formData.ame2,
-            ame3: formData.ame3,
-            ame4: formData.ame4,
-            kad1: formData.koddrast1,
-            kad2: formData.koddrast2,
-            kad3: formData.koddrast3,
-            kad4: formData.koddrast4,
-            kad5: formData.koddrast5,
-            kad6: formData.koddrast6,
-            texnikos_asfaleias: formData.kod_ta,
-            iatros_ergasias: formData.kod_ia,
-            logisths: formData.kod_lo,
-            doy_logisth: formData.doy_logisths,
-            emmesos_ergodoths: formData.kod_em_erg,
-            diadoxos_ergodoths: formData.kod_diad_erg,
-            oikodomika: formData.oikodomika,
-            doropasxa_apd: formData.doropasxa_apd,
-            doroxrist_apd: formData.doroxrist_apd,
-            ypologismos_epi_pragmatikoy_oromisthioy:
-                formData.ypologismos_epi_pragmatikoy_oromisthioy,
-            apasxolhsh_kata_tis_argies: formData.apasxolhsh_kata_tis_argies,
-            leitoyrgia_stis_mh_ypoxreotikes_argies:
-                formData.leitoyrgia_stis_mh_ypoxreotikes_argies === true,
-            apousies_epireazoun_asfalistikes_hmeres:
-                formData.apousies_epireazoun_asfalistikes_hmeres === true,
-            apoysies_meionoyn_apodoxes: formData.apoysies_meionoyn_apodoxes === true,
-            hmeromhnia_payshs_polyetias_apo: formData.hmeromhnia_payshs_polyetias_apo,
-            hmeromhnia_payshs_polyetias_eos: formData.hmeromhnia_payshs_polyetias_eos,
-            xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta:
-                formData.xronos_epitrepomenhs_proorhs_apoxorhshs_se_lepta,
-            tropos_ypologismoy_pragmatikoy_oromisthioy:
-                formData.tropos_ypologismoy_pragmatikoy_oromisthioy,
-            keimeno_exoflhshs: formData.keimeno_exoflhshs,
-            users: formData.selectedUsers,
-            sfragida: formData.sfragida,
-            ...(imagePath ? { imagePath } : {})
+        const team = normalizeUpper(sessionUserTeam);
+        let stage = 'COMPANY_BASE_UPDATE';
+
+        const executeWrites = async (session = null) => {
+            const options = { new: true, runValidators: true, ...(session ? { session } : {}) };
+            stage = 'COMPANY_BASE_UPDATE';
+            const updatedCompany = await CompaniesModel.findOneAndUpdate(
+                { _id: companyId, team: req.companyAccessScope.companyTeamFilter },
+                { $set: normalized.company },
+                options
+            ).exec();
+            if (!updatedCompany) {
+                const notFound = new Error('Company not found in scoped update');
+                notFound.code = 'COMPANY_NOT_FOUND';
+                throw notFound;
+            }
+
+            for (const operation of normalized.relatedOperations) {
+                stage = operation.stage;
+                const Model = relatedUpdateModels[operation.modelKey];
+                await upsertSafe(
+                    Model,
+                    { team, kodikos: operation.kod },
+                    operation.payload,
+                    { team, kodikos: operation.kod },
+                    session ? { session } : {}
+                );
+            }
         };
 
+        let session;
         try {
-            await CompaniesModel.findOneAndUpdate(
-                { _id: companyId, team: req.companyAccessScope.companyTeamFilter },
-                { $set: filteredDataCompany },
-                { new: true }
-            ).exec();
-        } catch (error) {
-            console.error(error);
-            return res.status(500).json({ success: false, message: 'Σφάλμα ενημέρωσης εταιρείας' });
-        }
-
-        // related upserts (race-safe)
-        const team = normalizeUpper(sessionUserTeam);
-
-        const upserts = [];
-
-        if (normalizeStr(formData.kod_ta)) {
-            const kod = normalizeUpper(formData.kod_ta);
-            upserts.push(
-                upsertSafe(
-                    TexnikosAsfaleiasModel,
-                    { team, kodikos: kod },
-                    {
-                        eponymo: formData.eponymo_ta,
-                        onoma: formData.onoma_ta,
-                        afm: formData.afm_ta,
-                        dieythynsh: formData.dieythynsh_ta,
-                        thlefono: formData.thlefono_ta,
-                        ores: formData.ores_ta,
-                        ap_katatheshs: formData.ap_katatheshs_ta,
-                        hmnia_katatheshs: formData.hmnia_katatheshs_ta,
-                        isxyei_eos: formData.isxyei_eos_ta
-                    },
-                    { team, kodikos: kod }
-                )
-            );
-        }
-
-        if (normalizeStr(formData.kod_ia)) {
-            const kod = normalizeUpper(formData.kod_ia);
-            upserts.push(
-                upsertSafe(
-                    IatrosErgasiasModel,
-                    { team, kodikos: kod },
-                    {
-                        eponymo: formData.eponymo_ia,
-                        onoma: formData.onoma_ia,
-                        afm: formData.afm_ia,
-                        dieythynsh: formData.dieythynsh_ia,
-                        thlefono: formData.thlefono_ia,
-                        ores: formData.ores_ia,
-                        ap_katatheshs: formData.ap_katatheshs_ia,
-                        hmnia_katatheshs: formData.hmnia_katatheshs_ia,
-                        isxyei_eos: formData.isxyei_eos_ia
-                    },
-                    { team, kodikos: kod }
-                )
-            );
-        }
-
-        if (normalizeStr(formData.kod_lo)) {
-            const kod = normalizeUpper(formData.kod_lo);
-            upserts.push(
-                upsertSafe(
-                    LogisthsModel,
-                    { team, kodikos: kod },
-                    {
-                        eponymo: formData.eponymo_lo,
-                        onoma: formData.onoma_lo,
-                        afm: formData.afm_lo,
-                        dieythynsh: formData.dieythynsh_lo,
-                        thlefono: formData.thlefono_lo,
-                        doy: formData.doy_logisths,
-                        arithmos_adeias: formData.arithmos_adeias_lo,
-                        kathgoria_adeias: formData.kathgoria_adeias_lo
-                    },
-                    { team, kodikos: kod }
-                )
-            );
-        }
-
-        if (normalizeStr(formData.kod_em_erg)) {
-            const kod = normalizeUpper(formData.kod_em_erg);
-            upserts.push(
-                upsertSafe(
-                    EmmesosErgodothsModel,
-                    { team, kodikos: kod },
-                    {
-                        eponymo: formData.eponymo_em_erg,
-                        onoma: formData.onoma_em_erg,
-                        dieythynsh: formData.dieythynsh_em_erg,
-                        thlefono: formData.thlefono_em_erg,
-                        afm: formData.afm_em_erg,
-                        titlos: formData.titlos_em_erg,
-                        nomikhMorfh: formData.nomikhmorfh_emmesoyErgodoth,
-                        drasthriothta: formData.drasthriothta_em_erg,
-                        email: formData.email_em_erg,
-                        daneismosApo: formData.daneismos_epa_apo_em_erg,
-                        daneismosEos: formData.daneismos_epa_eos_em_erg
-                    },
-                    { team, kodikos: kod }
-                )
-            );
-        }
-
-        if (normalizeStr(formData.kod_diad_erg)) {
-            const kod = normalizeUpper(formData.kod_diad_erg);
-            upserts.push(
-                upsertSafe(
-                    DiadoxosErgodothsModel,
-                    { team, kodikos: kod },
-                    {
-                        eponymo: formData.eponymo_diad_erg,
-                        onoma: formData.onoma_diad_erg,
-                        dieythynsh: formData.dieythynsh_diad_erg,
-                        thlefono: formData.thlefono_diad_erg,
-                        afm: formData.afm_diad_erg,
-                        titlos: formData.titlos_diad_erg,
-                        nomikhMorfh: formData.nomikhmorfh_diadoxoyErgodoth,
-                        drasthriothta: formData.drasthriothta_diad_erg,
-                        email: formData.email_diad_erg
-                    },
-                    { team, kodikos: kod }
-                )
-            );
-        }
-
-        try {
-            await Promise.all(upserts);
+            if (await supportsTransactions()) {
+                session = await mongoose.connection.startSession();
+                await session.withTransaction(() => executeWrites(session));
+            } else {
+                await executeWrites();
+            }
+            if (formData.sfragida) {
+                const originalPath = isWindows
+                    ? 'C:\\stamps\\sfragida.png'
+                    : '/home/ubuntu/stamps/sfragida.png';
+                let movedPath;
+                try {
+                    await fs.mkdir(stampsDir(sessionUserTeam), { recursive: true });
+                    movedPath = await renameAndMoveImage(
+                        originalPath,
+                        companyId,
+                        {
+                            eponymia: normalizeStr(formData.eponymia),
+                            fatherName: normalizeStr(formData.fatherName).substring(0, 3),
+                            firstName: normalizeStr(formData.firstName)
+                        },
+                        sessionUserTeam
+                    );
+                    stage = 'COMPANY_SFRAGIDA_PATH_UPDATE';
+                    const stampUpdated = await CompaniesModel.findOneAndUpdate(
+                        { _id: companyId, team: req.companyAccessScope.companyTeamFilter },
+                        { $set: { imagePath: movedPath } },
+                        { new: true, runValidators: true }
+                    ).exec();
+                    if (!stampUpdated) {
+                        const notFound = new Error('Company not found during stamp path update');
+                        notFound.code = 'COMPANY_NOT_FOUND';
+                        throw notFound;
+                    }
+                } catch (error) {
+                    if (movedPath) {
+                        try {
+                            await fs.rename(movedPath, originalPath);
+                        } catch (compensationError) {
+                            logCompanyUpdateError('COMPANY_SFRAGIDA_COMPENSATION', compensationError);
+                        }
+                        throw error;
+                    }
+                }
+            }
             return res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {
-            console.error(error);
-            return res.status(500).json({ success: false, message: 'Σφάλμα ενημέρωσης' });
+            logCompanyUpdateError(stage, error);
+            if (error?.code === 'COMPANY_NOT_FOUND') {
+                return res.status(404).json({
+                    success: false,
+                    code: 'COMPANY_NOT_FOUND',
+                    message: 'Η εταιρεία δεν βρέθηκε ή δεν είναι διαθέσιμη στον χρήστη.'
+                });
+            }
+            if (error instanceof CompanyUpdateValidationError || error?.name === 'CastError') {
+                const fieldName = error.fieldName || error.path || 'άγνωστο';
+                return res.status(400).json({
+                    success: false,
+                    code: 'COMPANY_UPDATE_VALIDATION_ERROR',
+                    message: `Μη έγκυρη τιμή στο πεδίο ${fieldName}.`
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                code: 'COMPANY_UPDATE_FAILED',
+                message: 'Η ενημέρωση της εταιρείας απέτυχε.'
+            });
+        } finally {
+            if (session) await session.endSession();
         }
     };
 

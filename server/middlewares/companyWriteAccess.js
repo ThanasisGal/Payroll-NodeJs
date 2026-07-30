@@ -3,6 +3,7 @@ const { CompaniesModel, AntistoixiseisModel } = require('../models/companies');
 const UserModel = require('../models/userModel');
 const {
     CANONICAL_ALL_TEAMS_CODE,
+    buildManagedUserFilter,
     normalizeRequiredUserTeam,
     normalizeUserTeam
 } = require('../services/userTeamScopeService');
@@ -90,13 +91,25 @@ function companyScopeObject(req, company, effectiveTeam) {
 
 function handleScopeError(error, res) {
     const status = Number(error?.status) || 500;
+    if (error?.code === 'COMPANY_USERS_REQUIRED') {
+        return res.status(400).json({
+            success: false,
+            code: 'COMPANY_USERS_REQUIRED',
+            message: 'Πρέπει να επιλεγεί τουλάχιστον ένας χρήστης στη σελίδα «Διάφορα».'
+        });
+    }
     if (status === 500) return sendError(res, 500, 'Σφάλμα ελέγχου πρόσβασης');
     return sendError(res, status, status === 400 ? 'Μη έγκυρα δεδομένα' : 'Δεν βρέθηκε πόρος');
 }
 
 function validateSelectedUsers(body) {
-    if (!Array.isArray(body.selectedUsers) || body.selectedUsers.length === 0 ||
-        body.selectedUsers.length > MAX_SELECTED_USERS) {
+    if (!Array.isArray(body.selectedUsers) || body.selectedUsers.length === 0) {
+        throw Object.assign(new Error('Απαιτείται χρήστης εταιρείας'), {
+            status: 400,
+            code: 'COMPANY_USERS_REQUIRED'
+        });
+    }
+    if (body.selectedUsers.length > MAX_SELECTED_USERS) {
         throw Object.assign(new Error('Μη έγκυρα δεδομένα'), { status: 400 });
     }
     const normalized = [...new Set(body.selectedUsers.map((value) => stringValue(value, {
@@ -111,10 +124,12 @@ function validateSelectedUsers(body) {
 }
 
 async function assertSelectedUsersInTeam(userIds, effectiveTeam) {
-    const users = await UserModel.find({
-        _id: { $in: userIds },
-        team: new RegExp(`^\\s*${effectiveTeam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i')
-    })
+    const objectIds = userIds.map((id) => new mongoose.Types.ObjectId(id));
+    const userFilter = {
+        _id: mongoose.trusted({ $in: objectIds }),
+        ...buildManagedUserFilter(effectiveTeam)
+    };
+    const users = await UserModel.find(userFilter)
         .select('_id')
         .lean();
     const found = new Set(users.map((user) => String(user._id)));
@@ -158,19 +173,38 @@ async function findScopedCompany(req, companyId) {
 }
 
 async function authorizeCompanyUpdate(req, res, next) {
+    let stage = 'BODY_VALIDATION';
     try {
         assertPlainBody(req);
         assertPrimitiveFields(req.body, ['selectedUsers']);
+        stage = 'COMPANY_SCOPE_LOOKUP';
         const { company, companyTeam } = await findScopedCompany(req, req.params.companyId);
+        stage = 'COMPANY_OWNERSHIP_VALIDATION';
         if (req.body._id !== undefined || req.body.team !== undefined) {
             throw Object.assign(new Error('Μη έγκυρα δεδομένα'), { status: 400 });
         }
         assertOptionalOwnershipValue(req.body, 'companyTeam', companyTeam, normalizeUserTeam);
+        stage = 'SELECTED_USERS_VALIDATION';
         const selectedUsers = validateSelectedUsers(req.body);
+        stage = 'SELECTED_USERS_SCOPE_LOOKUP';
         await assertSelectedUsersInTeam(selectedUsers, companyTeam);
         req.companyAccessScope = companyScopeObject(req, company, companyTeam);
         return next();
     } catch (error) {
+        if (!Number(error?.status)) {
+            console.error('[COMPANY_ACCESS]', {
+                stage,
+                name: error?.name,
+                code: error?.code,
+                path: error?.path,
+                message: error?.message
+            });
+            return res.status(500).json({
+                success: false,
+                code: 'COMPANY_ACCESS_CHECK_FAILED',
+                message: 'Αποτυχία ελέγχου πρόσβασης στην εταιρεία.'
+            });
+        }
         return handleScopeError(error, res);
     }
 }

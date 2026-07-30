@@ -1,4 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+function companyUpdateServerMessage(data, responseStatus) {
+    return data?.message || data?.error || `HTTP ${responseStatus} / success=${data?.success}`;
+}
+
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
     async function handleFormSubmit(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -14,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (input.checked) {
                             formData[input.name] = input.value;
                         }
+                    } else if (input.type === 'date') {
+                        formData[input.name] = input.value ? input.value.slice(0, 10) : null;
                     } else if (input.type === 'file') {
                         if (input.files.length > 0) {
                             filePromises.push(
@@ -35,9 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     formData[input.name] = input.value;
                 } else if (input.tagName === 'SELECT') {
                     if (input.multiple) {
-                        formData[input.name] = Array.from(input.selectedOptions).map(
-                            (o) => o.value
-                        );
+                        formData[input.name] = [
+                            ...new Set(
+                                Array.from(input.selectedOptions)
+                                    .map((o) => String(o.value || '').trim())
+                                    .filter(Boolean)
+                            )
+                        ];
                     } else {
                         formData[input.name] =
                             input.selectedIndex === -1
@@ -113,7 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ct.includes('application/json')) {
                 const data = await response.json();
                 if (!response.ok || !data?.success) {
-                    throw new Error(`HTTP ${response.status} / success=${data?.success}`);
+                    const serverMessage = companyUpdateServerMessage(data, response.status);
+                    throw new Error(serverMessage);
                 }
                 await Swal.fire({
                     backdrop: false, // overlay
@@ -181,3 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', handleFormSubmit);
     });
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { companyUpdateServerMessage };
+}
