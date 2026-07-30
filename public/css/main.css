@@ -11086,8 +11086,9 @@ body.loader-active > *:not(.app-loader) {
     opacity: 1 !important;
 }
 
-/* Employee edit → Αποδοχές: το μοναδικό clear action μένει έξω από το TomSelect. */
-#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash {
+/* Employee edit → Αποδοχές/Κρατήσεις: το μοναδικό clear action μένει έξω από το TomSelect. */
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash,
+#editKrathseisTomDropdownScope .edit-employee-tom-trash {
     align-self: center;
     align-items: center;
     justify-content: center;
@@ -11098,12 +11099,32 @@ body.loader-active > *:not(.app-loader) {
     z-index: 2;
 }
 
-#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash:not([hidden]) {
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash:not([hidden]),
+#editKrathseisTomDropdownScope .edit-employee-tom-trash:not([hidden]) {
     display: inline-flex;
 }
 
-#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash[hidden] {
+#editApodoxesTomDropdownScope .edit-apodoxes-tom-trash[hidden],
+#editKrathseisTomDropdownScope .edit-employee-tom-trash[hidden] {
     display: none !important;
+}
+
+#editKrathseisTomDropdownScope .edit-employee-tom-field {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: visible;
+}
+
+#editKrathseisTomDropdownScope .edit-employee-tom-field > .tom-dropdown,
+#editKrathseisTomDropdownScope .edit-employee-tom-field > .ts-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#editKrathseisTomDropdownScope .edit-employee-tom-field > .edit-employee-tom-trash {
+    flex: 0 0 auto;
+    margin-left: 0.2rem;
 }
 
 .swal-overflow {

@@ -360,7 +360,8 @@ test('trash markup, tooltip, aria and CSS remain scoped and CSP-safe', () => {
     const combinedMarkup = `${viewSource}\n${dynamicSource}`;
     assert.doesNotMatch(combinedMarkup, /\son(?:click|change)\s*=/i);
     assert.doesNotMatch(combinedMarkup, /bi bi-x-lg cdarkred/);
-    assert.match(combinedMarkup, /bi bi-trash cdarkred/);
+    assert.doesNotMatch(combinedMarkup, /bi bi-trash(?!3) cdarkred/);
+    assert.match(combinedMarkup, /bi bi-trash3 cdarkred/);
     assert.match(combinedMarkup, /Ακύρωση τρέχουσας επιλογής/);
     assert.match(combinedMarkup, /aria-label="Ακύρωση τρέχουσας επιλογής"/);
     assert.match(cssSource, /#editApodoxesTomDropdownScope \.edit-apodoxes-tom-trash/);

@@ -369,7 +369,7 @@ function generateSelectRowsOfSymbaseis() {
                     data-bs-placement="bottom"
                     data-target="stoixeio_symbashs_${idNum}"
                     hidden>
-                    <i class="bi bi-trash cdarkred"></i>
+                    <i class="bi bi-trash3 cdarkred"></i>
                 </button>
             </div>
         `;

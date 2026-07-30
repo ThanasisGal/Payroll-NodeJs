@@ -27,6 +27,7 @@
 	const safeCheck = (k) => safe(k) ? 'checked' : '';
 %>
 
+<div id="editKrathseisTomDropdownScope">
 <input type="hidden" id="krathseis_table" name="krathseis_table" value="[]" />
 
 <div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem mb-3 margin-top--1rem">
@@ -68,11 +69,22 @@
 				class="tom-dropdown left-align krathsh-select" aria-label="Κρατήσεις"
 				data-api="/api/dropdown/ergazomenoi/krathseis" single data-target-input=<%= `krathsh_${idNum}` %>
 				data-preselect=<%= `krathsh_${idNum}` %> data-preload-all="false" data-pad-length="4"
-				data-row-index="<%= idNum %>" placeholder="Αναζήτηση Κρατήσεων">
+				data-row-index="<%= idNum %>" data-external-reset="true" placeholder="Αναζήτηση Κρατήσεων">
 			</select>
 		</div>
 
-		<div class="col-0-5"></div>
+		<button
+			type="button"
+			class="btn rounded-4 col-0-3 border-0 edit-employee-tom-trash edit-krathseis-tom-trash"
+			data-tom-target="select_krathsh_<%= idNum %>"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
+
+		<div class="col-0-2"></div>
 
 		<div class="col-1-5">
 			<input type="text" name="ama_krathshs_<%= idNum %>" id="ama_krathshs_<%= idNum %>" class="form-control input-contents"
@@ -112,7 +124,7 @@
 		value="<%= safe('epikoyrikh_xoris_efka') %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 edit-employee-tom-field">
 		<select
 			id="epikoyrikh_xoris_efka"
 			name="epikoyrikh_xoris_efka"
@@ -124,8 +136,18 @@
 			data-preselect=<%= `epikoyrikh_xoris_efka_stathera` %>
 			data-preload-all="true"
 			data-pad-length="2"
+			data-external-reset="true"
 			placeholder="Αναζήτηση Φορέα Επικουρικής Ασφάλισης εκτός e-ΕΦΚΑ">
 		</select>
+		<button type="button"
+			class="btn rounded-4 border-0 edit-employee-tom-trash edit-krathseis-tom-trash"
+			data-tom-target="epikoyrikh_xoris_efka"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
 
 	<div class="col-0-25"></div>
@@ -138,7 +160,7 @@
 		value="<%= safe('astheneia_xoris_efka') %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 edit-employee-tom-field">
 		<select
 			id="astheneia_xoris_efka"
 			name="astheneia_xoris_efka"
@@ -150,8 +172,18 @@
 			data-preselect=<%= `astheneia_xoris_efka_stathera` %>
 			data-preload-all="true"
 			data-pad-length="2"
+			data-external-reset="true"
 			placeholder="Αναζήτηση Φορέα Ασθένειας εκτός e-ΕΦΚΑ">
 		</select>
+		<button type="button"
+			class="btn rounded-4 border-0 edit-employee-tom-trash edit-krathseis-tom-trash"
+			data-tom-target="astheneia_xoris_efka"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
 
 	<div class="col-0-25"></div>
@@ -164,7 +196,7 @@
 		value="<%= safe('idiothta_sto_ergo_39') %>"
 	/>
 
-	<div class="col-3-75">
+	<div class="col-3-75 edit-employee-tom-field">
 		<select
 			id="idiothta_sto_ergo_39"
 			name="idiothta_sto_ergo_39"
@@ -176,7 +208,18 @@
 			data-preselect=<%= `idiothta_sto_ergo_39_stathera` %>
 			data-preload-all="true"
 			data-pad-length="2"
+			data-external-reset="true"
 			placeholder="Αναζήτηση Ιδιότητας αντισυμβαλλόμενου στο έργο αρ.39  παρ.9">
 		</select>
+		<button type="button"
+			class="btn rounded-4 border-0 edit-employee-tom-trash edit-krathseis-tom-trash"
+			data-tom-target="idiothta_sto_ergo_39"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
+</div>
 </div>

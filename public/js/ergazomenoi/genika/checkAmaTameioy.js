@@ -1,159 +1,131 @@
-document.addEventListener('DOMContentLoaded', function () {
-    // ✅ Άκουσε το native change event του select
-    const selectElements = document.querySelectorAll('.krathsh-select');
+const KRATHSEIS_ROW_COUNT = 7;
 
-    selectElements.forEach((selectEl) => {
-        const rowIndex = selectEl.dataset.rowIndex;
+function krathshRowId(index) {
+    return String(index).padStart(2, '0');
+}
 
-        // ✅ NATIVE change event (όχι Tom-Select custom)
-        selectEl.addEventListener('change', function (e) {
-            if (selectEl.value) {
-                handleKrathshChange(rowIndex, selectEl.value);
-            }
+function getKrathshSelectionForRow(rowIndex) {
+    const idNum = krathshRowId(rowIndex);
+    const selectEl = document.getElementById(`select_krathsh_${idNum}`);
+    const tom = selectEl?.tomselect;
+    const value = tom?.getValue?.() || selectEl?.value || '';
+    const normalizedValue = Array.isArray(value) ? value[0] || '' : value;
+    const option = normalizedValue ? tom?.options?.[normalizedValue] : null;
+    if (!normalizedValue || !option) return null;
+    return { idNum, selectEl, tom, value: normalizedValue, option };
+}
+
+function getSelectedKrathshRows() {
+    const rows = [];
+    for (let index = 1; index <= KRATHSEIS_ROW_COUNT; index += 1) {
+        const selection = getKrathshSelectionForRow(index);
+        if (selection) rows.push(selection);
+    }
+    return rows;
+}
+
+function rebuildKrathseisTableFromRows() {
+    const tableInput = document.getElementById('krathseis_table');
+    if (!tableInput) return [];
+
+    const byTameio = new Map();
+    getSelectedKrathshRows().forEach(({ option }) => {
+        const kodikosTameioy = String(option.kodikos_tameioy || '').padStart(4, '0');
+        if (!kodikosTameioy || kodikosTameioy === '0000' || byTameio.has(kodikosTameioy)) {
+            return;
+        }
+        byTameio.set(kodikosTameioy, {
+            kodikos: String(option.kodikos || '').padStart(4, '0'),
+            kodikos_tameioy: kodikosTameioy,
+            perigrafh: option.perigrafh || ''
         });
     });
 
-    // ✅ ΝΕΟ:  Άκουσε το focus event στα ama_ inputs
-    for (let index = 1; index <= 7; index++) {
-        const idNum = index.toString().padStart(2, '0');
-        const amaInput = document.getElementById(`ama_krathshs_${idNum}`);
-
-        if (amaInput) {
-            amaInput.addEventListener('focus', function () {
-                handleAmaFocus(idNum);
-            });
-        }
-    }
-});
+    const tableData = [...byTameio.values()];
+    tableInput.value = JSON.stringify(tableData);
+    return tableData;
+}
 
 function handleKrathshChange(rowIndex, selectedValue) {
-    if (!selectedValue) {
-        return;
-    }
+    const idNum = krathshRowId(rowIndex);
+    const hidden = document.getElementById(`krathsh_${idNum}`);
+    if (hidden) hidden.value = selectedValue || '';
 
-    // ✅ Πάρε το Tom-Select instance από το select element
-    const selectId = `select_krathsh_${rowIndex}`;
-    const selectEl = document.getElementById(selectId);
+    const selection = getKrathshSelectionForRow(idNum);
+    const tableData = rebuildKrathseisTableFromRows();
+    if (!selection) return;
 
-    if (!selectEl || !selectEl.tomselect) {
-        console.warn('[handleKrathshChange] ⚠️ Δεν βρέθηκε Tom-Select instance για:', selectId);
-        return;
-    }
-
-    const ts = selectEl.tomselect;
-
-    // ✅ Πάρε την επιλεγμένη τιμή από Tom-Select
-    const currentValue = ts.getValue();
-    const selectedOption = ts.options[currentValue];
-    if (!selectedOption || !selectedOption.kodikos_tameioy) {
-        console.error(`❌ ΠΡΟΒΛΗΜΑ: Δεν βρέθηκε kodikos_tameioy! `);
-        console.error('  selectedOption:', selectedOption);
-        console.error(
-            '  Έχει πεδίο kodikos_tameioy;',
-            selectedOption ? Object.keys(selectedOption) : 'N/A'
-        );
-        return;
-    }
-
-    // ✅ Πάρε το κρυφό table (JSON array)
-    const tableInput = document.getElementById('krathseis_table');
-    let tableData = [];
-    try {
-        tableData = JSON.parse(tableInput.value || '[]');
-    } catch (e) {
-        console.error('❌ Σφάλμα κατά την ανάγνωση krathseis_table:', e);
-        tableData = [];
-    }
-
-    // ✅ Ελέγξε αν ήδη υπάρχει αυτός ο κωδικός ταμείου
-    const tameioBrief = {
-        kodikos: String(selectedOption.kodikos || '').padStart(4, '0'),
-        kodikos_tameioy: String(selectedOption.kodikos_tameioy || '').padStart(4, '0'),
-        perigrafh: selectedOption.perigrafh || ''
-    };
-
-    const alreadyExists = tableData.some(
-        (item) => item.kodikos_tameioy === tameioBrief.kodikos_tameioy
-    );
-
-    if (!alreadyExists) {
-        tableData.push(tameioBrief);
-        tableInput.value = JSON.stringify(tableData);
-    }
-
-    // ✅ Εκπέμψε custom event
     document.dispatchEvent(
         new CustomEvent('krathshChanged', {
-            detail: { rowIndex, selectedOption, tableData }
+            detail: { rowIndex: idNum, selectedOption: selection.option, tableData }
         })
     );
 }
 
-// ✅ ΝΕΑ ΣΥΝΑΡΤΗΣΗ: Χειρισμός του focus event του ama_ input
 function handleAmaFocus(rowIndex) {
-    // 1️⃣ Πάρε τον kodikos_tameioy της τρέχουσας γραμμής
-    const selectId = `select_krathsh_${rowIndex}`;
-    const selectEl = document.getElementById(selectId);
+    const idNum = krathshRowId(rowIndex);
+    const current = getKrathshSelectionForRow(idNum);
+    const amaInput = document.getElementById(`ama_krathshs_${idNum}`);
+    if (!current || !amaInput) return;
 
-    if (!selectEl || !selectEl.tomselect) {
+    const currentTameio = String(current.option.kodikos_tameioy || '').padStart(4, '0');
+    const source = getSelectedKrathshRows().find(({ idNum: otherId, option }) => {
+        if (otherId === idNum) return false;
+        return String(option.kodikos_tameioy || '').padStart(4, '0') === currentTameio;
+    });
+    const sourceAma = source
+        ? document.getElementById(`ama_krathshs_${source.idNum}`)
+        : null;
+
+    if (sourceAma?.value) {
+        amaInput.value = sourceAma.value;
+        amaInput.style.backgroundColor = '#f0f0f0';
+        amaInput.setAttribute('data-copied-from', `ama_krathshs_${source.idNum}`);
         return;
     }
 
-    const ts = selectEl.tomselect;
-    const currentValue = ts.getValue();
+    amaInput.style.backgroundColor = '';
+    amaInput.removeAttribute('data-copied-from');
+}
 
-    if (!currentValue) {
-        return;
-    }
-
-    const selectedOption = ts.options[currentValue];
-    const currentKodikosTameioy = selectedOption?.kodikos_tameioy;
-
-    if (!currentKodikosTameioy) {
-        console.warn('[handleAmaFocus] Δεν βρέθηκε kodikos_tameioy');
-        return;
-    }
-
-    // 2️⃣ Πάρε τον πίνακα krathseis_table
-    const tableInput = document.getElementById('krathseis_table');
-    let tableData = [];
-    try {
-        tableData = JSON.parse(tableInput.value || '[]');
-    } catch (e) {
-        console.error('[handleAmaFocus] Σφάλμα parsing:', e);
-        return;
-    }
-
-    // 3️⃣ Ψάξε αν υπάρχει άλλη γραμμή με ίδιο kodikos_tameioy
-    const otherRowIndex = tableData.findIndex((item, idx) => {
-        // Βρες αν υπάρχει άλλη γραμμή (όχι η τρέχουσα) με ίδιο kodikos_tameioy
-        const itemNum = idx + 1; // το index του πίνακα + 1
-        const itemIdNum = itemNum.toString().padStart(2, '0');
-
-        return item.kodikos_tameioy === currentKodikosTameioy && itemIdNum !== rowIndex;
+function initializeKrathseisAmaHandlers() {
+    document.querySelectorAll('.krathsh-select').forEach((selectEl) => {
+        if (selectEl.dataset.krathshChangeBound === 'true') return;
+        selectEl.dataset.krathshChangeBound = 'true';
+        selectEl.addEventListener('change', () => {
+            handleKrathshChange(selectEl.dataset.rowIndex, selectEl.value || '');
+        });
     });
 
-    const amaInput = document.getElementById(`ama_krathshs_${rowIndex}`);
-
-    if (otherRowIndex !== -1) {
-        // ✅ Υπάρχει άλλη γραμμή με ίδιο kodikos_tameioy
-        const otherRowIdNum = (otherRowIndex + 1).toString().padStart(2, '0');
-        const otherAmaInput = document.getElementById(`ama_krathshs_${otherRowIdNum}`);
-
-        if (otherAmaInput && otherAmaInput.value) {
-            amaInput.value = otherAmaInput.value;
-            // amaInput.readOnly = true;  // ✅ Απενεργοποίηση επεξεργασίας
-            amaInput.style.backgroundColor = '#f0f0f0';
-            amaInput.setAttribute('data-copied-from', `ama_krathshs_${otherRowIdNum}`);
-        } else {
-            // amaInput.readOnly = false;
-            amaInput.style.backgroundColor = '';
-            amaInput.removeAttribute('data-copied-from');
-        }
-    } else {
-        // ✅ ΔΕΝ υπάρχει άλλη γραμμή - επιτρέπεται χειροκίνητη εισαγωγή
-        // amaInput.readOnly = false;
-        amaInput.style.backgroundColor = '';
-        amaInput.removeAttribute('data-copied-from');
+    for (let index = 1; index <= KRATHSEIS_ROW_COUNT; index += 1) {
+        const idNum = krathshRowId(index);
+        const amaInput = document.getElementById(`ama_krathshs_${idNum}`);
+        if (!amaInput || amaInput.dataset.amaFocusBound === 'true') continue;
+        amaInput.dataset.amaFocusBound = 'true';
+        amaInput.addEventListener('focus', () => handleAmaFocus(idNum));
     }
+
+    rebuildKrathseisTableFromRows();
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', initializeKrathseisAmaHandlers);
+}
+
+if (typeof window !== 'undefined') {
+    window.getSelectedKrathshRows = getSelectedKrathshRows;
+    window.rebuildKrathseisTableFromRows = rebuildKrathseisTableFromRows;
+    window.handleKrathshChange = handleKrathshChange;
+    window.handleAmaFocus = handleAmaFocus;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        getKrathshSelectionForRow,
+        getSelectedKrathshRows,
+        rebuildKrathseisTableFromRows,
+        handleKrathshChange,
+        handleAmaFocus,
+        initializeKrathseisAmaHandlers
+    };
 }
