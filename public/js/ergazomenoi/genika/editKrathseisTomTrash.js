@@ -18,6 +18,21 @@ function syncKrathseisExternalTrash(scope, selectId) {
     return hasValue;
 }
 
+function syncAllEditKrathseisTrash(scope) {
+    if (!scope) return;
+    scope.querySelectorAll('select[data-external-reset="true"]').forEach((selectEl) => {
+        syncKrathseisExternalTrash(scope, selectEl.id);
+    });
+}
+
+function syncHydratedKrathseisSelect(scope, selectEl) {
+    if (!selectEl || !scope.contains(selectEl)) return;
+    syncKrathseisExternalTrash(scope, selectEl.id);
+    if (selectEl.id.startsWith(EDIT_KRATHSEIS_MAIN_PREFIX)) {
+        window.rebuildKrathseisTableFromRows?.();
+    }
+}
+
 function unlockKrathseisTom(tom) {
     tom.enable();
     tom.wrapper?.classList.remove('disabled', 'ts-disabled-selected', 'ts-locked');
@@ -74,6 +89,7 @@ async function clearEditKrathseisTom(scope, selectId) {
         tom.close();
         tom.control_input?.blur();
         selectEl.value = '';
+        selectEl.setAttribute('data-has-value', 'false');
 
         if (selectId.startsWith(EDIT_KRATHSEIS_MAIN_PREFIX)) {
             clearKrathseisRowState(selectId);
@@ -108,20 +124,23 @@ function initializeEditKrathseisTomTrash() {
         if (selectEl.dataset.externalTrashSyncBound !== 'true') {
             selectEl.dataset.externalTrashSyncBound = 'true';
             selectEl.addEventListener('change', () => {
-                if (selectEl.id.startsWith(EDIT_KRATHSEIS_MAIN_PREFIX)) {
-                    const idNum = selectEl.id.slice(EDIT_KRATHSEIS_MAIN_PREFIX.length);
-                    const hidden = document.getElementById(`krathsh_${idNum}`);
-                    if (hidden) hidden.value = krathseisTomValue(selectEl) || '';
-                    window.rebuildKrathseisTableFromRows?.();
-                }
+                selectEl.setAttribute(
+                    'data-has-value',
+                    krathseisTomValue(selectEl) ? 'true' : 'false'
+                );
                 syncKrathseisExternalTrash(scope, selectEl.id);
             });
         }
-        syncKrathseisExternalTrash(scope, selectEl.id);
     });
 
     if (scope.dataset.externalTrashOwnerBound !== 'true') {
         scope.dataset.externalTrashOwnerBound = 'true';
+        scope.addEventListener('tomdropdown:preselect-complete', (event) => {
+            const selectEl = event.target?.matches?.('select[data-external-reset="true"]')
+                ? event.target
+                : null;
+            syncHydratedKrathseisSelect(scope, selectEl);
+        });
         scope.addEventListener('click', async (event) => {
             const button = event.target.closest('[data-tom-target]');
             if (!button || !scope.contains(button) || button.dataset.clearing === 'true') return;
@@ -136,25 +155,35 @@ function initializeEditKrathseisTomTrash() {
         });
     }
 
+    if (!scope.__editKrathseisTrashObserver) {
+        scope.__editKrathseisTrashObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type !== 'attributes') return;
+                syncHydratedKrathseisSelect(scope, mutation.target);
+            });
+        });
+        scope.querySelectorAll('select[data-external-reset="true"]').forEach((selectEl) => {
+            scope.__editKrathseisTrashObserver.observe(selectEl, {
+                attributes: true,
+                attributeFilter: ['data-has-value']
+            });
+        });
+    }
+
+    syncAllEditKrathseisTrash(scope);
     window.rebuildKrathseisTableFromRows?.();
 }
 
 if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeEditKrathseisTomTrash();
-        [100, 300, 700].forEach((delay) => {
-            setTimeout(() => {
-                initializeEditKrathseisTomTrash();
-                window.rebuildKrathseisTableFromRows?.();
-            }, delay);
-        });
-    });
+    document.addEventListener('DOMContentLoaded', initializeEditKrathseisTomTrash);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         krathseisTomValue,
         syncKrathseisExternalTrash,
+        syncAllEditKrathseisTrash,
+        syncHydratedKrathseisSelect,
         reloadKrathseisTomOptions,
         clearEditKrathseisTom,
         initializeEditKrathseisTomTrash

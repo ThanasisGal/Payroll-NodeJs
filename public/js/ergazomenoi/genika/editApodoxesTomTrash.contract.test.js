@@ -321,6 +321,12 @@ test('all edit Apodoxes dropdowns own exactly one external trash contract', () =
     assert.match(dynamicSource, /container\.innerHTML = ''/);
     assert.match(dynamicSource, /container\.addEventListener\('click'/);
     assert.doesNotMatch(dynamicSource, /addEventListener\('click'[\s\S]*addEventListener\('click'/);
+
+    const basicTrashCount = (viewSource.match(/bi bi-trash3 cdarkred/g) || []).length;
+    const dynamicTrashTemplateCount = (dynamicSource.match(/bi bi-trash3 cdarkred/g) || []).length;
+    assert.equal(basicTrashCount, 3);
+    assert.match(dynamicSource, /for \(let i = 1; i <= 15; i\+\+\)/);
+    assert.equal(basicTrashCount + 15 * dynamicTrashTemplateCount, 18);
 });
 
 test('preselect, change and rehydration paths explicitly resynchronize dynamic trash', () => {

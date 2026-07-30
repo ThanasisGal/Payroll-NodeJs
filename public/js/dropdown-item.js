@@ -16,6 +16,15 @@ const debounce = (fn, d = 100) => {
     };
 };
 
+function dispatchTomDropdownPreselectComplete(el, value) {
+    el.dispatchEvent(
+        new CustomEvent('tomdropdown:preselect-complete', {
+            bubbles: true,
+            detail: { value }
+        })
+    );
+}
+
 export function attachInlineSummary(tom, el) {
     if (!tom || !el) return;
     if (tom.settings.maxItems === 1) return;
@@ -872,6 +881,7 @@ export const initTomDropdown = ({
                     }
 
                     el.setAttribute('data-has-value', 'true');
+                    dispatchTomDropdownPreselectComplete(el, values);
                     return;
                 }
 
@@ -923,6 +933,7 @@ export const initTomDropdown = ({
                     ts.setValue(id, true);
                     selectedCache[id] = normalized;
                     el.setAttribute('data-has-value', 'true');
+                    dispatchTomDropdownPreselectComplete(el, id);
 
                     // ✅ ΚΡΙΣΙΜΟ: κάλεσε τον __onItemAddChain για hydration
                     // ώστε το downstream να ενημερωθεί (lock/unlock/load)
