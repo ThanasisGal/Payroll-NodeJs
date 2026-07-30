@@ -147,28 +147,89 @@ function removeLockedTomStyle(tomInst) {
 
 function syncHiddenTarget(idNum, value = '') {
     const hiddenTarget = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+    const savedHiddenTarget = document.getElementById(`stoixeioSymbashsHidden_${idNum}`);
+    const normalizedValue = value ? pad4(value) : '';
     if (hiddenTarget) {
-        hiddenTarget.value = value ? pad4(value) : '';
+        hiddenTarget.value = normalizedValue;
     }
+    if (savedHiddenTarget) savedHiddenTarget.value = normalizedValue;
 }
 
-function clearSingleStoixeioRow(idNum) {
+function syncStoixeioRowTrash(idNum) {
+    const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+    const hiddenTarget = document.getElementById(`stoixeio_symbashs_${idNum}_hidden`);
+    const trash = document.getElementById(`clearSelectSymbaseon-${idNum}`);
+    if (!trash) return false;
+
+    let value = '';
+    try {
+        value = selectEl?.tomselect?.getValue?.() || '';
+    } catch (_) {}
+    value = String(value || selectEl?.value || hiddenTarget?.value || '').trim();
+    trash.hidden = !value;
+    return Boolean(value);
+}
+
+function reloadStoixeioRowOptions(idNum) {
+    const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
+    const tom = selectEl?.tomselect;
+    if (!selectEl || !tom) return Promise.resolve(false);
+
+    selectEl.dataset.preloadAll = 'true';
+    tom.settings._preloadAll = true;
+    tom.nextPage = null;
+
+    try {
+        tom.setTextboxValue('');
+        tom.clearFilter();
+    } catch (error) {
+        console.error(`Stoixeio row ${idNum} filter reset failed`, error);
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            try {
+                tom.off('load', finish);
+                tom.refreshOptions(false);
+                tom.enable();
+                tom.close();
+            } catch (error) {
+                console.error(`Stoixeio row ${idNum} option refresh failed`, error);
+                resolve(false);
+                return;
+            }
+            resolve(true);
+        };
+
+        try {
+            tom.on('load', finish);
+            tom.load('');
+        } catch (error) {
+            try {
+                tom.off('load', finish);
+                tom.enable();
+                tom.close();
+            } catch (_) {}
+            console.error(`Stoixeio row ${idNum} option reload failed`, error);
+            resolve(false);
+        }
+    });
+}
+
+async function clearSingleStoixeioRow(idNum) {
     const selectEl = document.getElementById(`stoixeio_symbashs_${idNum}`);
     const row = document.getElementById(`row_${idNum}`);
+    const tom = selectEl?.tomselect;
 
-    if (selectEl?.tomselect) {
-        const tom = selectEl.tomselect;
-
+    if (tom) {
         try {
             removeLockedTomStyle(tom);
             tom.ignoreFocusOpen = true;
             tom.clear(true);
             tom.clearOptions();
-            tom.refreshItems();
-            tom.refreshState();
-            tom.close();
-            tom.control_input?.blur();
-            tom.ignoreFocusOpen = false;
         } catch (_) {}
     }
 
@@ -178,6 +239,21 @@ function clearSingleStoixeioRow(idNum) {
     if (row) row.classList.remove('d-none');
 
     calculateTotal();
+    applyNomimaFromSymbashTotals();
+    syncStoixeioRowTrash(idNum);
+
+    if (tom) {
+        try {
+            await reloadStoixeioRowOptions(idNum);
+        } finally {
+            try {
+                tom.close();
+                tom.control_input?.blur();
+                tom.enable();
+            } catch (_) {}
+            tom.ignoreFocusOpen = false;
+        }
+    }
 }
 
 // ========================================================================
@@ -257,6 +333,7 @@ function generateSelectRowsOfSymbaseis() {
                         name="stoixeio_symbashs_${idNum}" 
                         id="stoixeio_symbashs_${idNum}"
                         data-target-input="stoixeio_symbashs_${idNum}_hidden"
+                        data-external-reset="true"
                         data-pad-length="4">
                     </select>
                 </div>
@@ -284,13 +361,15 @@ function generateSelectRowsOfSymbaseis() {
                         data-autocomplete-hack="true"
                     />
                 </div>
-                <button type="button" class="btn rounded-4 col-0-3 clear-row border-0" 
-                    id="clearSelectSymbaseon-${idNum}" 
-                    data-bs-toggle="tooltip" 
-                    data-bs-title="Καθαρισμός όλης της τρέχουσας γραμμής" 
-                    data-bs-placement="bottom" 
-                    data-target="stoixeio_symbashs_${idNum}">
-                    <i class="bi bi-x-lg cdarkred"></i>
+                <button type="button" class="btn rounded-4 col-0-3 clear-row edit-apodoxes-tom-trash border-0"
+                    id="clearSelectSymbaseon-${idNum}"
+                    data-bs-toggle="tooltip"
+                    data-bs-title="Ακύρωση τρέχουσας επιλογής"
+                    aria-label="Ακύρωση τρέχουσας επιλογής"
+                    data-bs-placement="bottom"
+                    data-target="stoixeio_symbashs_${idNum}"
+                    hidden>
+                    <i class="bi bi-trash3 cdarkred"></i>
                 </button>
             </div>
         `;
@@ -495,6 +574,7 @@ async function loadExistingStoixeia() {
                             if (_isStoixeioChangeInProgress) return;
 
                             syncHiddenTarget(idNum, value || '');
+                            syncStoixeioRowTrash(idNum);
 
                             if (value) {
                                 await handleStoixeioChange(idNum, value);
@@ -564,6 +644,7 @@ async function loadExistingStoixeia() {
                     try {
                         tomInst.setValue(kodikos, true);
                         syncHiddenTarget(idNum, kodikos);
+                        syncStoixeioRowTrash(idNum);
 
                         requestAnimationFrame(() => {
                             tomInst.refreshItems();
@@ -595,6 +676,8 @@ async function loadExistingStoixeia() {
                 console.error(`❌ fetch saved stoixeio failed row ${idNum}:`, err);
             }
         }
+
+        syncStoixeioRowTrash(idNum);
     }
 
     // Κρύβουμε τα rows που δεν χρειάζονται
@@ -651,7 +734,7 @@ function addEventListeners() {
             if (!rowNumMatch) return;
 
             const rowNum = rowNumMatch[0];
-            clearSingleStoixeioRow(rowNum);
+            void clearSingleStoixeioRow(rowNum);
         }
     });
 }
@@ -1595,6 +1678,7 @@ async function initializeTomSelectForStoixeia(items) {
                             if (_isStoixeioChangeInProgress) return;
 
                             syncHiddenTarget(idNum, value || '');
+                            syncStoixeioRowTrash(idNum);
 
                             if (value) {
                                 await handleStoixeioChange(idNum, value);
@@ -1614,6 +1698,7 @@ async function initializeTomSelectForStoixeia(items) {
         } catch (err) {
             console.error(`❌ Failed to init Tom-Select for ${selectId}:`, err);
         }
+        syncStoixeioRowTrash(idNum);
     }
 }
 
@@ -2266,6 +2351,7 @@ async function ensureTomSelectForManualRow(idNum) {
             onInitialize: function () {
                 this.on('change', async (value) => {
                     syncManualHiddenTarget(idNum, value || '');
+                    syncStoixeioRowTrash(idNum);
                     if (typeof handleStoixeioChange === 'function' && value) {
                         await handleStoixeioChange(idNum, value);
                     } else if (!value) {
@@ -2334,6 +2420,7 @@ async function applyExtraApodoxesToRow(idNum, extraItem, diafora) {
             } catch (_) {}
 
             tom.setValue(kodikos, true);
+            syncStoixeioRowTrash(idNum);
             tom.refreshOptions(false);
             tom.refreshItems();
             tom.refreshState();
@@ -2375,3 +2462,5 @@ function setManualExtraAmountToRow(idNum, diafora) {
 window.loadStoixeiaSymbaseonFromAPI = loadStoixeiaSymbaseonFromAPI;
 window.calculateTotal = calculateTotal;
 window.calculatePartTimeWages = calculatePartTimeWages;
+window.syncStoixeioRowTrash = syncStoixeioRowTrash;
+window.reloadStoixeioRowOptions = reloadStoixeioRowOptions;

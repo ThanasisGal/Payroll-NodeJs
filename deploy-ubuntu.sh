@@ -832,6 +832,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/getDaysFromDate.js"
     "public/js/ergazomenoi/genika/selectRepo.js"
     "public/js/ergazomenoi/genika/checkAmaTameioy.js"
+    "public/js/ergazomenoi/genika/editKrathseisTomTrash.js"
     "public/js/ergazomenoi/genika/calcChildren.js"
     "public/js/ergazomenoi/genika/autoLoadTaxScale.js"
     "public/js/ergazomenoi/genika/autoCalculateEndDate.js"

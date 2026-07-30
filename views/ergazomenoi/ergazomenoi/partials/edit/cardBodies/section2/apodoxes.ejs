@@ -1,4 +1,5 @@
 	<% const safe = (k) => (ergazomenoiData && ergazomenoiData[k]) || ''; %>
+	<div id="editApodoxesTomDropdownScope">
 
 	<input type="hidden" name="kodikosSymbashs_Kathgorias_Eidikothtas" id="kodikosSymbashs_Kathgorias_Eidikothtas" />
 
@@ -27,7 +28,7 @@
 			value="<%= safe('symbash') %>"
 		/>
 
-		<div class="col-9-8">
+		<div class="col-9-5">
 			<select
 				id="symbash"
 				name="symbash"
@@ -39,10 +40,21 @@
 				data-preselect="symbash_stathera"
 				data-preload-all="true"
 				data-pad-length="4"
+				data-external-reset="true"
 				data-skip-autoload="true"
 				placeholder="Αναζήτηση Σύμβασης">
 			</select>
 		</div>
+		<button type="button"
+			class="btn rounded-4 col-0-3 border-0 edit-apodoxes-tom-trash"
+			id="clearEditApodoxes-symbash"
+			data-tom-target="symbash"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
 
 	<div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem">
@@ -60,7 +72,7 @@
 			value="<%= safe('kathgoria_symbashs') %>"
 		/>
 
-		<div class="col-9-8">
+		<div class="col-9-5">
 			<select
 				id="kathgoria_symbashs"
 				name="kathgoria_symbashs"
@@ -73,10 +85,21 @@
 				data-extra-filter="symbash_stathera"
 				data-preload-all="true"
 				data-pad-length="4"
+				data-external-reset="true"
 				data-skip-autoload="true"
 				placeholder="Αναζήτηση Κατηγορίας Σύμβασης">
 			</select>
 		</div>
+		<button type="button"
+			class="btn rounded-4 col-0-3 border-0 edit-apodoxes-tom-trash"
+			id="clearEditApodoxes-kathgoria_symbashs"
+			data-tom-target="kathgoria_symbashs"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
 
 	<div class="row form-group g-1 align-items-center margin-left-1rem margin-top-0_1rem mb-2">
@@ -94,7 +117,7 @@
 			value="<%= safe('eidikothta_symbashs') %>"
 		/>
 
-		<div class="col-9-8">
+		<div class="col-9-5">
 			<select
 				id="eidikothta_symbashs"
 				name="eidikothta_symbashs"
@@ -108,10 +131,21 @@
 				data-extra-filter2="kathgoria_symbashs_stathera"
 				data-preload-all="true"
 				data-pad-length="4"
+				data-external-reset="true"
 				data-skip-autoload="true"
 				placeholder="Αναζήτηση Ειδικότητας Σύμβασης">
 			</select>
 		</div>
+		<button type="button"
+			class="btn rounded-4 col-0-3 border-0 edit-apodoxes-tom-trash"
+			id="clearEditApodoxes-eidikothta_symbashs"
+			data-tom-target="eidikothta_symbashs"
+			data-bs-toggle="tooltip"
+			data-bs-title="Ακύρωση τρέχουσας επιλογής"
+			aria-label="Ακύρωση τρέχουσας επιλογής"
+			hidden>
+			<i class="bi bi-trash3 cdarkred"></i>
+		</button>
 	</div>
 
 	<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem">
@@ -255,4 +289,5 @@
 		<button type="button" class="btn btn-brown rounded-4 mt-2 w-20 buttons-content" name="reCalcButton" id="reCalcButton">
 			<i class="bi bi-floppy"></i> Επανυπολογισμός Αποδοχών
 		</button>
+	</div>
 	</div>
