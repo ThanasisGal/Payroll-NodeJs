@@ -11,6 +11,7 @@ const UserModel = require('../../models/userModel');
 const Models = require('../../models/stathera_arxeia');
 const {
     CompanyUpdateValidationError,
+    CompanyUsersRequiredError,
     normalizeCompanyUpdatePayload
 } = require('../../services/companies/companyUpdateNormalization');
 
@@ -31,6 +32,14 @@ const {
     EmmesosErgodothsModel,
     DiadoxosErgodothsModel
 } = Models;
+
+const relatedUpdateModels = Object.freeze({
+    texnikosAsfaleias: TexnikosAsfaleiasModel,
+    iatrosErgasias: IatrosErgasiasModel,
+    logisths: LogisthsModel,
+    emmesosErgodoths: EmmesosErgodothsModel,
+    diadoxosErgodoths: DiadoxosErgodothsModel
+});
 
 let redir,
     sTerm = '';
@@ -787,6 +796,13 @@ class companiesController {
         try {
             normalized = normalizeCompanyUpdatePayload(formData);
         } catch (error) {
+            if (error instanceof CompanyUsersRequiredError) {
+                return res.status(400).json({
+                    success: false,
+                    code: 'COMPANY_USERS_REQUIRED',
+                    message: error.message
+                });
+            }
             if (error instanceof CompanyUpdateValidationError) {
                 return res.status(400).json({
                     success: false,
@@ -800,28 +816,6 @@ class companiesController {
                 code: 'COMPANY_UPDATE_FAILED',
                 message: 'Η ενημέρωση της εταιρείας απέτυχε.'
             });
-        }
-
-        try {
-            await fs.mkdir(stampsDir(sessionUserTeam), { recursive: true });
-        } catch (_) {}
-
-        if (formData.sfragida) {
-            const originalPath = isWindows
-                ? 'C:\\stamps\\sfragida.png'
-                : '/home/ubuntu/stamps/sfragida.png';
-            try {
-                normalized.company.imagePath = await renameAndMoveImage(
-                    originalPath,
-                    companyId,
-                    {
-                        eponymia: normalizeStr(formData.eponymia),
-                        fatherName: normalizeStr(formData.fatherName).substring(0, 3),
-                        firstName: normalizeStr(formData.firstName)
-                    },
-                    sessionUserTeam
-                );
-            } catch (_) {}
         }
 
         const team = normalizeUpper(sessionUserTeam);
@@ -841,58 +835,14 @@ class companiesController {
                 throw notFound;
             }
 
-            if (normalizeStr(formData.kod_ta)) {
-                stage = 'TEXNIKOS_ASFALEIAS_UPSERT';
-                const kod = normalizeUpper(formData.kod_ta);
+            for (const operation of normalized.relatedOperations) {
+                stage = operation.stage;
+                const Model = relatedUpdateModels[operation.modelKey];
                 await upsertSafe(
-                    TexnikosAsfaleiasModel,
-                    { team, kodikos: kod },
-                    normalized.texnikosAsfaleias,
-                    { team, kodikos: kod },
-                    session ? { session } : {}
-                );
-            }
-            if (normalizeStr(formData.kod_ia)) {
-                stage = 'IATROS_ERGASIAS_UPSERT';
-                const kod = normalizeUpper(formData.kod_ia);
-                await upsertSafe(
-                    IatrosErgasiasModel,
-                    { team, kodikos: kod },
-                    normalized.iatrosErgasias,
-                    { team, kodikos: kod },
-                    session ? { session } : {}
-                );
-            }
-            if (normalizeStr(formData.kod_lo)) {
-                stage = 'LOGISTHS_UPSERT';
-                const kod = normalizeUpper(formData.kod_lo);
-                await upsertSafe(
-                    LogisthsModel,
-                    { team, kodikos: kod },
-                    normalized.logisths,
-                    { team, kodikos: kod },
-                    session ? { session } : {}
-                );
-            }
-            if (normalizeStr(formData.kod_em_erg)) {
-                stage = 'EMMESOS_ERGODOTHS_UPSERT';
-                const kod = normalizeUpper(formData.kod_em_erg);
-                await upsertSafe(
-                    EmmesosErgodothsModel,
-                    { team, kodikos: kod },
-                    normalized.emmesosErgodoths,
-                    { team, kodikos: kod },
-                    session ? { session } : {}
-                );
-            }
-            if (normalizeStr(formData.kod_diad_erg)) {
-                stage = 'DIADOXOS_ERGODOTHS_UPSERT';
-                const kod = normalizeUpper(formData.kod_diad_erg);
-                await upsertSafe(
-                    DiadoxosErgodothsModel,
-                    { team, kodikos: kod },
-                    normalized.diadoxosErgodoths,
-                    { team, kodikos: kod },
+                    Model,
+                    { team, kodikos: operation.kod },
+                    operation.payload,
+                    { team, kodikos: operation.kod },
                     session ? { session } : {}
                 );
             }
@@ -905,6 +855,45 @@ class companiesController {
                 await session.withTransaction(() => executeWrites(session));
             } else {
                 await executeWrites();
+            }
+            if (formData.sfragida) {
+                const originalPath = isWindows
+                    ? 'C:\\stamps\\sfragida.png'
+                    : '/home/ubuntu/stamps/sfragida.png';
+                let movedPath;
+                try {
+                    await fs.mkdir(stampsDir(sessionUserTeam), { recursive: true });
+                    movedPath = await renameAndMoveImage(
+                        originalPath,
+                        companyId,
+                        {
+                            eponymia: normalizeStr(formData.eponymia),
+                            fatherName: normalizeStr(formData.fatherName).substring(0, 3),
+                            firstName: normalizeStr(formData.firstName)
+                        },
+                        sessionUserTeam
+                    );
+                    stage = 'COMPANY_SFRAGIDA_PATH_UPDATE';
+                    const stampUpdated = await CompaniesModel.findOneAndUpdate(
+                        { _id: companyId, team: req.companyAccessScope.companyTeamFilter },
+                        { $set: { imagePath: movedPath } },
+                        { new: true, runValidators: true }
+                    ).exec();
+                    if (!stampUpdated) {
+                        const notFound = new Error('Company not found during stamp path update');
+                        notFound.code = 'COMPANY_NOT_FOUND';
+                        throw notFound;
+                    }
+                } catch (error) {
+                    if (movedPath) {
+                        try {
+                            await fs.rename(movedPath, originalPath);
+                        } catch (compensationError) {
+                            logCompanyUpdateError('COMPANY_SFRAGIDA_COMPENSATION', compensationError);
+                        }
+                        throw error;
+                    }
+                }
             }
             return res.json({ success: true, redirectUrl: '/companies/genikastoixeia' });
         } catch (error) {

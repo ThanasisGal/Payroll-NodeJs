@@ -1,15 +1,33 @@
 const assert = require('assert');
+const fixture = require('./fixtures/company-0004.sanitized.json');
 const { CompaniesModel } = require('../../models/companies');
 const {
     TexnikosAsfaleiasModel,
     IatrosErgasiasModel,
+    LogisthsModel,
     EmmesosErgodothsModel
 } = require('../../models/stathera_arxeia');
+const {
+    normalizeCompanyUpdatePayload
+} = require('../../services/companies/companyUpdateNormalization');
 
 function castRawUpdate(Model, update) {
     const query = Model.findOneAndUpdate({}, { $set: update });
     return query._castUpdate(query.getUpdate()).$set;
 }
+
+const exactSanitizedPlan = normalizeCompanyUpdatePayload(fixture);
+assert.strictEqual(exactSanitizedPlan.relatedOperations.length, 1);
+assert.deepStrictEqual(
+    exactSanitizedPlan.relatedOperations.map(({ modelKey, stage, kod }) => ({
+        modelKey,
+        stage,
+        kod
+    })),
+    [{ modelKey: 'logisths', stage: 'LOGISTHS_UPSERT', kod: '1' }]
+);
+castRawUpdate(CompaniesModel, exactSanitizedPlan.company);
+castRawUpdate(LogisthsModel, exactSanitizedPlan.relatedOperations[0].payload);
 
 const emptyCompanyDates = castRawUpdate(CompaniesModel, {
     hmeromhnia_payshs_polyetias_apo: '',
@@ -35,4 +53,4 @@ for (const [Model, field, stage] of [
     );
 }
 
-console.log('PASS raw company edit Date CastError forensic reproduction and stage map');
+console.log('PASS sanitized company 0004 plan and synthetic Date CastError forensic coverage');

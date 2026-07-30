@@ -146,6 +146,19 @@ function queryResult(value) {
         });
         assert.strictEqual(result.res.statusCode, 400);
 
+        result = await run(authorizeCompanyUpdate, {
+            session: { userId: USER_ID, userTeam: 'TEAM1' },
+            authenticatedUserTeam: 'TEAM1',
+            params: { companyId: COMPANY_ID },
+            body: { selectedUsers: [] }
+        });
+        assert.strictEqual(result.res.statusCode, 400);
+        assert.deepStrictEqual(result.res.payload, {
+            success: false,
+            code: 'COMPANY_USERS_REQUIRED',
+            message: 'Πρέπει να επιλεγεί τουλάχιστον ένας χρήστης στη σελίδα «Διάφορα».'
+        });
+
         AntistoixiseisModel.findById = () => queryResult({
             _id: OTHER_ID,
             companyId: COMPANY_ID,

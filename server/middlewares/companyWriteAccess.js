@@ -90,13 +90,25 @@ function companyScopeObject(req, company, effectiveTeam) {
 
 function handleScopeError(error, res) {
     const status = Number(error?.status) || 500;
+    if (error?.code === 'COMPANY_USERS_REQUIRED') {
+        return res.status(400).json({
+            success: false,
+            code: 'COMPANY_USERS_REQUIRED',
+            message: 'Πρέπει να επιλεγεί τουλάχιστον ένας χρήστης στη σελίδα «Διάφορα».'
+        });
+    }
     if (status === 500) return sendError(res, 500, 'Σφάλμα ελέγχου πρόσβασης');
     return sendError(res, status, status === 400 ? 'Μη έγκυρα δεδομένα' : 'Δεν βρέθηκε πόρος');
 }
 
 function validateSelectedUsers(body) {
-    if (!Array.isArray(body.selectedUsers) || body.selectedUsers.length === 0 ||
-        body.selectedUsers.length > MAX_SELECTED_USERS) {
+    if (!Array.isArray(body.selectedUsers) || body.selectedUsers.length === 0) {
+        throw Object.assign(new Error('Απαιτείται χρήστης εταιρείας'), {
+            status: 400,
+            code: 'COMPANY_USERS_REQUIRED'
+        });
+    }
+    if (body.selectedUsers.length > MAX_SELECTED_USERS) {
         throw Object.assign(new Error('Μη έγκυρα δεδομένα'), { status: 400 });
     }
     const normalized = [...new Set(body.selectedUsers.map((value) => stringValue(value, {

@@ -1,5 +1,6 @@
 const assert = require('assert');
 const mongoose = require('mongoose');
+const fs = require('fs-extra');
 const companiesController = require('./companiesController');
 const { CompaniesModel } = require('../../models/companies');
 const {
@@ -60,6 +61,8 @@ async function withModelStubs(test) {
     const originals = models.map((model) => model.findOneAndUpdate);
     const originalDb = mongoose.connection.db;
     const originalStartSession = mongoose.connection.startSession;
+    const originalMkdir = fs.mkdir;
+    const originalRename = fs.rename;
     try {
         mongoose.connection.db = undefined;
         await test();
@@ -69,6 +72,8 @@ async function withModelStubs(test) {
         });
         mongoose.connection.db = originalDb;
         mongoose.connection.startSession = originalStartSession;
+        fs.mkdir = originalMkdir;
+        fs.rename = originalRename;
     }
 }
 
@@ -103,12 +108,73 @@ async function withModelStubs(test) {
         };
         const res = response();
         await companiesController.postCompanyUpdate(
-            request({ hmnia_katatheshs_ta: 'not-a-date' }),
+            request({ kod_ta: 'TA1', hmnia_katatheshs_ta: 'not-a-date' }),
             res
         );
         assert.strictEqual(res.statusCode, 400);
         assert.strictEqual(res.payload.code, 'COMPANY_UPDATE_VALIDATION_ERROR');
         assert.match(res.payload.message, /hmnia_katatheshs_ta/);
+        assert.strictEqual(writes, 0);
+    });
+
+    for (const [codeField, staleDateField, Model] of [
+        ['kod_ta', 'hmnia_katatheshs_ta', TexnikosAsfaleiasModel],
+        ['kod_ia', 'hmnia_katatheshs_ia', IatrosErgasiasModel],
+        ['kod_em_erg', 'daneismos_epa_apo_em_erg', EmmesosErgodothsModel]
+    ]) {
+        await withModelStubs(async () => {
+            let baseWrites = 0;
+            let relatedWrites = 0;
+            CompaniesModel.findOneAndUpdate = () => {
+                baseWrites += 1;
+                return query({ _id: COMPANY_ID });
+            };
+            Model.findOneAndUpdate = () => {
+                relatedWrites += 1;
+                return query({});
+            };
+            const res = response();
+            await companiesController.postCompanyUpdate(
+                request({ [codeField]: '', [staleDateField]: 'not-a-date' }),
+                res
+            );
+            assert.strictEqual(res.statusCode, 200);
+            assert.strictEqual(baseWrites, 1);
+            assert.strictEqual(relatedWrites, 0);
+        });
+
+        await withModelStubs(async () => {
+            let writes = 0;
+            CompaniesModel.findOneAndUpdate = () => {
+                writes += 1;
+                return query({ _id: COMPANY_ID });
+            };
+            const res = response();
+            await companiesController.postCompanyUpdate(
+                request({ [codeField]: 'ACTIVE', [staleDateField]: 'not-a-date' }),
+                res
+            );
+            assert.strictEqual(res.statusCode, 400);
+            assert.strictEqual(res.payload.code, 'COMPANY_UPDATE_VALIDATION_ERROR');
+            assert.match(res.payload.message, new RegExp(staleDateField));
+            assert.strictEqual(writes, 0);
+        });
+    }
+
+    await withModelStubs(async () => {
+        let writes = 0;
+        CompaniesModel.findOneAndUpdate = () => {
+            writes += 1;
+            return query({ _id: COMPANY_ID });
+        };
+        const res = response();
+        await companiesController.postCompanyUpdate(request({ selectedUsers: [] }), res);
+        assert.strictEqual(res.statusCode, 400);
+        assert.deepStrictEqual(res.payload, {
+            success: false,
+            code: 'COMPANY_USERS_REQUIRED',
+            message: 'Πρέπει να επιλεγεί τουλάχιστον ένας χρήστης στη σελίδα «Διάφορα».'
+        });
         assert.strictEqual(writes, 0);
     });
 
@@ -124,6 +190,65 @@ async function withModelStubs(test) {
         assert.strictEqual(res.statusCode, 404);
         assert.strictEqual(res.payload.code, 'COMPANY_NOT_FOUND');
         assert.strictEqual(relatedWrites, 0);
+    });
+
+    await withModelStubs(async () => {
+        let filesystemMutations = 0;
+        fs.mkdir = async () => {
+            filesystemMutations += 1;
+        };
+        fs.rename = async () => {
+            filesystemMutations += 1;
+        };
+        CompaniesModel.findOneAndUpdate = () => query(new Error('database failed'));
+        const originalError = console.error;
+        console.error = () => {};
+        try {
+            const res = response();
+            await companiesController.postCompanyUpdate(
+                request({ sfragida: 'data:image/png;base64,fixture' }),
+                res
+            );
+            assert.strictEqual(res.statusCode, 500);
+            assert.strictEqual(filesystemMutations, 0);
+        } finally {
+            console.error = originalError;
+        }
+    });
+
+    await withModelStubs(async () => {
+        const renames = [];
+        let companyWrites = 0;
+        fs.mkdir = async () => {};
+        fs.rename = async (from, to) => {
+            renames.push({ from, to });
+        };
+        CompaniesModel.findOneAndUpdate = () => {
+            companyWrites += 1;
+            return query(
+                companyWrites === 1
+                    ? { _id: COMPANY_ID }
+                    : new Error('stamp path database update failed')
+            );
+        };
+        const originalError = console.error;
+        console.error = () => {};
+        try {
+            const res = response();
+            await companiesController.postCompanyUpdate(
+                request({
+                    eponymia: 'fixture',
+                    sfragida: 'data:image/png;base64,fixture'
+                }),
+                res
+            );
+            assert.strictEqual(res.statusCode, 500);
+            assert.strictEqual(renames.length, 2);
+            assert.strictEqual(renames[1].from, renames[0].to);
+            assert.strictEqual(renames[1].to, renames[0].from);
+        } finally {
+            console.error = originalError;
+        }
     });
 
     await withModelStubs(async () => {

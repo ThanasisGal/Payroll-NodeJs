@@ -10,6 +10,15 @@ class CompanyUpdateValidationError extends Error {
     }
 }
 
+class CompanyUsersRequiredError extends Error {
+    constructor() {
+        super('Πρέπει να επιλεγεί τουλάχιστον ένας χρήστης στη σελίδα «Διάφορα».');
+        this.name = 'CompanyUsersRequiredError';
+        this.code = 'COMPANY_USERS_REQUIRED';
+        this.status = 400;
+    }
+}
+
 function validationError(fieldName) {
     throw new CompanyUpdateValidationError(fieldName);
 }
@@ -39,9 +48,15 @@ function normalizeOptionalNumber(value, fieldName) {
 }
 
 function normalizeObjectIdArray(value, fieldName) {
-    if (!Array.isArray(value)) validationError(fieldName);
+    if (!Array.isArray(value)) {
+        if (fieldName === 'selectedUsers') throw new CompanyUsersRequiredError();
+        validationError(fieldName);
+    }
     const normalized = [...new Set(value.map((item) => String(item ?? '').trim()).filter(Boolean))];
-    if (normalized.length === 0 || !normalized.every((item) => mongoose.isValidObjectId(item))) {
+    if (normalized.length === 0 && fieldName === 'selectedUsers') {
+        throw new CompanyUsersRequiredError();
+    }
+    if (!normalized.every((item) => mongoose.isValidObjectId(item))) {
         validationError(fieldName);
     }
     return normalized.map((item) => new mongoose.Types.ObjectId(item));
@@ -116,13 +131,19 @@ function normalizeCompanyUpdatePayload(formData) {
         tropos_ypologismoy_pragmatikoy_oromisthioy:
             formData.tropos_ypologismoy_pragmatikoy_oromisthioy,
         keimeno_exoflhshs: formData.keimeno_exoflhshs,
-        users: normalizeObjectIdArray(formData.selectedUsers, 'selectedUsers'),
-        sfragida: formData.sfragida
+        users: normalizeObjectIdArray(formData.selectedUsers, 'selectedUsers')
+    };
+    if (formData.sfragida) company.sfragida = formData.sfragida;
+
+    const relatedOperations = [];
+    const addRelatedOperation = (code, modelKey, stage, payload) => {
+        const normalizedCode = String(code ?? '').trim().toUpperCase();
+        if (!normalizedCode) return;
+        relatedOperations.push({ modelKey, stage, kod: normalizedCode, payload });
     };
 
-    return {
-        company,
-        texnikosAsfaleias: {
+    if (String(formData.kod_ta ?? '').trim()) {
+        addRelatedOperation(formData.kod_ta, 'texnikosAsfaleias', 'TEXNIKOS_ASFALEIAS_UPSERT', {
             eponymo: formData.eponymo_ta,
             onoma: formData.onoma_ta,
             afm: formData.afm_ta,
@@ -135,8 +156,10 @@ function normalizeCompanyUpdatePayload(formData) {
                 'hmnia_katatheshs_ta'
             ),
             isxyei_eos: normalizeOptionalDate(formData.isxyei_eos_ta, 'isxyei_eos_ta')
-        },
-        iatrosErgasias: {
+        });
+    }
+    if (String(formData.kod_ia ?? '').trim()) {
+        addRelatedOperation(formData.kod_ia, 'iatrosErgasias', 'IATROS_ERGASIAS_UPSERT', {
             eponymo: formData.eponymo_ia,
             onoma: formData.onoma_ia,
             afm: formData.afm_ia,
@@ -149,8 +172,10 @@ function normalizeCompanyUpdatePayload(formData) {
                 'hmnia_katatheshs_ia'
             ),
             isxyei_eos: normalizeOptionalDate(formData.isxyei_eos_ia, 'isxyei_eos_ia')
-        },
-        logisths: {
+        });
+    }
+    if (String(formData.kod_lo ?? '').trim()) {
+        addRelatedOperation(formData.kod_lo, 'logisths', 'LOGISTHS_UPSERT', {
             eponymo: formData.eponymo_lo,
             onoma: formData.onoma_lo,
             afm: formData.afm_lo,
@@ -159,42 +184,59 @@ function normalizeCompanyUpdatePayload(formData) {
             doy: formData.doy_logisths,
             arithmos_adeias: formData.arithmos_adeias_lo,
             kathgoria_adeias: formData.kathgoria_adeias_lo
-        },
-        emmesosErgodoths: {
-            eponymo: formData.eponymo_em_erg,
-            onoma: formData.onoma_em_erg,
-            dieythynsh: formData.dieythynsh_em_erg,
-            thlefono: formData.thlefono_em_erg,
-            afm: formData.afm_em_erg,
-            titlos: formData.titlos_em_erg,
-            nomikhMorfh: formData.nomikhmorfh_emmesoyErgodoth,
-            drasthriothta: formData.drasthriothta_em_erg,
-            email: formData.email_em_erg,
-            daneismosApo: normalizeOptionalDate(
-                formData.daneismos_epa_apo_em_erg,
-                'daneismos_epa_apo_em_erg'
-            ),
-            daneismosEos: normalizeOptionalDate(
-                formData.daneismos_epa_eos_em_erg,
-                'daneismos_epa_eos_em_erg'
-            )
-        },
-        diadoxosErgodoths: {
-            eponymo: formData.eponymo_diad_erg,
-            onoma: formData.onoma_diad_erg,
-            dieythynsh: formData.dieythynsh_diad_erg,
-            thlefono: formData.thlefono_diad_erg,
-            afm: formData.afm_diad_erg,
-            titlos: formData.titlos_diad_erg,
-            nomikhMorfh: formData.nomikhmorfh_diadoxoyErgodoth,
-            drasthriothta: formData.drasthriothta_diad_erg,
-            email: formData.email_diad_erg
-        }
-    };
+        });
+    }
+    if (String(formData.kod_em_erg ?? '').trim()) {
+        addRelatedOperation(
+            formData.kod_em_erg,
+            'emmesosErgodoths',
+            'EMMESOS_ERGODOTHS_UPSERT',
+            {
+                eponymo: formData.eponymo_em_erg,
+                onoma: formData.onoma_em_erg,
+                dieythynsh: formData.dieythynsh_em_erg,
+                thlefono: formData.thlefono_em_erg,
+                afm: formData.afm_em_erg,
+                titlos: formData.titlos_em_erg,
+                nomikhMorfh: formData.nomikhmorfh_emmesoyErgodoth,
+                drasthriothta: formData.drasthriothta_em_erg,
+                email: formData.email_em_erg,
+                daneismosApo: normalizeOptionalDate(
+                    formData.daneismos_epa_apo_em_erg,
+                    'daneismos_epa_apo_em_erg'
+                ),
+                daneismosEos: normalizeOptionalDate(
+                    formData.daneismos_epa_eos_em_erg,
+                    'daneismos_epa_eos_em_erg'
+                )
+            }
+        );
+    }
+    if (String(formData.kod_diad_erg ?? '').trim()) {
+        addRelatedOperation(
+            formData.kod_diad_erg,
+            'diadoxosErgodoths',
+            'DIADOXOS_ERGODOTHS_UPSERT',
+            {
+                eponymo: formData.eponymo_diad_erg,
+                onoma: formData.onoma_diad_erg,
+                dieythynsh: formData.dieythynsh_diad_erg,
+                thlefono: formData.thlefono_diad_erg,
+                afm: formData.afm_diad_erg,
+                titlos: formData.titlos_diad_erg,
+                nomikhMorfh: formData.nomikhmorfh_diadoxoyErgodoth,
+                drasthriothta: formData.drasthriothta_diad_erg,
+                email: formData.email_diad_erg
+            }
+        );
+    }
+
+    return { company, relatedOperations };
 }
 
 module.exports = {
     CompanyUpdateValidationError,
+    CompanyUsersRequiredError,
     normalizeOptionalDate,
     normalizeOptionalNumber,
     normalizeObjectIdArray,

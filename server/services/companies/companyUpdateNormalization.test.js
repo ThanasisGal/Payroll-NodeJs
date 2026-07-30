@@ -26,7 +26,7 @@ const users = normalizeObjectIdArray([USER_A, '', USER_A, USER_B], 'selectedUser
 assert.deepStrictEqual(users.map(String), [USER_A, USER_B]);
 assert.throws(
     () => normalizeObjectIdArray([], 'selectedUsers'),
-    (error) => error.code === 'COMPANY_UPDATE_VALIDATION_ERROR'
+    (error) => error.code === 'COMPANY_USERS_REQUIRED'
 );
 
 const payload = normalizeCompanyUpdatePayload({
@@ -42,11 +42,34 @@ const payload = normalizeCompanyUpdatePayload({
 });
 assert.strictEqual(payload.company.hmeromhnia_payshs_polyetias_apo, null);
 assert.strictEqual(payload.company.hmeromhnia_payshs_polyetias_eos, null);
-assert.strictEqual(payload.texnikosAsfaleias.hmnia_katatheshs, null);
-assert.strictEqual(payload.texnikosAsfaleias.isxyei_eos, null);
-assert.strictEqual(payload.iatrosErgasias.hmnia_katatheshs, null);
-assert.strictEqual(payload.iatrosErgasias.isxyei_eos, null);
-assert.strictEqual(payload.emmesosErgodoths.daneismosApo, null);
-assert.strictEqual(payload.emmesosErgodoths.daneismosEos, null);
+assert.strictEqual(Object.hasOwn(payload.company, 'sfragida'), false);
+assert.deepStrictEqual(payload.relatedOperations, []);
+
+const inactiveRelated = normalizeCompanyUpdatePayload({
+    selectedUsers: [USER_A],
+    kod_ta: '',
+    hmnia_katatheshs_ta: 'not-a-date',
+    kod_ia: '',
+    hmnia_katatheshs_ia: 'not-a-date',
+    kod_em_erg: '',
+    daneismos_epa_apo_em_erg: 'not-a-date'
+});
+assert.deepStrictEqual(inactiveRelated.relatedOperations, []);
+
+for (const [codeField, dateField] of [
+    ['kod_ta', 'hmnia_katatheshs_ta'],
+    ['kod_ia', 'hmnia_katatheshs_ia'],
+    ['kod_em_erg', 'daneismos_epa_apo_em_erg']
+]) {
+    assert.throws(
+        () =>
+            normalizeCompanyUpdatePayload({
+                selectedUsers: [USER_A],
+                [codeField]: 'ACTIVE',
+                [dateField]: 'not-a-date'
+            }),
+        (error) => error.code === 'COMPANY_UPDATE_VALIDATION_ERROR' && error.fieldName === dateField
+    );
+}
 
 console.log('PASS company update normalization');
