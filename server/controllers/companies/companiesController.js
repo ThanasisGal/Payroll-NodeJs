@@ -14,6 +14,7 @@ const {
     CompanyUsersRequiredError,
     normalizeCompanyUpdatePayload
 } = require('../../services/companies/companyUpdateNormalization');
+const { presentCompanyForEdit } = require('../../services/companies/companyEditPresentation');
 
 const { ParamModel } = Models_A;
 const { UserPrivilegesModel } = Models_B;
@@ -683,7 +684,8 @@ class companiesController {
             );
 
             const companyId = req.params.id;
-            const companyData = await CompaniesModel.findById(companyId).lean();
+            let companyData = await CompaniesModel.findById(companyId).lean();
+            companyData = presentCompanyForEdit(companyData);
 
             for (let i = 1; i <= 6; i++) companyData[`koddrast${i}`] = companyData[`kad${i}`] || '';
             companyData.nomikhmorfh_stathera = companyData.nomikh_morfh || '';
