@@ -6,6 +6,7 @@ const {
     downloadOrariaToBuffer,
     getErganhScheduleState,
     logErganhScheduleDiagnostic,
+    resolveErganhBranchOption,
     runErganhScheduleCriticalStep,
     selectErganhScheduleBranch,
     selectors
@@ -27,6 +28,10 @@ function createFakePage({
     searchFormPresent = true,
     selectorCount = 1,
     optionValues = ['0001'],
+    options,
+    asyncOptions,
+    beforeSelectOptions,
+    afterSelectOptions,
     urlError = false,
     locatorError = false,
     countError = false,
@@ -34,12 +39,30 @@ function createFakePage({
     optionEvaluateError = false,
     selectOptionError = false,
     selectedValues,
+    finalSelectedValue,
     loginClickError = false,
     disconnectOnLoginFailure = false,
     disconnectOnBranchWait = false,
     postBranchError = false
 } = {}) {
     let disconnected = false;
+    const toFakeOption = (option) => ({
+        value: String(option.value),
+        textContent: option.text ?? option.label ?? String(option.value),
+        disabled: option.disabled === true,
+        closest: () => (option.optgroupDisabled ? { disabled: true } : null)
+    });
+    let currentOptions = (options || optionValues.map((value) => ({ value }))).map(toFakeOption);
+    let selectedOption = null;
+    let branchOptionsReadCount = 0;
+    const fakeSelect = {
+        get options() {
+            return currentOptions;
+        },
+        get selectedOptions() {
+            return selectedOption ? [selectedOption] : [];
+        }
+    };
     const selectOptionCalls = [];
     const page = {
         selectOptionCalls,
@@ -61,6 +84,25 @@ function createFakePage({
             }
         },
         waitForTimeout: async () => {},
+        waitForFunction: async (callback, argument) => {
+            const previousDocument = global.document;
+            const evaluateCondition = () => {
+                global.document = { querySelector: () => fakeSelect };
+                try {
+                    return callback(argument);
+                } finally {
+                    global.document = previousDocument;
+                }
+            };
+            if (evaluateCondition()) return;
+            if (asyncOptions) {
+                currentOptions = asyncOptions.map(toFakeOption);
+                if (evaluateCondition()) return;
+            }
+            const error = new Error('raw-wait-secret');
+            error.name = 'TimeoutError';
+            throw error;
+        },
         waitForSelector: async (selector, options = {}) => {
             if (selector !== selectors.branch) return;
             if (disconnectOnBranchWait) {
@@ -80,6 +122,16 @@ function createFakePage({
                 error.name = 'TimeoutError';
                 throw error;
             }
+            const selectedValue = finalSelectedValue === undefined ? value : finalSelectedValue;
+            selectedOption = currentOptions.find((option) => option.value === selectedValue) || null;
+            if (afterSelectOptions) {
+                const selectedValueBeforeMutation = selectedOption?.value;
+                currentOptions = afterSelectOptions.map(toFakeOption);
+                selectedOption =
+                    currentOptions.find((option) => option.value === selectedValueBeforeMutation) ||
+                    selectedOption;
+                afterSelectOptions = null;
+            }
             return selectedValues === undefined ? [value] : selectedValues;
         },
         locator(selector) {
@@ -90,12 +142,19 @@ function createFakePage({
                     if (selector === selectors.loginForm) return loginFormPresent ? 1 : 0;
                     if (selector === selectors.searchForm) return searchFormPresent ? 1 : 0;
                     if (selector === selectors.branch) return selectorCount;
-                    if (selector === `${selectors.branch} option`) return optionValues.length;
+                    if (selector === `${selectors.branch} option`) return currentOptions.length;
                     return 0;
                 },
-                evaluate: async (_callback, requestedValue) => {
+                evaluate: async (callback, argument) => {
                     if (optionEvaluateError) throw new Error('raw-evaluate-secret');
-                    return optionValues.includes(requestedValue);
+                    if (selector === selectors.branch) {
+                        branchOptionsReadCount += 1;
+                        if (branchOptionsReadCount === 2 && beforeSelectOptions) {
+                            currentOptions = beforeSelectOptions.map(toFakeOption);
+                            beforeSelectOptions = null;
+                        }
+                    }
+                    return callback(fakeSelect, argument);
                 }
             };
         },
@@ -217,14 +276,231 @@ test('missing, duplicate, and hidden branch selectors have distinct safe outcome
 });
 
 test('preserves string branch 0000 and numeric branch 0', async () => {
-    for (const [branch, expected] of [
-        ['0000', '0000'],
-        [0, '0']
-    ]) {
-        const page = createFakePage({ optionValues: [expected] });
+    for (const branch of ['0000', 0]) {
+        const page = createFakePage({ optionValues: ['0000'] });
         await selectErganhScheduleBranch(page, branch, createLogger());
-        assert.equal(page.selectOptionCalls[0].value, expected);
+        assert.equal(page.selectOptionCalls[0].value, '0000');
     }
+});
+
+test('selects raw numeric values for normalized application branch codes', async () => {
+    for (const [branch, rawValue] of [
+        ['0000', '0'],
+        [0, '0'],
+        ['0001', '1'],
+        ['0001', '001']
+    ]) {
+        const page = createFakePage({
+            options: [{ value: rawValue, text: `${rawValue} - Branch` }]
+        });
+        await selectErganhScheduleBranch(page, branch, createLogger());
+        assert.deepEqual(page.selectOptionCalls, [{ selector: selectors.branch, value: rawValue }]);
+    }
+});
+
+test('prefers an exact raw value over a normalized numeric value', async () => {
+    const page = createFakePage({
+        options: [
+            { value: '1', text: '1 - Normalized' },
+            { value: '0001', text: 'Exact raw' }
+        ]
+    });
+    await selectErganhScheduleBranch(page, '0001', createLogger());
+    assert.deepEqual(page.selectOptionCalls, [{ selector: selectors.branch, value: '0001' }]);
+});
+
+test('rejects duplicate normalized numeric values', async () => {
+    const page = createFakePage({
+        options: [
+            { value: '0', text: 'First' },
+            { value: '00', text: 'Second' }
+        ]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+    assert.equal(page.selectOptionCalls.length, 0);
+});
+
+test('ignores disabled normalized numeric values', async () => {
+    const page = createFakePage({
+        options: [{ value: '0', text: '0 - Disabled', disabled: true }]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_OPTION_MISSING'
+    );
+    assert.equal(page.selectOptionCalls.length, 0);
+});
+
+test('does not normalize GUID, negative, blank, or alphanumeric option values', () => {
+    for (const value of ['123e4567-e89b-12d3-a456-426614174000', '-1', '', 'A1']) {
+        const resolution = resolveErganhBranchOption(
+            [{ value, text: 'No branch code', disabled: false }],
+            '0001'
+        );
+        assert.equal(resolution.status, 'missing');
+    }
+});
+
+test('prefers an exact active option value over a label code match', async () => {
+    const page = createFakePage({
+        options: [
+            { value: 'exact-value', text: '0000 - Label fallback' },
+            { value: '0000', text: 'Different description' }
+        ]
+    });
+    await selectErganhScheduleBranch(page, '0000', createLogger());
+    assert.equal(page.selectOptionCalls[0].value, '0000');
+});
+
+test('selects the real value from one normalized label code match', async () => {
+    for (const text of [
+        '  0000    Κεντρικό  ',
+        '\u00a00000\u00a0\u00a0Κεντρικό',
+        '0000 - Κεντρικό'
+    ]) {
+        const page = createFakePage({ options: [{ value: 'actual-branch-value', text }] });
+        await selectErganhScheduleBranch(page, '0000', createLogger());
+        assert.equal(page.selectOptionCalls[0].value, 'actual-branch-value');
+    }
+});
+
+test('ignores disabled matches and rejects missing or duplicate active label matches', async () => {
+    await assert.rejects(
+        selectErganhScheduleBranch(
+            createFakePage({
+                options: [{ value: 'disabled-value', text: '0000 - Disabled', disabled: true }]
+            }),
+            '0000',
+            createLogger()
+        ),
+        (error) => error?.code === 'ERGANI_BRANCH_OPTION_MISSING'
+    );
+
+    await assert.rejects(
+        selectErganhScheduleBranch(
+            createFakePage({
+                options: [
+                    { value: 'first', text: '0000 - First' },
+                    { value: 'second', text: '0000 - Second' }
+                ]
+            }),
+            '0000',
+            createLogger()
+        ),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+});
+
+test('uses exact digit boundaries and does not match 0000 inside 10000', async () => {
+    const resolution = resolveErganhBranchOption(
+        [{ value: 'unrelated', text: 'Branch 10000 - Other', disabled: false }],
+        '0000'
+    );
+    assert.equal(resolution.status, 'missing');
+});
+
+test('waits by condition for asynchronously appearing matching option', async () => {
+    const page = createFakePage({
+        options: [{ value: 'placeholder', text: 'Επιλέξτε παράρτημα' }],
+        asyncOptions: [{ value: 'async-real-value', text: '0000 - Async branch' }]
+    });
+    await selectErganhScheduleBranch(page, '0000', createLogger());
+    assert.equal(page.selectOptionCalls[0].value, 'async-real-value');
+});
+
+test('rejects a second active label match that appears before selection', async () => {
+    const page = createFakePage({
+        options: [{ value: 'first', text: '0000 - First' }],
+        beforeSelectOptions: [
+            { value: 'first', text: '0000 - First' },
+            { value: 'second', text: '0000 - Second' }
+        ]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+    assert.equal(page.selectOptionCalls.length, 0);
+});
+
+test('uses an exact value that appears before selection instead of stale label fallback', async () => {
+    const page = createFakePage({
+        options: [{ value: 'fallback-value', text: '0000 - Fallback' }],
+        beforeSelectOptions: [
+            { value: 'fallback-value', text: '0000 - Fallback' },
+            { value: '0000', text: 'Exact value' }
+        ]
+    });
+    await selectErganhScheduleBranch(page, '0000', createLogger());
+    assert.deepEqual(page.selectOptionCalls, [{ selector: selectors.branch, value: '0000' }]);
+});
+
+test('uses a normalized numeric value that appears before selection', async () => {
+    const page = createFakePage({
+        options: [{ value: 'fallback-value', text: '0000 - Fallback' }],
+        beforeSelectOptions: [
+            { value: 'fallback-value', text: '0000 - Fallback' },
+            { value: '0', text: '0 - Numeric value' }
+        ]
+    });
+    await selectErganhScheduleBranch(page, '0000', createLogger());
+    assert.deepEqual(page.selectOptionCalls, [{ selector: selectors.branch, value: '0' }]);
+});
+
+test('rejects a second active label match that appears after selection', async () => {
+    const page = createFakePage({
+        options: [{ value: 'first', text: '0000 - First' }],
+        afterSelectOptions: [
+            { value: 'first', text: '0000 - First' },
+            { value: 'second', text: '0000 - Second' }
+        ]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+});
+
+test('rejects a new exact value that supersedes the selected fallback after selection', async () => {
+    const page = createFakePage({
+        options: [{ value: 'fallback-value', text: '0000 - Fallback' }],
+        afterSelectOptions: [
+            { value: 'fallback-value', text: '0000 - Fallback' },
+            { value: '0000', text: 'Exact value' }
+        ]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+});
+
+test('rejects a normalized numeric value that supersedes fallback after selection', async () => {
+    const page = createFakePage({
+        options: [{ value: 'fallback-value', text: '0000 - Fallback' }],
+        afterSelectOptions: [
+            { value: 'fallback-value', text: '0000 - Fallback' },
+            { value: '0', text: '0 - Numeric value' }
+        ]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
+});
+
+test('ignores a matching option inside a disabled optgroup', async () => {
+    const page = createFakePage({
+        options: [{ value: 'disabled-group-value', text: '0000 - Disabled group', optgroupDisabled: true }]
+    });
+    await assert.rejects(
+        selectErganhScheduleBranch(page, '0000', createLogger()),
+        (error) => error?.code === 'ERGANI_BRANCH_OPTION_MISSING'
+    );
+    assert.equal(page.selectOptionCalls.length, 0);
 });
 
 test('empty or undefined branch remains empty without coercing another value', async () => {
@@ -266,10 +542,27 @@ test('selectOption throw or unconfirmed returned value maps to selection failed'
         createLogger(),
         'ERGANI_BRANCH_SELECTION_FAILED'
     );
+    await assert.rejects(
+        selectErganhScheduleBranch(
+            createFakePage({
+                options: [
+                    { value: 'actual-value', text: '0001 - Correct' },
+                    { value: 'wrong-value', text: '0002 - Wrong' }
+                ],
+                finalSelectedValue: 'wrong-value'
+            }),
+            '0001',
+            createLogger()
+        ),
+        (error) => error?.code === 'ERGANI_BRANCH_SELECTION_FAILED'
+    );
 });
 
 test('full flow reaches branch selection then stops before search/export and closes browser', async () => {
-    const page = createFakePage({ postBranchError: true });
+    const page = createFakePage({
+        options: [{ value: 'real-html-value', text: '0001 - Full flow branch' }],
+        postBranchError: true
+    });
     const browser = createBrowserHarness(page);
     await assert.rejects(
         downloadOrariaToBuffer('user', 'password', '01/08/2026', '31/08/2026', '0001', {
@@ -278,7 +571,9 @@ test('full flow reaches branch selection then stops before search/export and clo
         }),
         /EXPECTED_POST_BRANCH_STOP/
     );
-    assert.deepEqual(page.selectOptionCalls, [{ selector: selectors.branch, value: '0001' }]);
+    assert.deepEqual(page.selectOptionCalls, [
+        { selector: selectors.branch, value: 'real-html-value' }
+    ]);
     assert.equal(browser.getCloseCount(), 1);
 });
 

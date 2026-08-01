@@ -11471,6 +11471,67 @@ function createErganhScheduleError(code) {
     return error;
 }
 
+function normalizeErganhBranchCode(value) {
+    if (value === null || value === undefined) return '';
+    const normalized = String(value).trim();
+    return /^\d{1,4}$/.test(normalized) ? normalized.padStart(4, '0') : normalized;
+}
+
+function normalizeErganhOptionText(value) {
+    return String(value || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function optionTextContainsExactBranchCode(text, requestedBranch) {
+    if (!/^\d{4}$/.test(requestedBranch)) return false;
+    const normalizedText = normalizeErganhOptionText(text);
+    const codePattern = new RegExp(`(^|\\D)${requestedBranch}(?!\\d)`);
+    return codePattern.test(normalizedText);
+}
+
+function resolveErganhBranchOption(options, requestedBranch) {
+    const enabledOptions = (Array.isArray(options) ? options : []).filter(
+        (option) => option && option.disabled !== true
+    );
+    const exactValueMatches = enabledOptions.filter(
+        (option) => String(option.value) === requestedBranch
+    );
+
+    if (exactValueMatches.length === 1) {
+        return { status: 'match', value: String(exactValueMatches[0].value) };
+    }
+    if (exactValueMatches.length > 1) return { status: 'ambiguous' };
+
+    const normalizedValueMatches = enabledOptions.filter((option) => {
+        const rawValue = String(option.value);
+        return /^\d{1,4}$/.test(rawValue) && normalizeErganhBranchCode(rawValue) === requestedBranch;
+    });
+    if (normalizedValueMatches.length === 1) {
+        return { status: 'match', value: String(normalizedValueMatches[0].value) };
+    }
+    if (normalizedValueMatches.length > 1) return { status: 'ambiguous' };
+
+    const labelMatches = enabledOptions.filter((option) =>
+        optionTextContainsExactBranchCode(option.text, requestedBranch)
+    );
+    if (labelMatches.length === 1) {
+        return { status: 'match', value: String(labelMatches[0].value) };
+    }
+    return { status: labelMatches.length === 0 ? 'missing' : 'ambiguous' };
+}
+
+async function readErganhBranchOptions(page) {
+    return page.locator(ERGANH_SCHEDULE_SELECTORS.branch).evaluate((select) =>
+        Array.from(select.options).map((option) => ({
+            value: option.value,
+            text: option.textContent || '',
+            disabled: option.disabled || option.closest('optgroup')?.disabled === true
+        }))
+    );
+}
+
 async function getErganhScheduleState(page) {
     async function readCount(selector) {
         try {
@@ -11532,8 +11593,7 @@ async function runErganhScheduleCriticalStep(page, stage, action, logger) {
 }
 
 async function selectErganhScheduleBranch(page, pararthma, logger = console) {
-    const requestedBranch =
-        pararthma === null || pararthma === undefined ? '' : String(pararthma);
+    const requestedBranch = normalizeErganhBranchCode(pararthma);
     let state = await getErganhScheduleState(page);
 
     if (!state.diagnosticStateAvailable) {
@@ -11607,15 +11667,45 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
         throw createErganhScheduleError(errorCode);
     }
 
-    let requestedOptionPresent;
+    let optionResolution;
     try {
-        requestedOptionPresent = await page
-            .locator(ERGANH_SCHEDULE_SELECTORS.branch)
-            .evaluate(
-                (select, value) =>
-                    Array.from(select.options).some((option) => option.value === value),
-                requestedBranch
+        try {
+            await page.waitForFunction(
+                ({ selector, code }) => {
+                    const select = document.querySelector(selector);
+                    if (!select) return false;
+                    const normalizeText = (value) =>
+                        String(value || '')
+                            .replace(/\u00a0/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                    const codePattern = /^\d{4}$/.test(code)
+                        ? new RegExp(`(^|\\D)${code}(?!\\d)`)
+                        : null;
+                    return Array.from(select.options).some((option) => {
+                        const disabled =
+                            option.disabled || option.closest('optgroup')?.disabled === true;
+                        if (disabled) return false;
+                        const rawValue = String(option.value);
+                        const normalizedValue = /^\d{1,4}$/.test(rawValue)
+                            ? rawValue.padStart(4, '0')
+                            : rawValue;
+                        return (
+                            rawValue === code ||
+                            normalizedValue === code ||
+                            (codePattern && codePattern.test(normalizeText(option.textContent)))
+                        );
+                    });
+                },
+                { selector: ERGANH_SCHEDULE_SELECTORS.branch, code: requestedBranch },
+                { timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS }
             );
+        } catch (_waitError) {
+            // Resolve once after the bounded wait so a true absence gets the stable missing code.
+        }
+
+        const options = await readErganhBranchOptions(page);
+        optionResolution = resolveErganhBranchOption(options, requestedBranch);
     } catch (error) {
         state = await getErganhScheduleState(page);
         logErganhScheduleDiagnostic(logger, {
@@ -11628,7 +11718,7 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
         throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
     }
 
-    if (!requestedOptionPresent) {
+    if (optionResolution.status === 'missing') {
         logErganhScheduleDiagnostic(logger, {
             ...state,
             stage: 'branch-option-check',
@@ -11638,14 +11728,91 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
         throw createErganhScheduleError('ERGANI_BRANCH_OPTION_MISSING');
     }
 
+    if (optionResolution.status !== 'match') {
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-option-check',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
+
+    let preSelectionResolution;
     try {
+        const currentOptions = await readErganhBranchOptions(page);
+        preSelectionResolution = resolveErganhBranchOption(currentOptions, requestedBranch);
+    } catch (error) {
+        state = await getErganhScheduleState(page);
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-pre-selection-check',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED',
+            playwrightErrorName: error?.name
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
+
+    if (preSelectionResolution.status === 'missing') {
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-pre-selection-check',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_OPTION_MISSING'
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_OPTION_MISSING');
+    }
+
+    if (preSelectionResolution.status !== 'match') {
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-pre-selection-check',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
+
+    try {
+        const optionValue = preSelectionResolution.value;
         const selectedValues = await page.selectOption(
             ERGANH_SCHEDULE_SELECTORS.branch,
-            requestedBranch,
+            optionValue,
             { timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS }
         );
-        if (!selectedValues.includes(requestedBranch)) {
+        if (!selectedValues.includes(optionValue)) {
             throw new Error('Branch selection was not confirmed');
+        }
+        const postSelectionOptions = await readErganhBranchOptions(page);
+        const postSelectionResolution = resolveErganhBranchOption(
+            postSelectionOptions,
+            requestedBranch
+        );
+        const selectedOption = await page
+            .locator(ERGANH_SCHEDULE_SELECTORS.branch)
+            .evaluate((select) => {
+                const option = select.selectedOptions[0];
+                if (!option) return null;
+                return {
+                    value: option.value,
+                    text: option.textContent || '',
+                    disabled: option.disabled || option.closest('optgroup')?.disabled === true
+                };
+            });
+        const selectedOptionResolution = resolveErganhBranchOption(
+            selectedOption ? [selectedOption] : [],
+            requestedBranch
+        );
+        if (
+            postSelectionResolution.status !== 'match' ||
+            postSelectionResolution.value !== selectedOption?.value ||
+            selectedOption?.disabled === true ||
+            selectedOption?.value !== optionValue ||
+            selectedOptionResolution.status !== 'match' ||
+            !selectedValues.includes(selectedOption.value)
+        ) {
+            throw new Error('Branch DOM selection was not confirmed');
         }
     } catch (error) {
         state = await getErganhScheduleState(page);
@@ -13047,6 +13214,10 @@ Object.defineProperty(erganhController, '__scheduleDownloadTestHooks', {
         downloadOrariaToBuffer,
         getErganhScheduleState,
         logErganhScheduleDiagnostic,
+        normalizeErganhBranchCode,
+        normalizeErganhOptionText,
+        optionTextContainsExactBranchCode,
+        resolveErganhBranchOption,
         runErganhScheduleCriticalStep,
         sanitizeErganhPathname,
         selectErganhScheduleBranch,
