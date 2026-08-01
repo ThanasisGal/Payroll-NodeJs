@@ -1,3 +1,26 @@
+const ERGANI_CARDS_ERROR_MESSAGES = Object.freeze({
+    ERGANI_CARDS_LOGIN_OR_NAVIGATION_FAILED:
+        'Η σύνδεση ή η μετάβαση στη σελίδα Καρτών του ΕΡΓΑΝΗ ΙΙ απέτυχε.',
+    ERGANI_CARDS_BRANCH_SELECTOR_MISSING:
+        'Το πεδίο επιλογής παραρτήματος δεν βρέθηκε στο ΕΡΓΑΝΗ ΙΙ.',
+    ERGANI_CARDS_BRANCH_OPTION_MISSING:
+        'Το επιλεγμένο παράρτημα δεν είναι διαθέσιμο στο ΕΡΓΑΝΗ ΙΙ.',
+    ERGANI_CARDS_BRANCH_SELECTION_FAILED:
+        'Η ασφαλής επιλογή του παραρτήματος στο ΕΡΓΑΝΗ ΙΙ απέτυχε.',
+    ERGANI_CARDS_DOWNLOAD_INVALID:
+        'Το αρχείο που επέστρεψε το ΕΡΓΑΝΗ ΙΙ δεν είναι έγκυρο Excel.',
+    ERGANI_CARDS_DOWNLOAD_FAILED:
+        'Η λήψη του Excel Καρτών από το ΕΡΓΑΝΗ ΙΙ δεν ολοκληρώθηκε.',
+    ERGANI_CARDS_PROCESSING_FAILED:
+        'Η επεξεργασία του Excel Καρτών δεν ολοκληρώθηκε.',
+    ERGANI_CARDS_UPLOAD_FAILED:
+        'Η αποθήκευση του Excel Καρτών δεν ολοκληρώθηκε.',
+    ERGANI_CARDS_DATABASE_FAILED:
+        'Η ενημέρωση των δεδομένων Καρτών δεν ολοκληρώθηκε. Μπορείτε να επαναλάβετε τη λειτουργία.',
+    ERGANH_TIMEOUT:
+        'Η σύνδεση με το ΕΡΓΑΝΗ ΙΙ δεν ολοκληρώθηκε εγκαίρως. Παρακαλούμε δοκιμάστε ξανά.'
+});
+
 document.addEventListener('DOMContentLoaded', async function () {
     const downloadCardsButton = document.getElementById('downloadCardsButton');
 
@@ -120,10 +143,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                     Swal.fire({
                         icon: 'warning',
                         title: 'Λήξη χρόνου σύνδεσης με ΕΡΓΑΝΗ ΙΙ',
-                        html:
-                            data.message ||
-                            'Η σύνδεση με το πληροφοριακό σύστη��α <strong>ΕΡΓΑΝΗ ΙΙ</strong> δεν ολοκληρώθηκε εγκαίρως.<br>' +
-                                'Παρακαλούμε δοκιμάστε ξανά σε λίγα λεπτά.',
+                        text: ERGANI_CARDS_ERROR_MESSAGES[data.code] ||
+                            ERGANI_CARDS_ERROR_MESSAGES.ERGANH_TIMEOUT,
                         confirmButtonText: 'Κλείσιμο',
                         customClass: {
                             title: 'custom-title',
@@ -142,9 +163,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                     Swal.fire({
                         icon: 'error',
                         title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
-                        html:
-                            data.message ||
-                            `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
+                        text: ERGANI_CARDS_ERROR_MESSAGES[data.code] ||
+                            'Η λήψη δεν ολοκληρώθηκε. Παρακαλούμε δοκιμάστε ξανά.',
                         timer: 5000,
                         confirmButtonText: 'Κλείσιμο',
                         customClass: {
