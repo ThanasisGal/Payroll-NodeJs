@@ -13,3 +13,4 @@ public/pdf/*.pdf
 public/xlsx/*.xlsx
 public/xml/*.xml
 node_modules/
+*.test.js

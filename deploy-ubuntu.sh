@@ -988,8 +988,10 @@ else
     log_info "DEPLOY MERGED RELEASE: Git mutation disabled"
     log_info "Deploying already merged version: ${DEPLOY_VERSION}"
 
-    if ! exclude_file_has_exact_line '.env' || ! exclude_file_has_exact_line '.env.production'; then
-        log_error "rsync-excludes.txt must contain exact .env and .env.production exclusions."
+    if ! exclude_file_has_exact_line '.env' \
+        || ! exclude_file_has_exact_line '.env.production' \
+        || ! exclude_file_has_exact_line '*.test.js'; then
+        log_error "rsync-excludes.txt must contain the required environment and test-file exclusions."
         exit 1
     fi
 
@@ -1669,6 +1671,24 @@ RSYNC_END=$(date +%s)
 RSYNC_DURATION=$((RSYNC_END - RSYNC_START))
 
 log_success "Files synced to EC2 in $(format_duration $RSYNC_DURATION)"
+echo ""
+
+# Remove test files left by older deployments, then enforce the deployed-tree contract.
+log_info "Removing legacy application test files and verifying the deployed tree..."
+ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'TEST_JS_GUARD'
+    set -euo pipefail
+
+    APP_ROOT='/home/ubuntu/Payroll-NodeJs'
+    GUARD="$APP_ROOT/scripts/deployment/test-js-artifact-guard.sh"
+    if [[ ! -f "$GUARD" ]]; then
+        echo "TEST JS DEPLOYMENT GUARD MISSING"
+        exit 1
+    fi
+
+    bash "$GUARD" cleanup "$APP_ROOT"
+    bash "$GUARD" verify "$APP_ROOT"
+TEST_JS_GUARD
+log_success "Remote application test-file count is zero"
 echo ""
 
 # =============================================================================
