@@ -179,7 +179,7 @@ class ErganSessionManager {
 const sessionManager = new ErganSessionManager();
 
 // ✅ Auto-cleanup every 2 minutes
-setInterval(
+const maintenanceInterval = setInterval(
     () => {
         sessionManager.cleanupIdleSessions().catch((e) => {
             console.error('[SESSION-MGR] Auto-cleanup error:', e.message);
@@ -187,6 +187,7 @@ setInterval(
     },
     2 * 60 * 1000
 );
+maintenanceInterval.unref?.();
 
 // ✅ Cleanup on process exit
 process.on('SIGINT', async () => {

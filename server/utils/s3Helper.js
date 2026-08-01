@@ -418,12 +418,35 @@ async function downloadS3UriToTempFile(s3Url, companyInUse) {
 // HELPER: Save to local filesystem (Dev mode)
 // =========================================================================
 
-async function saveToLocalStorage(s3Key, data) {
-    const localPath = path.join(LOCAL_STORAGE_DIR, s3Key);
+async function saveToLocalStorage(s3Key, data, dependencies = {}) {
+    const fileSystem = dependencies.fileSystem || fs;
+    const localStorageDir = dependencies.localStorageDir || LOCAL_STORAGE_DIR;
+    const logger = dependencies.logger || console;
+    const randomSuffix = dependencies.randomSuffix || crypto.randomBytes(6).toString('hex');
+    const localPath = path.join(localStorageDir, s3Key);
     const dir = path.dirname(localPath);
+    const tempPath = path.join(
+        dir,
+        `.${path.basename(localPath)}.${process.pid}.${randomSuffix}.tmp`
+    );
 
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(localPath, data);
+    await fileSystem.mkdir(dir, { recursive: true });
+    try {
+        await fileSystem.writeFile(tempPath, data, { flag: 'wx' });
+        await fileSystem.rename(tempPath, localPath);
+    } finally {
+        try {
+            await fileSystem.unlink(tempPath);
+        } catch (cleanupError) {
+            if (cleanupError?.code !== 'ENOENT') {
+                try {
+                    logger.error('[S3-LOCAL-ATOMIC-CLEANUP]', { code: 'LOCAL_TEMP_CLEANUP_FAILED' });
+                } catch (_loggingError) {
+                    // Cleanup diagnostics must never mask the original storage failure.
+                }
+            }
+        }
+    }
 
     // console.log(`📁 DEV MODE: Saved locally: ${localPath}`);
 
@@ -1099,3 +1122,8 @@ module.exports = {
     deleteContractsForEmployee,
     USE_LOCAL_STORAGE // Export for debugging
 };
+
+Object.defineProperty(module.exports, '__atomicLocalStorageTestHooks', {
+    value: Object.freeze({ saveToLocalStorage }),
+    enumerable: false
+});

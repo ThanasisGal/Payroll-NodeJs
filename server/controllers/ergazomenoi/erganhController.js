@@ -4519,63 +4519,26 @@ class erganhController {
                 );
             }
 
-            // 3. savePath (local s3-mock)
+            // 3. Canonical storage key (S3 σε production, local s3-mock σε development)
             const fileName = `${periodInUseDescr}_${yearInUse}.xlsx`;
-            const savePath = path.join(
-                process.cwd(),
-                'uploads',
-                's3-mock',
-                'xlsx',
-                userTeam,
-                `${companyKodikos}_${companyDescription}`,
-                'Apasxolhseis_Apo_Kartes',
-                fileName
-            );
+            const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Apasxolhseis_Apo_Kartes/${fileName}`;
+            const { uploadBufferToS3 } = require('../../utils/s3Helper');
 
-            // 4. Διαγραφή παλιού αρχείου
-            try {
-                await fs.promises.unlink(savePath);
-                console.log(`[lhpshOrarionApoKartes] Διαγράφηκε παλιό: ${savePath}`);
-            } catch (e) {
-                /* δεν υπάρχει — ok */
-            }
-
-            // 5. Δημιουργία φακέλου
-            await fs.promises.mkdir(path.dirname(savePath), { recursive: true });
-
-            // 6. Download xlsx από Εργάνη
-            const xlsxBuffer = await downloadKartesXlsxToBuffer(
+            // Storage-first / DB-last best-effort consistency.
+            await downloadPrepareStoreAndPersistCards({
                 username,
                 password,
                 selectedPararthma,
                 apoHmeromhnia,
-                eosHmeromhnia
-            );
-
-            // 7α. Αποθήκευση τοπικά
-            await fs.promises.writeFile(savePath, xlsxBuffer);
-            console.log(`[lhpshOrarionApoKartes] Αποθηκεύτηκε τοπικά: ${savePath}`);
-
-            // 8. Επεξεργασία xlsx + αποθήκευση MongoDB  ← ΠΡΩΤΑ η επεξεργασία
-            await processKartesXlsx(savePath, apoHmeromhnia);
-
-            // 7β. Αποθήκευση στο S3 ← ΜΕΤΑ ανέβασε το επεξεργασμένο αρχείο
-            try {
-                const { uploadBufferToS3 } = require('../../utils/s3Helper');
-                const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Apasxolhseis_Apo_Kartes/${fileName}`;
-
-                // ✅ Διάβασε το επεξεργασμένο αρχείο από το δίσκο
-                const processedBuffer = await fs.promises.readFile(savePath);
-
-                await uploadBufferToS3(
-                    processedBuffer,
-                    s3Key,
+                eosHmeromhnia,
+                s3Key
+            }, {
+                store: (buffer, key) => uploadBufferToS3(
+                    buffer,
+                    key,
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                );
-                console.log(`[lhpshOrarionApoKartes] ✅ S3: ${s3Key}`);
-            } catch (s3Error) {
-                console.error(`[lhpshOrarionApoKartes] ❌ S3 Error:`, s3Error.message);
-            }
+                )
+            });
 
             return res.status(200).json({
                 success: true,
@@ -4583,28 +4546,37 @@ class erganhController {
                 redirectUrl: '/ergazomenoi/programmata/lhpshOrarionApoKartes'
             });
         } catch (error) {
-            console.error('[lhpshOrarionApoKartes] ❌', error);
+            const reportedCode = String(error?.code || '');
+            const code = Object.values(ERGANH_CARDS_CODES).includes(reportedCode)
+                ? reportedCode
+                : ERGANH_CARDS_CODES.downloadFailed;
+            console.error('[lhpshOrarionApoKartes]', { code });
 
-            // ✅ Αναγνώριση Playwright TimeoutError
-            const isTimeout =
-                error?.name === 'TimeoutError' ||
-                /Timeout .* exceeded/i.test(error?.message || '') ||
-                /waiting for locator/i.test(error?.message || '');
-
-            if (isTimeout) {
-                return res.status(504).json({
-                    success: false,
-                    code: 'ERGANH_TIMEOUT',
-                    message:
-                        'Η σύνδεση με το πληροφοριακό σύστημα ΕΡΓΑΝΗ ΙΙ δεν ολοκληρώθηκε εγκαίρως. ' +
-                        'Το σύστημα ενδέχεται να παρουσιάζει υψηλό φόρτο. ' +
-                        'Παρακαλούμε δοκιμάστε ξανά σε λίγα λεπτά.'
-                });
-            }
+            const messages = {
+                [ERGANH_CARDS_CODES.loginOrNavigation]:
+                    'Η σύνδεση ή η μετάβαση στη σελίδα Καρτών του ΕΡΓΑΝΗ ΙΙ απέτυχε.',
+                [ERGANH_CARDS_CODES.selectorMissing]:
+                    'Το πεδίο επιλογής παραρτήματος δεν βρέθηκε στη σελίδα Καρτών του ΕΡΓΑΝΗ ΙΙ.',
+                [ERGANH_CARDS_CODES.optionMissing]:
+                    'Το επιλεγμένο παράρτημα δεν είναι διαθέσιμο στη σελίδα Καρτών του ΕΡΓΑΝΗ ΙΙ.',
+                [ERGANH_CARDS_CODES.selectionFailed]:
+                    'Η ασφαλής επιλογή παραρτήματος στη σελίδα Καρτών του ΕΡΓΑΝΗ ΙΙ απέτυχε.',
+                'ERGANI_CARDS_DOWNLOAD_INVALID':
+                    'Το αρχείο που επέστρεψε το ΕΡΓΑΝΗ ΙΙ δεν είναι έγκυρο Excel.',
+                [ERGANH_CARDS_CODES.downloadFailed]:
+                    'Η λήψη του Excel Καρτών από το ΕΡΓΑΝΗ ΙΙ δεν ολοκληρώθηκε.',
+                'ERGANI_CARDS_PROCESSING_FAILED':
+                    'Η επεξεργασία του Excel Καρτών δεν ολοκληρώθηκε.',
+                'ERGANI_CARDS_UPLOAD_FAILED':
+                    'Η αποθήκευση του Excel Καρτών δεν ολοκληρώθηκε.',
+                'ERGANI_CARDS_DATABASE_FAILED':
+                    'Η ενημέρωση των δεδομένων Καρτών δεν ολοκληρώθηκε. Μπορείτε να επαναλάβετε τη λειτουργία.'
+            };
 
             return res.status(500).json({
                 success: false,
-                message: 'Σφάλμα κατά τη Λήψη Απασχολήσεων'
+                code,
+                message: messages[code] || messages[ERGANH_CARDS_CODES.downloadFailed]
             });
         }
     };
@@ -11431,6 +11403,25 @@ const ERGANH_SCHEDULE_SELECTORS = Object.freeze({
         '#ctl00_ctl00_ContentHolder_ContentHolder_ErgazomenosWorkingSearchControl_PararthmaSelection_PararthmaListEdit'
 });
 const ERGANH_SCHEDULE_STATE_TIMEOUT_MS = 10000;
+const ERGANH_CARDS_DIAGNOSTIC_TAG = '[ERGANH-CARDS-DOWNLOAD]';
+const ERGANH_CARDS_SELECTORS = Object.freeze({
+    loginForm: ERGANH_SCHEDULE_SELECTORS.loginForm,
+    searchForm:
+        '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_SearchControlSearchButton',
+    branch:
+        '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_PararthmaSelection_PararthmaListEdit'
+});
+const ERGANH_CARDS_CODES = Object.freeze({
+    downloadInvalid: 'ERGANI_CARDS_DOWNLOAD_INVALID',
+    loginOrNavigation: 'ERGANI_CARDS_LOGIN_OR_NAVIGATION_FAILED',
+    selectorMissing: 'ERGANI_CARDS_BRANCH_SELECTOR_MISSING',
+    optionMissing: 'ERGANI_CARDS_BRANCH_OPTION_MISSING',
+    selectionFailed: 'ERGANI_CARDS_BRANCH_SELECTION_FAILED',
+    downloadFailed: 'ERGANI_CARDS_DOWNLOAD_FAILED',
+    processingFailed: 'ERGANI_CARDS_PROCESSING_FAILED',
+    uploadFailed: 'ERGANI_CARDS_UPLOAD_FAILED',
+    databaseFailed: 'ERGANI_CARDS_DATABASE_FAILED'
+});
 
 function sanitizeErganhPathname(urlValue) {
     try {
@@ -11462,6 +11453,28 @@ function logErganhScheduleDiagnostic(logger, details = {}) {
         (logger || console).error(ERGANH_SCHEDULE_DIAGNOSTIC_TAG, safeDetails);
     } catch (_loggingError) {
         // Diagnostics are best-effort and must never replace the stable runtime error code.
+    }
+}
+
+function logErganhCardsDiagnostic(logger, details = {}) {
+    try {
+        const safeDetails = {
+            stage: String(details.stage || 'unknown'),
+            pathname: sanitizeErganhPathname(details.url),
+            selectorCount: Number.isFinite(details.selectorCount) ? details.selectorCount : -1,
+            optionCount: Number.isFinite(details.optionCount) ? details.optionCount : -1,
+            requestedBranch:
+                details.requestedBranch === null || details.requestedBranch === undefined
+                    ? ''
+                    : String(details.requestedBranch),
+            loginFormPresent: details.loginFormPresent === true,
+            searchFormPresent: details.searchFormPresent === true,
+            diagnosticStateAvailable: details.diagnosticStateAvailable === true,
+            errorCode: String(details.errorCode || '')
+        };
+        (logger || console).error(ERGANH_CARDS_DIAGNOSTIC_TAG, safeDetails);
+    } catch (_loggingError) {
+        // Cards diagnostics are best-effort and intentionally contain no raw DOM/error data.
     }
 }
 
@@ -11522,8 +11535,8 @@ function resolveErganhBranchOption(options, requestedBranch) {
     return { status: labelMatches.length === 0 ? 'missing' : 'ambiguous' };
 }
 
-async function readErganhBranchOptions(page) {
-    return page.locator(ERGANH_SCHEDULE_SELECTORS.branch).evaluate((select) =>
+async function readErganhBranchOptions(page, branchSelector = ERGANH_SCHEDULE_SELECTORS.branch) {
+    return page.locator(branchSelector).evaluate((select) =>
         Array.from(select.options).map((option) => ({
             value: option.value,
             text: option.textContent || '',
@@ -11532,7 +11545,7 @@ async function readErganhBranchOptions(page) {
     );
 }
 
-async function getErganhScheduleState(page) {
+async function getErganhScheduleState(page, selectors = ERGANH_SCHEDULE_SELECTORS) {
     async function readCount(selector) {
         try {
             const locator = page.locator(selector);
@@ -11553,10 +11566,10 @@ async function getErganhScheduleState(page) {
     const [urlResult, loginFormResult, searchFormResult, branchResult, optionResult] =
         await Promise.all([
             readUrl(),
-            readCount(ERGANH_SCHEDULE_SELECTORS.loginForm),
-            readCount(ERGANH_SCHEDULE_SELECTORS.searchForm),
-            readCount(ERGANH_SCHEDULE_SELECTORS.branch),
-            readCount(`${ERGANH_SCHEDULE_SELECTORS.branch} option`)
+            readCount(selectors.loginForm),
+            readCount(selectors.searchForm),
+            readCount(selectors.branch),
+            readCount(`${selectors.branch} option`)
         ]);
 
     const diagnosticStateAvailable = [
@@ -11592,47 +11605,69 @@ async function runErganhScheduleCriticalStep(page, stage, action, logger) {
     }
 }
 
-async function selectErganhScheduleBranch(page, pararthma, logger = console) {
+async function runErganhCardsCriticalStep(page, stage, action, logger) {
+    try {
+        await action();
+    } catch (_error) {
+        const state = await getErganhScheduleState(page, ERGANH_CARDS_SELECTORS);
+        logErganhCardsDiagnostic(logger, {
+            ...state,
+            stage,
+            errorCode: ERGANH_CARDS_CODES.loginOrNavigation
+        });
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.loginOrNavigation);
+    }
+}
+
+async function selectErganhBranch(page, pararthma, logger = console, config = {}) {
+    const selectors = config.selectors || ERGANH_SCHEDULE_SELECTORS;
+    const codes = config.codes || {
+        loginOrNavigation: 'ERGANI_LOGIN_OR_NAVIGATION_FAILED',
+        selectorMissing: 'ERGANI_BRANCH_SELECTOR_MISSING',
+        optionMissing: 'ERGANI_BRANCH_OPTION_MISSING',
+        selectionFailed: 'ERGANI_BRANCH_SELECTION_FAILED'
+    };
+    const logDiagnostic = config.logDiagnostic || logErganhScheduleDiagnostic;
     const requestedBranch = normalizeErganhBranchCode(pararthma);
-    let state = await getErganhScheduleState(page);
+    let state = await getErganhScheduleState(page, selectors);
 
     if (!state.diagnosticStateAvailable) {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'authenticated-search-state',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+            errorCode: codes.selectionFailed
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     // false means the expected search state was not confirmed; it is not proof of bad credentials.
     if (state.loginFormPresent || !state.searchFormPresent) {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'authenticated-search-state',
             requestedBranch,
-            errorCode: 'ERGANI_LOGIN_OR_NAVIGATION_FAILED'
+            errorCode: codes.loginOrNavigation
         });
-        throw createErganhScheduleError('ERGANI_LOGIN_OR_NAVIGATION_FAILED');
+        throw createErganhScheduleError(codes.loginOrNavigation);
     }
 
     try {
-        await page.waitForSelector(ERGANH_SCHEDULE_SELECTORS.branch, {
+        await page.waitForSelector(selectors.branch, {
             state: 'attached',
             timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS
         });
-        await page.waitForSelector(ERGANH_SCHEDULE_SELECTORS.branch, {
+        await page.waitForSelector(selectors.branch, {
             state: 'visible',
             timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS
         });
     } catch (error) {
-        state = await getErganhScheduleState(page);
+        state = await getErganhScheduleState(page, selectors);
         const errorCode =
             state.diagnosticStateAvailable && state.selectorCount === 0
-                ? 'ERGANI_BRANCH_SELECTOR_MISSING'
-                : 'ERGANI_BRANCH_SELECTION_FAILED';
-        logErganhScheduleDiagnostic(logger, {
+                ? codes.selectorMissing
+                : codes.selectionFailed;
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-selector-ready',
             requestedBranch,
@@ -11642,23 +11677,23 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
         throw createErganhScheduleError(errorCode, error);
     }
 
-    state = await getErganhScheduleState(page);
+    state = await getErganhScheduleState(page, selectors);
     if (!state.diagnosticStateAvailable) {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-selector-count',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+            errorCode: codes.selectionFailed
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     if (state.selectorCount !== 1) {
         const errorCode =
             state.selectorCount === 0
-                ? 'ERGANI_BRANCH_SELECTOR_MISSING'
-                : 'ERGANI_BRANCH_SELECTION_FAILED';
-        logErganhScheduleDiagnostic(logger, {
+                ? codes.selectorMissing
+                : codes.selectionFailed;
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-selector-count',
             requestedBranch,
@@ -11697,100 +11732,100 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
                         );
                     });
                 },
-                { selector: ERGANH_SCHEDULE_SELECTORS.branch, code: requestedBranch },
+                { selector: selectors.branch, code: requestedBranch },
                 { timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS }
             );
         } catch (_waitError) {
             // Resolve once after the bounded wait so a true absence gets the stable missing code.
         }
 
-        const options = await readErganhBranchOptions(page);
+        const options = await readErganhBranchOptions(page, selectors.branch);
         optionResolution = resolveErganhBranchOption(options, requestedBranch);
     } catch (error) {
-        state = await getErganhScheduleState(page);
-        logErganhScheduleDiagnostic(logger, {
+        state = await getErganhScheduleState(page, selectors);
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-option-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED',
+            errorCode: codes.selectionFailed,
             playwrightErrorName: error?.name
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     if (optionResolution.status === 'missing') {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-option-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_OPTION_MISSING'
+            errorCode: codes.optionMissing
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_OPTION_MISSING');
+        throw createErganhScheduleError(codes.optionMissing);
     }
 
     if (optionResolution.status !== 'match') {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-option-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+            errorCode: codes.selectionFailed
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     let preSelectionResolution;
     try {
-        const currentOptions = await readErganhBranchOptions(page);
+        const currentOptions = await readErganhBranchOptions(page, selectors.branch);
         preSelectionResolution = resolveErganhBranchOption(currentOptions, requestedBranch);
     } catch (error) {
-        state = await getErganhScheduleState(page);
-        logErganhScheduleDiagnostic(logger, {
+        state = await getErganhScheduleState(page, selectors);
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-pre-selection-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED',
+            errorCode: codes.selectionFailed,
             playwrightErrorName: error?.name
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     if (preSelectionResolution.status === 'missing') {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-pre-selection-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_OPTION_MISSING'
+            errorCode: codes.optionMissing
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_OPTION_MISSING');
+        throw createErganhScheduleError(codes.optionMissing);
     }
 
     if (preSelectionResolution.status !== 'match') {
-        logErganhScheduleDiagnostic(logger, {
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-pre-selection-check',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+            errorCode: codes.selectionFailed
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+        throw createErganhScheduleError(codes.selectionFailed);
     }
 
     try {
         const optionValue = preSelectionResolution.value;
         const selectedValues = await page.selectOption(
-            ERGANH_SCHEDULE_SELECTORS.branch,
+            selectors.branch,
             optionValue,
             { timeout: ERGANH_SCHEDULE_STATE_TIMEOUT_MS }
         );
         if (!selectedValues.includes(optionValue)) {
             throw new Error('Branch selection was not confirmed');
         }
-        const postSelectionOptions = await readErganhBranchOptions(page);
+        const postSelectionOptions = await readErganhBranchOptions(page, selectors.branch);
         const postSelectionResolution = resolveErganhBranchOption(
             postSelectionOptions,
             requestedBranch
         );
         const selectedOption = await page
-            .locator(ERGANH_SCHEDULE_SELECTORS.branch)
+            .locator(selectors.branch)
             .evaluate((select) => {
                 const option = select.selectedOptions[0];
                 if (!option) return null;
@@ -11815,16 +11850,28 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
             throw new Error('Branch DOM selection was not confirmed');
         }
     } catch (error) {
-        state = await getErganhScheduleState(page);
-        logErganhScheduleDiagnostic(logger, {
+        state = await getErganhScheduleState(page, selectors);
+        logDiagnostic(logger, {
             ...state,
             stage: 'branch-selection',
             requestedBranch,
-            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED',
+            errorCode: codes.selectionFailed,
             playwrightErrorName: error?.name
         });
-        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED', error);
+        throw createErganhScheduleError(codes.selectionFailed);
     }
+}
+
+async function selectErganhScheduleBranch(page, pararthma, logger = console) {
+    return selectErganhBranch(page, pararthma, logger);
+}
+
+async function selectErganhCardsBranch(page, pararthma, logger = console) {
+    return selectErganhBranch(page, pararthma, logger, {
+        selectors: ERGANH_CARDS_SELECTORS,
+        codes: ERGANH_CARDS_CODES,
+        logDiagnostic: logErganhCardsDiagnostic
+    });
 }
 
 async function downloadOrariaToBuffer(
@@ -12456,10 +12503,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse) {
     );
 }
 
-async function processKartesXlsx(filePath, apoHmeromhnia) {
+async function prepareKartesXlsx(xlsxBuffer, apoHmeromhnia) {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(filePath);
+    await workbook.xlsx.load(xlsxBuffer);
 
     // 7) Μετονόμασε το τρέχον φύλλο σε Κάρτες_Αρχικό
     const sheetArxiko = workbook.worksheets[0];
@@ -12871,13 +12918,72 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
             sheetTeliko.spliceRows(rowNumber, 1);
         });
 
-    await workbook.xlsx.writeFile(filePath);
-    console.log(`[processKartesXlsx] ✅ Επεξεργασία ολοκληρώθηκε: ${filePath}`);
+    const processedBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const persistencePayload = buildKartesPersistencePayload(sheetTeliko);
+    return { processedBuffer, persistencePayload };
+}
 
-    // ============================================================
-    // Αποθήκευση στο OrariaFromCardsModel
-    // ============================================================
-    await saveKartesTelikoToMongo(sheetTeliko);
+async function validateKartesXlsxBuffer(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.downloadInvalid);
+    }
+
+    try {
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        if (workbook.worksheets.length === 0) {
+            throw new Error('missing worksheet');
+        }
+    } catch (_error) {
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.downloadInvalid);
+    }
+
+    return buffer;
+}
+
+async function downloadPrepareStoreAndPersistCards(options, dependencies = {}) {
+    const download = dependencies.download || downloadKartesXlsxToBuffer;
+    const validate = dependencies.validate || validateKartesXlsxBuffer;
+    const prepare = dependencies.prepare || prepareKartesXlsx;
+    const store = dependencies.store;
+    const persist = dependencies.persist || saveKartesPayloadToMongo;
+
+    let sourceBuffer;
+    try {
+        sourceBuffer = await download(
+            options.username,
+            options.password,
+            options.selectedPararthma,
+            options.apoHmeromhnia,
+            options.eosHmeromhnia
+        );
+        await validate(sourceBuffer);
+    } catch (error) {
+        if (String(error?.code || '').startsWith('ERGANI_CARDS_')) throw error;
+        throw createErganhScheduleError('ERGANI_CARDS_DOWNLOAD_FAILED');
+    }
+
+    let prepared;
+    try {
+        prepared = await prepare(sourceBuffer, options.apoHmeromhnia);
+        await validate(prepared.processedBuffer);
+    } catch (_error) {
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.processingFailed);
+    }
+
+    try {
+        await store(prepared.processedBuffer, options.s3Key);
+    } catch (_error) {
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.uploadFailed);
+    }
+
+    try {
+        await persist(prepared.persistencePayload);
+    } catch (_error) {
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.databaseFailed);
+    }
+
+    return prepared.processedBuffer;
 }
 
 // ============================================================
@@ -12894,7 +13000,7 @@ async function processKartesXlsx(filePath, apoHmeromhnia) {
 //       check_ergasia        (true αν H τελευταίας γραμμής = 'Not Ok', αλλιώς false)
 //  - Δεν δημιουργεί νέα έγγραφα (upsert: false)
 // ============================================================
-async function saveKartesTelikoToMongo(sheetTeliko) {
+function buildKartesPersistencePayload(sheetTeliko) {
     // -------- 1) Διάβασε όλες τις γραμμές του sheet --------
     const rows = [];
     sheetTeliko.eachRow((row, rowNumber) => {
@@ -12910,6 +13016,13 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
             h_check: row.getCell(8).text?.trim() || '' // 'Ok' / 'Not Ok' / ''
         });
     });
+
+    return rows;
+}
+
+async function saveKartesPayloadToMongo(rows, dependencies = {}) {
+    const ergazomenoiModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
+    const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
 
     // -------- 2) Group κατά (afm + hmeromhnia) --------
     const groups = new Map();
@@ -12947,7 +13060,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
 
     // -------- 3) Φόρτωσε ergazomenoi με ΜΙΑ query --------
     const uniqueAfms = [...new Set([...groups.values()].map((g) => g.afm))];
-    const ergazomenoiList = await ErgazomenoiModel.find({
+    const ergazomenoiList = await ergazomenoiModel.find({
         afm: mongoose.trusted({ $in: uniqueAfms })
     }).lean();
 
@@ -13016,7 +13129,7 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
 
     // -------- 5) ΜΙΑ κλήση στη ΒΔ --------
     if (bulkOps.length > 0) {
-        const result = await ProdhlomenaOrariaModel.bulkWrite(bulkOps, { ordered: false });
+        const result = await prodhlomenaModel.bulkWrite(bulkOps, { ordered: false });
         console.log(
             `[saveKartesTelikoToMongo] ✅ ProdhlomenaOraria — ` +
                 `matched: ${result.matchedCount}, modified: ${result.modifiedCount}` +
@@ -13025,6 +13138,8 @@ async function saveKartesTelikoToMongo(sheetTeliko) {
     } else {
         console.log('[saveKartesTelikoToMongo] Δεν υπάρχουν εγγραφές προς ενημέρωση');
     }
+
+    return bulkOps;
 }
 
 async function downloadKartesXlsxToBuffer(
@@ -13032,48 +13147,68 @@ async function downloadKartesXlsxToBuffer(
     password,
     pararthma,
     apoHmeromhnia,
-    eosHmeromhnia
+    eosHmeromhnia,
+    dependencies = {}
 ) {
-    const browser = await chromium.launch({
+    const launchBrowser = dependencies.launchBrowser || ((options) => chromium.launch(options));
+    const diagnosticLogger = dependencies.logger || console;
+    const browser = await launchBrowser({
         headless: true,
         args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
     });
 
-    const context = await browser.newContext({ acceptDownloads: true });
-    const page = await context.newPage();
-
+    let context;
+    let page;
     try {
+        context = await browser.newContext({ acceptDownloads: true });
+        page = await context.newPage();
         // ============================================================
         // 1) LOGIN
         // ============================================================
-        await page.goto(
-            'https://eservices.yeka.gr/(S(kscbsvaffyzprn0p1havg3k1))/login.aspx?ReturnUrl=%2f',
-            { waitUntil: 'domcontentloaded', timeout: 25000 }
-        );
+        await runErganhCardsCriticalStep(page, 'login-page', async () => {
+            await page.goto('https://eservices.yeka.gr/login.aspx?ReturnUrl=%2f', {
+                waitUntil: 'domcontentloaded',
+                timeout: 25000
+            });
+            await page.fill(ERGANH_CARDS_SELECTORS.loginForm, username);
+            await page.fill(
+                '#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Password',
+                password
+            );
+        }, diagnosticLogger);
 
-        await page.fill('#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_UserName', username);
-        await page.fill('#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Password', password);
-
-        await Promise.allSettled([
-            page.waitForLoadState('domcontentloaded', { timeout: 25000 }),
-            page.click('#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Login')
-        ]);
+        await runErganhCardsCriticalStep(page, 'login-submit', () =>
+            Promise.all([
+                page.waitForSelector(
+                    'a.menu-dropdown:has(span.menu-text:text-is("ΧΡΟΝΟΣ ΕΡΓΑΣΙΑΣ"))',
+                    { state: 'visible', timeout: 25000 }
+                ),
+                page.click('#ctl00_ctl00_ContentHolder_ContentHolder_SiteLogin_Login')
+            ]), diagnosticLogger);
 
         await page.waitForTimeout(400);
 
         // ============================================================
         // 2) ΜΕΝΟΥ: ΧΡΟΝΟΣ ΕΡΓΑΣΙΑΣ → Κάρτα Εργασίας → Ημερολόγιο
         // ============================================================
-        await page.click('a.menu-dropdown:has(span.menu-text:text-is("ΧΡΟΝΟΣ ΕΡΓΑΣΙΑΣ"))');
+        await runErganhCardsCriticalStep(page, 'work-time-menu', () =>
+            page.click('a.menu-dropdown:has(span.menu-text:text-is("ΧΡΟΝΟΣ ΕΡΓΑΣΙΑΣ"))'),
+        diagnosticLogger);
         await page.waitForTimeout(300);
 
-        await page.click('a.menu-dropdown:has(span.menu-text:text-is("Κάρτα Εργασίας"))');
+        await runErganhCardsCriticalStep(page, 'work-card-menu', () =>
+            page.click('a.menu-dropdown:has(span.menu-text:text-is("Κάρτα Εργασίας"))'),
+        diagnosticLogger);
         await page.waitForTimeout(300);
 
-        await Promise.allSettled([
-            page.waitForLoadState('domcontentloaded', { timeout: 25000 }),
-            page.click('a[href="/WTO/Workcard/DailyWorkTimesSearch.aspx"]')
-        ]);
+        await runErganhCardsCriticalStep(page, 'search-navigation', () =>
+            Promise.all([
+                page.waitForSelector(ERGANH_CARDS_SELECTORS.searchForm, {
+                    state: 'visible',
+                    timeout: 25000
+                }),
+                page.click('a[href="/WTO/Workcard/DailyWorkTimesSearch.aspx"]')
+            ]), diagnosticLogger);
 
         await page.waitForTimeout(400);
 
@@ -13081,10 +13216,7 @@ async function downloadKartesXlsxToBuffer(
         // 3) ΠΑΡΑΡΤΗΜΑ
         // ============================================================
         if (pararthma !== null && pararthma !== undefined && pararthma !== '') {
-            await page.selectOption(
-                '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_PararthmaSelection_PararthmaListEdit',
-                String(pararthma)
-            );
+            await selectErganhCardsBranch(page, pararthma, diagnosticLogger);
             await page.waitForTimeout(200);
         }
 
@@ -13141,7 +13273,7 @@ async function downloadKartesXlsxToBuffer(
         await page.keyboard.type(toDateFormatted);
         await page.waitForTimeout(200);
 
-        await Promise.allSettled([
+        await Promise.all([
             page.waitForLoadState('domcontentloaded', { timeout: 25000 }),
             page.click(
                 '#ctl00_ctl00_ContentHolder_ContentHolder_DailyWorkTimesSearchControl_SearchControlSearchButton'
@@ -13202,8 +13334,16 @@ async function downloadKartesXlsxToBuffer(
             throw new Error('[KARTES] Δεν ήρθε Excel response μέσα σε 30 δευτερόλεπτα');
         }
 
-        console.log(`[KARTES] Excel buffer size: ${excelBuffer.length}`);
         return excelBuffer;
+    } catch (error) {
+        if (String(error?.code || '').startsWith('ERGANI_CARDS_')) throw error;
+        const state = await getErganhScheduleState(page, ERGANH_CARDS_SELECTORS);
+        logErganhCardsDiagnostic(diagnosticLogger, {
+            ...state,
+            stage: 'download',
+            errorCode: ERGANH_CARDS_CODES.downloadFailed
+        });
+        throw createErganhScheduleError(ERGANH_CARDS_CODES.downloadFailed);
     } finally {
         await browser.close();
     }
@@ -13222,6 +13362,23 @@ Object.defineProperty(erganhController, '__scheduleDownloadTestHooks', {
         sanitizeErganhPathname,
         selectErganhScheduleBranch,
         selectors: ERGANH_SCHEDULE_SELECTORS
+    }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__cardsDownloadTestHooks', {
+    value: Object.freeze({
+        buildKartesPersistencePayload,
+        downloadKartesXlsxToBuffer,
+        downloadPrepareStoreAndPersistCards,
+        getErganhScheduleState,
+        logErganhCardsDiagnostic,
+        prepareKartesXlsx,
+        saveKartesPayloadToMongo,
+        selectErganhCardsBranch,
+        validateKartesXlsxBuffer,
+        codes: ERGANH_CARDS_CODES,
+        selectors: ERGANH_CARDS_SELECTORS
     }),
     enumerable: false
 });
