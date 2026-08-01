@@ -126,6 +126,7 @@ jobs:
           require 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'
           require "exclude_file_has_exact_line '\.env'"
           require "exclude_file_has_exact_line '\.env\.production'"
+          require "exclude_file_has_exact_line '\*\.test\.js'"
           require 'pm2 reload payroll --update-env'
           require 'CONFIRM_PRODUCTION_DEPLOY.*!=.*yes'
           require 'Active users should complete/save their work before deployment\.'
@@ -184,6 +185,11 @@ jobs:
             echo "ERROR: production env files are not both excluded from rsync"
             exit 1
           fi
+          if ! awk '{ sub(/\r$/, ""); if ($0 == "*.test.js") found=1 } END { exit !found }' rsync-excludes.txt; then
+            echo "ERROR: application test files are not excluded from rsync"
+            exit 1
+          fi
+          node --test server/contracts/testJsDeploymentExclusion.contract.test.js
 
           flag_guard_body=$(awk '/^remote_apply_flags_disabled_guard\(\)/ { capture=1 } /^remote_runtime_apply_disabled_guard\(\)/ { if (capture) exit } capture' "$script")
           runtime_guard_body=$(awk '/^remote_runtime_apply_disabled_guard\(\)/ { capture=1 } /^get_file_size\(\)/ { if (capture) exit } capture' "$script")
@@ -732,6 +738,7 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/contracts/testJsDeploymentExclusion.contract.test.js"
             "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js"
             "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.holidayBadge.test.js"
             "public/js/symbaseis/ypologismoiKlimakion/ypologismos.test.js"
