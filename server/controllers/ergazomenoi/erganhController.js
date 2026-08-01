@@ -11441,18 +11441,28 @@ function sanitizeErganhPathname(urlValue) {
 }
 
 function logErganhScheduleDiagnostic(logger, details = {}) {
-    const safeDetails = {
-        stage: String(details.stage || 'unknown'),
-        pathname: sanitizeErganhPathname(details.url),
-        selectorCount: Number(details.selectorCount || 0),
-        optionCount: Number(details.optionCount || 0),
-        requestedBranch: String(details.requestedBranch || ''),
-        loginFormPresent: details.loginFormPresent === true,
-        searchFormPresent: details.searchFormPresent === true,
-        errorCode: String(details.errorCode || ''),
-        playwrightErrorName: String(details.playwrightErrorName || '')
-    };
-    (logger || console).error(ERGANH_SCHEDULE_DIAGNOSTIC_TAG, safeDetails);
+    try {
+        const safeDetails = {
+            stage: String(details.stage || 'unknown'),
+            pathname: sanitizeErganhPathname(details.url),
+            selectorCount: Number.isFinite(details.selectorCount)
+                ? details.selectorCount
+                : -1,
+            optionCount: Number.isFinite(details.optionCount) ? details.optionCount : -1,
+            requestedBranch:
+                details.requestedBranch === null || details.requestedBranch === undefined
+                    ? ''
+                    : String(details.requestedBranch),
+            loginFormPresent: details.loginFormPresent === true,
+            searchFormPresent: details.searchFormPresent === true,
+            diagnosticStateAvailable: details.diagnosticStateAvailable === true,
+            errorCode: String(details.errorCode || ''),
+            playwrightErrorName: String(details.playwrightErrorName || '')
+        };
+        (logger || console).error(ERGANH_SCHEDULE_DIAGNOSTIC_TAG, safeDetails);
+    } catch (_loggingError) {
+        // Diagnostics are best-effort and must never replace the stable runtime error code.
+    }
 }
 
 function createErganhScheduleError(code) {
@@ -11462,19 +11472,47 @@ function createErganhScheduleError(code) {
 }
 
 async function getErganhScheduleState(page) {
-    const [loginFormCount, searchFormCount, selectorCount, optionCount] = await Promise.all([
-        page.locator(ERGANH_SCHEDULE_SELECTORS.loginForm).count(),
-        page.locator(ERGANH_SCHEDULE_SELECTORS.searchForm).count(),
-        page.locator(ERGANH_SCHEDULE_SELECTORS.branch).count(),
-        page.locator(`${ERGANH_SCHEDULE_SELECTORS.branch} option`).count()
-    ]);
+    async function readCount(selector) {
+        try {
+            const locator = page.locator(selector);
+            return { available: true, value: await locator.count() };
+        } catch (_error) {
+            return { available: false, value: -1 };
+        }
+    }
+
+    async function readUrl() {
+        try {
+            return { available: true, value: await page.url() };
+        } catch (_error) {
+            return { available: false, value: '' };
+        }
+    }
+
+    const [urlResult, loginFormResult, searchFormResult, branchResult, optionResult] =
+        await Promise.all([
+            readUrl(),
+            readCount(ERGANH_SCHEDULE_SELECTORS.loginForm),
+            readCount(ERGANH_SCHEDULE_SELECTORS.searchForm),
+            readCount(ERGANH_SCHEDULE_SELECTORS.branch),
+            readCount(`${ERGANH_SCHEDULE_SELECTORS.branch} option`)
+        ]);
+
+    const diagnosticStateAvailable = [
+        urlResult,
+        loginFormResult,
+        searchFormResult,
+        branchResult,
+        optionResult
+    ].every((result) => result.available);
 
     return {
-        url: page.url(),
-        selectorCount,
-        optionCount,
-        loginFormPresent: loginFormCount > 0,
-        searchFormPresent: searchFormCount > 0
+        url: urlResult.value,
+        selectorCount: branchResult.value,
+        optionCount: optionResult.value,
+        loginFormPresent: loginFormResult.available && loginFormResult.value > 0,
+        searchFormPresent: searchFormResult.available && searchFormResult.value > 0,
+        diagnosticStateAvailable
     };
 }
 
@@ -11494,9 +11532,21 @@ async function runErganhScheduleCriticalStep(page, stage, action, logger) {
 }
 
 async function selectErganhScheduleBranch(page, pararthma, logger = console) {
-    const requestedBranch = String(pararthma || '');
+    const requestedBranch =
+        pararthma === null || pararthma === undefined ? '' : String(pararthma);
     let state = await getErganhScheduleState(page);
 
+    if (!state.diagnosticStateAvailable) {
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'authenticated-search-state',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
+
+    // false means the expected search state was not confirmed; it is not proof of bad credentials.
     if (state.loginFormPresent || !state.searchFormPresent) {
         logErganhScheduleDiagnostic(logger, {
             ...state,
@@ -11519,7 +11569,7 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
     } catch (error) {
         state = await getErganhScheduleState(page);
         const errorCode =
-            state.selectorCount === 0
+            state.diagnosticStateAvailable && state.selectorCount === 0
                 ? 'ERGANI_BRANCH_SELECTOR_MISSING'
                 : 'ERGANI_BRANCH_SELECTION_FAILED';
         logErganhScheduleDiagnostic(logger, {
@@ -11533,6 +11583,16 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
     }
 
     state = await getErganhScheduleState(page);
+    if (!state.diagnosticStateAvailable) {
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-selector-count',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED'
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
+
     if (state.selectorCount !== 1) {
         const errorCode =
             state.selectorCount === 0
@@ -11547,12 +11607,26 @@ async function selectErganhScheduleBranch(page, pararthma, logger = console) {
         throw createErganhScheduleError(errorCode);
     }
 
-    const requestedOptionPresent = await page
-        .locator(ERGANH_SCHEDULE_SELECTORS.branch)
-        .evaluate(
-            (select, value) => Array.from(select.options).some((option) => option.value === value),
-            requestedBranch
-        );
+    let requestedOptionPresent;
+    try {
+        requestedOptionPresent = await page
+            .locator(ERGANH_SCHEDULE_SELECTORS.branch)
+            .evaluate(
+                (select, value) =>
+                    Array.from(select.options).some((option) => option.value === value),
+                requestedBranch
+            );
+    } catch (error) {
+        state = await getErganhScheduleState(page);
+        logErganhScheduleDiagnostic(logger, {
+            ...state,
+            stage: 'branch-option-check',
+            requestedBranch,
+            errorCode: 'ERGANI_BRANCH_SELECTION_FAILED',
+            playwrightErrorName: error?.name
+        });
+        throw createErganhScheduleError('ERGANI_BRANCH_SELECTION_FAILED');
+    }
 
     if (!requestedOptionPresent) {
         logErganhScheduleDiagnostic(logger, {
