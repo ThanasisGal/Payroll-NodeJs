@@ -26,8 +26,11 @@ function productionUnscheduledRow(overrides = {}) {
         cards_eos_ora_01: '16:16',
         cards_ores_ergasias: 8.066666666666666,
         kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        apo_ora_01_apologistika: '08:12',
+        eos_ora_01_apologistika: '16:12',
         ores_ergasias_apologistika: 7.57,
         ores_pragmatikhs_ergasias_apologistika: 8.066666666666666,
+        compensation_breakdown_apologistika: { status: 'READY', reasons: [] },
         apologistiko_biblio: true,
         ...overrides
     };
@@ -37,16 +40,15 @@ function classify(row) {
     return matchApasxoliseisScenarioFacts(buildApasxoliseisScenarioFacts(row));
 }
 
-function testProductionUnscheduledDayIsKnownReviewScenario() {
+function testProductionUnscheduledDayIsResolvedWithoutHrReview() {
     const decision = classify(productionUnscheduledRow());
 
     assert.strictEqual(decision.scenario_code, 'UNSCHEDULED_DAY_WITH_CARDS');
     assert.strictEqual(decision.confidence, 'HIGH');
-    assert.strictEqual(decision.requires_review, true);
+    assert.strictEqual(decision.requires_review, false);
     assert.strictEqual(decision.can_auto_apply, false);
-    assert.deepStrictEqual(decision.proposed_updates, {
-        kathgoria_ergasias_apologistika: 'ΕΡΓ'
-    });
+    assert.deepStrictEqual(decision.proposed_updates, {});
+    assert.strictEqual(decision.display_labels.show_badge, false);
 
     const [preview] = buildApasxoliseisPolicyPreviewRows({
         rows: [productionUnscheduledRow()]
@@ -54,10 +56,27 @@ function testProductionUnscheduledDayIsKnownReviewScenario() {
     assert.strictEqual(preview.policyResult.success, true);
     assert.strictEqual(
         preview.policyResult.policy_code,
-        'DECLARED_REPO_OR_NON_WORK_WITH_CARDS'
+        'UNSCHEDULED_DAY_WITH_COMPLETE_CARDS'
     );
-    assert.strictEqual(preview.policyResult.result_status, 'NEEDS_REVIEW');
+    assert.strictEqual(preview.policyResult.result_status, 'RESOLVED_BY_POLICY');
+    assert.strictEqual(preview.policyResult.requires_human_approval, false);
     assert.strictEqual(preview.policyResult.blocked, false);
+}
+
+function testIncompleteApologistikaStillRequireReview() {
+    const incomplete = productionUnscheduledRow({
+        compensation_breakdown_apologistika: { status: 'NEEDS_HR_DECISION', reasons: [] }
+    });
+    const decision = classify(incomplete);
+    assert.strictEqual(decision.scenario_code, 'UNSCHEDULED_DAY_WITH_CARDS');
+    assert.strictEqual(decision.requires_review, true);
+    assert.deepStrictEqual(decision.proposed_updates, {
+        kathgoria_ergasias_apologistika: 'ΕΡΓ'
+    });
+
+    const [preview] = buildApasxoliseisPolicyPreviewRows({ rows: [incomplete] });
+    assert.strictEqual(preview.policyResult.policy_code, 'UNSCHEDULED_DAY_WITH_COMPLETE_CARDS');
+    assert.strictEqual(preview.policyResult.result_status, 'NEEDS_REVIEW');
 }
 
 function testUnsafeBlankDaysRemainUnknown() {
@@ -90,7 +109,8 @@ function testUnsafeBlankDaysRemainUnknown() {
 }
 
 function run() {
-    testProductionUnscheduledDayIsKnownReviewScenario();
+    testProductionUnscheduledDayIsResolvedWithoutHrReview();
+    testIncompleteApologistikaStillRequireReview();
     testUnsafeBlankDaysRemainUnknown();
     console.log('apasxoliseis scenario matcher tests passed');
 }

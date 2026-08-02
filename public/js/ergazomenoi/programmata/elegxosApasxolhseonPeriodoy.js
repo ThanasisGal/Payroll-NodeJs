@@ -129,6 +129,8 @@ const policyPreviewStatusLabels = {
 const policyPreviewPolicyLabels = {
     NO_APOLOGISTIKO_BIBLIO_OK: 'Δεν αφορά απολογιστικό βιβλίο',
     CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK: 'Δεν απαιτείται κάρτα για προδηλωμένο ωράριο',
+    UNSCHEDULED_DAY_WITH_COMPLETE_CARDS:
+        'Μη προδηλωμένη ημέρα με πλήρεις κάρτες',
     DECLARED_REPO_OR_NON_WORK_WITH_CARDS:
         'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
     NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY: 'Εργασία χωρίς κάρτες λόγω άδειας ή αργίας',
@@ -399,6 +401,7 @@ function renderScenarioBadge(row, repoTransferState) {
     const decision = row?.scenarioDecision;
 
     if (!decision || !decision.scenario_code) return '';
+    if (decision.display_labels?.show_badge === false) return '';
     if (
         decision.requires_review === true &&
         repoTransferState !== undefined &&

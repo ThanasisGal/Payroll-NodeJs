@@ -893,6 +893,27 @@ function testConfidenceAndDecisionTerminology() {
     assert.ok(!source.includes('<span>Δεν μπορεί να εφαρμοστεί</span>'));
 }
 
+function testResolvedUnscheduledWorkDoesNotRenderReviewBadge() {
+    const resolved = sandbox.renderScenarioBadge({
+        scenarioDecision: {
+            scenario_code: 'UNSCHEDULED_DAY_WITH_CARDS',
+            confidence: 'HIGH',
+            requires_review: false,
+            display_labels: { show_badge: false }
+        }
+    });
+    assert.strictEqual(resolved, '');
+    assert.strictEqual(
+        sandbox.isScenarioReviewRow({
+            scenarioDecision: {
+                scenario_code: 'UNSCHEDULED_DAY_WITH_CARDS',
+                requires_review: false
+            }
+        }),
+        false
+    );
+}
+
 function testBranchRequiredForDecisionButtons() {
     vm.runInContext("currentPolicyPreviewBaseParams = new URLSearchParams('ypokatasthma=ALL')", sandbox);
     const withoutBranch = render(readyProjection());
@@ -2315,6 +2336,7 @@ const tests = [
     testReadOnlySafety,
     testServerDerivedRepoTransferPermissionsAndRoleVisibility,
     testConfidenceAndDecisionTerminology,
+    testResolvedUnscheduledWorkDoesNotRenderReviewBadge,
     testBranchRequiredForDecisionButtons,
     testAllBranchSkipsDecisionRequests,
     testOnlyCurrentDecisionDisablesButtons,

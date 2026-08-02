@@ -270,6 +270,61 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         ]
     },
     {
+        policy_code: 'UNSCHEDULED_DAY_WITH_COMPLETE_CARDS',
+        policy_version: 'foundation:v1',
+        title: 'Μη προδηλωμένη ημέρα με πλήρεις κάρτες',
+        description:
+            'Θεωρεί ολοκληρωμένη τη μη προδηλωμένη εργασία όταν οι κάρτες και τα απολογιστικά αποτελέσματα είναι πλήρη και συνεπή.',
+        category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
+        default_mode: POLICY_MODE.SUGGESTION,
+        supported_modes: [
+            POLICY_MODE.REVIEW_ONLY,
+            POLICY_MODE.SUGGESTION,
+            POLICY_MODE.PREFILL
+        ],
+        default_priority: 95,
+        safety_level: POLICY_SAFETY_LEVEL.MEDIUM_RISK,
+        batch_approvable: false,
+        requires_human_approval: false,
+        required_facts: [
+            'declared.kathgoria_ergasias',
+            'declared.hasDeclaredHours',
+            'declared.hasDeclaredIntervals',
+            'cards.hasCards',
+            'cards.cardIntervalsNormalized',
+            'cards.cardHours',
+            'apologistika.currentApologistikaCategory',
+            'apologistika.currentApologistikaIntervals',
+            'apologistika.currentApologistikaHours',
+            'apologistika.currentActualWorkHours',
+            'apologistika.compensationBreakdownStatus'
+        ],
+        allowed_parameters_schema: {},
+        proposed_update_fields: [
+            'kathgoria_ergasias_apologistika',
+            'apo_ora_01_apologistika',
+            'eos_ora_01_apologistika',
+            'apo_ora_02_apologistika',
+            'eos_ora_02_apologistika',
+            'apo_ora_03_apologistika',
+            'eos_ora_03_apologistika',
+            'ores_ergasias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'compensation_breakdown_apologistika'
+        ],
+        result_statuses: [
+            POLICY_RESULT_STATUS.RESOLVED_BY_POLICY,
+            POLICY_RESULT_STATUS.PREFILLED_PENDING_APPROVAL,
+            POLICY_RESULT_STATUS.NEEDS_REVIEW,
+            POLICY_RESULT_STATUS.CONFLICT_AMBIGUOUS
+        ],
+        related_scenario_codes: ['UNSCHEDULED_DAY_WITH_CARDS'],
+        notes: [
+            'Δεν δημιουργεί απόφαση HR όταν ο υπολογισμός έχει ολοκληρωθεί με READY breakdown.',
+            'Ελλιπή ή ασυνεπή απολογιστικά στοιχεία παραμένουν προς έλεγχο.'
+        ]
+    },
+    {
         policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
         policy_version: 'foundation:v3',
         title: 'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
@@ -329,8 +384,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         ],
         related_scenario_codes: [
             'DECLARED_REPO_WITH_CARDS',
-            'DECLARED_NON_WORK_WITH_CARDS',
-            'UNSCHEDULED_DAY_WITH_CARDS'
+            'DECLARED_NON_WORK_WITH_CARDS'
         ],
         notes: [
             'Δεν αλλάζει τον υπολογισμό απασχολήσεων.',

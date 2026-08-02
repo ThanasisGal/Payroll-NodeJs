@@ -125,6 +125,32 @@ function isSafeUnscheduledDayWithCards(facts = {}) {
     );
 }
 
+function isResolvedUnscheduledDayWithCards(facts = {}) {
+    if (!isSafeUnscheduledDayWithCards(facts)) return false;
+
+    const apologistikaIntervals = Array.isArray(
+        facts?.apologistika?.currentApologistikaIntervals
+    )
+        ? facts.apologistika.currentApologistikaIntervals
+        : [];
+    const completeIntervals = apologistikaIntervals.filter(
+        (interval) => interval?.isComplete && !interval?.isZeroLength
+    );
+    const incompleteIntervals = apologistikaIntervals.filter(
+        (interval) => !interval?.isComplete && (interval?.start || interval?.end)
+    );
+
+    return (
+        facts?.apologistika?.currentApologistikaCategory === 'ΕΡΓ' &&
+        Number(facts?.apologistika?.currentApologistikaHours) > 0 &&
+        Number(facts?.apologistika?.currentActualWorkHours) > 0 &&
+        completeIntervals.length > 0 &&
+        incompleteIntervals.length === 0 &&
+        facts?.apologistika?.compensationBreakdownStatus === 'READY' &&
+        facts?.apologistika?.compensationBreakdownReasons.length === 0
+    );
+}
+
 function buildScenarioDecision({
     scenario_code,
     confidence,
@@ -214,6 +240,19 @@ function makeUnknownDecision(facts = {}) {
 
 function getMvpScenarioTemplates() {
     return [
+        {
+            scenario_code: SCENARIO_CODES.UNSCHEDULED_DAY_WITH_CARDS,
+            description:
+                'Μη προδηλωμένη ημέρα με πλήρεις κάρτες και ολοκληρωμένα απολογιστικά πεδία.',
+            confidence: CONFIDENCE.HIGH,
+            requires_review: false,
+            reasons: [REASON_CODES.UNSCHEDULED_DAY_WITH_CARDS],
+            match: (facts) => isResolvedUnscheduledDayWithCards(facts),
+            proposed_updates: {},
+            display_labels: {
+                show_badge: false
+            }
+        },
         {
             scenario_code: SCENARIO_CODES.UNSCHEDULED_DAY_WITH_CARDS,
             description:
@@ -397,5 +436,6 @@ module.exports = {
     SCENARIO_CODES,
     CONFIDENCE,
     DECISION_STATUS,
-    REASON_CODES
+    REASON_CODES,
+    isResolvedUnscheduledDayWithCards
 };

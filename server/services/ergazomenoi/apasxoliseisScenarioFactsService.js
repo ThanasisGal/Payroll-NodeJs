@@ -189,6 +189,9 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
     const declaredHours = toNumberOrZero(sourceRow.ores_ergasias);
     const cardHours = toNumberOrZero(sourceRow.cards_ores_ergasias);
     const currentApologistikaHours = toNumberOrZero(sourceRow.ores_ergasias_apologistika);
+    const currentActualWorkHours = toNumberOrZero(
+        sourceRow.ores_pragmatikhs_ergasias_apologistika
+    );
     const kathgoriaErgasias = toTrimmedString(sourceRow.kathgoria_ergasias);
     const cardIntervalsNormalized = getCompleteNonZeroIntervals(cardIntervalsRaw);
     const hasInvalidCardTimeValue = CARD_INTERVAL_FIELDS.some(([startField, endField]) =>
@@ -230,6 +233,15 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
         ),
         currentApologistikaIntervals,
         currentApologistikaHours,
+        currentActualWorkHours,
+        compensationBreakdownStatus: toTrimmedString(
+            sourceRow.compensation_breakdown_apologistika?.status
+        ),
+        compensationBreakdownReasons: Array.isArray(
+            sourceRow.compensation_breakdown_apologistika?.reasons
+        )
+            ? sourceRow.compensation_breakdown_apologistika.reasons
+            : [],
         existingFlags: buildExistingFlags(sourceRow)
     };
 
