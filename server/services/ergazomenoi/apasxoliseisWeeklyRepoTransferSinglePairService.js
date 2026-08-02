@@ -22,8 +22,8 @@ const {
 } = require('../../utils/date/mondaySundayWeek');
 
 const SCENARIO_CODE = 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR';
-const SCENARIO_VERSION = 'repo-transfer-single-pair:v3';
-const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v3';
+const SCENARIO_VERSION = 'repo-transfer-single-pair:v4';
+const SCENARIO_VERSION_V2 = 'repo-transfer-single-pair:v4';
 
 const ELIGIBILITY_STATUS = Object.freeze({
     ELIGIBLE: 'ELIGIBLE',
@@ -242,15 +242,28 @@ function isProvisionalAutoCalculatedLeave({
     const workHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_ergasias_apologistika'
     ) || { kind: 'ZERO', value: 0 };
+    const actualWorkHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_pragmatikhs_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
     const absenceHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_apoysias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const paidLeaveHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_adeias_pistomenes_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
+    const holidayCreditedHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_argias_pistomenes_apologistika'
     ) || { kind: 'ZERO', value: 0 };
     const unrelatedPositiveHours = apologistikaState.numericStates.some(
         (state) =>
             state.kind === 'POSITIVE' &&
-            !['ores_ergasias_apologistika', 'ores_apoysias_apologistika'].includes(
-                state.field
-            )
+            ![
+                'ores_ergasias_apologistika',
+                'ores_apoysias_apologistika',
+                'ores_pragmatikhs_ergasias_apologistika',
+                'ores_adeias_pistomenes_apologistika',
+                'ores_argias_pistomenes_apologistika'
+            ].includes(state.field)
     );
     const declaredHours = toFiniteNumber(row.ores_ergasias);
     const workHoursMatchFallback =
@@ -258,6 +271,11 @@ function isProvisionalAutoCalculatedLeave({
         (workHoursState.kind === 'POSITIVE' &&
             declaredHours !== null &&
             workHoursState.value === declaredHours);
+    const paidLeaveHoursCompatible =
+        paidLeaveHoursState.kind === 'ZERO' ||
+        (paidLeaveHoursState.kind === 'POSITIVE' &&
+            declaredHours !== null &&
+            numbersMatch(paidLeaveHoursState.value, declaredHours));
     const autoLeaveMarker =
         facts.leave.adeia_apologistika ||
         apologistikaState.category === 'ΑΔΕΙΑ' ||
@@ -284,6 +302,9 @@ function isProvisionalAutoCalculatedLeave({
         apologistikaState.invalidNumericValue === false &&
         workHoursMatchFallback &&
         absenceHoursState.kind === 'ZERO' &&
+        actualWorkHoursState.kind === 'ZERO' &&
+        paidLeaveHoursCompatible &&
+        holidayCreditedHoursState.kind === 'ZERO' &&
         unrelatedPositiveHours === false &&
         hasCompleteNonZeroApologistikaInterval(row) === false &&
         facts.apologistika.existingFlags.repo_apologistika === false
@@ -291,6 +312,7 @@ function isProvisionalAutoCalculatedLeave({
 }
 
 const AUTO_SOURCE_DERIVED_HOUR_FIELDS = new Set([
+    'ores_pragmatikhs_ergasias_apologistika',
     'ores_nyxtas_apologistika',
     'ores_argion_prosayxhsh_apologistika',
     'ores_argion_ergasia_apologistika',
@@ -387,6 +409,9 @@ function isProvisionalAutoCalculatedSourceWork({
     const workHoursState = apologistikaState.numericStates.find(
         (state) => state.field === 'ores_ergasias_apologistika'
     ) || { kind: 'ZERO', value: 0 };
+    const actualWorkHoursState = apologistikaState.numericStates.find(
+        (state) => state.field === 'ores_pragmatikhs_ergasias_apologistika'
+    ) || { kind: 'ZERO', value: 0 };
     const apologistikaIntervalHours = facts.apologistika.currentApologistikaIntervals
         .filter((interval) => interval.isComplete && !interval.isZeroLength)
         .reduce((sum, interval) => sum + interval.durationMinutes / 60, 0);
@@ -410,6 +435,11 @@ function isProvisionalAutoCalculatedSourceWork({
             ].some((expected) =>
                 numbersMatch(workHoursState.value, expected)
             ));
+    const actualWorkHoursCompatible =
+        actualWorkHoursState.kind === 'ZERO' ||
+        (actualWorkHoursState.kind === 'POSITIVE' &&
+            [cardHours, cardHoursAfterKnownBreak, apologistikaIntervalHours]
+                .some((expected) => numbersMatch(actualWorkHoursState.value, expected)));
     const unrelatedPositiveHours = apologistikaState.numericStates.some((state) => {
         if (state.kind !== 'POSITIVE') return false;
         if (state.field === 'ores_ergasias_apologistika') return false;
@@ -417,7 +447,9 @@ function isProvisionalAutoCalculatedSourceWork({
     });
     const positiveDerivedHours = apologistikaState.numericStates.filter(
         (state) =>
-            state.kind === 'POSITIVE' && AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field)
+            state.kind === 'POSITIVE' &&
+            AUTO_SOURCE_DERIVED_HOUR_FIELDS.has(state.field) &&
+            state.field !== 'ores_pragmatikhs_ergasias_apologistika'
     );
     const isSunday = new Date(row.hmeromhnia).getUTCDay() === 0;
     const derivedHoursCompatibleWithProvenance =
@@ -447,6 +479,7 @@ function isProvisionalAutoCalculatedSourceWork({
         categoryCompatible &&
         apologistikaState.invalidNumericValue === false &&
         workHoursCompatible &&
+        actualWorkHoursCompatible &&
         unrelatedPositiveHours === false &&
         derivedHoursCompatibleWithProvenance &&
         sourceIntervalsMatchAutoResult(row, facts, employmentProfile)
@@ -856,6 +889,18 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
                 cleanTargets.length > 1 ? 'MULTIPLE_TARGET_CANDIDATES' : 'NO_TARGET_CANDIDATE',
                 ...unsafeReasons
             ],
+            counts
+        });
+    }
+
+    if (
+        cleanSources[0].dateKey.slice(0, 7) !==
+        cleanTargets[0].dateKey.slice(0, 7)
+    ) {
+        return buildResult({
+            ...base,
+            status: ELIGIBILITY_STATUS.NEEDS_REVIEW,
+            reasons: ['CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED'],
             counts
         });
     }

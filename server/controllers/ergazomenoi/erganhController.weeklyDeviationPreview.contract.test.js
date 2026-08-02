@@ -57,7 +57,37 @@ assert.ok(source.includes('pendingDeviationWeeks'));
 assert.ok(source.includes('legacyDeviations'));
 assert.ok(source.includes('normalizeLegacyDeviation({'));
 assert.ok(source.includes('deviationPolicyVersion: deviationPreview.policyVersion'));
+const cleanupFilterStart = source.indexOf('const deviationsCleanupFilter = {');
+const cleanupFilterEnd = source.indexOf(
+    'await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter);',
+    cleanupFilterStart
+);
+assert.ok(cleanupFilterStart >= 0 && cleanupFilterEnd > cleanupFilterStart);
+const cleanupFilterSource = source.slice(cleanupFilterStart, cleanupFilterEnd);
+assert.ok(cleanupFilterSource.includes('team: sessionTeam'));
+assert.ok(cleanupFilterSource.includes('company_kod: companyId'));
+assert.ok(cleanupFilterSource.includes('period_apo: asDateOnlyUtc(apoDate)'));
+assert.ok(cleanupFilterSource.includes('period_eos: asDateOnlyUtc(eosDate, true)'));
+assert.ok(cleanupFilterSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    cleanupFilterSource.includes(
+        'deviationsCleanupFilter.ypokatasthma = selectedYpokatasthma;'
+    )
+);
 assert.ok(!source.includes('startOfWeekSunday'));
 assert.ok(!source.includes('endOfWeekSaturday'));
+
+const atomicStart = source.indexOf('async function buildAtomicRepoTransferPolicyPreviewProjection');
+const atomicEnd = source.indexOf('function getWeekRangesInsidePeriod', atomicStart);
+assert.ok(atomicStart >= 0 && atomicEnd > atomicStart);
+const atomicSource = source.slice(atomicStart, atomicEnd);
+assert.ok(atomicSource.includes('startOfWeekMondayUtc(requestedPeriodStart)'));
+assert.ok(atomicSource.includes('endOfWeekSundayUtc(requestedPeriodEnd)'));
+assert.ok(atomicSource.includes('validationPeriodStart: requestedPeriodStart'));
+assert.ok(atomicSource.includes('validationPeriodEnd: requestedPeriodEnd'));
+assert.ok(atomicSource.includes('presentationStart: requestedPeriodStart'));
+assert.ok(atomicSource.includes('presentationEnd: requestedPeriodEnd'));
+assert.ok(atomicSource.includes('$gte: analysisPeriodStart'));
+assert.ok(atomicSource.includes('$lte: analysisPeriodEnd'));
 
 console.log('employment review weekly deviation preview controller contract passed');

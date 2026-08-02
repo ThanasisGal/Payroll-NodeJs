@@ -23,7 +23,7 @@ const {
 } = require('./apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const { getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
 
-const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v2';
+const SNAPSHOT_VERSION = 'weekly-repo-transfer-decision-snapshot:v3';
 const ROW_FIELDS = Object.freeze(ATOMIC_REPO_TRANSFER_ROW_FIELDS.split(/\s+/).filter(Boolean));
 
 function conflict(message) { const error = new Error(message); error.statusCode = 409; return error; }
@@ -202,7 +202,7 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.');
     const auditCounts = new Map(); context.audits.forEach((audit) => { const id = String(audit.prodhlomena_oraria_id); auditCounts.set(id, (auditCounts.get(id) || 0) + 1); });
     const contractVersion = command.expected_proposal_version ===
-        'repo-transfer-single-pair-proposal:v3'
+        'repo-transfer-single-pair-proposal:v4'
         ? normalizeEmploymentType(context.employmentProfile?.typos_apasxolhshs) ===
             EMPLOYMENT_TYPE.FULL
             ? 'v1'

@@ -35,6 +35,23 @@ function resolve(rows, profile) {
     });
     assert.strictEqual(result.effectiveExpectedWeeklyRepo, 2);
     assert.strictEqual(result.repoResolutionSource, REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS);
+    assert.strictEqual(result.derivedMhniaiaRepo, 2);
+    assert.strictEqual(result.mhniaiaRepoConflictsWithContract, true);
+}
+
+for (let contractualWorkdays = 1; contractualWorkdays <= 6; contractualWorkdays++) {
+    const result = resolve(scheduledRows(contractualWorkdays), {
+        raw_mhniaia_repo: 99,
+        mhniaia_repo: 99,
+        hmeres_ergasias_ebdomadas: contractualWorkdays
+    });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.effectiveExpectedWeeklyRepo, 7 - contractualWorkdays);
+    assert.strictEqual(result.effectiveWeeklyWorkdays, contractualWorkdays);
+    assert.strictEqual(
+        result.repoResolutionSource,
+        REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS
+    );
 }
 
 {
@@ -84,6 +101,9 @@ for (const mhniaiaRepo of [0, 2]) {
         hmeres_ergasias_ebdomadas: 5
     });
     assert.strictEqual(contractualProfileWins.effectiveExpectedWeeklyRepo, 2);
+    assert.strictEqual(contractualProfileWins.rawMhniaiaRepo, 3);
+    assert.strictEqual(contractualProfileWins.derivedMhniaiaRepo, 2);
+    assert.strictEqual(contractualProfileWins.mhniaiaRepoConflictsWithContract, true);
     assert.strictEqual(
         contractualProfileWins.repoResolutionSource,
         REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS

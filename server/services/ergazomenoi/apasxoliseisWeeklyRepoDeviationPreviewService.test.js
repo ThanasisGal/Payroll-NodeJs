@@ -81,6 +81,13 @@ function testCompletedMondaySundayRanges() {
         assert.strictEqual(result.deviations[0].week_eos, end);
         assert.strictEqual(result.deviations[0].policyVersion, POLICY_VERSION);
         assert.strictEqual(result.deviations[0].expected_repo, 2);
+        assert.strictEqual(result.deviations[0].missing_repo, 2);
+        assert.strictEqual(result.deviations[0].effective_expected_repo, 2);
+        assert.strictEqual(result.deviations[0].effective_weekly_workdays, 5);
+        assert.strictEqual(
+            result.deviations[0].expected_repo_source,
+            'CONTRACTUAL_WEEKLY_WORKDAYS'
+        );
     }
 }
 
@@ -97,6 +104,25 @@ function testContractualProfileControlsExpectedRepo() {
         })
     });
     assert.strictEqual(sixDay.deviations[0].expected_repo, 1);
+
+    const fourDay = buildWeeklyRepoDeviationPreview({
+        rows: rows('2026-06-15'),
+        periodStart: '2026-06-01',
+        periodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveWeeklyProfile: () => ({
+            expectedWeeklyRepo: 99,
+            repoResolutionReason: null,
+            effectiveProfile: {
+                hmeres_ergasias_ebdomadas: 4,
+                raw_mhniaia_repo: 2
+            }
+        })
+    });
+    assert.strictEqual(fourDay.deviations[0].expected_repo, 3);
+    assert.strictEqual(fourDay.deviations[0].raw_mhniaia_repo, 2);
+    assert.strictEqual(fourDay.deviations[0].derived_mhniaia_repo, 3);
+    assert.strictEqual(fourDay.deviations[0].mhniaia_repo_conflicts_with_contract, true);
 
     const changed = buildWeeklyRepoDeviationPreview({
         rows: rows('2026-06-15'),

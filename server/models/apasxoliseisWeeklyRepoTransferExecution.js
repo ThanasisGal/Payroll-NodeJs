@@ -1,14 +1,45 @@
 const { Schema, model } = require('mongoose');
 
 const immutable = (type, extra = {}) => ({ type, required: true, immutable: true, ...extra });
-const SNAPSHOT_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika']);
+const compensationHoursSchema = new Schema({
+    declaredWorkHours: Number, actualWorkHours: Number, paidLeaveHours: Number,
+    holidayCreditedHours: Number, nightHours: Number, sundayHolidayWorkHours: Number,
+    sixthDayHours: Number, illegalOvertimeHours: Number
+}, { _id: false, strict: 'throw' });
+const compensationRatesSchema = new Schema({
+    paidHourlyRate: Number, legalHourlyRate: Number
+}, { _id: false, strict: 'throw' });
+const compensationComponentSchema = new Schema({
+    code: String, hours: Number, ratePercent: Number, rateBasis: String,
+    baseHourlyRate: Number, premiumAmount: Number, policySource: String,
+    policyStatus: String, appliedRuleId: String
+}, { _id: false, strict: 'throw' });
+const compensationAmountsSchema = new Schema({
+    baseActualWorkAmount: Number, premiumTotalAmount: Number, grossWorkAmount: Number
+}, { _id: false, strict: 'throw' });
+const compensationBreakdownSchema = new Schema({
+    policyVersion: String,
+    status: String,
+    reasons: [String],
+    warnings: [String],
+    hours: compensationHoursSchema,
+    rates: compensationRatesSchema,
+    components: [compensationComponentSchema],
+    amounts: compensationAmountsSchema,
+    accumulationRule: String
+}, { _id: false, strict: 'throw' });
+const SNAPSHOT_FIELDS = Object.freeze(['kathgoria_ergasias_apologistika','repo_apologistika','adeia_apologistika','kathgoria_adeias_apologistika','ores_apoysias_apologistika','apo_ora_01_apologistika','eos_ora_01_apologistika','apo_ora_02_apologistika','eos_ora_02_apologistika','apo_ora_03_apologistika','eos_ora_03_apologistika','ores_ergasias_apologistika','ores_pragmatikhs_ergasias_apologistika','ores_adeias_pistomenes_apologistika','ores_argias_pistomenes_apologistika','compensation_breakdown_apologistika']);
 const snapshotFieldTypes = Object.freeze({
     kathgoria_ergasias_apologistika: String, repo_apologistika: Boolean,
     adeia_apologistika: Boolean, kathgoria_adeias_apologistika: String,
     ores_apoysias_apologistika: Number, apo_ora_01_apologistika: String,
     eos_ora_01_apologistika: String, apo_ora_02_apologistika: String,
     eos_ora_02_apologistika: String, apo_ora_03_apologistika: String,
-    eos_ora_03_apologistika: String, ores_ergasias_apologistika: Number
+    eos_ora_03_apologistika: String, ores_ergasias_apologistika: Number,
+    ores_pragmatikhs_ergasias_apologistika: Number,
+    ores_adeias_pistomenes_apologistika: Number,
+    ores_argias_pistomenes_apologistika: Number,
+    compensation_breakdown_apologistika: compensationBreakdownSchema
 });
 const snapshotDefinition = () => Object.fromEntries(SNAPSHOT_FIELDS.map((field) => [field, { type: snapshotFieldTypes[field], immutable: true }]));
 const beforeValuesSchema = new Schema(snapshotDefinition(), { _id: false, strict: 'throw' });
@@ -17,7 +48,7 @@ function plainSnapshot(value) { return value && typeof value.toObject === 'funct
 function exactSnapshotValues(value, nullable) {
     const source = plainSnapshot(value); if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
     const keys = Object.keys(source); if (keys.length !== SNAPSHOT_FIELDS.length || keys.some((field) => !SNAPSHOT_FIELDS.includes(field)) || SNAPSHOT_FIELDS.some((field) => !Object.hasOwn(source, field))) return false;
-    return SNAPSHOT_FIELDS.every((field) => { const item = source[field]; if (item === null) return nullable; const expected = snapshotFieldTypes[field]; if (expected === String) return typeof item === 'string'; if (expected === Boolean) return typeof item === 'boolean'; return typeof item === 'number' && Number.isFinite(item); });
+    return SNAPSHOT_FIELDS.every((field) => { const item = source[field]; if (item === null) return nullable || field === 'compensation_breakdown_apologistika'; if (!nullable && field === 'compensation_breakdown_apologistika') return false; const expected = snapshotFieldTypes[field]; if (expected === String) return typeof item === 'string'; if (expected === Boolean) return typeof item === 'boolean'; if (expected === Number) return typeof item === 'number' && Number.isFinite(item); return item && typeof item === 'object' && !Array.isArray(item); });
 }
 const exactValidator = (nullable) => ({ validator: (value) => exactSnapshotValues(value, nullable), message: 'Invalid fixed repo-transfer snapshot values.' });
 const beforeSnapshotSchema = new Schema({ source: { type: beforeValuesSchema, required: true, validate: exactValidator(true) }, target: { type: beforeValuesSchema, required: true, validate: exactValidator(true) }, source_locked: { type: Boolean, required: true }, target_locked: { type: Boolean, required: true } }, { _id: false, strict: 'throw' });

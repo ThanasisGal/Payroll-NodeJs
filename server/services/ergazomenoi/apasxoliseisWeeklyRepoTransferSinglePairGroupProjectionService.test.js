@@ -118,10 +118,10 @@ function assertSafetyContract(group) {
     assert.strictEqual(group.employees_count, 1);
     assert.deepStrictEqual(group.pair_contract, {
         choice_code: 'TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR',
-        proposal_version: 'repo-transfer-single-pair-proposal:v3',
+        proposal_version: 'repo-transfer-single-pair-proposal:v4',
         policy_versions: {
-            weekly_repo: 'foundation:v2',
-            source_work: 'foundation:v1'
+            weekly_repo: 'foundation:v3',
+            source_work: 'foundation:v2'
         },
         atomic_pair_required: true,
         requires_hr_review: true,
@@ -237,7 +237,7 @@ function testStableGroupIdentity() {
         'group_type=ATOMIC_PAIRED_PROPOSAL|' +
             'scenario=REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR|' +
             'choice=TRANSFER_REPO_WITHIN_WEEK_SINGLE_PAIR|' +
-            'proposal_version=repo-transfer-single-pair-proposal:v3|' +
+            'proposal_version=repo-transfer-single-pair-proposal:v4|' +
             'employee=001|week=2026-07-06:2026-07-12|source=row-1|target=row-4'
     );
     assert.match(first.groups[0].group_id, /^policy-preview-paired-group-[a-f0-9]{16}$/);
@@ -293,7 +293,11 @@ function testSplitShiftIntervalsArePreservedInProjection() {
         eos_ora_02_apologistika: '16:00',
         apo_ora_03_apologistika: '',
         eos_ora_03_apologistika: '',
-        ores_ergasias_apologistika: 7.5
+        ores_ergasias_apologistika: 7.5,
+        ores_pragmatikhs_ergasias_apologistika: 7.5,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        compensation_breakdown_apologistika: null
     };
 
     assert.deepStrictEqual(twoIntervalSource.proposed_values, twoIntervalValues);

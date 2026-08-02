@@ -34,29 +34,41 @@ command validation, πραγματικό reconstruction, preflight και apply 
 controller/route tests παραμένουν source contracts επειδή η φόρτωση της
 κανονικής εφαρμογής θα μπορούσε να εκκινήσει πραγματικές υποδομές.
 
-## Reduced-workdays partial-family contract
+## Authoritative expected-repo contract
 
-Η validation αποκάλυψε πραγματικό production gap: το legacy
-`mhniaia_repo` αναπαριστά μόνο τις καθιερωμένες τιμές 1/2 και επιστρέφει
-`0` για έγκυρο τετραήμερο profile. Η διόρθωση περιορίζεται στη v2
-`PARTIAL_FAMILY`. Όταν το authoritative
+Το `mhniaia_repo` δεν συμμετέχει στον υπολογισμό της εβδομαδιαίας
+υποχρέωσης. Διατηρείται μόνο ως διαγνωστική/legacy πληροφορία. Για FULL,
+MERIKH και EK_PERITROPHS, όταν το authoritative
 `hmeres_ergasias_ebdomadas` είναι ακέραιος από 1 έως 6, ο αναμενόμενος
 αριθμός μη εργάσιμων ημερών είναι:
 
 `7 - hmeres_ergasias_ebdomadas`
 
-Άρα ένα τετραήμερο profile έχει expected count 3. Legacy
-`mhniaia_repo: 0` θεωρείται μη διαθέσιμη legacy τιμή όταν υπάρχουν έγκυρες
-ημέρες και δεν εμποδίζει τον υπολογισμό. Θετικό explicit repo count που
-διαφέρει από το αποτέλεσμα απορρίπτεται fail-closed με
-`PARTIAL_WEEKLY_REPO_PROFILE_CONFLICT`. Άκυρες ή ασαφείς ημέρες
-απορρίπτονται χωρίς inference από τις εβδομαδιαίες ώρες.
+Άρα πενθήμερο profile έχει expected count 2, εξαήμερο 1 και τετραήμερο 3.
+Άκυρες ή ασαφείς συμβατικές ημέρες απορρίπτονται fail-closed χωρίς inference
+από τις εβδομαδιαίες ώρες ή από το `mhniaia_repo`. Το FULL target παραμένει
+`ΑΝ`, ενώ MERIKH και EK_PERITROPHS χρησιμοποιούν `ΜΕ`.
 
-Το direct v1 contract και το FULL παραμένουν αμετάβλητα: δέχονται μόνο
-repo limits 1/2 και το FULL target παραμένει `ΑΝ`. Το HR page projection,
-το decision reconstruction και το decision batch μεταφέρουν πλέον το ίδιο
-ήδη επιλυμένο authoritative `hmeres_ergasias_ebdomadas` στο v2 analyzer.
-Δεν προστέθηκε schema, DB query ή controller business logic.
+## Όρια και ατομικότητα μεταφοράς
+
+- Η εβδομάδα αναλύεται ολόκληρη, Δευτέρα–Κυριακή, ακόμη και όταν τέμνει
+  την αρχή ή το τέλος του επιλεγμένου μήνα.
+- Οι εκτός φίλτρου ημέρες χρησιμοποιούνται μόνο ως read context.
+- Όταν ο υπολογισμός εκτελείται για συγκεκριμένο παράρτημα, η αντικατάσταση
+  των αποθηκευμένων αποκλίσεων περιορίζεται στο ίδιο παράρτημα· αποκλίσεις
+  άλλων παραρτημάτων της εταιρείας για την ίδια περίοδο δεν διαγράφονται.
+- Source και target πρέπει να ανήκουν στον ίδιο μήνα και στο επιλεγμένο
+  διάστημα. Διαφορετικά επιστρέφεται
+  `CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED` ή η ομάδα αποκρύπτεται ως
+  context-only.
+- Εβδομάδα της οποίας η Κυριακή δεν έχει παρέλθει επιστρέφει
+  `OPEN_WEEK_PENDING_COMPLETION` και δεν προτείνεται αλλαγή.
+- Η αλλαγή source→εργασία και target→ρεπό εφαρμόζεται μόνο ως ένα atomic
+  transaction με δύο audit records και ένα execution record.
+- Με την εφαρμογή ενημερώνονται οι πραγματικές/πιστωμένες ώρες και το παλιό
+  `compensation_breakdown_apologistika` μηδενίζεται σε `null`, ώστε να
+  επανυπολογιστεί και να μη μείνει οικονομικό αποτέλεσμα της προηγούμενης
+  κατάστασης.
 
 ## Τι αποδεικνύει το ενοποιημένο harness
 

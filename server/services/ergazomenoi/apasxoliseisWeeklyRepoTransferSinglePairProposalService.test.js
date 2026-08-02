@@ -110,6 +110,10 @@ function expectedClearedTarget(category) {
         adeia_apologistika: false,
         kathgoria_adeias_apologistika: '',
         ores_ergasias_apologistika: 0,
+        ores_pragmatikhs_ergasias_apologistika: 0,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        compensation_breakdown_apologistika: null,
         ores_apoysias_apologistika: 0,
         apo_ora_01_apologistika: '',
         eos_ora_01_apologistika: '',
@@ -122,7 +126,7 @@ function expectedClearedTarget(category) {
 
 function assertReadyContract(result, sourceDate, targetDate, targetCategory) {
     assert.strictEqual(result.scenario_code, 'REPO_TRANSFER_WITHIN_WEEK_SINGLE_PAIR');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
     assert.strictEqual(result.proposal_version, PROPOSAL_VERSION);
     assert.strictEqual(result.proposal_status, PROPOSAL_STATUS.READY);
     assert.strictEqual(result.choice_code, CHOICE_CODE);
@@ -139,6 +143,15 @@ function assertReadyContract(result, sourceDate, targetDate, targetCategory) {
         result.items[1].proposed_values.kathgoria_ergasias_apologistika,
         targetCategory
     );
+    assert.strictEqual(
+        result.items[0].proposed_values.ores_pragmatikhs_ergasias_apologistika,
+        result.items[0].proposed_values.ores_ergasias_apologistika
+    );
+    for (const item of result.items) {
+        assert.strictEqual(item.proposed_values.ores_adeias_pistomenes_apologistika, 0);
+        assert.strictEqual(item.proposed_values.ores_argias_pistomenes_apologistika, 0);
+        assert.strictEqual(item.proposed_values.compensation_breakdown_apologistika, null);
+    }
     assert.deepStrictEqual(result.apply_readiness, {
         status: 'BLOCKED',
         reason: 'ATOMIC_APPLY_SUPPORT_REQUIRED'
@@ -183,7 +196,11 @@ function testValidFullTimeProposal() {
             eos_ora_02_apologistika: '',
             apo_ora_03_apologistika: '',
             eos_ora_03_apologistika: '',
-            ores_ergasias_apologistika: 8
+            ores_ergasias_apologistika: 8,
+            ores_pragmatikhs_ergasias_apologistika: 8,
+            ores_adeias_pistomenes_apologistika: 0,
+            ores_argias_pistomenes_apologistika: 0,
+            compensation_breakdown_apologistika: null
         }
     });
     assert.deepStrictEqual(result.items[1], {
@@ -197,9 +214,9 @@ function testValidFullTimeProposal() {
     });
     assert.deepStrictEqual(result.policy_context, {
         weekly_repo_policy_code: 'WEEKLY_REPO_BALANCE',
-        weekly_repo_policy_version: 'foundation:v2',
+        weekly_repo_policy_version: 'foundation:v3',
         source_work_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
-        source_work_policy_version: 'foundation:v1'
+        source_work_policy_version: 'foundation:v2'
     });
 }
 
@@ -244,7 +261,11 @@ function testSourceIntervalPositionsAndZeroLengthClearing() {
         eos_ora_02_apologistika: '16:00',
         apo_ora_03_apologistika: '',
         eos_ora_03_apologistika: '',
-        ores_ergasias_apologistika: 7.5
+        ores_ergasias_apologistika: 7.5,
+        ores_pragmatikhs_ergasias_apologistika: 7.5,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        compensation_breakdown_apologistika: null
     });
 
     const zeroLengthRows = fullTimeWeek();
@@ -486,7 +507,7 @@ function testMissingAndDuplicateIds() {
 function testV2InvalidResultsPreserveVersions() {
     const assertV2Invalid = (result, reason) => {
         assertInvalid(result, reason);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
         assert.strictEqual(result.proposal_version, PROPOSAL_VERSION_V2);
     };
 
@@ -566,7 +587,7 @@ function testV2InvalidResultsPreserveVersions() {
     delete v1MissingSource[1]._id;
     const v1Result = build(v1MissingSource);
     assertInvalid(v1Result, 'MISSING_SOURCE_RECORD_ID');
-    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v3');
+    assert.strictEqual(v1Result.scenario_version, 'repo-transfer-single-pair:v4');
     assert.strictEqual(v1Result.proposal_version, PROPOSAL_VERSION);
 }
 

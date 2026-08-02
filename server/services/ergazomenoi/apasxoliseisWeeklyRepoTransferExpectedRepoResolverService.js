@@ -62,14 +62,28 @@ function profileInteger(value) {
     return Number.isSafeInteger(number) ? number : NaN;
 }
 
-function resolved(expectedRepo, source, scheduledDays, effectiveWeeklyWorkdays) {
+function resolved(
+    expectedRepo,
+    source,
+    scheduledDays,
+    effectiveWeeklyWorkdays,
+    effectiveProfile = {}
+) {
+    const rawMhniaiaRepo =
+        effectiveProfile.raw_mhniaia_repo ?? effectiveProfile.mhniaia_repo ?? null;
+    const parsedRawMhniaiaRepo = profileInteger(rawMhniaiaRepo);
     return Object.freeze({
         ok: true,
         reason: null,
         effectiveExpectedWeeklyRepo: expectedRepo,
         repoResolutionSource: source,
         scheduledWorkDays: scheduledDays,
-        effectiveWeeklyWorkdays
+        effectiveWeeklyWorkdays,
+        rawMhniaiaRepo,
+        derivedMhniaiaRepo: expectedRepo,
+        mhniaiaRepoConflictsWithContract:
+            Number.isSafeInteger(parsedRawMhniaiaRepo) &&
+            parsedRawMhniaiaRepo !== expectedRepo
     });
 }
 
@@ -91,12 +105,13 @@ function resolveEffectiveExpectedWeeklyRepo({ weekRows = [], effectiveProfile = 
     }
 
     const workdays = profileInteger(effectiveProfile.hmeres_ergasias_ebdomadas);
-    if (workdays === 5 || workdays === 6) {
+    if (workdays >= 1 && workdays <= 6) {
         return resolved(
-            workdays === 5 ? 2 : 1,
+            7 - workdays,
             REPO_RESOLUTION_SOURCE.CONTRACTUAL_WEEKLY_WORKDAYS,
             scheduledDays,
-            workdays
+            workdays,
+            effectiveProfile
         );
     }
     return diagnostic(

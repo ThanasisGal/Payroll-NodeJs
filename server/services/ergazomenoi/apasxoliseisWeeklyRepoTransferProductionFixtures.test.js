@@ -80,9 +80,9 @@ assert.deepStrictEqual(
         sixthDay
     })),
     [
-        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-07' },
-        { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-21' },
-        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-28' }
+        { source: '2026-06-02', target: '2026-06-04', sixthDay: '2026-06-02' },
+        { source: '2026-06-15', target: '2026-06-17', sixthDay: '2026-06-18' },
+        { source: '2026-06-22', target: '2026-06-24', sixthDay: '2026-06-22' }
     ]
 );
 assert.ok(

@@ -213,7 +213,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
     },
     {
         policy_code: 'WEEKLY_REPO_BALANCE',
-        policy_version: 'foundation:v2',
+        policy_version: 'foundation:v3',
         title: 'Ισορροπία εβδομαδιαίων ρεπό',
         description:
             'Ελέγχει ή εξηγεί 1 ή 2 ρεπό ανά εβδομάδα και πιθανή αντικατάσταση ρεπό μέσα στην ίδια εβδομάδα.',
@@ -251,7 +251,11 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
             'kathgoria_ergasias_apologistika',
             'adeia_apologistika',
             'kathgoria_adeias_apologistika',
-            'ores_apoysias_apologistika'
+            'ores_apoysias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'ores_adeias_pistomenes_apologistika',
+            'ores_argias_pistomenes_apologistika',
+            'compensation_breakdown_apologistika'
         ],
         result_statuses: [
             POLICY_RESULT_STATUS.OK,
@@ -267,7 +271,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
     },
     {
         policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
-        policy_version: 'foundation:v1',
+        policy_version: 'foundation:v2',
         title: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
         description:
             'Χειρίζεται περιπτώσεις όπου η ημέρα είναι δηλωμένη ως ΡΕΠΟ ή ΜΗ ΕΡΓΑΣΙΑ αλλά υπάρχουν κάρτες.',
@@ -309,7 +313,11 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
             'eos_ora_02_apologistika',
             'apo_ora_03_apologistika',
             'eos_ora_03_apologistika',
-            'ores_ergasias_apologistika'
+            'ores_ergasias_apologistika',
+            'ores_pragmatikhs_ergasias_apologistika',
+            'ores_adeias_pistomenes_apologistika',
+            'ores_argias_pistomenes_apologistika',
+            'compensation_breakdown_apologistika'
         ],
         result_statuses: [
             POLICY_RESULT_STATUS.PREFILLED_PENDING_APPROVAL,

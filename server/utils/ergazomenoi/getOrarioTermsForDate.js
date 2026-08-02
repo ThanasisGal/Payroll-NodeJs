@@ -206,6 +206,10 @@ function buildFallbackTerms(ergazomenos = {}) {
         mhniaia_repo: resolveExpectedWeeklyRepo(ergazomenos),
         raw_mhniaia_repo: ergazomenos.mhniaia_repo,
         pososto_prosayxhshs_6hs_hmeras: ergazomenos.pososto_prosayxhshs_6hs_hmeras,
+        nomimoOromisthio: toNumberOrZero(ergazomenos.nomimoOromisthio),
+        pragmatikoOromisthio: toNumberOrZero(ergazomenos.pragmatikoOromisthio),
+        eidikh_kathgoria_ergazomenoy: ergazomenos.eidikh_kathgoria_ergazomenoy || '',
+        eidikh_periptosh: ergazomenos.eidikh_periptosh || '',
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -223,7 +227,7 @@ function buildFallbackTerms(ergazomenos = {}) {
     };
 }
 
-function buildTermsFromHistoryRecord(record) {
+function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}) {
     const hmeres = toNumberOrZero(record.hmeres_ergasias_ebdomadas);
     const ores = toNumberOrZero(record.ores_ergasias_ebdomadas);
     const mo =
@@ -239,7 +243,21 @@ function buildTermsFromHistoryRecord(record) {
         typos_apasxolhshs: employmentType,
         mhniaia_repo: resolveExpectedWeeklyRepo(record),
         raw_mhniaia_repo: record.mhniaia_repo,
-        pososto_prosayxhshs_6hs_hmeras: record.pososto_prosayxhshs_6hs_hmeras,
+        pososto_prosayxhshs_6hs_hmeras:
+            toNumberOrNull(record.pososto_prosayxhshs_6hs_hmeras) ??
+            toNumberOrNull(fallbackErgazomenos.pososto_prosayxhshs_6hs_hmeras),
+        nomimoOromisthio:
+            toNumberOrNull(record.nomimoOromisthio) ??
+            toNumberOrZero(fallbackErgazomenos.nomimoOromisthio),
+        pragmatikoOromisthio:
+            toNumberOrNull(record.pragmatikoOromisthio) ??
+            toNumberOrZero(fallbackErgazomenos.pragmatikoOromisthio),
+        eidikh_kathgoria_ergazomenoy:
+            record.eidikh_kathgoria_ergazomenoy ||
+            fallbackErgazomenos.eidikh_kathgoria_ergazomenoy ||
+            '',
+        eidikh_periptosh:
+            record.eidikh_periptosh || fallbackErgazomenos.eidikh_periptosh || '',
 
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: ores,
@@ -299,7 +317,7 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
         return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
     });
 
-    return buildTermsFromHistoryRecord(matchingRows[0]);
+    return buildTermsFromHistoryRecord(matchingRows[0], ergazomenos);
 }
 
 module.exports = {

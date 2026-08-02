@@ -1015,11 +1015,11 @@ function formatDate(value) {
     if (isNaN(dt.getTime())) return '';
 
     const days = ['Κυ', 'Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα'];
-    const dayName = days[dt.getDay()];
+    const dayName = days[dt.getUTCDay()];
 
-    const day = String(dt.getDate()).padStart(2, '0');
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const year = dt.getFullYear();
+    const day = String(dt.getUTCDate()).padStart(2, '0');
+    const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const year = dt.getUTCFullYear();
 
     return `${dayName}   ${day}/${month}/${year}`;
 }
@@ -1759,7 +1759,12 @@ function employmentTypeLabel(value) {
 }
 
 function renderDeviationProfileCell(dev) {
-    const effectiveRepo = dev.effective_mhniaia_repo ?? dev.mhniaia_repo ?? dev.expected_repo ?? '';
+    const effectiveRepo =
+        dev.effective_expected_repo ??
+        dev.expected_repo ??
+        dev.effective_mhniaia_repo ??
+        '';
+    const weeklyWorkdays = Number(dev.effective_weekly_workdays || 0);
     const effectiveType = employmentTypeLabel(dev.effective_typos_apasxolhshs);
     const effectiveDate = dev.effective_profile_date ? formatDate(dev.effective_profile_date) : '';
     const hasReadableEmploymentType =
@@ -1768,14 +1773,18 @@ function renderDeviationProfileCell(dev) {
     if (!dev.profile_changed_inside_week) {
         return `
             ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
-            <small class="text-muted">Αναμενόμενα ρεπό profile: ${escapeHtml(effectiveRepo)}</small>
+            ${weeklyWorkdays ? `<small class="text-muted d-block">Συμβατικές ημέρες εργασίας: ${escapeHtml(weeklyWorkdays)}</small>` : ''}
+            <small class="text-muted">Αναμενόμενες ημέρες μη εργασίας: ${escapeHtml(effectiveRepo)}</small>
+            ${dev.mhniaia_repo_conflicts_with_contract ? `<div class="small text-warning-emphasis">Το mhniaia_repo (${escapeHtml(dev.raw_mhniaia_repo ?? '-')}) δεν συμφωνεί με το συμβατικό προφίλ.</div>` : ''}
         `;
     }
 
     return `
         <div class="fw-bold text-warning-emphasis">Τελικό προφίλ εβδομάδας</div>
         ${hasReadableEmploymentType ? `<div>${escapeHtml(effectiveType)}</div>` : ''}
-        <div>${escapeHtml(effectiveRepo)} ${Number(effectiveRepo) === 1 ? 'ρεπό' : 'ρεπό'}</div>
+        ${weeklyWorkdays ? `<div>${escapeHtml(weeklyWorkdays)} συμβατικές ημέρες εργασίας</div>` : ''}
+        <div>${escapeHtml(effectiveRepo)} αναμενόμενες ημέρες μη εργασίας</div>
+        ${dev.mhniaia_repo_conflicts_with_contract ? `<div class="small text-warning-emphasis">Το mhniaia_repo (${escapeHtml(dev.raw_mhniaia_repo ?? '-')}) δεν συμφωνεί με το συμβατικό προφίλ.</div>` : ''}
         ${
             effectiveDate
                 ? `<small class="text-muted">Ισχύει από: ${escapeHtml(effectiveDate)}</small>`
@@ -2406,9 +2415,9 @@ function formatPolicyPreviewDate(value) {
 
     if (Number.isNaN(dt.getTime())) return '-';
 
-    const day = String(dt.getDate()).padStart(2, '0');
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const year = dt.getFullYear();
+    const day = String(dt.getUTCDate()).padStart(2, '0');
+    const month = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const year = dt.getUTCFullYear();
 
     return `${day}/${month}/${year}`;
 }
@@ -4162,6 +4171,8 @@ const atomicRepoTransferDiagnosticLabels = Object.freeze({
         'Το επιλεγμένο διάστημα κόβει ήδη ολοκληρωμένη εβδομάδα.',
     OPEN_WEEK_PENDING_COMPLETION:
         'Η τελευταία εβδομάδα δεν έχει ακόμη ολοκληρωθεί και θα επανελεγχθεί μετά την Κυριακή.',
+    CROSS_MONTH_REPO_TRANSFER_NOT_ALLOWED:
+        'Η μεταφορά ρεπό δεν επιτρέπεται ανάμεσα σε ημέρες διαφορετικών μηνών.',
     NO_SOURCE_CANDIDATE:
         'Δεν βρέθηκε ημέρα ρεπό κατά την οποία ο εργαζόμενος απασχολήθηκε.',
     REPO_DEFICIT_REMAINS:

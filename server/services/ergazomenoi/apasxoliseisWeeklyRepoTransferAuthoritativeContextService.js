@@ -16,7 +16,8 @@ const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
     'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
     'kathgoria_ergasias_apologistika apologistiko_biblio repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
     'argia argia_apologistika kyriakes_apologistika is_locked ' +
-    'ores_ergasias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
+    'ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ' +
+    'ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
     'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
     'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
     'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
@@ -26,6 +27,7 @@ const ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS =
     '_id kodikos eponymo onoma ypokatasthma energos archived updatedAt ' +
     'kathestos_apasxolhshs plhrhs_apasxolhsh apasxolhsh_basei_symbashs ' +
     'mhniaia_repo pososto_prosayxhshs_6hs_hmeras hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
+    'nomimoOromisthio pragmatikoOromisthio ' +
     'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
     'dialleima_entos_ektos_orarioy dialleima_se_lepta';
 
@@ -35,6 +37,7 @@ const ATOMIC_REPO_TRANSFER_HISTORY_FIELDS =
     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias ' +
     'kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
+    'nomimoOromisthio pragmatikoOromisthio ' +
     'employment_profile_source afora_allagh_oron_ergasias createdAt updatedAt';
 
 function clampDateStartUtc(value) { const date = new Date(value); date.setUTCHours(0, 0, 0, 0); return date; }
@@ -110,7 +113,18 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     const company = id ? await companiesModel.findOne(companyQuery).select('team kod apasxolhsh_kata_tis_argies leitoyrgia_stis_mh_ypoxreotikes_argies').lean() : null;
     const resolvedCompanyKodikos = String(company?.kod || '').trim();
     if (!company || String(company.team || '').trim() !== sessionTeam || !resolvedCompanyKodikos) { const error = new Error('Δεν ήταν δυνατή η επίλυση του πλαισίου αργιών.'); error.statusCode = 409; throw error; }
-    const argies = await argiesModel.find({ team: sessionTeam, company_kod: resolvedCompanyKodikos, etos: String(etos || ''), hmeromhnia: mongoose.trusted({ $gte: periodStart, $lte: periodEnd }) }).select('hmeromhnia ypoxreotikh_argia perigrafh perigrafh_argias').lean();
+    const startYear = new Date(periodStart).getUTCFullYear();
+    const endYear = new Date(periodEnd).getUTCFullYear();
+    const resolvedYears = Number.isSafeInteger(startYear) && Number.isSafeInteger(endYear)
+        ? Array.from(
+              { length: Math.max(endYear - startYear + 1, 0) },
+              (_, index) => String(startYear + index)
+          )
+        : [String(etos || '')].filter(Boolean);
+    const yearFilter = resolvedYears.length === 1
+        ? resolvedYears[0]
+        : mongoose.trusted({ $in: resolvedYears });
+    const argies = await argiesModel.find({ team: sessionTeam, company_kod: resolvedCompanyKodikos, etos: yearFilter, hmeromhnia: mongoose.trusted({ $gte: periodStart, $lte: periodEnd }) }).select('hmeromhnia ypoxreotikh_argia perigrafh perigrafh_argias').lean();
     const companyFlags = getCompanyHolidayFlags(company);
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
@@ -121,7 +135,8 @@ function profileSignature(profile = {}) {
         String(profile.hmeres_ergasias_ebdomadas ?? ''),
         String(profile.ores_ergasias_ebdomadas ?? ''),
         String(profile.mo_oron_hmerhsias_ergasias ?? ''),
-        String(profile.pososto_prosayxhshs_6hs_hmeras ?? '')
+        String(profile.pososto_prosayxhshs_6hs_hmeras ?? ''),
+        String(profile.raw_mhniaia_repo ?? profile.mhniaia_repo ?? '')
     ].join('|');
 }
 function getProfileDateForDeviation(profile = {}, fallbackDate = null) {
@@ -147,11 +162,11 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {} })
     const contractualWeeklyWorkdays = Number(effective.hmeres_ergasias_ebdomadas);
     const expectedWeeklyRepo = profileChangedInsideWeek
         ? null
-        : contractualWeeklyWorkdays === 5
-            ? 2
-            : contractualWeeklyWorkdays === 6
-                ? 1
-                : null;
+        : Number.isSafeInteger(contractualWeeklyWorkdays) &&
+            contractualWeeklyWorkdays >= 1 &&
+            contractualWeeklyWorkdays <= 6
+          ? 7 - contractualWeeklyWorkdays
+          : null;
     return {
         expectedWeeklyRepo,
         repoResolutionSource:

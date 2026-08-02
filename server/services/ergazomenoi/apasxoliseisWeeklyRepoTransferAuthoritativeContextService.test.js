@@ -29,7 +29,11 @@ function testRowFieldEquivalence() {
         'ores_prostheths_ergasias_apologistika',
         'ores_yperergasias_argion_nyxtas_apologistika',
         'ores_nominhs_yperorias_argion_nyxtas_apologistika',
-        'ores_paranomhs_yperorias_argion_nyxtas_apologistika'
+        'ores_paranomhs_yperorias_argion_nyxtas_apologistika',
+        'ores_pragmatikhs_ergasias_apologistika',
+        'ores_adeias_pistomenes_apologistika',
+        'ores_argias_pistomenes_apologistika',
+        'compensation_breakdown_apologistika'
     ].forEach((field) => assert.ok(authoritative.has(field), `missing ${field}`));
 }
 
@@ -145,11 +149,9 @@ function testRawAuthoritativeRepoResolution() {
         rows: scheduledRows(5)
     });
     assert.strictEqual(employeeResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 3);
-    assert.strictEqual(employeeResult.result.ok, false);
-    assert.strictEqual(
-        employeeResult.result.reason,
-        'INVALID_EFFECTIVE_WEEKLY_WORKDAYS'
-    );
+    assert.strictEqual(employeeResult.result.ok, true);
+    assert.strictEqual(employeeResult.result.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(employeeResult.result.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
     const history = [{
         _id: 'history-authoritative',
@@ -166,7 +168,9 @@ function testRawAuthoritativeRepoResolution() {
     });
     assert.strictEqual(historyResult.profileInfo.effectiveProfile.source, 'ISTORIKO');
     assert.strictEqual(historyResult.profileInfo.effectiveProfile.raw_mhniaia_repo, 4);
-    assert.strictEqual(historyResult.result.ok, false);
+    assert.strictEqual(historyResult.result.ok, true);
+    assert.strictEqual(historyResult.result.effectiveExpectedWeeklyRepo, 3);
+    assert.strictEqual(historyResult.result.mhniaiaRepoConflictsWithContract, true);
 
     const invalid = resolveThroughAuthoritativeProfile({
         employee: { ...employee, mhniaia_repo: 7, hmeres_ergasias_ebdomadas: 5 },
@@ -176,7 +180,7 @@ function testRawAuthoritativeRepoResolution() {
     assert.strictEqual(invalid.effectiveExpectedWeeklyRepo, 2);
     assert.strictEqual(invalid.repoResolutionSource, 'CONTRACTUAL_WEEKLY_WORKDAYS');
 
-    for (const [workdays, expected] of [[5, 2], [6, 1]]) {
+    for (const [workdays, expected] of [[1, 6], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]]) {
         const fallback = resolveThroughAuthoritativeProfile({
             employee: { ...employee, mhniaia_repo: 0, hmeres_ergasias_ebdomadas: workdays },
             rows: scheduledRows(5)
@@ -327,6 +331,13 @@ async function testTeamScopedCompanyResolution() {
     assert.strictEqual(byId.company_kodikos, '0004');
     assert.strictEqual(String(companyQueries[1]._id), thaId);
     assert.strictEqual(companyQueries[1].team, 'THA');
+    await buildNoCardsDisplayContext({
+        ...base,
+        companyId: '0004',
+        periodStart: new Date('2026-12-28T00:00:00Z'),
+        periodEnd: new Date('2027-01-03T23:59:59Z')
+    });
+    assert.deepStrictEqual(argiesQueries[2].etos.$in, ['2026', '2027']);
     await assert.rejects(
         () => buildNoCardsDisplayContext({ ...base, companyId: blgId }),
         (error) => error.statusCode === 409

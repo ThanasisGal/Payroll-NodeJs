@@ -12,14 +12,14 @@ const group = {
         scheduled_work_days: 6,
         effective_weekly_workdays: 6
     },
-    pair_contract: { proposal_version: 'repo-transfer-single-pair-proposal:v3', choice_code: 'choice', policy_versions: {} },
+    pair_contract: { proposal_version: 'repo-transfer-single-pair-proposal:v4', choice_code: 'choice', policy_versions: {} },
     items: [
         { role: 'SOURCE_BECOMES_WORK', prodhlomena_oraria_id: sourceId, hmeromhnia: '2026-06-15', proposed_values: { kathgoria_ergasias_apologistika: 'ΕΡΓ' }, flags: { approval_supported: false, runtime_apply_supported: false } },
         { role: 'TARGET_BECOMES_REPO', prodhlomena_oraria_id: targetId, hmeromhnia: '2026-06-16', proposed_values: { kathgoria_ergasias_apologistika: 'ΑΝ' }, flags: { approval_supported: false, runtime_apply_supported: false } }
     ]
 };
 const context = { candidates: [{ _id: sourceId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }, { _id: targetId, team: 't', company_kod: 'c', ypokatasthma: '0001', kodikos: '001' }], weekRows: [{ _id: sourceId, hmeromhnia: '2026-06-15' }, { _id: targetId, hmeromhnia: '2026-06-16' }], employee: { _id: '507f191e810c19729de860eb' }, employmentProfile: { typos_apasxolhshs: 'PLHRHS' }, history: [], audits: [], week: { start: '2026-06-15', end: '2026-06-21' }, companyFlags: {}, companyKodikos: '0004', holidayByDateKey: new Map() };
-const command = { proposal_id: 'proposal-1', expected_source_id: sourceId, expected_target_id: targetId, expected_proposal_version: 'repo-transfer-single-pair-proposal:v3', expected_choice_code: 'choice' };
+const command = { proposal_id: 'proposal-1', expected_source_id: sourceId, expected_target_id: targetId, expected_proposal_version: 'repo-transfer-single-pair-proposal:v4', expected_choice_code: 'choice' };
 
 async function run() {
     const originalRows = JSON.stringify(context.weekRows);

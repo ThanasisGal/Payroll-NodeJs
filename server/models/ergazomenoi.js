@@ -382,6 +382,10 @@ const ProdhlomenaOrariaSchema = new Schema(
         apologistiko_biblio: { type: Boolean, default: false },
         kathgoria_ergasias_apologistika: { type: String, trim: true },
         ores_ergasias_apologistika: { type: Number, default: 0 },
+        ores_pragmatikhs_ergasias_apologistika: { type: Number, default: 0 },
+        ores_adeias_pistomenes_apologistika: { type: Number, default: 0 },
+        ores_argias_pistomenes_apologistika: { type: Number, default: 0 },
+        compensation_breakdown_apologistika: { type: Schema.Types.Mixed, default: null },
         ores_nyxtas_apologistika: { type: Number, default: 0 },
         ores_argion_prosayxhsh_apologistika: { type: Number, default: 0 },
         ores_argion_ergasia_apologistika: { type: Number, default: 0 },
@@ -488,6 +492,7 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
 
         expected_repo: { type: Number, default: 0 },
         actual_repo: { type: Number, default: 0 },
+        missing_repo: { type: Number, default: 0 },
 
         // Οι παλιές εγγραφές χωρίς version παραμένουν legacy και δεν
         // επανερμηνεύονται ως Monday-Sunday current-policy preview.
@@ -497,6 +502,12 @@ const ProdhlomenaOrariaDeviationsSchema = new Schema(
         excess_repo: { type: Number, default: 0 },
 
         effective_mhniaia_repo: { type: Number, default: 0 },
+        effective_expected_repo: { type: Number, default: 0 },
+        effective_weekly_workdays: { type: Number, default: 0 },
+        expected_repo_source: { type: String, trim: true, default: '' },
+        raw_mhniaia_repo: { type: Number, default: null },
+        derived_mhniaia_repo: { type: Number, default: null },
+        mhniaia_repo_conflicts_with_contract: { type: Boolean, default: false },
         effective_typos_apasxolhshs: { type: String, trim: true, default: '' },
         effective_profile_source: { type: String, trim: true, default: '' },
         effective_profile_date: { type: Date },

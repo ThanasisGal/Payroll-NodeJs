@@ -209,6 +209,86 @@ function testOpenTrailingWeekIsDistinctFromCompletedPartialFilter() {
     });
     assert.deepStrictEqual(completedPartial.weeklyInputs, []);
     assert.deepStrictEqual(completedPartial.inputReasonCodes, [INPUT_REASON.PARTIAL_WEEK]);
+
+    const fullButStillOpen = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        validationPeriodStart: '2026-06-01',
+        validationPeriodEnd: '2026-06-30',
+        asOfDate: '2026-06-30',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(fullButStillOpen.weeklyInputs, []);
+    assert.deepStrictEqual(fullButStillOpen.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const sundayIsStillOpen = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        asOfDate: '2026-07-05',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.deepStrictEqual(sundayIsStillOpen.weeklyInputs, []);
+    assert.deepStrictEqual(sundayIsStillOpen.inputReasonCodes, [INPUT_REASON.OPEN_WEEK]);
+
+    const completedOnMonday = buildWeeklyRepoTransferAtomicInputs({
+        rows: fullTimeWeek('2026-06-29', '001'),
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({})
+    });
+    assert.strictEqual(completedOnMonday.weeklyInputs.length, 1);
+    assert.deepStrictEqual(completedOnMonday.inputReasonCodes, []);
+}
+
+function testBoundaryWeekUsesContextButRespectsPresentationAndMonth() {
+    const rows = fullTimeWeek('2026-06-29', '001');
+    rows[1] = workRow('2026-06-29', 1, '001');
+    rows[3] = workRow('2026-06-29', 3, '001', { kathgoria_ergasias: 'ΑΝ' });
+    const built = buildWeeklyRepoTransferAtomicInputs({
+        rows,
+        periodStart: '2026-06-29',
+        periodEnd: '2026-07-05',
+        validationPeriodStart: '2026-07-01',
+        validationPeriodEnd: '2026-07-31',
+        asOfDate: '2026-07-06',
+        resolveEmploymentProfile: () => ({
+            typos_apasxolhshs: 'PLHRHS',
+            hmeres_ergasias_ebdomadas: 5
+        })
+    });
+    assert.strictEqual(built.weeklyInputs.length, 1);
+
+    const visible = buildWeeklyRepoTransferAtomicPageProjection(built, {
+        presentationStart: '2026-07-01',
+        presentationEnd: '2026-07-31'
+    });
+    assert.strictEqual(visible.summary.groups_count, 1);
+    assert.deepStrictEqual(
+        visible.groups[0].items.map((item) => item.hmeromhnia),
+        ['2026-07-02', '2026-07-03']
+    );
+
+    const contextOnlyRows = fullTimeWeek('2026-06-29', '002');
+    contextOnlyRows[1] = workRow('2026-06-29', 1, '002', {
+        cards_ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: ''
+    });
+    contextOnlyRows[4] = workRow('2026-06-29', 4, '002');
+    contextOnlyRows[0] = workRow('2026-06-29', 0, '002', {
+        kathgoria_ergasias: 'ΑΝ'
+    });
+    const contextOnly = buildWeeklyRepoTransferAtomicPageProjection({
+        weeklyInputs: [weeklyInput(contextOnlyRows)]
+    }, {
+        presentationStart: '2026-07-01',
+        presentationEnd: '2026-07-31'
+    });
+    assert.strictEqual(contextOnly.summary.groups_count, 0);
+    assert.strictEqual(contextOnly.summary.context_only_groups_count, 1);
 }
 
 function testValidFullTimeAndPartTimeWeeks() {
@@ -665,6 +745,7 @@ function testReviewOutcomeSummaryIdentityAndSorting() {
 function run() {
     testCompleteWeekInputConstruction();
     testOpenTrailingWeekIsDistinctFromCompletedPartialFilter();
+    testBoundaryWeekUsesContextButRespectsPresentationAndMonth();
     testValidFullTimeAndPartTimeWeeks();
     testInputConstructionSeparatesEmployeesAndWeeks();
     testBranchAwareBucketsAndResolverContext();

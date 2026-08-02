@@ -13,8 +13,11 @@ const {
 const {
     analyzeWeeklyRepoTransferForEmploymentContract
 } = require('./apasxoliseisWeeklyRepoTransferSinglePairService');
+const {
+    resolveEffectiveExpectedWeeklyRepo
+} = require('./apasxoliseisWeeklyRepoTransferExpectedRepoResolverService');
 
-const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v1';
+const POLICY_VERSION = 'weekly-repo-deviation-preview:monday-sunday:v2';
 const SOURCE_VERSION = 'raw-prodhlomena-oraria-daily-rows:v1';
 const STATUS = Object.freeze({
     READY: 'READY',
@@ -37,17 +40,18 @@ function isEffectiveRepo(row = {}, isFullTimeProfile = () => true) {
     ).trim();
     const effectiveCategory =
         persistedCategory || String(row.kathgoria_ergasias || '').trim();
+    const fullTime = isFullTimeProfile(row) === true;
+    const expectedCategory = fullTime ? 'ΑΝ' : 'ΜΕ';
     const persistedRepo =
-        row.repo_apologistika === true || persistedCategory === 'ΑΝ';
+        row.repo_apologistika === true || persistedCategory === expectedCategory;
     const effectiveHours = persistedRepo
         ? row.ores_ergasias_apologistika
         : row.ores_ergasias;
 
     return (
-        (persistedRepo || effectiveCategory === 'ΑΝ') &&
+        (persistedRepo || effectiveCategory === expectedCategory) &&
         finiteZero(effectiveHours) &&
-        finiteZero(row.cards_ores_ergasias) &&
-        isFullTimeProfile(row) === true
+        finiteZero(row.cards_ores_ergasias)
     );
 }
 
@@ -171,9 +175,14 @@ function buildWeeklyRepoDeviationPreview({
                       weekRows: uniqueRows
                   }) || {}
                 : {};
-        const expectedRepo = weeklyProfile.expectedWeeklyRepo;
-        const profileReason = weeklyProfile.repoResolutionReason || null;
         const effectiveProfile = weeklyProfile.effectiveProfile || {};
+        const expectedRepoResolution = resolveEffectiveExpectedWeeklyRepo({
+            weekRows: uniqueRows,
+            effectiveProfile
+        });
+        const expectedRepo = expectedRepoResolution.effectiveExpectedWeeklyRepo;
+        const profileReason =
+            weeklyProfile.repoResolutionReason || expectedRepoResolution.reason || null;
         const actualRepo = uniqueRows.filter((row) => {
             const dailyProfile =
                 typeof resolveDailyProfile === 'function'
@@ -214,6 +223,7 @@ function buildWeeklyRepoDeviationPreview({
                 reasons: profileReason ? [profileReason] : [],
                 expected_repo: expectedRepo,
                 actual_repo: actualRepo,
+                missing_repo: Math.max(Number(expectedRepo || 0) - Number(actualRepo), 0),
                 resolved_repo: resolution?.resolved_repo ?? actualRepo,
                 actual_workdays: resolution?.actual_workdays ??
                     dailyFacts.filter((facts) => facts.countsAsActualWorkDay).length,
@@ -233,6 +243,18 @@ function buildWeeklyRepoDeviationPreview({
                     profileReason === 'PROFILE_CHANGED_INSIDE_WEEK'
                         ? 'PROFILE_CHANGED_INSIDE_WEEK'
                         : 'WEEKLY_REPO_MISMATCH',
+                effective_expected_repo: expectedRepo,
+                effective_weekly_workdays:
+                    expectedRepoResolution.effectiveWeeklyWorkdays,
+                expected_repo_source:
+                    expectedRepoResolution.repoResolutionSource,
+                raw_mhniaia_repo:
+                    expectedRepoResolution.rawMhniaiaRepo,
+                derived_mhniaia_repo:
+                    expectedRepoResolution.derivedMhniaiaRepo,
+                mhniaia_repo_conflicts_with_contract:
+                    expectedRepoResolution.mhniaiaRepoConflictsWithContract === true,
+                // Legacy alias retained only so old review/export consumers remain readable.
                 effective_mhniaia_repo: expectedRepo,
                 effective_typos_apasxolhshs:
                     weeklyProfile.effectiveProfile?.typos_apasxolhshs || '',

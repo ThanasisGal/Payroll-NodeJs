@@ -121,7 +121,7 @@ function assertEquivalentPartialPolicy(rows, profile = {}) {
     assertEquivalentPartialPolicy(rows);
     const result = analyze(rows, 'EK_PERITROPHS');
     assert.strictEqual(result.eligibility_status, 'ELIGIBLE');
-    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+    assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
     assert.strictEqual(result.source.semantic_target_category, 'ΕΡΓ');
     assert.strictEqual(result.target.semantic_target_category, 'ΜΕ');
     assert.strictEqual(result.counts.existing_actual_repo, 0);
@@ -150,10 +150,11 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             mo_oron_hmerhsias_ergasias: 4,
             mhniaia_repo: 3
         });
-        assert.strictEqual(result.eligibility_status, 'NEEDS_REVIEW', type);
-        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v3');
+        assert.strictEqual(result.eligibility_status, 'ELIGIBLE', type);
+        assert.strictEqual(result.scenario_version, 'repo-transfer-single-pair:v4');
         assert.strictEqual(result.employee.typos_apasxolhshs, type);
-        assert.ok(result.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS'));
+        assert.strictEqual(result.employee.mhniaia_repo, 3);
+        assert.strictEqual(result.counts.predicted_final_repo, 3);
 
         const proposal = buildWeeklyRepoTransferSinglePairProposal({
             weekRows: fourDayWeek,
@@ -165,7 +166,7 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             },
             contractVersion: 'v2'
         });
-        assert.strictEqual(proposal.proposal_status, 'NOT_AVAILABLE');
+        assert.strictEqual(proposal.proposal_status, 'READY');
         assert.strictEqual(proposal.proposal_version, PROPOSAL_VERSION_V2);
 
         const projection = buildWeeklyRepoTransferSinglePairGroupProjection({
@@ -178,8 +179,8 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             },
             contractVersion: 'v2'
         });
-        assert.strictEqual(projection.projection_status, 'NOT_AVAILABLE');
-        assert.strictEqual(projection.groups.length, 0);
+        assert.strictEqual(projection.projection_status, 'READY');
+        assert.strictEqual(projection.groups.length, 1);
     }
 }
 
@@ -192,8 +193,8 @@ for (const alias of ['1', 'PARTIAL', '2', '02', 'EK_PERITROPHS', 'EK_PERITROPIS'
             mhniaia_repo: 3
         }
     });
-    assert.strictEqual(v1.eligibility_status, 'NEEDS_REVIEW');
-    assert.ok(v1.reasons.includes('INVALID_EFFECTIVE_WEEKLY_WORKDAYS'));
+    assert.strictEqual(v1.eligibility_status, 'ELIGIBLE');
+    assert.strictEqual(v1.employee.effective_expected_weekly_repo, 3);
 }
 
 {
@@ -664,8 +665,8 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
         contractVersion: 'v2'
     });
     assert.strictEqual(proposal.proposal_status, 'READY');
-    assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v2');
-    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v1');
+    assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v3');
+    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v2');
     assert.strictEqual(proposal.items[0].proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
     assert.strictEqual(proposal.items[1].proposed_values.kathgoria_ergasias_apologistika, 'ΜΕ');
     assert.strictEqual(proposal.items[1].proposed_values.repo_apologistika, true);
@@ -677,7 +678,7 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
     });
     assert.strictEqual(projection.projection_status, 'READY');
     assert.ok(projection.groups[0].group_key.includes(
-        'proposal_version=repo-transfer-single-pair-proposal:v3'
+        'proposal_version=repo-transfer-single-pair-proposal:v4'
     ));
 }
 
