@@ -666,7 +666,7 @@ for (const invalidHours of [0, '0', '', null, -1, NaN, Infinity, 'invalid']) {
     });
     assert.strictEqual(proposal.proposal_status, 'READY');
     assert.strictEqual(proposal.policy_context.weekly_repo_policy_version, 'foundation:v3');
-    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v2');
+    assert.strictEqual(proposal.policy_context.source_work_policy_version, 'foundation:v3');
     assert.strictEqual(proposal.items[0].proposed_values.kathgoria_ergasias_apologistika, 'ΕΡΓ');
     assert.strictEqual(proposal.items[1].proposed_values.kathgoria_ergasias_apologistika, 'ΜΕ');
     assert.strictEqual(proposal.items[1].proposed_values.repo_apologistika, true);

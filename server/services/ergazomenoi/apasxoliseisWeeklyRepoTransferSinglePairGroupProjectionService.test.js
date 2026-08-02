@@ -121,7 +121,7 @@ function assertSafetyContract(group) {
         proposal_version: 'repo-transfer-single-pair-proposal:v4',
         policy_versions: {
             weekly_repo: 'foundation:v3',
-            source_work: 'foundation:v2'
+            source_work: 'foundation:v3'
         },
         atomic_pair_required: true,
         requires_hr_review: true,

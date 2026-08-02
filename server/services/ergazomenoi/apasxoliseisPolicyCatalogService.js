@@ -271,10 +271,10 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
     },
     {
         policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
-        policy_version: 'foundation:v2',
-        title: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
+        policy_version: 'foundation:v3',
+        title: 'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
         description:
-            'Χειρίζεται περιπτώσεις όπου η ημέρα είναι δηλωμένη ως ΡΕΠΟ ή ΜΗ ΕΡΓΑΣΙΑ αλλά υπάρχουν κάρτες.',
+            'Χειρίζεται περιπτώσεις όπου η ημέρα είναι δηλωμένη ως ΡΕΠΟ/ΜΗ ΕΡΓΑΣΙΑ ή είναι ασφαλώς μη προδηλωμένη, αλλά υπάρχουν πλήρεις κάρτες.',
         category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
         default_mode: POLICY_MODE.SUGGESTION,
         supported_modes: [
@@ -289,6 +289,9 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         required_facts: [
             'declared.isDeclaredRepo',
             'declared.isDeclaredNonWork',
+            'declared.kathgoria_ergasias',
+            'declared.hasDeclaredHours',
+            'declared.hasDeclaredIntervals',
             'cards.hasCards',
             'cards.cardIntervalsNormalized',
             'cards.cardHours'
@@ -326,7 +329,8 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         ],
         related_scenario_codes: [
             'DECLARED_REPO_WITH_CARDS',
-            'DECLARED_NON_WORK_WITH_CARDS'
+            'DECLARED_NON_WORK_WITH_CARDS',
+            'UNSCHEDULED_DAY_WITH_CARDS'
         ],
         notes: [
             'Δεν αλλάζει τον υπολογισμό απασχολήσεων.',

@@ -236,6 +236,7 @@ function buildApasxoliseisScenarioFacts(row, context = {}) {
     const leave = {
         hasDeclaredLeave:
             toBoolean(sourceRow.adeia) || toTrimmedString(sourceRow.kathgoria_adeias) !== '',
+        hasDeclaredSickness: toBoolean(sourceRow.astheneia),
         kathgoria_adeias: toTrimmedString(sourceRow.kathgoria_adeias),
         adeia_apologistika: toBoolean(sourceRow.adeia_apologistika),
         kathgoria_adeias_apologistika: toTrimmedString(

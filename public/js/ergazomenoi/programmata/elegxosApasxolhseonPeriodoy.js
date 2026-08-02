@@ -61,6 +61,7 @@ const scenarioCodeLabels = {
         'Μη υποχρεωτική αργία - εταιρεία λειτουργεί',
     ZERO_LENGTH_CARD_INTERVAL: 'Μηδενικό διάστημα κάρτας',
     DECLARED_NON_WORK_WITH_CARDS: 'Μη εργασία με κάρτες',
+    UNSCHEDULED_DAY_WITH_CARDS: 'Μη προδηλωμένη ημέρα με κάρτες',
     SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'Σπαστό με απόκλιση',
     REPO_TRANSFER_WITHIN_WEEK: 'Πιθανή μεταφορά ρεπό'
 };
@@ -86,6 +87,7 @@ const scenarioReasonLabels = {
     SPLIT_SHIFT_DEVIATION_FOUND: 'Βρέθηκε σπαστό με απόκλιση',
     DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
     DECLARED_NON_WORK_WITH_CARDS: 'Μη εργασία με κάρτες',
+    UNSCHEDULED_DAY_WITH_CARDS: 'Μη προδηλωμένη ημέρα με κάρτες',
     REPO_TRANSFER_CANDIDATE: 'Πιθανή μεταφορά ρεπό',
     LEGAL_CLASSIFICATION_REQUIRED: 'Απαιτείται νομοθετική ταξινόμηση',
     UNKNOWN_PATTERN: 'Δεν βρέθηκε ασφαλής αντιστοίχιση γνωστού μοτίβου'
@@ -127,7 +129,8 @@ const policyPreviewStatusLabels = {
 const policyPreviewPolicyLabels = {
     NO_APOLOGISTIKO_BIBLIO_OK: 'Δεν αφορά απολογιστικό βιβλίο',
     CARD_NOT_REQUIRED_DECLARED_SCHEDULE_OK: 'Δεν απαιτείται κάρτα για προδηλωμένο ωράριο',
-    DECLARED_REPO_OR_NON_WORK_WITH_CARDS: 'Δηλωμένο ρεπό ή μη εργασία με κάρτες',
+    DECLARED_REPO_OR_NON_WORK_WITH_CARDS:
+        'Ρεπό, μη εργασία ή μη προδηλωμένη ημέρα με κάρτες',
     NO_CARDS_DECLARED_WORK_LEAVE_OR_HOLIDAY: 'Εργασία χωρίς κάρτες λόγω άδειας ή αργίας',
     WEEKLY_REPO_BALANCE: 'Ισορροπία εβδομαδιαίων ρεπό',
     UNKNOWN: 'Δεν αντιστοιχίστηκε διαθέσιμη πολιτική'
@@ -144,6 +147,7 @@ const policyPreviewScenarioLabels = {
     DECLARED_WORK_NO_CARDS_LEAVE: 'Εργασία χωρίς κάρτες λόγω άδειας',
     DECLARED_REPO_WITH_CARDS: 'Δηλωμένο ρεπό με κάρτες',
     DECLARED_NON_WORK_WITH_CARDS: 'Δηλωμένη μη εργασία με κάρτες',
+    UNSCHEDULED_DAY_WITH_CARDS: 'Μη προδηλωμένη ημέρα με κάρτες',
     ZERO_LENGTH_CARD_INTERVAL: 'Μηδενικό διάστημα κάρτας',
     SPLIT_SHIFT_MATCHED_WITH_DEVIATION: 'Σπαστό ωράριο με απόκλιση',
     REPO_TRANSFER_WITHIN_WEEK: 'Πιθανή μεταφορά ρεπό εντός εβδομάδας',
@@ -173,6 +177,7 @@ const policyPreviewReasonLabels = {
     SPLIT_SHIFT_DEVIATION_FOUND: 'Βρέθηκε απόκλιση σε σπαστό ωράριο',
     DECLARED_REPO_WITH_CARDS: 'Βρέθηκε προδηλωμένο ρεπό με κάρτες',
     DECLARED_NON_WORK_WITH_CARDS: 'Βρέθηκε προδηλωμένη μη εργασία με κάρτες',
+    UNSCHEDULED_DAY_WITH_CARDS: 'Βρέθηκε μη προδηλωμένη ημέρα με πλήρεις κάρτες',
     REPO_TRANSFER_CANDIDATE: 'Βρέθηκε πιθανή μεταφορά ρεπό εντός εβδομάδας',
     LEGAL_CLASSIFICATION_REQUIRED: 'Απαιτείται έλεγχος νομικής ταξινόμησης',
     CARD_NOT_REQUIRED: 'Δεν απαιτείται κάρτα εργασίας',

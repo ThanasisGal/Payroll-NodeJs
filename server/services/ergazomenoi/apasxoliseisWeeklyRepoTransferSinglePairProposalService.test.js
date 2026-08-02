@@ -216,7 +216,7 @@ function testValidFullTimeProposal() {
         weekly_repo_policy_code: 'WEEKLY_REPO_BALANCE',
         weekly_repo_policy_version: 'foundation:v3',
         source_work_policy_code: 'DECLARED_REPO_OR_NON_WORK_WITH_CARDS',
-        source_work_policy_version: 'foundation:v2'
+        source_work_policy_version: 'foundation:v3'
     });
 }
 
