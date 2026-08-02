@@ -158,6 +158,14 @@ const {
     getWeeklyRepoProfileInfo
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const {
+    LEAVE_PROVENANCE,
+    classifyLeaveProvenance
+} = require('../../services/ergazomenoi/apasxoliseisLeaveProvenanceService');
+const {
+    resolveFullTimeFromWorkTerms,
+    resolveReviewIsFullTimeProfile
+} = require('../../services/ergazomenoi/apasxoliseisReviewEmploymentProfileService');
+const {
     POLICY_VERSION: WEEKLY_REPO_DEVIATION_POLICY_VERSION,
     SOURCE_VERSION: WEEKLY_REPO_DEVIATION_SOURCE_VERSION,
     buildWeeklyRepoDeviationPreview,
@@ -1364,20 +1372,7 @@ function getExpectedWeeklyRepo(ergazomenos) {
 }
 
 function isFullTimeWorkTerms(workTerms = {}) {
-    const typos = String(workTerms.typos_apasxolhshs ?? '')
-        .trim()
-        .toUpperCase();
-
-    if (typos === '0' || typos === 'PLHRHS' || typos === 'ΠΛΗΡΗΣ') {
-        return true;
-    }
-
-    if (typos === '1' || typos === '2' || typos === 'MERIKH' || typos === 'EK_PERITROPHS') {
-        return false;
-    }
-
-    const weeklyHours = Number(workTerms.ores_ergasias_ebdomadas || 0);
-    return weeklyHours >= 40;
+    return resolveFullTimeFromWorkTerms(workTerms) === true;
 }
 
 function asDateOnlyUtc(value, endOfDay = false) {
@@ -1644,7 +1639,8 @@ async function runWeeklyRepoPostCheck({
         .select(
             'ypokatasthma kodikos eponymo onoma mhniaia_repo ' +
                 'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                'typos_apasxolhshs typos_ebdomadas ' +
                 'typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh ' +
                 'pososto_prosayxhshs_6hs_hmeras nomimoOromisthio pragmatikoOromisthio'
         )
@@ -1711,7 +1707,8 @@ async function runWeeklyRepoPostCheck({
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                    'typos_apasxolhshs typos_ebdomadas ' +
                     'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
                     'nomimoOromisthio pragmatikoOromisthio ' +
                     'employment_profile_source afora_allagh_oron_ergasias createdAt'
@@ -2262,6 +2259,8 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
     const weeklyHours = getNumber(ergazomenos.ores_ergasias_ebdomadas, 40);
     const averageDailyHours =
         getNumber(ergazomenos.mo_oron_hmerhsias_ergasias, 0) || weeklyHours / Math.max(hmeres, 1);
+    const employmentType =
+        ergazomenos.kathestos_apasxolhshs || ergazomenos.typos_apasxolhshs || '';
 
     return {
         source: 'ERG_AKTUAL',
@@ -2269,7 +2268,8 @@ function buildWorkTermsFromEmployee(ergazomenos = {}) {
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
-        typos_apasxolhshs: ergazomenos.typos_apasxolhshs || '',
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
         typos_ebdomadas: ergazomenos.typos_ebdomadas || '',
         typos_ergazomenon: ergazomenos.typos_ergazomenon || '',
         mhniaia_repo: getNumber(ergazomenos.mhniaia_repo, 0),
@@ -2285,6 +2285,12 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
     const weeklyHours = getNumber(row.ores_ergasias_ebdomadas, fallback.ores_ergasias_ebdomadas);
     const averageDailyHours =
         getNumber(row.mo_oron_hmerhsias_ergasias, 0) || weeklyHours / Math.max(hmeres, 1);
+    const employmentType =
+        row.kathestos_apasxolhshs ||
+        row.typos_apasxolhshs ||
+        fallback.kathestos_apasxolhshs ||
+        fallback.typos_apasxolhshs ||
+        '';
 
     return {
         source: 'ISTORIKO',
@@ -2292,7 +2298,8 @@ function buildWorkTermsFromHistory(row = {}, fallbackErgazomenos = {}) {
         hmeres_ergasias_ebdomadas: hmeres,
         ores_ergasias_ebdomadas: weeklyHours,
         mo_oron_hmerhsias_ergasias: averageDailyHours,
-        typos_apasxolhshs: row.typos_apasxolhshs || fallback.typos_apasxolhshs || '',
+        kathestos_apasxolhshs: employmentType,
+        typos_apasxolhshs: employmentType,
         typos_ebdomadas: row.typos_ebdomadas || fallback.typos_ebdomadas || '',
         typos_ergazomenon: row.typos_ergazomenon || fallback.typos_ergazomenon || '',
         mhniaia_repo: getNumber(row.mhniaia_repo, fallback.mhniaia_repo || 0),
@@ -3386,10 +3393,10 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
     ).trim();
     const apologistikiKathgoria = String(row.kathgoria_ergasias_apologistika || '').trim();
     const reviewPhaseCode = String(phaseCode || '').trim();
-    const isNonFullPhase =
-        reviewPhaseCode === '1' ||
-        reviewPhaseCode === '2' ||
-        (!reviewPhaseCode && !isFullTimeWorkTerms(effectiveProfile));
+    const isNonFullPhase = !resolveReviewIsFullTimeProfile(
+        effectiveProfile,
+        reviewPhaseCode
+    );
 
     if (
         isNonFullPhase &&
@@ -3480,17 +3487,44 @@ function getReviewPhaseCodeForRow(row = {}, phaseContextByKodikos = new Map()) {
 }
 
 function reviewIsFullTimeProfile(row = {}) {
-    const reviewPhaseCode = String(row.review_phase_code ?? row.review_kathestos_code ?? '').trim();
-    if (reviewPhaseCode === '0') return true;
-    if (reviewPhaseCode === '1' || reviewPhaseCode === '2') return false;
-
-    return (
+    if (
         row.effective_is_full_time === true ||
         row.effective_is_full_time === 'true' ||
         row.effective_is_full_time === 1 ||
-        row.effective_is_full_time === '1' ||
-        String(row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? '').trim() === '0'
+        row.effective_is_full_time === '1'
+    ) {
+        return true;
+    }
+    if (
+        row.effective_is_full_time === false ||
+        row.effective_is_full_time === 'false' ||
+        row.effective_is_full_time === 0 ||
+        row.effective_is_full_time === '0'
+    ) {
+        return false;
+    }
+
+    const reviewPhaseCode = String(row.review_phase_code ?? row.review_kathestos_code ?? '').trim();
+    return resolveReviewIsFullTimeProfile(
+        {
+            kathestos_apasxolhshs:
+                row.effective_kathestos_apasxolhshs ?? row.kathestos_apasxolhshs,
+            typos_apasxolhshs:
+                row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs,
+            hmeres_ergasias_ebdomadas:
+                row.effective_weekly_workdays ?? row.hmeres_ergasias_ebdomadas,
+            ores_ergasias_ebdomadas:
+                row.effective_weekly_hours ?? row.ores_ergasias_ebdomadas,
+            mo_oron_hmerhsias_ergasias:
+                row.effective_daily_hours ?? row.mo_oron_hmerhsias_ergasias
+        },
+        reviewPhaseCode
     );
+}
+
+function reviewLeaveProvenance(row = {}) {
+    const persisted = String(row.leave_provenance || '').trim();
+    return persisted || classifyLeaveProvenance(row);
 }
 
 function reviewProgramDisplay(row = {}) {
@@ -3546,6 +3580,10 @@ function reviewApologistikoDisplay(row = {}) {
         hasNoCards
     ) {
         return { text: 'ΜΗ ΕΡΓΑΣΙΑ', type: 'non_work' };
+    }
+
+    if (reviewLeaveProvenance(row) === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE) {
+        return { text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ', type: 'adeia_suggestion' };
     }
 
     if (!persistedCategory) {
@@ -3872,7 +3910,7 @@ function buildProdhlomenaReviewFilter(req) {
     return filter;
 }
 const REVIEW_SELECT_FIELDS =
-    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
+    'ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at';
 async function getReviewRowsForExport(req) {
     const rows = await ProdhlomenaOrariaModel.find(buildProdhlomenaReviewFilter(req))
         .select(REVIEW_SELECT_FIELDS)
@@ -3890,7 +3928,8 @@ async function getReviewRowsForExport(req) {
               .select(
                   'kodikos eponymo onoma ypokatasthma mhniaia_repo ' +
                       'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                      'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                      'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                      'typos_apasxolhshs typos_ebdomadas'
               )
               .lean()
         : [];
@@ -3948,7 +3987,8 @@ async function getReviewRowsForExport(req) {
                     'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                     'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                     'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                    'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                    'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                    'typos_apasxolhshs typos_ebdomadas ' +
                     'mhniaia_repo employment_profile_source afora_allagh_oron_ergasias createdAt'
             )
             .sort({
@@ -4009,6 +4049,11 @@ async function getReviewRowsForExport(req) {
             reviewPhaseCode
         );
         const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+        const leaveProvenance = classifyLeaveProvenance(normalizedRow);
+        const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
+            effectiveProfile,
+            reviewPhaseCode
+        );
 
         return {
             ...normalizedRow,
@@ -4019,19 +4064,25 @@ async function getReviewRowsForExport(req) {
                 normalizedRow,
                 noCardsDisplayContext
             ),
+            leave_provenance: leaveProvenance,
+            is_auto_calculated_leave:
+                leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE,
             eponymo: erg.eponymo || '',
             onoma: erg.onoma || '',
             employeeName: `${erg.eponymo || ''} ${erg.onoma || ''}`.trim(),
             exportYpokatasthma: normalizedRow.ypokatasthma || erg.ypokatasthma || '',
             effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-            effective_is_full_time:
-                reviewPhaseCode === '0'
-                    ? true
-                    : reviewPhaseCode === '1' || reviewPhaseCode === '2'
-                      ? false
-                      : isFullTimeWorkTerms(effectiveProfile),
+            effective_is_full_time: effectiveIsFullTime,
+            effective_kathestos_apasxolhshs:
+                effectiveProfile.kathestos_apasxolhshs || '',
             effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
             effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
+            effective_weekly_workdays:
+                Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+            effective_weekly_hours:
+                Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
+            effective_daily_hours:
+                Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
             effective_profile_source: effectiveProfile.source || '',
             effective_profile_date: getProfileDateForDeviation(
                 effectiveProfile,
@@ -5019,13 +5070,15 @@ class erganhController {
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'repo argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
+                            'repo adeia kathgoria_adeias ores_apoysias hr_declared_leave ' +
+                            'argia perigrafh_argias apologistiko_biblio kyriakes_apologistika ' +
                             'ores_ergasias cards_ores_ergasias ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ' +
                             'ores_prostheths_ergasias_apologistika ' +
                             'ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ' +
                             'ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ' +
                             'ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika ' +
-                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika ' +
+                            'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika ' +
+                            'astheneia astheneia_apologistika ' +
                             'ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ' +
                             'ores_adeias_pistomenes_apologistika ores_argias_pistomenes_apologistika ' +
                             'compensation_breakdown_apologistika ' +
@@ -5067,7 +5120,8 @@ class erganhController {
                 .select(
                     'kodikos eponymo onoma mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
                         'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                        'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas'
+                        'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                        'typos_apasxolhshs typos_ebdomadas'
                         + ' dialleima_se_lepta dialleima_entos_ektos_orarioy'
                         + ' eidikh_kathgoria_ergazomenoy eidikh_periptosh'
                 )
@@ -5150,7 +5204,8 @@ class erganhController {
                             'hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                            'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                            'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                            'typos_apasxolhshs typos_ebdomadas ' +
                             'mhniaia_repo pososto_prosayxhshs_6hs_hmeras ' +
                             'employment_profile_source afora_allagh_oron_ergasias createdAt'
                     )
@@ -5253,6 +5308,11 @@ class erganhController {
                     reviewPhaseCode
                 );
                 const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
+                const leaveProvenance = classifyLeaveProvenance(normalizedRow);
+                const effectiveIsFullTime = resolveReviewIsFullTimeProfile(
+                    effectiveProfile,
+                    reviewPhaseCode
+                );
 
                 return {
                     ...normalizedRow,
@@ -5263,6 +5323,9 @@ class erganhController {
                         normalizedRow,
                         noCardsDisplayContext
                     ),
+                    leave_provenance: leaveProvenance,
+                    is_auto_calculated_leave:
+                        leaveProvenance === LEAVE_PROVENANCE.AUTO_CALCULATED_LEAVE,
                     ...buildReviewHolidayResponseFields(
                         normalizedRow,
                         noCardsDisplayContext
@@ -5275,14 +5338,17 @@ class erganhController {
                     // - πλήρης + μη εργασία: ΑΝΑΠΑΥΣΗ/ΡΕΠΟ
                     // - μερική/εκ περιτροπής + μη εργασία: ΜΗ ΕΡΓΑΣΙΑ
                     effective_mhniaia_repo: getExpectedWeeklyRepo(effectiveProfile),
-                    effective_is_full_time:
-                        reviewPhaseCode === '0'
-                            ? true
-                            : reviewPhaseCode === '1' || reviewPhaseCode === '2'
-                              ? false
-                              : isFullTimeWorkTerms(effectiveProfile),
+                    effective_is_full_time: effectiveIsFullTime,
+                    effective_kathestos_apasxolhshs:
+                        effectiveProfile.kathestos_apasxolhshs || '',
                     effective_typos_apasxolhshs: effectiveProfile.typos_apasxolhshs || '',
                     effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas || '',
+                    effective_weekly_workdays:
+                        Number(effectiveProfile.hmeres_ergasias_ebdomadas) || 0,
+                    effective_weekly_hours:
+                        Number(effectiveProfile.ores_ergasias_ebdomadas) || 0,
+                    effective_daily_hours:
+                        Number(effectiveProfile.mo_oron_hmerhsias_ergasias) || 0,
                     effective_profile_source: effectiveProfile.source || '',
                     effective_profile_date: getProfileDateForDeviation(
                         effectiveProfile,
@@ -7474,7 +7540,8 @@ class erganhController {
                         'kodikos aa_eggrafhs hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
                             'hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas ' +
-                            'mo_oron_hmerhsias_ergasias typos_apasxolhshs typos_ebdomadas ' +
+                            'mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
+                            'typos_apasxolhshs typos_ebdomadas ' +
                             'afora_allagh_oron_ergasias createdAt'
                     )
                     .sort({

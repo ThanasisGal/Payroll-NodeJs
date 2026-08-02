@@ -210,6 +210,61 @@ function testPersistedRepoCategoryOverridesDerivedLeave() {
     assert.strictEqual(derived.source, 'derived');
 }
 
+function testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation() {
+    const autoCalculated = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        adeia: false,
+        adeia_apologistika: true,
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        leave_provenance: 'AUTO_CALCULATED_LEAVE'
+    }, { apologistikoText: '' });
+    assert.strictEqual(autoCalculated.text, 'ΠΙΘΑΝΗ ΑΔΕΙΑ');
+    assert.strictEqual(autoCalculated.className, 'cell-adeia-suggestion');
+    assert.strictEqual(autoCalculated.source, 'derived');
+
+    const hrDeclared = sandbox.resolveReviewApologistikoPresentation({
+        kathgoria_ergasias_original: 'ΕΡΓ',
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        ores_ergasias: 8,
+        cards_ores_ergasias: 0,
+        adeia: true,
+        adeia_apologistika: true,
+        kathgoria_adeias: 'ΚΑΝΟΝΙΚΗ',
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        leave_provenance: 'HR_DECLARED_LEAVE'
+    }, { apologistikoText: '' });
+    assert.strictEqual(hrDeclared.text, 'ΑΔΕΙΑ');
+    assert.notStrictEqual(hrDeclared.className, 'cell-adeia-suggestion');
+}
+
+function testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay() {
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_is_full_time: true,
+            review_phase_code: '2'
+        }),
+        true
+    );
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_is_full_time: false,
+            review_phase_code: '0'
+        }),
+        false
+    );
+    assert.strictEqual(
+        sandbox.resolveReviewIsFullTimePresentation({
+            effective_kathestos_apasxolhshs: '',
+            effective_typos_apasxolhshs: '0',
+            review_phase_code: '2'
+        }),
+        true
+    );
+}
+
 function testPersistedAnWithCardsIsNotBlanketRepoPresentation() {
     const presentation = sandbox.resolveReviewApologistikoPresentation({
         kathgoria_ergasias: 'ΑΝ',
@@ -2240,6 +2295,8 @@ async function testHrLoadingLocksAndRestoresFilters() {
 const tests = [
     testWeeklyResolutionShowsRepoAndSixthDayFacts,
     testPersistedRepoCategoryOverridesDerivedLeave,
+    testAutoCalculatedAndHrDeclaredLeaveHaveDistinctPresentation,
+    testContractualEmploymentTypeWinsOverOperationalPhaseForRestDisplay,
     testPersistedAnWithCardsIsNotBlanketRepoPresentation,
     testAppliedTargetRowOverridesGenericPendingBadgeOnlyForExactRow,
     testDeclaredRepoPresentationDistinguishesNeutralWorkAndAppliedStates,

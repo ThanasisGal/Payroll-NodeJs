@@ -2025,6 +2025,68 @@ function attachScenarioClassifications(rows = [], scenarioByProdhlomenaId = new 
     });
 }
 
+function isAutoCalculatedLeavePresentation(row = {}) {
+    const provenance = String(row.leave_provenance || '').trim();
+    if (provenance === 'AUTO_CALCULATED_LEAVE') return true;
+    if (provenance === 'HR_DECLARED_LEAVE') return false;
+    if (row.is_auto_calculated_leave === true) return true;
+
+    const declaredCategory = String(
+        row.kathgoria_ergasias_original ?? row.kathgoria_ergasias ?? ''
+    ).trim();
+    const apologistikoCategory = String(
+        row.kathgoria_ergasias_apologistika || ''
+    ).trim();
+
+    return (
+        declaredCategory === 'ΕΡΓ' &&
+        num(row.ores_ergasias) > 0 &&
+        num(row.cards_ores_ergasias) === 0 &&
+        row.adeia_apologistika === true &&
+        String(row.kathgoria_adeias_apologistika || '').trim() === 'ΑΔΑΛ' &&
+        (apologistikoCategory === '' || apologistikoCategory === 'ΑΔΕΙΑ') &&
+        row.adeia !== true &&
+        !hasMeaningfulValue(row.kathgoria_adeias) &&
+        num(row.ores_apoysias) === 0
+    );
+}
+
+function resolveReviewIsFullTimePresentation(row = {}) {
+    if (
+        row.effective_is_full_time === true ||
+        row.effective_is_full_time === 'true' ||
+        row.effective_is_full_time === 1 ||
+        row.effective_is_full_time === '1'
+    ) {
+        return true;
+    }
+    if (
+        row.effective_is_full_time === false ||
+        row.effective_is_full_time === 'false' ||
+        row.effective_is_full_time === 0 ||
+        row.effective_is_full_time === '0'
+    ) {
+        return false;
+    }
+
+    const employmentType = [
+        row.effective_kathestos_apasxolhshs,
+        row.effective_typos_apasxolhshs,
+        row.kathestos_apasxolhshs,
+        row.typos_apasxolhshs
+    ]
+        .map((value) => String(value ?? '').trim())
+        .find(Boolean) || '';
+    if (employmentType === '0') return true;
+    if (employmentType === '1' || employmentType === '2') return false;
+
+    const reviewPhaseCode = String(
+        row.review_phase_code ?? row.review_kathestos_code ?? ''
+    ).trim();
+    if (reviewPhaseCode === '1' || reviewPhaseCode === '2') return false;
+    return true;
+}
+
 function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
     const persistedCategory = String(
         row.kathgoria_ergasias_apologistika || ''
@@ -2046,6 +2108,14 @@ function resolveReviewApologistikoPresentation(row = {}, derived = {}) {
             text: 'ΜΗ ΕΡΓΑΣΙΑ',
             className: 'cell-non-work-day',
             source: 'persisted'
+        };
+    }
+
+    if (isAutoCalculatedLeavePresentation(row)) {
+        return {
+            text: 'ΠΙΘΑΝΗ ΑΔΕΙΑ',
+            className: 'cell-adeia-suggestion',
+            source: 'derived'
         };
     }
 
@@ -2265,20 +2335,7 @@ function renderReviewRows(rows = [], deviations = []) {
                 ? String(row.kathgoria_ergasias_apologistika).trim()
                 : String(row.kathgoria_ergasias || '').trim();
 
-        const effectiveTyposApasxolhshs = String(
-            row.effective_typos_apasxolhshs ?? row.typos_apasxolhshs ?? ''
-        ).trim();
-        const reviewPhaseCode = String(
-            row.review_phase_code ?? row.review_kathestos_code ?? ''
-        ).trim();
-
-        const isFullTimeProfile = reviewPhaseCode
-            ? reviewPhaseCode === '0'
-            : row.effective_is_full_time === true ||
-              row.effective_is_full_time === 'true' ||
-              row.effective_is_full_time === 1 ||
-              row.effective_is_full_time === '1' ||
-              effectiveTyposApasxolhshs === '0';
+        const isFullTimeProfile = resolveReviewIsFullTimePresentation(row);
 
         const isApologistikoRepoRow =
             row.apologistiko_biblio === true &&
