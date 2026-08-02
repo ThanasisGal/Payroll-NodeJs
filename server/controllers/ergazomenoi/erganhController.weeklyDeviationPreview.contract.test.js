@@ -77,6 +77,32 @@ assert.ok(
 assert.ok(!source.includes('startOfWeekSunday'));
 assert.ok(!source.includes('endOfWeekSaturday'));
 
+const postCheckStart = source.indexOf('async function runWeeklyRepoPostCheck({');
+const postCheckEnd = source.indexOf('function getDailyDeclaredMinutes', postCheckStart);
+assert.ok(postCheckStart >= 0 && postCheckEnd > postCheckStart);
+const postCheckSource = source.slice(postCheckStart, postCheckEnd);
+assert.ok(postCheckSource.includes('const postCheckRowsQuery = {'));
+assert.ok(postCheckSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    postCheckSource.includes(
+        'postCheckRowsQuery.ypokatasthma = selectedYpokatasthma;'
+    )
+);
+assert.ok(postCheckSource.includes('ProdhlomenaOrariaModel.find(postCheckRowsQuery)'));
+
+const calculationStart = source.indexOf('static calcApasxolhseisPeriodoy');
+const calculationEnd = source.indexOf('static ', calculationStart + 7);
+assert.ok(calculationStart >= 0 && calculationEnd > calculationStart);
+const calculationSource = source.slice(calculationStart, calculationEnd);
+assert.ok(calculationSource.includes('const prodhlomenaQuery = {'));
+assert.ok(calculationSource.includes('if (selectedYpokatasthma)'));
+assert.ok(
+    calculationSource.includes(
+        'prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;'
+    )
+);
+assert.ok(calculationSource.includes('ProdhlomenaOrariaModel.find(prodhlomenaQuery)'));
+
 const atomicStart = source.indexOf('async function buildAtomicRepoTransferPolicyPreviewProjection');
 const atomicEnd = source.indexOf('function getWeekRangesInsidePeriod', atomicStart);
 assert.ok(atomicStart >= 0 && atomicEnd > atomicStart);

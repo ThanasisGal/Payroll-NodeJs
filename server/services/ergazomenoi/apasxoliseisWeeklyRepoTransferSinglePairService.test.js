@@ -405,6 +405,91 @@ function testAutoCalculatedLeavePriorityRegression() {
     assert.strictEqual(JSON.stringify(rows), before);
 }
 
+function testBlankZeroUnscheduledProductionSourceRegression() {
+    const rows = autoLeavePriorityWeek();
+    Object.assign(rows[0], {
+        kathgoria_ergasias: '',
+        ores_ergasias: 0,
+        apo_ora_01: '',
+        eos_ora_01: '',
+        cards_apo_ora_01: '08:12',
+        cards_eos_ora_01: '16:16',
+        cards_ores_ergasias: 8.066666666666666,
+        kathgoria_ergasias_apologistika: 'ΕΡΓ',
+        ores_ergasias_apologistika: 7.57,
+        ores_pragmatikhs_ergasias_apologistika: 8.066666666666666,
+        ores_adeias_pistomenes_apologistika: 0,
+        ores_argias_pistomenes_apologistika: 0,
+        apologistiko_biblio: true,
+        compensation_breakdown_apologistika: { status: 'READY', reasons: [] }
+    });
+    Object.assign(rows[1], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        apo_ora_01: '08:00',
+        eos_ora_01: '16:00',
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0,
+        adeia_apologistika: true,
+        kathgoria_ergasias_apologistika: 'ΑΔΕΙΑ',
+        kathgoria_adeias_apologistika: 'ΑΔΑΛ',
+        ores_ergasias_apologistika: 8,
+        ores_apoysias_apologistika: 0
+    });
+    Object.assign(rows[2], {
+        kathgoria_ergasias: 'ΑΝ',
+        ores_ergasias: 0,
+        cards_apo_ora_01: '',
+        cards_eos_ora_01: '',
+        cards_ores_ergasias: 0,
+        adeia_apologistika: false,
+        kathgoria_ergasias_apologistika: '',
+        kathgoria_adeias_apologistika: '',
+        ores_ergasias_apologistika: 0,
+        ores_apoysias_apologistika: 0
+    });
+    Object.assign(rows[3], {
+        kathgoria_ergasias: 'ΕΡΓ',
+        ores_ergasias: 8,
+        cards_apo_ora_01: '08:00',
+        cards_eos_ora_01: '16:00',
+        cards_ores_ergasias: 8
+    });
+
+    const before = JSON.stringify(rows);
+    const result = analyze(rows, {
+        typos_apasxolhshs: 'PLHRHS',
+        mhniaia_repo: 2,
+        mo_oron_hmerhsias_ergasias: 8,
+        external_break_minutes: 30
+    });
+
+    assertEligible(result, '2026-06-01', '2026-06-02', 'ΑΝ');
+    assert.deepStrictEqual(result.counts, {
+        source_candidates: 1,
+        target_candidates: 1,
+        existing_actual_repo: 1,
+        predicted_final_repo: 2
+    });
+    assert.strictEqual(JSON.stringify(rows), before);
+}
+
+function testBlankZeroUnscheduledSourceRequiresNoDeclaredInterval() {
+    const rows = autoLeavePriorityWeek();
+    Object.assign(rows[1], {
+        kathgoria_ergasias: '',
+        ores_ergasias: 0,
+        apo_ora_01: '08:00',
+        eos_ora_01: '16:00',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ'
+    });
+
+    const result = analyze(rows);
+    assert.strictEqual(result.eligibility_status, 'NOT_APPLICABLE');
+    assertReason(result, 'NO_SOURCE_CANDIDATE');
+}
+
 function testCompensationBreakdownFieldsRemainCompatibleWithAutomaticRows() {
     const rows = autoLeavePriorityWeek();
     Object.assign(rows[1], {
@@ -1057,6 +1142,8 @@ function run() {
     testNoTarget();
     testExactRepoCount();
     testAutoCalculatedLeavePriorityRegression();
+    testBlankZeroUnscheduledProductionSourceRegression();
+    testBlankZeroUnscheduledSourceRequiresNoDeclaredInterval();
     testCompensationBreakdownFieldsRemainCompatibleWithAutomaticRows();
     testCrossMonthRepoTransferIsNeverEligible();
     testOptionalHolidayRepoTransferPolicy();

@@ -1733,7 +1733,7 @@ async function runWeeklyRepoPostCheck({
         }
     }
 
-    const rows = await ProdhlomenaOrariaModel.find({
+    const postCheckRowsQuery = {
         team: sessionTeam,
         company_kod: companyId,
         kodikos: mongoose.trusted({ $in: kodikoi }),
@@ -1741,7 +1741,13 @@ async function runWeeklyRepoPostCheck({
             $gte: periodStart,
             $lte: periodEnd
         })
-    })
+    };
+
+    if (selectedYpokatasthma) {
+        postCheckRowsQuery.ypokatasthma = selectedYpokatasthma;
+    }
+
+    const rows = await ProdhlomenaOrariaModel.find(postCheckRowsQuery)
         .select(
             'team company_kod kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika repo repo_apologistika ' +
                 'ores_ergasias cards_ores_ergasias ores_apoysias adeia adeia_apologistika ' +
@@ -7509,6 +7515,10 @@ class erganhController {
                         $lte: eosDate
                     })
                 };
+
+                if (selectedYpokatasthma) {
+                    prodhlomenaQuery.ypokatasthma = selectedYpokatasthma;
+                }
 
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(

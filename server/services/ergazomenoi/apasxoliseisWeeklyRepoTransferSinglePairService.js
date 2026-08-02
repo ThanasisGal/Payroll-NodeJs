@@ -401,9 +401,14 @@ function isProvisionalAutoCalculatedSourceWork({
     apologistikaState,
     employmentProfile
 }) {
+    const isBlankUnscheduledDay =
+        toTrimmedString(row.kathgoria_ergasias) === '' &&
+        toFiniteNumber(row.ores_ergasias) === 0 &&
+        facts.declared.hasDeclaredIntervals === false;
     const declaredRestOrNonWork =
         facts.declared.isDeclaredRepo ||
         facts.declared.isDeclaredNonWork ||
+        isBlankUnscheduledDay ||
         toBoolean(row.repo);
     const categoryCompatible = ['', 'ΕΡΓ'].includes(apologistikaState.category);
     const workHoursState = apologistikaState.numericStates.find(
@@ -554,6 +559,13 @@ function buildRowInfo(row, contexts) {
 
 function sourceExclusions(info) {
     const reasons = [];
+    const blockingCriticalWarnings = info.criticalWarnings.filter(
+        (warning) =>
+            !(
+                info.provisionalAutoCalculatedSourceWork &&
+                warning === 'MISSING_KATHGORIA_ERGASIAS'
+            )
+    );
     if (info.row.is_locked === true) reasons.push('SOURCE_LOCKED');
     if (info.manualOverride && info.row.is_locked !== true) reasons.push('SOURCE_MANUAL_OVERRIDE');
     if (
@@ -563,7 +575,7 @@ function sourceExclusions(info) {
         reasons.push('SOURCE_LEAVE_OR_SICKNESS');
     }
     if (info.holidayState.blocksRepoTransfer) reasons.push('SOURCE_HOLIDAY');
-    if (info.criticalWarnings.length > 0) reasons.push('SOURCE_CONFLICTING_FACTS');
+    if (blockingCriticalWarnings.length > 0) reasons.push('SOURCE_CONFLICTING_FACTS');
     if (
         !info.facts.cards.cardIntervalsNormalized.length ||
         info.facts.cards.incompleteCardPairs.length > 0
@@ -843,12 +855,21 @@ function analyzeWeeklyRepoTransferSinglePairInternal(input = {}, options = {}) {
     );
     const sourceCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
     const targetCategory = employmentType === EMPLOYMENT_TYPE.FULL ? 'ΑΝ' : 'ΜΕ';
-    const potentialSources = rowInfos.filter(
-        (info) =>
-            toTrimmedString(info.row.kathgoria_ergasias) === sourceCategory &&
+    const potentialSources = rowInfos.filter((info) => {
+        const category = toTrimmedString(info.row.kathgoria_ergasias);
+        const isFullTimeBlankUnscheduledSource =
+            employmentType === EMPLOYMENT_TYPE.FULL &&
+            category === '' &&
+            toFiniteNumber(info.row.ores_ergasias) === 0 &&
+            info.facts.declared.hasDeclaredIntervals === false &&
+            info.provisionalAutoCalculatedSourceWork;
+
+        return (
+            (category === sourceCategory || isFullTimeBlankUnscheduledSource) &&
             info.cardHours !== null &&
             info.cardHours > 0
-    );
+        );
+    });
     const cleanSources = potentialSources.filter((info) => sourceExclusions(info).length === 0);
     const potentialTargets = rowInfos.filter(
         (info) =>
