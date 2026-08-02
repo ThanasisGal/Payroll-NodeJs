@@ -5579,7 +5579,7 @@ class erganhController {
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika compensation_breakdown_apologistika apologistiko_biblio ' +
                             'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
                             'is_locked locked_by locked_at'
                     )
@@ -6010,7 +6010,7 @@ class erganhController {
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias ' +
                             'apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika ' +
-                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika apologistiko_biblio ' +
+                            'kathgoria_ergasias_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika compensation_breakdown_apologistika apologistiko_biblio ' +
                             'repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia_apologistika argia kyriakes_apologistika ores_apoysias_apologistika ' +
                             'is_locked locked_by locked_at'
                     )
