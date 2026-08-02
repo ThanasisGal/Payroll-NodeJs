@@ -120,7 +120,6 @@ function isSafeUnscheduledDayWithCards(facts = {}) {
         facts?.apologistika?.existingFlags?.astheneia_apologistika !== true &&
         facts?.apologistika?.existingFlags?.repo_apologistika !== true &&
         facts?.apologistika?.existingFlags?.argia !== true &&
-        facts?.holiday?.isHoliday !== true &&
         ['', 'ΕΡΓ'].includes(apologistikaCategory)
     );
 }
@@ -243,7 +242,7 @@ function getMvpScenarioTemplates() {
         {
             scenario_code: SCENARIO_CODES.UNSCHEDULED_DAY_WITH_CARDS,
             description:
-                'Μη προδηλωμένη ημέρα με πλήρεις κάρτες και ολοκληρωμένα απολογιστικά πεδία.',
+                'Μη προδηλωμένη ημέρα, με πλήρεις κάρτες και ολοκληρωμένα απολογιστικά πεδία, ακόμη και όταν η ημέρα είναι αργία.',
             confidence: CONFIDENCE.HIGH,
             requires_review: false,
             reasons: [REASON_CODES.UNSCHEDULED_DAY_WITH_CARDS],

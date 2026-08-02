@@ -63,6 +63,39 @@ function testProductionUnscheduledDayIsResolvedWithoutHrReview() {
     assert.strictEqual(preview.policyResult.blocked, false);
 }
 
+function testProductionUnscheduledHolidayWorkIsResolvedWithoutHrReview() {
+    const row = productionUnscheduledRow();
+    const facts = buildApasxoliseisScenarioFacts(row, {
+        holiday: {
+            isHoliday: true,
+            isOptionalHoliday: true,
+            description: 'ΑΓΙΟΥ ΠΝΕΥΜΑΤΟΣ'
+        }
+    });
+    const decision = matchApasxoliseisScenarioFacts(facts);
+
+    assert.strictEqual(decision.scenario_code, 'UNSCHEDULED_DAY_WITH_CARDS');
+    assert.strictEqual(decision.requires_review, false);
+    assert.strictEqual(decision.display_labels.show_badge, false);
+
+    const [preview] = buildApasxoliseisPolicyPreviewRows({
+        rows: [row],
+        argiesByDateKey: new Map([
+            [
+                '2026-06-01',
+                {
+                    ypoxreotikh_argia: false,
+                    description: 'ΑΓΙΟΥ ΠΝΕΥΜΑΤΟΣ'
+                }
+            ]
+        ])
+    });
+    assert.strictEqual(preview.policyResult.success, true);
+    assert.strictEqual(preview.scenarioFactsSummary.is_holiday, true);
+    assert.strictEqual(preview.policyResult.result_status, 'RESOLVED_BY_POLICY');
+    assert.strictEqual(preview.policyResult.requires_human_approval, false);
+}
+
 function testIncompleteApologistikaStillRequireReview() {
     const incomplete = productionUnscheduledRow({
         compensation_breakdown_apologistika: { status: 'NEEDS_HR_DECISION', reasons: [] }
@@ -90,7 +123,6 @@ function testUnsafeBlankDaysRemainUnknown() {
         ['sickness', { astheneia_apologistika: true }],
         ['raw holiday', { argia: true }],
         ['leave category', { kathgoria_adeias_apologistika: 'ΑΔΑΛ' }],
-        ['holiday', {}, { isHoliday: true }],
         ['conflicting category', { kathgoria_ergasias_apologistika: 'ΑΝ' }]
     ];
 
@@ -110,6 +142,7 @@ function testUnsafeBlankDaysRemainUnknown() {
 
 function run() {
     testProductionUnscheduledDayIsResolvedWithoutHrReview();
+    testProductionUnscheduledHolidayWorkIsResolvedWithoutHrReview();
     testIncompleteApologistikaStillRequireReview();
     testUnsafeBlankDaysRemainUnknown();
     console.log('apasxoliseis scenario matcher tests passed');

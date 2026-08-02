@@ -274,7 +274,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         policy_version: 'foundation:v1',
         title: 'Μη προδηλωμένη ημέρα με πλήρεις κάρτες',
         description:
-            'Θεωρεί ολοκληρωμένη τη μη προδηλωμένη εργασία όταν οι κάρτες και τα απολογιστικά αποτελέσματα είναι πλήρη και συνεπή.',
+            'Θεωρεί ολοκληρωμένη τη μη προδηλωμένη εργασία όταν οι κάρτες και τα απολογιστικά αποτελέσματα είναι πλήρη και συνεπή, ανεξάρτητα από το αν η ημέρα είναι αργία.',
         category: POLICY_CATEGORIES.CARDS_ON_NON_WORK,
         default_mode: POLICY_MODE.SUGGESTION,
         supported_modes: [
@@ -321,6 +321,7 @@ const APASXOLISEIS_POLICY_CATALOG = deepFreeze([
         related_scenario_codes: ['UNSCHEDULED_DAY_WITH_CARDS'],
         notes: [
             'Δεν δημιουργεί απόφαση HR όταν ο υπολογισμός έχει ολοκληρωθεί με READY breakdown.',
+            'Η ίδια αρχή ισχύει και σε αργία, εφόσον η εργασία και οι προσαυξήσεις έχουν ήδη υπολογιστεί χωρίς εκκρεμότητα.',
             'Ελλιπή ή ασυνεπή απολογιστικά στοιχεία παραμένουν προς έλεγχο.'
         ]
     },
